@@ -1,3 +1,3 @@
 __name__ = 'Ptychodus'
-__version__ = 'dev'
+__version__ = '0.0.0.dev0'
 __all__ = [ 'model', 'view', 'controller' ]
