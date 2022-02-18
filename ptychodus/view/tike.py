@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import *
 
 
 class TikeAdaptiveMomentView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__(' Use Adaptive Moment', parent)
         self.mdecaySpinBox = QDoubleSpinBox()
         self.vdecaySpinBox = QDoubleSpinBox()
@@ -28,7 +28,7 @@ class TikeAdaptiveMomentView(QGroupBox):
 
 
 class TikePositionCorrectionView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__('Position Correction', parent)
         self.positionRegularizationCheckBox = QCheckBox('Use Regularization')
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
@@ -48,7 +48,7 @@ class TikePositionCorrectionView(QGroupBox):
 
 
 class TikeProbeCorrectionView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__('Probe Correction', parent)
         self.sparsityConstraintSpinBox = QDoubleSpinBox()
         self.orthogonalityConstraintCheckBox = QCheckBox('Orthogonality Constraint')
@@ -74,7 +74,7 @@ class TikeProbeCorrectionView(QGroupBox):
 
 
 class TikeObjectCorrectionView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__('Object Correction', parent)
         self.positivityConstraintSpinBox = QDoubleSpinBox()
         self.smoothnessConstraintSpinBox = QDoubleSpinBox()
@@ -94,7 +94,7 @@ class TikeObjectCorrectionView(QGroupBox):
 
 
 class TikeIterationOptionsView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__('Iteration Options', parent)
         self.numBatchSpinBox = QSpinBox()
         self.numIterSpinBox = QSpinBox()
@@ -103,7 +103,7 @@ class TikeIterationOptionsView(QGroupBox):
         self.stepLengthSpinBox = QDoubleSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> TikeIterationOptionsView:
+    def createInstance(cls, showCgIter: bool, showAlpha: bool, showStepLength: bool, parent: QWidget = None) -> TikeIterationOptionsView:
         view = cls(parent)
 
         view.numBatchSpinBox.setToolTip('The dataset is divided into this number of groups where each group is processed sequentially.')
@@ -115,25 +115,32 @@ class TikeIterationOptionsView(QGroupBox):
         layout = QFormLayout()
         layout.addRow('Number of Batches:', view.numBatchSpinBox)
         layout.addRow('Number of Iterations:', view.numIterSpinBox)
-        layout.addRow('CG Search Directions:', view.cgIterSpinBox)
-        layout.addRow('Alpha:', view.alphaSpinBox)
-        layout.addRow('Step Length:', view.stepLengthSpinBox)
+
+        if showCgIter:
+            layout.addRow('CG Search Directions:', view.cgIterSpinBox)
+
+        if showAlpha:
+            layout.addRow('Alpha:', view.alphaSpinBox)
+
+        if showStepLength:
+            layout.addRow('Step Length:', view.stepLengthSpinBox)
+
         view.setLayout(layout)
 
         return view
 
 
 class TikeParametersView(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, showCgIter: bool, showAlpha: bool, showStepLength: bool, parent: QWidget) -> None:
         super().__init__(parent)
         self.positionCorrectionView = TikePositionCorrectionView.createInstance()
         self.probeCorrectionView = TikeProbeCorrectionView.createInstance()
         self.objectCorrectionView = TikeObjectCorrectionView.createInstance()
-        self.iterationOptionsView = TikeIterationOptionsView.createInstance()
+        self.iterationOptionsView = TikeIterationOptionsView.createInstance(showCgIter, showAlpha, showStepLength)
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> TikeParametersView:
-        view = cls(parent)
+    def createInstance(cls, showCgIter: bool, showAlpha: bool, showStepLength: bool, parent: QWidget = None) -> TikeParametersView:
+        view = cls(showCgIter, showAlpha, showStepLength, parent)
 
         layout = QVBoxLayout()
         layout.addWidget(view.positionCorrectionView)

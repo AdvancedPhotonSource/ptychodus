@@ -9,6 +9,7 @@ from .data_file import *
 from .detector import *
 from .object import *
 from .probe import *
+from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import *
 from .scan import *
 from .settings import *
@@ -20,6 +21,7 @@ class ControllerCore:
         self.model = model
         self.view = view
 
+        self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(model.ptychopyBackend)
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeBackend)
 
         self._importSettingsController = ImportSettingsController.createInstance(
@@ -53,7 +55,7 @@ class ControllerCore:
                 view.dataFileTreeView, view.dataFileTableView)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
                 model.reconstructorPresenter, view.reconstructorParametersView,
-                [ self._tikeViewControllerFactory ])
+                [ self._ptychopyViewControllerFactory, self._tikeViewControllerFactory ])
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
                 model.reconstructorPresenter, view.reconstructorPlotView)
         self._monitorProbeController = ProbeImageController.createInstance(

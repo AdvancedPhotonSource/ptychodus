@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import *
 
 
 class PtychoPyBasicView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__('Basic', parent)
         self.probeModesSpinBox = QSpinBox()
         self.thresholdSpinBox = QSpinBox()
@@ -31,9 +31,9 @@ class PtychoPyBasicView(QGroupBox):
 
 
 class PtychoPyAdvancedView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__('Advanced', parent)
-        self.rmsSpinBox = QDoubleSpinBox()
+        self.calculateRMSCheckBox = QCheckBox('Calculate RMS')
         self.updateProbeSpinBox = QSpinBox()
         self.updateModesSpinBox = QSpinBox()
         self.phaseConstraintSpinBox = QSpinBox()
@@ -50,7 +50,7 @@ class PtychoPyAdvancedView(QGroupBox):
                 ' a phase constraint (forcing the reconstructed phase in the range [-2pi, 0])')
 
         layout = QFormLayout()
-        layout.addRow('RMS:', view.rmsSpinBox)
+        layout.addRow(view.calculateRMSCheckBox)
         layout.addRow('updateProbe:', view.updateProbeSpinBox)
         layout.addRow('updateModes:', view.updateModesSpinBox)
         layout.addRow('phaseConstraint:', view.phaseConstraintSpinBox)
@@ -60,7 +60,7 @@ class PtychoPyAdvancedView(QGroupBox):
 
 
 class PtychoPyParametersView(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.basicView = PtychoPyBasicView.createInstance()
         self.advancedView = PtychoPyAdvancedView.createInstance()
