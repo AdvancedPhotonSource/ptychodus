@@ -21,8 +21,8 @@ class PtychoPySettings(Observable, Observer):
         self.probeModes = settingsGroup.createIntegerEntry('ProbeModes', 1)
         self.threshold = settingsGroup.createIntegerEntry('Threshold', 0)
         self.reconstructionIterations = settingsGroup.createIntegerEntry('ReconstructionIterations', 100)
-        self.reconstructionTime = settingsGroup.createIntegerEntry('ReconstructionTimeInSeconds', 0)
-        self.rms = settingsGroup.createIntegerEntry('RMS', 0)
+        self.reconstructionTimeInSeconds = settingsGroup.createIntegerEntry('ReconstructionTimeInSeconds', 0)
+        self.calculateRMS = settingsGroup.createBooleanEntry('RMS', False)
         self.updateProbe = settingsGroup.createIntegerEntry('UpdateProbe', 10)
         self.updateModes = settingsGroup.createIntegerEntry('UpdateModes', 20)
         self.phaseConstraint = settingsGroup.createIntegerEntry('PhaseConstraint', 1)
@@ -191,6 +191,114 @@ class CommandStringBuilder:
         return self
 
 
+class PtychoPyPresenter(Observable, Observer):
+    MAX_INT = 0x7FFFFFFF
+
+    def __init__(self, settings: PtychoPySettings) -> None:
+        super().__init__()
+        self._settings = settings
+
+    @classmethod
+    def createInstance(cls, settings: PtychoPySettings) -> PtychoPyPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
+        return presenter
+
+    def getMinProbeModes(self) -> int:
+        return 1
+
+    def getMaxProbeModes(self) -> int:
+        return self.MAX_INT
+
+    def getProbeModes(self) -> int:
+        return self._settings.probeModes.value
+
+    def setProbeModes(self, value: int) -> None:
+        self._settings.probeModes.value = value
+
+    def getMinThreshold(self) -> int:
+        return 0
+
+    def getMaxThreshold(self) -> int:
+        return self.MAX_INT
+
+    def getThreshold(self) -> int:
+        return self._settings.threshold.value
+
+    def setThreshold(self, value: int) -> None:
+        self._settings.threshold.value = value
+
+    def getMinReconstructionIterations(self) -> int:
+        return 0
+
+    def getMaxReconstructionIterations(self) -> int:
+        return self.MAX_INT
+
+    def getReconstructionIterations(self) -> int:
+        return self._settings.reconstructionIterations.value
+
+    def setReconstructionIterations(self, value: int) -> None:
+        self._settings.reconstructionIterations.value = value
+
+    def getMinReconstructionTimeInSeconds(self) -> int:
+        return 0
+
+    def getMaxReconstructionTimeInSeconds(self) -> int:
+        return self.MAX_INT
+
+    def getReconstructionTimeInSeconds(self) -> int:
+        return self._settings.reconstructionTimeInSeconds.value
+
+    def setReconstructionTimeInSeconds(self, value: int) -> None:
+        self._settings.reconstructionTimeInSeconds.value = value
+
+    def isCalculateRMSEnabled(self) -> bool:
+        return self._settings.calculateRMS.value
+
+    def setCalculateRMSEnabled(self, enabled: bool) -> None:
+        self._settings.calculateRMS.value = enabled
+
+    def getMinUpdateProbe(self) -> int:
+        return 0
+
+    def getMaxUpdateProbe(self) -> int:
+        return self.MAX_INT
+
+    def getUpdateProbe(self) -> int:
+        return self._settings.updateProbe.value
+
+    def setUpdateProbe(self, value: int) -> None:
+        self._settings.updateProbe.value = value
+
+    def getMinUpdateModes(self) -> int:
+        return 0
+
+    def getMaxUpdateModes(self) -> int:
+        return self.MAX_INT
+
+    def getUpdateModes(self) -> int:
+        return self._settings.updateModes.value
+
+    def setUpdateModes(self, value: int) -> None:
+        self._settings.updateModes.value = value
+
+    def getMinPhaseConstraint(self) -> int:
+        return 0
+
+    def getMaxPhaseConstraint(self) -> int:
+        return self.MAX_INT
+
+    def getPhaseConstraint(self) -> int:
+        return self._settings.phaseConstraint.value
+
+    def setPhaseConstraint(self, value: int) -> None:
+        self._settings.phaseConstraint.value = value
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self.notifyObservers()
+
+
 class ExtendedPIEReconstructor(Reconstructor):
     @property
     def name(self) -> str:
@@ -264,7 +372,8 @@ class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
 
 class PtychoPyBackend:
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
-        self.settings = PtychoPySettings.createInstance(settingsRegistry)
+        self._settings = PtychoPySettings.createInstance(settingsRegistry)
+        self.presenter = PtychoPyPresenter.createInstance(self._settings)
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod

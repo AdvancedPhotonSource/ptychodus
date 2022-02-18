@@ -254,25 +254,28 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
         self._controllerList: list[TikeParametersController] = list()
 
     @property
-    def backendName(self):
+    def backendName(self) -> str:
         return 'Tike'
 
     def createViewController(self, reconstructorName: str) -> QWidget:
-        view = TikeParametersView.createInstance()
-        controller = TikeParametersController.createInstance(self._model, view)
+        view = None
 
         if reconstructorName == 'rpie':
-            view.iterationOptionsView.cgIterSpinBox.setVisible(False)
-            view.iterationOptionsView.stepLengthSpinBox.setVisible(False)
+            view = TikeParametersView.createInstance(
+                    showCgIter = False, showAlpha = True, showStepLength = False)
         elif reconstructorName == 'adam_grad':
-            view.iterationOptionsView.cgIterSpinBox.setVisible(False)
+            view = TikeParametersView.createInstance(
+                    showCgIter = False, showAlpha = True, showStepLength = True)
         elif reconstructorName == 'cgrad':
-            view.iterationOptionsView.alphaSpinBox.setVisible(False)
+            view = TikeParametersView.createInstance(
+                    showCgIter = True, showAlpha = False, showStepLength = True)
         elif reconstructorName == 'lstsq_grad':
-            view.iterationOptionsView.cgIterSpinBox.setVisible(False)
-            view.iterationOptionsView.alphaSpinBox.setVisible(False)
-            view.iterationOptionsView.stepLengthSpinBox.setVisible(False)
+            view = TikeParametersView.createInstance(
+                    showCgIter = False, showAlpha = False, showStepLength = False)
+        else:
+            view = TikeParametersView.createInstance()
 
+        controller = TikeParametersController.createInstance(self._model, view)
         self._controllerList.append(controller)
 
         return view

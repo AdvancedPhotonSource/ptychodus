@@ -6,7 +6,7 @@ from PyQt5.QtGui import QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import QWidget, QLabel, QFileDialog
 
 from ..model import Observable, Observer, Reconstructor, ReconstructorPresenter
-from ..view import ReconstructorParametersView, ReconstructorPlotView, PtychoPyParametersView
+from ..view import ReconstructorParametersView, ReconstructorPlotView
 
 
 class ReconstructorViewControllerFactory(ABC):
@@ -59,8 +59,6 @@ class ReconstructorParametersController(Observer):
         if backendName in self._viewControllerFactoryDict:
             viewControllerFactory = self._viewControllerFactoryDict[backendName]
             widget = viewControllerFactory.createViewController(reconstructorName)
-        elif backendName == 'PtychoPy': # TODO extract
-            widget = PtychoPyParametersView.createInstance()
         else:
             widget = QLabel(f'{backendName}: {reconstructorName} Parameters')
             widget.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
