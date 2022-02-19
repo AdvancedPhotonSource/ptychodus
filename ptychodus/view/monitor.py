@@ -17,7 +17,7 @@ class MonitorProbeView(BottomTitledGroupBox):
         layout.setContentsMargins(10, 10, 10, 30)
         layout.addWidget(view.imageView)
         view.setLayout(layout)
-        view.imageView.imageRibbon.frameGroupBox.setVisible(False) # TODO to controller
+        view.imageView.imageRibbon.frameGroupBox.setVisible(False)  # TODO to controller
 
         return view
 
@@ -35,7 +35,6 @@ class MonitorObjectView(BottomTitledGroupBox):
         layout.setContentsMargins(10, 10, 10, 30)
         layout.addWidget(view.imageView)
         view.setLayout(layout)
-        view.imageView.imageRibbon.frameGroupBox.setVisible(False) # TODO to controller
+        view.imageView.imageRibbon.frameGroupBox.setVisible(False)  # TODO to controller
 
         return view
-

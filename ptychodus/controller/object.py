@@ -24,18 +24,15 @@ class ObjectInitializerController(Observer):
         for initializer in presenter.getInitializerList():
             view.initializerComboBox.addItem(initializer)
 
-        view.initializerComboBox.currentTextChanged.connect(
-                presenter.setCurrentInitializer)
-        view.initializeButton.clicked.connect(
-                presenter.initializeObject)
+        view.initializerComboBox.currentTextChanged.connect(presenter.setCurrentInitializer)
+        view.initializeButton.clicked.connect(presenter.initializeObject)
 
         controller._syncModelToView()
 
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(
-                self._presenter.getCurrentInitializer())
+        self._view.initializerComboBox.setCurrentText(self._presenter.getCurrentInitializer())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -46,7 +43,8 @@ class ObjectParametersController:
     def __init__(self, presenter: ObjectPresenter, view: ObjectParametersView) -> None:
         self._presenter = presenter
         self._view = view
-        self._initializerController = ObjectInitializerController.createInstance(presenter, view.initializerView)
+        self._initializerController = ObjectInitializerController.createInstance(
+            presenter, view.initializerView)
 
     @classmethod
     def createInstance(cls, presenter: ObjectPresenter, view: ObjectParametersView):
@@ -54,16 +52,16 @@ class ObjectParametersController:
         return controller
 
     def openObject(self) -> None:
-        fileName, _ = QFileDialog.getOpenFileName(self._view,
-                'Open Object', str(Path.home()), ObjectIO.FILE_FILTER)
+        fileName, _ = QFileDialog.getOpenFileName(self._view, 'Open Object', str(Path.home()),
+                                                  ObjectIO.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)
             self._presenter.openObject(filePath)
 
     def saveObject(self) -> None:
-        fileName, _ = QFileDialog.getSaveFileName(self._view,
-                'Save Object', str(Path.home()), ObjectIO.FILE_FILTER)
+        fileName, _ = QFileDialog.getSaveFileName(self._view, 'Save Object', str(Path.home()),
+                                                  ObjectIO.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)
@@ -72,8 +70,8 @@ class ObjectParametersController:
 
 class ObjectImageController(Observer):
     def __init__(self, presenter: ObjectPresenter, view: ImageView) -> None:
-       self._presenter = presenter
-       self._image_controller = ImageController.createInstance(view)
+        self._presenter = presenter
+        self._image_controller = ImageController.createInstance(view)
 
     @classmethod
     def createInstance(cls, presenter: ObjectPresenter, view: ImageView):
@@ -90,4 +88,3 @@ class ObjectImageController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self.renderImageData()
-

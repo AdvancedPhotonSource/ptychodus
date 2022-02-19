@@ -154,4 +154,3 @@ class ImageView(QWidget):
         view.setLayout(layout)
 
         return view
-

@@ -98,7 +98,7 @@ class EntryGroup:
     sample: SampleGroup
 
 
-class VelociprobeReader(DataFileReader,Observable):
+class VelociprobeReader(DataFileReader, Observable):
     def __init__(self) -> None:
         super().__init__()
         self.entryGroup = None
@@ -110,13 +110,12 @@ class VelociprobeReader(DataFileReader,Observable):
             h5Item = h5DataGroup.get(name, getlink=True)
 
             if isinstance(h5Item, h5py.ExternalLink):
-                datafile = Datafile(
-                        name = name,
-                        filePath = masterFilePath.parent / h5Item.filename,
-                        dataPath = str(h5Item.path))
+                datafile = Datafile(name=name,
+                                    filePath=masterFilePath.parent / h5Item.filename,
+                                    dataPath=str(h5Item.path))
                 datafileList.append(datafile)
 
-        datafileList.sort(key = lambda x: x.name)
+        datafileList.sort(key=lambda x: x.name)
 
         return DataGroup(datafileList)
 
@@ -131,17 +130,14 @@ class VelociprobeReader(DataFileReader,Observable):
         h5XPixelsInDetector = h5DetectorSpecificGroup['x_pixels_in_detector']
         h5YPixelsInDetector = h5DetectorSpecificGroup['y_pixels_in_detector']
 
-        detectorSpecific = DetectorSpecificGroup(
-                photon_energy_eV = h5PhotonEnergy[()],
-                x_pixels_in_detector = h5XPixelsInDetector[()],
-                y_pixels_in_detector = h5YPixelsInDetector[()])
+        detectorSpecific = DetectorSpecificGroup(photon_energy_eV=h5PhotonEnergy[()],
+                                                 x_pixels_in_detector=h5XPixelsInDetector[()],
+                                                 y_pixels_in_detector=h5YPixelsInDetector[()])
 
         h5DataSize = h5ModuleGroup['data_size']
         assert len(h5DataSize) == 2
 
-        module = ModuleGroup(
-                x_data_size = h5DataSize[0],
-                y_data_size = h5DataSize[1])
+        module = ModuleGroup(x_data_size=h5DataSize[0], y_data_size=h5DataSize[1])
 
         h5DetectorDistance = h5DetectorGroup['detector_distance']
         assert h5DetectorDistance.attrs['units'] == b'm'
@@ -155,17 +151,16 @@ class VelociprobeReader(DataFileReader,Observable):
         h5YPixelSize = h5DetectorGroup['y_pixel_size']
         assert h5YPixelSize.attrs['units'] == b'm'
 
-        detector = DetectorGroup(
-                detectorSpecific = detectorSpecific,
-                module = module,
-                detector_distance_m = h5DetectorDistance[()],
-                beam_center_x_px = h5BeamCenterX[()],
-                beam_center_y_px = h5BeamCenterY[()],
-                bit_depth_image = h5BitDepthImage[()],
-                x_pixel_size_m = h5XPixelSize[()],
-                y_pixel_size_m = h5YPixelSize[()])
+        detector = DetectorGroup(detectorSpecific=detectorSpecific,
+                                 module=module,
+                                 detector_distance_m=h5DetectorDistance[()],
+                                 beam_center_x_px=h5BeamCenterX[()],
+                                 beam_center_y_px=h5BeamCenterY[()],
+                                 bit_depth_image=h5BitDepthImage[()],
+                                 x_pixel_size_m=h5XPixelSize[()],
+                                 y_pixel_size_m=h5YPixelSize[()])
 
-        return InstrumentGroup(detector = detector)
+        return InstrumentGroup(detector=detector)
 
     @staticmethod
     def _readSampleGroup(h5SampleGroup: h5py.Group) -> SampleGroup:
@@ -174,17 +169,15 @@ class VelociprobeReader(DataFileReader,Observable):
         h5ChiDataset = h5GoniometerGroup['chi']
         assert h5ChiDataset.attrs['units'] == b'degree'
 
-        goniometer = GoniometerGroup(
-                chi_deg = h5ChiDataset[0])
-        return SampleGroup(goniometer = goniometer)
+        goniometer = GoniometerGroup(chi_deg=h5ChiDataset[0])
+        return SampleGroup(goniometer=goniometer)
 
     def read(self, rootGroup: h5py.Group) -> None:
         masterFilePath = Path(rootGroup.filename)
 
         h5EntryGroup = rootGroup['entry']
         self.entryGroup = EntryGroup(
-                data = self._readDataGroup(h5EntryGroup['data'], masterFilePath),
-                instrument = self._readInstrumentGroup(h5EntryGroup['instrument']),
-                sample = self._readSampleGroup(h5EntryGroup['sample']))
+            data=self._readDataGroup(h5EntryGroup['data'], masterFilePath),
+            instrument=self._readInstrumentGroup(h5EntryGroup['instrument']),
+            sample=self._readSampleGroup(h5EntryGroup['sample']))
         self.notifyObservers()
-

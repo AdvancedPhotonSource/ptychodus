@@ -7,7 +7,6 @@ from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLineEdit, QWidget
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -105,7 +104,8 @@ class EnergyWidget(QWidget):
 
         widget.magnitudeValidator.setBottom(0.)
         widget.magnitudeLineEdit.setValidator(widget.magnitudeValidator)
-        widget.magnitudeLineEdit.editingFinished.connect(widget._setEnergyInElectronVoltsFromWidgets)
+        widget.magnitudeLineEdit.editingFinished.connect(
+            widget._setEnergyInElectronVoltsFromWidgets)
 
         widget.unitsComboBox.addItem('eV', 0)
         widget.unitsComboBox.addItem('keV', 3)
@@ -154,4 +154,3 @@ class EnergyWidget(QWidget):
     def _updateDisplay(self) -> None:
         energyInDisplayUnits = self.energyInElectronVolts / self._scaleToElectronVolts
         self.magnitudeLineEdit.setText(str(energyInDisplayUnits))
-

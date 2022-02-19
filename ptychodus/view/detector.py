@@ -87,4 +87,3 @@ class DetectorParametersView(QWidget):
         view.setLayout(layout)
 
         return view
-

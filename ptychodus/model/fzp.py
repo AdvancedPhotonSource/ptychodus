@@ -25,8 +25,7 @@ def single_probe(probe_shape, lambda0, dx_dec, dis_defocus, dis_StoD, **kwargs):
     dx = lambda0 * dis_StoD / probe_shape / dx_dec
 
     # get zone plate parameter
-    T, dx_fzp, FL0 = fzp_calculate(lambda0, dis_defocus, probe_shape, dx,
-                                   **kwargs)
+    T, dx_fzp, FL0 = fzp_calculate(lambda0, dis_defocus, probe_shape, dx, **kwargs)
 
     nprobe = fresnel_propagation(T, dx_fzp, (FL0 + dis_defocus), lambda0)
 
@@ -39,8 +38,7 @@ def gaussian_spectrum(lambda0, bandwidth, energy):
     spectrum = np.zeros((energy, 2))
     sigma = lambda0 * bandwidth / 2.355
     d_lam = sigma * 4 / (energy - 1)
-    spectrum[:, 0] = np.arange(-1 * np.floor(energy / 2), np.ceil(
-        energy / 2)) * d_lam + lambda0
+    spectrum[:, 0] = np.arange(-1 * np.floor(energy / 2), np.ceil(energy / 2)) * d_lam + lambda0
     spectrum[:, 1] = np.exp(-(spectrum[:, 0] - lambda0)**2 / sigma**2)
     return spectrum
 
@@ -138,8 +136,7 @@ def fresnel_propagation(input, dxy, z, wavelength):
         OUT = np.fft.fftshift(cgh * np.fft.fftshift(pf))
     else:
         pf = np.exp(1j * k * z) * np.exp(1j * k * (XX**2 + YY**2) / 2 / z)
-        cgh = np.fft.ifft2(
-            np.fft.fftshift(input * np.exp(1j * k * (Fx**2 + Fy**2) / 2 / z)))
+        cgh = np.fft.ifft2(np.fft.fftshift(input * np.exp(1j * k * (Fx**2 + Fy**2) / 2 / z)))
         OUT = np.fft.fftshift(cgh) * pf
     return OUT
 
@@ -168,4 +165,3 @@ if __name__ == "__main__":
     plt.figure(1)
     plt.imshow(np.abs(probe))
     plt.show()
-

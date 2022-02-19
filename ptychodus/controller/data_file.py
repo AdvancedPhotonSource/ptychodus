@@ -13,7 +13,8 @@ class DataArrayTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._array = None
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: Qt.ItemDataRole) -> QVariant:
+    def headerData(self, section: int, orientation: Qt.Orientation,
+                   role: Qt.ItemDataRole) -> QVariant:
         result = QVariant()
 
         if role == Qt.DisplayRole:
@@ -40,7 +41,7 @@ class DataArrayTableModel(QAbstractTableModel):
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         count = 0
 
-        if self._array is not None: # and len(self._array.shape) > 1:
+        if self._array is not None:  # and len(self._array.shape) > 1:
             count = self._array.shape[1]
 
         return count
@@ -57,7 +58,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
 class DataFileController:
     def __init__(self, presenter: DataFilePresenter, treeReader: H5FileTreeReader,
-            treeView: QTreeView, tableView: QTableView) -> None:
+                 treeView: QTreeView, tableView: QTableView) -> None:
         self._presenter = presenter
         self._treeReader = treeReader
         self._treeModel = SimpleTreeModel(treeReader.getTree())
@@ -67,7 +68,7 @@ class DataFileController:
 
     @classmethod
     def createInstance(cls, presenter: DataFilePresenter, treeReader: H5FileTreeReader,
-            treeView: QTreeView, tableView: QTableView) -> None:
+                       treeView: QTreeView, tableView: QTableView) -> None:
         controller = cls(presenter, treeReader, treeView, tableView)
         treeView.setModel(controller._treeModel)
         treeView.selectionModel().currentChanged.connect(controller.updateDataArrayInTableView)
@@ -76,9 +77,8 @@ class DataFileController:
         return controller
 
     def openDataFile(self) -> None:
-        fileName, _ = QFileDialog.getOpenFileName(self._treeView,
-                'Open Data File',
-                str(Path.home()), H5FileTreeReader.FILE_FILTER)
+        fileName, _ = QFileDialog.getOpenFileName(self._treeView, 'Open Data File',
+                                                  str(Path.home()), H5FileTreeReader.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)
@@ -96,8 +96,6 @@ class DataFileController:
         data = self._presenter.readData(dataPath)
         self._tableModel.setArray(data)
 
-
     def update(self, observable: Observable) -> None:
         if observable is self._treeReader:
             self._treeModel.setRootNode(self._treeReader.getTree())
-

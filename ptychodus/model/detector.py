@@ -16,8 +16,10 @@ class DetectorSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.pixelSizeXInMeters = settingsGroup.createRealEntry('PixelSizeXInMeters', '75e-6')
         self.pixelSizeYInMeters = settingsGroup.createRealEntry('PixelSizeYInMeters', '75e-6')
-        self.detectorDistanceInMeters = settingsGroup.createRealEntry('DetectorDistanceInMeters', '2')
-        self.defocusDistanceInMeters = settingsGroup.createRealEntry('DefocusDistanceInMeters', '800e-6')
+        self.detectorDistanceInMeters = settingsGroup.createRealEntry(
+            'DetectorDistanceInMeters', '2')
+        self.defocusDistanceInMeters = settingsGroup.createRealEntry('DefocusDistanceInMeters',
+                                                                     '800e-6')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DetectorSettings:
@@ -58,7 +60,8 @@ class Detector(Observable, Observer):
         self._cropSettings = cropSettings
 
     @classmethod
-    def createInstance(cls, detectorSettings: DetectorSettings, cropSettings: CropSettings) -> Detector:
+    def createInstance(cls, detectorSettings: DetectorSettings,
+                       cropSettings: CropSettings) -> Detector:
         detector = cls(detectorSettings, cropSettings)
         detectorSettings.detectorDistanceInMeters.addObserver(detector)
         detectorSettings.pixelSizeXInMeters.addObserver(detector)
@@ -99,7 +102,8 @@ class DetectorParametersPresenter(Observer, Observable):
         self._cropSettings = cropSettings
 
     @classmethod
-    def createInstance(cls, detectorSettings: DetectorSettings, cropSettings: CropSettings) -> DetectorParametersPresenter:
+    def createInstance(cls, detectorSettings: DetectorSettings,
+                       cropSettings: CropSettings) -> DetectorParametersPresenter:
         presenter = cls(detectorSettings, cropSettings)
         detectorSettings.addObserver(presenter)
         cropSettings.addObserver(presenter)
@@ -277,7 +281,8 @@ class CroppedImageSequence(ImageSequence):
         self._imageSequence = imageSequence
 
     @classmethod
-    def createInstance(cls, settings: CropSettings, imageSequence: ImageSequence) -> CroppedImageSequence:
+    def createInstance(cls, settings: CropSettings,
+                       imageSequence: ImageSequence) -> CroppedImageSequence:
         croppedImageSequence = cls(settings, imageSequence)
         settings.addObserver(croppedImageSequence)
         imageSequence.addObserver(croppedImageSequence)
@@ -350,4 +355,3 @@ class DetectorImagePresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._imageSequence:
             self.notifyObservers()
-

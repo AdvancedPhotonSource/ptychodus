@@ -76,7 +76,7 @@ class ScanPointIO:
         return point_list
 
 
-class ScanSequence(Sequence,Observable,Observer):
+class ScanSequence(Sequence, Observable, Observer):
     pass
 
 
@@ -230,7 +230,7 @@ class SelectableScanSequence(ScanSequence):
     def setCurrentScanSequence(self, name: str) -> None:
         try:
             sequence = next(seq for seq in self._sequenceList
-                    if name.casefold() == str(seq).casefold())
+                            if name.casefold() == str(seq).casefold())
         except StopIteration:
             return
 
@@ -307,7 +307,8 @@ class TransformedScanSequence(ScanSequence):
         self._transform = None
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings, sequence: ScanSequence) -> TransformedScanSequence:
+    def createInstance(cls, settings: ScanSettings,
+                       sequence: ScanSequence) -> TransformedScanSequence:
         transformedSequence = cls(settings, sequence)
         transformedSequence.setCurrentTransformXYFromSettings()
         settings.transformXY.addObserver(transformedSequence)
@@ -354,7 +355,7 @@ class ScanPresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
     def __init__(self, settings: ScanSettings, selectableSequence: SelectableScanSequence,
-            transformedSequence: TransformedScanSequence) -> None:
+                 transformedSequence: TransformedScanSequence) -> None:
         super().__init__()
         self._settings = settings
         self._selectableSequence = selectableSequence
@@ -363,7 +364,7 @@ class ScanPresenter(Observable, Observer):
 
     @classmethod
     def createInstance(cls, settings: ScanSettings, selectableSequence: SelectableScanSequence,
-            transformedSequence: TransformedScanSequence) -> ScanPresenter:
+                       transformedSequence: TransformedScanSequence) -> ScanPresenter:
         presenter = cls(settings, selectableSequence, transformedSequence)
         transformedSequence.addObserver(presenter)
         return presenter
@@ -404,7 +405,8 @@ class ScanPresenter(Observable, Observer):
         return self.MAX_INT
 
     def getExtentX(self) -> int:
-        return self._clamp(self._settings.extentX.value, self.getMinExtentX(), self.getMaxExtentX())
+        return self._clamp(self._settings.extentX.value, self.getMinExtentX(),
+                           self.getMaxExtentX())
 
     def setExtentX(self, value: int) -> None:
         self._settings.extentX.value = value
@@ -416,7 +418,8 @@ class ScanPresenter(Observable, Observer):
         return self.MAX_INT
 
     def getExtentY(self) -> int:
-        return self._clamp(self._settings.extentY.value, self.getMinExtentY(), self.getMaxExtentY())
+        return self._clamp(self._settings.extentY.value, self.getMinExtentY(),
+                           self.getMaxExtentY())
 
     def setExtentY(self, value: int) -> None:
         self._settings.extentY.value = value
@@ -456,4 +459,3 @@ class ScanPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._transformedSequence:
             self.notifyObservers()
-

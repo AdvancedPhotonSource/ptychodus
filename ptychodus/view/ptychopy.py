@@ -15,10 +15,14 @@ class PtychoPyBasicView(QGroupBox):
     def createInstance(cls, parent: QWidget = None) -> PtychoPyBasicView:
         view = cls(parent)
 
-        view.probeModesSpinBox.setToolTip('Number of orthogonal probe modes to simulate partial incoherence of the beam')
-        view.thresholdSpinBox.setToolTip('To remove noise from the diffraction patterns. Any count below this number will be set to zero in the diffraction data.')
+        view.probeModesSpinBox.setToolTip(
+            'Number of orthogonal probe modes to simulate partial incoherence of the beam')
+        view.thresholdSpinBox.setToolTip(
+            'To remove noise from the diffraction patterns. Any count below this number will be set to zero in the diffraction data.'
+        )
         view.iterationLimitSpinBox.setToolTip('Number of reconstruction iterations')
-        view.timeLimitSpinBox.setToolTip('Maximum allowed reconstruction time (in sec). Overrides iterations.')
+        view.timeLimitSpinBox.setToolTip(
+            'Maximum allowed reconstruction time (in sec). Overrides iterations.')
 
         layout = QFormLayout()
         layout.addRow('Probe Modes:', view.probeModesSpinBox)
@@ -43,11 +47,12 @@ class PtychoPyAdvancedView(QGroupBox):
         view = cls(parent)
 
         view.updateProbeSpinBox.setToolTip('The number of iterations after which to start updating'
-                ' the primary probe mode')
+                                           ' the primary probe mode')
         view.updateModesSpinBox.setToolTip('The number of iterations after which to start updating'
-                ' all probe modes')
-        view.phaseConstraintSpinBox.setToolTip('The number of iterations to keep applying'
-                ' a phase constraint (forcing the reconstructed phase in the range [-2pi, 0])')
+                                           ' all probe modes')
+        view.phaseConstraintSpinBox.setToolTip(
+            'The number of iterations to keep applying'
+            ' a phase constraint (forcing the reconstructed phase in the range [-2pi, 0])')
 
         layout = QFormLayout()
         layout.addRow(view.calculateRMSCheckBox)
@@ -76,4 +81,3 @@ class PtychoPyParametersView(QWidget):
         view.setLayout(layout)
 
         return view
-

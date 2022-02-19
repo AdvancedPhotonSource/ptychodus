@@ -9,8 +9,8 @@ from ..view import ScanParametersView, ScanPlotView
 
 class ScanParametersController(Observer):
     def __init__(self, presenter: ScanPresenter, view: ScanParametersView) -> None:
-       self._presenter = presenter
-       self._view = view
+        self._presenter = presenter
+        self._view = view
 
     @staticmethod
     def createPositiveRealValidator() -> QDoubleValidator:
@@ -52,16 +52,16 @@ class ScanParametersController(Observer):
         return controller
 
     def openScan(self) -> None:
-        fileName, _ = QFileDialog.getOpenFileName(self._view,
-                'Open Scan', str(Path.home()), ScanPointIO.FILE_FILTER)
+        fileName, _ = QFileDialog.getOpenFileName(self._view, 'Open Scan', str(Path.home()),
+                                                  ScanPointIO.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)
             self._presenter.openScan(filePath)
 
     def saveScan(self) -> None:
-        fileName, _ = QFileDialog.getSaveFileName(self._view,
-                'Save Scan', str(Path.home()), ScanPointIO.FILE_FILTER)
+        fileName, _ = QFileDialog.getSaveFileName(self._view, 'Save Scan', str(Path.home()),
+                                                  ScanPointIO.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)
@@ -72,19 +72,19 @@ class ScanParametersController(Observer):
 
         self._view.numberOfScanPointsSpinBox.blockSignals(True)
         self._view.numberOfScanPointsSpinBox.setRange(self._presenter.getMinNumberOfScanPoints(),
-                self._presenter.getMaxNumberOfScanPoints())
+                                                      self._presenter.getMaxNumberOfScanPoints())
         self._view.numberOfScanPointsSpinBox.setValue(self._presenter.getNumberOfScanPoints())
         self._view.numberOfScanPointsSpinBox.blockSignals(False)
 
         self._view.extentXSpinBox.blockSignals(True)
         self._view.extentXSpinBox.setRange(self._presenter.getMinExtentX(),
-                self._presenter.getMaxExtentX())
+                                           self._presenter.getMaxExtentX())
         self._view.extentXSpinBox.setValue(self._presenter.getExtentX())
         self._view.extentXSpinBox.blockSignals(False)
 
         self._view.extentYSpinBox.blockSignals(True)
         self._view.extentYSpinBox.setRange(self._presenter.getMinExtentY(),
-                self._presenter.getMaxExtentY())
+                                           self._presenter.getMaxExtentY())
         self._view.extentYSpinBox.setValue(self._presenter.getExtentY())
         self._view.extentYSpinBox.blockSignals(False)
 
@@ -94,8 +94,7 @@ class ScanParametersController(Observer):
         self._view.transformComboBox.setCurrentText(self._presenter.getCurrentTransformXY())
 
     def _syncJitterRadiusV2M(self) -> None:
-        self._presenter.setJitterRadiusInPixels(
-                Decimal(self._view.jitterRadiusLineEdit.text()))
+        self._presenter.setJitterRadiusInPixels(Decimal(self._view.jitterRadiusLineEdit.text()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -104,8 +103,8 @@ class ScanParametersController(Observer):
 
 class ScanPlotController(Observer):
     def __init__(self, presenter: ScanPresenter, view: ScanPlotView) -> None:
-       self._presenter = presenter
-       self._view = view
+        self._presenter = presenter
+        self._view = view
 
     @classmethod
     def createInstance(cls, presenter: ScanPresenter, view: ScanPlotView):
@@ -132,4 +131,3 @@ class ScanPlotController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
-

@@ -31,4 +31,3 @@ class SimpleTreeNode:
             return self.parentItem.childItems.index(self)
 
         return 0
-

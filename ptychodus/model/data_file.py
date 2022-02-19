@@ -9,13 +9,14 @@ import threading
 import watchdog.events
 import watchdog.observers
 
-
 logger = logging.getLogger(__name__)
 
 
 class H5FileEventHandler(watchdog.events.PatternMatchingEventHandler):
     def __init__(self) -> None:
-        super().__init__(patterns=['*.h5', '*.hdf5'], ignore_directories=True, case_sensitive=False)
+        super().__init__(patterns=['*.h5', '*.hdf5'],
+                         ignore_directories=True,
+                         case_sensitive=False)
 
     def on_any_event(self, event) -> None:
         print(f'{event.event_type}: {event.src_path}')
@@ -41,7 +42,7 @@ class DataDirectoryWatcher(threading.Thread):
 
         except:
             self._observer.stop()
-            logging.error('Watchdog Thread Error') # TODO improve message
+            logging.error('Watchdog Thread Error')  # TODO improve message
 
         self._observer.join()
 
@@ -99,4 +100,3 @@ class DataFilePresenter:
         #    data = value.decode('utf-8')
 
         return data
-

@@ -10,7 +10,6 @@ from .observer import Observable, Observer
 from .reconstructor import Reconstructor
 from .settings import SettingsRegistry, SettingsGroup
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -20,8 +19,10 @@ class PtychoPySettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.probeModes = settingsGroup.createIntegerEntry('ProbeModes', 1)
         self.threshold = settingsGroup.createIntegerEntry('Threshold', 0)
-        self.reconstructionIterations = settingsGroup.createIntegerEntry('ReconstructionIterations', 100)
-        self.reconstructionTimeInSeconds = settingsGroup.createIntegerEntry('ReconstructionTimeInSeconds', 0)
+        self.reconstructionIterations = settingsGroup.createIntegerEntry(
+            'ReconstructionIterations', 100)
+        self.reconstructionTimeInSeconds = settingsGroup.createIntegerEntry(
+            'ReconstructionTimeInSeconds', 0)
         self.calculateRMS = settingsGroup.createBooleanEntry('RMS', False)
         self.updateProbe = settingsGroup.createIntegerEntry('UpdateProbe', 10)
         self.updateModes = settingsGroup.createIntegerEntry('UpdateModes', 20)
@@ -40,7 +41,7 @@ class PtychoPySettings(Observable, Observer):
 
 class CommandStringBuilder:
     def __init__(self, jobID: str, algorithm: str) -> None:
-        self._sb = [ f'./ptycho -jobID={jobID} -algorithm={algorithm}' ]
+        self._sb = [f'./ptycho -jobID={jobID} -algorithm={algorithm}']
 
     @classmethod
     def createEPIEString(cls, jobID: str) -> CommandStringBuilder:
@@ -57,11 +58,13 @@ class CommandStringBuilder:
     def build(self) -> str:
         return ' '.join(self._sb)
 
-    def withNumberOfReconconstructionIterations(self, iterations: int = 100) -> CommandStringBuilder:
+    def withNumberOfReconconstructionIterations(self,
+                                                iterations: int = 100) -> CommandStringBuilder:
         self._sb.append(f'-i={iterations}')
         return self
 
-    def withMaximumAllowedReconstructionTime(self, timeInSeconds: int = 10) -> CommandStringBuilder:
+    def withMaximumAllowedReconstructionTime(self,
+                                             timeInSeconds: int = 10) -> CommandStringBuilder:
         # Maximum allowed reconstruction time (in sec). Overrides iterations.
         self._sb.append(f'-T={timeInSeconds}')
         return self
@@ -82,11 +85,14 @@ class CommandStringBuilder:
         self._sb.append(f'-probeGuess={filePath}')
         return self
 
-    def withIncidentBeamWavelengthInMeters(self, wavelengthInMeters: float = 2.3843e-10) -> CommandStringBuilder:
+    def withIncidentBeamWavelengthInMeters(self,
+                                           wavelengthInMeters: float = 2.3843e-10
+                                           ) -> CommandStringBuilder:
         self._sb.append(f'-lambda={wavelengthInMeters}')
         return self
 
-    def withIncidentBeamSizeInMeters(self, beamSizeInMeters: float = 400.e-9) -> CommandStringBuilder:
+    def withIncidentBeamSizeInMeters(self,
+                                     beamSizeInMeters: float = 400.e-9) -> CommandStringBuilder:
         self._sb.append(f'-beamSize={beamSizeInMeters}')
         return self
 
@@ -94,11 +100,13 @@ class CommandStringBuilder:
         self._sb.append(f'-bitDepth={bitDepth}')
         return self
 
-    def withNumberOfDiffractionPatternsPerFile(self, patternsPerFile: int = 1) -> CommandStringBuilder:
+    def withNumberOfDiffractionPatternsPerFile(self,
+                                               patternsPerFile: int = 1) -> CommandStringBuilder:
         self._sb.append(f'-dpf={patternsPerFile}')
         return self
 
-    def withDetectorPixelSizeInMeters(self, pixelSizeInMeters: float = 75.e-6) -> CommandStringBuilder:
+    def withDetectorPixelSizeInMeters(self,
+                                      pixelSizeInMeters: float = 75.e-6) -> CommandStringBuilder:
         self._sb.append(f'-dx_d={pixelSizeInMeters}')
         return self
 
@@ -107,7 +115,10 @@ class CommandStringBuilder:
         self._sb.append(f'-z={distanceInMeters}')
         return self
 
-    def withDiffractionPatternGeometryInPixels(self, centerX: int = 256, centerY: int = 256, cropSize: int = 512) -> CommandStringBuilder:
+    def withDiffractionPatternGeometryInPixels(self,
+                                               centerX: int = 256,
+                                               centerY: int = 256,
+                                               cropSize: int = 512) -> CommandStringBuilder:
         # The center of the diffraction pattern in pixels (image pixel location Y, image pixel location X).
         self._sb.append(f'-qxy={centerX},{centerY}')
         # The desired size for cropping the diffraction patterns and probe size.
@@ -115,7 +126,9 @@ class CommandStringBuilder:
         # Diffraction patterns will be cropped to a square image of sizeXsize pixels around qxy.
         return self
 
-    def withDiffractionPatternData(self, pathFormat: str, firstFileIndex: int = 0) -> CommandStringBuilder:
+    def withDiffractionPatternData(self,
+                                   pathFormat: str,
+                                   firstFileIndex: int = 0) -> CommandStringBuilder:
         # A c-style formatted string for the location of the HDF5 files. For file name string substitution starting at fs .
         self._sb.append(f'-fp={pathFormat}')
         # The file index of the file containing the first diffraction pattern (top left corner for Cartesian scans)
@@ -146,7 +159,9 @@ class CommandStringBuilder:
         self._sb.append(f'-phaseConstraint={iterations}')
         return self
 
-    def withProbeUpdateWait(self, primaryModeWait: int = 10, allModesWait: int = 20) -> CommandStringBuilder:
+    def withProbeUpdateWait(self,
+                            primaryModeWait: int = 10,
+                            allModesWait: int = 20) -> CommandStringBuilder:
         # The number of iterations after which to start updating the primary probe mode
         self._sb.append(f'-updateProbe={primaryModeWait}')
         # The number of iterations after which to start updating all probe modes
@@ -159,20 +174,26 @@ class CommandStringBuilder:
         self._sb.append(f'-PPS={numberOfIterations}')
         return self
 
-    def withLeastSquaresDampingConstant(self, dampingConstant: float = 0.1) -> CommandStringBuilder:
+    def withLeastSquaresDampingConstant(self,
+                                        dampingConstant: float = 0.1) -> CommandStringBuilder:
         assert 'MLs' in self._sb[0]
         self._sb.append(f'-delta_p={dampingConstant}')
         return self
 
-    def withSquareRootTransformedDiffractionPatternMagnitudes(self, sqrtData: bool = False) -> CommandStringBuilder:
+    def withSquareRootTransformedDiffractionPatternMagnitudes(self,
+                                                              sqrtData: bool = False
+                                                              ) -> CommandStringBuilder:
         self._sb.append(f'-sqrtData={1 if sqrtData else 0}')
         return self
 
-    def withFFTShiftedDiffractionPatterns(self, fftShiftData: bool = False) -> CommandStringBuilder:
+    def withFFTShiftedDiffractionPatterns(self,
+                                          fftShiftData: bool = False) -> CommandStringBuilder:
         self._sb.append(f'-fftShiftData={1 if fftShiftData else 0}')
         return self
 
-    def withBeamstopAreaFourierModulusConstraint(self, beamstopMask: bool = False) -> CommandStringBuilder:
+    def withBeamstopAreaFourierModulusConstraint(self,
+                                                 beamstopMask: bool = False
+                                                 ) -> CommandStringBuilder:
         # Determine whether the beamstop area (0 values, set by a binary array "beamstopMask.h5" which is put in the data directory) is applied with Fourier modulus constraint or not
         self._sb.append(f'-beamstopMask={1 if beamstopMask else 0}')
         return self
@@ -309,7 +330,8 @@ class ExtendedPIEReconstructor(Reconstructor):
         return 'PtychoPy'
 
     def reconstruct(self) -> int:
-        return 0 # TODO
+        return 0  # TODO
+
 
 # {"epie", (PyCFunction)ptycholib_epie, METH_VARARGS|METH_KEYWORDS, epie_docstring},
 # {"epienp", (PyCFunction)ptycholib_epienp, METH_VARARGS|METH_KEYWORDS, epie_docstring},
@@ -335,7 +357,8 @@ class DifferenceMapReconstructor(Reconstructor):
         return 'PtychoPy'
 
     def reconstruct(self) -> int:
-        return 0 # TODO
+        return 0  # TODO
+
 
 # {"dm", (PyCFunction)ptycholib_dm, METH_VARARGS|METH_KEYWORDS, dm_docstring},
 # {"dmnp", (PyCFunction)ptycholib_dmnp, METH_VARARGS|METH_KEYWORDS, dm_docstring},
@@ -352,7 +375,8 @@ class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
         return 'PtychoPy'
 
     def reconstruct(self) -> int:
-        return 0 # TODO
+        return 0  # TODO
+
 
 # {"mls", (PyCFunction)ptycholib_mls, METH_VARARGS|METH_KEYWORDS, mls_docstring},
 # {"mlsnp", (PyCFunction)ptycholib_mlsnp, METH_VARARGS|METH_KEYWORDS, mls_docstring},
@@ -370,6 +394,7 @@ class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
 # TODO objectNP
 # TODO probeNP
 
+
 class PtychoPyBackend:
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         self._settings = PtychoPySettings.createInstance(settingsRegistry)
@@ -377,7 +402,9 @@ class PtychoPyBackend:
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool = False) -> PtychoPyBackend:
+    def createInstance(cls,
+                       settingsRegistry: SettingsRegistry,
+                       isDeveloperModeEnabled: bool = False) -> PtychoPyBackend:
         core = cls(settingsRegistry)
 
         if ptychopy or isDeveloperModeEnabled:
@@ -388,4 +415,3 @@ class PtychoPyBackend:
             logger.info('ptychopy not found.')
 
         return core
-

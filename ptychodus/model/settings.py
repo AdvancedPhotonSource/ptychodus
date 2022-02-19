@@ -7,12 +7,11 @@ import numpy
 
 from .observer import Observable, Observer
 
-
 T = TypeVar('T')
 
 
 class SettingsEntry(Generic[T], Observable):
-    def __init__(self, name: str, defaultValue: T, stringConverter: Callable[[str],T]) -> None:
+    def __init__(self, name: str, defaultValue: T, stringConverter: Callable[[str], T]) -> None:
         super().__init__()
         self._name = name
         self._value = defaultValue
@@ -54,28 +53,28 @@ class SettingsGroup(Observable, Observer):
 
     def createStringEntry(self, name: str, defaultValue: str) -> SettingsEntry[str]:
         candidateEntry = SettingsEntry[str](name, defaultValue,
-                lambda valueString: str(valueString))
+                                            lambda valueString: str(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createPathEntry(self, name: str, defaultValue: Path) -> SettingsEntry[Path]:
         candidateEntry = SettingsEntry[Path](name, defaultValue,
-                lambda valueString: Path(valueString))
+                                             lambda valueString: Path(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createBooleanEntry(self, name: str, defaultValue: bool) -> SettingsEntry[bool]:
         trueStringList = ['1', 'true', 't', 'yes', 'y']
-        candidateEntry = SettingsEntry[bool](name, defaultValue,
-                lambda valueString: valueString.lower() in trueStringList)
+        candidateEntry = SettingsEntry[bool](
+            name, defaultValue, lambda valueString: valueString.lower() in trueStringList)
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createIntegerEntry(self, name: str, defaultValue: int) -> SettingsEntry[int]:
         candidateEntry = SettingsEntry[int](name, defaultValue,
-                lambda valueString: int(valueString))
+                                            lambda valueString: int(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createRealEntry(self, name: str, defaultValue: str) -> SettingsEntry[Decimal]:
         candidateEntry = SettingsEntry[Decimal](name, Decimal(defaultValue),
-                lambda valueString: Decimal(valueString))
+                                                lambda valueString: Decimal(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def _registerEntryIfNonexistent(self, candidateEntry):
@@ -171,4 +170,3 @@ class SettingsPresenter(Observable):
 
         with open(filePath, 'w') as configFile:
             config.write(configFile)
-

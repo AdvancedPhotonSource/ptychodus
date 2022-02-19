@@ -44,4 +44,3 @@ class ImportSettingsDialog(QDialog):
             self.accept()
         else:
             self.reject()
-

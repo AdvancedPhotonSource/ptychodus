@@ -43,7 +43,7 @@ class ScanPlotView(QWidget):
         width = 1
         height = 1
         dpi = 200
-        self.figure = Figure(figsize=(width, height), dpi = dpi)
+        self.figure = Figure(figsize=(width, height), dpi=dpi)
         self.figureCanvas = FigureCanvas(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
@@ -58,4 +58,3 @@ class ScanPlotView(QWidget):
         view.setLayout(layout)
 
         return view
-

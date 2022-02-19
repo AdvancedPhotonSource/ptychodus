@@ -18,15 +18,15 @@ class ProbeSettings(Observable, Observer):
         self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
         self.probeShape = settingsGroup.createIntegerEntry('ProbeShape', 64)
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
-                'ProbeEnergyInElectronVolts', '2000')
-        self.probeDiameterInMeters = settingsGroup.createRealEntry(
-                'ProbeDiameterInMeters', '400e-6')
-        self.zonePlateRadiusInMeters = settingsGroup.createRealEntry(
-                'ZonePlateRadiusInMeters', '90e-6')
+            'ProbeEnergyInElectronVolts', '2000')
+        self.probeDiameterInMeters = settingsGroup.createRealEntry('ProbeDiameterInMeters',
+                                                                   '400e-6')
+        self.zonePlateRadiusInMeters = settingsGroup.createRealEntry('ZonePlateRadiusInMeters',
+                                                                     '90e-6')
         self.outermostZoneWidthInMeters = settingsGroup.createRealEntry(
-                'OutermostZoneWidthInMeters', '50e-9')
+            'OutermostZoneWidthInMeters', '50e-9')
         self.beamstopDiameterInMeters = settingsGroup.createRealEntry(
-                'BeamstopDiameterInMeters', '60e-6')
+            'BeamstopDiameterInMeters', '60e-6')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry):
@@ -94,7 +94,7 @@ class GaussianBeamProbeInitializer(Callable):
         x = idx * float(self._detectorSettings.pixelSizeXInMeters.value / w_m)
         y = idx * float(self._detectorSettings.pixelSizeYInMeters.value / w_m)
         xx, yy = numpy.meshgrid(x, y)
-        rr_sq = xx ** 2 + yy ** 2
+        rr_sq = xx**2 + yy**2
         ff = numpy.exp(-rr_sq / 2) + 0.j
         return ff / ff.sum()
 
@@ -103,7 +103,8 @@ class GaussianBeamProbeInitializer(Callable):
 
 
 class FresnelZonePlateProbeInitializer(Callable):
-    def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings, probe: Probe) -> None:
+    def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
+                 probe: Probe) -> None:
         super().__init__()
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
@@ -112,7 +113,7 @@ class FresnelZonePlateProbeInitializer(Callable):
     def __call__(self) -> numpy.ndarray:
         shape = self._probeSettings.probeShape.value
         lambda0 = self._probe.wavelengthInMeters
-        dx_dec = self._detectorSettings.pixelSizeXInMeters.value # TODO non-square pixels are unsupported
+        dx_dec = self._detectorSettings.pixelSizeXInMeters.value  # TODO non-square pixels are unsupported
         dis_defocus = self._detectorSettings.defocusDistanceInMeters.value
         dis_StoD = self._detectorSettings.detectorDistanceInMeters.value
         radius = self._probeSettings.zonePlateRadiusInMeters.value
@@ -120,13 +121,13 @@ class FresnelZonePlateProbeInitializer(Callable):
         beamstop = self._probeSettings.beamstopDiameterInMeters.value
 
         probe = single_probe(shape,
-                float(lambda0),
-                float(dx_dec),
-                float(dis_defocus),
-                float(dis_StoD),
-                radius=float(radius),
-                outmost=float(outmost),
-                beamstop=float(beamstop))
+                             float(lambda0),
+                             float(dx_dec),
+                             float(dis_defocus),
+                             float(dis_StoD),
+                             radius=float(radius),
+                             outmost=float(outmost),
+                             beamstop=float(beamstop))
         return probe
 
     def __str__(self) -> str:
@@ -154,20 +155,23 @@ class CustomProbeInitializer(Callable):
 class ProbePresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
-    def __init__(self, settings: ProbeSettings, probe: Probe, initializerList: list[Callable]) -> None:
+    def __init__(self, settings: ProbeSettings, probe: Probe,
+                 initializerList: list[Callable]) -> None:
         super().__init__()
         self._settings = settings
         self._probe = probe
         self._initializerList = initializerList
         self._initializer = initializerList[0]
-        self._estimate = numpy.zeros((0,0), dtype=complex)
+        self._estimate = numpy.zeros((0, 0), dtype=complex)
         self._probeIO = ProbeIO()
 
     @classmethod
-    def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings, probe: Probe) -> ProbePresenter:
+    def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
+                       probe: Probe) -> ProbePresenter:
         initializerList = list()
         initializerList.append(GaussianBeamProbeInitializer(detectorSettings, probeSettings))
-        initializerList.append(FresnelZonePlateProbeInitializer(detectorSettings, probeSettings, probe))
+        initializerList.append(
+            FresnelZonePlateProbeInitializer(detectorSettings, probeSettings, probe))
         initializerList.append(CustomProbeInitializer())
 
         presenter = cls(probeSettings, probe, initializerList)
@@ -186,7 +190,7 @@ class ProbePresenter(Observable, Observer):
     def setCurrentInitializer(self, name: str) -> None:
         try:
             initializer = next(ini for ini in self._initializerList
-                    if name.casefold() == str(ini).casefold())
+                               if name.casefold() == str(ini).casefold())
         except StopIteration:
             return
 
@@ -269,4 +273,3 @@ class ProbePresenter(Observable, Observer):
             self.setCurrentInitializerFromSettings()
         elif observable is self._settings:
             self.notifyObservers()
-

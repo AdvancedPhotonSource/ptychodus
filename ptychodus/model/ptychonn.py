@@ -10,9 +10,7 @@ from .observer import Observable, Observer
 from .reconstructor import Reconstructor
 from .settings import SettingsRegistry, SettingsGroup
 
-
 logger = logging.getLogger(__name__)
-
 
 # class ReconModel(torch.nn.Module):
 # 	def __init__(self, nconv: int = 32):
@@ -109,7 +107,7 @@ class PtychoNNReconstructor(Reconstructor):
         # 1) Load best_model.pth
         # 2) Predict
         # 3) Stitch
-        return 0 # TODO
+        return 0  # TODO
 
 
 class PtychoNNBackend:
@@ -117,7 +115,9 @@ class PtychoNNBackend:
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool = False) -> PtychoNNBackend:
+    def createInstance(cls,
+                       settingsRegistry: SettingsRegistry,
+                       isDeveloperModeEnabled: bool = False) -> PtychoNNBackend:
         core = cls(settingsRegistry)
 
         if torch or isDeveloperModeEnabled:
@@ -126,4 +126,3 @@ class PtychoNNBackend:
             logger.info('torch not found.')
 
         return core
-

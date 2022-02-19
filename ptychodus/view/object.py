@@ -38,4 +38,3 @@ class ObjectParametersView(QWidget):
         view.setLayout(layout)
 
         return view
-

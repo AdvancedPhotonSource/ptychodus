@@ -11,7 +11,6 @@ from .observer import Observable, Observer
 from .reconstructor import Reconstructor
 from .settings import SettingsRegistry, SettingsGroup
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -79,8 +78,10 @@ class TikeProbeCorrectionSettings(TikeAdaptiveMomentSettings):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
         self.sparsityConstraint = settingsGroup.createRealEntry('SparsityConstraint', 1)
-        self.orthogonalityConstraint = settingsGroup.createBooleanEntry('OrthogonalityConstraint', True)
-        self.centeredIntensityConstraint = settingsGroup.createBooleanEntry('CenteredIntensityConstraint', False)
+        self.orthogonalityConstraint = settingsGroup.createBooleanEntry(
+            'OrthogonalityConstraint', True)
+        self.centeredIntensityConstraint = settingsGroup.createBooleanEntry(
+            'CenteredIntensityConstraint', False)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikeProbeCorrectionSettings:
@@ -104,7 +105,7 @@ class TikeProbeCorrectionPresenter(TikeAdaptiveMomentPresenter):
 
     def getSparsityConstraint(self) -> Decimal:
         return self._clamp(self._settings.sparsityConstraint.value,
-                self.getMinSparsityConstraint(), self.getMaxSparsityConstraint())
+                           self.getMinSparsityConstraint(), self.getMaxSparsityConstraint())
 
     def setSparsityConstraint(self, value: Decimal) -> None:
         self._settings.sparsityConstraint.value = value
@@ -138,7 +139,8 @@ class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
         super().__init__(settings)
 
     @classmethod
-    def createInstance(cls, settings: TikeObjectCorrectionSettings) -> TikeObjectCorrectionPresenter:
+    def createInstance(cls,
+                       settings: TikeObjectCorrectionSettings) -> TikeObjectCorrectionPresenter:
         presenter = cls(settings)
         return presenter
 
@@ -150,7 +152,7 @@ class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
 
     def getPositivityConstraint(self) -> Decimal:
         return self._clamp(self._settings.positivityConstraint.value,
-                self.getMinPositivityConstraint(), self.getMaxPositivityConstraint())
+                           self.getMinPositivityConstraint(), self.getMaxPositivityConstraint())
 
     def setPositivityConstraint(self, value: Decimal) -> None:
         self._settings.positivityConstraint.value = value
@@ -163,7 +165,7 @@ class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
 
     def getSmoothnessConstraint(self) -> Decimal:
         return self._clamp(self._settings.smoothnessConstraint.value,
-                self.getMinSmoothnessConstraint(), self.getMaxSmoothnessConstraint())
+                           self.getMinSmoothnessConstraint(), self.getMaxSmoothnessConstraint())
 
     def setSmoothnessConstraint(self, value: Decimal) -> None:
         self._settings.smoothnessConstraint.value = value
@@ -172,7 +174,8 @@ class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
 class TikePositionCorrectionSettings(TikeAdaptiveMomentSettings):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
-        self.usePositionRegularization = settingsGroup.createBooleanEntry('UsePositionRegularization', False)
+        self.usePositionRegularization = settingsGroup.createBooleanEntry(
+            'UsePositionRegularization', False)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikePositionCorrectionSettings:
@@ -184,7 +187,8 @@ class TikePositionCorrectionPresenter(TikeAdaptiveMomentPresenter):
         super().__init__(settings)
 
     @classmethod
-    def createInstance(cls, settings: TikePositionCorrectionSettings) -> TikePositionCorrectionPresenter:
+    def createInstance(
+            cls, settings: TikePositionCorrectionSettings) -> TikePositionCorrectionPresenter:
         presenter = cls(settings)
         return presenter
 
@@ -236,7 +240,8 @@ class TikeIterationPresenter(Observable, Observer):
         return self.MAX_INT
 
     def getNumBatch(self) -> int:
-        return self._clamp(self._settings.numBatch.value, self.getMinNumBatch(), self.getMaxNumBatch())
+        return self._clamp(self._settings.numBatch.value, self.getMinNumBatch(),
+                           self.getMaxNumBatch())
 
     def setNumBatch(self, value: int) -> None:
         self._settings.numBatch.value = value
@@ -248,7 +253,8 @@ class TikeIterationPresenter(Observable, Observer):
         return self.MAX_INT
 
     def getNumIter(self) -> int:
-        return self._clamp(self._settings.numIter.value, self.getMinNumIter(), self.getMaxNumIter())
+        return self._clamp(self._settings.numIter.value, self.getMinNumIter(),
+                           self.getMaxNumIter())
 
     def setNumIter(self, value: int) -> None:
         self._settings.numIter.value = value
@@ -272,8 +278,7 @@ class TikeIterationPresenter(Observable, Observer):
         return Decimal(1)
 
     def getAlpha(self) -> Decimal:
-        return self._clamp(self._settings.alpha.value,
-                self.getMinAlpha(), self.getMaxAlpha())
+        return self._clamp(self._settings.alpha.value, self.getMinAlpha(), self.getMaxAlpha())
 
     def setAlpha(self, value: Decimal) -> None:
         self._settings.alpha.value = value
@@ -285,8 +290,8 @@ class TikeIterationPresenter(Observable, Observer):
         return Decimal(1)
 
     def getStepLength(self) -> Decimal:
-        return self._clamp(self._settings.stepLength.value,
-                self.getMinStepLength(), self.getMaxStepLength())
+        return self._clamp(self._settings.stepLength.value, self.getMinStepLength(),
+                           self.getMaxStepLength())
 
     def setStepLength(self, value: Decimal) -> None:
         self._settings.stepLength.value = value
@@ -311,7 +316,7 @@ class RegularizedPIEReconstructor(Reconstructor):
         return 'Tike'
 
     def reconstruct(self) -> int:
-        return 0 # TODO
+        return 0  # TODO
 
 
 class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
@@ -324,7 +329,7 @@ class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
         return 'Tike'
 
     def reconstruct(self) -> int:
-        return 0 # TODO
+        return 0  # TODO
 
 
 class ConjugateGradientReconstructor(Reconstructor):
@@ -337,7 +342,7 @@ class ConjugateGradientReconstructor(Reconstructor):
         return 'Tike'
 
     def reconstruct(self) -> int:
-        return 0 # TODO
+        return 0  # TODO
 
 
 class IterativeLeastSquaresReconstructor(Reconstructor):
@@ -350,33 +355,33 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
         return 'Tike'
 
     def reconstruct(self) -> int:
-        return 0 # TODO
+        return 0  # TODO
 
 
 class TikeBackend:
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         self._positionCorrectionSettings = TikePositionCorrectionSettings.createInstance(
-                settingsRegistry)
+            settingsRegistry)
         self._probeCorrectionSettings = TikeProbeCorrectionSettings.createInstance(
-                settingsRegistry)
+            settingsRegistry)
         self._objectCorrectionSettings = TikeObjectCorrectionSettings.createInstance(
-                settingsRegistry)
-        self._iterationSettings = TikeIterationSettings.createInstance(
-                settingsRegistry)
+            settingsRegistry)
+        self._iterationSettings = TikeIterationSettings.createInstance(settingsRegistry)
 
         self.positionCorrectionPresenter = TikePositionCorrectionPresenter.createInstance(
-                self._positionCorrectionSettings)
+            self._positionCorrectionSettings)
         self.probeCorrectionPresenter = TikeProbeCorrectionPresenter.createInstance(
-                self._probeCorrectionSettings)
+            self._probeCorrectionSettings)
         self.objectCorrectionPresenter = TikeObjectCorrectionPresenter.createInstance(
-                self._objectCorrectionSettings)
-        self.iterationPresenter = TikeIterationPresenter.createInstance(
-                self._iterationSettings)
+            self._objectCorrectionSettings)
+        self.iterationPresenter = TikeIterationPresenter.createInstance(self._iterationSettings)
 
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool = False) -> TikeBackend:
+    def createInstance(cls,
+                       settingsRegistry: SettingsRegistry,
+                       isDeveloperModeEnabled: bool = False) -> TikeBackend:
         core = cls(settingsRegistry)
 
         if tike or isDeveloperModeEnabled:
@@ -388,4 +393,3 @@ class TikeBackend:
             logger.info('tike not found.')
 
         return core
-

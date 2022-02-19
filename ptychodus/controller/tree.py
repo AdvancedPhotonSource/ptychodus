@@ -31,7 +31,10 @@ class SimpleTreeModel(QAbstractItemModel):
 
         return value
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> QVariant:
+    def headerData(self,
+                   section: int,
+                   orientation: Qt.Orientation,
+                   role: int = Qt.DisplayRole) -> QVariant:
         value = None
 
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
@@ -76,4 +79,3 @@ class SimpleTreeModel(QAbstractItemModel):
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(parent.internalPointer().itemData) if parent.isValid() \
                 else len(self._rootNode.itemData)
-

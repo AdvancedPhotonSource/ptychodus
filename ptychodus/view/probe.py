@@ -82,4 +82,3 @@ class ProbeParametersView(QWidget):
         view.setLayout(layout)
 
         return view
-

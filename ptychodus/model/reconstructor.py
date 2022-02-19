@@ -53,7 +53,7 @@ class NullReconstructor(Reconstructor):
 
 class SelectableReconstructor(Reconstructor, Observer):
     def __init__(self, settings: ReconstructorSettings,
-            reconstructorList: list[Reconstructor]) -> None:
+                 reconstructorList: list[Reconstructor]) -> None:
         super().__init__()
         self._settings = settings
         self._reconstructorList = reconstructorList
@@ -61,7 +61,7 @@ class SelectableReconstructor(Reconstructor, Observer):
 
     @classmethod
     def createInstance(cls, settings: ReconstructorSettings,
-            reconstructorList: list[Reconstructor]) -> SelectableReconstructor:
+                       reconstructorList: list[Reconstructor]) -> SelectableReconstructor:
         if not reconstructorList:
             reconstructorList.append(NullReconstructor())
 
@@ -81,9 +81,11 @@ class SelectableReconstructor(Reconstructor, Observer):
     def reconstruct(self) -> int:
         return self._reconstructor.reconstruct()
 
-    def getAlgorithmDict(self) -> dict[str,str]:
-        return { reconstructor.name: reconstructor.backendName
-                for reconstructor in self._reconstructorList }
+    def getAlgorithmDict(self) -> dict[str, str]:
+        return {
+            reconstructor.name: reconstructor.backendName
+            for reconstructor in self._reconstructorList
+        }
 
     def getCurrentAlgorithm(self) -> str:
         return self.name
@@ -91,7 +93,7 @@ class SelectableReconstructor(Reconstructor, Observer):
     def setCurrentAlgorithm(self, name: str) -> None:
         try:
             reconstructor = next(recon for recon in self._reconstructorList
-                    if name.casefold() == recon.name.casefold())
+                                 if name.casefold() == recon.name.casefold())
         except StopIteration:
             return
 
@@ -112,19 +114,19 @@ class SelectableReconstructor(Reconstructor, Observer):
 
 class ReconstructorPresenter(Observable, Observer):
     def __init__(self, settings: ReconstructorSettings,
-            selectableReconstructor: SelectableReconstructor) -> None:
+                 selectableReconstructor: SelectableReconstructor) -> None:
         super().__init__()
         self._settings = settings
         self._selectableReconstructor = selectableReconstructor
 
     @classmethod
     def createInstance(cls, settings: ReconstructorSettings,
-            selectableReconstructor: SelectableReconstructor) -> ReconstructorPresenter:
+                       selectableReconstructor: SelectableReconstructor) -> ReconstructorPresenter:
         presenter = cls(settings, selectableReconstructor)
         selectableReconstructor.addObserver(presenter)
         return presenter
 
-    def getAlgorithmDict(self) -> dict[str,str]:
+    def getAlgorithmDict(self) -> dict[str, str]:
         return self._selectableReconstructor.getAlgorithmDict()
 
     def getCurrentAlgorithm(self) -> str:
@@ -139,4 +141,3 @@ class ReconstructorPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._selectableReconstructor:
             self.notifyObservers()
-

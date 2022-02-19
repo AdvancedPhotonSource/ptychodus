@@ -9,7 +9,6 @@ import numpy
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,7 +40,8 @@ class ObjectSizer(Observable, Observer):
         self._scanExtentYInMeters = Decimal()
 
     @classmethod
-    def createInstance(cls, scanSequence: ScanSequence, detector: Detector, probe: Probe) -> ObjectSizer:
+    def createInstance(cls, scanSequence: ScanSequence, detector: Detector,
+                       probe: Probe) -> ObjectSizer:
         sizer = cls(scanSequence, detector, probe)
         scanSequence.addObserver(sizer)
         detector.addObserver(sizer)
@@ -50,7 +50,7 @@ class ObjectSizer(Observable, Observer):
         return sizer
 
     @property
-    def shape(self) -> Tuple[int,int]:
+    def shape(self) -> Tuple[int, int]:
         return self.extentYInPixels, self.extentXInPixels
 
     @property
@@ -120,8 +120,8 @@ class UniformRandomObjectInitializer(Callable):
 
     def __call__(self) -> numpy.ndarray:
         size = self._sizer.shape
-        magnitude = numpy.sqrt(self._rng.uniform(low = 0., high = 1., size = size))
-        phase = self._rng.uniform(low = 0., high = 2. * numpy.pi, size = size)
+        magnitude = numpy.sqrt(self._rng.uniform(low=0., high=1., size=size))
+        phase = self._rng.uniform(low=0., high=2. * numpy.pi, size=size)
         return magnitude * numpy.exp(1.j * phase)
 
     def __str__(self) -> str:
@@ -148,17 +148,19 @@ class CustomObjectInitializer(Callable):
 
 
 class ObjectPresenter(Observable, Observer):
-    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, initializerList: list[Callable]) -> None:
+    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer,
+                 initializerList: list[Callable]) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
         self._initializerList = initializerList
         self._initializer = initializerList[0]
-        self._estimate = numpy.zeros((0,0), dtype=complex)
+        self._estimate = numpy.zeros((0, 0), dtype=complex)
         self._objectIO = ObjectIO()
 
     @classmethod
-    def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings, sizer: ObjectSizer) -> ObjectPresenter:
+    def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings,
+                       sizer: ObjectSizer) -> ObjectPresenter:
         initializerList = list()
         initializerList.append(UniformRandomObjectInitializer(sizer, rng))
         initializerList.append(CustomObjectInitializer(sizer))
@@ -179,7 +181,7 @@ class ObjectPresenter(Observable, Observer):
     def setCurrentInitializer(self, name: str) -> None:
         try:
             initializer = next(ini for ini in self._initializerList
-                    if name.casefold() == str(ini).casefold())
+                               if name.casefold() == str(ini).casefold())
         except StopIteration:
             return
 
@@ -213,4 +215,3 @@ class ObjectPresenter(Observable, Observer):
             self.setCurrentInitializerFromSettings()
         elif observable is self._sizer:
             self.notifyObservers()
-

@@ -81,7 +81,7 @@ class ViewCore(QMainWindow):
         view.addToolBar(Qt.LeftToolBarArea, view.navigationToolBar)
         view.navigationToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
 
-        commonSize = QSize(150, 88) # TODO calculate
+        commonSize = QSize(150, 88)  # TODO calculate
 
         for index, action in enumerate(view.navigationToolBar.actions()):
             action.setCheckable(True)
@@ -111,8 +111,9 @@ class ViewCore(QMainWindow):
         objectToolButton.setMenu(view.objectMenu)
         objectToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 
-        view.parametersWidget.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Minimum) # TODO
-        view.settingsEntryView.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        view.parametersWidget.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Minimum)  # TODO
+        view.settingsEntryView.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeToContents)
         view.dataFileTreeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         # maintain same order as navigationToolBar buttons
@@ -139,7 +140,6 @@ class ViewCore(QMainWindow):
         view.splitter.addWidget(view.contentsWidget)
         view.setCentralWidget(view.splitter)
 
-        view.statusBar().showMessage('Ready') # TODO
+        view.statusBar().showMessage('Ready')  # TODO
 
         return view
-

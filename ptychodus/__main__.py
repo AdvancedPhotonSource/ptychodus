@@ -29,14 +29,19 @@ def version_string() -> str:
 def main() -> int:
     NOT_FOUND_STR = 'NOT FOUND!'
 
-    parser = argparse.ArgumentParser(prog=ptychodus.__name__.lower(),
-            description=f'{ptychodus.__name__} is a ptychographic reconstruction user interface')
-    parser.add_argument('-b', '--batch', action='store_true',
-            help='run reconstruction non-interactively')
-    parser.add_argument('-d', '--dev', action='store_true',
-            help='run in developer mode')
-    parser.add_argument('-s', '--settings', action='store', type=argparse.FileType('r'),
-            help='use settings from file')
+    parser = argparse.ArgumentParser(
+        prog=ptychodus.__name__.lower(),
+        description=f'{ptychodus.__name__} is a ptychographic reconstruction user interface')
+    parser.add_argument('-b',
+                        '--batch',
+                        action='store_true',
+                        help='run reconstruction non-interactively')
+    parser.add_argument('-d', '--dev', action='store_true', help='run in developer mode')
+    parser.add_argument('-s',
+                        '--settings',
+                        action='store',
+                        type=argparse.FileType('r'),
+                        help='use settings from file')
     parser.add_argument('-v', '--version', action='version', version=version_string())
     parsed_args, unparsed_args = parser.parse_known_args()
 
@@ -51,7 +56,7 @@ def main() -> int:
     logger.debug('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
     logger.debug('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
 
-    model = ptychodus.model.ModelCore.createInstance(isDeveloperModeEnabled = parsed_args.dev)
+    model = ptychodus.model.ModelCore.createInstance(isDeveloperModeEnabled=parsed_args.dev)
     model.start()
     result = 0
 
@@ -86,4 +91,3 @@ def main() -> int:
 
 
 sys.exit(main())
-

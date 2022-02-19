@@ -30,14 +30,12 @@ class DetectorParametersController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.pixelSizeXWidget.setLengthInMeters(
-                self._presenter.getPixelSizeXInMeters())
-        self._view.pixelSizeYWidget.setLengthInMeters(
-                self._presenter.getPixelSizeYInMeters())
+        self._view.pixelSizeXWidget.setLengthInMeters(self._presenter.getPixelSizeXInMeters())
+        self._view.pixelSizeYWidget.setLengthInMeters(self._presenter.getPixelSizeYInMeters())
         self._view.detectorDistanceWidget.setLengthInMeters(
-                self._presenter.getDetectorDistanceInMeters())
+            self._presenter.getDetectorDistanceInMeters())
         self._view.defocusDistanceWidget.setLengthInMeters(
-                self._presenter.getDefocusDistanceInMeters())
+            self._presenter.getDefocusDistanceInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -83,7 +81,7 @@ class DetectorDatasetListModel(QAbstractListModel):
 
 class DetectorDatasetController(Observer):
     def __init__(self, datasetPresenter: DetectorDatasetPresenter,
-            imagePresenter: DetectorImagePresenter, view: DetectorDatasetView) -> None:
+                 imagePresenter: DetectorImagePresenter, view: DetectorDatasetView) -> None:
         self._datasetPresenter = datasetPresenter
         self._imagePresenter = imagePresenter
         self._listModel = DetectorDatasetListModel(datasetPresenter)
@@ -91,7 +89,7 @@ class DetectorDatasetController(Observer):
 
     @classmethod
     def createInstance(cls, datasetPresenter: DetectorDatasetPresenter,
-            imagePresenter: DetectorImagePresenter, view: DetectorDatasetView):
+                       imagePresenter: DetectorImagePresenter, view: DetectorDatasetView):
         controller = cls(datasetPresenter, imagePresenter, view)
 
         view.dataFileListView.setModel(controller._listModel)
@@ -99,7 +97,7 @@ class DetectorDatasetController(Observer):
         imagePresenter.addObserver(controller)
 
         view.dataFileListView.selectionModel().currentChanged.connect(
-                controller._updateCurrentDatasetIndex)
+            controller._updateCurrentDatasetIndex)
 
         return controller
 
@@ -122,7 +120,8 @@ class DetectorDatasetController(Observer):
 class DetectorImageCropController(Observer):
     MAX_INT = 0x7FFFFFFF
 
-    def __init__(self, presenter: DetectorParametersPresenter, view: DetectorImageCropView) -> None:
+    def __init__(self, presenter: DetectorParametersPresenter,
+                 view: DetectorImageCropView) -> None:
         self._presenter = presenter
         self._view = view
 
@@ -133,13 +132,17 @@ class DetectorImageCropController(Observer):
 
         view.setCheckable(True)
         view.toggled.connect(presenter.setCropEnabled)
-        view.centerXSpinBox.setRange(0, DetectorImageCropController.MAX_INT) # TODO image width (move to model)
+        view.centerXSpinBox.setRange(
+            0, DetectorImageCropController.MAX_INT)  # TODO image width (move to model)
         view.centerXSpinBox.valueChanged.connect(presenter.setCropCenterXInPixels)
-        view.centerYSpinBox.setRange(0, DetectorImageCropController.MAX_INT) # TODO image height (move to model)
+        view.centerYSpinBox.setRange(
+            0, DetectorImageCropController.MAX_INT)  # TODO image height (move to model)
         view.centerYSpinBox.valueChanged.connect(presenter.setCropCenterYInPixels)
-        view.extentXSpinBox.setRange(0, DetectorImageCropController.MAX_INT) # TODO image width (move to model)
+        view.extentXSpinBox.setRange(
+            0, DetectorImageCropController.MAX_INT)  # TODO image width (move to model)
         view.extentXSpinBox.valueChanged.connect(presenter.setCropExtentXInPixels)
-        view.extentYSpinBox.setRange(0, DetectorImageCropController.MAX_INT) # TODO image height (move to model)
+        view.extentYSpinBox.setRange(
+            0, DetectorImageCropController.MAX_INT)  # TODO image height (move to model)
         view.extentYSpinBox.valueChanged.connect(presenter.setCropExtentYInPixels)
 
         controller._syncModelToView()
@@ -160,9 +163,9 @@ class DetectorImageCropController(Observer):
 
 class DetectorImageController(Observer):
     def __init__(self, presenter: DetectorImagePresenter, view: ImageView) -> None:
-       self._presenter = presenter
-       self._view = view
-       self._image_controller = ImageController.createInstance(view)
+        self._presenter = presenter
+        self._view = view
+        self._image_controller = ImageController.createInstance(view)
 
     @classmethod
     def createInstance(cls, presenter: DetectorImagePresenter, view: ImageView):
@@ -189,4 +192,3 @@ class DetectorImageController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self.updateView()
-

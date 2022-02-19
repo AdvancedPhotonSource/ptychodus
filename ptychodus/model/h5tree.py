@@ -8,11 +8,10 @@ from .observer import Observable
 from .tree import SimpleTreeNode
 from .data_file import DataFileReader
 
-
 logger = logging.getLogger(__name__)
 
 
-class H5FileTreeReader(DataFileReader,Observable):
+class H5FileTreeReader(DataFileReader, Observable):
     FILE_FILTER = 'Hierarchical Data Format 5 Files (*.h5)'
 
     @staticmethod
@@ -45,7 +44,7 @@ class H5FileTreeReader(DataFileReader,Observable):
 
     def read(self, rootGroup: h5py.Group) -> None:
         self._rootNode = H5FileTreeReader.createRootNode()
-        unvisited = [ (self._rootNode, rootGroup) ]
+        unvisited = [(self._rootNode, rootGroup)]
 
         while unvisited:
             parentItem, h5Group = unvisited.pop()
@@ -64,7 +63,7 @@ class H5FileTreeReader(DataFileReader,Observable):
                     if isinstance(h5Item, h5py.Group):
                         itemType = 'Group'
                         H5FileTreeReader._addAttributes(treeNode, h5Item.attrs)
-                        unvisited.append( (treeNode, h5Item) )
+                        unvisited.append((treeNode, h5Item))
                     elif isinstance(h5Item, h5py.Dataset):
                         itemType = 'Dataset'
                         H5FileTreeReader._addAttributes(treeNode, h5Item.attrs)
@@ -94,4 +93,3 @@ class H5FileTreeReader(DataFileReader,Observable):
                 treeNode.itemData = [itemName, itemType, itemDetails]
 
         self.notifyObservers()
-

@@ -32,7 +32,8 @@ class SettingsEntryTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._settingsGroup = settingsGroup
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: Qt.ItemDataRole) -> QVariant:
+    def headerData(self, section: int, orientation: Qt.Orientation,
+                   role: Qt.ItemDataRole) -> QVariant:
         result = None
 
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
@@ -70,7 +71,7 @@ class SettingsEntryTableModel(QAbstractTableModel):
 
 class SettingsController(Observer):
     def __init__(self, settingsRegistry: SettingsRegistry, presenter: SettingsPresenter,
-            groupListView: QListView, entryTableView: QTableView) -> None:
+                 groupListView: QListView, entryTableView: QTableView) -> None:
         self._settingsRegistry = settingsRegistry
         self._presenter = presenter
         self._groupListModel = SettingsGroupListModel(settingsRegistry)
@@ -80,28 +81,29 @@ class SettingsController(Observer):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry, presenter: SettingsPresenter,
-            groupListView: QListView, entryTableView: QTableView) -> None:
+                       groupListView: QListView, entryTableView: QTableView) -> None:
         controller = cls(settingsRegistry, presenter, groupListView, entryTableView)
         settingsRegistry.addObserver(controller)
 
         controller._groupListView.setModel(controller._groupListModel)
         controller._entryTableView.setModel(controller._entryTableModel)
 
-        controller._groupListView.selectionModel().currentChanged.connect(controller._swapSettingsEntries)
+        controller._groupListView.selectionModel().currentChanged.connect(
+            controller._swapSettingsEntries)
 
         return controller
 
     def openSettings(self) -> None:
-        fileName, _ = QFileDialog.getOpenFileName(self._groupListView,
-                'Open Settings', str(Path.home()), SettingsPresenter.FILE_FILTER)
+        fileName, _ = QFileDialog.getOpenFileName(self._groupListView, 'Open Settings',
+                                                  str(Path.home()), SettingsPresenter.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)
             self._presenter.openSettings(filePath)
 
     def saveSettings(self) -> None:
-        fileName, _ = QFileDialog.getSaveFileName(self._groupListView,
-                'Save Settings', str(Path.home()), SettingsPresenter.FILE_FILTER)
+        fileName, _ = QFileDialog.getSaveFileName(self._groupListView, 'Save Settings',
+                                                  str(Path.home()), SettingsPresenter.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)
@@ -153,4 +155,3 @@ class ImportSettingsController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._dialog.open()
-

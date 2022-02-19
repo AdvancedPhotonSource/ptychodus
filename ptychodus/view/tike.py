@@ -15,9 +15,9 @@ class TikeAdaptiveMomentView(QGroupBox):
 
         view.setCheckable(True)
         view.mdecaySpinBox.setToolTip('The proportion of the first moment '
-        'that is previous first moments.')
+                                      'that is previous first moments.')
         view.vdecaySpinBox.setToolTip('The proportion of the second moment '
-        'that is previous second moments.')
+                                      'that is previous second moments.')
 
         layout = QFormLayout()
         layout.addRow('M Decay:', view.mdecaySpinBox)
@@ -37,7 +37,8 @@ class TikePositionCorrectionView(QGroupBox):
     def createInstance(cls, parent: QWidget = None) -> TikePositionCorrectionView:
         view = cls(parent)
 
-        view.positionRegularizationCheckBox.setToolTip('Whether the positions are constrained to fit a random error plus affine error model.')
+        view.positionRegularizationCheckBox.setToolTip(
+            'Whether the positions are constrained to fit a random error plus affine error model.')
 
         layout = QFormLayout()
         layout.addRow(view.positionRegularizationCheckBox)
@@ -59,9 +60,12 @@ class TikeProbeCorrectionView(QGroupBox):
     def createInstance(cls, parent: QWidget = None) -> TikeProbeCorrectionView:
         view = cls(parent)
 
-        view.sparsityConstraintSpinBox.setToolTip('Forces a maximum proportion of non-zero elements.')
-        view.orthogonalityConstraintCheckBox.setToolTip('Forces probes to be orthogonal each iteration.')
-        view.centeredIntensityConstraintCheckBox.setToolTip('Forces the probe intensity to be centered.')
+        view.sparsityConstraintSpinBox.setToolTip(
+            'Forces a maximum proportion of non-zero elements.')
+        view.orthogonalityConstraintCheckBox.setToolTip(
+            'Forces probes to be orthogonal each iteration.')
+        view.centeredIntensityConstraintCheckBox.setToolTip(
+            'Forces the probe intensity to be centered.')
 
         layout = QFormLayout()
         layout.addRow('Sparsity Constraint:', view.sparsityConstraintSpinBox)
@@ -103,14 +107,22 @@ class TikeIterationOptionsView(QGroupBox):
         self.stepLengthSpinBox = QDoubleSpinBox()
 
     @classmethod
-    def createInstance(cls, showCgIter: bool, showAlpha: bool, showStepLength: bool, parent: QWidget = None) -> TikeIterationOptionsView:
+    def createInstance(cls,
+                       showCgIter: bool,
+                       showAlpha: bool,
+                       showStepLength: bool,
+                       parent: QWidget = None) -> TikeIterationOptionsView:
         view = cls(parent)
 
-        view.numBatchSpinBox.setToolTip('The dataset is divided into this number of groups where each group is processed sequentially.')
+        view.numBatchSpinBox.setToolTip(
+            'The dataset is divided into this number of groups where each group is processed sequentially.'
+        )
         view.numIterSpinBox.setToolTip('The number of epochs to process before returning.')
-        view.cgIterSpinBox.setToolTip('The number of conjugate directions to search for each update.')
+        view.cgIterSpinBox.setToolTip(
+            'The number of conjugate directions to search for each update.')
         view.alphaSpinBox.setToolTip('RPIE becomes EPIE when this parameter is 1.')
-        view.stepLengthSpinBox.setToolTip('Scales the inital search directions before the line search.')
+        view.stepLengthSpinBox.setToolTip(
+            'Scales the inital search directions before the line search.')
 
         layout = QFormLayout()
         layout.addRow('Number of Batches:', view.numBatchSpinBox)
@@ -131,15 +143,21 @@ class TikeIterationOptionsView(QGroupBox):
 
 
 class TikeParametersView(QWidget):
-    def __init__(self, showCgIter: bool, showAlpha: bool, showStepLength: bool, parent: QWidget) -> None:
+    def __init__(self, showCgIter: bool, showAlpha: bool, showStepLength: bool,
+                 parent: QWidget) -> None:
         super().__init__(parent)
         self.positionCorrectionView = TikePositionCorrectionView.createInstance()
         self.probeCorrectionView = TikeProbeCorrectionView.createInstance()
         self.objectCorrectionView = TikeObjectCorrectionView.createInstance()
-        self.iterationOptionsView = TikeIterationOptionsView.createInstance(showCgIter, showAlpha, showStepLength)
+        self.iterationOptionsView = TikeIterationOptionsView.createInstance(
+            showCgIter, showAlpha, showStepLength)
 
     @classmethod
-    def createInstance(cls, showCgIter: bool, showAlpha: bool, showStepLength: bool, parent: QWidget = None) -> TikeParametersView:
+    def createInstance(cls,
+                       showCgIter: bool,
+                       showAlpha: bool,
+                       showStepLength: bool,
+                       parent: QWidget = None) -> TikeParametersView:
         view = cls(showCgIter, showAlpha, showStepLength, parent)
 
         layout = QVBoxLayout()
@@ -151,4 +169,3 @@ class TikeParametersView(QWidget):
         view.setLayout(layout)
 
         return view
-

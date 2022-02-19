@@ -7,9 +7,10 @@ from .settings import SettingsGroup
 from .velociprobe import VelociprobeReader, DetectorGroup, DetectorSpecificGroup
 
 
-class ImportSettingsPresenter(Observable, Observer): # TODO refactor to set using presenters rather than settings
+class ImportSettingsPresenter(Observable, Observer
+                              ):  # TODO refactor to set using presenters rather than settings
     def __init__(self, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
-            cropSettings: CropSettings, probeSettings: ProbeSettings) -> None:
+                 cropSettings: CropSettings, probeSettings: ProbeSettings) -> None:
         super().__init__()
         self._velociprobeReader = velociprobeReader
         self._detectorSettings = detectorSettings
@@ -17,8 +18,9 @@ class ImportSettingsPresenter(Observable, Observer): # TODO refactor to set usin
         self._probeSettings = probeSettings
 
     @classmethod
-    def createInstance(cls, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
-            cropSettings: CropSettings, probeSettings: ProbeSettings):
+    def createInstance(cls, velociprobeReader: VelociprobeReader,
+                       detectorSettings: DetectorSettings, cropSettings: CropSettings,
+                       probeSettings: ProbeSettings):
         presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings)
         velociprobeReader.addObserver(presenter)
         return presenter
@@ -72,4 +74,3 @@ class ImportSettingsPresenter(Observable, Observer): # TODO refactor to set usin
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:
             self.notifyObservers()
-

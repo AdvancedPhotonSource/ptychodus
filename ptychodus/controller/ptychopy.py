@@ -13,7 +13,8 @@ class PtychoPyBasicParametersController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: PtychoPyPresenter, view: PtychoPyBasicView) -> PtychoPyBasicParametersController:
+    def createInstance(cls, presenter: PtychoPyPresenter,
+                       view: PtychoPyBasicView) -> PtychoPyBasicParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -29,25 +30,25 @@ class PtychoPyBasicParametersController(Observer):
     def _syncModelToView(self) -> None:
         self._view.probeModesSpinBox.blockSignals(True)
         self._view.probeModesSpinBox.setRange(self._presenter.getMinProbeModes(),
-                self._presenter.getMaxProbeModes())
+                                              self._presenter.getMaxProbeModes())
         self._view.probeModesSpinBox.setValue(self._presenter.getProbeModes())
         self._view.probeModesSpinBox.blockSignals(False)
 
         self._view.thresholdSpinBox.blockSignals(True)
         self._view.thresholdSpinBox.setRange(self._presenter.getMinThreshold(),
-                self._presenter.getMaxThreshold())
+                                             self._presenter.getMaxThreshold())
         self._view.thresholdSpinBox.setValue(self._presenter.getThreshold())
         self._view.thresholdSpinBox.blockSignals(False)
 
         self._view.iterationLimitSpinBox.blockSignals(True)
         self._view.iterationLimitSpinBox.setRange(self._presenter.getMinReconstructionIterations(),
-                self._presenter.getMaxReconstructionIterations())
+                                                  self._presenter.getMaxReconstructionIterations())
         self._view.iterationLimitSpinBox.setValue(self._presenter.getReconstructionIterations())
         self._view.iterationLimitSpinBox.blockSignals(False)
 
         self._view.timeLimitSpinBox.blockSignals(True)
         self._view.timeLimitSpinBox.setRange(self._presenter.getMinReconstructionTimeInSeconds(),
-                self._presenter.getMaxReconstructionTimeInSeconds())
+                                             self._presenter.getMaxReconstructionTimeInSeconds())
         self._view.timeLimitSpinBox.setValue(self._presenter.getReconstructionTimeInSeconds())
         self._view.timeLimitSpinBox.blockSignals(False)
 
@@ -63,7 +64,8 @@ class PtychoPyAdvancedParametersController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: PtychoPyPresenter, view: PtychoPyAdvancedView) -> PtychoPyAdvancedParametersController:
+    def createInstance(cls, presenter: PtychoPyPresenter,
+                       view: PtychoPyAdvancedView) -> PtychoPyAdvancedParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -81,19 +83,19 @@ class PtychoPyAdvancedParametersController(Observer):
 
         self._view.updateProbeSpinBox.blockSignals(True)
         self._view.updateProbeSpinBox.setRange(self._presenter.getMinUpdateProbe(),
-                self._presenter.getMaxUpdateProbe())
+                                               self._presenter.getMaxUpdateProbe())
         self._view.updateProbeSpinBox.setValue(self._presenter.getUpdateProbe())
         self._view.updateProbeSpinBox.blockSignals(False)
 
         self._view.updateModesSpinBox.blockSignals(True)
         self._view.updateModesSpinBox.setRange(self._presenter.getMinUpdateModes(),
-                self._presenter.getMaxUpdateModes())
+                                               self._presenter.getMaxUpdateModes())
         self._view.updateModesSpinBox.setValue(self._presenter.getUpdateModes())
         self._view.updateModesSpinBox.blockSignals(False)
 
         self._view.phaseConstraintSpinBox.blockSignals(True)
         self._view.phaseConstraintSpinBox.setRange(self._presenter.getMinPhaseConstraint(),
-                self._presenter.getMaxPhaseConstraint())
+                                                   self._presenter.getMaxPhaseConstraint())
         self._view.phaseConstraintSpinBox.setValue(self._presenter.getPhaseConstraint())
         self._view.phaseConstraintSpinBox.blockSignals(False)
 
@@ -107,12 +109,13 @@ class PtychoPyParametersController:
         self._model = model
         self._view = view
         self._basicParametersController = PtychoPyBasicParametersController.createInstance(
-                model.presenter, view.basicView)
+            model.presenter, view.basicView)
         self._advancedParametersController = PtychoPyAdvancedParametersController.createInstance(
-                model.presenter, view.advancedView)
+            model.presenter, view.advancedView)
 
     @classmethod
-    def createInstance(cls, model: PtychoPyBackend, view: PtychoPyParametersView) -> PtychoPyParametersController:
+    def createInstance(cls, model: PtychoPyBackend,
+                       view: PtychoPyParametersView) -> PtychoPyParametersController:
         controller = cls(model, view)
         return controller
 
@@ -133,4 +136,3 @@ class PtychoPyViewControllerFactory(ReconstructorViewControllerFactory):
         self._controllerList.append(controller)
 
         return view
-
