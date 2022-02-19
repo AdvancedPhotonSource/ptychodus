@@ -22,8 +22,13 @@ except ImportError:
     PyQt5 = None
 
 
-def version_string() -> str:
+def versionString() -> str:
     return f'{ptychodus.__name__} ({ptychodus.__version__})'
+
+
+def verifyAllArgumentsParsed(parser: argparse.ArgumentParser, argv: list[str]) -> None:
+    if argv:
+        parser.error('unrecognized arguments: %s' % ' '.join(argv))
 
 
 def main() -> int:
@@ -42,13 +47,13 @@ def main() -> int:
                         action='store',
                         type=argparse.FileType('r'),
                         help='use settings from file')
-    parser.add_argument('-v', '--version', action='version', version=version_string())
-    parsed_args, unparsed_args = parser.parse_known_args()
+    parser.add_argument('-v', '--version', action='version', version=versionString())
+    parsedArgs, unparsedArgs = parser.parse_known_args()
 
     logger = logging.getLogger(ptychodus.__name__)
     logger.setLevel(logging.DEBUG)
 
-    logger.debug(version_string())
+    logger.debug(versionString())
     logger.debug(f'\tNumPy {numpy.__version__}')
     logger.debug(f'\tMatplotlib {matplotlib.__version__}')
     logger.debug(f'\tHDF5 {h5py.version.hdf5_version}')
@@ -56,29 +61,32 @@ def main() -> int:
     logger.debug('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
     logger.debug('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
 
-    model = ptychodus.model.ModelCore.createInstance(isDeveloperModeEnabled=parsed_args.dev)
+    model = ptychodus.model.ModelCore.createInstance(isDeveloperModeEnabled=parsedArgs.dev)
     model.start()
     result = 0
 
-    if parsed_args.settings:
-        result = model.settingsPresenter.openSettings(parsed_args.settings)
+    if parsedArgs.settings:
+        result = model.settingsPresenter.openSettings(parsedArgs.settings)
 
         if result != 0:
             return result
 
-    if parsed_args.batch:
+    if parsedArgs.batch:
+        verifyAllArgumentsParsed(parser, unparsedArgs)
+
         model.probePresenter.initializeProbe()
         model.objectPresenter.initializeObject()
         result = model.reconstructorPresenter.reconstruct()
     elif PyQt5:
         # QApplication expects the first argument to be the program name
-        qt_args = sys.argv[:1] + unparsed_args
-        app = QApplication(qt_args)
+        qtArgs = sys.argv[:1] + unparsedArgs
+        app = QApplication(qtArgs)
+        verifyAllArgumentsParsed(parser, app.arguments()[1:])
 
         view = ptychodus.view.ViewCore.createInstance()
         controller = ptychodus.controller.ControllerCore.createInstance(model, view)
 
-        view.setWindowTitle(version_string())
+        view.setWindowTitle(versionString())
         view.show()
         result = app.exec_()
     else:
