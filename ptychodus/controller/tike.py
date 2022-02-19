@@ -19,6 +19,7 @@ class TikeAdaptiveMomentController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        view.setCheckable(True)
         view.toggled.connect(presenter.setAdaptiveMomentEnabled)
 
         view.mdecaySpinBox.valueChanged.connect(presenter.setMDecay)
@@ -68,6 +69,9 @@ class TikeProbeCorrectionController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        view.setCheckable(True)
+        view.toggled.connect(presenter.setProbeCorrectionEnabled)
+
         view.sparsityConstraintSpinBox.valueChanged.connect(presenter.setSparsityConstraint)
         view.sparsityConstraintSpinBox.setDecimals(3)
         view.sparsityConstraintSpinBox.setSingleStep(1.e-3)
@@ -82,6 +86,8 @@ class TikeProbeCorrectionController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.setChecked(self._presenter.isProbeCorrectionEnabled())
+
         self._view.sparsityConstraintSpinBox.blockSignals(True)
         self._view.sparsityConstraintSpinBox.setRange(self._presenter.getMinSparsityConstraint(),
                                                       self._presenter.getMaxSparsityConstraint())
@@ -113,6 +119,9 @@ class TikeObjectCorrectionController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        view.setCheckable(True)
+        view.toggled.connect(presenter.setObjectCorrectionEnabled)
+
         view.positivityConstraintSpinBox.valueChanged.connect(presenter.setPositivityConstraint)
         view.positivityConstraintSpinBox.setDecimals(3)
         view.positivityConstraintSpinBox.setSingleStep(1.e-3)
@@ -126,6 +135,8 @@ class TikeObjectCorrectionController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.setChecked(self._presenter.isObjectCorrectionEnabled())
+
         self._view.positivityConstraintSpinBox.blockSignals(True)
         self._view.positivityConstraintSpinBox.setRange(
             self._presenter.getMinPositivityConstraint(),
@@ -160,6 +171,9 @@ class TikePositionCorrectionController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        view.setCheckable(True)
+        view.toggled.connect(presenter.setPositionCorrectionEnabled)
+
         view.positionRegularizationCheckBox.toggled.connect(
             presenter.setPositionRegularizationEnabled)
 
@@ -168,6 +182,8 @@ class TikePositionCorrectionController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.setChecked(self._presenter.isPositionCorrectionEnabled())
+
         self._view.positionRegularizationCheckBox.setChecked(
             self._presenter.isPositionRegularizationEnabled())
 

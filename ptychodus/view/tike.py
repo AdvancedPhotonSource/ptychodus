@@ -13,7 +13,6 @@ class TikeAdaptiveMomentView(QGroupBox):
     def createInstance(cls, parent: QWidget = None) -> TikeAdaptiveMomentView:
         view = cls(parent)
 
-        view.setCheckable(True)
         view.mdecaySpinBox.setToolTip('The proportion of the first moment '
                                       'that is previous first moments.')
         view.vdecaySpinBox.setToolTip('The proportion of the second moment '

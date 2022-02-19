@@ -77,6 +77,7 @@ class TikeAdaptiveMomentPresenter(Observable, Observer):
 class TikeProbeCorrectionSettings(TikeAdaptiveMomentSettings):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
+        self.useProbeCorrection = settingsGroup.createBooleanEntry('UseProbeCorrection', False)
         self.sparsityConstraint = settingsGroup.createRealEntry('SparsityConstraint', 1)
         self.orthogonalityConstraint = settingsGroup.createBooleanEntry(
             'OrthogonalityConstraint', True)
@@ -96,6 +97,12 @@ class TikeProbeCorrectionPresenter(TikeAdaptiveMomentPresenter):
     def createInstance(cls, settings: TikeProbeCorrectionSettings) -> TikeProbeCorrectionPresenter:
         presenter = cls(settings)
         return presenter
+
+    def isProbeCorrectionEnabled(self) -> bool:
+        return self._settings.useProbeCorrection.value
+
+    def setProbeCorrectionEnabled(self, enabled: bool) -> None:
+        self._settings.useProbeCorrection.value = enabled
 
     def getMinSparsityConstraint(self) -> Decimal:
         return Decimal(0)
@@ -126,6 +133,7 @@ class TikeProbeCorrectionPresenter(TikeAdaptiveMomentPresenter):
 class TikeObjectCorrectionSettings(TikeAdaptiveMomentSettings):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
+        self.useObjectCorrection = settingsGroup.createBooleanEntry('UseObjectCorrection', False)
         self.positivityConstraint = settingsGroup.createRealEntry('PositivityConstraint', 0)
         self.smoothnessConstraint = settingsGroup.createRealEntry('SmoothnessConstraint', 0)
 
@@ -143,6 +151,12 @@ class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
                        settings: TikeObjectCorrectionSettings) -> TikeObjectCorrectionPresenter:
         presenter = cls(settings)
         return presenter
+
+    def isObjectCorrectionEnabled(self) -> bool:
+        return self._settings.useObjectCorrection.value
+
+    def setObjectCorrectionEnabled(self, enabled: bool) -> None:
+        self._settings.useObjectCorrection.value = enabled
 
     def getMinPositivityConstraint(self) -> Decimal:
         return Decimal(0)
@@ -174,6 +188,8 @@ class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
 class TikePositionCorrectionSettings(TikeAdaptiveMomentSettings):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
+        self.usePositionCorrection = settingsGroup.createBooleanEntry(
+            'UsePositionCorrection', False)
         self.usePositionRegularization = settingsGroup.createBooleanEntry(
             'UsePositionRegularization', False)
 
@@ -191,6 +207,12 @@ class TikePositionCorrectionPresenter(TikeAdaptiveMomentPresenter):
             cls, settings: TikePositionCorrectionSettings) -> TikePositionCorrectionPresenter:
         presenter = cls(settings)
         return presenter
+
+    def isPositionCorrectionEnabled(self) -> bool:
+        return self._settings.usePositionCorrection.value
+
+    def setPositionCorrectionEnabled(self, enabled: bool) -> None:
+        self._settings.usePositionCorrection.value = enabled
 
     def isPositionRegularizationEnabled(self) -> bool:
         return self._settings.usePositionRegularization.value
