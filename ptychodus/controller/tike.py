@@ -192,17 +192,24 @@ class TikePositionCorrectionController(Observer):
             self._syncModelToView()
 
 
-class TikeIterationController(Observer):
-    def __init__(self, presenter: TikeIterationPresenter, view: TikeIterationView) -> None:
+class TikeBasicParametersController(Observer):
+    def __init__(self, presenter: TikePresenter, view: TikeBasicParametersView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: TikeIterationPresenter,
-                       view: TikeIterationView) -> TikeIterationController:
+    def createInstance(cls, presenter: TikePresenter,
+                       view: TikeBasicParametersView) -> TikeBasicParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
+
+        for model in presenter.getNoiseModelList():
+            view.noiseModelComboBox.addItem(model)
+
+        view.useMpiCheckBox.toggled.connect(presenter.setMpiEnabled)
+        view.numGpusSpinBox.valueChanged.connect(presenter.setNumGpus)
+        view.noiseModelComboBox.currentTextChanged.connect(presenter.setNoiseModel)
 
         view.numBatchSpinBox.valueChanged.connect(presenter.setNumBatch)
         view.numIterSpinBox.valueChanged.connect(presenter.setNumIter)
@@ -221,6 +228,16 @@ class TikeIterationController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.useMpiCheckBox.setChecked(self._presenter.isMpiEnabled())
+
+        self._view.numGpusSpinBox.blockSignals(True)
+        self._view.numGpusSpinBox.setRange(self._presenter.getMinNumGpus(),
+                                           self._presenter.getMaxNumGpus())
+        self._view.numGpusSpinBox.setValue(self._presenter.getNumGpus())
+        self._view.numGpusSpinBox.blockSignals(False)
+
+        self._view.noiseModelComboBox.setCurrentText(self._presenter.getNoiseModel())
+
         self._view.numBatchSpinBox.blockSignals(True)
         self._view.numBatchSpinBox.setRange(self._presenter.getMinNumBatch(),
                                             self._presenter.getMaxNumBatch())
@@ -266,8 +283,8 @@ class TikeParametersController:
             model.probeCorrectionPresenter, view.probeCorrectionView)
         self._objectCorrectionController = TikeObjectCorrectionController.createInstance(
             model.objectCorrectionPresenter, view.objectCorrectionView)
-        self._iterationOptionsController = TikeIterationController.createInstance(
-            model.iterationPresenter, view.iterationOptionsView)
+        self._basicParametersController = TikeBasicParametersController.createInstance(
+            model.presenter, view.basicParametersView)
 
     @classmethod
     def createInstance(cls, model: TikeBackend,

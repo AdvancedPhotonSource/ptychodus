@@ -221,10 +221,13 @@ class TikePositionCorrectionPresenter(TikeAdaptiveMomentPresenter):
         self._settings.usePositionRegularization.value = enabled
 
 
-class TikeIterationSettings(Observable, Observer):
+class TikeSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
+        self.useMpi = settingsGroup.createBooleanEntry('UseMpi', False)
+        self.numGpus = settingsGroup.createIntegerEntry('NumGpus', 1)
+        self.noiseModel = settingsGroup.createStringEntry('NoiseModel', 'gaussian')
         self.numBatch = settingsGroup.createIntegerEntry('NumBatch', 1)
         self.numIter = settingsGroup.createIntegerEntry('NumIter', 1)
         self.cgIter = settingsGroup.createIntegerEntry('CgIter', 2)
@@ -232,8 +235,8 @@ class TikeIterationSettings(Observable, Observer):
         self.stepLength = settingsGroup.createRealEntry('StepLength', 1)
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikeIterationSettings:
-        settings = cls(settingsRegistry.createGroup('TikeIteration'))
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikeSettings:
+        settings = cls(settingsRegistry.createGroup('Tike'))
         settings._settingsGroup.addObserver(settings)
         return settings
 
@@ -242,18 +245,46 @@ class TikeIterationSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class TikeIterationPresenter(Observable, Observer):
+class TikePresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
-    def __init__(self, settings: TikeIterationSettings) -> None:
+    def __init__(self, settings: TikeSettings) -> None:
         super().__init__()
         self._settings = settings
 
     @classmethod
-    def createInstance(cls, settings: TikeIterationSettings) -> TikeIterationPresenter:
+    def createInstance(cls, settings: TikeSettings) -> TikePresenter:
         presenter = cls(settings)
         settings.addObserver(presenter)
         return presenter
+
+    def isMpiEnabled(self) -> bool:
+        return self._settings.useMpi.value
+
+    def setMpiEnabled(self, enabled: bool) -> None:
+        self._settings.useMpi.value = enabled
+
+    def getMinNumGpus(self) -> int:
+        return 1
+
+    def getMaxNumGpus(self) -> int:
+        return self.MAX_INT
+
+    def getNumGpus(self) -> int:
+        return self._clamp(self._settings.numGpus.value, self.getMinNumGpus(),
+                           self.getMaxNumGpus())
+
+    def setNumGpus(self, value: int) -> None:
+        self._settings.numGpus.value = value
+
+    def getNoiseModelList(self) -> list[str]:
+        return ['poisson', 'gaussian']
+
+    def getNoiseModel(self) -> str:
+        return self._settings.noiseModel.value
+
+    def setNoiseModel(self, name: str) -> None:
+        self._settings.noiseModel.value = name
 
     def getMinNumBatch(self) -> int:
         return 1
@@ -328,6 +359,58 @@ class TikeIterationPresenter(Observable, Observer):
             self.notifyObservers()
 
 
+class TikeReconstructor(Reconstructor):
+    """
+    data : (FRAME, WIDE, HIGH) float32
+        The intensity (square of the absolute value) of the propagated
+        wavefront; i.e. what the detector records. FFT-shifted so the
+        diffraction peak is at the corners.
+    probe : (1, 1, SHARED, WIDE, HIGH) complex64
+        The shared complex illumination function amongst all positions.
+    scan : (POSI, 2) float32
+        Coordinates of the minimum corner of the probe grid for each
+        measurement in the coordinate system of psi. Coordinate order
+        consistent with WIDE, HIGH order.
+    algorithm_options : :py:class:`tike.ptycho.solvers.IterativeOptions`
+        A class containing algorithm specific parameters
+    object_options : :py:class:`tike.ptycho.ObjectOptions`
+        A class containing settings related to object updates.
+    position_options : :py:class:`tike.ptycho.PositionOptions`
+        A class containing settings related to position correction.
+    probe_options : :py:class:`tike.ptycho.ProbeOptions`
+        A class containing settings related to probe updates.
+    psi : (WIDE, HIGH) complex64
+        The wavefront modulation coefficients of the object.
+    """
+    def reconstruct(self, algorithm_options):  # TODO typing
+        data = None # FIXME
+        probe = None # FIXME
+        scan = None # FIXME
+        model = None # FIXME
+        num_gpu = None # FIXME
+        object_options = None # FIXME
+        position_options = None # FIXME
+        probe_options = None # FIXME
+        psi = None # FIXME
+        use_mpi = None # FIXME
+
+        result = tike.ptycho.reconstruct(
+            data = data,
+            probe = probe,
+            scan = scan,
+            algorithm_options = algorithm_options,
+            model = model,
+            num_gpu = num_gpu,
+            object_options = object_options,
+            position_options = position_options,
+            probe_options = probe_options,
+            psi = initial_object,
+            use_mpi = use_mpi,
+        )
+
+        return result
+
+
 class RegularizedPIEReconstructor(Reconstructor):
     @property
     def name(self) -> str:
@@ -382,21 +465,21 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
 
 class TikeBackend:
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
+        self._settings = TikeSettings.createInstance(settingsRegistry)
         self._positionCorrectionSettings = TikePositionCorrectionSettings.createInstance(
             settingsRegistry)
         self._probeCorrectionSettings = TikeProbeCorrectionSettings.createInstance(
             settingsRegistry)
         self._objectCorrectionSettings = TikeObjectCorrectionSettings.createInstance(
             settingsRegistry)
-        self._iterationSettings = TikeIterationSettings.createInstance(settingsRegistry)
 
+        self.presenter = TikePresenter.createInstance(self._settings)
         self.positionCorrectionPresenter = TikePositionCorrectionPresenter.createInstance(
             self._positionCorrectionSettings)
         self.probeCorrectionPresenter = TikeProbeCorrectionPresenter.createInstance(
             self._probeCorrectionSettings)
         self.objectCorrectionPresenter = TikeObjectCorrectionPresenter.createInstance(
             self._objectCorrectionSettings)
-        self.iterationPresenter = TikeIterationPresenter.createInstance(self._iterationSettings)
 
         self.reconstructorList: list[Reconstructor] = list()
 
@@ -404,14 +487,20 @@ class TikeBackend:
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
                        isDeveloperModeEnabled: bool = False) -> TikeBackend:
+        loadReconstructors = isDeveloperModeEnabled
+
+        if tike:
+            logger.info(f'{tike.__name__} ({tike.__version__})')
+            loadReconstructors = True
+        else:
+            logger.info('tike not found.')
+
         core = cls(settingsRegistry)
 
-        if tike or isDeveloperModeEnabled:
+        if loadReconstructors:
             core.reconstructorList.append(RegularizedPIEReconstructor())
             core.reconstructorList.append(AdaptiveMomentGradientDescentReconstructor())
             core.reconstructorList.append(ConjugateGradientReconstructor())
             core.reconstructorList.append(IterativeLeastSquaresReconstructor())
-        else:
-            logger.info('tike not found.')
 
         return core
