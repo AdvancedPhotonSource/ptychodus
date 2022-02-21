@@ -1,5 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
+from pathlib import Path
 from typing import Callable
 
 import numpy
@@ -15,7 +16,7 @@ class ProbeSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Gaussian')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
+        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', Path())
         self.probeShape = settingsGroup.createIntegerEntry('ProbeShape', 64)
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
             'ProbeEnergyInElectronVolts', '2000')
@@ -29,7 +30,7 @@ class ProbeSettings(Observable, Observer):
             'BeamstopDiameterInMeters', '60e-6')
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry):
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> ProbeSettings:
         settings = cls(settingsRegistry.createGroup('Probe'))
         settings._settingsGroup.addObserver(settings)
         return settings
@@ -87,16 +88,24 @@ class GaussianBeamProbeInitializer(Callable):
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
 
+    def _createCircularMask(self) -> numpy.ndarray:
+        width_px = self._probeSettings.probeShape.value
+        height_px = width_px
+
+        Y_px, X_px = numpy.ogrid[:height_px, :width_px]
+        X_m = (X_px - width_px / 2) * float(self._detectorSettings.pixelSizeXInMeters.value)
+        Y_m = (Y_px - height_px / 2) * float(self._detectorSettings.pixelSizeYInMeters.value)
+
+        probeRadius_m = self._probeSettings.probeDiameterInMeters.value / 2
+        R_m = numpy.hypot(X_m, Y_m)
+
+        return (R_m <= probeRadius_m)
+
     def __call__(self) -> numpy.ndarray:
-        probeShape = self._probeSettings.probeShape.value
-        idx = numpy.arange(probeShape) + (1 - probeShape) / 2
-        w_m = self._probeSettings.probeDiameterInMeters.value
-        x = idx * float(self._detectorSettings.pixelSizeXInMeters.value / w_m)
-        y = idx * float(self._detectorSettings.pixelSizeYInMeters.value / w_m)
-        xx, yy = numpy.meshgrid(x, y)
-        rr_sq = xx**2 + yy**2
-        ff = numpy.exp(-rr_sq / 2) + 0.j
-        return ff / ff.sum()
+        mask = self._createCircularMask()
+        ft = numpy.fft.fft2(mask)
+        ft = numpy.fft.fftshift(ft)
+        return ft
 
     def __str__(self) -> str:
         return 'Gaussian Beam'

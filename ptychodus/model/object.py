@@ -1,13 +1,16 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Tuple
 import logging
 import math
 
 import numpy
 
+from .detector import Detector
 from .observer import Observable, Observer
+from .probe import Probe
+from .scan import ScanSequence
 from .settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
@@ -18,7 +21,7 @@ class ObjectSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Random')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
+        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', Path())
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:

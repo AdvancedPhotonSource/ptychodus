@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QSize
@@ -13,7 +14,7 @@ from .settings import *
 
 
 class ViewCore(QMainWindow):
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
 
         pixmapi = getattr(QStyle, 'SP_FileIcon')
@@ -74,7 +75,7 @@ class ViewCore(QMainWindow):
         self.monitorObjectView = MonitorObjectView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> ViewCore:
         view = cls(parent)
 
         view.navigationToolBar.setContextMenuPolicy(Qt.PreventContextMenu)

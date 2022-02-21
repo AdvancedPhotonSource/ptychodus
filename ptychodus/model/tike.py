@@ -138,8 +138,8 @@ class TikeObjectCorrectionSettings(TikeAdaptiveMomentSettings):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
         self.useObjectCorrection = settingsGroup.createBooleanEntry('UseObjectCorrection', False)
-        self.positivityConstraint = settingsGroup.createRealEntry('PositivityConstraint', 0)
-        self.smoothnessConstraint = settingsGroup.createRealEntry('SmoothnessConstraint', 0)
+        self.positivityConstraint = settingsGroup.createRealEntry('PositivityConstraint', '0')
+        self.smoothnessConstraint = settingsGroup.createRealEntry('SmoothnessConstraint', '0')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikeObjectCorrectionSettings:
@@ -236,7 +236,7 @@ class TikeSettings(Observable, Observer):
         self.numIter = settingsGroup.createIntegerEntry('NumIter', 1)
         self.cgIter = settingsGroup.createIntegerEntry('CgIter', 2)
         self.alpha = settingsGroup.createRealEntry('Alpha', '0.05')
-        self.stepLength = settingsGroup.createRealEntry('StepLength', 1)
+        self.stepLength = settingsGroup.createRealEntry('StepLength', '1')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikeSettings:

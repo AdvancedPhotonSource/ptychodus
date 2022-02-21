@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 
 import numpy
@@ -5,17 +6,19 @@ import numpy
 from .data_file import *
 from .detector import *
 from .h5tree import *
+from .image import *
 from .metadata import *
 from .object import *
 from .observer import *
 from .probe import *
-from .ptychopy import PtychoPyBackend
 from .ptychonn import PtychoNNBackend
+from .ptychopy import PtychoPyBackend
 from .reconstructor import *
 from .scan import *
 from .settings import *
 from .tike import TikeBackend
 from .velociprobe import *
+
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +83,7 @@ class ModelCore:
             self._reconstructorSettings, self._selectableReconstructor)
 
     @classmethod
-    def createInstance(cls, isDeveloperModeEnabled: bool = False):
+    def createInstance(cls, isDeveloperModeEnabled: bool = False) -> ModelCore:
         model = cls(isDeveloperModeEnabled)
         model.dataFilePresenter.addReader(model.h5FileTreeReader)
         model.dataFilePresenter.addReader(model._velociprobeReader)

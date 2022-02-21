@@ -78,6 +78,10 @@ class DetectorDatasetListModel(QAbstractListModel):
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return self._presenter.getNumberOfDatasets()
 
+    def reload(self) -> None:
+        self.beginResetModel()
+        self.endResetModel()
+
 
 class DetectorDatasetController(Observer):
     def __init__(self, datasetPresenter: DetectorDatasetPresenter,
@@ -111,8 +115,7 @@ class DetectorDatasetController(Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._datasetPresenter:
-            index = QModelIndex()
-            self._listModel.dataChanged.emit(index, index)
+            self._listModel.reload()
         elif observable is self._imagePresenter:
             self._updateSelection()
 

@@ -11,7 +11,7 @@ from ..view import ReconstructorParametersView, ReconstructorPlotView
 
 class ReconstructorViewControllerFactory(ABC):
     @abstractproperty
-    def backendName(self):
+    def backendName(self) -> str:
         pass
 
     @abstractmethod

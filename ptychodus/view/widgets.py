@@ -1,3 +1,4 @@
+from __future__ import annotations
 from decimal import Decimal
 import logging
 
@@ -23,7 +24,7 @@ class BottomTitledGroupBox(QGroupBox):
 class LengthWidget(QWidget):
     lengthChanged = pyqtSignal(Decimal)
 
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
         self.lengthInMeters = Decimal()
         self.magnitudeValidator = QDoubleValidator()
@@ -31,7 +32,7 @@ class LengthWidget(QWidget):
         self.unitsComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> LengthWidget:
         widget = cls(parent)
 
         widget.magnitudeValidator.setBottom(0.)
@@ -90,7 +91,7 @@ class LengthWidget(QWidget):
 class EnergyWidget(QWidget):
     energyChanged = pyqtSignal(Decimal)
 
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
         self.energyInElectronVolts = Decimal()
         self.magnitudeValidator = QDoubleValidator()
@@ -98,7 +99,7 @@ class EnergyWidget(QWidget):
         self.unitsComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> EnergyWidget:
         widget = cls(parent)
 
         widget.magnitudeValidator.setBottom(0.)

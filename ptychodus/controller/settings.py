@@ -26,6 +26,10 @@ class SettingsGroupListModel(QAbstractListModel):
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._settingsRegistry)
 
+    def reload(self) -> None:
+        self.beginResetModel()
+        self.endResetModel()
+
 
 class SettingsEntryTableModel(QAbstractTableModel):
     def __init__(self, settingsGroup: SettingsGroup, parent: QObject = None) -> None:
@@ -115,8 +119,7 @@ class SettingsController(Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:
-            index = QModelIndex()
-            self._groupListModel.dataChanged.emit(index, index)
+            self._groupListModel.reload()
         # TODO update settingsContentsTableModel
 
 

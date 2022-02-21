@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt5.QtWidgets import QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QLabel, QVBoxLayout, QWidget
 
 
@@ -8,7 +10,7 @@ class ImportSettingsDialog(QDialog):
         widget.setChecked(True)
         return widget
 
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
         self.instructionsLabel = QLabel('Select the settings to overwrite using metadata values:')
         self.detectorPixelSizeCheckBox = self.createCheckBox('Detector Pixel Size')
@@ -19,7 +21,7 @@ class ImportSettingsDialog(QDialog):
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> ImportSettingsDialog:
         view = cls(parent)
 
         view.setWindowTitle('Import Settings')

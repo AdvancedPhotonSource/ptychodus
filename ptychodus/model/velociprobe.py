@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import Optional
 
 import h5py
+import numpy
 
 from .data_file import DataFileReader
+from .image import ImageSequence
 from .observer import Observable, Observer
 
 
@@ -182,3 +184,81 @@ class VelociprobeReader(DataFileReader, Observable):
             instrument=self._readInstrumentGroup(h5EntryGroup['instrument']),
             sample=self._readSampleGroup(h5EntryGroup['sample']))
         self.notifyObservers()
+
+
+class VelociprobeImageSequence(ImageSequence):
+    def __init__(self, velociprobeReader: VelociprobeReader) -> None:
+        super().__init__()
+        self._velociprobeReader = velociprobeReader
+        self._datasetImageList: list[numpy.ndarray] = list()
+        self._datasetIndex = -1
+
+    @classmethod
+    def createInstance(cls, velociprobeReader: VelociprobeReader) -> VelociprobeImageSequence:
+        imageSequence = cls(velociprobeReader)
+        imageSequence._updateImages()
+        velociprobeReader.addObserver(imageSequence)
+        return imageSequence
+
+    def setCurrentDatasetIndex(self, index: int) -> None:
+        if index < 0:
+            raise IndexError('Current dataset index must be non-negative.')
+
+        self._datasetIndex = index
+        self._updateImages()
+
+    def getCurrentDatasetIndex(self) -> int:
+        return self._datasetIndex
+
+    def getWidth(self) -> int:
+        value = 0
+
+        if self._datasetImageList:
+            value = self._datasetImageList[0].shape[1]
+
+        return value
+
+    def getHeight(self) -> int:
+        value = 0
+
+        if self._datasetImageList:
+            value = self._datasetImageList[0].shape[0]
+
+        return value
+
+    def __getitem__(self, index: int) -> numpy.ndarray:
+        return self._datasetImageList[index]
+
+    def __len__(self) -> int:
+        return len(self._datasetImageList)
+
+    def _updateImages(self) -> None:
+        self._datasetImageList = list()
+
+        if self._velociprobeReader.entryGroup is None:
+            self._datasetIndex = 0
+            return
+        elif self._datasetIndex >= len(self._velociprobeReader.entryGroup.data):
+            self._datasetIndex = 0
+
+        datafile = self._velociprobeReader.entryGroup.data[self._datasetIndex]
+
+        with h5py.File(datafile.filePath, 'r') as h5File:
+            item = h5File.get(datafile.dataPath)
+
+            if isinstance(item, h5py.Dataset):
+                data = item[()]
+
+                for imslice in data:
+                    image = numpy.copy(imslice)
+                    self._datasetImageList.append(image)
+            else:
+                raise TypeError('Data path does not refer to a dataset.')
+
+        self.notifyObservers()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._velociprobeReader:
+            self._updateImages()
+
+

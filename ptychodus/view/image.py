@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QWheelEvent
 from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, \
@@ -34,7 +36,7 @@ class ImageRibbon(QWidget):
         self.imageSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> ImageRibbon:
         view = cls(parent)
 
         imageFileLayout = QVBoxLayout()
@@ -111,7 +113,7 @@ class ImageWidget(QGraphicsView):
         self._pixmapItem = ImageItem()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> ImageWidget:
         widget = cls(parent)
 
         scene = QGraphicsScene()
@@ -146,7 +148,7 @@ class ImageView(QWidget):
         self.imageWidget = ImageWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> ImageView:
         view = cls(parent)
 
         layout = QVBoxLayout()
