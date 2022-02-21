@@ -3,7 +3,7 @@ from PyQt5.QtGui import QPixmap, QWheelEvent
 from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, \
         QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
         QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout, \
-        QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget
+        QLabel, QLineEdit, QPushButton, QSizePolicy, QSpinBox, QVBoxLayout, QWidget
 
 from .widgets import BottomTitledGroupBox
 
@@ -77,6 +77,8 @@ class ImageRibbon(QWidget):
         layout.addWidget(view.frameGroupBox)
         layout.addStretch(1)
         view.setLayout(layout)
+
+        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
 
         return view
 
@@ -152,5 +154,7 @@ class ImageView(QWidget):
         layout.setMenuBar(view.imageRibbon)
         layout.addWidget(view.imageWidget)
         view.setLayout(layout)
+
+        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
 
         return view

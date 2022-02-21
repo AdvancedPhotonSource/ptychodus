@@ -1,5 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
+from pathlib import Path
 from typing import Callable
 import logging
 import math
@@ -55,13 +56,15 @@ class ObjectSizer(Observable, Observer):
 
     @property
     def extentXInPixels(self) -> int:
-        objectPlanePixelSizeXInMeters = self._probe.wavelengthInMeters * self._detector.distanceToObjectInMeters / self._detector.extentXInMeters
+        objectPlanePixelSizeXInMeters = self._probe.wavelengthInMeters \
+                * self._detector.distanceToObjectInMeters / self._detector.extentXInMeters
         numberOfInteriorPixels = self._scanExtentXInMeters / objectPlanePixelSizeXInMeters
         return int(math.ceil(numberOfInteriorPixels)) + self.numberOfPaddingPixels
 
     @property
     def extentYInPixels(self) -> int:
-        objectPlanePixelSizeYInMeters = self._probe.wavelengthInMeters * self._detector.distanceToObjectInMeters / self._detector.extentYInMeters
+        objectPlanePixelSizeYInMeters = self._probe.wavelengthInMeters \
+                * self._detector.distanceToObjectInMeters / self._detector.extentYInMeters
         numberOfInteriorPixels = self._scanExtentYInMeters / objectPlanePixelSizeYInMeters
         return int(math.ceil(numberOfInteriorPixels)) + self.numberOfPaddingPixels
 

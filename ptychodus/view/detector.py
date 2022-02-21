@@ -4,7 +4,7 @@ from .image import ImageView
 from .widgets import LengthWidget
 
 
-class DetectorDetectorView(QGroupBox):
+class DetectorView(QGroupBox):
     def __init__(self, parent: QWidget = None):
         super().__init__('Parameters', parent)
         self.pixelSizeXWidget = LengthWidget.createInstance()
@@ -45,7 +45,7 @@ class DetectorDatasetView(QGroupBox):
         return view
 
 
-class DetectorImageCropView(QGroupBox):
+class CropView(QGroupBox):
     def __init__(self, parent: QWidget = None):
         super().__init__('Image Crop', parent)
         self.centerXSpinBox = QSpinBox()
@@ -70,9 +70,9 @@ class DetectorImageCropView(QGroupBox):
 class DetectorParametersView(QWidget):
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
-        self.detectorView = DetectorDetectorView.createInstance()
+        self.detectorView = DetectorView.createInstance()
         self.datasetView = DetectorDatasetView.createInstance()
-        self.imageCropView = DetectorImageCropView.createInstance()
+        self.imageCropView = CropView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: QWidget = None):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import QCheckBox, QFormLayout, QGroupBox, QSpinBox, QVBoxLayout, QWidget
 
 
 class PtychoPyBasicView(QGroupBox):

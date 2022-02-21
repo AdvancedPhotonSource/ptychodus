@@ -32,27 +32,6 @@ class DetectorSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class CropSettings(Observable, Observer):
-    def __init__(self, settingsGroup: SettingsGroup) -> None:
-        super().__init__()
-        self._settingsGroup = settingsGroup
-        self.cropEnabled = settingsGroup.createBooleanEntry('CropEnabled', False)
-        self.centerXInPixels = settingsGroup.createIntegerEntry('CenterXInPixels', 32)
-        self.centerYInPixels = settingsGroup.createIntegerEntry('CenterYInPixels', 32)
-        self.extentXInPixels = settingsGroup.createIntegerEntry('ExtentXInPixels', 64)
-        self.extentYInPixels = settingsGroup.createIntegerEntry('ExtentYInPixels', 64)
-
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> CropSettings:
-        settings = cls(settingsRegistry.createGroup('Crop'))
-        settings._settingsGroup.addObserver(settings)
-        return settings
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
-            self.notifyObservers()
-
-
 class Detector(Observable, Observer):
     def __init__(self, detectorSettings: DetectorSettings, cropSettings: CropSettings) -> None:
         super().__init__()
@@ -76,11 +55,13 @@ class Detector(Observable, Observer):
 
     @property
     def extentXInMeters(self) -> Decimal:
-        return self._detectorSettings.pixelSizeXInMeters.value * self._cropSettings.extentXInPixels.value
+        return self._detectorSettings.pixelSizeXInMeters.value \
+                * self._cropSettings.extentXInPixels.value
 
     @property
     def extentYInMeters(self) -> Decimal:
-        return self._detectorSettings.pixelSizeYInMeters.value * self._cropSettings.extentYInPixels.value
+        return self._detectorSettings.pixelSizeYInMeters.value \
+                * self._cropSettings.extentYInPixels.value
 
     def update(self, observable: Observable) -> None:
         if observable is self._detectorSettings.detectorDistanceInMeters:
@@ -95,78 +76,136 @@ class Detector(Observable, Observer):
             self.notifyObservers()
 
 
-class DetectorParametersPresenter(Observer, Observable):
-    def __init__(self, detectorSettings: DetectorSettings, cropSettings: CropSettings) -> None:
+class DetectorPresenter(Observer, Observable):
+    def __init__(self, settings: DetectorSettings) -> None:
         super().__init__()
-        self._detectorSettings = detectorSettings
-        self._cropSettings = cropSettings
+        self._settings = settings
 
     @classmethod
-    def createInstance(cls, detectorSettings: DetectorSettings,
-                       cropSettings: CropSettings) -> DetectorParametersPresenter:
-        presenter = cls(detectorSettings, cropSettings)
-        detectorSettings.addObserver(presenter)
-        cropSettings.addObserver(presenter)
+    def createInstance(cls, settings: DetectorSettings) -> DetectorPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
         return presenter
 
     def getPixelSizeXInMeters(self) -> Decimal:
-        return self._detectorSettings.pixelSizeXInMeters.value
+        return self._settings.pixelSizeXInMeters.value
 
     def setPixelSizeXInMeters(self, value: Decimal) -> None:
-        self._detectorSettings.pixelSizeXInMeters.value = value
+        self._settings.pixelSizeXInMeters.value = value
 
     def getPixelSizeYInMeters(self) -> Decimal:
-        return self._detectorSettings.pixelSizeYInMeters.value
+        return self._settings.pixelSizeYInMeters.value
 
     def setPixelSizeYInMeters(self, value: Decimal) -> None:
-        self._detectorSettings.pixelSizeYInMeters.value = value
+        self._settings.pixelSizeYInMeters.value = value
 
     def getDetectorDistanceInMeters(self) -> Decimal:
-        return self._detectorSettings.detectorDistanceInMeters.value
+        return self._settings.detectorDistanceInMeters.value
 
     def setDetectorDistanceInMeters(self, value: Decimal) -> None:
-        self._detectorSettings.detectorDistanceInMeters.value = value
+        self._settings.detectorDistanceInMeters.value = value
 
     def getDefocusDistanceInMeters(self) -> Decimal:
-        return self._detectorSettings.defocusDistanceInMeters.value
+        return self._settings.defocusDistanceInMeters.value
 
     def setDefocusDistanceInMeters(self, value: Decimal) -> None:
-        self._detectorSettings.defocusDistanceInMeters.value = value
-
-    def isCropEnabled(self) -> bool:
-        return self._cropSettings.cropEnabled.value
-
-    def setCropEnabled(self, value: bool) -> None:
-        self._cropSettings.cropEnabled.value = value
-
-    def getCropCenterXInPixels(self) -> int:
-        return self._cropSettings.centerXInPixels.value
-
-    def setCropCenterXInPixels(self, value: int) -> None:
-        self._cropSettings.centerXInPixels.value = value
-
-    def getCropCenterYInPixels(self) -> int:
-        return self._cropSettings.centerYInPixels.value
-
-    def setCropCenterYInPixels(self, value: int) -> None:
-        self._cropSettings.centerYInPixels.value = value
-
-    def getCropExtentXInPixels(self) -> int:
-        return self._cropSettings.extentXInPixels.value
-
-    def setCropExtentXInPixels(self, value: int) -> None:
-        self._cropSettings.extentXInPixels.value = value
-
-    def getCropExtentYInPixels(self) -> int:
-        return self._cropSettings.extentYInPixels.value
-
-    def setCropExtentYInPixels(self, value: int) -> None:
-        self._cropSettings.extentYInPixels.value = value
+        self._settings.defocusDistanceInMeters.value = value
 
     def update(self, observable: Observable) -> None:
-        if observable is self._detectorSettings:
+        if observable is self._settings:
             self.notifyObservers()
-        elif observable is self._cropSettings:
+
+
+class CropSettings(Observable, Observer):
+    def __init__(self, settingsGroup: SettingsGroup) -> None:
+        super().__init__()
+        self._settingsGroup = settingsGroup
+        self.cropEnabled = settingsGroup.createBooleanEntry('CropEnabled', False)
+        self.centerXInPixels = settingsGroup.createIntegerEntry('CenterXInPixels', 32)
+        self.centerYInPixels = settingsGroup.createIntegerEntry('CenterYInPixels', 32)
+        self.extentXInPixels = settingsGroup.createIntegerEntry('ExtentXInPixels', 64)
+        self.extentYInPixels = settingsGroup.createIntegerEntry('ExtentYInPixels', 64)
+
+    @classmethod
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> CropSettings:
+        settings = cls(settingsRegistry.createGroup('Crop'))
+        settings._settingsGroup.addObserver(settings)
+        return settings
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class CropPresenter(Observer, Observable):
+    MAX_INT = 0x7FFFFFFF
+
+    def __init__(self, settings: CropSettings) -> None:
+        super().__init__()
+        self._settings = settings
+
+    @classmethod
+    def createInstance(cls, settings: CropSettings) -> CropPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
+        return presenter
+
+    def isCropEnabled(self) -> bool:
+        return self._settings.cropEnabled.value
+
+    def setCropEnabled(self, value: bool) -> None:
+        self._settings.cropEnabled.value = value
+
+    def getMinCenterXInPixels(self) -> int:
+        return 0
+
+    def getMaxCenterXInPixels(self) -> int:
+        return self.MAX_INT
+
+    def getCenterXInPixels(self) -> int:
+        return self._settings.centerXInPixels.value
+
+    def setCenterXInPixels(self, value: int) -> None:
+        self._settings.centerXInPixels.value = value
+
+    def getMinCenterYInPixels(self) -> int:
+        return 0
+
+    def getMaxCenterYInPixels(self) -> int:
+        return self.MAX_INT
+
+    def getCenterYInPixels(self) -> int:
+        return self._settings.centerYInPixels.value
+
+    def setCenterYInPixels(self, value: int) -> None:
+        self._settings.centerYInPixels.value = value
+
+    def getMinExtentXInPixels(self) -> int:
+        return 0
+
+    def getMaxExtentXInPixels(self) -> int:
+        return self.MAX_INT
+
+    def getExtentXInPixels(self) -> int:
+        return self._settings.extentXInPixels.value
+
+    def setExtentXInPixels(self, value: int) -> None:
+        self._settings.extentXInPixels.value = value
+
+    def getMinExtentYInPixels(self) -> int:
+        return 0
+
+    def getMaxExtentYInPixels(self) -> int:
+        return self.MAX_INT
+
+    def getExtentYInPixels(self) -> int:
+        return self._settings.extentYInPixels.value
+
+    def setExtentYInPixels(self, value: int) -> None:
+        self._settings.extentYInPixels.value = value
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
             self.notifyObservers()
 
 

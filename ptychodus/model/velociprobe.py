@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
+from typing import Optional
 
 import h5py
 
@@ -101,7 +102,7 @@ class EntryGroup:
 class VelociprobeReader(DataFileReader, Observable):
     def __init__(self) -> None:
         super().__init__()
-        self.entryGroup = None
+        self.entryGroup: Optional[EntryGroup] = None
 
     def _readDataGroup(self, h5DataGroup: h5py.Group, masterFilePath: Path) -> DataGroup:
         datafileList = list()

@@ -72,16 +72,15 @@ class LengthWidget(QWidget):
         return Decimal(f'1e{exponent:+d}')
 
     def _setLengthInMetersFromWidgets(self) -> None:
-        magnitude = None
         decimalText = self.magnitudeLineEdit.text()
 
         try:
             magnitude = Decimal(decimalText)
         except ValueError:
             logger.error(f'Failed to parse length magnitude "{decimalText}"')
-
-        self.lengthInMeters = magnitude * self._scaleToMeters
-        self.lengthChanged.emit(self.lengthInMeters)
+        else:
+            self.lengthInMeters = magnitude * self._scaleToMeters
+            self.lengthChanged.emit(self.lengthInMeters)
 
     def _updateDisplay(self) -> None:
         lengthInDisplayUnits = self.lengthInMeters / self._scaleToMeters
@@ -140,16 +139,15 @@ class EnergyWidget(QWidget):
         return Decimal(f'1e{exponent:+d}')
 
     def _setEnergyInElectronVoltsFromWidgets(self) -> None:
-        magnitude = None
         decimalText = self.magnitudeLineEdit.text()
 
         try:
             magnitude = Decimal(decimalText)
         except ValueError:
             logger.error(f'Failed to parse energy magnitude "{decimalText}"')
-
-        self.energyInElectronVolts = magnitude * self._scaleToElectronVolts
-        self.energyChanged.emit(self.energyInElectronVolts)
+        else:
+            self.energyInElectronVolts = magnitude * self._scaleToElectronVolts
+            self.energyChanged.emit(self.energyInElectronVolts)
 
     def _updateDisplay(self) -> None:
         energyInDisplayUnits = self.energyInElectronVolts / self._scaleToElectronVolts

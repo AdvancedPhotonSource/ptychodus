@@ -39,13 +39,18 @@ class Reconstructor(Observable, ABC):
 
 
 class NullReconstructor(Reconstructor):
+    def __init__(self, name: str = 'None', backendName: str = 'Backend') -> None:
+        super().__init__()
+        self._name = name
+        self._backendName = backendName
+
     @property
     def name(self) -> str:
-        return 'None'
+        return self._name
 
     @property
     def backendName(self) -> str:
-        return 'Missing'
+        return self._backendName
 
     def reconstruct(self) -> int:
         return 0

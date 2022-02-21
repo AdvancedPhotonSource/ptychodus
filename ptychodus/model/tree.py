@@ -1,8 +1,9 @@
 from __future__ import annotations
+from typing import Optional
 
 
 class SimpleTreeNode:
-    def __init__(self, parentItem: SimpleTreeNode, itemData: list[str]) -> None:
+    def __init__(self, parentItem: Optional[SimpleTreeNode], itemData: list[str]) -> None:
         self.parentItem = parentItem
         self.itemData = itemData
         self.childItems: list[SimpleTreeNode] = list()
@@ -20,7 +21,7 @@ class SimpleTreeNode:
     def isRoot(self) -> bool:
         return (self.parentItem == None)
 
-    def data(self, column: int) -> str:
+    def data(self, column: int) -> Optional[str]:
         try:
             return self.itemData[column]
         except IndexError:

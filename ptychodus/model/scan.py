@@ -3,7 +3,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import Callable, Tuple
+from pathlib import Path
+from typing import Callable, Optional, Tuple
 import csv
 
 import numpy
@@ -17,7 +18,7 @@ class ScanSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
+        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', '')
         self.extentX = settingsGroup.createIntegerEntry('ExtentX', 10)
         self.extentY = settingsGroup.createIntegerEntry('ExtentY', 10)
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')
@@ -304,7 +305,7 @@ class TransformedScanSequence(ScanSequence):
         super().__init__()
         self._settings = settings
         self._sequence = sequence
-        self._transform = None
+        self._transform: Optional[TransformXY] = None
 
     @classmethod
     def createInstance(cls, settings: ScanSettings,

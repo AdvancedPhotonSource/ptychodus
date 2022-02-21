@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 import logging
 
 import h5py
@@ -61,7 +61,7 @@ class DataFilePresenter:
     def __init__(self) -> None:
         super().__init__()
         self._readerList: list[DataFileReader] = list()
-        self._filePath: Path = None
+        self._filePath: Optional[Path] = None
 
     def addReader(self, reader: DataFileReader) -> None:
         if reader not in self._readerList:

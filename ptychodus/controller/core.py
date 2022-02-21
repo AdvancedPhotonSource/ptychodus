@@ -30,13 +30,13 @@ class ControllerCore:
                                                                      model.settingsPresenter,
                                                                      view.settingsGroupView,
                                                                      view.settingsEntryView)
-        self._detectorParametersController = DetectorParametersController.createInstance(
-            model.detectorParametersPresenter, view.detectorParametersView.detectorView)
+        self._detectorController = DetectorController.createInstance(
+            model.detectorPresenter, view.detectorParametersView.detectorView)
         self._detectorDatasetController = DetectorDatasetController.createInstance(
             model.detectorDatasetPresenter, model.detectorImagePresenter,
             view.detectorParametersView.datasetView)
-        self._detectorImageCropController = DetectorImageCropController.createInstance(
-            model.detectorParametersPresenter, view.detectorParametersView.imageCropView)
+        self._cropController = CropController.createInstance(
+            model.cropPresenter, view.detectorParametersView.imageCropView)
         self._detectorImageController = DetectorImageController.createInstance(
             model.detectorImagePresenter, view.detectorImageView)
         self._probeParametersController = ProbeParametersController.createInstance(

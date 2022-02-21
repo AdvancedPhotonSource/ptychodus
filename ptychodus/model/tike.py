@@ -1,6 +1,9 @@
 from __future__ import annotations
 from decimal import Decimal
+from typing import Any
 import logging
+
+import numpy
 
 try:
     import tike
@@ -8,7 +11,8 @@ except ImportError:
     tike = None
 
 from .observer import Observable, Observer
-from .reconstructor import Reconstructor
+from .reconstructor import Reconstructor, NullReconstructor
+from .scan import ScanSequence
 from .settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
@@ -78,7 +82,7 @@ class TikeProbeCorrectionSettings(TikeAdaptiveMomentSettings):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
         self.useProbeCorrection = settingsGroup.createBooleanEntry('UseProbeCorrection', False)
-        self.sparsityConstraint = settingsGroup.createRealEntry('SparsityConstraint', 1)
+        self.sparsityConstraint = settingsGroup.createRealEntry('SparsityConstraint', '1')
         self.orthogonalityConstraint = settingsGroup.createBooleanEntry(
             'OrthogonalityConstraint', True)
         self.centeredIntensityConstraint = settingsGroup.createBooleanEntry(
@@ -359,108 +363,186 @@ class TikePresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class TikeReconstructor(Reconstructor):
-    """
-    data : (FRAME, WIDE, HIGH) float32
-        The intensity (square of the absolute value) of the propagated
-        wavefront; i.e. what the detector records. FFT-shifted so the
-        diffraction peak is at the corners.
-    probe : (1, 1, SHARED, WIDE, HIGH) complex64
-        The shared complex illumination function amongst all positions.
-    scan : (POSI, 2) float32
-        Coordinates of the minimum corner of the probe grid for each
-        measurement in the coordinate system of psi. Coordinate order
-        consistent with WIDE, HIGH order.
-    algorithm_options : :py:class:`tike.ptycho.solvers.IterativeOptions`
-        A class containing algorithm specific parameters
-    object_options : :py:class:`tike.ptycho.ObjectOptions`
-        A class containing settings related to object updates.
-    position_options : :py:class:`tike.ptycho.PositionOptions`
-        A class containing settings related to position correction.
-    probe_options : :py:class:`tike.ptycho.ProbeOptions`
-        A class containing settings related to probe updates.
-    psi : (WIDE, HIGH) complex64
-        The wavefront modulation coefficients of the object.
-    """
-    def reconstruct(self, algorithm_options):  # TODO typing
-        data = None # FIXME
-        probe = None # FIXME
-        scan = None # FIXME
-        model = None # FIXME
-        num_gpu = None # FIXME
-        object_options = None # FIXME
-        position_options = None # FIXME
-        probe_options = None # FIXME
-        psi = None # FIXME
-        use_mpi = None # FIXME
+class TikeReconstructor:
+    def __init__(self, settings: TikeSettings,
+                 objectCorrectionSettings: TikeObjectCorrectionSettings,
+                 positionCorrectionSettings: TikePositionCorrectionSettings,
+                 probeCorrectionSettings: TikeProbeCorrectionSettings,
+                 scanSequence: ScanSequence) -> None:
+        self._settings = settings
+        self._objectCorrectionSettings = objectCorrectionSettings
+        self._positionCorrectionSettings = positionCorrectionSettings
+        self._probeCorrectionSettings = probeCorrectionSettings
+        self._scanSequence = scanSequence
+
+    @property
+    def backendName(self) -> str:
+        return 'Tike'
+
+    def getScan(self) -> numpy.ndarray:
+        x = [point.x for point in iter(self._scanSequence)]
+        y = [point.y for point in iter(self._scanSequence)]
+        return numpy.column_stack((x, y))
+
+    def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
+        settings = self._objectCorrectionSettings
+        options = None
+
+        if settings.useObjectCorrection.value:
+            options = tike.ptycho.ObjectOptions(
+                positivity_constraint=settings.positivityConstraint.value,
+                smoothness_constraint=settings.smoothnessConstraint.value,
+                use_adaptive_moment=settings.useAdaptiveMoment.value,
+                vdecay=settings.vdecay.value,
+                mdecay=settings.mdecay.value,
+            )
+
+        return options
+
+    def getPositionOptions(self) -> tike.ptycho.PositionOptions:
+        settings = self._positionCorrectionSettings
+        options = None
+
+        if settings.usePositionCorrection.value:
+            options = tike.ptycho.PositionOptions(
+                num_positions=len(self._scanSequence),
+                initial_scan=self.getScan(),  # TODO CHECKME
+                use_adaptive_moment=settings.useAdaptiveMoment.value,
+                vdecay=settings.vdecay.value,
+                mdecay=settings.mdecay.value,
+                use_position_regularization=settings.usePositionRegularization.value,
+            )
+
+        return options
+
+    def getProbeOptions(self) -> tike.ptycho.ProbeOptions:
+        settings = self._probeCorrectionSettings
+        options = None
+
+        if settings.useProbeCorrection.value:
+            options = tike.ptycho.ProbeOptions(
+                orthogonality_constraint=settings.orthogonalityConstraint.value,
+                centered_intensity_constraint=settings.centeredIntensityConstraint.value,
+                sparsity_constraint=settings.sparsityConstraint.value,
+                use_adaptive_moment=settings.useAdaptiveMoment.value,
+                vdecay=settings.vdecay.value,
+                mdecay=settings.mdecay.value,
+            )
+
+        return options
+
+    def __call__(self, algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> int:
+        """
+        data : (FRAME, WIDE, HIGH) float32
+            The intensity (square of the absolute value) of the propagated
+            wavefront; i.e. what the detector records. FFT-shifted so the
+            diffraction peak is at the corners.
+        """
+        data = None  # FIXME
+        """
+        probe : (1, 1, SHARED, WIDE, HIGH) complex64
+            The shared complex illumination function amongst all positions.
+        """
+        probe = None  # FIXME
+        """
+        psi : (WIDE, HIGH) complex64
+            The wavefront modulation coefficients of the object.
+        """
+        initialObject = None  # FIXME
 
         result = tike.ptycho.reconstruct(
-            data = data,
-            probe = probe,
-            scan = scan,
-            algorithm_options = algorithm_options,
-            model = model,
-            num_gpu = num_gpu,
-            object_options = object_options,
-            position_options = position_options,
-            probe_options = probe_options,
-            psi = initial_object,
-            use_mpi = use_mpi,
+            data=data,
+            probe=probe,
+            scan=self.getScan(),
+            algorithm_options=algorithmOptions,
+            model=self._settings.noiseModel.value,
+            num_gpu=self._settings.numGpus.value,
+            object_options=self.getObjectOptions(),
+            position_options=self.getPositionOptions(),
+            probe_options=self.getProbeOptions(),
+            psi=initialObject,
+            use_mpi=self._settings.useMpi.value,
         )
 
-        return result
+        # TODO do stuff with result
+
+        return 0  # TODO return non-zero if problems
 
 
 class RegularizedPIEReconstructor(Reconstructor):
+    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
+        super().__init__()
+        self._algorithmOptions = tike.ptycho.solvers.RpieOptions()
+        self._tikeReconstructor = tikeReconstructor
+
     @property
     def name(self) -> str:
-        return 'rpie'
+        return self._algorithmOptions.name
 
     @property
     def backendName(self) -> str:
-        return 'Tike'
+        return self._tikeReconstructor.backendName
 
     def reconstruct(self) -> int:
-        return 0  # TODO
+        # TODO update self._algorithmOptions
+        return self._tikeReconstructor(self._algorithmOptions)
 
 
 class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
+    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
+        super().__init__()
+        self._algorithmOptions = tike.ptycho.solvers.AdamOptions()
+        self._tikeReconstructor = tikeReconstructor
+
     @property
     def name(self) -> str:
-        return 'adam_grad'
+        return self._algorithmOptions.name
 
     @property
     def backendName(self) -> str:
-        return 'Tike'
+        return self._tikeReconstructor.backendName
 
     def reconstruct(self) -> int:
-        return 0  # TODO
+        # TODO update self._algorithmOptions
+        return self._tikeReconstructor(self._algorithmOptions)
 
 
 class ConjugateGradientReconstructor(Reconstructor):
+    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
+        super().__init__()
+        self._algorithmOptions = tike.ptycho.solvers.CgradOptions()
+        self._tikeReconstructor = tikeReconstructor
+
     @property
     def name(self) -> str:
-        return 'cgrad'
+        return self._algorithmOptions.name
 
     @property
     def backendName(self) -> str:
-        return 'Tike'
+        return self._tikeReconstructor.backendName
 
     def reconstruct(self) -> int:
-        return 0  # TODO
+        # TODO update self._algorithmOptions
+        return self._tikeReconstructor(self._algorithmOptions)
 
 
 class IterativeLeastSquaresReconstructor(Reconstructor):
+    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
+        super().__init__()
+        self._algorithmOptions = tike.ptycho.solvers.LstsqOptions()
+        self._tikeReconstructor = tikeReconstructor
+
     @property
     def name(self) -> str:
-        return 'lstsq_grad'
+        return self._algorithmOptions.name
 
     @property
     def backendName(self) -> str:
-        return 'Tike'
+        return self._tikeReconstructor.backendName
 
     def reconstruct(self) -> int:
-        return 0  # TODO
+        # TODO update self._algorithmOptions
+        return self._tikeReconstructor(self._algorithmOptions)
 
 
 class TikeBackend:
@@ -486,21 +568,28 @@ class TikeBackend:
     @classmethod
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
+                       scanSequence: ScanSequence,
                        isDeveloperModeEnabled: bool = False) -> TikeBackend:
-        loadReconstructors = isDeveloperModeEnabled
+        core = cls(settingsRegistry)
 
         if tike:
             logger.info(f'{tike.__name__} ({tike.__version__})')
-            loadReconstructors = True
+
+            tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
+                                                  core._positionCorrectionSettings,
+                                                  core._probeCorrectionSettings, scanSequence)
+            core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
+            core.reconstructorList.append(
+                AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))
+            core.reconstructorList.append(ConjugateGradientReconstructor(tikeReconstructor))
+            core.reconstructorList.append(IterativeLeastSquaresReconstructor(tikeReconstructor))
         else:
             logger.info('tike not found.')
 
-        core = cls(settingsRegistry)
-
-        if loadReconstructors:
-            core.reconstructorList.append(RegularizedPIEReconstructor())
-            core.reconstructorList.append(AdaptiveMomentGradientDescentReconstructor())
-            core.reconstructorList.append(ConjugateGradientReconstructor())
-            core.reconstructorList.append(IterativeLeastSquaresReconstructor())
+            if isDeveloperModeEnabled:
+                core.reconstructorList.append(NullReconstructor('rpie', 'Tike'))
+                core.reconstructorList.append(NullReconstructor('adam_grad', 'Tike'))
+                core.reconstructorList.append(NullReconstructor('cgrad', 'Tike'))
+                core.reconstructorList.append(NullReconstructor('lstsq_grad', 'Tike'))
 
         return core
