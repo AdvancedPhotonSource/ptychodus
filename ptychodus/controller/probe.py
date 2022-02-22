@@ -3,7 +3,7 @@ from pathlib import Path
 from PyQt5.QtGui import QStandardItemModel
 from PyQt5.QtWidgets import QFileDialog
 
-from ..model import Observer, Observable, ProbeIO, ProbePresenter
+from ..model import Observer, Observable, Probe, ProbePresenter
 from ..view import ImageView, ProbeProbeView, ProbeInitializerView, ProbeZonePlateView, ProbeParametersView
 
 from .image import ImageController
@@ -126,7 +126,7 @@ class ProbeParametersController:
 
     def openProbe(self) -> None:
         fileName, _ = QFileDialog.getOpenFileName(self._view, 'Open Probe', str(Path.home()),
-                                                  ProbeIO.FILE_FILTER)
+                                                  Probe.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)
@@ -134,7 +134,7 @@ class ProbeParametersController:
 
     def saveProbe(self) -> None:
         fileName, _ = QFileDialog.getSaveFileName(self._view, 'Save Probe', str(Path.home()),
-                                                  ProbeIO.FILE_FILTER)
+                                                  Probe.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)

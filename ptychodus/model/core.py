@@ -19,7 +19,6 @@ from .settings import *
 from .tike import TikeBackend
 from .velociprobe import *
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -42,6 +41,7 @@ class ModelCore:
         self._probe = Probe.createInstance(self._probeSettings)
         self._objectSizer = ObjectSizer.createInstance(self._scanSequence, self._detector,
                                                        self._probe)
+        self._object = Object.createInstance(self._objectSettings)
 
         self.h5FileTreeReader = H5FileTreeReader()
         self._velociprobeReader = VelociprobeReader()
@@ -54,6 +54,7 @@ class ModelCore:
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._scanSequence,
+                                                      self._probe, self._object,
                                                       isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
@@ -78,7 +79,7 @@ class ModelCore:
                                                           self._selectableScanSequence,
                                                           self._scanSequence)
         self.objectPresenter = ObjectPresenter.createInstance(self.rng, self._objectSettings,
-                                                              self._objectSizer)
+                                                              self._objectSizer, self._object)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 

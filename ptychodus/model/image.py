@@ -236,4 +236,3 @@ class CropPresenter(Observer, Observable):
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
-

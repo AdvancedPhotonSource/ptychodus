@@ -9,6 +9,7 @@ class TikeBasicParametersView(QGroupBox):
         self.useMpiCheckBox = QCheckBox('Use MPI')
         self.numGpusSpinBox = QSpinBox()
         self.noiseModelComboBox = QComboBox()
+        self.numProbeModesSpinBox = QSpinBox()
         self.numBatchSpinBox = QSpinBox()
         self.numIterSpinBox = QSpinBox()
         self.cgIterSpinBox = QSpinBox()
@@ -28,6 +29,8 @@ class TikeBasicParametersView(QGroupBox):
             'The number of GPUs to use. If the number of GPUs is less than the requested number, only workers for the available GPUs are allocated.'
         )
         view.noiseModelComboBox.setToolTip('The noise model to use for the cost function.')
+        view.numProbeModesSpinBox.setToolTip(
+            'Number of orthogonal probe modes to simulate partial incoherence of the beam')
         view.numBatchSpinBox.setToolTip(
             'The dataset is divided into this number of groups where each group is processed sequentially.'
         )
@@ -42,6 +45,7 @@ class TikeBasicParametersView(QGroupBox):
         layout.addRow(view.useMpiCheckBox)
         layout.addRow('Number of GPUs:', view.numGpusSpinBox)
         layout.addRow('Noise Model:', view.noiseModelComboBox)
+        layout.addRow('Number of Probe Modes:', view.numProbeModesSpinBox)
         layout.addRow('Number of Batches:', view.numBatchSpinBox)
         layout.addRow('Number of Iterations:', view.numIterSpinBox)
 

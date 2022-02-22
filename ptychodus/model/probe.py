@@ -41,9 +41,12 @@ class ProbeSettings(Observable, Observer):
 
 
 class Probe(Observable, Observer):
+    FILE_FILTER = 'NumPy Binary Files (*.npy)'
+
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__()
         self._settings = settings
+        self._array = numpy.zeros((0, 0), dtype=complex)
 
     @classmethod
     def createInstance(cls, settings: ProbeSettings) -> Probe:
@@ -65,21 +68,29 @@ class Probe(Observable, Observer):
         probe_wavelength_m = hc_eVm / self._settings.probeEnergyInElectronVolts.value
         return probe_wavelength_m
 
+    def getArray(self) -> numpy.ndarray:
+        return self._array
+
+    def setArray(self, array: numpy.ndarray) -> None:
+        if not numpy.iscomplexobj(array):
+            raise TypeError('Probe must be a complex-valued ndarray')
+
+        self._array = array
+        self.notifyObservers()
+
+    def read(self, filePath: Path) -> None:
+        self._settings.customFilePath.value = filePath
+        array = numpy.load(filePath)
+        self.setArray(array)
+
+    def write(self, filePath: Path) -> None:
+        numpy.save(filePath, self._array)
+
     def update(self, observable: Observable) -> None:
         if observable is self._settings.probeShape:
             self.notifyObservers()
         elif observable is self._settings.probeEnergyInElectronVolts:
             self.notifyObservers()
-
-
-class ProbeIO:
-    FILE_FILTER = 'NumPy Binary Files (*.npy)'
-
-    def write(self, filePath: Path, estimate: numpy.ndarray) -> None:
-        numpy.save(filePath, estimate)
-
-    def read(self, filePath: Path) -> numpy.ndarray:
-        return numpy.load(filePath)
 
 
 class GaussianBeamProbeInitializer(Callable):
@@ -148,11 +159,11 @@ class CustomProbeInitializer(Callable):
         super().__init__()
         self._initialProbe = numpy.zeros((64, 64), dtype=complex)
 
-    def setInitialProbe(self, initialProbe: numpy.ndarray) -> None:
-        if not numpy.iscomplexobj(initialProbe):
+    def cacheProbe(self, probe: numpy.ndarray) -> None:
+        if not numpy.iscomplexobj(probe):
             raise TypeError('Probe must be a complex-valued ndarray')
 
-        self._initialProbe = initialProbe
+        self._probe = probe
 
     def __call__(self) -> numpy.ndarray:
         return self._initialProbe
@@ -171,8 +182,6 @@ class ProbePresenter(Observable, Observer):
         self._probe = probe
         self._initializerList = initializerList
         self._initializer = initializerList[0]
-        self._estimate = numpy.zeros((0, 0), dtype=complex)
-        self._probeIO = ProbeIO()
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
@@ -212,17 +221,16 @@ class ProbePresenter(Observable, Observer):
         self.setCurrentInitializer(self._settings.initializer.value)
 
     def openProbe(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        initialProbe = self._probeIO.read(filePath)
+        self._probe.read(filePath)
         self.setCurrentInitializer('Custom')
-        self._initializer.setInitialProbe(initialProbe)
-        self.initializeProbe()
+        self._initializer.cacheProbe(self._probe.getArray())
+        self.notifyObservers()
 
     def saveProbe(self, filePath: Path) -> None:
-        self._probeIO.write(filePath, self._estimate)
+        self._probe.write(filePath)
 
     def initializeProbe(self) -> None:
-        self._estimate = self._initializer()
+        self._probe.setArray(self._initializer())
         self.notifyObservers()
 
     def getProbeMinShape(self) -> int:
@@ -275,7 +283,7 @@ class ProbePresenter(Observable, Observer):
         return self._settings.beamstopDiameterInMeters.value
 
     def getProbe(self) -> numpy.ndarray:
-        return self._estimate
+        return self._probe.getArray()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.initializer:

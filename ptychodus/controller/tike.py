@@ -207,10 +207,12 @@ class TikeBasicParametersController(Observer):
         for model in presenter.getNoiseModelList():
             view.noiseModelComboBox.addItem(model)
 
+        view.useMpiCheckBox.setVisible(False)  # TODO make visible when supported
         view.useMpiCheckBox.toggled.connect(presenter.setMpiEnabled)
         view.numGpusSpinBox.valueChanged.connect(presenter.setNumGpus)
         view.noiseModelComboBox.currentTextChanged.connect(presenter.setNoiseModel)
 
+        view.numProbeModesSpinBox.valueChanged.connect(presenter.setNumProbeModes)
         view.numBatchSpinBox.valueChanged.connect(presenter.setNumBatch)
         view.numIterSpinBox.valueChanged.connect(presenter.setNumIter)
         view.cgIterSpinBox.valueChanged.connect(presenter.setCgIter)
@@ -237,6 +239,12 @@ class TikeBasicParametersController(Observer):
         self._view.numGpusSpinBox.blockSignals(False)
 
         self._view.noiseModelComboBox.setCurrentText(self._presenter.getNoiseModel())
+
+        self._view.numProbeModesSpinBox.blockSignals(True)
+        self._view.numProbeModesSpinBox.setRange(self._presenter.getMinNumProbeModes(),
+                                                 self._presenter.getMaxNumProbeModes())
+        self._view.numProbeModesSpinBox.setValue(self._presenter.getNumProbeModes())
+        self._view.numProbeModesSpinBox.blockSignals(False)
 
         self._view.numBatchSpinBox.blockSignals(True)
         self._view.numBatchSpinBox.setRange(self._presenter.getMinNumBatch(),

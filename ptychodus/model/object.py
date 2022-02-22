@@ -108,14 +108,35 @@ class ObjectSizer(Observable, Observer):
             self.notifyObservers()
 
 
-class ObjectIO:
+class Object(Observable):
     FILE_FILTER = 'NumPy Binary Files (*.npy)'
 
-    def write(self, filePath: Path, estimate: numpy.ndarray) -> None:
-        numpy.save(filePath, estimate)
+    def __init__(self, settings: ObjectSettings) -> None:
+        super().__init__()
+        self._settings = settings
+        self._array = numpy.zeros((0, 0), dtype=complex)
 
-    def read(self, filePath: Path) -> numpy.ndarray:
-        return numpy.load(filePath)
+    @classmethod
+    def createInstance(cls, settings: ObjectSettings) -> Object:
+        return cls(settings)
+
+    def getArray(self) -> numpy.ndarray:
+        return self._array
+
+    def setArray(self, array: numpy.ndarray) -> None:
+        if not numpy.iscomplexobj(array):
+            raise TypeError('Object must be a complex-valued ndarray')
+
+        self._array = array
+        self.notifyObservers()
+
+    def read(self, filePath: Path) -> None:
+        self._settings.customFilePath.value = filePath
+        array = numpy.load(filePath)
+        self.setArray(array)
+
+    def write(self, filePath: Path) -> None:
+        numpy.save(filePath, self._array)
 
 
 class UniformRandomObjectInitializer(Callable):
@@ -154,24 +175,23 @@ class CustomObjectInitializer(Callable):
 
 
 class ObjectPresenter(Observable, Observer):
-    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer,
+    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, obj: Object,
                  initializerList: list[Callable]) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
+        self._object = obj
         self._initializerList = initializerList
         self._initializer = initializerList[0]
-        self._estimate = numpy.zeros((0, 0), dtype=complex)
-        self._objectIO = ObjectIO()
 
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings,
-                       sizer: ObjectSizer) -> ObjectPresenter:
+                       sizer: ObjectSizer, obj: Object) -> ObjectPresenter:
         initializerList = list()
         initializerList.append(UniformRandomObjectInitializer(sizer, rng))
         initializerList.append(CustomObjectInitializer(sizer))
 
-        presenter = cls(settings, sizer, initializerList)
+        presenter = cls(settings, sizer, obj, initializerList)
         presenter.setCurrentInitializerFromSettings()
         settings.initializer.addObserver(presenter)
         sizer.addObserver(presenter)
@@ -200,21 +220,20 @@ class ObjectPresenter(Observable, Observer):
         self.setCurrentInitializer(self._settings.initializer.value)
 
     def openObject(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        initialObject = self._objectIO.read(filePath)
+        self._object.read(filePath)
         self.setCurrentInitializer('Custom')
-        self._initializer.setInitialObject(initialObject)
-        self.initializeObject()
+        self._initializer.cacheObject(self._object.getArray())
+        self.notifyObservers()
 
     def saveObject(self, filePath: Path) -> None:
-        self._objectIO.write(filePath, self._estimate)
+        self._object.write(filePath)
 
     def initializeObject(self) -> None:
-        self._estimate = self._initializer()
+        self._object.setArray(self._initializer())
         self.notifyObservers()
 
     def getObject(self) -> numpy.ndarray:
-        return self._estimate
+        return self._object.getArray()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.initializer:

@@ -3,7 +3,7 @@ from pathlib import Path
 from PyQt5.QtGui import QStandardItemModel
 from PyQt5.QtWidgets import QFileDialog
 
-from ..model import Observer, Observable, ObjectIO, ObjectPresenter
+from ..model import Observer, Observable, Object, ObjectPresenter
 from ..view import ImageView, ObjectInitializerView, ObjectParametersView
 
 from .image import ImageController
@@ -53,7 +53,7 @@ class ObjectParametersController:
 
     def openObject(self) -> None:
         fileName, _ = QFileDialog.getOpenFileName(self._view, 'Open Object', str(Path.home()),
-                                                  ObjectIO.FILE_FILTER)
+                                                  Object.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)
@@ -61,7 +61,7 @@ class ObjectParametersController:
 
     def saveObject(self) -> None:
         fileName, _ = QFileDialog.getSaveFileName(self._view, 'Save Object', str(Path.home()),
-                                                  ObjectIO.FILE_FILTER)
+                                                  Object.FILE_FILTER)
 
         if fileName:
             filePath = Path(fileName)

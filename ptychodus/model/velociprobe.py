@@ -260,5 +260,3 @@ class VelociprobeImageSequence(ImageSequence):
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:
             self._updateImages()
-
-
