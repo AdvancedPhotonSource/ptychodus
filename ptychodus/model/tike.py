@@ -8,7 +8,8 @@ import numpy
 try:
     import tike.ptycho
 except ImportError:
-    tike = None
+    class tike:
+        ptycho = None
 
 from .observer import Observable, Observer
 from .reconstructor import Reconstructor, NullReconstructor
@@ -402,7 +403,7 @@ class TikeReconstructor:
             wavefront; i.e. what the detector records. FFT-shifted so the
             diffraction peak is at the corners.
         """
-        return
+        return numpy.empty(shape=None)
 
     def getProbe(self) -> numpy.ndarray:
         numAdditionalProbeModes = self._settings.numProbeModes.value - 1
@@ -488,7 +489,7 @@ class TikeReconstructor:
             algorithm_options=algorithmOptions,
             model=self._settings.noiseModel.value,
             num_gpu=self._settings.numGpus.value,
-            objoptions=objectOptions,
+            object_options=objectOptions,
             position_options=positionOptions,
             probe_options=probeOptions,
             psi=initialObject,
@@ -514,6 +515,10 @@ class RegularizedPIEReconstructor(Reconstructor):
     def backendName(self) -> str:
         return self._tikeReconstructor.backendName
 
+    @property
+    def _settings(self) -> TikeSettings:
+        return self._tikeReconstructor._settings
+
     def reconstruct(self) -> int:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
@@ -534,6 +539,10 @@ class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
     @property
     def backendName(self) -> str:
         return self._tikeReconstructor.backendName
+
+    @property
+    def _settings(self) -> TikeSettings:
+        return self._tikeReconstructor._settings
 
     def reconstruct(self) -> int:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
@@ -557,6 +566,10 @@ class ConjugateGradientReconstructor(Reconstructor):
     def backendName(self) -> str:
         return self._tikeReconstructor.backendName
 
+    @property
+    def _settings(self) -> TikeSettings:
+        return self._tikeReconstructor._settings
+
     def reconstruct(self) -> int:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
@@ -578,6 +591,10 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
     @property
     def backendName(self) -> str:
         return self._tikeReconstructor.backendName
+
+    @property
+    def _settings(self) -> TikeSettings:
+        return self._tikeReconstructor._settings
 
     def reconstruct(self) -> int:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
@@ -614,7 +631,7 @@ class TikeBackend:
                        isDeveloperModeEnabled: bool = False) -> TikeBackend:
         core = cls(settingsRegistry)
 
-        if tike:
+        if tike.ptycho:
             logger.info(f'{tike.__name__} ({tike.__version__})')
 
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
