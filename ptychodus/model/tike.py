@@ -6,7 +6,7 @@ import logging
 import numpy
 
 try:
-    import tike
+    import tike.ptycho
 except ImportError:
     tike = None
 
