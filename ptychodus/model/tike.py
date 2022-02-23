@@ -418,20 +418,23 @@ class TikeReconstructor:
         ymax = self._cropSettings.centerYInPixels.value + radiusY
 
         for datafile in self._velociprobeReader.entryGroup.data:
-            with h5py.File(datafile.filePath, 'r') as h5File:
-                item = h5File.get(datafile.dataPath)
+            try:
+                with h5py.File(datafile.filePath, 'r') as h5File:
+                    item = h5File.get(datafile.dataPath)
 
-                if isinstance(item, h5py.Dataset):
-                    data = item[()]
+                    if isinstance(item, h5py.Dataset):
+                        data = item[()]
 
-                    if self._cropSettings.cropEnabled.value:
-                        data = numpy.copy(data[ymin:ymax, xmin:xmax])
+                        if self._cropSettings.cropEnabled.value:
+                            data = numpy.copy(data[ymin:ymax, xmin:xmax])
 
-                    dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
-                    dataList.append(dataShifted)
-                else:
-                    logger.debug(
-                        f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.')
+                        dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
+                        dataList.append(dataShifted)
+                    else:
+                        logger.debug(
+                            f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.')
+            except FileNotFoundError:
+                logger.debug(f'File {datafile.filePath} not found!')
 
         data = numpy.concatenate(dataList, axis=0)
 
