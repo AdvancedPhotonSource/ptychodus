@@ -18,7 +18,7 @@ class ScanSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', Path())
+        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
         self.extentX = settingsGroup.createIntegerEntry('ExtentX', 10)
         self.extentY = settingsGroup.createIntegerEntry('ExtentY', 10)
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')

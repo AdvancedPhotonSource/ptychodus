@@ -4,17 +4,24 @@ from typing import Any
 import logging
 
 import numpy
+import h5py
 
 try:
     import tike.ptycho
 except ImportError:
+
     class tike:
         ptycho = None
 
+
+from .image import CropSettings
+from .object import Object
 from .observer import Observable, Observer
+from .probe import Probe
 from .reconstructor import Reconstructor, NullReconstructor
 from .scan import ScanSequence
 from .settings import SettingsRegistry, SettingsGroup
+from .velociprobe import VelociprobeReader
 
 logger = logging.getLogger(__name__)
 
@@ -382,12 +389,15 @@ class TikeReconstructor:
     def __init__(self, settings: TikeSettings,
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
-                 probeCorrectionSettings: TikeProbeCorrectionSettings, scanSequence: ScanSequence,
-                 probe: Probe, obj: Object) -> None:
+                 probeCorrectionSettings: TikeProbeCorrectionSettings, cropSettings: CropSettings,
+                 velociprobeReader: VelociprobeReader, scanSequence: ScanSequence, probe: Probe,
+                 obj: Object) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
+        self._cropSettings = cropSettings
+        self._velociprobeReader = velociprobeReader
         self._scanSequence = scanSequence
         self._probe = probe
         self._object = obj
@@ -396,14 +406,36 @@ class TikeReconstructor:
     def backendName(self) -> str:
         return 'Tike'
 
-    def getData(self) -> numpy.ndarray:  # FIXME
-        """
-        data : (FRAME, WIDE, HIGH) float32
-            The intensity (square of the absolute value) of the propagated
-            wavefront; i.e. what the detector records. FFT-shifted so the
-            diffraction peak is at the corners.
-        """
-        return numpy.empty(shape=None)
+    def getData(self) -> numpy.ndarray:
+        dataList: list[numpy.ndarray] = list()
+
+        radiusX = self._cropSettings.extentXInPixels.value // 2
+        xmin = self._cropSettings.centerXInPixels.value - radiusX
+        xmax = self._cropSettings.centerXInPixels.value + radiusX
+
+        radiusY = self._cropSettings.extentYInPixels.value // 2
+        ymin = self._cropSettings.centerYInPixels.value - radiusY
+        ymax = self._cropSettings.centerYInPixels.value + radiusY
+
+        for datafile in self._velociprobeReader.entryGroup.data:
+            with h5py.File(datafile.filePath, 'r') as h5File:
+                item = h5File.get(datafile.dataPath)
+
+                if isinstance(item, h5py.Dataset):
+                    data = item[()]
+
+                    if self._cropSettings.cropEnabled.value:
+                        data = numpy.copy(data[ymin:ymax, xmin:xmax])
+
+                    dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
+                    dataList.append(dataShifted)
+                else:
+                    logger.debug(
+                        f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.')
+
+        data = numpy.concatenate(dataList, axis=0)
+
+        return data
 
     def getProbe(self) -> numpy.ndarray:
         numAdditionalProbeModes = self._settings.numProbeModes.value - 1
@@ -625,6 +657,8 @@ class TikeBackend:
     @classmethod
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
+                       cropSettings: CropSettings,
+                       velociprobeReader: VelociprobeReader,
                        scanSequence: ScanSequence,
                        probe: Probe,
                        obj: Object,
@@ -636,8 +670,8 @@ class TikeBackend:
 
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
-                                                  core._probeCorrectionSettings, scanSequence,
-                                                  probe, obj)
+                                                  core._probeCorrectionSettings, cropSettings,
+                                                  velociprobeReader, scanSequence, probe, obj)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

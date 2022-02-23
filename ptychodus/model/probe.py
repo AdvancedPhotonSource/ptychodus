@@ -16,7 +16,7 @@ class ProbeSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Gaussian')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', Path())
+        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
         self.probeShape = settingsGroup.createIntegerEntry('ProbeShape', 64)
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
             'ProbeEnergyInElectronVolts', '2000')

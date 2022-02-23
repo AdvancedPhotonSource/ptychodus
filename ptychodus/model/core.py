@@ -53,7 +53,8 @@ class ModelCore:
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
-        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._scanSequence,
+        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSettings,
+                                                      self._velociprobeReader, self._scanSequence,
                                                       self._probe, self._object,
                                                       isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,

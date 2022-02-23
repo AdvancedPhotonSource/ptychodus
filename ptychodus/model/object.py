@@ -21,7 +21,7 @@ class ObjectSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Random')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', Path())
+        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:

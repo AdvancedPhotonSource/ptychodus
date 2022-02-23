@@ -7,8 +7,9 @@ from .settings import SettingsGroup
 from .velociprobe import VelociprobeReader, DetectorGroup, DetectorSpecificGroup
 
 
-class ImportSettingsPresenter(Observable, Observer
-                              ):  # TODO refactor to set using presenters rather than settings
+class ImportSettingsPresenter(Observable, Observer):
+    # TODO refactor to set using presenters rather than settings
+
     def __init__(self, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
                  cropSettings: CropSettings, probeSettings: ProbeSettings) -> None:
         super().__init__()
