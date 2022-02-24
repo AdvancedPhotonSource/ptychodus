@@ -1,8 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
 
-import numpy
-
 from .observer import Observable, Observer
 from .settings import SettingsGroup, SettingsRegistry
 

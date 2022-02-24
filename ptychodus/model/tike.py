@@ -391,7 +391,7 @@ class TikeReconstructor:
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSettings: CropSettings,
                  velociprobeReader: VelociprobeReader, scanSequence: ScanSequence, probe: Probe,
-                 obj: Object) -> None:
+                 objectSizer: ObjectSizer, obj: Object) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
@@ -400,6 +400,7 @@ class TikeReconstructor:
         self._velociprobeReader = velociprobeReader
         self._scanSequence = scanSequence
         self._probe = probe
+        self._objectSizer = objectSizer
         self._object = obj
 
     @property
@@ -455,9 +456,23 @@ class TikeReconstructor:
         return self._object.getArray().astype('complex64')
 
     def getScan(self) -> numpy.ndarray:
-        x = [float(point.x) for point in iter(self._scanSequence)]
-        y = [float(point.y) for point in iter(self._scanSequence)]
-        return numpy.column_stack((x, y))
+        xvalues = list()
+        yvalues = list()
+
+        for point in iter(self._scanSequence):
+            xvalues.append(point.x)
+            yvalues.append(point.y)
+
+        xmin = min(xvalues)
+        ymin = min(yvalues)
+
+        dx = self._objectSizer.objectPlanePixelSizeXInMeters
+        dy = self._objectSizer.objectPlanePixelSizeYInMeters
+
+        xvalues = [float((x - xmin) / dx) for x in xvalues]
+        yvalues = [float((y - ymin) / dy) for y in yvalues]
+
+        return numpy.column_stack((xvalues, yvalues))
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings
@@ -664,6 +679,7 @@ class TikeBackend:
                        velociprobeReader: VelociprobeReader,
                        scanSequence: ScanSequence,
                        probe: Probe,
+                       objectSizer: ObjectSizer,
                        obj: Object,
                        isDeveloperModeEnabled: bool = False) -> TikeBackend:
         core = cls(settingsRegistry)
@@ -674,7 +690,8 @@ class TikeBackend:
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, cropSettings,
-                                                  velociprobeReader, scanSequence, probe, obj)
+                                                  velociprobeReader, scanSequence, probe,
+                                                  objectSizer, obj)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

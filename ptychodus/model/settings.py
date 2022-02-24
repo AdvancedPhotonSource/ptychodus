@@ -3,8 +3,6 @@ from pathlib import Path
 from typing import TypeVar, Callable, Generic
 import configparser
 
-import numpy
-
 from .observer import Observable, Observer
 
 T = TypeVar('T')

@@ -55,7 +55,7 @@ class ModelCore:
                                                               isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSettings,
                                                       self._velociprobeReader, self._scanSequence,
-                                                      self._probe, self._object,
+                                                      self._probe, self._objectSizer, self._object,
                                                       isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)

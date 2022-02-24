@@ -58,22 +58,28 @@ class ObjectSizer(Observable, Observer):
         return self.extentYInPixels, self.extentXInPixels
 
     @property
+    def objectPlanePixelSizeXInMeters(self) -> Decimal:
+        return self._probe.wavelengthInMeters * self._detector.distanceToObjectInMeters \
+                / self._detector.extentXInMeters
+
+    @property
     def extentXInPixels(self) -> int:
-        objectPlanePixelSizeXInMeters = self._probe.wavelengthInMeters \
-                * self._detector.distanceToObjectInMeters / self._detector.extentXInMeters
-        numberOfInteriorPixels = self._scanExtentXInMeters / objectPlanePixelSizeXInMeters
+        numberOfInteriorPixels = self._scanExtentXInMeters / self.objectPlanePixelSizeXInMeters
         return int(math.ceil(numberOfInteriorPixels)) + self.numberOfPaddingPixels
 
     @property
+    def objectPlanePixelSizeYInMeters(self) -> Decimal:
+        return self._probe.wavelengthInMeters * self._detector.distanceToObjectInMeters \
+                / self._detector.extentYInMeters
+
+    @property
     def extentYInPixels(self) -> int:
-        objectPlanePixelSizeYInMeters = self._probe.wavelengthInMeters \
-                * self._detector.distanceToObjectInMeters / self._detector.extentYInMeters
-        numberOfInteriorPixels = self._scanExtentYInMeters / objectPlanePixelSizeYInMeters
+        numberOfInteriorPixels = self._scanExtentYInMeters / self.objectPlanePixelSizeYInMeters
         return int(math.ceil(numberOfInteriorPixels)) + self.numberOfPaddingPixels
 
     @property
     def numberOfPaddingPixels(self) -> int:
-        return 2 * (self._probe.extentInPixels // 2)
+        return 2 * (self._probe.extentInPixels + 1) # TODO 2 * (self._probe.extentInPixels // 2)
 
     def _updateBoundingBox(self) -> None:
         pointIter = iter(self._scanSequence)
