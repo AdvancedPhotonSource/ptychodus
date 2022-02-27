@@ -469,8 +469,11 @@ class TikeReconstructor:
         dx = self._objectSizer.objectPlanePixelSizeXInMeters
         dy = self._objectSizer.objectPlanePixelSizeYInMeters
 
-        xvalues = [float((x - xmin) / dx) for x in xvalues]
-        yvalues = [float((y - ymin) / dy) for y in yvalues]
+        xvalues = [float(1 + (x - xmin) / dx) for x in xvalues] # TODO fix 1+
+        yvalues = [float(1 + (y - ymin) / dy) for y in yvalues] # TODO fix 1+
+
+        for x, y in zip(xvalues, yvalues):
+            print(f'{x:+.6e}, {y:+.6e}')
 
         return numpy.column_stack((xvalues, yvalues))
 
