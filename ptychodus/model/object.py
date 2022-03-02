@@ -3,7 +3,6 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Callable, Tuple
 import logging
-import math
 
 import numpy
 
@@ -63,9 +62,12 @@ class ObjectSizer(Observable, Observer):
                 / self._detector.extentXInMeters
 
     @property
+    def numberOfInteriorPixelsX(self) -> int:
+        return int(numpy.ceil(self._scanExtentXInMeters / self.objectPlanePixelSizeXInMeters))
+
+    @property
     def extentXInPixels(self) -> int:
-        numberOfInteriorPixels = self._scanExtentXInMeters / self.objectPlanePixelSizeXInMeters
-        return int(math.ceil(numberOfInteriorPixels)) + self.numberOfPaddingPixels
+        return self.numberOfInteriorPixelsX + self.numberOfPaddingPixels
 
     @property
     def objectPlanePixelSizeYInMeters(self) -> Decimal:
@@ -73,13 +75,16 @@ class ObjectSizer(Observable, Observer):
                 / self._detector.extentYInMeters
 
     @property
+    def numberOfInteriorPixelsY(self) -> int:
+        return int(numpy.ceil(self._scanExtentYInMeters / self.objectPlanePixelSizeYInMeters))
+
+    @property
     def extentYInPixels(self) -> int:
-        numberOfInteriorPixels = self._scanExtentYInMeters / self.objectPlanePixelSizeYInMeters
-        return int(math.ceil(numberOfInteriorPixels)) + self.numberOfPaddingPixels
+        return self.numberOfInteriorPixelsY + self.numberOfPaddingPixels
 
     @property
     def numberOfPaddingPixels(self) -> int:
-        return 2 * (self._probe.extentInPixels + 1) # TODO 2 * (self._probe.extentInPixels // 2)
+        return 2 * (self._probe.extentInPixels // 2)
 
     def _updateBoundingBox(self) -> None:
         pointIter = iter(self._scanSequence)

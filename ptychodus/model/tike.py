@@ -452,30 +452,52 @@ class TikeReconstructor:
 
         return probe
 
+    @property
+    def numberOfPaddingPixels(self) -> int:
+        return 2 * (self._probe.extentInPixels + 1)
+
+    @property
+    def objectExtentXInPixels(self) -> int:
+        return self._objectSizer.numberOfInteriorPixelsX + self.numberOfPaddingPixels
+
+    @property
+    def objectExtentYInPixels(self) -> int:
+        return self._objectSizer.numberOfInteriorPixelsY + self.numberOfPaddingPixels
+
     def getInitialObject(self) -> numpy.ndarray:
-        return self._object.getArray().astype('complex64')
+        ptychodusObject = self._object.getArray()
+
+        delta0 = max(self.objectExtentXInPixels - ptychodusObject.shape[0], 0)
+        before0 = delta0 // 2
+        after0 = delta0 - before0
+
+        delta1 = max(self.objectExtentYInPixels - ptychodusObject.shape[1], 0)
+        before1 = delta1 // 2
+        after1 = delta1 - before1
+
+        tikeObject = numpy.pad(ptychodusObject, ((before0, after0), (before1, after1))).astype('complex64')
+
+        return tikeObject
 
     def getScan(self) -> numpy.ndarray:
         xvalues = list()
         yvalues = list()
 
-        for point in iter(self._scanSequence):
-            xvalues.append(point.x)
-            yvalues.append(point.y)
-
-        xmin = min(xvalues)
-        ymin = min(yvalues)
-
         dx = self._objectSizer.objectPlanePixelSizeXInMeters
         dy = self._objectSizer.objectPlanePixelSizeYInMeters
 
-        xvalues = [float(1 + (x - xmin) / dx) for x in xvalues] # TODO fix 1+
-        yvalues = [float(1 + (y - ymin) / dy) for y in yvalues] # TODO fix 1+
+        for point in iter(self._scanSequence):
+            xvalues.append(float(point.x / dx))
+            yvalues.append(float(point.y / dy))
 
-        for x, y in zip(xvalues, yvalues):
-            print(f'{x:+.6e}, {y:+.6e}')
+        dx = self.objectExtentXInPixels / 2 - numpy.mean(xvalues)
+        dy = self.objectExtentYInPixels / 2 - numpy.mean(yvalues)
 
-        return numpy.column_stack((xvalues, yvalues))
+        xvalues = numpy.add(xvalues, dx)
+        yvalues = numpy.add(yvalues, dy)
+        scan = numpy.column_stack((xvalues, yvalues))
+
+        return scan
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings
