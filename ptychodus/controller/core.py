@@ -32,8 +32,8 @@ class ControllerCore:
                                                                      view.settingsEntryView)
         self._detectorController = DetectorController.createInstance(
             model.detectorPresenter, view.detectorParametersView.detectorView)
-        self._detectorDatasetController = DetectorDatasetController.createInstance(
-            model.detectorDatasetPresenter, model.detectorImagePresenter,
+        self._datasetController = DatasetController.createInstance(
+            model.datasetPresenter, model.detectorImagePresenter,
             view.detectorParametersView.datasetView)
         self._cropController = CropController.createInstance(
             model.cropPresenter, view.detectorParametersView.imageCropView)

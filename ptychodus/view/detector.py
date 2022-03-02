@@ -28,13 +28,13 @@ class DetectorView(QGroupBox):
         return view
 
 
-class DetectorDatasetView(QGroupBox):
+class DatasetView(QGroupBox):
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__('Diffraction Data', parent)
         self.dataFileListView = QListView()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> DetectorDatasetView:
+    def createInstance(cls, parent: QWidget = None) -> DatasetView:
         view = cls(parent)
 
         view.dataFileListView.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
@@ -73,7 +73,7 @@ class DetectorParametersView(QWidget):
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
         self.detectorView = DetectorView.createInstance()
-        self.datasetView = DetectorDatasetView.createInstance()
+        self.datasetView = DatasetView.createInstance()
         self.imageCropView = CropView.createInstance()
 
     @classmethod

@@ -14,6 +14,7 @@ class DetectorSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
+        self.dataPath = settingsGroup.createPathEntry('DataPath', None)
         self.pixelSizeXInMeters = settingsGroup.createRealEntry('PixelSizeXInMeters', '75e-6')
         self.pixelSizeYInMeters = settingsGroup.createRealEntry('PixelSizeYInMeters', '75e-6')
         self.detectorDistanceInMeters = settingsGroup.createRealEntry(
@@ -116,14 +117,15 @@ class DetectorPresenter(Observer, Observable):
             self.notifyObservers()
 
 
-class DetectorDatasetPresenter(Observable, Observer):
-    def __init__(self, velociprobeReader: VelociprobeReader) -> None:
+class DatasetPresenter(Observable, Observer):
+    def __init__(self, settings: DetectorSettings, velociprobeReader: VelociprobeReader) -> None:
         super().__init__()
+        self._settings = settings
         self._velociprobeReader = velociprobeReader
 
     @classmethod
-    def createInstance(cls, velociprobeReader: VelociprobeReader) -> DetectorDatasetPresenter:
-        presenter = cls(velociprobeReader)
+    def createInstance(cls, settings: DetectorSettings, velociprobeReader: VelociprobeReader) -> DatasetPresenter:
+        presenter = cls(settings, velociprobeReader)
         velociprobeReader.addObserver(presenter)
         return presenter
 
@@ -141,6 +143,7 @@ class DetectorDatasetPresenter(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:
+            self._settings.dataPath.value = self._velociprobeReader.masterFilePath
             self.notifyObservers()
 
 

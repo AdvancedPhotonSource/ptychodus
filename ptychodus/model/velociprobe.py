@@ -1,53 +1,24 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from pathlib import Path
 from typing import Optional
 
 import h5py
 import numpy
 
-from .data_file import DataFileReader
+from .data_file import DataFile, DataFileReader
 from .image import ImageSequence
 from .observer import Observable, Observer
 
 
-class DatasetState(Enum):
-    MISSING = auto()
-    FOUND = auto()
-    VALID = auto()
-
-
-@dataclass(frozen=True)
-class Datafile:
-    name: str
-    filePath: Path
-    dataPath: str
-
-    def getState(self) -> DatasetState:
-        state = DatasetState.MISSING
-
-        if self.filePath.is_file():
-            state = DatasetState.FOUND
-
-            try:
-                with h5py.File(self.filePath, 'r') as h5File:
-                    if self.dataPath in h5File:
-                        state = DatasetState.VALID
-            except OSError:
-                pass
-
-        return state
-
-
 @dataclass(frozen=True)
 class DataGroup:
-    datafileList: list[Datafile] = field(default_factory=list)
+    datafileList: list[DataFile] = field(default_factory=list)
 
     def __iter__(self):
         return iter(self.datafileList)
 
-    def __getitem__(self, index: int) -> Datafile:
+    def __getitem__(self, index: int) -> DataFile:
         return self.datafileList[index]
 
     def __len__(self) -> int:
@@ -104,17 +75,18 @@ class EntryGroup:
 class VelociprobeReader(DataFileReader, Observable):
     def __init__(self) -> None:
         super().__init__()
+        self.masterFilePath: Optional[Path] = None
         self.entryGroup: Optional[EntryGroup] = None
 
-    def _readDataGroup(self, h5DataGroup: h5py.Group, masterFilePath: Path) -> DataGroup:
+    def _readDataGroup(self, h5DataGroup: h5py.Group) -> DataGroup:
         datafileList = list()
 
         for name, h5Item in h5DataGroup.items():
             h5Item = h5DataGroup.get(name, getlink=True)
 
             if isinstance(h5Item, h5py.ExternalLink):
-                datafile = Datafile(name=name,
-                                    filePath=masterFilePath.parent / h5Item.filename,
+                datafile = DataFile(name=name,
+                                    filePath=self.masterFilePath.parent / h5Item.filename,
                                     dataPath=str(h5Item.path))
                 datafileList.append(datafile)
 
@@ -176,11 +148,11 @@ class VelociprobeReader(DataFileReader, Observable):
         return SampleGroup(goniometer=goniometer)
 
     def read(self, rootGroup: h5py.Group) -> None:
-        masterFilePath = Path(rootGroup.filename)
+        self.masterFilePath = Path(rootGroup.filename)
 
         h5EntryGroup = rootGroup['entry']
         self.entryGroup = EntryGroup(
-            data=self._readDataGroup(h5EntryGroup['data'], masterFilePath),
+            data=self._readDataGroup(h5EntryGroup['data']),
             instrument=self._readInstrumentGroup(h5EntryGroup['instrument']),
             sample=self._readSampleGroup(h5EntryGroup['sample']))
         self.notifyObservers()

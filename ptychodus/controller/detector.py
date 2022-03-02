@@ -42,8 +42,8 @@ class DetectorController(Observer):
             self._syncModelToView()
 
 
-class DetectorDatasetListModel(QAbstractListModel):
-    def __init__(self, presenter: DetectorDatasetPresenter, parent: QObject = None) -> None:
+class DatasetListModel(QAbstractListModel):
+    def __init__(self, presenter: DatasetPresenter, parent: QObject = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
 
@@ -83,17 +83,17 @@ class DetectorDatasetListModel(QAbstractListModel):
         self.endResetModel()
 
 
-class DetectorDatasetController(Observer):
-    def __init__(self, datasetPresenter: DetectorDatasetPresenter,
-                 imagePresenter: DetectorImagePresenter, view: DetectorDatasetView) -> None:
+class DatasetController(Observer):
+    def __init__(self, datasetPresenter: DatasetPresenter,
+                 imagePresenter: DetectorImagePresenter, view: DatasetView) -> None:
         self._datasetPresenter = datasetPresenter
         self._imagePresenter = imagePresenter
-        self._listModel = DetectorDatasetListModel(datasetPresenter)
+        self._listModel = DatasetListModel(datasetPresenter)
         self._view = view
 
     @classmethod
-    def createInstance(cls, datasetPresenter: DetectorDatasetPresenter,
-                       imagePresenter: DetectorImagePresenter, view: DetectorDatasetView):
+    def createInstance(cls, datasetPresenter: DatasetPresenter,
+                       imagePresenter: DetectorImagePresenter, view: DatasetView):
         controller = cls(datasetPresenter, imagePresenter, view)
 
         view.dataFileListView.setModel(controller._listModel)

@@ -67,8 +67,8 @@ class ModelCore:
         self.settingsPresenter = SettingsPresenter.createInstance(self.settingsRegistry)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings)
-        self.detectorDatasetPresenter = DetectorDatasetPresenter.createInstance(
-            self._velociprobeReader)
+        self.datasetPresenter = DatasetPresenter.createInstance(
+            self._detectorSettings, self._velociprobeReader)
         self.detectorImagePresenter = DetectorImagePresenter.createInstance(
             self._croppedImageSequence)
         self.importSettingsPresenter = ImportSettingsPresenter.createInstance(

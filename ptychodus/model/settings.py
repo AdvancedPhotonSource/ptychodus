@@ -1,6 +1,6 @@
 from decimal import Decimal
 from pathlib import Path
-from typing import TypeVar, Callable, Generic
+from typing import Callable, Generic, Optional, TypeVar
 import configparser
 
 from .observer import Observable, Observer
@@ -54,7 +54,7 @@ class SettingsGroup(Observable, Observer):
                                             lambda valueString: str(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 
-    def createPathEntry(self, name: str, defaultValue: Path) -> SettingsEntry[Path]:
+    def createPathEntry(self, name: str, defaultValue: Optional[Path]) -> SettingsEntry[Path]:
         candidateEntry = SettingsEntry[Path](name, defaultValue,
                                              lambda valueString: Path(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)

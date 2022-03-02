@@ -1,11 +1,14 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Optional
 import logging
+import threading
 
 import h5py
 import numpy
-import threading
 import watchdog.events
 import watchdog.observers
 
@@ -42,13 +45,41 @@ class DataDirectoryWatcher(threading.Thread):
 
         except:
             self._observer.stop()
-            logging.error('Watchdog Thread Error')  # TODO improve message
+            logger.error('Watchdog Thread Error')  # TODO improve message
 
         self._observer.join()
 
     def stop(self) -> None:
         self._observer.stop()
         self._stopEvent.set()
+
+
+class DatasetState(Enum):
+    MISSING = auto()
+    FOUND = auto()
+    VALID = auto()
+
+
+@dataclass(frozen=True)
+class DataFile:
+    name: str
+    filePath: Path
+    dataPath: str
+
+    def getState(self) -> DatasetState:
+        state = DatasetState.MISSING
+
+        if self.filePath.is_file():
+            state = DatasetState.FOUND
+
+            try:
+                with h5py.File(self.filePath, 'r') as h5File:
+                    if self.dataPath in h5File:
+                        state = DatasetState.VALID
+            except OSError:
+                pass
+
+        return state
 
 
 class DataFileReader(ABC):
