@@ -124,7 +124,8 @@ class DatasetPresenter(Observable, Observer):
         self._velociprobeReader = velociprobeReader
 
     @classmethod
-    def createInstance(cls, settings: DetectorSettings, velociprobeReader: VelociprobeReader) -> DatasetPresenter:
+    def createInstance(cls, settings: DetectorSettings,
+                       velociprobeReader: VelociprobeReader) -> DatasetPresenter:
         presenter = cls(settings, velociprobeReader)
         velociprobeReader.addObserver(presenter)
         return presenter

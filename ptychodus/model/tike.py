@@ -14,8 +14,8 @@ except ImportError:
         ptycho = None
 
 
-from .image import CropSettings
-from .object import Object
+from .image import CropSettings, ImageExtent
+from .object import Object, ObjectSizer
 from .observer import Observable, Observer
 from .probe import Probe
 from .reconstructor import Reconstructor, NullReconstructor
@@ -452,30 +452,22 @@ class TikeReconstructor:
 
         return probe
 
-    @property
-    def numberOfPaddingPixels(self) -> int:
-        return 2 * (self._probe.extentInPixels + 1)
+    def getTikeObjectExtent(self) -> ImageExtent:
+        pad = 2 * (self._probe.extentInPixels + 1)
+        paddingExtent = ImageExtent(width=pad, height=pad)
+        return self._objectSizer.getScanExtent() + paddingExtent
 
-    @property
-    def objectExtentXInPixels(self) -> int:
-        return self._objectSizer.numberOfInteriorPixelsX + self.numberOfPaddingPixels
-
-    @property
-    def objectExtentYInPixels(self) -> int:
-        return self._objectSizer.numberOfInteriorPixelsY + self.numberOfPaddingPixels
+    def getPtychodusObjectExtent(self) -> ImageExtent:
+        return self._objectSizer.getObjectExtent()
 
     def getInitialObject(self) -> numpy.ndarray:
-        ptychodusObject = self._object.getArray()
+        delta = self.getTikeObjectExtent() - self.getPtychodusObjectExtent()
+        before = delta // 2
+        after = delta - before
 
-        delta0 = max(self.objectExtentXInPixels - ptychodusObject.shape[0], 0)
-        before0 = delta0 // 2
-        after0 = delta0 - before0
-
-        delta1 = max(self.objectExtentYInPixels - ptychodusObject.shape[1], 0)
-        before1 = delta1 // 2
-        after1 = delta1 - before1
-
-        tikeObject = numpy.pad(ptychodusObject, ((before0, after0), (before1, after1))).astype('complex64')
+        widthPad = (before.width, after.width)
+        heightPad = (before.height, after.height)
+        tikeObject = numpy.pad(self._object.getArray(), (heightPad, widthPad)).astype('complex64')
 
         return tikeObject
 
@@ -483,21 +475,18 @@ class TikeReconstructor:
         xvalues = list()
         yvalues = list()
 
-        dx = self._objectSizer.objectPlanePixelSizeXInMeters
-        dy = self._objectSizer.objectPlanePixelSizeYInMeters
+        tikeObjectExtent = self.getTikeObjectExtent()
+        scanBBox = self._objectSizer.getScanBoundingBoxInPixels()
+
+        py_m, px_m = self._objectSizer.objectPlanePixelShapeInMeters
+        dx_px = tikeObjectExtent.width / 2 - float(scanBBox[0].center)
+        dy_px = tikeObjectExtent.height / 2 - float(scanBBox[1].center)
 
         for point in iter(self._scanSequence):
-            xvalues.append(float(point.x / dx))
-            yvalues.append(float(point.y / dy))
+            xvalues.append(float(point.x / px_m) + dx_px)
+            yvalues.append(float(point.y / py_m) + dy_px)
 
-        dx = self.objectExtentXInPixels / 2 - numpy.mean(xvalues)
-        dy = self.objectExtentYInPixels / 2 - numpy.mean(yvalues)
-
-        xvalues = numpy.add(xvalues, dx)
-        yvalues = numpy.add(yvalues, dy)
-        scan = numpy.column_stack((xvalues, yvalues))
-
-        return scan
+        return numpy.column_stack((xvalues, yvalues))
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings

@@ -151,10 +151,10 @@ class VelociprobeReader(DataFileReader, Observable):
         self.masterFilePath = Path(rootGroup.filename)
 
         h5EntryGroup = rootGroup['entry']
-        self.entryGroup = EntryGroup(
-            data=self._readDataGroup(h5EntryGroup['data']),
-            instrument=self._readInstrumentGroup(h5EntryGroup['instrument']),
-            sample=self._readSampleGroup(h5EntryGroup['sample']))
+        self.entryGroup = EntryGroup(data=self._readDataGroup(h5EntryGroup['data']),
+                                     instrument=self._readInstrumentGroup(
+                                         h5EntryGroup['instrument']),
+                                     sample=self._readSampleGroup(h5EntryGroup['sample']))
         self.notifyObservers()
 
 

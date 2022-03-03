@@ -84,8 +84,8 @@ class DatasetListModel(QAbstractListModel):
 
 
 class DatasetController(Observer):
-    def __init__(self, datasetPresenter: DatasetPresenter,
-                 imagePresenter: DetectorImagePresenter, view: DatasetView) -> None:
+    def __init__(self, datasetPresenter: DatasetPresenter, imagePresenter: DetectorImagePresenter,
+                 view: DatasetView) -> None:
         self._datasetPresenter = datasetPresenter
         self._imagePresenter = imagePresenter
         self._listModel = DatasetListModel(datasetPresenter)

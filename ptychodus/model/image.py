@@ -75,6 +75,34 @@ class ScalarTransformation:
     transformFunction: Callable[[numpy.ndarray], numpy.ndarray]
 
 
+@dataclass(frozen=True)
+class ImageExtent:
+    width: int
+    height: int
+
+    @property
+    def shape(self) -> Tuple[int, int]:
+        return self.height, self.width
+
+    def __add__(self, other: ImageExtent) -> ImageExtent:
+        if isinstance(other, ImageExtent):
+            w = self.width + other.width
+            h = self.height + other.height
+            return ImageExtent(width=w, height=h)
+
+    def __sub__(self, other: ImageExtent) -> ImageExtent:
+        if isinstance(other, ImageExtent):
+            w = self.width - other.width
+            h = self.height - other.height
+            return ImageExtent(width=w, height=h)
+
+    def __floordiv__(self, other: int) -> ImageExtent:
+        if isinstance(other, int):
+            w = self.width // other
+            h = self.height // other
+            return ImageExtent(width=w, height=h)
+
+
 class ImageSequence(Sequence, Observable, Observer):
     @abstractmethod
     def setCurrentDatasetIndex(self, index: int) -> None:

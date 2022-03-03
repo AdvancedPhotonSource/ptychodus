@@ -9,6 +9,7 @@ import csv
 
 import numpy
 
+from .geometry import Interval, Box
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 
@@ -78,7 +79,22 @@ class ScanPointIO:
 
 
 class ScanSequence(Sequence, Observable, Observer):
-    pass
+    def getBoundingBox(self) -> Optional[Box[Decimal]]:
+        pointIter = iter(self)
+
+        try:
+            point = next(pointIter)
+        except StopIteration:
+            return None
+
+        xint = Interval(point.x, point.x)
+        yint = Interval(point.y, point.y)
+
+        for point in pointIter:
+            xint.hull(point.x)
+            yint.hull(point.y)
+
+        return Box[Decimal]((xint, yint))
 
 
 class CartesianScanSequence(ScanSequence):
