@@ -59,6 +59,9 @@ class ObjectSizer(Observable, Observer):
         py_m = lambdaZ_m2 / self._detector.extentYInMeters
         return py_m, px_m
 
+    def getScanBoundingBoxInMeters(self) -> Box[Decimal]:
+        return self._scanBoundingBoxInMeters
+
     def getScanBoundingBoxInPixels(self) -> Box[Decimal]:
         assert len(self._scanBoundingBoxInMeters) == 2
         py_m, px_m = self.objectPlanePixelShapeInMeters

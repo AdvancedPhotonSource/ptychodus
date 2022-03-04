@@ -410,13 +410,13 @@ class TikeReconstructor:
     def getData(self) -> numpy.ndarray:
         dataList: list[numpy.ndarray] = list()
 
-        radiusX = self._cropSettings.extentXInPixels.value // 2
-        xmin = self._cropSettings.centerXInPixels.value - radiusX
-        xmax = self._cropSettings.centerXInPixels.value + radiusX
+        xradius = self._cropSettings.extentXInPixels.value // 2
+        xmin = self._cropSettings.centerXInPixels.value - xradius
+        xmax = self._cropSettings.centerXInPixels.value + xradius
 
-        radiusY = self._cropSettings.extentYInPixels.value // 2
-        ymin = self._cropSettings.centerYInPixels.value - radiusY
-        ymax = self._cropSettings.centerYInPixels.value + radiusY
+        yradius = self._cropSettings.extentYInPixels.value // 2
+        ymin = self._cropSettings.centerYInPixels.value - yradius
+        ymax = self._cropSettings.centerYInPixels.value + yradius
 
         for datafile in self._velociprobeReader.entryGroup.data:
             try:
@@ -427,7 +427,7 @@ class TikeReconstructor:
                         data = item[()]
 
                         if self._cropSettings.cropEnabled.value:
-                            data = numpy.copy(data[ymin:ymax, xmin:xmax])
+                            data = numpy.copy(data[..., ymin:ymax, xmin:xmax])
 
                         dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
                         dataList.append(dataShifted)
@@ -437,7 +437,7 @@ class TikeReconstructor:
             except FileNotFoundError:
                 logger.debug(f'File {datafile.filePath} not found!')
 
-        data = numpy.concatenate(dataList, axis=0)
+        data = numpy.concatenate(dataList)
 
         return data
 
@@ -453,7 +453,7 @@ class TikeReconstructor:
         return probe
 
     def getTikeObjectExtent(self) -> ImageExtent:
-        pad = 2 * (self._probe.extentInPixels + 1)
+        pad = 2 * (self._probe.extentInPixels + 2)
         paddingExtent = ImageExtent(width=pad, height=pad)
         return self._objectSizer.getScanExtent() + paddingExtent
 
@@ -476,15 +476,12 @@ class TikeReconstructor:
         yvalues = list()
 
         tikeObjectExtent = self.getTikeObjectExtent()
-        scanBBox = self._objectSizer.getScanBoundingBoxInPixels()
-
+        scanBBox_m = self._objectSizer.getScanBoundingBoxInMeters()
         py_m, px_m = self._objectSizer.objectPlanePixelShapeInMeters
-        dx_px = tikeObjectExtent.width / 2 - float(scanBBox[0].center)
-        dy_px = tikeObjectExtent.height / 2 - float(scanBBox[1].center)
 
         for point in iter(self._scanSequence):
-            xvalues.append(float(point.x / px_m) + dx_px)
-            yvalues.append(float(point.y / py_m) + dy_px)
+            xvalues.append(float((point.x - scanBBox_m[0].xmin) / px_m) + 2)
+            yvalues.append(float((point.y - scanBBox_m[1].xmin) / py_m) + 2)
 
         return numpy.column_stack((xvalues, yvalues))
 
@@ -537,14 +534,18 @@ class TikeReconstructor:
 
     def __call__(self, algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> int:
         data = self.getData()
-        probe = self.getProbe()
         scan = self.getScan()
+        probe = self.getProbe()
+        initialObject = self.getInitialObject()
+
+        if len(data) != len(scan):
+            numFrame = min(len(data), len(scan))
+            scan = scan[:numFrame, ...]
+            data = data[:numFrame, ...]
 
         objectOptions = self.getObjectOptions()
         positionOptions = self.getPositionOptions()
         probeOptions = self.getProbeOptions()
-
-        initialObject = self.getInitialObject()
 
         result = tike.ptycho.reconstruct(
             data=data,
