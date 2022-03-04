@@ -561,7 +561,10 @@ class TikeReconstructor:
             use_mpi=self._settings.useMpi.value,
         )
 
-        print(result)  # TODO do stuff with result
+        self._probe.setArray(result['probe'][0,0,0,:,:])
+        self._object.setArray(result['psi'])
+
+        print(result)
 
         return 0  # TODO return non-zero if problems
 
