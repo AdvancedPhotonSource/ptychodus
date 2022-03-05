@@ -139,20 +139,21 @@ class ImportSettingsController(Observer):
         if result != QDialog.Accepted:
             return
 
-        if self._dialog.detectorPixelSizeCheckBox.isChecked():
+        if self._dialog.valuesGroupBox.detectorPixelSizeCheckBox.isChecked():
             self._presenter.syncDetectorPixelSize()
 
-        if self._dialog.detectorDistanceCheckBox.isChecked():
-            self._presenter.syncDetectorDistance()
+        if self._dialog.valuesGroupBox.detectorDistanceCheckBox.isChecked():
+            overrideDistanceUnits = self._dialog.optionsGroupBox.fixDetectorDistanceUnitsCheckBox.isChecked()
+            self._presenter.syncDetectorDistance(overrideDistanceUnits)
 
-        if self._dialog.imageCropCenterCheckBox.isChecked():
+        if self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked():
             self._presenter.syncImageCropCenter()
 
         # NOTE this must happen after crop center to avoid introducing a bug
-        if self._dialog.imageCropExtentCheckBox.isChecked():
+        if self._dialog.valuesGroupBox.imageCropExtentCheckBox.isChecked():
             self._presenter.syncImageCropExtent()
 
-        if self._dialog.probeEnergyCheckBox.isChecked():
+        if self._dialog.valuesGroupBox.probeEnergyCheckBox.isChecked():
             self._presenter.syncProbeEnergy()
 
     def update(self, observable: Observable) -> None:

@@ -7,7 +7,7 @@ from .widgets import LengthWidget
 
 
 class DetectorView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__('Parameters', parent)
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
@@ -29,7 +29,7 @@ class DetectorView(QGroupBox):
 
 
 class DatasetView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__('Diffraction Data', parent)
         self.dataFileListView = QListView()
 
@@ -48,7 +48,7 @@ class DatasetView(QGroupBox):
 
 
 class CropView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__('Image Crop', parent)
         self.centerXSpinBox = QSpinBox()
         self.centerYSpinBox = QSpinBox()
@@ -70,7 +70,7 @@ class CropView(QGroupBox):
 
 
 class DetectorParametersView(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.detectorView = DetectorView.createInstance()
         self.datasetView = DatasetView.createInstance()

@@ -40,9 +40,13 @@ class ImportSettingsPresenter(Observable, Observer):
         self._detectorSettings.pixelSizeYInMeters.value = \
                 SettingsGroup.convertFloatToDecimal(self._detectorGroup.y_pixel_size_m)
 
-    def syncDetectorDistance(self) -> None:
-        self._detectorSettings.detectorDistanceInMeters.value = \
-                SettingsGroup.convertFloatToDecimal(self._detectorGroup.detector_distance_m)
+    def syncDetectorDistance(self, overrideDistanceUnits: bool = False) -> None:
+        value = SettingsGroup.convertFloatToDecimal(self._detectorGroup.detector_distance_m)
+
+        if overrideDistanceUnits:
+            value /= 1000
+
+        self._detectorSettings.detectorDistanceInMeters.value = value
 
     def syncImageCropCenter(self) -> None:
         self._cropSettings.centerXInPixels.value = \
