@@ -122,6 +122,7 @@ class PtychoPyParametersController:
 
 class PtychoPyViewControllerFactory(ReconstructorViewControllerFactory):
     def __init__(self, model: PtychoPyBackend) -> None:
+        super().__init__()
         self._model = model
         self._controllerList: list[PtychoPyParametersController] = list()
 

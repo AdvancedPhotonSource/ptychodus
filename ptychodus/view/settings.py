@@ -49,7 +49,8 @@ class ImportSettingsOptionsGroupBox(QGroupBox):
     def createInstance(cls, parent: QWidget = None) -> ImportSettingsOptionsGroupBox:
         view = cls(parent)
 
-        view.fixDetectorDistanceUnitsCheckBox.setToolTip('Force interpreting detector distance units as millimeters')
+        view.fixDetectorDistanceUnitsCheckBox.setToolTip(
+            'Force interpreting detector distance units as millimeters')
 
         layout = QVBoxLayout()
         layout.addWidget(view.fixDetectorDistanceUnitsCheckBox)

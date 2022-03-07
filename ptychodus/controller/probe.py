@@ -1,11 +1,9 @@
-from pathlib import Path
-
+from __future__ import annotations
 from PyQt5.QtGui import QStandardItemModel
-from PyQt5.QtWidgets import QFileDialog
 
 from ..model import Observer, Observable, Probe, ProbePresenter
 from ..view import ImageView, ProbeProbeView, ProbeInitializerView, ProbeZonePlateView, ProbeParametersView
-
+from .data_file import FileDialogFactory
 from .image import ImageController
 
 
@@ -16,7 +14,8 @@ class ProbeProbeController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ProbeProbeView):
+    def createInstance(cls, presenter: ProbePresenter,
+                       view: ProbeProbeView) -> ProbeProbeController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -30,12 +29,9 @@ class ProbeProbeController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.shapeSpinBox.blockSignals(True)
-        self._view.shapeSpinBox.setRange(self._presenter.getProbeMinShape(),
-                                         self._presenter.getProbeMaxShape())
-        self._view.shapeSpinBox.setValue(self._presenter.getProbeShape())
-        self._view.shapeSpinBox.blockSignals(False)
-
+        self._view.shapeSpinBox.setValueAndRange(self._presenter.getProbeShape(),
+                                                 self._presenter.getProbeMinShape(),
+                                                 self._presenter.getProbeMaxShape())
         self._view.energyWidget.setEnergyInElectronVolts(
             self._presenter.getProbeEnergyInElectronVolts())
         self._view.wavelengthWidget.setLengthInMeters(self._presenter.getProbeWavelengthInMeters())
@@ -53,7 +49,8 @@ class ProbeZonePlateController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ProbeZonePlateView):
+    def createInstance(cls, presenter: ProbePresenter,
+                       view: ProbeZonePlateView) -> ProbeZonePlateController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -87,7 +84,8 @@ class ProbeInitializerController(Observer):
         self._initComboBoxModel = QStandardItemModel()
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ProbeInitializerView):
+    def createInstance(cls, presenter: ProbePresenter,
+                       view: ProbeInitializerView) -> ProbeInitializerController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -110,9 +108,11 @@ class ProbeInitializerController(Observer):
 
 
 class ProbeParametersController:
-    def __init__(self, presenter: ProbePresenter, view: ProbeParametersView) -> None:
+    def __init__(self, presenter: ProbePresenter, view: ProbeParametersView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
         self._view = view
+        self._fileDialogFactory = fileDialogFactory
         self._probeController = ProbeProbeController.createInstance(presenter, view.probeView)
         self._zonePlateController = ProbeZonePlateController.createInstance(
             presenter, view.zonePlateView)
@@ -120,36 +120,37 @@ class ProbeParametersController:
             presenter, view.initializerView)
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ProbeParametersView):
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: ProbePresenter, view: ProbeParametersView,
+                       fileDialogFactory: FileDialogFactory) -> ProbeParametersController:
+        controller = cls(presenter, view, fileDialogFactory)
         return controller
 
     def openProbe(self) -> None:
-        fileName, _ = QFileDialog.getOpenFileName(self._view, 'Open Probe', str(Path.home()),
-                                                  Probe.FILE_FILTER)
+        filePath = self._fileDialogFactory.getOpenFilePath(self._view, 'Open Probe',
+                                                           Probe.FILE_FILTER)
 
-        if fileName:
-            filePath = Path(fileName)
+        if filePath:
             self._presenter.openProbe(filePath)
 
     def saveProbe(self) -> None:
-        fileName, _ = QFileDialog.getSaveFileName(self._view, 'Save Probe', str(Path.home()),
-                                                  Probe.FILE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Probe',
+                                                           Probe.FILE_FILTER)
 
-        if fileName:
-            filePath = Path(fileName)
+        if filePath:
             self._presenter.saveProbe(filePath)
 
 
 class ProbeImageController(Observer):
-    def __init__(self, presenter: ProbePresenter, view: ImageView) -> None:
+    def __init__(self, presenter: ProbePresenter, view: ImageView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
-        self._image_controller = ImageController.createInstance(view)
+        self._image_controller = ImageController.createInstance(view, fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ImageView):
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: ProbePresenter, view: ImageView,
+                       fileDialogFactory: FileDialogFactory) -> ProbeImageController:
+        controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
         controller._syncModelToView()
         view.imageRibbon.frameGroupBox.setVisible(False)

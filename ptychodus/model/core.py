@@ -7,7 +7,6 @@ from .data_file import *
 from .detector import *
 from .h5tree import *
 from .image import *
-from .metadata import *
 from .object import *
 from .observer import *
 from .probe import *
@@ -67,11 +66,9 @@ class ModelCore:
         self.settingsPresenter = SettingsPresenter.createInstance(self.settingsRegistry)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings)
-        self.datasetPresenter = DatasetPresenter.createInstance(self._detectorSettings,
-                                                                self._velociprobeReader)
         self.detectorImagePresenter = DetectorImagePresenter.createInstance(
             self._croppedImageSequence)
-        self.importSettingsPresenter = ImportSettingsPresenter.createInstance(
+        self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
             self._probeSettings)
         self.probePresenter = ProbePresenter.createInstance(self._detectorSettings,

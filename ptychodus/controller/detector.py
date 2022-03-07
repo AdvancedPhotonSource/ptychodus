@@ -1,22 +1,24 @@
+from __future__ import annotations
 from decimal import Decimal
-from pathlib import Path
 
 from PyQt5.QtCore import QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
 from ..model import *
 from ..view import *
-
+from .data_file import FileDialogFactory
 from .image import ImageController
 
 
 class DetectorController(Observer):
     def __init__(self, presenter: DetectorPresenter, view: DetectorView) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: DetectorPresenter, view: DetectorView):
+    def createInstance(cls, presenter: DetectorPresenter,
+                       view: DetectorView) -> DetectorController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -43,7 +45,7 @@ class DetectorController(Observer):
 
 
 class DatasetListModel(QAbstractListModel):
-    def __init__(self, presenter: DatasetPresenter, parent: QObject = None) -> None:
+    def __init__(self, presenter: VelociprobePresenter, parent: QObject = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
 
@@ -84,20 +86,22 @@ class DatasetListModel(QAbstractListModel):
 
 
 class DatasetController(Observer):
-    def __init__(self, datasetPresenter: DatasetPresenter, imagePresenter: DetectorImagePresenter,
-                 view: DatasetView) -> None:
-        self._datasetPresenter = datasetPresenter
+    def __init__(self, velociprobePresenter: VelociprobePresenter,
+                 imagePresenter: DetectorImagePresenter, view: DatasetView) -> None:
+        super().__init__()
+        self._velociprobePresenter = velociprobePresenter
         self._imagePresenter = imagePresenter
-        self._listModel = DatasetListModel(datasetPresenter)
+        self._listModel = DatasetListModel(velociprobePresenter)
         self._view = view
 
     @classmethod
-    def createInstance(cls, datasetPresenter: DatasetPresenter,
-                       imagePresenter: DetectorImagePresenter, view: DatasetView):
-        controller = cls(datasetPresenter, imagePresenter, view)
+    def createInstance(cls, velociprobePresenter: VelociprobePresenter,
+                       imagePresenter: DetectorImagePresenter,
+                       view: DatasetView) -> DatasetController:
+        controller = cls(velociprobePresenter, imagePresenter, view)
 
         view.dataFileListView.setModel(controller._listModel)
-        datasetPresenter.addObserver(controller)
+        velociprobePresenter.addObserver(controller)
         imagePresenter.addObserver(controller)
 
         view.dataFileListView.selectionModel().currentChanged.connect(
@@ -114,7 +118,7 @@ class DatasetController(Observer):
         self._view.dataFileListView.setCurrentIndex(index)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._datasetPresenter:
+        if observable is self._velociprobePresenter:
             self._listModel.reload()
         elif observable is self._imagePresenter:
             self._updateSelection()
@@ -122,11 +126,12 @@ class DatasetController(Observer):
 
 class CropController(Observer):
     def __init__(self, presenter: CropPresenter, view: CropView) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: CropPresenter, view: CropView):
+    def createInstance(cls, presenter: CropPresenter, view: CropView) -> CropController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -175,14 +180,17 @@ class CropController(Observer):
 
 
 class DetectorImageController(Observer):
-    def __init__(self, presenter: DetectorImagePresenter, view: ImageView) -> None:
+    def __init__(self, presenter: DetectorImagePresenter, view: ImageView,
+                 fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
-        self._image_controller = ImageController.createInstance(view)
+        self._image_controller = ImageController.createInstance(view, fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, presenter: DetectorImagePresenter, view: ImageView):
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: DetectorImagePresenter, view: ImageView,
+                       fileDialogFactory: FileDialogFactory) -> DetectorImageController:
+        controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
         controller.updateView()

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from PyQt5.QtWidgets import QGroupBox, QWidget, QSpinBox, QFormLayout, QComboBox, QPushButton, QVBoxLayout
 
-from .widgets import LengthWidget, EnergyWidget
+from .widgets import SemiautomaticSpinBox, LengthWidget, EnergyWidget
 
 
 class ProbeProbeView(QGroupBox):
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__('Parameters', parent)
-        self.shapeSpinBox = QSpinBox()
+        self.shapeSpinBox = SemiautomaticSpinBox.createInstance()
         self.energyWidget = EnergyWidget.createInstance()
         self.wavelengthWidget = LengthWidget.createInstance()
         self.diameterWidget = LengthWidget.createInstance()

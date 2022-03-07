@@ -4,8 +4,26 @@ import numpy
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
-from .tree import *
 from ..model import *
+from .tree import SimpleTreeModel
+
+
+class FileDialogFactory:
+    def __init__(self) -> None:
+        self._openWorkingDirectory = Path.home()
+        self._saveWorkingDirectory = Path.home()
+
+    def getOpenFilePath(self, parent: QWidget, caption: str, fileFilter: str) -> Optional[Path]:
+        fileName, _ = QFileDialog.getOpenFileName(parent, caption, str(self._openWorkingDirectory),
+                                                  fileFilter)
+        # TODO update self._openWorkingDirectory
+        return Path(fileName) if fileName else None
+
+    def getSaveFilePath(self, parent: QWidget, caption: str, fileFilter: str) -> Optional[Path]:
+        fileName, _ = QFileDialog.getSaveFileName(parent, caption, str(self._saveWorkingDirectory),
+                                                  fileFilter)
+        # TODO update self._saveWorkingDirectory
+        return Path(fileName) if fileName else None
 
 
 class DataArrayTableModel(QAbstractTableModel):
@@ -58,18 +76,21 @@ class DataArrayTableModel(QAbstractTableModel):
 
 class DataFileController:
     def __init__(self, presenter: DataFilePresenter, treeReader: H5FileTreeReader,
-                 treeView: QTreeView, tableView: QTableView) -> None:
+                 treeView: QTreeView, tableView: QTableView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
         self._treeReader = treeReader
         self._treeModel = SimpleTreeModel(treeReader.getTree())
         self._treeView = treeView
         self._tableModel = DataArrayTableModel()
         self._tableView = tableView
+        self._fileDialogFactory = fileDialogFactory
 
     @classmethod
     def createInstance(cls, presenter: DataFilePresenter, treeReader: H5FileTreeReader,
-                       treeView: QTreeView, tableView: QTableView) -> None:
-        controller = cls(presenter, treeReader, treeView, tableView)
+                       treeView: QTreeView, tableView: QTableView,
+                       fileDialogFactory: FileDialogFactory) -> None:
+        controller = cls(presenter, treeReader, treeView, tableView, fileDialogFactory)
         treeView.setModel(controller._treeModel)
         treeView.selectionModel().currentChanged.connect(controller.updateDataArrayInTableView)
         tableView.setModel(controller._tableModel)
@@ -77,11 +98,10 @@ class DataFileController:
         return controller
 
     def openDataFile(self) -> None:
-        fileName, _ = QFileDialog.getOpenFileName(self._treeView, 'Open Data File',
-                                                  str(Path.home()), H5FileTreeReader.FILE_FILTER)
+        filePath = self._fileDialogFactory.getOpenFilePath(self._treeView, 'Open Data File',
+                                                           H5FileTreeReader.FILE_FILTER)
 
-        if fileName:
-            filePath = Path(fileName)
+        if filePath:
             self._presenter.readFile(filePath)
 
     def updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:

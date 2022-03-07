@@ -5,9 +5,8 @@ from decimal import Decimal
 import numpy
 
 from .image import ImageSequence, CropSettings
-from .observer import Observable
+from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
-from .velociprobe import *
 
 
 class DetectorSettings(Observable, Observer):
@@ -114,37 +113,6 @@ class DetectorPresenter(Observer, Observable):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.notifyObservers()
-
-
-class DatasetPresenter(Observable, Observer):
-    def __init__(self, settings: DetectorSettings, velociprobeReader: VelociprobeReader) -> None:
-        super().__init__()
-        self._settings = settings
-        self._velociprobeReader = velociprobeReader
-
-    @classmethod
-    def createInstance(cls, settings: DetectorSettings,
-                       velociprobeReader: VelociprobeReader) -> DatasetPresenter:
-        presenter = cls(settings, velociprobeReader)
-        velociprobeReader.addObserver(presenter)
-        return presenter
-
-    def getDatasetName(self, index: int) -> str:
-        datafile = self._velociprobeReader.entryGroup.data[index]
-        return datafile.name
-
-    def getDatasetState(self, index: int) -> DatasetState:
-        datafile = self._velociprobeReader.entryGroup.data[index]
-        return datafile.getState()
-
-    def getNumberOfDatasets(self) -> int:
-        return 0 if self._velociprobeReader.entryGroup is None \
-                else len(self._velociprobeReader.entryGroup.data)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._velociprobeReader:
-            self._settings.dataPath.value = self._velociprobeReader.masterFilePath
             self.notifyObservers()
 
 

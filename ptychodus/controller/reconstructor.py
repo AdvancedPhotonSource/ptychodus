@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod, abstractproperty
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItem, QStandardItemModel
-from PyQt5.QtWidgets import QWidget, QLabel, QFileDialog
+from PyQt5.QtWidgets import QWidget, QLabel
 
 from ..model import Observable, Observer, Reconstructor, ReconstructorPresenter
 from ..view import ReconstructorParametersView, ReconstructorPlotView
@@ -22,6 +22,7 @@ class ReconstructorViewControllerFactory(ABC):
 class ReconstructorParametersController(Observer):
     def __init__(self, presenter: ReconstructorPresenter, view: ReconstructorParametersView,
                  viewControllerFactoryList: list[ReconstructorViewControllerFactory]) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
         self._algorithmComboBoxModel = QStandardItemModel()
@@ -77,6 +78,7 @@ class ReconstructorParametersController(Observer):
 
 class ReconstructorPlotController(Observer):
     def __init__(self, presenter: ReconstructorPresenter, view: ReconstructorPlotView) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
 

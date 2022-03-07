@@ -1,14 +1,17 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import h5py
 import numpy
 
 from .data_file import DataFile, DataFileReader
+from .detector import DetectorSettings, CropSettings
 from .image import ImageSequence
 from .observer import Observable, Observer
+from .probe import ProbeSettings
+from .settings import SettingsGroup
 
 
 @dataclass(frozen=True)
@@ -232,3 +235,88 @@ class VelociprobeImageSequence(ImageSequence):
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:
             self._updateImages()
+
+
+class VelociprobePresenter(Observable, Observer):
+    def __init__(self, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
+                 cropSettings: CropSettings, probeSettings: ProbeSettings) -> None:
+        super().__init__()
+        self._velociprobeReader = velociprobeReader
+        self._detectorSettings = detectorSettings
+        self._cropSettings = cropSettings
+        self._probeSettings = probeSettings
+
+    @classmethod
+    def createInstance(cls, velociprobeReader: VelociprobeReader,
+                       detectorSettings: DetectorSettings, cropSettings: CropSettings,
+                       probeSettings: ProbeSettings):
+        presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings)
+        velociprobeReader.addObserver(presenter)
+        return presenter
+
+    def getDatasetName(self, index: int) -> str:
+        datafile = self._velociprobeReader.entryGroup.data[index]
+        return datafile.name
+
+    def getDatasetState(self, index: int) -> DatasetState:
+        datafile = self._velociprobeReader.entryGroup.data[index]
+        return datafile.getState()
+
+    def getNumberOfDatasets(self) -> int:
+        return 0 if self._velociprobeReader.entryGroup is None \
+                else len(self._velociprobeReader.entryGroup.data)
+
+    @property
+    def _detectorGroup(self) -> DetectorGroup:
+        return self._velociprobeReader.entryGroup.instrument.detector
+
+    @property
+    def _detectorSpecificGroup(self) -> DetectorSpecificGroup:
+        return self._detectorGroup.detectorSpecific
+
+    def syncDetectorPixelSize(self) -> None:
+        self._detectorSettings.pixelSizeXInMeters.value = \
+                SettingsGroup.convertFloatToDecimal(self._detectorGroup.x_pixel_size_m)
+        self._detectorSettings.pixelSizeYInMeters.value = \
+                SettingsGroup.convertFloatToDecimal(self._detectorGroup.y_pixel_size_m)
+
+    def syncDetectorDistance(self, overrideDistanceUnits: bool = False) -> None:
+        value = SettingsGroup.convertFloatToDecimal(self._detectorGroup.detector_distance_m)
+
+        if overrideDistanceUnits:
+            value /= 1000
+
+        self._detectorSettings.detectorDistanceInMeters.value = value
+
+    def syncImageCropCenter(self) -> None:
+        self._cropSettings.centerXInPixels.value = \
+                int(round(self._detectorGroup.beam_center_x_px))
+        self._cropSettings.centerYInPixels.value = \
+                int(round(self._detectorGroup.beam_center_y_px))
+
+    def syncImageCropExtent(self) -> None:
+        centerX = self._cropSettings.centerXInPixels.value
+        centerY = self._cropSettings.centerYInPixels.value
+
+        extentX = self._detectorGroup.module.x_data_size
+        extentY = self._detectorGroup.module.y_data_size
+
+        maxRadiusX = min(centerX, extentX - centerX)
+        maxRadiusY = min(centerY, extentY - centerY)
+        maxRadius = min(maxRadiusX, maxRadiusY)
+        cropDiameterInPixels = 1
+
+        while cropDiameterInPixels < maxRadius:
+            cropDiameterInPixels <<= 1
+
+        self._cropSettings.extentXInPixels.value = cropDiameterInPixels
+        self._cropSettings.extentYInPixels.value = cropDiameterInPixels
+
+    def syncProbeEnergy(self) -> None:
+        self._probeSettings.probeEnergyInElectronVolts.value = \
+                SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._velociprobeReader:
+            self._detectorSettings.dataPath.value = self._velociprobeReader.masterFilePath
+            self.notifyObservers()

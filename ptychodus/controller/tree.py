@@ -1,5 +1,4 @@
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
 
 from ..model import SimpleTreeNode
 

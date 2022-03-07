@@ -303,6 +303,7 @@ class TikeParametersController:
 
 class TikeViewControllerFactory(ReconstructorViewControllerFactory):
     def __init__(self, model: TikeBackend) -> None:
+        super().__init__()
         self._model = model
         self._controllerList: list[TikeParametersController] = list()
 

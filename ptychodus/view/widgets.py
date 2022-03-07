@@ -6,7 +6,7 @@ import numpy
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QDoubleValidator
-from PyQt5.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLineEdit, QWidget
+from PyQt5.QtWidgets import QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLineEdit, QSizePolicy, QSpinBox, QWidget
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +21,63 @@ class BottomTitledGroupBox(QGroupBox):
             }""")
 
 
+class SemiautomaticSpinBox(QWidget):
+    valueChanged = pyqtSignal(int)
+    autoToggled = pyqtSignal(bool)
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.spinBox = QSpinBox()
+        self.autoCheckBox = QCheckBox('Auto')
+
+    @classmethod
+    def createInstance(cls, parent: QWidget = None) -> SemiautomaticSpinBox:
+        widget = cls(parent)
+
+        widget.spinBox.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
+        widget.spinBox.valueChanged.connect(widget.valueChanged.emit)
+        widget.autoCheckBox.toggled.connect(widget._handleAutoToggled)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(widget.spinBox)
+        layout.addWidget(widget.autoCheckBox)
+        widget.setLayout(layout)
+
+        return widget
+
+    def _handleAutoToggled(self, checked: bool) -> None:
+        self.spinBox.setEnabled(not checked)
+        self.autoToggled.emit(checked)
+
+    def getValue(self) -> int:
+        return self.spinBox.value()
+
+    def setValue(self, val: int) -> None:
+        self.spinBox.setValue(val)
+
+    def setValueAndRange(self, value: int, minValue: int, maxValue: int) -> None:
+        shouldEmit = (self.spinBox.value() == value)
+
+        self.spinBox.blockSignals(True)
+        self.spinBox.setRange(minValue, maxValue)
+        self.spinBox.setValue(value)
+        self.spinBox.blockSignals(False)
+
+        if shouldEmit:
+            self.valueChanged.emit(value)
+
+    def isAutomatic(self) -> bool:
+        return self.autoCheckBox.isChecked()
+
+    def setAutomatic(self, isAuto: bool) -> None:
+        self.autoCheckBox.setChecked(isAuto)
+
+
 class LengthWidget(QWidget):
     lengthChanged = pyqtSignal(Decimal)
 
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.lengthInMeters = Decimal()
         self.magnitudeValidator = QDoubleValidator()
@@ -91,7 +144,7 @@ class LengthWidget(QWidget):
 class EnergyWidget(QWidget):
     energyChanged = pyqtSignal(Decimal)
 
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.energyInElectronVolts = Decimal()
         self.magnitudeValidator = QDoubleValidator()
