@@ -7,6 +7,7 @@ from typing import Callable
 
 import numpy
 
+from .geometry import Interval
 from .observer import Observable, Observer
 from .settings import SettingsGroup, SettingsRegistry
 
@@ -139,6 +140,64 @@ class CropSettings(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class CropSizer(Observer, Observable): # FIXME use this
+    MAX_INT = 0x7FFFFFFF
+
+    def __init__(self, settings: CropSettings) -> None:
+        super().__init__()
+        self._settings = settings
+
+    @classmethod
+    def createInstance(cls, settings: CropSettings) -> CropPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
+        return presenter
+
+    def getExtentXLimits(self) -> Interval[int]:
+        return Interval(1, self.MAX_INT) # TODO 1, imageWidth
+
+    def getExtentX(self) -> int:
+        limits = self.getExtentXLimits()
+        return limits.clamp(self._settings.extentXInPixels.value)
+
+    def getCenterXLimits(self) -> Interval[int]:
+        radius = self.getExtentX() // 2
+        return Interval(radius, imageWidth - 1 - radius) # CHECKME
+
+    def getCenterX(self) -> int:
+        limits = self.getCenterXLimits()
+        return limits.clamp(self._settings.centerXInPixels.value)
+
+    def getSliceX(self) -> Interval[int]:
+        center = self.getCenterX()
+        radius = self.getExtentX() // 2
+        return Interval(center - radius, center + radius + 1)
+
+    def getExtentYLimits(self) -> Interval[int]:
+        return Interval(1, self.MAX_INT) # TODO 1, imageHeight
+
+    def getExtentY(self) -> int:
+        limits = self.getExtentYLimits()
+        return limits.clamp(self._settings.extentYInPixels.value)
+
+    def getCenterYLimits(self) -> Interval[int]:
+        radius = self.getExtentY() // 2
+        return Interval(radius, imageWidth - 1 - radius) # CHECKME
+
+    def getCenterY(self) -> int:
+        limits = self.getCenterYLimits()
+        return limits.clamp(self._settings.centerYInPixels.value)
+
+    def getSliceY(self) -> Interval[int]:
+        center = self.getCenterY()
+        radius = self.getExtentY() // 2
+        return Interval(center - radius, center + radius + 1)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
             self.notifyObservers()
 
 

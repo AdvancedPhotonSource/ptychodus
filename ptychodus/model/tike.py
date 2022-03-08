@@ -480,8 +480,8 @@ class TikeReconstructor:
         py_m, px_m = self._objectSizer.objectPlanePixelShapeInMeters
 
         for point in iter(self._scanSequence):
-            xvalues.append(float((point.x - scanBBox_m[0].xmin) / px_m) + 2)
-            yvalues.append(float((point.y - scanBBox_m[1].xmin) / py_m) + 2)
+            xvalues.append(float((point.x - scanBBox_m[0].lower) / px_m) + 2)
+            yvalues.append(float((point.y - scanBBox_m[1].upper) / py_m) + 2)
 
         return numpy.column_stack((xvalues, yvalues))
 

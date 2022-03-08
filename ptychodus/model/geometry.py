@@ -6,27 +6,30 @@ T = TypeVar('T', int, float, Decimal)
 
 
 class Interval(Generic[T]):
-    def __init__(self, xmin: T, xmax: T) -> None:
-        self.xmin: T = xmin
-        self.xmax: T = xmax
+    def __init__(self, lower: T, upper: T) -> None:
+        self.lower: T = lower
+        self.upper: T = upper
+
+    def clamp(self, value: T) -> T:
+        return max(self.lower, min(value, self.upper))
 
     def hull(self, value: T) -> None:
-        if value < self.xmin:
-            self.xmin = value
+        if value < self.lower:
+            self.lower = value
 
-        if value > self.xmax:
-            self.xmax = value
+        if value > self.upper:
+            self.upper = value
 
     @property
     def length(self) -> T:
-        return self.xmax - self.xmin
+        return self.upper - self.lower
 
     @property
     def center(self) -> T:
-        return self.xmin + self.length / 2
+        return self.lower + self.length / 2
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.xmin}, {self.xmax})'
+        return f'{type(self).__name__}({self.lower}, {self.upper})'
 
 
 class Box(Generic[T]):

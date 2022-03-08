@@ -65,10 +65,10 @@ class ObjectSizer(Observable, Observer):
     def getScanBoundingBoxInPixels(self) -> Box[Decimal]:
         assert len(self._scanBoundingBoxInMeters) == 2
         py_m, px_m = self.objectPlanePixelShapeInMeters
-        ix = Interval(xmin=self._scanBoundingBoxInMeters[0].xmin / px_m,
-                      xmax=self._scanBoundingBoxInMeters[0].xmax / px_m)
-        iy = Interval(xmin=self._scanBoundingBoxInMeters[1].xmin / py_m,
-                      xmax=self._scanBoundingBoxInMeters[1].xmax / py_m)
+        ix = Interval(lower=self._scanBoundingBoxInMeters[0].lower / px_m,
+                      upper=self._scanBoundingBoxInMeters[0].upper / px_m)
+        iy = Interval(lower=self._scanBoundingBoxInMeters[1].lower / py_m,
+                      upper=self._scanBoundingBoxInMeters[1].upper / py_m)
         return Box([ix, iy])
 
     def getScanExtent(self) -> ImageExtent:
