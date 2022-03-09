@@ -153,11 +153,16 @@ class VelociprobeReader(DataFileReader, Observable):
     def read(self, rootGroup: h5py.Group) -> None:
         self.masterFilePath = Path(rootGroup.filename)
 
-        h5EntryGroup = rootGroup['entry']
-        self.entryGroup = EntryGroup(data=self._readDataGroup(h5EntryGroup['data']),
-                                     instrument=self._readInstrumentGroup(
-                                         h5EntryGroup['instrument']),
-                                     sample=self._readSampleGroup(h5EntryGroup['sample']))
+        try:
+            h5EntryGroup = rootGroup['entry']
+            self.entryGroup = EntryGroup(data=self._readDataGroup(h5EntryGroup['data']),
+                                         instrument=self._readInstrumentGroup(
+                                             h5EntryGroup['instrument']),
+                                         sample=self._readSampleGroup(h5EntryGroup['sample']))
+        except KeyError as err:
+            # TODO log
+            self.entryGroup = None
+
         self.notifyObservers()
 
 
@@ -317,6 +322,6 @@ class VelociprobePresenter(Observable, Observer):
                 SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._velociprobeReader:
+        if observable is self._velociprobeReader and self._velociprobeReader.entryGroup:
             self._detectorSettings.dataPath.value = self._velociprobeReader.masterFilePath
             self.notifyObservers()

@@ -1,29 +1,41 @@
+from __future__ import annotations
 from pathlib import Path
+from typing import Optional
 
 import numpy
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt, QModelIndex, QObject, QVariant, QAbstractTableModel
+from PyQt5.QtWidgets import QWidget, QFileDialog, QTreeView, QTableView
 
-from ..model import *
+from ..model import DataFilePresenter, H5FileTreeReader, Observable, Observer
 from .tree import SimpleTreeModel
 
 
 class FileDialogFactory:
     def __init__(self) -> None:
-        self._openWorkingDirectory = Path.home()
-        self._saveWorkingDirectory = Path.home()
+        self._openWorkingDirectory = Path.cwd()
+        self._saveWorkingDirectory = Path.cwd()
 
     def getOpenFilePath(self, parent: QWidget, caption: str, fileFilter: str) -> Optional[Path]:
+        filePath = None
         fileName, _ = QFileDialog.getOpenFileName(parent, caption, str(self._openWorkingDirectory),
                                                   fileFilter)
-        # TODO update self._openWorkingDirectory
-        return Path(fileName) if fileName else None
+
+        if fileName:
+            filePath = Path(fileName)
+            self._openWorkingDirectory = filePath.parent
+
+        return filePath
 
     def getSaveFilePath(self, parent: QWidget, caption: str, fileFilter: str) -> Optional[Path]:
+        filePath = None
         fileName, _ = QFileDialog.getSaveFileName(parent, caption, str(self._saveWorkingDirectory),
                                                   fileFilter)
-        # TODO update self._saveWorkingDirectory
-        return Path(fileName) if fileName else None
+
+        if fileName:
+            filePath = Path(fileName)
+            self._saveWorkingDirectory = filePath.parent
+
+        return filePath
 
 
 class DataArrayTableModel(QAbstractTableModel):
@@ -36,15 +48,15 @@ class DataArrayTableModel(QAbstractTableModel):
         result = QVariant()
 
         if role == Qt.DisplayRole:
-            result = section
+            result = QVariant(section)
 
         return result
 
     def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
         result = QVariant()
 
-        if index.isValid() and role == Qt.DisplayRole:
-            result = str(self._array[index.row(), index.column()])
+        if index.isValid() and role == Qt.DisplayRole and self._array is not None:
+            result = QVariant(self._array[index.row(), index.column()])
 
         return result
 
@@ -59,22 +71,27 @@ class DataArrayTableModel(QAbstractTableModel):
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         count = 0
 
-        if self._array is not None:  # and len(self._array.shape) > 1:
+        if self._array is not None:
             count = self._array.shape[1]
 
         return count
 
     def setArray(self, data: numpy.ndarray) -> None:
         self.beginResetModel()
-        self._array = None if data is None else numpy.atleast_2d(data)
+        self._array = None
 
-        if numpy.ndim(data) == 1:
-            self._array = self._array.T
+        if data is not None:
+            array = numpy.atleast_2d(data)
+
+            if numpy.ndim(data) == 1:
+                array = array.T
+
+            self._array = array
 
         self.endResetModel()
 
 
-class DataFileController:
+class DataFileController(Observer):
     def __init__(self, presenter: DataFilePresenter, treeReader: H5FileTreeReader,
                  treeView: QTreeView, tableView: QTableView,
                  fileDialogFactory: FileDialogFactory) -> None:
@@ -89,7 +106,7 @@ class DataFileController:
     @classmethod
     def createInstance(cls, presenter: DataFilePresenter, treeReader: H5FileTreeReader,
                        treeView: QTreeView, tableView: QTableView,
-                       fileDialogFactory: FileDialogFactory) -> None:
+                       fileDialogFactory: FileDialogFactory) -> DataFileController:
         controller = cls(presenter, treeReader, treeView, tableView, fileDialogFactory)
         treeView.setModel(controller._treeModel)
         treeView.selectionModel().currentChanged.connect(controller.updateDataArrayInTableView)

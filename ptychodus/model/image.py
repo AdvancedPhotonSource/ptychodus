@@ -3,7 +3,7 @@ from abc import abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable
+from typing import Callable, Tuple
 
 import numpy
 
@@ -149,14 +149,14 @@ class CropSizer(Observer, Observable):
     def __init__(self, settings: CropSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._imageWidth = CropSizer.MAX_INT # FIXME use real image width
-        self._imageHeight = CropSizer.MAX_INT # FIXME use real image height
+        self._imageWidth = CropSizer.MAX_INT  # FIXME use real image width
+        self._imageHeight = CropSizer.MAX_INT  # FIXME use real image height
 
     @classmethod
-    def createInstance(cls, settings: CropSettings) -> CropPresenter:
-        presenter = cls(settings)
-        settings.addObserver(presenter)
-        return presenter
+    def createInstance(cls, settings: CropSettings) -> CropSizer:
+        sizer = cls(settings)
+        settings.addObserver(sizer)
+        return sizer
 
     def isCropEnabled(self) -> bool:
         return self._settings.cropEnabled.value

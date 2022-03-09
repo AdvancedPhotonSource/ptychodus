@@ -39,8 +39,7 @@ class Detector(Observable, Observer):
         self._cropSizer = cropSizer
 
     @classmethod
-    def createInstance(cls, detectorSettings: DetectorSettings,
-                       cropSizer: CropSizer) -> Detector:
+    def createInstance(cls, detectorSettings: DetectorSettings, cropSizer: CropSizer) -> Detector:
         detector = cls(detectorSettings, cropSizer)
         detectorSettings.detectorDistanceInMeters.addObserver(detector)
         detectorSettings.pixelSizeXInMeters.addObserver(detector)

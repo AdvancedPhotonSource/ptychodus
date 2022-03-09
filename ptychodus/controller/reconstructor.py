@@ -60,7 +60,7 @@ class ReconstructorParametersController(Observer):
             widget = viewControllerFactory.createViewController(reconstructorName)
         else:
             widget = QLabel(f'{backendName} not found!')
-            widget.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            widget.setAlignment(Qt.AlignCenter)
 
         self._view.reconstructorStackedWidget.addWidget(widget)
 

@@ -39,7 +39,7 @@ class SimpleTreeModel(QAbstractItemModel):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             value = self._rootNode.data(section)
 
-        return value
+        return QVariant(value)
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         value = QModelIndex()

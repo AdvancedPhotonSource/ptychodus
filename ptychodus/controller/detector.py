@@ -1,11 +1,11 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from PyQt5.QtCore import QAbstractListModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ..model import *
-from ..view import *
+from ..model import Observable, Observer, DetectorPresenter, DatasetState
+from ..view import DetectorView
 from .data_file import FileDialogFactory
 from .image import ImageController
 

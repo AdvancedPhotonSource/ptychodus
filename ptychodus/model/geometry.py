@@ -26,7 +26,9 @@ class Interval(Generic[T]):
 
     @property
     def center(self) -> T:
-        return self.lower + self.length / 2
+        fullLength = self.length
+        halfLength = fullLength // 2 if isinstance(fullLength, int) else fullLength / 2
+        return self.lower + halfLength
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.lower}, {self.upper})'

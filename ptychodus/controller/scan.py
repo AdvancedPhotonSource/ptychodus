@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from PyQt5.QtGui import QDoubleValidator, QStandardItem, QStandardItemModel
 
-from ..model import Observer, Observable, ScanPresenter
+from ..model import Observer, Observable, ScanPointIO, ScanPresenter
 from ..view import ScanParametersView, ScanPlotView
 from .data_file import FileDialogFactory
 

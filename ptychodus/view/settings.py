@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from PyQt5.QtWidgets import QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
@@ -10,7 +11,7 @@ class ImportSettingsValuesGroupBox(QGroupBox):
         widget.setChecked(True)
         return widget
 
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Choose Settings', parent)
         self.detectorPixelSizeCheckBox = self.createCheckBox('Detector Pixel Size')
         self.detectorDistanceCheckBox = self.createCheckBox('Detector Distance')
@@ -19,7 +20,7 @@ class ImportSettingsValuesGroupBox(QGroupBox):
         self.probeEnergyCheckBox = self.createCheckBox('Probe Energy')
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ImportSettingsValuesGroupBox:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImportSettingsValuesGroupBox:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -41,12 +42,12 @@ class ImportSettingsOptionsGroupBox(QGroupBox):
         widget.setChecked(True)
         return widget
 
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Additional Options', parent)
         self.fixDetectorDistanceUnitsCheckBox = self.createCheckBox('Fix Detector Distance Units')
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ImportSettingsOptionsGroupBox:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImportSettingsOptionsGroupBox:
         view = cls(parent)
 
         view.fixDetectorDistanceUnitsCheckBox.setToolTip(
@@ -61,7 +62,7 @@ class ImportSettingsOptionsGroupBox(QGroupBox):
 
 
 class ImportSettingsDialog(QDialog):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.valuesGroupBox = ImportSettingsValuesGroupBox.createInstance()
         self.optionsGroupBox = ImportSettingsOptionsGroupBox.createInstance()
@@ -69,7 +70,7 @@ class ImportSettingsDialog(QDialog):
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ImportSettingsDialog:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImportSettingsDialog:
         view = cls(parent)
 
         view.setWindowTitle('Import Settings')

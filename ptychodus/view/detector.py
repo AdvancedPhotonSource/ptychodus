@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from PyQt5.QtWidgets import QFormLayout, QGroupBox, QListView, QSizePolicy, QSpinBox, QVBoxLayout, QWidget
 
@@ -7,7 +8,7 @@ from .widgets import LengthWidget
 
 
 class DetectorView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
@@ -15,7 +16,7 @@ class DetectorView(QGroupBox):
         self.defocusDistanceWidget = LengthWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> DetectorView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -29,12 +30,12 @@ class DetectorView(QGroupBox):
 
 
 class DatasetView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Data', parent)
         self.dataFileListView = QListView()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> DatasetView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetView:
         view = cls(parent)
 
         view.dataFileListView.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
@@ -48,7 +49,7 @@ class DatasetView(QGroupBox):
 
 
 class CropView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Image Crop', parent)
         self.centerXSpinBox = QSpinBox()
         self.centerYSpinBox = QSpinBox()
@@ -56,7 +57,7 @@ class CropView(QGroupBox):
         self.extentYSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> CropView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> CropView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -70,14 +71,14 @@ class CropView(QGroupBox):
 
 
 class DetectorParametersView(QWidget):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.detectorView = DetectorView.createInstance()
         self.datasetView = DatasetView.createInstance()
         self.imageCropView = CropView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> DetectorParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorParametersView:
         view = cls(parent)
 
         view.datasetView.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)

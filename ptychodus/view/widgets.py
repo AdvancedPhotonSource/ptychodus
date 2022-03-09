@@ -1,5 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
+from typing import Optional
 import logging
 
 import numpy
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class BottomTitledGroupBox(QGroupBox):
-    def __init__(self, title: str, parent: QWidget = None) -> None:
+    def __init__(self, title: str, parent: Optional[QWidget] = None) -> None:
         super().__init__(title, parent)
         self.setStyleSheet("""
             QGroupBox::title {
@@ -21,17 +22,17 @@ class BottomTitledGroupBox(QGroupBox):
             }""")
 
 
-class SemiautomaticSpinBox(QWidget): # FIXME use this
+class SemiautomaticSpinBox(QWidget):  # FIXME use this
     valueChanged = pyqtSignal(int)
     autoToggled = pyqtSignal(bool)
 
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.spinBox = QSpinBox()
         self.autoCheckBox = QCheckBox('Auto')
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> SemiautomaticSpinBox:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SemiautomaticSpinBox:
         widget = cls(parent)
 
         widget.spinBox.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
@@ -77,7 +78,7 @@ class SemiautomaticSpinBox(QWidget): # FIXME use this
 class LengthWidget(QWidget):
     lengthChanged = pyqtSignal(Decimal)
 
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.lengthInMeters = Decimal()
         self.magnitudeValidator = QDoubleValidator()
@@ -85,7 +86,7 @@ class LengthWidget(QWidget):
         self.unitsComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> LengthWidget:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> LengthWidget:
         widget = cls(parent)
 
         widget.magnitudeValidator.setBottom(0.)
@@ -144,7 +145,7 @@ class LengthWidget(QWidget):
 class EnergyWidget(QWidget):
     energyChanged = pyqtSignal(Decimal)
 
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.energyInElectronVolts = Decimal()
         self.magnitudeValidator = QDoubleValidator()
@@ -152,7 +153,7 @@ class EnergyWidget(QWidget):
         self.unitsComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> EnergyWidget:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> EnergyWidget:
         widget = cls(parent)
 
         widget.magnitudeValidator.setBottom(0.)

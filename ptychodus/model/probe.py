@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Callable
@@ -96,7 +97,7 @@ class Probe(Observable, Observer):
             self.notifyObservers()
 
 
-class GaussianBeamProbeInitializer(Callable):
+class GaussianBeamProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings) -> None:
         super().__init__()
         self._detectorSettings = detectorSettings
@@ -125,7 +126,7 @@ class GaussianBeamProbeInitializer(Callable):
         return 'Gaussian Beam'
 
 
-class FresnelZonePlateProbeInitializer(Callable):
+class FresnelZonePlateProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
                  probe: Probe) -> None:
         super().__init__()
@@ -157,7 +158,7 @@ class FresnelZonePlateProbeInitializer(Callable):
         return 'Fresnel Zone Plate'
 
 
-class CustomProbeInitializer(Callable):
+class CustomProbeInitializer:
     def __init__(self) -> None:
         super().__init__()
         self._initialProbe = numpy.zeros((64, 64), dtype=complex)
@@ -179,7 +180,7 @@ class ProbePresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
     def __init__(self, settings: ProbeSettings, probe: Probe,
-                 initializerList: list[Callable]) -> None:
+                 initializerList: Sequence[Callable]) -> None:
         super().__init__()
         self._settings = settings
         self._probe = probe

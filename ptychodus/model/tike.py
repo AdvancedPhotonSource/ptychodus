@@ -410,26 +410,28 @@ class TikeReconstructor:
     def getData(self) -> numpy.ndarray:
         dataList: list[numpy.ndarray] = list()
 
-        for datafile in self._velociprobeReader.entryGroup.data:
-            try:
-                with h5py.File(datafile.filePath, 'r') as h5File:
-                    item = h5File.get(datafile.dataPath)
+        if self._velociprobeReader.entryGroup:
+            for datafile in self._velociprobeReader.entryGroup.data:
+                try:
+                    with h5py.File(datafile.filePath, 'r') as h5File:
+                        item = h5File.get(datafile.dataPath)
 
-                    if isinstance(item, h5py.Dataset):
-                        data = item[()]
+                        if isinstance(item, h5py.Dataset):
+                            data = item[()]
 
-                        if self._cropSizer.isCropEnabled():
-                            sliceX = self._sizer.getSliceX()
-                            sliceY = self._sizer.getSliceY()
-                            data = numpy.copy(data[..., sliceY, sliceX])
+                            if self._cropSizer.isCropEnabled():
+                                sliceX = self._cropSizer.getSliceX()
+                                sliceY = self._cropSizer.getSliceY()
+                                data = numpy.copy(data[..., sliceY, sliceX])
 
-                        dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
-                        dataList.append(dataShifted)
-                    else:
-                        logger.debug(
-                            f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.')
-            except FileNotFoundError:
-                logger.debug(f'File {datafile.filePath} not found!')
+                            dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
+                            dataList.append(dataShifted)
+                        else:
+                            logger.debug(
+                                f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.'
+                            )
+                except FileNotFoundError:
+                    logger.debug(f'File {datafile.filePath} not found!')
 
         data = numpy.concatenate(dataList)
 
@@ -541,26 +543,30 @@ class TikeReconstructor:
         positionOptions = self.getPositionOptions()
         probeOptions = self.getProbeOptions()
 
-        result = tike.ptycho.reconstruct(
-            data=data,
-            probe=probe,
-            scan=scan,
-            algorithm_options=algorithmOptions,
-            model=self._settings.noiseModel.value,
-            num_gpu=self._settings.numGpus.value,
-            object_options=objectOptions,
-            position_options=positionOptions,
-            probe_options=probeOptions,
-            psi=initialObject,
-            use_mpi=self._settings.useMpi.value,
-        )
+        try:
+            result = tike.ptycho.reconstruct(
+                data=data,
+                probe=probe,
+                scan=scan,
+                algorithm_options=algorithmOptions,
+                model=self._settings.noiseModel.value,
+                num_gpu=self._settings.numGpus.value,
+                object_options=objectOptions,
+                position_options=positionOptions,
+                probe_options=probeOptions,
+                psi=initialObject,
+                use_mpi=self._settings.useMpi.value,
+            )
+        except ValueError as err:
+            print(err)
+            return -1
 
         self._probe.setArray(result['probe'][0, 0, 0, :, :])
         self._object.setArray(result['psi'])
 
         print(result)
 
-        return 0  # TODO return non-zero if problems
+        return 0
 
 
 class RegularizedPIEReconstructor(Reconstructor):

@@ -1,8 +1,11 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from ..model import Observer, Observable
-from ..view import TikeParametersView
+from PyQt5.QtWidgets import QWidget
+
+from ..model import Observable, Observer # FIXME, TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter
+from ..view import TikeAdaptiveMomentView, TikeBasicParametersView, TikeObjectCorrectionView, \
+        TikeParametersView, TikePositionCorrectionView, TikeProbeCorrectionView
 from .reconstructor import ReconstructorViewControllerFactory
 
 
@@ -331,7 +334,9 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
                                                      showAlpha=False,
                                                      showStepLength=False)
         else:
-            view = TikeParametersView.createInstance()
+            view = TikeParametersView.createInstance(showCgIter=True,
+                                                     showAlpha=True,
+                                                     showStepLength=True)
 
         controller = TikeParametersController.createInstance(self._model, view)
         self._controllerList.append(controller)

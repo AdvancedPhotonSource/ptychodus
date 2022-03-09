@@ -1,10 +1,11 @@
 from __future__ import annotations
+from typing import Optional
 
 from PyQt5.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox, QSpinBox, QVBoxLayout, QWidget
 
 
 class TikeBasicParametersView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Basic Parameters', parent)
         self.useMpiCheckBox = QCheckBox('Use MPI')
         self.numGpusSpinBox = QSpinBox()
@@ -21,7 +22,7 @@ class TikeBasicParametersView(QGroupBox):
                        showCgIter: bool,
                        showAlpha: bool,
                        showStepLength: bool,
-                       parent: QWidget = None) -> TikeBasicParametersView:
+                       parent: Optional[QWidget] = None) -> TikeBasicParametersView:
         view = cls(parent)
 
         view.useMpiCheckBox.setToolTip('Whether to use MPI or not.')
@@ -64,13 +65,13 @@ class TikeBasicParametersView(QGroupBox):
 
 
 class TikeAdaptiveMomentView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(' Use Adaptive Moment', parent)
         self.mdecaySpinBox = QDoubleSpinBox()
         self.vdecaySpinBox = QDoubleSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> TikeAdaptiveMomentView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeAdaptiveMomentView:
         view = cls(parent)
 
         view.mdecaySpinBox.setToolTip('The proportion of the first moment '
@@ -87,13 +88,13 @@ class TikeAdaptiveMomentView(QGroupBox):
 
 
 class TikePositionCorrectionView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Position Correction', parent)
         self.positionRegularizationCheckBox = QCheckBox('Use Regularization')
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> TikePositionCorrectionView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> TikePositionCorrectionView:
         view = cls(parent)
 
         view.positionRegularizationCheckBox.setToolTip(
@@ -108,7 +109,7 @@ class TikePositionCorrectionView(QGroupBox):
 
 
 class TikeProbeCorrectionView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Probe Correction', parent)
         self.sparsityConstraintSpinBox = QDoubleSpinBox()
         self.orthogonalityConstraintCheckBox = QCheckBox('Orthogonality Constraint')
@@ -116,7 +117,7 @@ class TikeProbeCorrectionView(QGroupBox):
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> TikeProbeCorrectionView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeProbeCorrectionView:
         view = cls(parent)
 
         view.sparsityConstraintSpinBox.setToolTip(
@@ -137,14 +138,14 @@ class TikeProbeCorrectionView(QGroupBox):
 
 
 class TikeObjectCorrectionView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Object Correction', parent)
         self.positivityConstraintSpinBox = QDoubleSpinBox()
         self.smoothnessConstraintSpinBox = QDoubleSpinBox()
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> TikeObjectCorrectionView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeObjectCorrectionView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -158,7 +159,7 @@ class TikeObjectCorrectionView(QGroupBox):
 
 class TikeParametersView(QWidget):
     def __init__(self, showCgIter: bool, showAlpha: bool, showStepLength: bool,
-                 parent: QWidget) -> None:
+                 parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.basicParametersView = TikeBasicParametersView.createInstance(
             showCgIter, showAlpha, showStepLength)
@@ -171,7 +172,7 @@ class TikeParametersView(QWidget):
                        showCgIter: bool,
                        showAlpha: bool,
                        showStepLength: bool,
-                       parent: QWidget = None) -> TikeParametersView:
+                       parent: Optional[QWidget] = None) -> TikeParametersView:
         view = cls(showCgIter, showAlpha, showStepLength, parent)
 
         layout = QVBoxLayout()

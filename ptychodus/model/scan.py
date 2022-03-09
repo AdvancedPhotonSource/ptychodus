@@ -198,7 +198,7 @@ class SpiralScanSequence(ScanSequence):
 class CustomScanSequence(ScanSequence):
     def __init__(self) -> None:
         super().__init__()
-        self._pointList = list()
+        self._pointList: list[ScanPoint] = list()
 
     def __getitem__(self, index: int) -> ScanPoint:
         return self._pointList[index]

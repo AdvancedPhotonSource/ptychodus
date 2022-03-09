@@ -156,6 +156,9 @@ class SettingsPresenter(Observable):
                 optionValueString = config.get(settingsGroup.name, settingsEntry.name)
                 settingsEntry.setValueFromString(optionValueString)
 
+        # FIXME need to load dataset, load scan, init probe, init object, etc.
+        self._settingsRegistry.notifyObservers()
+
     def saveSettings(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.optionxform = lambda option: option

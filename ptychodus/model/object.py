@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Callable
@@ -128,7 +129,7 @@ class Object(Observable):
         numpy.save(filePath, self._array)
 
 
-class UniformRandomObjectInitializer(Callable):
+class UniformRandomObjectInitializer:
     def __init__(self, sizer: ObjectSizer, rng: numpy.random.Generator) -> None:
         super().__init__()
         self._sizer = sizer
@@ -144,7 +145,7 @@ class UniformRandomObjectInitializer(Callable):
         return 'Random'
 
 
-class CustomObjectInitializer(Callable):
+class CustomObjectInitializer:
     def __init__(self, sizer: ObjectSizer) -> None:
         super().__init__()
         self._sizer = sizer
@@ -165,7 +166,7 @@ class CustomObjectInitializer(Callable):
 
 class ObjectPresenter(Observable, Observer):
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, obj: Object,
-                 initializerList: list[Callable]) -> None:
+                 initializerList: Sequence[Callable]) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer

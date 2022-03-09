@@ -1,10 +1,11 @@
 from __future__ import annotations
+from typing import Optional
 
 from PyQt5.QtWidgets import QCheckBox, QFormLayout, QGroupBox, QSpinBox, QVBoxLayout, QWidget
 
 
 class PtychoPyBasicView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Basic Parameters', parent)
         self.probeModesSpinBox = QSpinBox()
         self.thresholdSpinBox = QSpinBox()
@@ -12,7 +13,7 @@ class PtychoPyBasicView(QGroupBox):
         self.timeLimitSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> PtychoPyBasicView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoPyBasicView:
         view = cls(parent)
 
         view.probeModesSpinBox.setToolTip(
@@ -35,7 +36,7 @@ class PtychoPyBasicView(QGroupBox):
 
 
 class PtychoPyAdvancedView(QGroupBox):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Advanced Parameters', parent)
         self.calculateRMSCheckBox = QCheckBox('Calculate RMS')
         self.updateProbeSpinBox = QSpinBox()
@@ -43,7 +44,7 @@ class PtychoPyAdvancedView(QGroupBox):
         self.phaseConstraintSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> PtychoPyAdvancedView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoPyAdvancedView:
         view = cls(parent)
 
         view.updateProbeSpinBox.setToolTip('The number of iterations after which to start updating'
@@ -65,13 +66,13 @@ class PtychoPyAdvancedView(QGroupBox):
 
 
 class PtychoPyParametersView(QWidget):
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.basicView = PtychoPyBasicView.createInstance()
         self.advancedView = PtychoPyAdvancedView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> PtychoPyParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoPyParametersView:
         view = cls(parent)
 
         layout = QVBoxLayout()

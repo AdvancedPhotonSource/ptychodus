@@ -73,9 +73,6 @@ def main() -> int:
 
     if parsedArgs.batch:
         verifyAllArgumentsParsed(parser, unparsedArgs)
-
-        model.probePresenter.initializeProbe()
-        model.objectPresenter.initializeObject()
         result = model.reconstructorPresenter.reconstruct()
     elif PyQt5:
         # QApplication expects the first argument to be the program name

@@ -1,13 +1,17 @@
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from typing import Optional
 
-from ..model import *
+from PyQt5.QtCore import Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject, QVariant
+from PyQt5.QtWidgets import QDialog, QListView, QTableView
+
+from ..model import Observable, Observer, SettingsGroup, SettingsPresenter, SettingsRegistry, VelociprobePresenter
 from ..view import ImportSettingsDialog
 from .data_file import FileDialogFactory
 
 
 class SettingsGroupListModel(QAbstractListModel):
-    def __init__(self, settingsRegistry: SettingsRegistry, parent: QObject = None) -> None:
+    def __init__(self,
+                 settingsRegistry: SettingsRegistry,
+                 parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._settingsRegistry = settingsRegistry
 
@@ -18,18 +22,16 @@ class SettingsGroupListModel(QAbstractListModel):
             settingsGroup = self._settingsRegistry[index.row()]
             value = settingsGroup.name
 
-        return value
+        return QVariant(value)
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._settingsRegistry)
 
-    def reload(self) -> None:
-        self.beginResetModel()
-        self.endResetModel()
-
 
 class SettingsEntryTableModel(QAbstractTableModel):
-    def __init__(self, settingsGroup: SettingsGroup, parent: QObject = None) -> None:
+    def __init__(self,
+                 settingsGroup: Optional[SettingsGroup],
+                 parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._settingsGroup = settingsGroup
 
@@ -43,7 +45,7 @@ class SettingsEntryTableModel(QAbstractTableModel):
             elif section == 1:
                 result = 'Value'
 
-        return result
+        return QVariant(result)
 
     def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
         result = None
@@ -56,18 +58,13 @@ class SettingsEntryTableModel(QAbstractTableModel):
             elif index.column() == 1:
                 result = str(settingsEntry.value)
 
-        return result
+        return QVariant(result)
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._settingsGroup)
+        return len(self._settingsGroup) if self._settingsGroup else 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return 2
-
-    def setGroup(self, settingsGroup: SettingsGroup) -> None:
-        self.beginResetModel()
-        self._settingsGroup = settingsGroup
-        self.endResetModel()
 
 
 class SettingsController(Observer):
@@ -79,7 +76,6 @@ class SettingsController(Observer):
         self._presenter = presenter
         self._groupListModel = SettingsGroupListModel(settingsRegistry)
         self._groupListView = groupListView
-        self._entryTableModel = SettingsEntryTableModel(settingsRegistry[0])
         self._entryTableView = entryTableView
         self._fileDialogFactory = fileDialogFactory
 
@@ -92,10 +88,8 @@ class SettingsController(Observer):
         settingsRegistry.addObserver(controller)
 
         controller._groupListView.setModel(controller._groupListModel)
-        controller._entryTableView.setModel(controller._entryTableModel)
-
         controller._groupListView.selectionModel().currentChanged.connect(
-            controller._swapSettingsEntries)
+            lambda current, previous: controller._updateEntryTable())
 
         return controller
 
@@ -113,14 +107,17 @@ class SettingsController(Observer):
         if filePath:
             self._presenter.saveSettings(filePath)
 
-    def _swapSettingsEntries(self, current: QModelIndex, previous: QModelIndex) -> None:
-        settingsGroup = self._settingsRegistry[current.row()]
-        self._entryTableModel.setGroup(settingsGroup)
+    def _updateEntryTable(self) -> None:
+        current = self._groupListView.currentIndex()
+        settingsGroup = self._settingsRegistry[current.row()] if current.isValid() else None
+        entryTableModel = SettingsEntryTableModel(settingsGroup)
+        self._entryTableView.setModel(entryTableModel)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:
-            self._groupListModel.reload()
-        # TODO update settingsContentsTableModel
+            self._groupListModel.beginResetModel()
+            self._groupListModel.endResetModel()
+            self._updateEntryTable()
 
 
 class ImportSettingsController(Observer):
@@ -147,12 +144,11 @@ class ImportSettingsController(Observer):
             override = self._dialog.optionsGroupBox.fixDetectorDistanceUnitsCheckBox.isChecked()
             self._presenter.syncDetectorDistance(override)
 
-        if self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked():
-            self._presenter.syncImageCropCenter()
-
-        # NOTE this must happen after crop center to avoid introducing a bug
         if self._dialog.valuesGroupBox.imageCropExtentCheckBox.isChecked():
             self._presenter.syncImageCropExtent()
+
+        if self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked():
+            self._presenter.syncImageCropCenter()
 
         if self._dialog.valuesGroupBox.probeEnergyCheckBox.isChecked():
             self._presenter.syncProbeEnergy()
