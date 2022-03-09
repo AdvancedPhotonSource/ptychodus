@@ -36,7 +36,8 @@ class ModelCore:
         self._selectableScanSequence = SelectableScanSequence.createInstance(self._scanSettings)
         self._scanSequence = TransformedScanSequence.createInstance(self._scanSettings,
                                                                     self._selectableScanSequence)
-        self._detector = Detector.createInstance(self._detectorSettings, self._cropSettings)
+        self._cropSizer = CropSizer.createInstance(self._cropSettings)
+        self._detector = Detector.createInstance(self._detectorSettings, self._cropSizer)
         self._probe = Probe.createInstance(self._probeSettings)
         self._objectSizer = ObjectSizer.createInstance(self._scanSequence, self._detector,
                                                        self._probe)
@@ -47,12 +48,12 @@ class ModelCore:
         self._velociprobeImageSequence = VelociprobeImageSequence.createInstance(
             self._velociprobeReader)
         self._croppedImageSequence = CroppedImageSequence.createInstance(
-            self._cropSettings, self._velociprobeImageSequence)
+            self._cropSizer, self._velociprobeImageSequence)
         self._dataDirectoryWatcher = DataDirectoryWatcher()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
-        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSettings,
+        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSizer,
                                                       self._velociprobeReader, self._scanSequence,
                                                       self._probe, self._objectSizer, self._object,
                                                       isDeveloperModeEnabled)
@@ -65,7 +66,7 @@ class ModelCore:
         self.dataFilePresenter = DataFilePresenter()
         self.settingsPresenter = SettingsPresenter.createInstance(self.settingsRegistry)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
-        self.cropPresenter = CropPresenter.createInstance(self._cropSettings)
+        self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.detectorImagePresenter = DetectorImagePresenter.createInstance(
             self._croppedImageSequence)
         self.velociprobePresenter = VelociprobePresenter.createInstance(

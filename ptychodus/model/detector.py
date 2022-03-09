@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import numpy
 
-from .image import ImageSequence, CropSettings
+from .image import ImageSequence, CropSizer
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 
@@ -33,20 +33,19 @@ class DetectorSettings(Observable, Observer):
 
 
 class Detector(Observable, Observer):
-    def __init__(self, detectorSettings: DetectorSettings, cropSettings: CropSettings) -> None:
+    def __init__(self, detectorSettings: DetectorSettings, cropSizer: CropSizer) -> None:
         super().__init__()
         self._detectorSettings = detectorSettings
-        self._cropSettings = cropSettings
+        self._cropSizer = cropSizer
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings,
-                       cropSettings: CropSettings) -> Detector:
-        detector = cls(detectorSettings, cropSettings)
+                       cropSizer: CropSizer) -> Detector:
+        detector = cls(detectorSettings, cropSizer)
         detectorSettings.detectorDistanceInMeters.addObserver(detector)
         detectorSettings.pixelSizeXInMeters.addObserver(detector)
         detectorSettings.pixelSizeYInMeters.addObserver(detector)
-        cropSettings.extentXInPixels.addObserver(detector)
-        cropSettings.extentYInPixels.addObserver(detector)
+        cropSizer.addObserver(detector)
         return detector
 
     @property
@@ -56,12 +55,12 @@ class Detector(Observable, Observer):
     @property
     def extentXInMeters(self) -> Decimal:
         return self._detectorSettings.pixelSizeXInMeters.value \
-                * self._cropSettings.extentXInPixels.value
+                * self._cropSizer.getExtentX()
 
     @property
     def extentYInMeters(self) -> Decimal:
         return self._detectorSettings.pixelSizeYInMeters.value \
-                * self._cropSettings.extentYInPixels.value
+                * self._cropSizer.getExtentY()
 
     def update(self, observable: Observable) -> None:
         if observable is self._detectorSettings.detectorDistanceInMeters:
@@ -70,9 +69,7 @@ class Detector(Observable, Observer):
             self.notifyObservers()
         elif observable is self._detectorSettings.pixelSizeYInMeters:
             self.notifyObservers()
-        elif observable is self._cropSettings.extentXInPixels:
-            self.notifyObservers()
-        elif observable is self._cropSettings.extentYInPixels:
+        elif observable is self._cropSizer:
             self.notifyObservers()
 
 

@@ -7,8 +7,8 @@ import h5py
 import numpy
 
 from .data_file import DataFile, DataFileReader
-from .detector import DetectorSettings, CropSettings
-from .image import ImageSequence
+from .detector import DetectorSettings
+from .image import CropSettings, ImageSequence
 from .observer import Observable, Observer
 from .probe import ProbeSettings
 from .settings import SettingsGroup

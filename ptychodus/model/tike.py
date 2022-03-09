@@ -14,7 +14,7 @@ except ImportError:
         ptycho = None
 
 
-from .image import CropSettings, ImageExtent
+from .image import CropSizer, ImageExtent
 from .object import Object, ObjectSizer
 from .observer import Observable, Observer
 from .probe import Probe
@@ -389,14 +389,14 @@ class TikeReconstructor:
     def __init__(self, settings: TikeSettings,
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
-                 probeCorrectionSettings: TikeProbeCorrectionSettings, cropSettings: CropSettings,
+                 probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
                  velociprobeReader: VelociprobeReader, scanSequence: ScanSequence, probe: Probe,
                  objectSizer: ObjectSizer, obj: Object) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
-        self._cropSettings = cropSettings
+        self._cropSizer = cropSizer
         self._velociprobeReader = velociprobeReader
         self._scanSequence = scanSequence
         self._probe = probe
@@ -410,14 +410,6 @@ class TikeReconstructor:
     def getData(self) -> numpy.ndarray:
         dataList: list[numpy.ndarray] = list()
 
-        xradius = self._cropSettings.extentXInPixels.value // 2
-        xmin = self._cropSettings.centerXInPixels.value - xradius
-        xmax = self._cropSettings.centerXInPixels.value + xradius
-
-        yradius = self._cropSettings.extentYInPixels.value // 2
-        ymin = self._cropSettings.centerYInPixels.value - yradius
-        ymax = self._cropSettings.centerYInPixels.value + yradius
-
         for datafile in self._velociprobeReader.entryGroup.data:
             try:
                 with h5py.File(datafile.filePath, 'r') as h5File:
@@ -426,8 +418,10 @@ class TikeReconstructor:
                     if isinstance(item, h5py.Dataset):
                         data = item[()]
 
-                        if self._cropSettings.cropEnabled.value:
-                            data = numpy.copy(data[..., ymin:ymax, xmin:xmax])
+                        if self._cropSizer.isCropEnabled():
+                            sliceX = self._sizer.getSliceX()
+                            sliceY = self._sizer.getSliceY()
+                            data = numpy.copy(data[..., sliceY, sliceX])
 
                         dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
                         dataList.append(dataShifted)
@@ -693,7 +687,7 @@ class TikeBackend:
     @classmethod
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
-                       cropSettings: CropSettings,
+                       cropSizer: CropSizer,
                        velociprobeReader: VelociprobeReader,
                        scanSequence: ScanSequence,
                        probe: Probe,
@@ -707,7 +701,7 @@ class TikeBackend:
 
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
-                                                  core._probeCorrectionSettings, cropSettings,
+                                                  core._probeCorrectionSettings, cropSizer,
                                                   velociprobeReader, scanSequence, probe,
                                                   objectSizer, obj)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))

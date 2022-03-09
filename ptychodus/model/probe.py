@@ -7,6 +7,7 @@ import numpy
 
 from .detector import DetectorSettings
 from .fzp import single_probe
+from .image import CropSizer
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 
@@ -54,6 +55,8 @@ class Probe(Observable, Observer):
         settings.probeShape.addObserver(probe)
         settings.probeEnergyInElectronVolts.addObserver(probe)
         return probe
+
+    # FIXME auto probe size from min(cropExtentX, cropExtentY)
 
     @property
     def extentInPixels(self) -> int:

@@ -143,12 +143,14 @@ class CropSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class CropSizer(Observer, Observable): # FIXME use this
+class CropSizer(Observer, Observable):
     MAX_INT = 0x7FFFFFFF
 
     def __init__(self, settings: CropSettings) -> None:
         super().__init__()
         self._settings = settings
+        self._imageWidth = CropSizer.MAX_INT # FIXME use real image width
+        self._imageHeight = CropSizer.MAX_INT # FIXME use real image height
 
     @classmethod
     def createInstance(cls, settings: CropSettings) -> CropPresenter:
@@ -156,8 +158,11 @@ class CropSizer(Observer, Observable): # FIXME use this
         settings.addObserver(presenter)
         return presenter
 
+    def isCropEnabled(self) -> bool:
+        return self._settings.cropEnabled.value
+
     def getExtentXLimits(self) -> Interval[int]:
-        return Interval(1, self.MAX_INT) # TODO 1, imageWidth
+        return Interval[int](1, self._imageWidth)
 
     def getExtentX(self) -> int:
         limits = self.getExtentXLimits()
@@ -165,19 +170,19 @@ class CropSizer(Observer, Observable): # FIXME use this
 
     def getCenterXLimits(self) -> Interval[int]:
         radius = self.getExtentX() // 2
-        return Interval(radius, imageWidth - 1 - radius) # CHECKME
+        return Interval[int](radius, self._imageWidth - 1 - radius)
 
     def getCenterX(self) -> int:
         limits = self.getCenterXLimits()
         return limits.clamp(self._settings.centerXInPixels.value)
 
-    def getSliceX(self) -> Interval[int]:
+    def getSliceX(self) -> slice:
         center = self.getCenterX()
         radius = self.getExtentX() // 2
-        return Interval(center - radius, center + radius + 1)
+        return slice(center - radius, center + radius + 1)
 
     def getExtentYLimits(self) -> Interval[int]:
-        return Interval(1, self.MAX_INT) # TODO 1, imageHeight
+        return Interval[int](1, self._imageHeight)
 
     def getExtentY(self) -> int:
         limits = self.getExtentYLimits()
@@ -185,16 +190,16 @@ class CropSizer(Observer, Observable): # FIXME use this
 
     def getCenterYLimits(self) -> Interval[int]:
         radius = self.getExtentY() // 2
-        return Interval(radius, imageWidth - 1 - radius) # CHECKME
+        return Interval[int](radius, self._imageHeight - 1 - radius)
 
     def getCenterY(self) -> int:
         limits = self.getCenterYLimits()
         return limits.clamp(self._settings.centerYInPixels.value)
 
-    def getSliceY(self) -> Interval[int]:
+    def getSliceY(self) -> slice:
         center = self.getCenterY()
         radius = self.getExtentY() // 2
-        return Interval(center - radius, center + radius + 1)
+        return slice(center - radius, center + radius + 1)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
@@ -202,16 +207,16 @@ class CropSizer(Observer, Observable): # FIXME use this
 
 
 class CroppedImageSequence(ImageSequence):
-    def __init__(self, settings: CropSettings, imageSequence: ImageSequence) -> None:
+    def __init__(self, sizer: CropSizer, imageSequence: ImageSequence) -> None:
         super().__init__()
-        self._settings = settings
+        self._sizer = sizer
         self._imageSequence = imageSequence
 
     @classmethod
-    def createInstance(cls, settings: CropSettings,
+    def createInstance(cls, sizer: CropSizer,
                        imageSequence: ImageSequence) -> CroppedImageSequence:
-        croppedImageSequence = cls(settings, imageSequence)
-        settings.addObserver(croppedImageSequence)
+        croppedImageSequence = cls(sizer, imageSequence)
+        sizer.addObserver(croppedImageSequence)
         imageSequence.addObserver(croppedImageSequence)
         return croppedImageSequence
 
@@ -230,16 +235,10 @@ class CroppedImageSequence(ImageSequence):
     def __getitem__(self, index: int) -> numpy.ndarray:
         img = self._imageSequence[index]
 
-        if self._settings.cropEnabled.value == True:
-            radiusX = self._settings.extentXInPixels.value // 2
-            xmin = self._settings.centerXInPixels.value - radiusX
-            xmax = self._settings.centerXInPixels.value + radiusX
-
-            radiusY = self._settings.extentYInPixels.value // 2
-            ymin = self._settings.centerYInPixels.value - radiusY
-            ymax = self._settings.centerYInPixels.value + radiusY
-
-            img = numpy.copy(img[ymin:ymax, xmin:xmax])
+        if self._sizer.isCropEnabled():
+            sliceX = self._sizer.getSliceX()
+            sliceY = self._sizer.getSliceY()
+            img = numpy.copy(img[sliceY, sliceX])
 
         return img
 
@@ -247,79 +246,78 @@ class CroppedImageSequence(ImageSequence):
         return len(self._imageSequence)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings:
+        if observable is self._sizer:
             self.notifyObservers()
         elif observable is self._imageSequence:
             self.notifyObservers()
 
 
 class CropPresenter(Observer, Observable):
-    MAX_INT = 0x7FFFFFFF
-
-    def __init__(self, settings: CropSettings) -> None:
+    def __init__(self, settings: CropSettings, sizer: CropSizer) -> None:
         super().__init__()
         self._settings = settings
+        self._sizer = sizer
 
     @classmethod
-    def createInstance(cls, settings: CropSettings) -> CropPresenter:
-        presenter = cls(settings)
-        settings.addObserver(presenter)
+    def createInstance(cls, settings: CropSettings, sizer: CropSizer) -> CropPresenter:
+        presenter = cls(settings, sizer)
+        sizer.addObserver(presenter)
         return presenter
 
     def isCropEnabled(self) -> bool:
-        return self._settings.cropEnabled.value
+        return self._sizer.isCropEnabled()
 
     def setCropEnabled(self, value: bool) -> None:
         self._settings.cropEnabled.value = value
 
     def getMinCenterXInPixels(self) -> int:
-        return 0
+        return self._sizer.getCenterXLimits().lower
 
     def getMaxCenterXInPixels(self) -> int:
-        return self.MAX_INT
+        return self._sizer.getCenterXLimits().upper
 
     def getCenterXInPixels(self) -> int:
-        return self._settings.centerXInPixels.value
+        return self._sizer.getCenterX()
 
     def setCenterXInPixels(self, value: int) -> None:
         self._settings.centerXInPixels.value = value
 
     def getMinCenterYInPixels(self) -> int:
-        return 0
+        return self._sizer.getCenterYLimits().lower
 
     def getMaxCenterYInPixels(self) -> int:
-        return self.MAX_INT
+        return self._sizer.getCenterYLimits().upper
 
     def getCenterYInPixels(self) -> int:
-        return self._settings.centerYInPixels.value
+        return self._sizer.getCenterY()
 
     def setCenterYInPixels(self, value: int) -> None:
         self._settings.centerYInPixels.value = value
 
     def getMinExtentXInPixels(self) -> int:
-        return 0
+        return self._sizer.getExtentXLimits().lower
 
     def getMaxExtentXInPixels(self) -> int:
-        return self.MAX_INT
+        return self._sizer.getExtentXLimits().upper
 
     def getExtentXInPixels(self) -> int:
-        return self._settings.extentXInPixels.value
+        return self._sizer.getExtentX()
 
     def setExtentXInPixels(self, value: int) -> None:
         self._settings.extentXInPixels.value = value
 
     def getMinExtentYInPixels(self) -> int:
-        return 0
+        return self._sizer.getExtentYLimits().lower
 
     def getMaxExtentYInPixels(self) -> int:
-        return self.MAX_INT
+        return self._sizer.getExtentYLimits().upper
 
     def getExtentYInPixels(self) -> int:
-        return self._settings.extentYInPixels.value
+        return self._sizer.getExtentY()
 
     def setExtentYInPixels(self, value: int) -> None:
         self._settings.extentYInPixels.value = value
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings:
+        if observable is self._sizer:
             self.notifyObservers()
