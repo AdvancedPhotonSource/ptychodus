@@ -137,6 +137,9 @@ class ImportSettingsController(Observer):
         if result != QDialog.Accepted:
             return
 
+        if self._dialog.valuesGroupBox.detectorPixelCountCheckBox.isChecked():
+            self._presenter.syncDetectorPixelCount()
+
         if self._dialog.valuesGroupBox.detectorPixelSizeCheckBox.isChecked():
             self._presenter.syncDetectorPixelSize()
 
@@ -145,8 +148,8 @@ class ImportSettingsController(Observer):
             self._presenter.syncDetectorDistance(override)
 
         self._presenter.syncImageCrop(
-                syncCenter = self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked(),
-                syncExtent = self._dialog.valuesGroupBox.imageCropExtentCheckBox.isChecked())
+            syncCenter=self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked(),
+            syncExtent=self._dialog.valuesGroupBox.imageCropExtentCheckBox.isChecked())
 
         if self._dialog.valuesGroupBox.probeEnergyCheckBox.isChecked():
             self._presenter.syncProbeEnergy()

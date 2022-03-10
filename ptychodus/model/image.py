@@ -118,4 +118,3 @@ class ImageSequence(Sequence, Observable, Observer):
     @abstractmethod
     def getHeight(self) -> int:
         pass
-

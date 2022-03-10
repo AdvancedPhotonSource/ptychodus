@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import QComboBox, QFormLayout, QLineEdit, QSpinBox, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLineEdit, QSpinBox, QVBoxLayout, QWidget
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -10,9 +10,9 @@ import matplotlib
 from .widgets import LengthWidget
 
 
-class ScanParametersView(QWidget):
+class ScanScanView(QGroupBox):
     def __init__(self, parent: QWidget = None) -> None:
-        super().__init__(parent)
+        super().__init__('Parameters', parent)
         self.initializerComboBox = QComboBox()
         self.numberOfScanPointsSpinBox = QSpinBox()
         self.extentXSpinBox = QSpinBox()
@@ -23,7 +23,7 @@ class ScanParametersView(QWidget):
         self.transformComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ScanParametersView:
+    def createInstance(cls, parent: QWidget = None) -> ScanScanView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -35,6 +35,23 @@ class ScanParametersView(QWidget):
         layout.addRow('Step Size Y:', view.stepSizeYWidget)
         layout.addRow('Jitter Radius [px]:', view.jitterRadiusLineEdit)
         layout.addRow('Transform (x,y) \u2192', view.transformComboBox)
+        view.setLayout(layout)
+
+        return view
+
+
+class ScanParametersView(QWidget):
+    def __init__(self, parent: QWidget = None) -> None:
+        super().__init__(parent)
+        self.scanView = ScanScanView.createInstance()
+
+    @classmethod
+    def createInstance(cls, parent: QWidget = None) -> ScanParametersView:
+        view = cls(parent)
+
+        layout = QVBoxLayout()
+        layout.addWidget(view.scanView)
+        layout.addStretch()
         view.setLayout(layout)
 
         return view

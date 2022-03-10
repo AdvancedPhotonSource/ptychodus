@@ -157,7 +157,9 @@ class VelociprobeReader(DataFileReader, Observable):
             dataGroup = self._readDataGroup(h5EntryGroup.get('data'))
             instrumentGroup = self._readInstrumentGroup(h5EntryGroup.get('instrument'))
             sampleGroup = self._readSampleGroup(h5EntryGroup.get('sample'))
-            self.entryGroup = EntryGroup(data=dataGroup, instrument=instrumentGroup, sample=sampleGroup)
+            self.entryGroup = EntryGroup(data=dataGroup,
+                                         instrument=instrumentGroup,
+                                         sample=sampleGroup)
         else:
             logger.debug(f'File {self.masterFilePath} is not a velociprobe data file.')
             self.entryGroup = None
@@ -283,6 +285,12 @@ class VelociprobePresenter(Observable, Observer):
     @property
     def _detectorSpecificGroup(self) -> DetectorSpecificGroup:
         return self._detectorGroup.detectorSpecific
+
+    def syncDetectorPixelCount(self) -> None:
+        self._detectorSettings.numberOfPixelsX.value = \
+                self._detectorSpecificGroup.x_pixels_in_detector
+        self._detectorSettings.numberOfPixelsY.value = \
+                self._detectorSpecificGroup.y_pixels_in_detector
 
     def syncDetectorPixelSize(self) -> None:
         self._detectorSettings.pixelSizeXInMeters.value = \

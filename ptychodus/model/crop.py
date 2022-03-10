@@ -31,8 +31,6 @@ class CropSettings(Observable, Observer):
 
 
 class CropSizer(Observer, Observable):
-    MAX_INT = 0x7FFFFFFF
-
     def __init__(self, settings: CropSettings, detector: Detector) -> None:
         super().__init__()
         self._settings = settings

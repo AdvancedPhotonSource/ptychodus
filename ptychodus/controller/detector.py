@@ -22,6 +22,8 @@ class DetectorController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        view.numberOfPixelsXSpinBox.valueChanged.connect(presenter.setNumberOfPixelsX)
+        view.numberOfPixelsYSpinBox.valueChanged.connect(presenter.setNumberOfPixelsY)
         view.pixelSizeXWidget.lengthChanged.connect(presenter.setPixelSizeXInMeters)
         view.pixelSizeYWidget.lengthChanged.connect(presenter.setPixelSizeYInMeters)
         view.detectorDistanceWidget.lengthChanged.connect(presenter.setDetectorDistanceInMeters)
@@ -32,6 +34,18 @@ class DetectorController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.numberOfPixelsXSpinBox.blockSignals(True)
+        self._view.numberOfPixelsXSpinBox.setRange(self._presenter.getMinNumberOfPixelsX(),
+                                                   self._presenter.getMaxNumberOfPixelsX())
+        self._view.numberOfPixelsXSpinBox.setValue(self._presenter.getNumberOfPixelsX())
+        self._view.numberOfPixelsXSpinBox.blockSignals(False)
+
+        self._view.numberOfPixelsYSpinBox.blockSignals(True)
+        self._view.numberOfPixelsYSpinBox.setRange(self._presenter.getMinNumberOfPixelsY(),
+                                                   self._presenter.getMaxNumberOfPixelsY())
+        self._view.numberOfPixelsYSpinBox.setValue(self._presenter.getNumberOfPixelsY())
+        self._view.numberOfPixelsYSpinBox.blockSignals(False)
+
         self._view.pixelSizeXWidget.setLengthInMeters(self._presenter.getPixelSizeXInMeters())
         self._view.pixelSizeYWidget.setLengthInMeters(self._presenter.getPixelSizeYInMeters())
         self._view.detectorDistanceWidget.setLengthInMeters(
@@ -80,10 +94,6 @@ class DatasetListModel(QAbstractListModel):
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return self._presenter.getNumberOfDatasets()
 
-    def reload(self) -> None:
-        self.beginResetModel()
-        self.endResetModel()
-
 
 class DatasetController(Observer):
     def __init__(self, velociprobePresenter: VelociprobePresenter,
@@ -119,7 +129,8 @@ class DatasetController(Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobePresenter:
-            self._listModel.reload()
+            self._listModel.beginResetModel()
+            self._listModel.endResetModel()
         elif observable is self._imagePresenter:
             self._updateSelection()
 

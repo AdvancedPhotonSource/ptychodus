@@ -44,7 +44,7 @@ class ControllerCore:
         self._probeImageController = ProbeImageController.createInstance(
             model.probePresenter, view.probeImageView, self._fileDialogFactory)
         self._scanParametersController = ScanParametersController.createInstance(
-            model.scanPresenter, view.scanParametersView, self._fileDialogFactory)
+            model.scanPresenter, view.scanParametersView.scanView, self._fileDialogFactory)
         self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter,
                                                                      view.scanPlotView)
         self._objectParametersController = ObjectParametersController.createInstance(

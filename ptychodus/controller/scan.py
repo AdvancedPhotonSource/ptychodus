@@ -3,12 +3,12 @@ from decimal import Decimal
 from PyQt5.QtGui import QDoubleValidator, QStandardItem, QStandardItemModel
 
 from ..model import Observer, Observable, ScanPointIO, ScanPresenter
-from ..view import ScanParametersView, ScanPlotView
+from ..view import ScanScanView, ScanPlotView
 from .data_file import FileDialogFactory
 
 
 class ScanParametersController(Observer):
-    def __init__(self, presenter: ScanPresenter, view: ScanParametersView,
+    def __init__(self, presenter: ScanPresenter, view: ScanScanView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
@@ -22,7 +22,7 @@ class ScanParametersController(Observer):
         return validator
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanParametersView,
+    def createInstance(cls, presenter: ScanPresenter, view: ScanScanView,
                        fileDialogFactory: FileDialogFactory):
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)

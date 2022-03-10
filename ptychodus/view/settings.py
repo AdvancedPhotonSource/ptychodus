@@ -13,6 +13,7 @@ class ImportSettingsValuesGroupBox(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Choose Settings', parent)
+        self.detectorPixelCountCheckBox = self.createCheckBox('Detector Pixel Count')
         self.detectorPixelSizeCheckBox = self.createCheckBox('Detector Pixel Size')
         self.detectorDistanceCheckBox = self.createCheckBox('Detector Distance')
         self.imageCropCenterCheckBox = self.createCheckBox('Image Crop Center')
@@ -24,6 +25,7 @@ class ImportSettingsValuesGroupBox(QGroupBox):
         view = cls(parent)
 
         layout = QVBoxLayout()
+        layout.addWidget(view.detectorPixelCountCheckBox)
         layout.addWidget(view.detectorPixelSizeCheckBox)
         layout.addWidget(view.detectorDistanceCheckBox)
         layout.addWidget(view.imageCropCenterCheckBox)
@@ -36,15 +38,9 @@ class ImportSettingsValuesGroupBox(QGroupBox):
 
 
 class ImportSettingsOptionsGroupBox(QGroupBox):
-    @staticmethod
-    def createCheckBox(text: str) -> QCheckBox:
-        widget = QCheckBox(text)
-        widget.setChecked(True)
-        return widget
-
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Additional Options', parent)
-        self.fixDetectorDistanceUnitsCheckBox = self.createCheckBox('Fix Detector Distance Units')
+        self.fixDetectorDistanceUnitsCheckBox = QCheckBox('Fix Detector Distance Units')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImportSettingsOptionsGroupBox:

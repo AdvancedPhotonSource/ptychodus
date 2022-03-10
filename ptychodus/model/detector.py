@@ -81,6 +81,8 @@ class Detector(Observable, Observer):
 
 
 class DetectorPresenter(Observer, Observable):
+    MAX_INT = 0x7FFFFFFF
+
     def __init__(self, settings: DetectorSettings) -> None:
         super().__init__()
         self._settings = settings
@@ -91,7 +93,29 @@ class DetectorPresenter(Observer, Observable):
         settings.addObserver(presenter)
         return presenter
 
-    # FIXME add plumbing for number of pixels
+    def getMinNumberOfPixelsX(self) -> int:
+        return 0
+
+    def getMaxNumberOfPixelsX(self) -> int:
+        return self.MAX_INT
+
+    def getNumberOfPixelsX(self) -> int:
+        return self._settings.numberOfPixelsX.value
+
+    def setNumberOfPixelsX(self, value: int) -> None:
+        self._settings.numberOfPixelsX.value = value
+
+    def getMinNumberOfPixelsY(self) -> int:
+        return 0
+
+    def getMaxNumberOfPixelsY(self) -> int:
+        return self.MAX_INT
+
+    def getNumberOfPixelsY(self) -> int:
+        return self._settings.numberOfPixelsY.value
+
+    def setNumberOfPixelsY(self, value: int) -> None:
+        self._settings.numberOfPixelsY.value = value
 
     def getPixelSizeXInMeters(self) -> Decimal:
         return self._settings.pixelSizeXInMeters.value
