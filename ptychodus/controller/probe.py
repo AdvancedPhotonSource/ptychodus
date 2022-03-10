@@ -19,7 +19,7 @@ class ProbeProbeController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        view.shapeSpinBox.valueChanged.connect(presenter.setProbeShape)
+        view.sizeSpinBox.valueChanged.connect(presenter.setProbeSize)
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setEnabled(False)
         view.diameterWidget.lengthChanged.connect(presenter.setProbeDiameterInMeters)
@@ -29,9 +29,9 @@ class ProbeProbeController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.shapeSpinBox.setValueAndRange(self._presenter.getProbeShape(),
-                                                 self._presenter.getProbeMinShape(),
-                                                 self._presenter.getProbeMaxShape())
+        self._view.sizeSpinBox.setValueAndRange(self._presenter.getProbeSize(),
+                                                 self._presenter.getProbeMinSize(),
+                                                 self._presenter.getProbeMaxSize())
         self._view.energyWidget.setEnergyInElectronVolts(
             self._presenter.getProbeEnergyInElectronVolts())
         self._view.wavelengthWidget.setLengthInMeters(self._presenter.getProbeWavelengthInMeters())

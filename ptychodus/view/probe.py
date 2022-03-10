@@ -8,7 +8,7 @@ from .widgets import SemiautomaticSpinBox, LengthWidget, EnergyWidget
 class ProbeProbeView(QGroupBox):
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__('Parameters', parent)
-        self.shapeSpinBox = SemiautomaticSpinBox.createInstance()
+        self.sizeSpinBox = SemiautomaticSpinBox.createInstance()
         self.energyWidget = EnergyWidget.createInstance()
         self.wavelengthWidget = LengthWidget.createInstance()
         self.diameterWidget = LengthWidget.createInstance()
@@ -18,7 +18,7 @@ class ProbeProbeView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Shape:', view.shapeSpinBox)
+        layout.addRow('Size:', view.sizeSpinBox)
         layout.addRow('Energy:', view.energyWidget)
         layout.addRow('Wavelength:', view.wavelengthWidget)
         layout.addRow('Diameter:', view.diameterWidget)
