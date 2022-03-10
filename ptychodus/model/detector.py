@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import numpy
 
-from .image import ImageSequence, CropSizer
+from .image import ImageSequence
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 
@@ -14,6 +14,8 @@ class DetectorSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.dataPath = settingsGroup.createPathEntry('DataPath', None)
+        self.numberOfPixelsX = settingsGroup.createIntegerEntry('NumberOfPixelsX', 1024)
+        self.numberOfPixelsY = settingsGroup.createIntegerEntry('NumberOfPixelsY', 1024)
         self.pixelSizeXInMeters = settingsGroup.createRealEntry('PixelSizeXInMeters', '75e-6')
         self.pixelSizeYInMeters = settingsGroup.createRealEntry('PixelSizeYInMeters', '75e-6')
         self.detectorDistanceInMeters = settingsGroup.createRealEntry(
@@ -33,42 +35,48 @@ class DetectorSettings(Observable, Observer):
 
 
 class Detector(Observable, Observer):
-    def __init__(self, detectorSettings: DetectorSettings, cropSizer: CropSizer) -> None:
+    def __init__(self, settings: DetectorSettings) -> None:
         super().__init__()
-        self._detectorSettings = detectorSettings
-        self._cropSizer = cropSizer
+        self._settings = settings
 
     @classmethod
-    def createInstance(cls, detectorSettings: DetectorSettings, cropSizer: CropSizer) -> Detector:
-        detector = cls(detectorSettings, cropSizer)
-        detectorSettings.detectorDistanceInMeters.addObserver(detector)
-        detectorSettings.pixelSizeXInMeters.addObserver(detector)
-        detectorSettings.pixelSizeYInMeters.addObserver(detector)
-        cropSizer.addObserver(detector)
+    def createInstance(cls, settings: DetectorSettings) -> Detector:
+        detector = cls(settings)
+        settings.detectorDistanceInMeters.addObserver(detector)
+        settings.pixelSizeXInMeters.addObserver(detector)
+        settings.pixelSizeYInMeters.addObserver(detector)
         return detector
 
     @property
-    def distanceToObjectInMeters(self) -> Decimal:
-        return self._detectorSettings.detectorDistanceInMeters.value
+    def numberOfPixelsX(self) -> int:
+        return self._settings.numberOfPixelsX.value
+
+    @property
+    def pixelSizeXInMeters(self) -> Decimal:
+        return self._settings.pixelSizeXInMeters.value
 
     @property
     def extentXInMeters(self) -> Decimal:
-        return self._detectorSettings.pixelSizeXInMeters.value \
-                * self._cropSizer.getExtentX()
+        return self.numberOfPixelsX * self.pixelSizeXInMeters
+
+    @property
+    def numberOfPixelsY(self) -> int:
+        return self._settings.numberOfPixelsY.value
+
+    @property
+    def pixelSizeYInMeters(self) -> Decimal:
+        return self._settings.pixelSizeYInMeters.value
 
     @property
     def extentYInMeters(self) -> Decimal:
-        return self._detectorSettings.pixelSizeYInMeters.value \
-                * self._cropSizer.getExtentY()
+        return self.numberOfPixelsY * self.pixelSizeYInMeters
+
+    @property
+    def distanceToObjectInMeters(self) -> Decimal:
+        return self._settings.detectorDistanceInMeters.value
 
     def update(self, observable: Observable) -> None:
-        if observable is self._detectorSettings.detectorDistanceInMeters:
-            self.notifyObservers()
-        elif observable is self._detectorSettings.pixelSizeXInMeters:
-            self.notifyObservers()
-        elif observable is self._detectorSettings.pixelSizeYInMeters:
-            self.notifyObservers()
-        elif observable is self._cropSizer:
+        if observable is self._settings:
             self.notifyObservers()
 
 
@@ -82,6 +90,8 @@ class DetectorPresenter(Observer, Observable):
         presenter = cls(settings)
         settings.addObserver(presenter)
         return presenter
+
+    # FIXME add plumbing for number of pixels
 
     def getPixelSizeXInMeters(self) -> Decimal:
         return self._settings.pixelSizeXInMeters.value

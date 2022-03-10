@@ -144,11 +144,9 @@ class ImportSettingsController(Observer):
             override = self._dialog.optionsGroupBox.fixDetectorDistanceUnitsCheckBox.isChecked()
             self._presenter.syncDetectorDistance(override)
 
-        if self._dialog.valuesGroupBox.imageCropExtentCheckBox.isChecked():
-            self._presenter.syncImageCropExtent()
-
-        if self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked():
-            self._presenter.syncImageCropCenter()
+        self._presenter.syncImageCrop(
+                syncCenter = self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked(),
+                syncExtent = self._dialog.valuesGroupBox.imageCropExtentCheckBox.isChecked())
 
         if self._dialog.valuesGroupBox.probeEnergyCheckBox.isChecked():
             self._presenter.syncProbeEnergy()

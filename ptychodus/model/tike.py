@@ -14,7 +14,8 @@ except ImportError:
         ptycho = None
 
 
-from .image import CropSizer, ImageExtent
+from .crop import CropSizer
+from .image import ImageExtent
 from .object import Object, ObjectSizer
 from .observer import Observable, Observer
 from .probe import Probe

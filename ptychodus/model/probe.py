@@ -8,7 +8,7 @@ import numpy
 
 from .detector import DetectorSettings
 from .fzp import single_probe
-from .image import CropSizer
+from .crop import CropSizer
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 

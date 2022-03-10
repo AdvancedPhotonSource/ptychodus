@@ -10,6 +10,8 @@ from .widgets import LengthWidget
 class DetectorView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
+        self.numberOfPixelsXSpinBox = QSpinBox()
+        self.numberOfPixelsYSpinBox = QSpinBox()
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
         self.detectorDistanceWidget = LengthWidget.createInstance()
@@ -20,6 +22,8 @@ class DetectorView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
+        layout.addRow('Number of Pixels X:', view.numberOfPixelsXSpinBox)
+        layout.addRow('Number of Pixels Y:', view.numberOfPixelsYSpinBox)
         layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
         layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
         layout.addRow('Detector-Object Distance:', view.detectorDistanceWidget)

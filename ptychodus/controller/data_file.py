@@ -45,20 +45,20 @@ class DataArrayTableModel(QAbstractTableModel):
 
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: Qt.ItemDataRole) -> QVariant:
-        result = QVariant()
+        result = None
 
         if role == Qt.DisplayRole:
-            result = QVariant(section)
+            result = section
 
-        return result
+        return QVariant(result)
 
     def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
-        result = QVariant()
+        result = None
 
         if index.isValid() and role == Qt.DisplayRole and self._array is not None:
-            result = QVariant(self._array[index.row(), index.column()])
+            result = str(self._array[index.row(), index.column()])
 
-        return result
+        return QVariant(result)
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         count = 0
@@ -82,11 +82,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
         if data is not None:
             array = numpy.atleast_2d(data)
-
-            if numpy.ndim(data) == 1:
-                array = array.T
-
-            self._array = array
+            self._array = array.T if numpy.ndim(data) == 1 else array
 
         self.endResetModel()
 

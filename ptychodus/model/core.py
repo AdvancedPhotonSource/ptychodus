@@ -3,6 +3,7 @@ import logging
 
 import numpy
 
+from .crop import *
 from .data_file import *
 from .detector import *
 from .h5tree import *
@@ -36,8 +37,8 @@ class ModelCore:
         self._selectableScanSequence = SelectableScanSequence.createInstance(self._scanSettings)
         self._scanSequence = TransformedScanSequence.createInstance(self._scanSettings,
                                                                     self._selectableScanSequence)
-        self._cropSizer = CropSizer.createInstance(self._cropSettings)
-        self._detector = Detector.createInstance(self._detectorSettings, self._cropSizer)
+        self._detector = Detector.createInstance(self._detectorSettings)
+        self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
         self._probe = Probe.createInstance(self._probeSettings)
         self._objectSizer = ObjectSizer.createInstance(self._scanSequence, self._detector,
                                                        self._probe)
