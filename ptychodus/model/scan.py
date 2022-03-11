@@ -3,11 +3,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import Callable, Tuple
+from pathlib import Path
+from typing import Callable, Optional, Tuple
 import csv
 
 import numpy
 
+from .geometry import Interval, Box
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 
@@ -77,7 +79,22 @@ class ScanPointIO:
 
 
 class ScanSequence(Sequence, Observable, Observer):
-    pass
+    def getBoundingBox(self) -> Optional[Box[Decimal]]:
+        pointIter = iter(self)
+
+        try:
+            point = next(pointIter)
+        except StopIteration:
+            return None
+
+        xint = Interval(point.x, point.x)
+        yint = Interval(point.y, point.y)
+
+        for point in pointIter:
+            xint.hull(point.x)
+            yint.hull(point.y)
+
+        return Box[Decimal]((xint, yint))
 
 
 class CartesianScanSequence(ScanSequence):
@@ -181,7 +198,7 @@ class SpiralScanSequence(ScanSequence):
 class CustomScanSequence(ScanSequence):
     def __init__(self) -> None:
         super().__init__()
-        self._pointList = list()
+        self._pointList: list[ScanPoint] = list()
 
     def __getitem__(self, index: int) -> ScanPoint:
         return self._pointList[index]
@@ -304,7 +321,7 @@ class TransformedScanSequence(ScanSequence):
         super().__init__()
         self._settings = settings
         self._sequence = sequence
-        self._transform = None
+        self._transform: Optional[TransformXY] = None
 
     @classmethod
     def createInstance(cls, settings: ScanSettings,

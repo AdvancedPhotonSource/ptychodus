@@ -1,25 +1,29 @@
+from __future__ import annotations
 from decimal import Decimal
-from pathlib import Path
 
-from PyQt5.QtCore import QAbstractListModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ..model import *
-from ..view import *
-
+from ..model import Observable, Observer, DetectorPresenter, DatasetState
+from ..view import DetectorView
+from .data_file import FileDialogFactory
 from .image import ImageController
 
 
-class DetectorParametersController(Observer):
-    def __init__(self, presenter: DetectorParametersPresenter, view: DetectorDetectorView) -> None:
+class DetectorController(Observer):
+    def __init__(self, presenter: DetectorPresenter, view: DetectorView) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: DetectorParametersPresenter, view: DetectorDetectorView):
+    def createInstance(cls, presenter: DetectorPresenter,
+                       view: DetectorView) -> DetectorController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        view.numberOfPixelsXSpinBox.valueChanged.connect(presenter.setNumberOfPixelsX)
+        view.numberOfPixelsYSpinBox.valueChanged.connect(presenter.setNumberOfPixelsY)
         view.pixelSizeXWidget.lengthChanged.connect(presenter.setPixelSizeXInMeters)
         view.pixelSizeYWidget.lengthChanged.connect(presenter.setPixelSizeYInMeters)
         view.detectorDistanceWidget.lengthChanged.connect(presenter.setDetectorDistanceInMeters)
@@ -30,6 +34,18 @@ class DetectorParametersController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.numberOfPixelsXSpinBox.blockSignals(True)
+        self._view.numberOfPixelsXSpinBox.setRange(self._presenter.getMinNumberOfPixelsX(),
+                                                   self._presenter.getMaxNumberOfPixelsX())
+        self._view.numberOfPixelsXSpinBox.setValue(self._presenter.getNumberOfPixelsX())
+        self._view.numberOfPixelsXSpinBox.blockSignals(False)
+
+        self._view.numberOfPixelsYSpinBox.blockSignals(True)
+        self._view.numberOfPixelsYSpinBox.setRange(self._presenter.getMinNumberOfPixelsY(),
+                                                   self._presenter.getMaxNumberOfPixelsY())
+        self._view.numberOfPixelsYSpinBox.setValue(self._presenter.getNumberOfPixelsY())
+        self._view.numberOfPixelsYSpinBox.blockSignals(False)
+
         self._view.pixelSizeXWidget.setLengthInMeters(self._presenter.getPixelSizeXInMeters())
         self._view.pixelSizeYWidget.setLengthInMeters(self._presenter.getPixelSizeYInMeters())
         self._view.detectorDistanceWidget.setLengthInMeters(
@@ -42,8 +58,8 @@ class DetectorParametersController(Observer):
             self._syncModelToView()
 
 
-class DetectorDatasetListModel(QAbstractListModel):
-    def __init__(self, presenter: DetectorDatasetPresenter, parent: QObject = None) -> None:
+class DatasetListModel(QAbstractListModel):
+    def __init__(self, presenter: VelociprobePresenter, parent: QObject = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
 
@@ -79,21 +95,23 @@ class DetectorDatasetListModel(QAbstractListModel):
         return self._presenter.getNumberOfDatasets()
 
 
-class DetectorDatasetController(Observer):
-    def __init__(self, datasetPresenter: DetectorDatasetPresenter,
-                 imagePresenter: DetectorImagePresenter, view: DetectorDatasetView) -> None:
-        self._datasetPresenter = datasetPresenter
+class DatasetController(Observer):
+    def __init__(self, velociprobePresenter: VelociprobePresenter,
+                 imagePresenter: DetectorImagePresenter, view: DatasetView) -> None:
+        super().__init__()
+        self._velociprobePresenter = velociprobePresenter
         self._imagePresenter = imagePresenter
-        self._listModel = DetectorDatasetListModel(datasetPresenter)
+        self._listModel = DatasetListModel(velociprobePresenter)
         self._view = view
 
     @classmethod
-    def createInstance(cls, datasetPresenter: DetectorDatasetPresenter,
-                       imagePresenter: DetectorImagePresenter, view: DetectorDatasetView):
-        controller = cls(datasetPresenter, imagePresenter, view)
+    def createInstance(cls, velociprobePresenter: VelociprobePresenter,
+                       imagePresenter: DetectorImagePresenter,
+                       view: DatasetView) -> DatasetController:
+        controller = cls(velociprobePresenter, imagePresenter, view)
 
         view.dataFileListView.setModel(controller._listModel)
-        datasetPresenter.addObserver(controller)
+        velociprobePresenter.addObserver(controller)
         imagePresenter.addObserver(controller)
 
         view.dataFileListView.selectionModel().currentChanged.connect(
@@ -110,40 +128,31 @@ class DetectorDatasetController(Observer):
         self._view.dataFileListView.setCurrentIndex(index)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._datasetPresenter:
-            index = QModelIndex()
-            self._listModel.dataChanged.emit(index, index)
+        if observable is self._velociprobePresenter:
+            self._listModel.beginResetModel()
+            self._listModel.endResetModel()
         elif observable is self._imagePresenter:
             self._updateSelection()
 
 
-class DetectorImageCropController(Observer):
-    MAX_INT = 0x7FFFFFFF
-
-    def __init__(self, presenter: DetectorParametersPresenter,
-                 view: DetectorImageCropView) -> None:
+class CropController(Observer):
+    def __init__(self, presenter: CropPresenter, view: CropView) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: DetectorParametersPresenter, view: DetectorImageCropView):
+    def createInstance(cls, presenter: CropPresenter, view: CropView) -> CropController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
         view.setCheckable(True)
         view.toggled.connect(presenter.setCropEnabled)
-        view.centerXSpinBox.setRange(
-            0, DetectorImageCropController.MAX_INT)  # TODO image width (move to model)
-        view.centerXSpinBox.valueChanged.connect(presenter.setCropCenterXInPixels)
-        view.centerYSpinBox.setRange(
-            0, DetectorImageCropController.MAX_INT)  # TODO image height (move to model)
-        view.centerYSpinBox.valueChanged.connect(presenter.setCropCenterYInPixels)
-        view.extentXSpinBox.setRange(
-            0, DetectorImageCropController.MAX_INT)  # TODO image width (move to model)
-        view.extentXSpinBox.valueChanged.connect(presenter.setCropExtentXInPixels)
-        view.extentYSpinBox.setRange(
-            0, DetectorImageCropController.MAX_INT)  # TODO image height (move to model)
-        view.extentYSpinBox.valueChanged.connect(presenter.setCropExtentYInPixels)
+
+        view.centerXSpinBox.valueChanged.connect(presenter.setCenterXInPixels)
+        view.centerYSpinBox.valueChanged.connect(presenter.setCenterYInPixels)
+        view.extentXSpinBox.valueChanged.connect(presenter.setExtentXInPixels)
+        view.extentYSpinBox.valueChanged.connect(presenter.setExtentYInPixels)
 
         controller._syncModelToView()
 
@@ -151,10 +160,30 @@ class DetectorImageCropController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.setChecked(self._presenter.isCropEnabled())
-        self._view.centerXSpinBox.setValue(self._presenter.getCropCenterXInPixels())
-        self._view.centerYSpinBox.setValue(self._presenter.getCropCenterYInPixels())
-        self._view.extentXSpinBox.setValue(self._presenter.getCropExtentXInPixels())
-        self._view.extentYSpinBox.setValue(self._presenter.getCropExtentYInPixels())
+
+        self._view.centerXSpinBox.blockSignals(True)
+        self._view.centerXSpinBox.setRange(self._presenter.getMinCenterXInPixels(),
+                                           self._presenter.getMaxCenterXInPixels())
+        self._view.centerXSpinBox.setValue(self._presenter.getCenterXInPixels())
+        self._view.centerXSpinBox.blockSignals(False)
+
+        self._view.centerYSpinBox.blockSignals(True)
+        self._view.centerYSpinBox.setRange(self._presenter.getMinCenterYInPixels(),
+                                           self._presenter.getMaxCenterYInPixels())
+        self._view.centerYSpinBox.setValue(self._presenter.getCenterYInPixels())
+        self._view.centerYSpinBox.blockSignals(False)
+
+        self._view.extentXSpinBox.blockSignals(True)
+        self._view.extentXSpinBox.setRange(self._presenter.getMinExtentXInPixels(),
+                                           self._presenter.getMaxExtentXInPixels())
+        self._view.extentXSpinBox.setValue(self._presenter.getExtentXInPixels())
+        self._view.extentXSpinBox.blockSignals(False)
+
+        self._view.extentYSpinBox.blockSignals(True)
+        self._view.extentYSpinBox.setRange(self._presenter.getMinExtentYInPixels(),
+                                           self._presenter.getMaxExtentYInPixels())
+        self._view.extentYSpinBox.setValue(self._presenter.getExtentYInPixels())
+        self._view.extentYSpinBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -162,14 +191,17 @@ class DetectorImageCropController(Observer):
 
 
 class DetectorImageController(Observer):
-    def __init__(self, presenter: DetectorImagePresenter, view: ImageView) -> None:
+    def __init__(self, presenter: DetectorImagePresenter, view: ImageView,
+                 fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
-        self._image_controller = ImageController.createInstance(view)
+        self._image_controller = ImageController.createInstance(view, fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, presenter: DetectorImagePresenter, view: ImageView):
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: DetectorImagePresenter, view: ImageView,
+                       fileDialogFactory: FileDialogFactory) -> DetectorImageController:
+        controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
         controller.updateView()

@@ -1,7 +1,8 @@
+from __future__ import annotations
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtWidgets import QActionGroup, QHeaderView, QMainWindow, QMenu, QSplitter, QStyle, QTableView, QToolBar, QToolButton, QTreeView
+from PyQt5.QtWidgets import QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu, QSplitter, QStyle, QTableView, QToolBar, QToolButton, QTreeView
 
 from .detector import *
 from .monitor import *
@@ -13,7 +14,7 @@ from .settings import *
 
 
 class ViewCore(QMainWindow):
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
 
         pixmapi = getattr(QStyle, 'SP_FileIcon')
@@ -74,21 +75,17 @@ class ViewCore(QMainWindow):
         self.monitorObjectView = MonitorObjectView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> ViewCore:
         view = cls(parent)
 
         view.navigationToolBar.setContextMenuPolicy(Qt.PreventContextMenu)
         view.addToolBar(Qt.LeftToolBarArea, view.navigationToolBar)
         view.navigationToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
 
-        commonSize = QSize(150, 88)  # TODO calculate
-
         for index, action in enumerate(view.navigationToolBar.actions()):
             action.setCheckable(True)
             action.setData(index)
             view.navigationActionGroup.addAction(action)
-            widget = view.navigationToolBar.widgetForAction(action)
-            widget.setMinimumSize(commonSize)
 
         view.settingsAction.setChecked(True)
         settingsToolButton = view.navigationToolBar.widgetForAction(view.settingsAction)
@@ -111,7 +108,6 @@ class ViewCore(QMainWindow):
         objectToolButton.setMenu(view.objectMenu)
         objectToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 
-        view.parametersWidget.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Minimum)  # TODO
         view.settingsEntryView.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeToContents)
         view.dataFileTreeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -125,6 +121,8 @@ class ViewCore(QMainWindow):
         view.parametersWidget.addWidget(view.objectParametersView)
         view.parametersWidget.addWidget(view.reconstructorParametersView)
         view.parametersWidget.addWidget(view.monitorProbeView)
+        view.parametersWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        view.splitter.addWidget(view.parametersWidget)
 
         # maintain same order as navigationToolBar buttons
         view.contentsWidget.addWidget(view.settingsEntryView)
@@ -135,11 +133,13 @@ class ViewCore(QMainWindow):
         view.contentsWidget.addWidget(view.objectImageView)
         view.contentsWidget.addWidget(view.reconstructorPlotView)
         view.contentsWidget.addWidget(view.monitorObjectView)
-
-        view.splitter.addWidget(view.parametersWidget)
+        view.contentsWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.contentsWidget)
+
         view.setCentralWidget(view.splitter)
 
+        availableSize = QApplication.desktop().availableGeometry().size()
+        view.resize(availableSize * 2 / 3)
         view.statusBar().showMessage('Ready')  # TODO
 
         return view

@@ -1,5 +1,4 @@
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
 
 from ..model import SimpleTreeNode
 
@@ -40,7 +39,7 @@ class SimpleTreeModel(QAbstractItemModel):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             value = self._rootNode.data(section)
 
-        return value
+        return QVariant(value)
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         value = QModelIndex()

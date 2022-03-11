@@ -1,20 +1,19 @@
-from pathlib import Path
-
 from PyQt5.QtGui import QDoubleValidator, QImage, QPixmap, QStandardItem, QStandardItemModel
-from PyQt5.QtWidgets import QFileDialog
 
 import matplotlib
 import numpy
 
 from ..model import ColorMapListFactory, ScalarTransformation, ComplexToRealStrategy
 from ..view import ImageView
+from .data_file import FileDialogFactory
 
 
 class ImageController:
     IMAGE_FILTER = 'Image Files (*.png *.jpg *.bmp)'  # TODO support more image types
 
-    def __init__(self, view: ImageView) -> None:
+    def __init__(self, view: ImageView, fileDialogFactory: FileDialogFactory) -> None:
         self._view = view
+        self._fileDialogFactory = fileDialogFactory
         self._vmin = 0.
         self._vmax = 1.
         self._image_data = None
@@ -22,8 +21,8 @@ class ImageController:
         self._cyclicColorMapModel = QStandardItemModel()
 
     @classmethod
-    def createInstance(cls, view: ImageView):
-        controller = cls(view)
+    def createInstance(cls, view: ImageView, fileDialogFactory: FileDialogFactory):
+        controller = cls(view, fileDialogFactory)
 
         view.imageRibbon.saveButton.clicked.connect(controller._saveImage)
 
@@ -88,12 +87,12 @@ class ImageController:
         return controller
 
     def _saveImage(self) -> None:
-        fileName, _ = QFileDialog.getSaveFileName(self._view, 'Save Image', str(Path.home()),
-                                                  ImageController.IMAGE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Image',
+                                                           ImageController.IMAGE_FILTER)
 
-        if fileName:
+        if filePath:
             pixmap = self._view.imageWidget.getPixmap()
-            pixmap.save(fileName)
+            pixmap.save(str(filePath))
 
     def _renderCachedImageData(self) -> None:
         image_data = self._image_data

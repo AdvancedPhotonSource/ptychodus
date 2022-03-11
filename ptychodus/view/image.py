@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QWheelEvent
 from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, \
         QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
         QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout, \
-        QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget
+        QLabel, QLineEdit, QPushButton, QSizePolicy, QSpinBox, QVBoxLayout, QWidget
 
 from .widgets import BottomTitledGroupBox
 
@@ -34,7 +36,7 @@ class ImageRibbon(QWidget):
         self.imageSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> ImageRibbon:
         view = cls(parent)
 
         imageFileLayout = QVBoxLayout()
@@ -78,6 +80,8 @@ class ImageRibbon(QWidget):
         layout.addStretch(1)
         view.setLayout(layout)
 
+        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+
         return view
 
 
@@ -88,10 +92,16 @@ class ImageItem(QGraphicsPixmapItem):
         self.setAcceptHoverEvents(True)
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
-        QApplication.instance().setOverrideCursor(Qt.OpenHandCursor)
+        app = QApplication.instance()
+
+        if app:
+            app.setOverrideCursor(Qt.OpenHandCursor)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
-        QApplication.instance().restoreOverrideCursor()
+        app = QApplication.instance()
+
+        if app:
+            app.restoreOverrideCursor()
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         pass
@@ -109,7 +119,7 @@ class ImageWidget(QGraphicsView):
         self._pixmapItem = ImageItem()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> ImageWidget:
         widget = cls(parent)
 
         scene = QGraphicsScene()
@@ -144,7 +154,7 @@ class ImageView(QWidget):
         self.imageWidget = ImageWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: QWidget = None) -> ImageView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -152,5 +162,7 @@ class ImageView(QWidget):
         layout.setMenuBar(view.imageRibbon)
         layout.addWidget(view.imageWidget)
         view.setLayout(layout)
+
+        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
 
         return view

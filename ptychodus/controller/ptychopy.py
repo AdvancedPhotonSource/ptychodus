@@ -1,7 +1,9 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from ..model import Observer, Observable
+from PyQt5.QtWidgets import QWidget
+
+from ..model import Observer, Observable  # FIXME , PtychoPyBackend, PtychoPyPresenter
 from ..view import PtychoPyParametersView, PtychoPyBasicView, PtychoPyAdvancedView
 from .reconstructor import ReconstructorViewControllerFactory
 
@@ -122,6 +124,7 @@ class PtychoPyParametersController:
 
 class PtychoPyViewControllerFactory(ReconstructorViewControllerFactory):
     def __init__(self, model: PtychoPyBackend) -> None:
+        super().__init__()
         self._model = model
         self._controllerList: list[PtychoPyParametersController] = list()
 

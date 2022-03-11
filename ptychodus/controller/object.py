@@ -1,11 +1,10 @@
-from pathlib import Path
+from __future__ import annotations
 
 from PyQt5.QtGui import QStandardItemModel
-from PyQt5.QtWidgets import QFileDialog
 
-from ..model import Observer, Observable, ObjectIO, ObjectPresenter
+from ..model import Observer, Observable, Object, ObjectPresenter
 from ..view import ImageView, ObjectInitializerView, ObjectParametersView
-
+from .data_file import FileDialogFactory
 from .image import ImageController
 
 
@@ -17,7 +16,8 @@ class ObjectInitializerController(Observer):
         self._initComboBoxModel = QStandardItemModel()
 
     @classmethod
-    def createInstance(cls, presenter: ObjectPresenter, view: ObjectInitializerView):
+    def createInstance(cls, presenter: ObjectPresenter,
+                       view: ObjectInitializerView) -> ObjectInitializerController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -40,42 +40,46 @@ class ObjectInitializerController(Observer):
 
 
 class ObjectParametersController:
-    def __init__(self, presenter: ObjectPresenter, view: ObjectParametersView) -> None:
+    def __init__(self, presenter: ObjectPresenter, view: ObjectParametersView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
         self._view = view
+        self._fileDialogFactory = fileDialogFactory
         self._initializerController = ObjectInitializerController.createInstance(
             presenter, view.initializerView)
 
     @classmethod
-    def createInstance(cls, presenter: ObjectPresenter, view: ObjectParametersView):
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: ObjectPresenter, view: ObjectParametersView,
+                       fileDialogFactory: FileDialogFactory) -> ObjectParametersController:
+        controller = cls(presenter, view, fileDialogFactory)
         return controller
 
     def openObject(self) -> None:
-        fileName, _ = QFileDialog.getOpenFileName(self._view, 'Open Object', str(Path.home()),
-                                                  ObjectIO.FILE_FILTER)
+        filePath = self._fileDialogFactory.getOpenFilePath(self._view, 'Open Object',
+                                                           Object.FILE_FILTER)
 
-        if fileName:
-            filePath = Path(fileName)
+        if filePath:
             self._presenter.openObject(filePath)
 
     def saveObject(self) -> None:
-        fileName, _ = QFileDialog.getSaveFileName(self._view, 'Save Object', str(Path.home()),
-                                                  ObjectIO.FILE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Object',
+                                                           Object.FILE_FILTER)
 
-        if fileName:
-            filePath = Path(fileName)
+        if filePath:
             self._presenter.saveObject(filePath)
 
 
 class ObjectImageController(Observer):
-    def __init__(self, presenter: ObjectPresenter, view: ImageView) -> None:
+    def __init__(self, presenter: ObjectPresenter, view: ImageView,
+                 fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._presenter = presenter
-        self._image_controller = ImageController.createInstance(view)
+        self._image_controller = ImageController.createInstance(view, fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, presenter: ObjectPresenter, view: ImageView):
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: ObjectPresenter, view: ImageView,
+                       fileDialogFactory: FileDialogFactory) -> ObjectImageController:
+        controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
         controller.renderImageData()
         view.imageRibbon.frameGroupBox.setVisible(False)

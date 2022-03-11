@@ -1,10 +1,7 @@
-from pathlib import Path
-
 from PyQt5.QtWidgets import QApplication, QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
-
 from .data_file import *
 from .detector import *
 from .object import *
@@ -21,49 +18,53 @@ class ControllerCore:
         self.model = model
         self.view = view
 
+        self._fileDialogFactory = FileDialogFactory()
+
         self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(model.ptychopyBackend)
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeBackend)
 
         self._importSettingsController = ImportSettingsController.createInstance(
-            model.importSettingsPresenter, view.importSettingsDialog)
+            model.velociprobePresenter, view.importSettingsDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
                                                                      model.settingsPresenter,
                                                                      view.settingsGroupView,
-                                                                     view.settingsEntryView)
-        self._detectorParametersController = DetectorParametersController.createInstance(
-            model.detectorParametersPresenter, view.detectorParametersView.detectorView)
-        self._detectorDatasetController = DetectorDatasetController.createInstance(
-            model.detectorDatasetPresenter, model.detectorImagePresenter,
+                                                                     view.settingsEntryView,
+                                                                     self._fileDialogFactory)
+        self._detectorController = DetectorController.createInstance(
+            model.detectorPresenter, view.detectorParametersView.detectorView)
+        self._datasetController = DatasetController.createInstance(
+            model.velociprobePresenter, model.detectorImagePresenter,
             view.detectorParametersView.datasetView)
-        self._detectorImageCropController = DetectorImageCropController.createInstance(
-            model.detectorParametersPresenter, view.detectorParametersView.imageCropView)
+        self._cropController = CropController.createInstance(
+            model.cropPresenter, view.detectorParametersView.imageCropView)
         self._detectorImageController = DetectorImageController.createInstance(
-            model.detectorImagePresenter, view.detectorImageView)
+            model.detectorImagePresenter, view.detectorImageView, self._fileDialogFactory)
         self._probeParametersController = ProbeParametersController.createInstance(
-            model.probePresenter, view.probeParametersView)
+            model.probePresenter, view.probeParametersView, self._fileDialogFactory)
         self._probeImageController = ProbeImageController.createInstance(
-            model.probePresenter, view.probeImageView)
+            model.probePresenter, view.probeImageView, self._fileDialogFactory)
         self._scanParametersController = ScanParametersController.createInstance(
-            model.scanPresenter, view.scanParametersView)
+            model.scanPresenter, view.scanParametersView.scanView, self._fileDialogFactory)
         self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter,
                                                                      view.scanPlotView)
         self._objectParametersController = ObjectParametersController.createInstance(
-            model.objectPresenter, view.objectParametersView)
+            model.objectPresenter, view.objectParametersView, self._fileDialogFactory)
         self._objectImageController = ObjectImageController.createInstance(
-            model.objectPresenter, view.objectImageView)
+            model.objectPresenter, view.objectImageView, self._fileDialogFactory)
         self._dataFileController = DataFileController.createInstance(model.dataFilePresenter,
                                                                      model.h5FileTreeReader,
                                                                      view.dataFileTreeView,
-                                                                     view.dataFileTableView)
+                                                                     view.dataFileTableView,
+                                                                     self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter, view.reconstructorParametersView,
             [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
             model.reconstructorPresenter, view.reconstructorPlotView)
         self._monitorProbeController = ProbeImageController.createInstance(
-            model.probePresenter, view.monitorProbeView.imageView)
+            model.probePresenter, view.monitorProbeView.imageView, self._fileDialogFactory)
         self._monitorObjectController = ObjectImageController.createInstance(
-            model.objectPresenter, view.monitorObjectView.imageView)
+            model.objectPresenter, view.monitorObjectView.imageView, self._fileDialogFactory)
 
     @classmethod
     def createInstance(cls, model: ModelCore, view: ViewCore):

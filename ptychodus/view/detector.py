@@ -1,22 +1,29 @@
+from __future__ import annotations
+from typing import Optional
+
 from PyQt5.QtWidgets import QFormLayout, QGroupBox, QListView, QSizePolicy, QSpinBox, QVBoxLayout, QWidget
 
 from .image import ImageView
 from .widgets import LengthWidget
 
 
-class DetectorDetectorView(QGroupBox):
-    def __init__(self, parent: QWidget = None):
+class DetectorView(QGroupBox):
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
+        self.numberOfPixelsXSpinBox = QSpinBox()
+        self.numberOfPixelsYSpinBox = QSpinBox()
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
         self.detectorDistanceWidget = LengthWidget.createInstance()
         self.defocusDistanceWidget = LengthWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorView:
         view = cls(parent)
 
         layout = QFormLayout()
+        layout.addRow('Number of Pixels X:', view.numberOfPixelsXSpinBox)
+        layout.addRow('Number of Pixels Y:', view.numberOfPixelsYSpinBox)
         layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
         layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
         layout.addRow('Detector-Object Distance:', view.detectorDistanceWidget)
@@ -26,13 +33,13 @@ class DetectorDetectorView(QGroupBox):
         return view
 
 
-class DetectorDatasetView(QGroupBox):
-    def __init__(self, parent: QWidget = None):
+class DatasetView(QGroupBox):
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Data', parent)
         self.dataFileListView = QListView()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetView:
         view = cls(parent)
 
         view.dataFileListView.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
@@ -45,8 +52,8 @@ class DetectorDatasetView(QGroupBox):
         return view
 
 
-class DetectorImageCropView(QGroupBox):
-    def __init__(self, parent: QWidget = None):
+class CropView(QGroupBox):
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Image Crop', parent)
         self.centerXSpinBox = QSpinBox()
         self.centerYSpinBox = QSpinBox()
@@ -54,7 +61,7 @@ class DetectorImageCropView(QGroupBox):
         self.extentYSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: Optional[QWidget] = None) -> CropView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -68,14 +75,14 @@ class DetectorImageCropView(QGroupBox):
 
 
 class DetectorParametersView(QWidget):
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.detectorView = DetectorDetectorView.createInstance()
-        self.datasetView = DetectorDatasetView.createInstance()
-        self.imageCropView = DetectorImageCropView.createInstance()
+        self.detectorView = DetectorView.createInstance()
+        self.datasetView = DatasetView.createInstance()
+        self.imageCropView = CropView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None):
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorParametersView:
         view = cls(parent)
 
         view.datasetView.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)

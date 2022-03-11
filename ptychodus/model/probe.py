@@ -1,11 +1,14 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from decimal import Decimal
+from pathlib import Path
 from typing import Callable
 
 import numpy
 
 from .detector import DetectorSettings
 from .fzp import single_probe
+from .crop import CropSizer
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 
@@ -16,7 +19,9 @@ class ProbeSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Gaussian')
         self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
-        self.probeShape = settingsGroup.createIntegerEntry('ProbeShape', 64)
+        self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
+            'AutomaticProbeSizeEnabled', True)
+        self.probeSize = settingsGroup.createIntegerEntry('ProbeSize', 64)
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
             'ProbeEnergyInElectronVolts', '2000')
         self.probeDiameterInMeters = settingsGroup.createRealEntry('ProbeDiameterInMeters',
@@ -29,7 +34,7 @@ class ProbeSettings(Observable, Observer):
             'BeamstopDiameterInMeters', '60e-6')
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry):
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> ProbeSettings:
         settings = cls(settingsRegistry.createGroup('Probe'))
         settings._settingsGroup.addObserver(settings)
         return settings
@@ -39,21 +44,53 @@ class ProbeSettings(Observable, Observer):
             self.notifyObservers()
 
 
+class ProbeSizer(Observable, Observer): # FIXME use this
+    def __init__(self, settings: ProbeSettings, cropSizer: CropSizer) -> None:
+        super().__init__()
+        self._settings = settings
+        self._cropSizer = cropSizer
+
+    @classmethod
+    def createInstance(cls, settings: ProbeSettings, cropSizer: CropSizer) -> ProbeSizer:
+        sizer = cls(settings, cropSizer)
+        settings.addObserver(sizer)
+        cropSizer.addObserver(sizer)
+        return sizer
+
+    def getProbeSizeLimits(self) -> Interval[int]:
+        cropX = self._cropSizer.getExtentX()
+        cropY = self._cropSizer.getExtentY()
+        probeSizeMax = min(cropX, cropY)
+        return Interval[int](1, probeSizeMax)
+
+    def getProbeSize(self) -> int:
+        return self._settings.probeSize.value
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self.notifyObservers()
+        elif observable is self._cropSizer:
+            self.notifyObservers()
+
+
 class Probe(Observable, Observer):
+    FILE_FILTER = 'NumPy Binary Files (*.npy)'
+
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__()
         self._settings = settings
+        self._array = numpy.zeros((0, 0), dtype=complex)
 
     @classmethod
     def createInstance(cls, settings: ProbeSettings) -> Probe:
         probe = cls(settings)
-        settings.probeShape.addObserver(probe)
+        settings.probeSize.addObserver(probe)
         settings.probeEnergyInElectronVolts.addObserver(probe)
         return probe
 
     @property
-    def extentInPixels(self) -> int:
-        return self._settings.probeShape.value
+    def extentInPixels(self) -> int: # FIXME REMOVE
+        return self._settings.probeSize.value
 
     @property
     def wavelengthInMeters(self) -> Decimal:
@@ -64,45 +101,61 @@ class Probe(Observable, Observer):
         probe_wavelength_m = hc_eVm / self._settings.probeEnergyInElectronVolts.value
         return probe_wavelength_m
 
+    def getArray(self) -> numpy.ndarray:
+        return self._array
+
+    def setArray(self, array: numpy.ndarray) -> None:
+        if not numpy.iscomplexobj(array):
+            raise TypeError('Probe must be a complex-valued ndarray')
+
+        self._array = array
+        self.notifyObservers()
+
+    def read(self, filePath: Path) -> None:
+        self._settings.customFilePath.value = filePath
+        array = numpy.load(filePath)
+        self.setArray(array)
+
+    def write(self, filePath: Path) -> None:
+        numpy.save(filePath, self._array)
+
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.probeShape:
+        if observable is self._settings.probeSize:
             self.notifyObservers()
         elif observable is self._settings.probeEnergyInElectronVolts:
             self.notifyObservers()
 
 
-class ProbeIO:
-    FILE_FILTER = 'NumPy Binary Files (*.npy)'
-
-    def write(self, filePath: Path, estimate: numpy.ndarray) -> None:
-        numpy.save(filePath, estimate)
-
-    def read(self, filePath: Path) -> numpy.ndarray:
-        return numpy.load(filePath)
-
-
-class GaussianBeamProbeInitializer(Callable):
+class GaussianBeamProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings) -> None:
         super().__init__()
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
 
+    def _createCircularMask(self) -> numpy.ndarray:
+        width_px = self._probeSettings.probeSize.value
+        height_px = width_px
+
+        Y_px, X_px = numpy.ogrid[:height_px, :width_px]
+        X_m = (X_px - width_px / 2) * float(self._detectorSettings.pixelSizeXInMeters.value)
+        Y_m = (Y_px - height_px / 2) * float(self._detectorSettings.pixelSizeYInMeters.value)
+
+        probeRadius_m = self._probeSettings.probeDiameterInMeters.value / 2
+        R_m = numpy.hypot(X_m, Y_m)
+
+        return (R_m <= probeRadius_m)
+
     def __call__(self) -> numpy.ndarray:
-        probeShape = self._probeSettings.probeShape.value
-        idx = numpy.arange(probeShape) + (1 - probeShape) / 2
-        w_m = self._probeSettings.probeDiameterInMeters.value
-        x = idx * float(self._detectorSettings.pixelSizeXInMeters.value / w_m)
-        y = idx * float(self._detectorSettings.pixelSizeYInMeters.value / w_m)
-        xx, yy = numpy.meshgrid(x, y)
-        rr_sq = xx**2 + yy**2
-        ff = numpy.exp(-rr_sq / 2) + 0.j
-        return ff / ff.sum()
+        mask = self._createCircularMask()
+        ft = numpy.fft.fft2(mask)
+        ft = numpy.fft.fftshift(ft)
+        return ft
 
     def __str__(self) -> str:
         return 'Gaussian Beam'
 
 
-class FresnelZonePlateProbeInitializer(Callable):
+class FresnelZonePlateProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
                  probe: Probe) -> None:
         super().__init__()
@@ -111,7 +164,7 @@ class FresnelZonePlateProbeInitializer(Callable):
         self._probe = probe
 
     def __call__(self) -> numpy.ndarray:
-        shape = self._probeSettings.probeShape.value
+        shape = self._probeSettings.probeSize.value
         lambda0 = self._probe.wavelengthInMeters
         dx_dec = self._detectorSettings.pixelSizeXInMeters.value  # TODO non-square pixels are unsupported
         dis_defocus = self._detectorSettings.defocusDistanceInMeters.value
@@ -134,16 +187,16 @@ class FresnelZonePlateProbeInitializer(Callable):
         return 'Fresnel Zone Plate'
 
 
-class CustomProbeInitializer(Callable):
+class CustomProbeInitializer:
     def __init__(self) -> None:
         super().__init__()
         self._initialProbe = numpy.zeros((64, 64), dtype=complex)
 
-    def setInitialProbe(self, initialProbe: numpy.ndarray) -> None:
-        if not numpy.iscomplexobj(initialProbe):
+    def cacheProbe(self, probe: numpy.ndarray) -> None:
+        if not numpy.iscomplexobj(probe):
             raise TypeError('Probe must be a complex-valued ndarray')
 
-        self._initialProbe = initialProbe
+        self._probe = probe
 
     def __call__(self) -> numpy.ndarray:
         return self._initialProbe
@@ -156,14 +209,12 @@ class ProbePresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
     def __init__(self, settings: ProbeSettings, probe: Probe,
-                 initializerList: list[Callable]) -> None:
+                 initializerList: Sequence[Callable]) -> None:
         super().__init__()
         self._settings = settings
         self._probe = probe
         self._initializerList = initializerList
         self._initializer = initializerList[0]
-        self._estimate = numpy.zeros((0, 0), dtype=complex)
-        self._probeIO = ProbeIO()
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
@@ -203,32 +254,31 @@ class ProbePresenter(Observable, Observer):
         self.setCurrentInitializer(self._settings.initializer.value)
 
     def openProbe(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        initialProbe = self._probeIO.read(filePath)
+        self._probe.read(filePath)
         self.setCurrentInitializer('Custom')
-        self._initializer.setInitialProbe(initialProbe)
-        self.initializeProbe()
-
-    def saveProbe(self, filePath: Path) -> None:
-        self._probeIO.write(filePath, self._estimate)
-
-    def initializeProbe(self) -> None:
-        self._estimate = self._initializer()
+        self._initializer.cacheProbe(self._probe.getArray())
         self.notifyObservers()
 
-    def getProbeMinShape(self) -> int:
+    def saveProbe(self, filePath: Path) -> None:
+        self._probe.write(filePath)
+
+    def initializeProbe(self) -> None:
+        self._probe.setArray(self._initializer())
+        self.notifyObservers()
+
+    def getProbeMinSize(self) -> int:
         return 0
 
-    def getProbeMaxShape(self) -> int:
+    def getProbeMaxSize(self) -> int:
         return self.MAX_INT
 
-    def setProbeShape(self, value: int) -> None:
-        self._settings.probeShape.value = value
+    def setProbeSize(self, value: int) -> None:
+        self._settings.probeSize.value = value
 
-    def getProbeShape(self) -> int:
-        valueMin = self.getProbeMinShape()
-        valueMax = self.getProbeMaxShape()
-        value = self._settings.probeShape.value
+    def getProbeSize(self) -> int:
+        valueMin = self.getProbeMinSize()
+        valueMax = self.getProbeMaxSize()
+        value = self._settings.probeSize.value
         valueClamp = max(valueMin, min(value, valueMax))
         return valueClamp
 
@@ -266,7 +316,7 @@ class ProbePresenter(Observable, Observer):
         return self._settings.beamstopDiameterInMeters.value
 
     def getProbe(self) -> numpy.ndarray:
-        return self._estimate
+        return self._probe.getArray()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.initializer:

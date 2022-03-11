@@ -1,16 +1,19 @@
 from decimal import Decimal
 
 from PyQt5.QtGui import QDoubleValidator, QStandardItem, QStandardItemModel
-from PyQt5.QtWidgets import QFileDialog
 
-from ..model import *
-from ..view import ScanParametersView, ScanPlotView
+from ..model import Observer, Observable, ScanPointIO, ScanPresenter
+from ..view import ScanScanView, ScanPlotView
+from .data_file import FileDialogFactory
 
 
 class ScanParametersController(Observer):
-    def __init__(self, presenter: ScanPresenter, view: ScanParametersView) -> None:
+    def __init__(self, presenter: ScanPresenter, view: ScanScanView,
+                 fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
+        self._fileDialogFactory = fileDialogFactory
 
     @staticmethod
     def createPositiveRealValidator() -> QDoubleValidator:
@@ -19,8 +22,9 @@ class ScanParametersController(Observer):
         return validator
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanParametersView):
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: ScanPresenter, view: ScanScanView,
+                       fileDialogFactory: FileDialogFactory):
+        controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
         for initializer in presenter.getScanSequenceList():
@@ -52,19 +56,17 @@ class ScanParametersController(Observer):
         return controller
 
     def openScan(self) -> None:
-        fileName, _ = QFileDialog.getOpenFileName(self._view, 'Open Scan', str(Path.home()),
-                                                  ScanPointIO.FILE_FILTER)
+        filePath = self._fileDialogFactory.getOpenFilePath(self._view, 'Open Scan',
+                                                           ScanPointIO.FILE_FILTER)
 
-        if fileName:
-            filePath = Path(fileName)
+        if filePath:
             self._presenter.openScan(filePath)
 
     def saveScan(self) -> None:
-        fileName, _ = QFileDialog.getSaveFileName(self._view, 'Save Scan', str(Path.home()),
-                                                  ScanPointIO.FILE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Scan',
+                                                           ScanPointIO.FILE_FILTER)
 
-        if fileName:
-            filePath = Path(fileName)
+        if filePath:
             self._presenter.saveScan(filePath)
 
     def _syncModelToView(self) -> None:
@@ -103,6 +105,7 @@ class ScanParametersController(Observer):
 
 class ScanPlotController(Observer):
     def __init__(self, presenter: ScanPresenter, view: ScanPlotView) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
 

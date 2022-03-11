@@ -1,8 +1,11 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from ..model import Observer, Observable
-from ..view import TikeParametersView
+from PyQt5.QtWidgets import QWidget
+
+from ..model import Observable, Observer  # FIXME, TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter
+from ..view import TikeAdaptiveMomentView, TikeBasicParametersView, TikeObjectCorrectionView, \
+        TikeParametersView, TikePositionCorrectionView, TikeProbeCorrectionView
 from .reconstructor import ReconstructorViewControllerFactory
 
 
@@ -192,18 +195,27 @@ class TikePositionCorrectionController(Observer):
             self._syncModelToView()
 
 
-class TikeIterationController(Observer):
-    def __init__(self, presenter: TikeIterationPresenter, view: TikeIterationView) -> None:
+class TikeBasicParametersController(Observer):
+    def __init__(self, presenter: TikePresenter, view: TikeBasicParametersView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: TikeIterationPresenter,
-                       view: TikeIterationView) -> TikeIterationController:
+    def createInstance(cls, presenter: TikePresenter,
+                       view: TikeBasicParametersView) -> TikeBasicParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        for model in presenter.getNoiseModelList():
+            view.noiseModelComboBox.addItem(model)
+
+        view.useMpiCheckBox.setVisible(False)  # TODO make visible when supported
+        view.useMpiCheckBox.toggled.connect(presenter.setMpiEnabled)
+        view.numGpusSpinBox.valueChanged.connect(presenter.setNumGpus)
+        view.noiseModelComboBox.currentTextChanged.connect(presenter.setNoiseModel)
+
+        view.numProbeModesSpinBox.valueChanged.connect(presenter.setNumProbeModes)
         view.numBatchSpinBox.valueChanged.connect(presenter.setNumBatch)
         view.numIterSpinBox.valueChanged.connect(presenter.setNumIter)
         view.cgIterSpinBox.valueChanged.connect(presenter.setCgIter)
@@ -221,6 +233,22 @@ class TikeIterationController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.useMpiCheckBox.setChecked(self._presenter.isMpiEnabled())
+
+        self._view.numGpusSpinBox.blockSignals(True)
+        self._view.numGpusSpinBox.setRange(self._presenter.getMinNumGpus(),
+                                           self._presenter.getMaxNumGpus())
+        self._view.numGpusSpinBox.setValue(self._presenter.getNumGpus())
+        self._view.numGpusSpinBox.blockSignals(False)
+
+        self._view.noiseModelComboBox.setCurrentText(self._presenter.getNoiseModel())
+
+        self._view.numProbeModesSpinBox.blockSignals(True)
+        self._view.numProbeModesSpinBox.setRange(self._presenter.getMinNumProbeModes(),
+                                                 self._presenter.getMaxNumProbeModes())
+        self._view.numProbeModesSpinBox.setValue(self._presenter.getNumProbeModes())
+        self._view.numProbeModesSpinBox.blockSignals(False)
+
         self._view.numBatchSpinBox.blockSignals(True)
         self._view.numBatchSpinBox.setRange(self._presenter.getMinNumBatch(),
                                             self._presenter.getMaxNumBatch())
@@ -266,8 +294,8 @@ class TikeParametersController:
             model.probeCorrectionPresenter, view.probeCorrectionView)
         self._objectCorrectionController = TikeObjectCorrectionController.createInstance(
             model.objectCorrectionPresenter, view.objectCorrectionView)
-        self._iterationOptionsController = TikeIterationController.createInstance(
-            model.iterationPresenter, view.iterationOptionsView)
+        self._basicParametersController = TikeBasicParametersController.createInstance(
+            model.presenter, view.basicParametersView)
 
     @classmethod
     def createInstance(cls, model: TikeBackend,
@@ -278,6 +306,7 @@ class TikeParametersController:
 
 class TikeViewControllerFactory(ReconstructorViewControllerFactory):
     def __init__(self, model: TikeBackend) -> None:
+        super().__init__()
         self._model = model
         self._controllerList: list[TikeParametersController] = list()
 
@@ -305,7 +334,9 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
                                                      showAlpha=False,
                                                      showStepLength=False)
         else:
-            view = TikeParametersView.createInstance()
+            view = TikeParametersView.createInstance(showCgIter=True,
+                                                     showAlpha=True,
+                                                     showStepLength=True)
 
         controller = TikeParametersController.createInstance(self._model, view)
         self._controllerList.append(controller)

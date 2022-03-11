@@ -1,50 +1,31 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from pathlib import Path
+from typing import Optional, Tuple
+import logging
 
 import h5py
+import numpy
 
-from .data_file import DataFileReader
+from .crop import CropSettings
+from .data_file import DataFile, DataFileReader
+from .detector import DetectorSettings
+from .image import ImageSequence
 from .observer import Observable, Observer
+from .probe import ProbeSettings
+from .settings import SettingsGroup
 
-
-class DatasetState(Enum):
-    MISSING = auto()
-    FOUND = auto()
-    VALID = auto()
-
-
-@dataclass(frozen=True)
-class Datafile:
-    name: str
-    filePath: Path
-    dataPath: str
-
-    def getState(self) -> DatasetState:
-        state = DatasetState.MISSING
-
-        if self.filePath.is_file():
-            state = DatasetState.FOUND
-
-            try:
-                with h5py.File(self.filePath, 'r') as h5File:
-                    if self.dataPath in h5File:
-                        state = DatasetState.VALID
-            except OSError:
-                pass
-
-        return state
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class DataGroup:
-    datafileList: list[Datafile] = field(default_factory=list)
+    datafileList: list[DataFile] = field(default_factory=list)
 
     def __iter__(self):
         return iter(self.datafileList)
 
-    def __getitem__(self, index: int) -> Datafile:
+    def __getitem__(self, index: int) -> DataFile:
         return self.datafileList[index]
 
     def __len__(self) -> int:
@@ -59,15 +40,8 @@ class DetectorSpecificGroup:
 
 
 @dataclass(frozen=True)
-class ModuleGroup:
-    x_data_size: int
-    y_data_size: int
-
-
-@dataclass(frozen=True)
 class DetectorGroup:
     detectorSpecific: DetectorSpecificGroup
-    module: ModuleGroup
     detector_distance_m: float
     beam_center_x_px: int
     beam_center_y_px: int
@@ -93,25 +67,29 @@ class SampleGroup:
 
 @dataclass(frozen=True)
 class EntryGroup:
-    data: DataGroup
-    instrument: InstrumentGroup
-    sample: SampleGroup
+    data: Optional[DataGroup]
+    instrument: Optional[InstrumentGroup]
+    sample: Optional[SampleGroup]
 
 
 class VelociprobeReader(DataFileReader, Observable):
     def __init__(self) -> None:
         super().__init__()
-        self.entryGroup = None
+        self.masterFilePath: Optional[Path] = None
+        self.entryGroup: Optional[EntryGroup] = None
 
-    def _readDataGroup(self, h5DataGroup: h5py.Group, masterFilePath: Path) -> DataGroup:
+    def _readDataGroup(self, h5DataGroup: Optional[h5py.Group]) -> Optional[DataGroup]:
+        if h5DataGroup is None:
+            return None
+
         datafileList = list()
 
         for name, h5Item in h5DataGroup.items():
             h5Item = h5DataGroup.get(name, getlink=True)
 
             if isinstance(h5Item, h5py.ExternalLink):
-                datafile = Datafile(name=name,
-                                    filePath=masterFilePath.parent / h5Item.filename,
+                datafile = DataFile(name=name,
+                                    filePath=self.masterFilePath.parent / h5Item.filename,
                                     dataPath=str(h5Item.path))
                 datafileList.append(datafile)
 
@@ -120,10 +98,12 @@ class VelociprobeReader(DataFileReader, Observable):
         return DataGroup(datafileList)
 
     @staticmethod
-    def _readInstrumentGroup(h5InstrumentGroup: h5py.Group) -> InstrumentGroup:
+    def _readInstrumentGroup(h5InstrumentGroup: Optional[h5py.Group]) -> Optional[InstrumentGroup]:
+        if h5InstrumentGroup is None:
+            return None
+
         h5DetectorGroup = h5InstrumentGroup['detector']
         h5DetectorSpecificGroup = h5DetectorGroup['detectorSpecific']
-        h5ModuleGroup = h5DetectorGroup['module']
 
         h5PhotonEnergy = h5DetectorSpecificGroup['photon_energy']
         assert h5PhotonEnergy.attrs['units'] == b'eV'
@@ -133,11 +113,6 @@ class VelociprobeReader(DataFileReader, Observable):
         detectorSpecific = DetectorSpecificGroup(photon_energy_eV=h5PhotonEnergy[()],
                                                  x_pixels_in_detector=h5XPixelsInDetector[()],
                                                  y_pixels_in_detector=h5YPixelsInDetector[()])
-
-        h5DataSize = h5ModuleGroup['data_size']
-        assert len(h5DataSize) == 2
-
-        module = ModuleGroup(x_data_size=h5DataSize[0], y_data_size=h5DataSize[1])
 
         h5DetectorDistance = h5DetectorGroup['detector_distance']
         assert h5DetectorDistance.attrs['units'] == b'm'
@@ -152,7 +127,6 @@ class VelociprobeReader(DataFileReader, Observable):
         assert h5YPixelSize.attrs['units'] == b'm'
 
         detector = DetectorGroup(detectorSpecific=detectorSpecific,
-                                 module=module,
                                  detector_distance_m=h5DetectorDistance[()],
                                  beam_center_x_px=h5BeamCenterX[()],
                                  beam_center_y_px=h5BeamCenterY[()],
@@ -163,7 +137,10 @@ class VelociprobeReader(DataFileReader, Observable):
         return InstrumentGroup(detector=detector)
 
     @staticmethod
-    def _readSampleGroup(h5SampleGroup: h5py.Group) -> SampleGroup:
+    def _readSampleGroup(h5SampleGroup: Optional[h5py.Group]) -> Optional[SampleGroup]:
+        if h5SampleGroup is None:
+            return None
+
         h5GoniometerGroup = h5SampleGroup['goniometer']
 
         h5ChiDataset = h5GoniometerGroup['chi']
@@ -173,11 +150,192 @@ class VelociprobeReader(DataFileReader, Observable):
         return SampleGroup(goniometer=goniometer)
 
     def read(self, rootGroup: h5py.Group) -> None:
-        masterFilePath = Path(rootGroup.filename)
+        self.masterFilePath = Path(rootGroup.filename)
+        h5EntryGroup = rootGroup.get('entry')
 
-        h5EntryGroup = rootGroup['entry']
-        self.entryGroup = EntryGroup(
-            data=self._readDataGroup(h5EntryGroup['data'], masterFilePath),
-            instrument=self._readInstrumentGroup(h5EntryGroup['instrument']),
-            sample=self._readSampleGroup(h5EntryGroup['sample']))
+        if h5EntryGroup:
+            dataGroup = self._readDataGroup(h5EntryGroup.get('data'))
+            instrumentGroup = self._readInstrumentGroup(h5EntryGroup.get('instrument'))
+            sampleGroup = self._readSampleGroup(h5EntryGroup.get('sample'))
+            self.entryGroup = EntryGroup(data=dataGroup,
+                                         instrument=instrumentGroup,
+                                         sample=sampleGroup)
+        else:
+            logger.debug(f'File {self.masterFilePath} is not a velociprobe data file.')
+            self.entryGroup = None
+
         self.notifyObservers()
+
+
+class VelociprobeImageSequence(ImageSequence):
+    def __init__(self, velociprobeReader: VelociprobeReader) -> None:
+        super().__init__()
+        self._velociprobeReader = velociprobeReader
+        self._datasetImageList: list[numpy.ndarray] = list()
+        self._datasetIndex = -1
+
+    @classmethod
+    def createInstance(cls, velociprobeReader: VelociprobeReader) -> VelociprobeImageSequence:
+        imageSequence = cls(velociprobeReader)
+        imageSequence._updateImages()
+        velociprobeReader.addObserver(imageSequence)
+        return imageSequence
+
+    def setCurrentDatasetIndex(self, index: int) -> None:
+        if index < 0:
+            raise IndexError('Current dataset index must be non-negative.')
+
+        self._datasetIndex = index
+        self._updateImages()
+
+    def getCurrentDatasetIndex(self) -> int:
+        return self._datasetIndex
+
+    def getWidth(self) -> int:
+        value = 0
+
+        if self._datasetImageList:
+            value = self._datasetImageList[0].shape[1]
+
+        return value
+
+    def getHeight(self) -> int:
+        value = 0
+
+        if self._datasetImageList:
+            value = self._datasetImageList[0].shape[0]
+
+        return value
+
+    def __getitem__(self, index: int) -> numpy.ndarray:
+        return self._datasetImageList[index]
+
+    def __len__(self) -> int:
+        return len(self._datasetImageList)
+
+    def _updateImages(self) -> None:
+        self._datasetImageList = list()
+
+        if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.data:
+            if self._datasetIndex >= len(self._velociprobeReader.entryGroup.data):
+                self._datasetIndex = 0
+        else:
+            self._datasetIndex = 0
+            return
+
+        datafile = self._velociprobeReader.entryGroup.data[self._datasetIndex]
+
+        if datafile.filePath.is_file():
+            logger.debug(f'Reading {datafile.filePath}/{datafile.dataPath}')
+
+            with h5py.File(datafile.filePath, 'r') as h5File:
+                item = h5File.get(datafile.dataPath)
+
+                if isinstance(item, h5py.Dataset):
+                    data = item[()]
+
+                    for imslice in data:
+                        image = numpy.copy(imslice)
+                        self._datasetImageList.append(image)
+                else:
+                    logger.error('Data path does not refer to a dataset.')
+        else:
+            logger.error(f'File {datafile.filePath} not found.')
+
+        self.notifyObservers()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._velociprobeReader:
+            self._updateImages()
+
+
+class VelociprobePresenter(Observable, Observer):
+    def __init__(self, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
+                 cropSettings: CropSettings, probeSettings: ProbeSettings) -> None:
+        super().__init__()
+        self._velociprobeReader = velociprobeReader
+        self._detectorSettings = detectorSettings
+        self._cropSettings = cropSettings
+        self._probeSettings = probeSettings
+
+    @classmethod
+    def createInstance(cls, velociprobeReader: VelociprobeReader,
+                       detectorSettings: DetectorSettings, cropSettings: CropSettings,
+                       probeSettings: ProbeSettings):
+        presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings)
+        velociprobeReader.addObserver(presenter)
+        return presenter
+
+    def getDatasetName(self, index: int) -> str:
+        datafile = self._velociprobeReader.entryGroup.data[index]
+        return datafile.name
+
+    def getDatasetState(self, index: int) -> DatasetState:
+        datafile = self._velociprobeReader.entryGroup.data[index]
+        return datafile.getState()
+
+    def getNumberOfDatasets(self) -> int:
+        return 0 if self._velociprobeReader.entryGroup is None \
+                else len(self._velociprobeReader.entryGroup.data)
+
+    @property
+    def _detectorGroup(self) -> DetectorGroup:
+        return self._velociprobeReader.entryGroup.instrument.detector
+
+    @property
+    def _detectorSpecificGroup(self) -> DetectorSpecificGroup:
+        return self._detectorGroup.detectorSpecific
+
+    def syncDetectorPixelCount(self) -> None:
+        self._detectorSettings.numberOfPixelsX.value = \
+                self._detectorSpecificGroup.x_pixels_in_detector
+        self._detectorSettings.numberOfPixelsY.value = \
+                self._detectorSpecificGroup.y_pixels_in_detector
+
+    def syncDetectorPixelSize(self) -> None:
+        self._detectorSettings.pixelSizeXInMeters.value = \
+                SettingsGroup.convertFloatToDecimal(self._detectorGroup.x_pixel_size_m)
+        self._detectorSettings.pixelSizeYInMeters.value = \
+                SettingsGroup.convertFloatToDecimal(self._detectorGroup.y_pixel_size_m)
+
+    def syncDetectorDistance(self, overrideDistanceUnits: bool = False) -> None:
+        value = SettingsGroup.convertFloatToDecimal(self._detectorGroup.detector_distance_m)
+
+        if overrideDistanceUnits:
+            value /= 1000
+
+        self._detectorSettings.detectorDistanceInMeters.value = value
+
+    def syncImageCrop(self, syncCenter: bool, syncExtent: bool) -> None:
+        if syncCenter:
+            self._cropSettings.centerXInPixels.value = \
+                    int(round(self._detectorGroup.beam_center_x_px))
+            self._cropSettings.centerYInPixels.value = \
+                    int(round(self._detectorGroup.beam_center_y_px))
+
+        if syncExtent:
+            centerX = self._cropSettings.centerXInPixels.value
+            centerY = self._cropSettings.centerYInPixels.value
+
+            extentX = self._detectorSpecificGroup.x_pixels_in_detector
+            extentY = self._detectorSpecificGroup.y_pixels_in_detector
+
+            maxRadiusX = min(centerX, extentX - centerX)
+            maxRadiusY = min(centerY, extentY - centerY)
+            maxRadius = min(maxRadiusX, maxRadiusY)
+            cropDiameterInPixels = 1
+
+            while cropDiameterInPixels < maxRadius:
+                cropDiameterInPixels <<= 1
+
+            self._cropSettings.extentXInPixels.value = cropDiameterInPixels
+            self._cropSettings.extentYInPixels.value = cropDiameterInPixels
+
+    def syncProbeEnergy(self) -> None:
+        self._probeSettings.probeEnergyInElectronVolts.value = \
+                SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._velociprobeReader and self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.instrument:
+            self._detectorSettings.dataPath.value = self._velociprobeReader.masterFilePath
+            self.notifyObservers()
