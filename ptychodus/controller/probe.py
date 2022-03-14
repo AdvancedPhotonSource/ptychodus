@@ -20,6 +20,7 @@ class ProbeProbeController(Observer):
         presenter.addObserver(controller)
 
         view.sizeSpinBox.valueChanged.connect(presenter.setProbeSize)
+        view.sizeSpinBox.autoToggled.connect(presenter.setAutomaticProbeSizeEnabled)
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setEnabled(False)
         view.diameterWidget.lengthChanged.connect(presenter.setProbeDiameterInMeters)
@@ -29,9 +30,10 @@ class ProbeProbeController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.sizeSpinBox.setAutomatic(self._presenter.isAutomaticProbeSizeEnabled())
         self._view.sizeSpinBox.setValueAndRange(self._presenter.getProbeSize(),
-                                                 self._presenter.getProbeMinSize(),
-                                                 self._presenter.getProbeMaxSize())
+                                                self._presenter.getProbeMinSize(),
+                                                self._presenter.getProbeMaxSize())
         self._view.energyWidget.setEnergyInElectronVolts(
             self._presenter.getProbeEnergyInElectronVolts())
         self._view.wavelengthWidget.setLengthInMeters(self._presenter.getProbeWavelengthInMeters())

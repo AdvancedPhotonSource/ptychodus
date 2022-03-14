@@ -37,25 +37,27 @@ class ObjectSettings(Observable, Observer):
 
 
 class ObjectSizer(Observable, Observer):
-    def __init__(self, scanSequence: ScanSequence, detector: Detector, probe: Probe) -> None:
+    def __init__(self, scanSequence: ScanSequence, detector: Detector,
+                 probeSizer: ProbeSizer) -> None:
         super().__init__()
         self._scanSequence = scanSequence
         self._detector = detector
-        self._probe = probe
+        self._probeSizer = probeSizer
         self._scanBoundingBoxInMeters = self._scanSequence.getBoundingBox()
 
     @classmethod
     def createInstance(cls, scanSequence: ScanSequence, detector: Detector,
-                       probe: Probe) -> ObjectSizer:
-        sizer = cls(scanSequence, detector, probe)
+                       probeSizer: ProbeSizer) -> ObjectSizer:
+        sizer = cls(scanSequence, detector, probeSizer)
         scanSequence.addObserver(sizer)
         detector.addObserver(sizer)
-        probe.addObserver(sizer)
+        probeSizer.addObserver(sizer)
         return sizer
 
     @property
     def objectPlanePixelShapeInMeters(self) -> Tuple[Decimal, Decimal]:
-        lambdaZ_m2 = self._probe.wavelengthInMeters * self._detector.distanceToObjectInMeters
+        lambdaZ_m2 = self._probeSizer.getWavelengthInMeters(
+        ) * self._detector.distanceToObjectInMeters
         px_m = lambdaZ_m2 / self._detector.extentXInMeters
         py_m = lambdaZ_m2 / self._detector.extentYInMeters
         return py_m, px_m
@@ -79,7 +81,7 @@ class ObjectSizer(Observable, Observer):
         return ImageExtent(width=scanWidth_px, height=scanHeight_px)
 
     def getPaddingExtent(self) -> ImageExtent:
-        pad = 2 * (self._probe.extentInPixels // 2)
+        pad = 2 * (self._probeSizer.getProbeSize() // 2)
         return ImageExtent(width=pad, height=pad)
 
     def getObjectExtent(self) -> ImageExtent:
@@ -94,7 +96,7 @@ class ObjectSizer(Observable, Observer):
             self._updateBoundingBox()
         elif observable is self._detector:
             self.notifyObservers()
-        elif observable is self._probe:
+        elif observable is self._probeSizer:
             self.notifyObservers()
 
 

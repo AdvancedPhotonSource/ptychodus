@@ -22,7 +22,7 @@ class BottomTitledGroupBox(QGroupBox):
             }""")
 
 
-class SemiautomaticSpinBox(QWidget):  # FIXME use this
+class SemiautomaticSpinBox(QWidget):
     valueChanged = pyqtSignal(int)
     autoToggled = pyqtSignal(bool)
 

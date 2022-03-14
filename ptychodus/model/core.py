@@ -39,9 +39,11 @@ class ModelCore:
                                                                     self._selectableScanSequence)
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
-        self._probe = Probe.createInstance(self._probeSettings)
+        self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._objectSizer = ObjectSizer.createInstance(self._scanSequence, self._detector,
-                                                       self._probe)
+                                                       self._probeSizer)
+
+        self._probe = Probe.createInstance(self._probeSettings)
         self._object = Object.createInstance(self._objectSettings)
 
         self.h5FileTreeReader = H5FileTreeReader()
@@ -74,7 +76,8 @@ class ModelCore:
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
             self._probeSettings)
         self.probePresenter = ProbePresenter.createInstance(self._detectorSettings,
-                                                            self._probeSettings, self._probe)
+                                                            self._probeSettings, self._probeSizer,
+                                                            self._probe)
         self.scanPresenter = ScanPresenter.createInstance(self._scanSettings,
                                                           self._selectableScanSequence,
                                                           self._scanSequence)

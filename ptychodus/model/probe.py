@@ -6,9 +6,10 @@ from typing import Callable
 
 import numpy
 
+from .crop import CropSizer
 from .detector import DetectorSettings
 from .fzp import single_probe
-from .crop import CropSizer
+from .geometry import Interval
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 
@@ -44,7 +45,7 @@ class ProbeSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class ProbeSizer(Observable, Observer): # FIXME use this
+class ProbeSizer(Observable, Observer):
     def __init__(self, settings: ProbeSettings, cropSizer: CropSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -57,23 +58,40 @@ class ProbeSizer(Observable, Observer): # FIXME use this
         cropSizer.addObserver(sizer)
         return sizer
 
-    def getProbeSizeLimits(self) -> Interval[int]:
+    @property
+    def _probeSizeMax(self) -> int:
         cropX = self._cropSizer.getExtentX()
         cropY = self._cropSizer.getExtentY()
-        probeSizeMax = min(cropX, cropY)
-        return Interval[int](1, probeSizeMax)
+        return min(cropX, cropY)
+
+    def getProbeSizeLimits(self) -> Interval[int]:
+        return Interval[int](1, self._probeSizeMax)
 
     def getProbeSize(self) -> int:
         return self._settings.probeSize.value
 
+    def getWavelengthInMeters(self) -> Decimal:
+        # Source: https://physics.nist.gov/cuu/Constants/index.html
+        planck_constant_eV_per_Hz = Decimal(4.135667696e-15)
+        light_speed_m_per_s = Decimal(299792458)
+        hc_eVm = planck_constant_eV_per_Hz * light_speed_m_per_s
+        probe_wavelength_m = hc_eVm / self._settings.probeEnergyInElectronVolts.value
+        return probe_wavelength_m
+
+    def _updateProbeSize(self) -> None:
+        if self._settings.automaticProbeSizeEnabled.value:
+            self._settings.probeSize.value = self._probeSizeMax
+
+        self.notifyObservers()
+
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.notifyObservers()
+            self._updateProbeSize()
         elif observable is self._cropSizer:
-            self.notifyObservers()
+            self._updateProbeSize()
 
 
-class Probe(Observable, Observer):
+class Probe(Observable):
     FILE_FILTER = 'NumPy Binary Files (*.npy)'
 
     def __init__(self, settings: ProbeSettings) -> None:
@@ -83,23 +101,7 @@ class Probe(Observable, Observer):
 
     @classmethod
     def createInstance(cls, settings: ProbeSettings) -> Probe:
-        probe = cls(settings)
-        settings.probeSize.addObserver(probe)
-        settings.probeEnergyInElectronVolts.addObserver(probe)
-        return probe
-
-    @property
-    def extentInPixels(self) -> int: # FIXME REMOVE
-        return self._settings.probeSize.value
-
-    @property
-    def wavelengthInMeters(self) -> Decimal:
-        # Source: https://physics.nist.gov/cuu/Constants/index.html
-        planck_constant_eV_per_Hz = Decimal(4.135667696e-15)
-        light_speed_m_per_s = Decimal(299792458)
-        hc_eVm = planck_constant_eV_per_Hz * light_speed_m_per_s
-        probe_wavelength_m = hc_eVm / self._settings.probeEnergyInElectronVolts.value
-        return probe_wavelength_m
+        return cls(settings)
 
     def getArray(self) -> numpy.ndarray:
         return self._array
@@ -118,12 +120,6 @@ class Probe(Observable, Observer):
 
     def write(self, filePath: Path) -> None:
         numpy.save(filePath, self._array)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._settings.probeSize:
-            self.notifyObservers()
-        elif observable is self._settings.probeEnergyInElectronVolts:
-            self.notifyObservers()
 
 
 class GaussianBeamProbeInitializer:
@@ -157,15 +153,15 @@ class GaussianBeamProbeInitializer:
 
 class FresnelZonePlateProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
-                 probe: Probe) -> None:
+                 probeSizer: ProbeSizer) -> None:
         super().__init__()
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
-        self._probe = probe
+        self._probeSizer = probeSizer
 
     def __call__(self) -> numpy.ndarray:
-        shape = self._probeSettings.probeSize.value
-        lambda0 = self._probe.wavelengthInMeters
+        shape = self._probeSizer.getProbeSize()
+        lambda0 = self._probeSizer.getWavelengthInMeters()
         dx_dec = self._detectorSettings.pixelSizeXInMeters.value  # TODO non-square pixels are unsupported
         dis_defocus = self._detectorSettings.defocusDistanceInMeters.value
         dis_StoD = self._detectorSettings.detectorDistanceInMeters.value
@@ -208,24 +204,25 @@ class CustomProbeInitializer:
 class ProbePresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
-    def __init__(self, settings: ProbeSettings, probe: Probe,
+    def __init__(self, settings: ProbeSettings, probeSizer: ProbeSizer, probe: Probe,
                  initializerList: Sequence[Callable]) -> None:
         super().__init__()
         self._settings = settings
+        self._probeSizer = probeSizer
         self._probe = probe
         self._initializerList = initializerList
         self._initializer = initializerList[0]
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
-                       probe: Probe) -> ProbePresenter:
+                       probeSizer: ProbeSizer, probe: Probe) -> ProbePresenter:
         initializerList = list()
         initializerList.append(GaussianBeamProbeInitializer(detectorSettings, probeSettings))
         initializerList.append(
-            FresnelZonePlateProbeInitializer(detectorSettings, probeSettings, probe))
+            FresnelZonePlateProbeInitializer(detectorSettings, probeSettings, probeSizer))
         initializerList.append(CustomProbeInitializer())
 
-        presenter = cls(probeSettings, probe, initializerList)
+        presenter = cls(probeSettings, probeSizer, probe, initializerList)
         presenter.setCurrentInitializerFromSettings()
         probeSettings.initializer.addObserver(presenter)
         probeSettings.addObserver(presenter)
@@ -266,21 +263,23 @@ class ProbePresenter(Observable, Observer):
         self._probe.setArray(self._initializer())
         self.notifyObservers()
 
+    def isAutomaticProbeSizeEnabled(self) -> bool:
+        return self._settings.automaticProbeSizeEnabled.value
+
+    def setAutomaticProbeSizeEnabled(self, enabled: bool) -> None:
+        self._settings.automaticProbeSizeEnabled.value = enabled
+
     def getProbeMinSize(self) -> int:
-        return 0
+        return self._probeSizer.getProbeSizeLimits().lower
 
     def getProbeMaxSize(self) -> int:
-        return self.MAX_INT
+        return self._probeSizer.getProbeSizeLimits().upper
 
     def setProbeSize(self, value: int) -> None:
         self._settings.probeSize.value = value
 
     def getProbeSize(self) -> int:
-        valueMin = self.getProbeMinSize()
-        valueMax = self.getProbeMaxSize()
-        value = self._settings.probeSize.value
-        valueClamp = max(valueMin, min(value, valueMax))
-        return valueClamp
+        return self._probeSizer.getProbeSize()
 
     def setProbeEnergyInElectronVolts(self, value: Decimal) -> None:
         self._settings.probeEnergyInElectronVolts.value = value
@@ -289,7 +288,7 @@ class ProbePresenter(Observable, Observer):
         return self._settings.probeEnergyInElectronVolts.value
 
     def getProbeWavelengthInMeters(self) -> Decimal:
-        return self._probe.wavelengthInMeters
+        return self._probeSizer.getWavelengthInMeters()
 
     def setProbeDiameterInMeters(self, value: Decimal) -> None:
         self._settings.probeDiameterInMeters.value = value
