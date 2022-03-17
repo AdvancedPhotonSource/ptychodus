@@ -67,7 +67,7 @@ class ProbeSizer(Observable, Observer):
     def getProbeSizeLimits(self) -> Interval[int]:
         return Interval[int](1, self._probeSizeMax)
 
-    def getProbeSize(self) -> int:
+    def getProbeSize(self) -> int:  # FIXME shouldn't this clamp?
         return self._settings.probeSize.value
 
     def getWavelengthInMeters(self) -> Decimal:

@@ -41,7 +41,7 @@ class ModelCore:
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._objectSizer = ObjectSizer.createInstance(self._scanSequence, self._detector,
-                                                       self._probeSizer)
+                                                       self._cropSizer, self._probeSizer)
 
         self._probe = Probe.createInstance(self._probeSettings)
         self._object = Object.createInstance(self._objectSettings)
@@ -58,7 +58,8 @@ class ModelCore:
                                                               isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSizer,
                                                       self._velociprobeReader, self._scanSequence,
-                                                      self._probe, self._objectSizer, self._object,
+                                                      self._probeSizer, self._probe,
+                                                      self._objectSizer, self._object,
                                                       isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)

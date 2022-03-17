@@ -7,6 +7,7 @@ import logging
 
 import numpy
 
+from .crop import CropSizer
 from .geometry import Box, Interval
 from .detector import Detector
 from .image import ImageExtent
@@ -37,29 +38,35 @@ class ObjectSettings(Observable, Observer):
 
 
 class ObjectSizer(Observable, Observer):
-    def __init__(self, scanSequence: ScanSequence, detector: Detector,
+    def __init__(self, scanSequence: ScanSequence, detector: Detector, cropSizer: CropSizer,
                  probeSizer: ProbeSizer) -> None:
         super().__init__()
         self._scanSequence = scanSequence
         self._detector = detector
+        self._cropSizer = cropSizer
         self._probeSizer = probeSizer
         self._scanBoundingBoxInMeters = self._scanSequence.getBoundingBox()
 
     @classmethod
-    def createInstance(cls, scanSequence: ScanSequence, detector: Detector,
+    def createInstance(cls, scanSequence: ScanSequence, detector: Detector, cropSizer: CropSizer,
                        probeSizer: ProbeSizer) -> ObjectSizer:
-        sizer = cls(scanSequence, detector, probeSizer)
+        sizer = cls(scanSequence, detector, cropSizer, probeSizer)
         scanSequence.addObserver(sizer)
         detector.addObserver(sizer)
+        cropSizer.addObserver(sizer)
         probeSizer.addObserver(sizer)
         return sizer
 
     @property
     def objectPlanePixelShapeInMeters(self) -> Tuple[Decimal, Decimal]:
-        lambdaZ_m2 = self._probeSizer.getWavelengthInMeters(
-        ) * self._detector.distanceToObjectInMeters
-        px_m = lambdaZ_m2 / self._detector.extentXInMeters
-        py_m = lambdaZ_m2 / self._detector.extentYInMeters
+        lambdaZ_m2 = self._probeSizer.getWavelengthInMeters() \
+                * self._detector.distanceToObjectInMeters
+        cropExtentXInMeters = self._cropSizer.getExtentX() \
+                * self._detector.pixelSizeXInMeters
+        cropExtentYInMeters = self._cropSizer.getExtentY() \
+                * self._detector.pixelSizeYInMeters
+        px_m = lambdaZ_m2 / cropExtentXInMeters
+        py_m = lambdaZ_m2 / cropExtentYInMeters
         return py_m, px_m
 
     def getScanBoundingBoxInMeters(self) -> Box[Decimal]:
@@ -95,6 +102,8 @@ class ObjectSizer(Observable, Observer):
         if observable is self._scanSequence:
             self._updateBoundingBox()
         elif observable is self._detector:
+            self.notifyObservers()
+        elif observable is self._cropSizer:
             self.notifyObservers()
         elif observable is self._probeSizer:
             self.notifyObservers()

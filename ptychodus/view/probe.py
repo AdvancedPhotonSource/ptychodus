@@ -18,7 +18,7 @@ class ProbeProbeView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Size:', view.sizeSpinBox)
+        layout.addRow('Size [px]:', view.sizeSpinBox)
         layout.addRow('Energy:', view.energyWidget)
         layout.addRow('Wavelength:', view.wavelengthWidget)
         layout.addRow('Diameter:', view.diameterWidget)

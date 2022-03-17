@@ -391,8 +391,9 @@ class TikeReconstructor:
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
-                 velociprobeReader: VelociprobeReader, scanSequence: ScanSequence, probe: Probe,
-                 objectSizer: ObjectSizer, obj: Object) -> None:
+                 velociprobeReader: VelociprobeReader, scanSequence: ScanSequence,
+                 probeSizer: ProbeSizer, probe: Probe, objectSizer: ObjectSizer,
+                 obj: Object) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
@@ -400,6 +401,7 @@ class TikeReconstructor:
         self._cropSizer = cropSizer
         self._velociprobeReader = velociprobeReader
         self._scanSequence = scanSequence
+        self._probeSizer = probeSizer
         self._probe = probe
         self._objectSizer = objectSizer
         self._object = obj
@@ -450,7 +452,7 @@ class TikeReconstructor:
         return probe
 
     def getTikeObjectExtent(self) -> ImageExtent:
-        pad = 2 * (self._probe.extentInPixels + 2)
+        pad = 2 * (self._probeSizer.getProbeSize() + 2)
         paddingExtent = ImageExtent(width=pad, height=pad)
         return self._objectSizer.getScanExtent() + paddingExtent
 
@@ -478,7 +480,7 @@ class TikeReconstructor:
 
         for point in iter(self._scanSequence):
             xvalues.append(float((point.x - scanBBox_m[0].lower) / px_m) + 2)
-            yvalues.append(float((point.y - scanBBox_m[1].upper) / py_m) + 2)
+            yvalues.append(float((point.y - scanBBox_m[1].lower) / py_m) + 2)
 
         return numpy.column_stack((xvalues, yvalues))
 
@@ -697,6 +699,7 @@ class TikeBackend:
                        cropSizer: CropSizer,
                        velociprobeReader: VelociprobeReader,
                        scanSequence: ScanSequence,
+                       probeSizer: ProbeSizer,
                        probe: Probe,
                        objectSizer: ObjectSizer,
                        obj: Object,
@@ -709,8 +712,8 @@ class TikeBackend:
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, cropSizer,
-                                                  velociprobeReader, scanSequence, probe,
-                                                  objectSizer, obj)
+                                                  velociprobeReader, scanSequence, probeSizer,
+                                                  probe, objectSizer, obj)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

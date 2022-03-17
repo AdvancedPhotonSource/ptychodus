@@ -56,20 +56,12 @@ class Detector(Observable, Observer):
         return self._settings.pixelSizeXInMeters.value
 
     @property
-    def extentXInMeters(self) -> Decimal:
-        return self.numberOfPixelsX * self.pixelSizeXInMeters
-
-    @property
     def numberOfPixelsY(self) -> int:
         return self._settings.numberOfPixelsY.value
 
     @property
     def pixelSizeYInMeters(self) -> Decimal:
         return self._settings.pixelSizeYInMeters.value
-
-    @property
-    def extentYInMeters(self) -> Decimal:
-        return self.numberOfPixelsY * self.pixelSizeYInMeters
 
     @property
     def distanceToObjectInMeters(self) -> Decimal:
