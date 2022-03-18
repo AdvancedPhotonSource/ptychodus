@@ -430,15 +430,12 @@ class TikeReconstructor:
                             dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
                             dataList.append(dataShifted)
                         else:
-                            logger.debug(
-                                f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.'
-                            )
+                            message = f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.'
+                            logger.debug(message)
                 except FileNotFoundError:
                     logger.debug(f'File {datafile.filePath} not found!')
 
-        data = numpy.concatenate(dataList)
-
-        return data
+        return numpy.concatenate(dataList).astype('float32')
 
     def getProbe(self) -> numpy.ndarray:
         numAdditionalProbeModes = self._settings.numProbeModes.value - 1
@@ -474,15 +471,21 @@ class TikeReconstructor:
         xvalues = list()
         yvalues = list()
 
-        tikeObjectExtent = self.getTikeObjectExtent()
-        scanBBox_m = self._objectSizer.getScanBoundingBoxInMeters()
-        py_m, px_m = self._objectSizer.objectPlanePixelShapeInMeters
+        px_m = self._objectSizer.getPixelSizeXInMeters()
+        py_m = self._objectSizer.getPixelSizeYInMeters()
 
         for point in iter(self._scanSequence):
-            xvalues.append(float((point.x - scanBBox_m[0].lower) / px_m) + 2)
-            yvalues.append(float((point.y - scanBBox_m[1].lower) / py_m) + 2)
+            xvalues.append(point.x / px_m)
+            yvalues.append(point.y / py_m)
 
-        return numpy.column_stack((xvalues, yvalues))
+        probeSize = self._probeSizer.getProbeSize()
+        ux = probeSize - min(xvalues)
+        uy = probeSize - min(yvalues)
+
+        xvalues = [x + ux for x in xvalues]
+        yvalues = [y + uy for y in yvalues]
+
+        return numpy.column_stack((xvalues, yvalues)).astype('float32')
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings

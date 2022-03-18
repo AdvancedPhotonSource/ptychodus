@@ -38,53 +38,52 @@ class ObjectSettings(Observable, Observer):
 
 
 class ObjectSizer(Observable, Observer):
-    def __init__(self, scanSequence: ScanSequence, detector: Detector, cropSizer: CropSizer,
+    def __init__(self, detector: Detector, cropSizer: CropSizer, scanSizer: ScanSizer,
                  probeSizer: ProbeSizer) -> None:
         super().__init__()
-        self._scanSequence = scanSequence
         self._detector = detector
         self._cropSizer = cropSizer
+        self._scanSizer = scanSizer
         self._probeSizer = probeSizer
-        self._scanBoundingBoxInMeters = self._scanSequence.getBoundingBox()
 
     @classmethod
-    def createInstance(cls, scanSequence: ScanSequence, detector: Detector, cropSizer: CropSizer,
+    def createInstance(cls, detector: Detector, cropSizer: CropSizer, scanSizer: ScanSizer,
                        probeSizer: ProbeSizer) -> ObjectSizer:
-        sizer = cls(scanSequence, detector, cropSizer, probeSizer)
-        scanSequence.addObserver(sizer)
+        sizer = cls(detector, cropSizer, scanSizer, probeSizer)
         detector.addObserver(sizer)
         cropSizer.addObserver(sizer)
+        scanSizer.addObserver(sizer)
         probeSizer.addObserver(sizer)
         return sizer
 
     @property
-    def objectPlanePixelShapeInMeters(self) -> Tuple[Decimal, Decimal]:
-        lambdaZ_m2 = self._probeSizer.getWavelengthInMeters() \
+    def _lambdaZ_m2(self) -> Decimal:
+        return self._probeSizer.getWavelengthInMeters() \
                 * self._detector.distanceToObjectInMeters
-        cropExtentXInMeters = self._cropSizer.getExtentX() \
-                * self._detector.pixelSizeXInMeters
-        cropExtentYInMeters = self._cropSizer.getExtentY() \
-                * self._detector.pixelSizeYInMeters
-        px_m = lambdaZ_m2 / cropExtentXInMeters
-        py_m = lambdaZ_m2 / cropExtentYInMeters
-        return py_m, px_m
 
-    def getScanBoundingBoxInMeters(self) -> Box[Decimal]:
-        return self._scanBoundingBoxInMeters
+    def getPixelSizeXInMeters(self) -> Decimal:
+        return self._lambdaZ_m2 / self._cropSizer.getExtentXInMeters()
 
-    def getScanBoundingBoxInPixels(self) -> Box[Decimal]:
-        assert len(self._scanBoundingBoxInMeters) == 2
-        py_m, px_m = self.objectPlanePixelShapeInMeters
-        ix = Interval(lower=self._scanBoundingBoxInMeters[0].lower / px_m,
-                      upper=self._scanBoundingBoxInMeters[0].upper / px_m)
-        iy = Interval(lower=self._scanBoundingBoxInMeters[1].lower / py_m,
-                      upper=self._scanBoundingBoxInMeters[1].upper / py_m)
-        return Box([ix, iy])
+    def getPixelSizeYInMeters(self) -> Decimal:
+        return self._lambdaZ_m2 / self._cropSizer.getExtentYInMeters()
 
     def getScanExtent(self) -> ImageExtent:
-        bbox_px = self.getScanBoundingBoxInPixels()
-        scanWidth_px = int(numpy.ceil(bbox_px[0].length))
-        scanHeight_px = int(numpy.ceil(bbox_px[1].length))
+        scanBox_m = self._scanSizer.getBoundingBoxInMeters()
+
+        if scanBox_m is None:
+            return ImageExtent(width=0, height=0)
+
+        assert len(scanBox_m) == 2
+
+        px_m = self.getPixelSizeXInMeters()
+        py_m = self.getPixelSizeYInMeters()
+
+        ix = Interval(scanBox_m[0].lower / px_m, scanBox_m[0].upper / px_m)
+        iy = Interval(scanBox_m[1].lower / py_m, scanBox_m[1].upper / py_m)
+
+        scanWidth_px = int(numpy.ceil(ix.length))
+        scanHeight_px = int(numpy.ceil(iy.length))
+
         return ImageExtent(width=scanWidth_px, height=scanHeight_px)
 
     def getPaddingExtent(self) -> ImageExtent:
@@ -94,16 +93,12 @@ class ObjectSizer(Observable, Observer):
     def getObjectExtent(self) -> ImageExtent:
         return self.getScanExtent() + self.getPaddingExtent()
 
-    def _updateBoundingBox(self) -> None:
-        self._scanBoundingBoxInMeters = self._scanSequence.getBoundingBox()
-        self.notifyObservers()
-
     def update(self, observable: Observable) -> None:
-        if observable is self._scanSequence:
-            self._updateBoundingBox()
-        elif observable is self._detector:
+        if observable is self._detector:
             self.notifyObservers()
         elif observable is self._cropSizer:
+            self.notifyObservers()
+        elif observable is self._scanSizer:
             self.notifyObservers()
         elif observable is self._probeSizer:
             self.notifyObservers()

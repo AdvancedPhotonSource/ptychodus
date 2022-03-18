@@ -39,9 +39,10 @@ class ModelCore:
                                                                     self._selectableScanSequence)
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
+        self._scanSizer = ScanSizer.createInstance(self._scanSequence)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
-        self._objectSizer = ObjectSizer.createInstance(self._scanSequence, self._detector,
-                                                       self._cropSizer, self._probeSizer)
+        self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer,
+                                                       self._scanSizer, self._probeSizer)
 
         self._probe = Probe.createInstance(self._probeSettings)
         self._object = Object.createInstance(self._objectSettings)

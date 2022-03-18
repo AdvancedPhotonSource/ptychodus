@@ -79,13 +79,32 @@ class ScanPointIO:
 
 
 class ScanSequence(Sequence, Observable, Observer):
-    def getBoundingBox(self) -> Optional[Box[Decimal]]:
+    pass
+
+
+class ScanSizer(Observable, Observer):
+    def __init__(self, scanSequence: ScanSequence) -> None:
+        super().__init__()
+        self._scanSequence = scanSequence
+        self._boundingBoxInMeters: Optional[Box[Decimal]] = None
+
+    @classmethod
+    def createInstance(cls, scanSequence: ScanSequence) -> ScanSizer:
+        sizer = cls(scanSequence)
+        scanSequence.addObserver(sizer)
+        return sizer
+
+    def getBoundingBoxInMeters(self) -> Optional[Box[Decimal]]:
+        return self._boundingBoxInMeters
+
+    def _updateBoundingBox(self) -> None:
         pointIter = iter(self)
 
         try:
             point = next(pointIter)
         except StopIteration:
-            return None
+            self._boundingBoxInMeters = None
+            return
 
         xint = Interval(point.x, point.x)
         yint = Interval(point.y, point.y)
@@ -94,7 +113,12 @@ class ScanSequence(Sequence, Observable, Observer):
             xint.hull(point.x)
             yint.hull(point.y)
 
-        return Box[Decimal]((xint, yint))
+        self._boundingBoxInMeters = Box[Decimal]((xint, yint))
+        self.notifyObservers()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._scanSequence:
+            self._updateBoundingBox()
 
 
 class CartesianScanSequence(ScanSequence):
