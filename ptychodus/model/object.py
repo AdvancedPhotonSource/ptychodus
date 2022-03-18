@@ -69,20 +69,17 @@ class ObjectSizer(Observable, Observer):
 
     def getScanExtent(self) -> ImageExtent:
         scanBox_m = self._scanSizer.getBoundingBoxInMeters()
+        scanWidth_px = 0
+        scanHeight_px = 0
 
-        if scanBox_m is None:
-            return ImageExtent(width=0, height=0)
+        if scanBox_m:
+            assert len(scanBox_m) == 2
 
-        assert len(scanBox_m) == 2
+            scanWidth_px = scanBox_m[0].length / self.getPixelSizeXInMeters()
+            scanWidth_px = int(numpy.ceil(scanWidth_px))
 
-        px_m = self.getPixelSizeXInMeters()
-        py_m = self.getPixelSizeYInMeters()
-
-        ix = Interval(scanBox_m[0].lower / px_m, scanBox_m[0].upper / px_m)
-        iy = Interval(scanBox_m[1].lower / py_m, scanBox_m[1].upper / py_m)
-
-        scanWidth_px = int(numpy.ceil(ix.length))
-        scanHeight_px = int(numpy.ceil(iy.length))
+            scanHeight_px = scanBox_m[1].length / self.getPixelSizeYInMeters()
+            scanHeight_px = int(numpy.ceil(scanHeight_px))
 
         return ImageExtent(width=scanWidth_px, height=scanHeight_px)
 

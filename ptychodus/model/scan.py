@@ -98,7 +98,7 @@ class ScanSizer(Observable, Observer):
         return self._boundingBoxInMeters
 
     def _updateBoundingBox(self) -> None:
-        pointIter = iter(self)
+        pointIter = iter(self._scanSequence)
 
         try:
             point = next(pointIter)

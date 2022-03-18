@@ -53,6 +53,9 @@ class CropSizer(Observer, Observable):
         limits = self.getExtentXLimits()
         return limits.clamp(self._settings.extentXInPixels.value)
 
+    def getExtentXInMeters(self) -> Decimal:
+        return self.getExtentX() * self._detector.pixelSizeXInMeters
+
     def getCenterXLimits(self) -> Interval[int]:
         radius = self.getExtentX() // 2
         return Interval[int](radius, self._detector.numberOfPixelsX - 1 - radius)
@@ -72,6 +75,9 @@ class CropSizer(Observer, Observable):
     def getExtentY(self) -> int:
         limits = self.getExtentYLimits()
         return limits.clamp(self._settings.extentYInPixels.value)
+
+    def getExtentYInMeters(self) -> Decimal:
+        return self.getExtentY() * self._detector.pixelSizeYInMeters
 
     def getCenterYLimits(self) -> Interval[int]:
         radius = self.getExtentY() // 2
