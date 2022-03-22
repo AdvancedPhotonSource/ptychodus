@@ -13,7 +13,7 @@ class CropSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.cropEnabled = settingsGroup.createBooleanEntry('CropEnabled', False)
+        self.cropEnabled = settingsGroup.createBooleanEntry('CropEnabled', True)
         self.centerXInPixels = settingsGroup.createIntegerEntry('CenterXInPixels', 32)
         self.centerYInPixels = settingsGroup.createIntegerEntry('CenterYInPixels', 32)
         self.extentXInPixels = settingsGroup.createIntegerEntry('ExtentXInPixels', 64)

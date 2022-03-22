@@ -51,6 +51,7 @@ class NullReconstructor(Reconstructor):
         return self._backendName
 
     def reconstruct(self) -> int:
+        raise NotImplementedError
         return 0
 
 

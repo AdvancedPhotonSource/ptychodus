@@ -1,19 +1,18 @@
+from __future__ import annotations
 from decimal import Decimal
 
-from PyQt5.QtGui import QDoubleValidator, QStandardItem, QStandardItemModel
+from PyQt5.QtGui import QDoubleValidator
 
 from ..model import Observer, Observable, ScanPointIO, ScanPresenter
-from ..view import ScanScanView, ScanPlotView
+from ..view import ScanScanView, ScanInitializerView, ScanParametersView, ScanPlotView
 from .data_file import FileDialogFactory
 
 
-class ScanParametersController(Observer):
-    def __init__(self, presenter: ScanPresenter, view: ScanScanView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+class ScanScanController(Observer):
+    def __init__(self, presenter: ScanPresenter, view: ScanScanView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._fileDialogFactory = fileDialogFactory
 
     @staticmethod
     def createPositiveRealValidator() -> QDoubleValidator:
@@ -22,15 +21,10 @@ class ScanParametersController(Observer):
         return validator
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanScanView,
-                       fileDialogFactory: FileDialogFactory):
-        controller = cls(presenter, view, fileDialogFactory)
+    def createInstance(cls, presenter: ScanPresenter, view: ScanScanView) -> ScanScanController:
+        controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        for initializer in presenter.getScanSequenceList():
-            view.initializerComboBox.addItem(initializer)
-
-        view.initializerComboBox.currentTextChanged.connect(presenter.setCurrentScanSequence)
         view.numberOfScanPointsSpinBox.setEnabled(False)
         view.extentXSpinBox.valueChanged.connect(presenter.setExtentX)
         view.extentYSpinBox.valueChanged.connect(presenter.setExtentY)
@@ -42,36 +36,11 @@ class ScanParametersController(Observer):
         view.jitterRadiusLineEdit.editingFinished.connect(controller._syncJitterRadiusV2M)
         view.jitterRadiusLineEdit.setEnabled(False)
 
-        transformModel = QStandardItemModel()
-
-        for transform in presenter.getTransformXYList():
-            row = QStandardItem(transform)
-            transformModel.appendRow(row)
-
-        view.transformComboBox.setModel(transformModel)
-        view.transformComboBox.currentTextChanged.connect(presenter.setCurrentTransformXY)
-
         controller._syncModelToView()
 
         return controller
 
-    def openScan(self) -> None:
-        filePath = self._fileDialogFactory.getOpenFilePath(self._view, 'Open Scan',
-                                                           ScanPointIO.FILE_FILTER)
-
-        if filePath:
-            self._presenter.openScan(filePath)
-
-    def saveScan(self) -> None:
-        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Scan',
-                                                           ScanPointIO.FILE_FILTER)
-
-        if filePath:
-            self._presenter.saveScan(filePath)
-
     def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(self._presenter.getCurrentScanSequence())
-
         self._view.numberOfScanPointsSpinBox.blockSignals(True)
         self._view.numberOfScanPointsSpinBox.setRange(self._presenter.getMinNumberOfScanPoints(),
                                                       self._presenter.getMaxNumberOfScanPoints())
@@ -93,7 +62,6 @@ class ScanParametersController(Observer):
         self._view.stepSizeXWidget.setLengthInMeters(self._presenter.getStepSizeXInMeters())
         self._view.stepSizeYWidget.setLengthInMeters(self._presenter.getStepSizeYInMeters())
         self._view.jitterRadiusLineEdit.setText(str(self._presenter.getJitterRadiusInPixels()))
-        self._view.transformComboBox.setCurrentText(self._presenter.getCurrentTransformXY())
 
     def _syncJitterRadiusV2M(self) -> None:
         self._presenter.setJitterRadiusInPixels(Decimal(self._view.jitterRadiusLineEdit.text()))
@@ -103,6 +71,98 @@ class ScanParametersController(Observer):
             self._syncModelToView()
 
 
+class ScanInitializerController(Observer):
+    def __init__(self, presenter: ScanPresenter, view: ScanInitializerView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: ScanPresenter,
+                       view: ScanInitializerView) -> ScanInitializerController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        for initializer in presenter.getScanSequenceList():
+            view.initializerComboBox.addItem(initializer)
+
+        view.initializerComboBox.currentTextChanged.connect(presenter.setCurrentInitializer)
+        view.initializeButton.clicked.connect(presenter.initializeScan)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _syncModelToView(self) -> None:
+        self._view.initializerComboBox.setCurrentText(self._presenter.getCurrentInitializer())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
+class ScanTransformController(Observer):
+    def __init__(self, presenter: ScanPresenter, view: ScanTransformView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: ScanPresenter,
+                       view: ScanTransformView) -> ScanTransformController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        for transform in presenter.getTransformXYList():
+            view.transformComboBox.addItem(transform)
+
+        view.transformComboBox.currentTextChanged.connect(presenter.setCurrentTransformXY)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _syncModelToView(self) -> None:
+        self._view.transformComboBox.setCurrentText(self._presenter.getCurrentTransformXY())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
+class ScanParametersController:
+    def __init__(self, presenter: ScanPresenter, view: ScanParametersView,
+                 fileDialogFactory: FileDialogFactory) -> None:
+        self._presenter = presenter
+        self._view = view
+        self._fileDialogFactory = fileDialogFactory
+        self._scanController = ScanScanController.createInstance(presenter, view.scanView)
+        self._initializerController = ScanInitializerController.createInstance(
+            presenter, view.initializerView)
+        self._transformController = ScanTransformController.createInstance(
+            presenter, view.transformView)
+
+    @classmethod
+    def createInstance(cls, presenter: ScanPresenter, view: ScanParametersView,
+                       fileDialogFactory: FileDialogFactory) -> ScanParametersController:
+        controller = cls(presenter, view, fileDialogFactory)
+        return controller
+
+    def openScan(self) -> None:
+        filePath = self._fileDialogFactory.getOpenFilePath(self._view, 'Open Scan',
+                                                           ScanPointIO.FILE_FILTER)
+
+        if filePath:
+            self._presenter.openScan(filePath)
+
+    def saveScan(self) -> None:
+        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Scan',
+                                                           ScanPointIO.FILE_FILTER)
+
+        if filePath:
+            self._presenter.saveScan(filePath)
+
+
 class ScanPlotController(Observer):
     def __init__(self, presenter: ScanPresenter, view: ScanPlotView) -> None:
         super().__init__()
@@ -110,7 +170,7 @@ class ScanPlotController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanPlotView):
+    def createInstance(cls, presenter: ScanPresenter, view: ScanPlotView) -> ScanPlotController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
         controller._syncModelToView()
@@ -123,7 +183,7 @@ class ScanPlotController(Observer):
         y = [point.y for point in scanPath]
 
         self._view.axes.clear()
-        self._view.axes.plot(x, y, '.-', linewidth=2.5)
+        self._view.axes.plot(x, y, '.-', linewidth=1.5)
         self._view.axes.invert_yaxis()
         self._view.axes.axis('equal')
         self._view.axes.grid(True)

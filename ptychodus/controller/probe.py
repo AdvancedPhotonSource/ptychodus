@@ -1,5 +1,4 @@
 from __future__ import annotations
-from PyQt5.QtGui import QStandardItemModel
 
 from ..model import Observer, Observable, Probe, ProbePresenter
 from ..view import ImageView, ProbeProbeView, ProbeInitializerView, ProbeZonePlateView, ProbeParametersView
@@ -83,7 +82,6 @@ class ProbeInitializerController(Observer):
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._initComboBoxModel = QStandardItemModel()
 
     @classmethod
     def createInstance(cls, presenter: ProbePresenter,

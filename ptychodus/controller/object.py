@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from PyQt5.QtGui import QStandardItemModel
-
 from ..model import Observer, Observable, Object, ObjectPresenter
 from ..view import ImageView, ObjectInitializerView, ObjectParametersView
 from .data_file import FileDialogFactory
@@ -13,7 +11,6 @@ class ObjectInitializerController(Observer):
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._initComboBoxModel = QStandardItemModel()
 
     @classmethod
     def createInstance(cls, presenter: ObjectPresenter,

@@ -51,11 +51,6 @@ class ScanPointParseError(Exception):
 class ScanPointIO:
     FILE_FILTER = 'Comma-Separated Values Files (*.csv)'
 
-    def write(self, filePath: Path, scanPointList: list[ScanPoint]) -> None:
-        with open(filePath, 'wt') as csv_file:
-            for point in scanPointList:
-                csv_file.write(f'{point.y},{point.x}\n')
-
     def read(self, filePath: Path) -> list[ScanPoint]:
         point_list = list()
 
@@ -76,6 +71,11 @@ class ScanPointIO:
                 point_list.append(point)
 
         return point_list
+
+    def write(self, filePath: Path, scanPointList: list[ScanPoint]) -> None:
+        with open(filePath, 'wt') as csv_file:
+            for point in scanPointList:
+                csv_file.write(f'{point.y},{point.x}\n')
 
 
 class ScanSequence(Sequence, Observable, Observer):
@@ -433,10 +433,10 @@ class ScanPresenter(Observable, Observer):
     def getScanSequenceList(self) -> list[str]:
         return self._selectableSequence.getScanSequenceList()
 
-    def getCurrentScanSequence(self) -> str:
+    def getCurrentInitializer(self) -> str:
         return self._selectableSequence.getCurrentScanSequence()
 
-    def setCurrentScanSequence(self, name: str) -> None:
+    def setCurrentInitializer(self, name: str) -> None:
         self._selectableSequence.setCurrentScanSequence(name)
 
     def getMinExtentX(self) -> int:
@@ -491,6 +491,9 @@ class ScanPresenter(Observable, Observer):
 
     def setCurrentTransformXY(self, name: str) -> None:
         self._transformedSequence.setCurrentTransformXYByName(name)
+
+    def initializeScan(self) -> None:
+        pass  # FIXME
 
     @staticmethod
     def _clamp(x, xmin, xmax):

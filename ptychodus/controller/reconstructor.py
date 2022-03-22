@@ -1,12 +1,16 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
+import logging
+import traceback
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItem, QStandardItemModel
-from PyQt5.QtWidgets import QWidget, QLabel
+from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
 from ..model import Observable, Observer, Reconstructor, ReconstructorPresenter
 from ..view import ReconstructorParametersView, ReconstructorPlotView
+
+logger = logging.getLogger(__name__)
 
 
 class ReconstructorViewControllerFactory(ABC):
@@ -65,7 +69,21 @@ class ReconstructorParametersController(Observer):
         self._view.reconstructorStackedWidget.addWidget(widget)
 
     def _reconstruct(self) -> None:
-        result = self._presenter.reconstruct()
+        result = -1
+
+        try:
+            result = self._presenter.reconstruct()
+        except Exception as err:
+            logger.exception(err)
+
+            msgBox = QMessageBox()
+            msgBox.setWindowTitle('Exception Dialog')
+            msgBox.setIcon(QMessageBox.Critical)
+            msgBox.setText(f'The reconstructor raised a {err.__class__.__name__}!')
+            msgBox.setInformativeText(str(err))
+            msgBox.setDetailedText(traceback.format_exc())
+            retval = msgBox.exec_()
+
         print(result)  # TODO
 
     def _syncModelToView(self) -> None:

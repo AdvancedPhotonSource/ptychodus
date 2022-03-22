@@ -202,8 +202,6 @@ class CustomProbeInitializer:
 
 
 class ProbePresenter(Observable, Observer):
-    MAX_INT = 0x7FFFFFFF
-
     def __init__(self, settings: ProbeSettings, probeSizer: ProbeSizer, probe: Probe,
                  initializerList: Sequence[Callable]) -> None:
         super().__init__()
