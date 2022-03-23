@@ -5,7 +5,7 @@ import numpy
 
 from ..model import ColorMapListFactory, ScalarTransformation, ComplexToRealStrategy
 from ..view import ImageView
-from .data_file import FileDialogFactory
+from .data import FileDialogFactory
 
 
 class ImageController:

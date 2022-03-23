@@ -4,9 +4,9 @@ import logging
 import numpy
 
 from .crop import *
-from .data_file import *
+from .data import *
 from .detector import *
-from .h5tree import *
+from .h5file import *
 from .image import *
 from .object import *
 from .observer import *
@@ -34,20 +34,17 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
-        self._selectableScanSequence = SelectableScanSequence.createInstance(self._scanSettings)
-        self._scanSequence = TransformedScanSequence.createInstance(self._scanSettings,
-                                                                    self._selectableScanSequence)
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
-        self._scanSizer = ScanSizer.createInstance(self._scanSequence)
+        self._scan = Scan.createInstance(self._scanSettings)
+        self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan, self.settingsRegistry)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
+        self._probe = Probe(self._probeSettings)
         self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer,
-                                                       self._scanSizer, self._probeSizer)
+                                                       self._scan, self._probeSizer)
+        self._object = Object(self._objectSettings)
 
-        self._probe = Probe.createInstance(self._probeSettings)
-        self._object = Object.createInstance(self._objectSettings)
-
-        self.h5FileTreeReader = H5FileTreeReader()
+        self.h5FileReader = H5FileReader()
         self._velociprobeReader = VelociprobeReader()
         self._velociprobeImageSequence = VelociprobeImageSequence.createInstance(
             self._velociprobeReader)
@@ -58,7 +55,7 @@ class ModelCore:
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSizer,
-                                                      self._velociprobeReader, self._scanSequence,
+                                                      self._velociprobeReader, self._scan,
                                                       self._probeSizer, self._probe,
                                                       self._objectSizer, self._object,
                                                       isDeveloperModeEnabled)
@@ -81,8 +78,8 @@ class ModelCore:
                                                             self._probeSettings, self._probeSizer,
                                                             self._probe)
         self.scanPresenter = ScanPresenter.createInstance(self._scanSettings,
-                                                          self._selectableScanSequence,
-                                                          self._scanSequence)
+                                                          self._scan,
+                                                          self._scanInitializer)
         self.objectPresenter = ObjectPresenter.createInstance(self.rng, self._objectSettings,
                                                               self._objectSizer, self._object)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
@@ -91,7 +88,7 @@ class ModelCore:
     @classmethod
     def createInstance(cls, isDeveloperModeEnabled: bool = False) -> ModelCore:
         model = cls(isDeveloperModeEnabled)
-        model.dataFilePresenter.addReader(model.h5FileTreeReader)
+        model.dataFilePresenter.addReader(model.h5FileReader)
         model.dataFilePresenter.addReader(model._velociprobeReader)
         return model
 

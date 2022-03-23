@@ -6,7 +6,7 @@ import numpy
 from PyQt5.QtCore import Qt, QModelIndex, QObject, QVariant, QAbstractTableModel
 from PyQt5.QtWidgets import QWidget, QFileDialog, QTreeView, QTableView
 
-from ..model import DataFilePresenter, H5FileTreeReader, Observable, Observer
+from ..model import DataFilePresenter, H5FileReader, Observable, Observer
 from .tree import SimpleTreeModel
 
 
@@ -88,7 +88,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
 
 class DataFileController(Observer):
-    def __init__(self, presenter: DataFilePresenter, treeReader: H5FileTreeReader,
+    def __init__(self, presenter: DataFilePresenter, treeReader: H5FileReader,
                  treeView: QTreeView, tableView: QTableView,
                  fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
@@ -100,7 +100,7 @@ class DataFileController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, presenter: DataFilePresenter, treeReader: H5FileTreeReader,
+    def createInstance(cls, presenter: DataFilePresenter, treeReader: H5FileReader,
                        treeView: QTreeView, tableView: QTableView,
                        fileDialogFactory: FileDialogFactory) -> DataFileController:
         controller = cls(presenter, treeReader, treeView, tableView, fileDialogFactory)
@@ -112,7 +112,7 @@ class DataFileController(Observer):
 
     def openDataFile(self) -> None:
         filePath = self._fileDialogFactory.getOpenFilePath(self._treeView, 'Open Data File',
-                                                           H5FileTreeReader.FILE_FILTER)
+                                                           H5FileReader.FILE_FILTER)
 
         if filePath:
             self._presenter.readFile(filePath)

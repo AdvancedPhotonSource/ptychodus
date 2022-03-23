@@ -1,3 +1,4 @@
+from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
 from typing import Callable, Generic, Optional, TypeVar
@@ -89,7 +90,7 @@ class SettingsGroup(Observable, Observer):
 
         return candidateEntry
 
-    def __iter__(self):
+    def __iter__(self):  # TODO typing
         return iter(self._entryList)
 
     def __getitem__(self, index: int) -> SettingsEntry:
@@ -115,11 +116,9 @@ class SettingsRegistry(Observable):
 
         group = SettingsGroup(name)
         self._groupList.append(group)
-        self.notifyObservers()
-
         return group
 
-    def __iter__(self):
+    def __iter__(self):  # TODO typing
         return iter(self._groupList)
 
     def __getitem__(self, index: int) -> SettingsGroup:
@@ -137,7 +136,7 @@ class SettingsPresenter(Observable):
         self._settingsRegistry = settingsRegistry
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry):
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> SettingsPresenter:
         presenter = cls(settingsRegistry)
         return presenter
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ..model import Observer, Observable, Object, ObjectPresenter
 from ..view import ImageView, ObjectInitializerView, ObjectParametersView
-from .data_file import FileDialogFactory
+from .data import FileDialogFactory
 from .image import ImageController
 
 

@@ -8,7 +8,7 @@ import h5py
 import numpy
 
 from .crop import CropSettings
-from .data_file import DataFile, DataFileReader
+from .data import DataFile, DataFileReader
 from .detector import DetectorSettings
 from .image import ImageSequence
 from .observer import Observable, Observer

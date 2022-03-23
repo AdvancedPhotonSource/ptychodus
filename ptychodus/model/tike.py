@@ -20,7 +20,7 @@ from .object import Object, ObjectSizer
 from .observer import Observable, Observer
 from .probe import Probe
 from .reconstructor import Reconstructor, NullReconstructor
-from .scan import ScanSequence
+from .scan import Scan
 from .settings import SettingsRegistry, SettingsGroup
 from .velociprobe import VelociprobeReader
 
@@ -391,7 +391,7 @@ class TikeReconstructor:
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
-                 velociprobeReader: VelociprobeReader, scanSequence: ScanSequence,
+                 velociprobeReader: VelociprobeReader, scan: Scan,
                  probeSizer: ProbeSizer, probe: Probe, objectSizer: ObjectSizer,
                  obj: Object) -> None:
         self._settings = settings
@@ -400,7 +400,7 @@ class TikeReconstructor:
         self._probeCorrectionSettings = probeCorrectionSettings
         self._cropSizer = cropSizer
         self._velociprobeReader = velociprobeReader
-        self._scanSequence = scanSequence
+        self._scan = scan
         self._probeSizer = probeSizer
         self._probe = probe
         self._objectSizer = objectSizer
@@ -474,7 +474,7 @@ class TikeReconstructor:
         px_m = self._objectSizer.getPixelSizeXInMeters()
         py_m = self._objectSizer.getPixelSizeYInMeters()
 
-        for point in iter(self._scanSequence):
+        for point in iter(self._scan):
             xvalues.append(point.x / px_m)
             yvalues.append(point.y / py_m)
 
@@ -508,7 +508,7 @@ class TikeReconstructor:
 
         if settings.usePositionCorrection.value:
             options = tike.ptycho.PositionOptions(
-                num_positions=len(self._scanSequence),
+                num_positions=len(self._scan),
                 initial_scan=self.getScan(),
                 use_adaptive_moment=settings.useAdaptiveMoment.value,
                 vdecay=float(settings.vdecay.value),
@@ -701,7 +701,7 @@ class TikeBackend:
                        settingsRegistry: SettingsRegistry,
                        cropSizer: CropSizer,
                        velociprobeReader: VelociprobeReader,
-                       scanSequence: ScanSequence,
+                       scan: Scan,
                        probeSizer: ProbeSizer,
                        probe: Probe,
                        objectSizer: ObjectSizer,
@@ -715,7 +715,7 @@ class TikeBackend:
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, cropSizer,
-                                                  velociprobeReader, scanSequence, probeSizer,
+                                                  velociprobeReader, scan, probeSizer,
                                                   probe, objectSizer, obj)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(

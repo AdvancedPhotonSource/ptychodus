@@ -8,12 +8,12 @@ import logging
 import numpy
 
 from .crop import CropSizer
-from .geometry import Box, Interval
 from .detector import Detector
+from .geometry import Box, Interval
 from .image import ImageExtent
 from .observer import Observable, Observer
 from .probe import Probe
-from .scan import ScanSequence
+from .scan import Scan
 from .settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
@@ -38,21 +38,21 @@ class ObjectSettings(Observable, Observer):
 
 
 class ObjectSizer(Observable, Observer):
-    def __init__(self, detector: Detector, cropSizer: CropSizer, scanSizer: ScanSizer,
+    def __init__(self, detector: Detector, cropSizer: CropSizer, scan: Scan,
                  probeSizer: ProbeSizer) -> None:
         super().__init__()
         self._detector = detector
         self._cropSizer = cropSizer
-        self._scanSizer = scanSizer
+        self._scan = scan
         self._probeSizer = probeSizer
 
     @classmethod
-    def createInstance(cls, detector: Detector, cropSizer: CropSizer, scanSizer: ScanSizer,
+    def createInstance(cls, detector: Detector, cropSizer: CropSizer, scan: Scan,
                        probeSizer: ProbeSizer) -> ObjectSizer:
-        sizer = cls(detector, cropSizer, scanSizer, probeSizer)
+        sizer = cls(detector, cropSizer, scan, probeSizer)
         detector.addObserver(sizer)
         cropSizer.addObserver(sizer)
-        scanSizer.addObserver(sizer)
+        scan.addObserver(sizer)
         probeSizer.addObserver(sizer)
         return sizer
 
@@ -68,7 +68,7 @@ class ObjectSizer(Observable, Observer):
         return self._lambdaZ_m2 / self._cropSizer.getExtentYInMeters()
 
     def getScanExtent(self) -> ImageExtent:
-        scanBox_m = self._scanSizer.getBoundingBoxInMeters()
+        scanBox_m = self._scan.getBoundingBoxInMeters()
         scanWidth_px = 0
         scanHeight_px = 0
 
@@ -95,7 +95,7 @@ class ObjectSizer(Observable, Observer):
             self.notifyObservers()
         elif observable is self._cropSizer:
             self.notifyObservers()
-        elif observable is self._scanSizer:
+        elif observable is self._scan:
             self.notifyObservers()
         elif observable is self._probeSizer:
             self.notifyObservers()

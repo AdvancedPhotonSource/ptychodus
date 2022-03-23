@@ -3,9 +3,9 @@ from decimal import Decimal
 
 from PyQt5.QtGui import QDoubleValidator
 
-from ..model import Observer, Observable, ScanPointIO, ScanPresenter
+from ..model import Observer, Observable, Scan, ScanPresenter
 from ..view import ScanScanView, ScanInitializerView, ScanParametersView, ScanPlotView
-from .data_file import FileDialogFactory
+from .data import FileDialogFactory
 
 
 class ScanScanController(Observer):
@@ -42,20 +42,20 @@ class ScanScanController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.numberOfScanPointsSpinBox.blockSignals(True)
-        self._view.numberOfScanPointsSpinBox.setRange(self._presenter.getMinNumberOfScanPoints(),
-                                                      self._presenter.getMaxNumberOfScanPoints())
+        self._view.numberOfScanPointsSpinBox.setRange(self._presenter.getNumberOfScanPointsLimits().lower,
+                                                      self._presenter.getNumberOfScanPointsLimits().upper)
         self._view.numberOfScanPointsSpinBox.setValue(self._presenter.getNumberOfScanPoints())
         self._view.numberOfScanPointsSpinBox.blockSignals(False)
 
         self._view.extentXSpinBox.blockSignals(True)
-        self._view.extentXSpinBox.setRange(self._presenter.getMinExtentX(),
-                                           self._presenter.getMaxExtentX())
+        self._view.extentXSpinBox.setRange(self._presenter.getExtentXLimits().lower,
+                                           self._presenter.getExtentXLimits().upper)
         self._view.extentXSpinBox.setValue(self._presenter.getExtentX())
         self._view.extentXSpinBox.blockSignals(False)
 
         self._view.extentYSpinBox.blockSignals(True)
-        self._view.extentYSpinBox.setRange(self._presenter.getMinExtentY(),
-                                           self._presenter.getMaxExtentY())
+        self._view.extentYSpinBox.setRange(self._presenter.getExtentYLimits().lower,
+                                           self._presenter.getExtentYLimits().upper)
         self._view.extentYSpinBox.setValue(self._presenter.getExtentY())
         self._view.extentYSpinBox.blockSignals(False)
 
@@ -83,10 +83,10 @@ class ScanInitializerController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        for initializer in presenter.getScanSequenceList():
+        for initializer in presenter.getInitializerList():
             view.initializerComboBox.addItem(initializer)
 
-        view.initializerComboBox.currentTextChanged.connect(presenter.setCurrentInitializer)
+        view.initializerComboBox.currentTextChanged.connect(presenter.setInitializer)
         view.initializeButton.clicked.connect(presenter.initializeScan)
 
         controller._syncModelToView()
@@ -94,7 +94,7 @@ class ScanInitializerController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(self._presenter.getCurrentInitializer())
+        self._view.initializerComboBox.setCurrentText(self._presenter.getInitializer())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -113,17 +113,17 @@ class ScanTransformController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        for transform in presenter.getTransformXYList():
+        for transform in presenter.getTransformList():
             view.transformComboBox.addItem(transform)
 
-        view.transformComboBox.currentTextChanged.connect(presenter.setCurrentTransformXY)
+        view.transformComboBox.currentTextChanged.connect(presenter.setTransform)
 
         controller._syncModelToView()
 
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.transformComboBox.setCurrentText(self._presenter.getCurrentTransformXY())
+        self._view.transformComboBox.setCurrentText(self._presenter.getTransform())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -150,14 +150,14 @@ class ScanParametersController:
 
     def openScan(self) -> None:
         filePath = self._fileDialogFactory.getOpenFilePath(self._view, 'Open Scan',
-                                                           ScanPointIO.FILE_FILTER)
+                                                           Scan.FILE_FILTER)
 
         if filePath:
             self._presenter.openScan(filePath)
 
     def saveScan(self) -> None:
         filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Scan',
-                                                           ScanPointIO.FILE_FILTER)
+                                                           Scan.FILE_FILTER)
 
         if filePath:
             self._presenter.saveScan(filePath)

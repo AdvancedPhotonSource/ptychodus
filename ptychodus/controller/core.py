@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QApplication, QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
-from .data_file import *
+from .data import *
 from .detector import *
 from .object import *
 from .probe import *
@@ -52,7 +52,7 @@ class ControllerCore:
         self._objectImageController = ObjectImageController.createInstance(
             model.objectPresenter, view.objectImageView, self._fileDialogFactory)
         self._dataFileController = DataFileController.createInstance(model.dataFilePresenter,
-                                                                     model.h5FileTreeReader,
+                                                                     model.h5FileReader,
                                                                      view.dataFileTreeView,
                                                                      view.dataFileTableView,
                                                                      self._fileDialogFactory)

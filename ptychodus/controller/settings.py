@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QDialog, QListView, QTableView
 
 from ..model import Observable, Observer, SettingsGroup, SettingsPresenter, SettingsRegistry, VelociprobePresenter
 from ..view import ImportSettingsDialog
-from .data_file import FileDialogFactory
+from .data import FileDialogFactory
 
 
 class SettingsGroupListModel(QAbstractListModel):
