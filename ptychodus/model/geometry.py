@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Generic, Iterable, overload, TypeVar, Union
+from typing import Generic, Iterable, Iterator, overload, TypeVar, Union
 from decimal import Decimal
 
 T = TypeVar('T', int, float, Decimal)
@@ -38,7 +38,7 @@ class Box(Generic[T]):
     def __init__(self, intervals: Iterable[Interval[T]]) -> None:
         self._intervalList: list[Interval[T]] = [x for x in intervals]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Interval[T]]:
         return iter(self._intervalList)
 
     @overload

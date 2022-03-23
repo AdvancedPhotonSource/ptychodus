@@ -109,10 +109,6 @@ class Object(Observable):
         self._settings = settings
         self._array = numpy.zeros((0, 0), dtype=complex)
 
-    @classmethod
-    def createInstance(cls, settings: ObjectSettings) -> Object:
-        return cls(settings)
-
     def getArray(self) -> numpy.ndarray:
         return self._array
 

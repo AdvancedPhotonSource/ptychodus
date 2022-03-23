@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Optional, Tuple
+from typing import Optional
 import csv
 
 import numpy
@@ -44,84 +44,48 @@ class ScanPoint:
     y: Decimal
 
 
-class ScanPointParseError(Exception):
-    pass
-
-
-class ScanPointIO:
-    FILE_FILTER = 'Comma-Separated Values Files (*.csv)'
-
-    def read(self, filePath: Path) -> list[ScanPoint]:
-        point_list = list()
-
-        with open(filePath, newline='') as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=',')
-
-            for row in csv_reader:
-                if row[0].startswith('#'):
-                    continue
-
-                if len(row) < 2:
-                    raise ScanPointParseError()
-
-                x = Decimal(row[1])
-                y = Decimal(row[0])
-                point = ScanPoint(x, y)
-
-                point_list.append(point)
-
-        return point_list
-
-    def write(self, filePath: Path, scanPointList: list[ScanPoint]) -> None:
-        with open(filePath, 'wt') as csv_file:
-            for point in scanPointList:
-                csv_file.write(f'{point.y},{point.x}\n')
-
-
-class ScanSequence(Sequence, Observable, Observer):
-    pass
-
-
-class ScanSizer(Observable, Observer):
-    def __init__(self, scanSequence: ScanSequence) -> None:
+class Scan(Sequence[ScanPoint], Observable):
+    def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
-        self._scanSequence = scanSequence
+        self._settings = settings
+        self._scanPointList: list[ScanPoint] = list()
         self._boundingBoxInMeters: Optional[Box[Decimal]] = None
-
-    @classmethod
-    def createInstance(cls, scanSequence: ScanSequence) -> ScanSizer:
-        sizer = cls(scanSequence)
-        scanSequence.addObserver(sizer)
-        return sizer
 
     def getBoundingBoxInMeters(self) -> Optional[Box[Decimal]]:
         return self._boundingBoxInMeters
 
-    def _updateBoundingBox(self) -> None:
-        pointIter = iter(self._scanSequence)
+    def __getitem__(self, index: int) -> ScanPoint:
+        return self._scanPointList[index]
+
+    def __len__(self) -> int:
+        return len(self._scanPointList)
+
+    def setScanPoints(self, scanPointIterable: Iterable[ScanPoint]) -> None:
+        scanPointList = list()
+        boundingBoxInMeters = None
+        scanPointIterator = iter(scanPointIterable)
 
         try:
-            point = next(pointIter)
+            scanPoint = next(scanPointIterator)
+            scanPointList.append(scanPoint)
+            xint = Interval(scanPoint.x, scanPoint.x)
+            yint = Interval(scanPoint.y, scanPoint.y)
+            boundingBoxInMeters = Box[Decimal]((xint, yint))
+
+            while True:
+                scanPoint = next(scanPointIterator)
+                scanPointList.append(scanPoint)
+                boundingBoxInMeters[0].hull(scanPoint.x)
+                boundingBoxInMeters[1].hull(scanPoint.y)
         except StopIteration:
-            self._boundingBoxInMeters = None
-            return
+            pass
 
-        xint = Interval(point.x, point.x)
-        yint = Interval(point.y, point.y)
-
-        for point in pointIter:
-            xint.hull(point.x)
-            yint.hull(point.y)
-
-        self._boundingBoxInMeters = Box[Decimal]((xint, yint))
+        self._scanPointList = scanPointList
+        self._boundingBoxInMeters = boundingBoxInMeters
         self.notifyObservers()
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._scanSequence:
-            self._updateBoundingBox()
 
-
-class CartesianScanSequence(ScanSequence):
+class CartesianScanSequence(Sequence[ScanPoint]):
     def __init__(self, settings: ScanSettings, snake: bool) -> None:
         super().__init__()
         self._settings = settings
@@ -129,21 +93,11 @@ class CartesianScanSequence(ScanSequence):
 
     @classmethod
     def createRasterInstance(cls, settings: ScanSettings) -> CartesianScanSequence:
-        generator = cls(settings, False)
-        settings.extentX.addObserver(generator)
-        settings.extentY.addObserver(generator)
-        settings.stepSizeXInMeters.addObserver(generator)
-        settings.stepSizeYInMeters.addObserver(generator)
-        return generator
+        return cls(settings, False)
 
     @classmethod
     def createSnakeInstance(cls, settings: ScanSettings) -> CartesianScanSequence:
-        generator = cls(settings, True)
-        settings.extentX.addObserver(generator)
-        settings.extentY.addObserver(generator)
-        settings.stepSizeXInMeters.addObserver(generator)
-        settings.stepSizeYInMeters.addObserver(generator)
-        return generator
+        return cls(settings, True)
 
     def __getitem__(self, index: int) -> ScanPoint:
         if index >= len(self):
@@ -168,23 +122,11 @@ class CartesianScanSequence(ScanSequence):
     def __str__(self) -> str:
         return 'Snake' if self._snake else 'Raster'
 
-    def update(self, observable: Observable) -> None:
-        self.notifyObservers()
 
-
-class SpiralScanSequence(ScanSequence):
+class SpiralScanSequence(Sequence[ScanPoint]):
     def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
         self._settings = settings
-
-    @classmethod
-    def createInstance(cls, settings: ScanSettings) -> SpiralScanSequence:
-        generator = cls(settings)
-        settings.extentX.addObserver(generator)
-        settings.extentY.addObserver(generator)
-        settings.stepSizeXInMeters.addObserver(generator)
-        settings.stepSizeYInMeters.addObserver(generator)
-        return generator
 
     def __getitem__(self, index: int) -> ScanPoint:
         if index >= len(self):
@@ -215,34 +157,58 @@ class SpiralScanSequence(ScanSequence):
     def __str__(self) -> str:
         return 'Spiral'
 
-    def update(self, observable: Observable) -> None:
-        self.notifyObservers()
+
+class ScanPointParseError(Exception):
+    pass
 
 
-class CustomScanSequence(ScanSequence):
-    def __init__(self) -> None:
+class CustomScanSequence(Sequence[ScanPoint]):
+    FILE_FILTER = 'Comma-Separated Values Files (*.csv)'
+
+    def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
-        self._pointList: list[ScanPoint] = list()
+        self._settings = settings
+        self._scanPointList: list[ScanPoint] = list()
 
     def __getitem__(self, index: int) -> ScanPoint:
-        return self._pointList[index]
+        return self._scanPointList[index]
 
     def __len__(self) -> int:
-        return len(self._pointList)
+        return len(self._scanPointList)
 
     def __str__(self) -> str:
         return 'Custom'
 
-    def setPointList(self, pointList: list[ScanPoint]) -> None:
-        self._pointList = pointList
-        self.notifyObservers()
+    def read(self, filePath: Path) -> list[ScanPoint]:
+        scanPointList = list()
 
-    def update(self, observable: Observable) -> None:
-        pass
+        with open(filePath, newline='') as csvFile:
+            csvReader = csv.reader(csvFile, delimiter=',')
+
+            for row in csvReader:
+                if row[0].startswith('#'):
+                    continue
+
+                if len(row) < 2:
+                    raise ScanPointParseError()
+
+                x = Decimal(row[1])
+                y = Decimal(row[0])
+                point = ScanPoint(x, y)
+
+                scanPointList.append(point)
+
+        self._settings.customFilePath.value = filePath
+        self.setScanPoints(scanPointList)
+
+    def write(self, filePath: Path) -> None:
+        with open(filePath, 'wt') as csvFile:
+            for point in self._scanPointList:
+                csvFile.write(f'{point.y},{point.x}\n')
 
 
-class SelectableScanSequence(ScanSequence):
-    def __init__(self, settings: ScanSettings, sequenceList: list[ScanSequence]) -> None:
+class SelectableScanSequence(Sequence[ScanPoint], Observer):
+    def __init__(self, settings: ScanSettings, sequenceList: list[Sequence[ScanPoint]]) -> None:
         super().__init__()
         self._settings = settings
         self._sequenceList = sequenceList
@@ -284,10 +250,6 @@ class SelectableScanSequence(ScanSequence):
 
     def setCurrentScanSequenceFromSettings(self) -> None:
         self.setCurrentScanSequence(self._settings.initializer.value)
-
-    def setCurrentScanSequenceToCustomPointList(self, pointList: list[ScanPoint]) -> None:
-        self.setCurrentScanSequence('Custom')
-        self._sequence.setPointList(pointList)
 
     def __getitem__(self, index: int) -> ScanPoint:
         return self._sequence[index]
@@ -340,7 +302,8 @@ class TransformXY(Enum):
         return f'{yp}{xp}' if self.value & 4 else f'{xp}{yp}'
 
 
-class TransformedScanSequence(ScanSequence):
+# FIXME BEGIN
+class TransformedScanSequence(Sequence[ScanPoint], Observer):
     def __init__(self, settings: ScanSettings, sequence: ScanSequence) -> None:
         super().__init__()
         self._settings = settings
@@ -349,7 +312,7 @@ class TransformedScanSequence(ScanSequence):
 
     @classmethod
     def createInstance(cls, settings: ScanSettings,
-                       sequence: ScanSequence) -> TransformedScanSequence:
+                       sequence: Sequence[ScanPoint]) -> TransformedScanSequence:
         transformedSequence = cls(settings, sequence)
         transformedSequence.setCurrentTransformXYFromSettings()
         settings.transformXY.addObserver(transformedSequence)
@@ -424,8 +387,8 @@ class ScanPresenter(Observable, Observer):
 
     def openScan(self, filePath: Path) -> None:
         self._settings.customFilePath.value = filePath
-        pointList = self._scanPointIO.read(filePath)
-        self._selectableSequence.setCurrentScanSequenceToCustomPointList(pointList)
+        scanPointList = self._scanPointIO.read(filePath)
+        self._selectableSequence.setCurrentScanSequenceToCustomPointList(scanPointList)
 
     def saveScan(self, filePath: Path) -> None:
         self._scanPointIO.write(filePath, self.getScanPointList())

@@ -99,10 +99,6 @@ class Probe(Observable):
         self._settings = settings
         self._array = numpy.zeros((0, 0), dtype=complex)
 
-    @classmethod
-    def createInstance(cls, settings: ProbeSettings) -> Probe:
-        return cls(settings)
-
     def getArray(self) -> numpy.ndarray:
         return self._array
 
@@ -124,7 +120,6 @@ class Probe(Observable):
 
 class GaussianBeamProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings) -> None:
-        super().__init__()
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
 
@@ -154,7 +149,6 @@ class GaussianBeamProbeInitializer:
 class FresnelZonePlateProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
                  probeSizer: ProbeSizer) -> None:
-        super().__init__()
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
         self._probeSizer = probeSizer
@@ -185,7 +179,6 @@ class FresnelZonePlateProbeInitializer:
 
 class CustomProbeInitializer:
     def __init__(self) -> None:
-        super().__init__()
         self._initialProbe = numpy.zeros((64, 64), dtype=complex)
 
     def cacheProbe(self, probe: numpy.ndarray) -> None:
