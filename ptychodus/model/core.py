@@ -37,11 +37,12 @@ class ModelCore:
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
         self._scan = Scan.createInstance(self._scanSettings)
-        self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan, self.settingsRegistry)
+        self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan,
+                                                               self.settingsRegistry)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings)
-        self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer,
-                                                       self._scan, self._probeSizer)
+        self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
+                                                       self._probeSizer)
         self._object = Object(self._objectSettings)
 
         self.h5FileReader = H5FileReader()
@@ -77,8 +78,7 @@ class ModelCore:
         self.probePresenter = ProbePresenter.createInstance(self._detectorSettings,
                                                             self._probeSettings, self._probeSizer,
                                                             self._probe)
-        self.scanPresenter = ScanPresenter.createInstance(self._scanSettings,
-                                                          self._scan,
+        self.scanPresenter = ScanPresenter.createInstance(self._scanSettings, self._scan,
                                                           self._scanInitializer)
         self.objectPresenter = ObjectPresenter.createInstance(self.rng, self._objectSettings,
                                                               self._objectSizer, self._object)

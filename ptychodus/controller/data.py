@@ -88,9 +88,8 @@ class DataArrayTableModel(QAbstractTableModel):
 
 
 class DataFileController(Observer):
-    def __init__(self, presenter: DataFilePresenter, treeReader: H5FileReader,
-                 treeView: QTreeView, tableView: QTableView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, presenter: DataFilePresenter, treeReader: H5FileReader, treeView: QTreeView,
+                 tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
         self._treeReader = treeReader
         self._treeModel = SimpleTreeModel(treeReader.getTree())

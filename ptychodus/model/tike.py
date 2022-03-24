@@ -391,9 +391,8 @@ class TikeReconstructor:
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
-                 velociprobeReader: VelociprobeReader, scan: Scan,
-                 probeSizer: ProbeSizer, probe: Probe, objectSizer: ObjectSizer,
-                 obj: Object) -> None:
+                 velociprobeReader: VelociprobeReader, scan: Scan, probeSizer: ProbeSizer,
+                 probe: Probe, objectSizer: ObjectSizer, obj: Object) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
@@ -451,10 +450,14 @@ class TikeReconstructor:
     def getTikeObjectExtent(self) -> ImageExtent:
         pad = 2 * (self._probeSizer.getProbeSize() + 2)
         paddingExtent = ImageExtent(width=pad, height=pad)
-        return self._objectSizer.getScanExtent() + paddingExtent
+        extent = self._objectSizer.getScanExtent() + paddingExtent
+        logger.debug(f'tike object extent = {extent}')
+        return extent
 
     def getPtychodusObjectExtent(self) -> ImageExtent:
-        return self._objectSizer.getObjectExtent()
+        extent = self._objectSizer.getObjectExtent()
+        logger.debug(f'ptychodus object extent = {extent}')
+        return extent
 
     def getInitialObject(self) -> numpy.ndarray:
         delta = self.getTikeObjectExtent() - self.getPtychodusObjectExtent()
@@ -473,6 +476,9 @@ class TikeReconstructor:
 
         px_m = self._objectSizer.getPixelSizeXInMeters()
         py_m = self._objectSizer.getPixelSizeYInMeters()
+
+        logger.debug(f'object pixel size x = {px_m} m')
+        logger.debug(f'object pixel size y = {py_m} m')
 
         for point in iter(self._scan):
             xvalues.append(point.x / px_m)
@@ -540,6 +546,14 @@ class TikeReconstructor:
         probe = self.getProbe()
         initialObject = self.getInitialObject()
 
+        logger.debug(f'data shape={data.shape}')
+        logger.debug(f'scan shape={scan.shape}')
+        logger.debug(f'probe shape={probe.shape}')
+        logger.debug(f'object shape={initialObject.shape}')
+
+        #with numpy.printoptions(threshold=numpy.inf):
+        #    print(scan)
+
         if len(data) != len(scan):
             numFrame = min(len(data), len(scan))
             scan = scan[:numFrame, ...]
@@ -549,23 +563,19 @@ class TikeReconstructor:
         positionOptions = self.getPositionOptions()
         probeOptions = self.getProbeOptions()
 
-        try:
-            result = tike.ptycho.reconstruct(
-                data=data,
-                probe=probe,
-                scan=scan,
-                algorithm_options=algorithmOptions,
-                model=self._settings.noiseModel.value,
-                num_gpu=self._settings.numGpus.value,
-                object_options=objectOptions,
-                position_options=positionOptions,
-                probe_options=probeOptions,
-                psi=initialObject,
-                use_mpi=self._settings.useMpi.value,
-            )
-        except ValueError as err:
-            print(err)
-            return -1
+        result = tike.ptycho.reconstruct(
+            data=data,
+            probe=probe,
+            scan=scan,
+            algorithm_options=algorithmOptions,
+            model=self._settings.noiseModel.value,
+            num_gpu=self._settings.numGpus.value,
+            object_options=objectOptions,
+            position_options=positionOptions,
+            probe_options=probeOptions,
+            psi=initialObject,
+            use_mpi=self._settings.useMpi.value,
+        )
 
         self._probe.setArray(result['probe'][0, 0, 0, :, :])
         self._object.setArray(result['psi'])
@@ -715,8 +725,8 @@ class TikeBackend:
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, cropSizer,
-                                                  velociprobeReader, scan, probeSizer,
-                                                  probe, objectSizer, obj)
+                                                  velociprobeReader, scan, probeSizer, probe,
+                                                  objectSizer, obj)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

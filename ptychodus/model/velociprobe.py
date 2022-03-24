@@ -288,9 +288,9 @@ class VelociprobePresenter(Observable, Observer):
 
     def syncDetectorPixelCount(self) -> None:
         self._detectorSettings.numberOfPixelsX.value = \
-                self._detectorSpecificGroup.x_pixels_in_detector
+                int(self._detectorSpecificGroup.x_pixels_in_detector)
         self._detectorSettings.numberOfPixelsY.value = \
-                self._detectorSpecificGroup.y_pixels_in_detector
+                int(self._detectorSpecificGroup.y_pixels_in_detector)
 
     def syncDetectorPixelSize(self) -> None:
         self._detectorSettings.pixelSizeXInMeters.value = \
@@ -317,8 +317,8 @@ class VelociprobePresenter(Observable, Observer):
             centerX = self._cropSettings.centerXInPixels.value
             centerY = self._cropSettings.centerYInPixels.value
 
-            extentX = self._detectorSpecificGroup.x_pixels_in_detector
-            extentY = self._detectorSpecificGroup.y_pixels_in_detector
+            extentX = int(self._detectorSpecificGroup.x_pixels_in_detector)
+            extentY = int(self._detectorSpecificGroup.y_pixels_in_detector)
 
             maxRadiusX = min(centerX, extentX - centerX)
             maxRadiusY = min(centerY, extentY - centerY)

@@ -67,7 +67,7 @@ class CropSizer(Observer, Observable):
     def getSliceX(self) -> slice:
         center = self.getCenterX()
         radius = self.getExtentX() // 2
-        return slice(center - radius, center + radius + 1)
+        return slice(center - radius, center + radius)
 
     def getExtentYLimits(self) -> Interval[int]:
         return Interval[int](1, self._detector.numberOfPixelsY)
@@ -90,7 +90,7 @@ class CropSizer(Observer, Observable):
     def getSliceY(self) -> slice:
         center = self.getCenterY()
         radius = self.getExtentY() // 2
-        return slice(center - radius, center + radius + 1)
+        return slice(center - radius, center + radius)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

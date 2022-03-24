@@ -42,8 +42,9 @@ class ScanScanController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.numberOfScanPointsSpinBox.blockSignals(True)
-        self._view.numberOfScanPointsSpinBox.setRange(self._presenter.getNumberOfScanPointsLimits().lower,
-                                                      self._presenter.getNumberOfScanPointsLimits().upper)
+        self._view.numberOfScanPointsSpinBox.setRange(
+            self._presenter.getNumberOfScanPointsLimits().lower,
+            self._presenter.getNumberOfScanPointsLimits().upper)
         self._view.numberOfScanPointsSpinBox.setValue(self._presenter.getNumberOfScanPoints())
         self._view.numberOfScanPointsSpinBox.blockSignals(False)
 

@@ -240,6 +240,54 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
         self._updateBoundingBox()
         self.notifyObservers()
 
+    def read8col(self, filePath: Path) -> list[ScanPoint]:  # FIXME
+        xy_columns = (5, 1)
+        trigger_column = 7
+        chi = 0.
+
+        # Load data from six column file
+        raw_position = numpy.genfromtxt(
+            str(filePath),
+            usecols=(*xy_columns, trigger_column),
+            delimiter=',',
+            dtype='int',
+        )
+
+        # Split positions where trigger number increases by 1. Assumes that
+        # positions are ordered by trigger number in file. Shift indices by 1
+        # because of how numpy.diff is defined.
+        sections = numpy.nonzero(numpy.diff(raw_position[:, -1]))[0] + 1
+        groups = numpy.split(
+            raw_position[:, :-1],
+            indices_or_sections=sections,
+            axis=0,
+        )
+
+        # Apply a reduction function to handle multiple positions per trigger
+        def position_reduce(g):
+            """Average of the first and last position in each trigger group."""
+            # return numpy.mean(g, axis=0, keepdims=True)
+            return (g[:1] + g[-1:]) / 2
+
+        groups = list(map(position_reduce, groups))
+        scan = numpy.concatenate(groups, axis=0)
+
+        # Rescale according to geometry of velociprobe
+        scan[:, 0] *= -1e-9
+        scan -= numpy.mean(scan, axis=0, keepdims=True)
+        scan[:, 1] *= 1e-9 * numpy.cos(chi / 180 * numpy.pi)
+
+        scanPointList = list()
+
+        for row in scan:
+            x = Decimal(row[0])
+            y = Decimal(row[1])
+            point = ScanPoint(x, y)
+            scanPointList.append(point)
+
+        self._settings.customFilePath.value = filePath
+        self.setScanPoints(scanPointList)
+
     def read(self, filePath: Path) -> list[ScanPoint]:
         scanPointList = list()
 
@@ -270,7 +318,7 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
     def getBoundingBoxInMeters(self) -> Optional[Box[Decimal]]:
         return self._boundingBoxInMeters
 
-    def _updateBoundingBox(self) -> None: # FIXME
+    def _updateBoundingBox(self) -> None:  # FIXME
         boundingBoxInMeters = None
         scanPointIterator = iter(self)
 
@@ -374,14 +422,16 @@ class ScanInitializer(Observable, Observer):
 class ScanPresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
-    def __init__(self, settings: ScanSettings, scan: Scan, scanInitializer: ScanInitializer) -> None:
+    def __init__(self, settings: ScanSettings, scan: Scan,
+                 scanInitializer: ScanInitializer) -> None:
         super().__init__()
         self._settings = settings
         self._scan = scan
         self._scanInitializer = scanInitializer
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings, scan: Scan, scanInitializer: ScanInitializer) -> ScanPresenter:
+    def createInstance(cls, settings: ScanSettings, scan: Scan,
+                       scanInitializer: ScanInitializer) -> ScanPresenter:
         presenter = cls(settings, scan, scanInitializer)
         settings.addObserver(presenter)
         scan.addObserver(presenter)
