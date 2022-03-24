@@ -216,24 +216,24 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
     def getTransform(self) -> str:
         return str(self._transform)
 
-    def setTransform(self, transform: ScanPointTransform) -> None:
+    def _setTransform(self, transform: ScanPointTransform) -> None:
         if transform != self._transform:
             self._transform = transform
             self._settings.transform.value = repr(self._transform)
             self._updateBoundingBox()
             self.notifyObservers()
 
-    def setTransformByName(self, name: str) -> None:
+    def setTransform(self, name: str) -> None:
         try:
             transform = next(xform for xform in ScanPointTransform if xform.isNameMatchFor(name))
         except StopIteration:
             logger.debug(f'Invalid transform \"{name}\"')
             return
 
-        self.setTransform(transform)
+        self._setTransform(transform)
 
     def setTransformFromSettings(self) -> None:
-        self.setTransformByName(self._settings.transform.value)
+        self.setTransform(self._settings.transform.value)
 
     def setScanPoints(self, scanPointIterable: Iterable[ScanPoint]) -> None:
         self._scanPointList = [scanPoint for scanPoint in scanPointIterable]
@@ -353,6 +353,13 @@ class ScanInitializer(Observable, Observer):
         self._customInitializer.setScanPoints(self._scan)
         self._setInitializer(self._customInitializer)
 
+    def _preloadScanFromCustomFile(self) -> None:
+        customFilePath = self._settings.customFilePath.value
+
+        if customFilePath is not None and customFilePath.is_file():
+            self._scan.read(customFilePath)
+            self._customInitializer.setScanPoints(self._scan)
+
     def saveScan(self, filePath: Path) -> None:
         self._scan.write(filePath)
 
@@ -360,6 +367,7 @@ class ScanInitializer(Observable, Observer):
         if observable is self._settings.initializer:
             self.setInitializerFromSettings()
         elif observable is self._reinitObservable:
+            self._preloadScanFromCustomFile()
             self.initializeScan()
 
 
