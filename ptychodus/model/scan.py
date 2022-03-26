@@ -120,14 +120,9 @@ class SpiralScanInitializer(Sequence[ScanPoint]):
         return 'Spiral'
 
 
-class ScanPointParseError(Exception):
-    pass
-
-
 class CustomScanInitializer(Sequence[ScanPoint]):
-    def __init__(self, settings: ScanSettings) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._settings = settings
         self._scanPointList: list[ScanPoint] = list()
 
     def setScanPoints(self, scanPointIterable: Iterable[ScanPoint]) -> None:
@@ -188,6 +183,10 @@ class ScanPointTransform(Enum):
         xp = '-x' if self.negateX else '+x'
         yp = '-y' if self.negateY else '+y'
         return f'{yp}{xp}' if self.swapXY else f'{xp}{yp}'
+
+
+class ScanPointParseError(Exception):
+    pass
 
 
 class Scan(Sequence[ScanPoint], Observable, Observer):
@@ -348,7 +347,7 @@ class ScanInitializer(Observable, Observer):
         self._settings = settings
         self._scan = scan
         self._reinitObservable = reinitObservable
-        self._customInitializer = CustomScanInitializer(settings)
+        self._customInitializer = CustomScanInitializer()
         self._initializer = self._customInitializer
         self._initializerList: list[Sequence[ScanPoint]] = [self._customInitializer]
 
@@ -422,39 +421,38 @@ class ScanInitializer(Observable, Observer):
 class ScanPresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
-    def __init__(self, settings: ScanSettings, scan: Scan,
-                 scanInitializer: ScanInitializer) -> None:
+    def __init__(self, settings: ScanSettings, scan: Scan, initializer: ScanInitializer) -> None:
         super().__init__()
         self._settings = settings
         self._scan = scan
-        self._scanInitializer = scanInitializer
+        self._initializer = initializer
 
     @classmethod
     def createInstance(cls, settings: ScanSettings, scan: Scan,
-                       scanInitializer: ScanInitializer) -> ScanPresenter:
-        presenter = cls(settings, scan, scanInitializer)
+                       initializer: ScanInitializer) -> ScanPresenter:
+        presenter = cls(settings, scan, initializer)
         settings.addObserver(presenter)
         scan.addObserver(presenter)
-        scanInitializer.addObserver(presenter)
+        initializer.addObserver(presenter)
         return presenter
 
     def openScan(self, filePath: Path) -> None:
-        self._scanInitializer.openScan(filePath)
+        self._initializer.openScan(filePath)
 
     def saveScan(self, filePath: Path) -> None:
-        self._scanInitializer.saveScan(filePath)
+        self._initializer.saveScan(filePath)
 
     def getInitializerList(self) -> list[str]:
-        return self._scanInitializer.getInitializerList()
+        return self._initializer.getInitializerList()
 
     def getInitializer(self) -> str:
-        return self._scanInitializer.getInitializer()
+        return self._initializer.getInitializer()
 
     def setInitializer(self, name: str) -> None:
-        self._scanInitializer.setInitializer(name)
+        self._initializer.setInitializer(name)
 
     def initializeScan(self) -> None:
-        self._scanInitializer.initializeScan()
+        self._initializer.initializeScan()
 
     def getTransformList(self) -> list[str]:
         return [str(xform) for xform in ScanPointTransform]
@@ -518,5 +516,5 @@ class ScanPresenter(Observable, Observer):
             self.notifyObservers()
         elif observable is self._scan:
             self.notifyObservers()
-        elif observable is self._scanInitializer:
+        elif observable is self._initializer:
             self.notifyObservers()

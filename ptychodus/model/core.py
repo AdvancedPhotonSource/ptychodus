@@ -41,6 +41,10 @@ class ModelCore:
                                                                self.settingsRegistry)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings)
+        self._probeInitializer = ProbeInitializer.createInstance(self._detectorSettings,
+                                                                 self._probeSettings,
+                                                                 self._probeSizer, self._probe,
+                                                                 self.settingsRegistry)
         self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
                                                        self._probeSizer)
         self._object = Object(self._objectSettings)
@@ -75,9 +79,8 @@ class ModelCore:
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
             self._probeSettings)
-        self.probePresenter = ProbePresenter.createInstance(self._detectorSettings,
-                                                            self._probeSettings, self._probeSizer,
-                                                            self._probe)
+        self.probePresenter = ProbePresenter.createInstance(self._probeSettings, self._probeSizer,
+                                                            self._probe, self._probeInitializer)
         self.scanPresenter = ScanPresenter.createInstance(self._scanSettings, self._scan,
                                                           self._scanInitializer)
         self.objectPresenter = ObjectPresenter.createInstance(self.rng, self._objectSettings,

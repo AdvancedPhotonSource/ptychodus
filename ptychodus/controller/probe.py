@@ -92,7 +92,7 @@ class ProbeInitializerController(Observer):
         for initializer in presenter.getInitializerList():
             view.initializerComboBox.addItem(initializer)
 
-        view.initializerComboBox.currentTextChanged.connect(presenter.setCurrentInitializer)
+        view.initializerComboBox.currentTextChanged.connect(presenter.setInitializer)
         view.initializeButton.clicked.connect(presenter.initializeProbe)
 
         controller._syncModelToView()
@@ -100,7 +100,7 @@ class ProbeInitializerController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(self._presenter.getCurrentInitializer())
+        self._view.initializerComboBox.setCurrentText(self._presenter.getInitializer())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
