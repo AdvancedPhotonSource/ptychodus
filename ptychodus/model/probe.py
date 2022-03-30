@@ -11,6 +11,7 @@ from .crop import CropSizer
 from .detector import DetectorSettings
 from .fzp import single_probe
 from .geometry import Interval
+from .image import ImageExtent
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
 
@@ -73,6 +74,10 @@ class ProbeSizer(Observable, Observer):
     def getProbeSize(self) -> int:
         limits = self.getProbeSizeLimits()
         return limits.clamp(self._settings.probeSize.value)
+
+    def getProbeExtent(self) -> ImageExtent:
+        size = self.getProbeSize()
+        return ImageExtent(width=size, height=size)
 
     def getWavelengthInMeters(self) -> Decimal:
         # Source: https://physics.nist.gov/cuu/Constants/index.html
@@ -155,17 +160,18 @@ class FresnelZonePlateProbeInitializer:
 
 
 class CustomProbeInitializer:
-    def __init__(self) -> None:
-        self._probe = numpy.zeros((64, 64), dtype=complex)
+    def __init__(self, sizer: ProbeSizer) -> None:
+        self._sizer = sizer
+        self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
 
-    def setArray(self, probe: numpy.ndarray) -> None:
-        if not numpy.iscomplexobj(probe):
+    def setArray(self, array: numpy.ndarray) -> None:
+        if not numpy.iscomplexobj(array):
             raise TypeError('Probe must be a complex-valued ndarray')
 
-        self._probe = probe
+        self._array = array
 
     def __call__(self) -> numpy.ndarray:
-        return self._probe
+        return self._array
 
     def __str__(self) -> str:
         return 'Custom'
@@ -174,10 +180,11 @@ class CustomProbeInitializer:
 class Probe(Observable):
     FILE_FILTER = 'NumPy Binary Files (*.npy)'
 
-    def __init__(self, settings: ProbeSettings) -> None:
+    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer) -> None:
         super().__init__()
         self._settings = settings
-        self._array = numpy.zeros((0, 0), dtype=complex)
+        self._sizer = sizer
+        self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
 
     def getArray(self) -> numpy.ndarray:
         return self._array
@@ -199,13 +206,13 @@ class Probe(Observable):
 
 
 class ProbeInitializer(Observable, Observer):
-    def __init__(self, settings: ProbeSettings, probe: Probe,
+    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
                  reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._probe = probe
         self._reinitObservable = reinitObservable
-        self._customInitializer = CustomProbeInitializer()
+        self._customInitializer = CustomProbeInitializer(sizer)
         self._initializer = self._customInitializer
         self._initializerList: list[Callable[[], numpy.ndarray]] = [self._customInitializer]
 
@@ -213,7 +220,7 @@ class ProbeInitializer(Observable, Observer):
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
                        sizer: ProbeSizer, probe: Probe,
                        reinitObservable: Observable) -> ProbeInitializer:
-        initializer = cls(probeSettings, probe, reinitObservable)
+        initializer = cls(probeSettings, sizer, probe, reinitObservable)
 
         gaussInit = GaussianBeamProbeInitializer(detectorSettings, probeSettings)
         initializer.addInitializer(gaussInit)
@@ -260,7 +267,7 @@ class ProbeInitializer(Observable, Observer):
     def openProbe(self, filePath: Path) -> None:
         self._settings.customFilePath.value = filePath
         self._probe.read(filePath)
-        self._customInitializer.setArray(self._probe)
+        self._customInitializer.setArray(self._probe.getArray())
         self._setInitializer(self._customInitializer)
 
     def _preloadProbeFromCustomFile(self) -> None:
@@ -268,7 +275,7 @@ class ProbeInitializer(Observable, Observer):
 
         if customFilePath is not None and customFilePath.is_file():
             self._probe.read(customFilePath)
-            self._customInitializer.setArray(self._probe)
+            self._customInitializer.setArray(self._probe.getArray())
 
     def saveProbe(self, filePath: Path) -> None:
         self._probe.write(filePath)

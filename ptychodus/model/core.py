@@ -40,14 +40,19 @@ class ModelCore:
         self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan,
                                                                self.settingsRegistry)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
-        self._probe = Probe(self._probeSettings)
+        self._probe = Probe(self._probeSettings, self._probeSizer)
         self._probeInitializer = ProbeInitializer.createInstance(self._detectorSettings,
                                                                  self._probeSettings,
                                                                  self._probeSizer, self._probe,
                                                                  self.settingsRegistry)
         self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
                                                        self._probeSizer)
-        self._object = Object(self._objectSettings)
+        self._object = Object(self._objectSettings, self._objectSizer)
+        self._objectInitializer = ObjectInitializer.createInstance(self.rng,
+                                                                   self._detectorSettings,
+                                                                   self._objectSettings,
+                                                                   self._objectSizer, self._object,
+                                                                   self.settingsRegistry)
 
         self.h5FileReader = H5FileReader()
         self._velociprobeReader = VelociprobeReader()
@@ -83,8 +88,9 @@ class ModelCore:
                                                             self._probe, self._probeInitializer)
         self.scanPresenter = ScanPresenter.createInstance(self._scanSettings, self._scan,
                                                           self._scanInitializer)
-        self.objectPresenter = ObjectPresenter.createInstance(self.rng, self._objectSettings,
-                                                              self._objectSizer, self._object)
+        self.objectPresenter = ObjectPresenter.createInstance(self._objectSettings,
+                                                              self._objectSizer, self._object,
+                                                              self._objectInitializer)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 
