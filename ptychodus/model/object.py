@@ -278,7 +278,7 @@ class ObjectPresenter(Observable, Observer):
         self._initializer.saveObject(filePath)
 
     def initializeObject(self) -> None:
-        self._initializer.initialzeObject()
+        self._initializer.initializeObject()
 
     def getObject(self) -> numpy.ndarray:
         return self._object.getArray()

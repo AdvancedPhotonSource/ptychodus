@@ -1,7 +1,10 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox, QSpinBox, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGroupBox, QSpinBox, QVBoxLayout, QWidget
+
+from .widgets import DecimalSlider
 
 
 class TikeBasicParametersView(QGroupBox):
@@ -14,8 +17,8 @@ class TikeBasicParametersView(QGroupBox):
         self.numBatchSpinBox = QSpinBox()
         self.numIterSpinBox = QSpinBox()
         self.cgIterSpinBox = QSpinBox()
-        self.alphaSpinBox = QDoubleSpinBox()
-        self.stepLengthSpinBox = QDoubleSpinBox()
+        self.alphaSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.stepLengthSlider = DecimalSlider.createInstance(Qt.Horizontal)
 
     @classmethod
     def createInstance(cls,
@@ -38,8 +41,8 @@ class TikeBasicParametersView(QGroupBox):
         view.numIterSpinBox.setToolTip('The number of epochs to process before returning.')
         view.cgIterSpinBox.setToolTip(
             'The number of conjugate directions to search for each update.')
-        view.alphaSpinBox.setToolTip('RPIE becomes EPIE when this parameter is 1.')
-        view.stepLengthSpinBox.setToolTip(
+        view.alphaSlider.setToolTip('RPIE becomes EPIE when this parameter is 1.')
+        view.stepLengthSlider.setToolTip(
             'Scales the inital search directions before the line search.')
 
         layout = QFormLayout()
@@ -54,10 +57,10 @@ class TikeBasicParametersView(QGroupBox):
             layout.addRow('CG Search Directions:', view.cgIterSpinBox)
 
         if showAlpha:
-            layout.addRow('Alpha:', view.alphaSpinBox)
+            layout.addRow('Alpha:', view.alphaSlider)
 
         if showStepLength:
-            layout.addRow('Step Length:', view.stepLengthSpinBox)
+            layout.addRow('Step Length:', view.stepLengthSlider)
 
         view.setLayout(layout)
 
@@ -67,21 +70,21 @@ class TikeBasicParametersView(QGroupBox):
 class TikeAdaptiveMomentView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(' Use Adaptive Moment', parent)
-        self.mdecaySpinBox = QDoubleSpinBox()
-        self.vdecaySpinBox = QDoubleSpinBox()
+        self.mdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.vdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikeAdaptiveMomentView:
         view = cls(parent)
 
-        view.mdecaySpinBox.setToolTip('The proportion of the first moment '
-                                      'that is previous first moments.')
-        view.vdecaySpinBox.setToolTip('The proportion of the second moment '
-                                      'that is previous second moments.')
+        view.mdecaySlider.setToolTip('The proportion of the first moment '
+                                     'that is previous first moments.')
+        view.vdecaySlider.setToolTip('The proportion of the second moment '
+                                     'that is previous second moments.')
 
         layout = QFormLayout()
-        layout.addRow('M Decay:', view.mdecaySpinBox)
-        layout.addRow('V Decay:', view.vdecaySpinBox)
+        layout.addRow('M Decay:', view.mdecaySlider)
+        layout.addRow('V Decay:', view.vdecaySlider)
         view.setLayout(layout)
 
         return view
@@ -111,7 +114,7 @@ class TikePositionCorrectionView(QGroupBox):
 class TikeProbeCorrectionView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Probe Correction', parent)
-        self.sparsityConstraintSpinBox = QDoubleSpinBox()
+        self.sparsityConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.orthogonalityConstraintCheckBox = QCheckBox('Orthogonality Constraint')
         self.centeredIntensityConstraintCheckBox = QCheckBox('Centered Intensity Constraint')
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
@@ -120,7 +123,7 @@ class TikeProbeCorrectionView(QGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikeProbeCorrectionView:
         view = cls(parent)
 
-        view.sparsityConstraintSpinBox.setToolTip(
+        view.sparsityConstraintSlider.setToolTip(
             'Forces a maximum proportion of non-zero elements.')
         view.orthogonalityConstraintCheckBox.setToolTip(
             'Forces probes to be orthogonal each iteration.')
@@ -128,7 +131,7 @@ class TikeProbeCorrectionView(QGroupBox):
             'Forces the probe intensity to be centered.')
 
         layout = QFormLayout()
-        layout.addRow('Sparsity Constraint:', view.sparsityConstraintSpinBox)
+        layout.addRow('Sparsity Constraint:', view.sparsityConstraintSlider)
         layout.addRow(view.orthogonalityConstraintCheckBox)
         layout.addRow(view.centeredIntensityConstraintCheckBox)
         layout.addRow(view.adaptiveMomentView)
@@ -140,8 +143,8 @@ class TikeProbeCorrectionView(QGroupBox):
 class TikeObjectCorrectionView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Object Correction', parent)
-        self.positivityConstraintSpinBox = QDoubleSpinBox()
-        self.smoothnessConstraintSpinBox = QDoubleSpinBox()
+        self.positivityConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.smoothnessConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
 
     @classmethod
@@ -149,8 +152,8 @@ class TikeObjectCorrectionView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Positivity Constraint:', view.positivityConstraintSpinBox)
-        layout.addRow('Smoothness Constraint:', view.smoothnessConstraintSpinBox)
+        layout.addRow('Positivity Constraint:', view.positivityConstraintSlider)
+        layout.addRow('Smoothness Constraint:', view.smoothnessConstraintSlider)
         layout.addRow(view.adaptiveMomentView)
         view.setLayout(layout)
 

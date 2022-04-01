@@ -90,7 +90,7 @@ class SettingsGroup(Observable, Observer):
 
         return candidateEntry
 
-    def __iter__(self):  # TODO typing
+    def __iter__(self) -> Iterator[SettingsEntry]:
         return iter(self._entryList)
 
     def __getitem__(self, index: int) -> SettingsEntry:
@@ -118,7 +118,7 @@ class SettingsRegistry(Observable):
         self._groupList.append(group)
         return group
 
-    def __iter__(self):  # TODO typing
+    def __iter__(self) -> Iterator[SettingsGroup]:
         return iter(self._groupList)
 
     def __getitem__(self, index: int) -> SettingsGroup:
@@ -155,7 +155,7 @@ class SettingsPresenter(Observable):
                 optionValueString = config.get(settingsGroup.name, settingsEntry.name)
                 settingsEntry.setValueFromString(optionValueString)
 
-        # FIXME need to load dataset, load scan, init probe, init object, etc.
+        # FIXME need to load dataset, etc.
         self._settingsRegistry.notifyObservers()
 
     def saveSettings(self, filePath: Path) -> None:
