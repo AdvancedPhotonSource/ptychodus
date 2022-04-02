@@ -9,7 +9,7 @@ from .data import FileDialogFactory
 
 
 class ImageController:
-    IMAGE_FILTER = 'Image Files (*.png *.jpg *.bmp)'  # TODO support more image types
+    MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
     def __init__(self, view: ImageView, fileDialogFactory: FileDialogFactory) -> None:
         self._view = view
@@ -87,8 +87,8 @@ class ImageController:
         return controller
 
     def _saveImage(self) -> None:
-        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Image',
-                                                           ImageController.IMAGE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(
+            self._view, 'Save Image', mimeTypeFilters=ImageController.MIME_TYPES)
 
         if filePath:
             pixmap = self._view.imageWidget.getPixmap()

@@ -150,15 +150,17 @@ class ScanParametersController:
         return controller
 
     def openScan(self) -> None:
-        filePath = self._fileDialogFactory.getOpenFilePath(self._view, 'Open Scan',
-                                                           Scan.FILE_FILTER)
+        filePath = self._fileDialogFactory.getOpenFilePath(self._view,
+                                                           'Open Scan',
+                                                           mimeTypeFilters=[Scan.MIME_TYPE])
 
         if filePath:
             self._presenter.openScan(filePath)
 
     def saveScan(self) -> None:
-        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Scan',
-                                                           Scan.FILE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(self._view,
+                                                           'Save Scan',
+                                                           mimeTypeFilters=[Scan.MIME_TYPE])
 
         if filePath:
             self._presenter.saveScan(filePath)

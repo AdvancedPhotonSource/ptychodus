@@ -190,7 +190,7 @@ class ScanPointParseError(Exception):
 
 
 class Scan(Sequence[ScanPoint], Observable, Observer):
-    FILE_FILTER = 'Comma-Separated Values Files (*.csv)'
+    MIME_TYPE = 'text/csv'
 
     def __init__(self, settings: ScanSettings) -> None:
         super().__init__()

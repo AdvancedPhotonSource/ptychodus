@@ -94,15 +94,15 @@ class SettingsController(Observer):
         return controller
 
     def openSettings(self) -> None:
-        filePath = self._fileDialogFactory.getOpenFilePath(self._groupListView, 'Open Settings',
-                                                           SettingsPresenter.FILE_FILTER)
+        filePath = self._fileDialogFactory.getOpenFilePath(
+            self._groupListView, 'Open Settings', nameFilters=[SettingsPresenter.FILE_FILTER])
 
         if filePath:
             self._presenter.openSettings(filePath)
 
     def saveSettings(self) -> None:
-        filePath = self._fileDialogFactory.getSaveFilePath(self._groupListView, 'Save Settings',
-                                                           SettingsPresenter.FILE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(
+            self._groupListView, 'Save Settings', nameFilters=[SettingsPresenter.FILE_FILTER])
 
         if filePath:
             self._presenter.saveSettings(filePath)
