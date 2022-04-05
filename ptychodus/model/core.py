@@ -76,7 +76,6 @@ class ModelCore:
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
 
         self.dataFilePresenter = DataFilePresenter()
-        self.settingsPresenter = SettingsPresenter.createInstance(self.settingsRegistry)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.detectorImagePresenter = DetectorImagePresenter.createInstance(

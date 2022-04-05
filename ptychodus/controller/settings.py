@@ -3,7 +3,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QDialog, QListView, QTableView
 
-from ..model import ObjectPresenter, Observable, Observer, ProbePresenter, SettingsGroup, SettingsPresenter, SettingsRegistry, VelociprobePresenter
+from ..model import ObjectPresenter, Observable, Observer, ProbePresenter, SettingsGroup, SettingsRegistry, VelociprobePresenter
 from ..view import ImportSettingsDialog
 from .data import FileDialogFactory
 
@@ -68,23 +68,19 @@ class SettingsEntryTableModel(QAbstractTableModel):
 
 
 class SettingsController(Observer):
-    def __init__(self, settingsRegistry: SettingsRegistry, presenter: SettingsPresenter,
-                 groupListView: QListView, entryTableView: QTableView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, groupListView: QListView,
+                 entryTableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._settingsRegistry = settingsRegistry
-        self._presenter = presenter
         self._groupListModel = SettingsGroupListModel(settingsRegistry)
         self._groupListView = groupListView
         self._entryTableView = entryTableView
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry, presenter: SettingsPresenter,
-                       groupListView: QListView, entryTableView: QTableView,
-                       fileDialogFactory: FileDialogFactory) -> None:
-        controller = cls(settingsRegistry, presenter, groupListView, entryTableView,
-                         fileDialogFactory)
+    def createInstance(cls, settingsRegistry: SettingsRegistry, groupListView: QListView,
+                       entryTableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
+        controller = cls(settingsRegistry, groupListView, entryTableView, fileDialogFactory)
         settingsRegistry.addObserver(controller)
 
         controller._groupListView.setModel(controller._groupListModel)
@@ -95,17 +91,17 @@ class SettingsController(Observer):
 
     def openSettings(self) -> None:
         filePath = self._fileDialogFactory.getOpenFilePath(
-            self._groupListView, 'Open Settings', nameFilters=[SettingsPresenter.FILE_FILTER])
+            self._groupListView, 'Open Settings', nameFilters=[SettingsRegistry.FILE_FILTER])
 
         if filePath:
-            self._presenter.openSettings(filePath)
+            self._settingsRegistry.read(filePath)
 
     def saveSettings(self) -> None:
         filePath = self._fileDialogFactory.getSaveFilePath(
-            self._groupListView, 'Save Settings', nameFilters=[SettingsPresenter.FILE_FILTER])
+            self._groupListView, 'Save Settings', nameFilters=[SettingsRegistry.FILE_FILTER])
 
         if filePath:
-            self._presenter.saveSettings(filePath)
+            self._settingsRegistry.write(filePath)
 
     def _updateEntryTable(self) -> None:
         current = self._groupListView.currentIndex()

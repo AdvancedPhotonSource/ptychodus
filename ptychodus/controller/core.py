@@ -27,7 +27,6 @@ class ControllerCore:
             model.probePresenter, model.objectPresenter, model.velociprobePresenter,
             view.importSettingsDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
-                                                                     model.settingsPresenter,
                                                                      view.settingsGroupView,
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)

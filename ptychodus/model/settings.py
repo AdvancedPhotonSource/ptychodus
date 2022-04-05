@@ -105,6 +105,8 @@ class SettingsGroup(Observable, Observer):
 
 
 class SettingsRegistry(Observable):
+    FILE_FILTER = 'Initialization Files (*.ini)'
+
     def __init__(self) -> None:
         super().__init__()
         self._groupList: list[SettingsGroup] = list()
@@ -127,24 +129,11 @@ class SettingsRegistry(Observable):
     def __len__(self) -> int:
         return len(self._groupList)
 
-
-class SettingsPresenter(Observable):
-    FILE_FILTER = 'Initialization Files (*.ini)'
-
-    def __init__(self, settingsRegistry: SettingsRegistry) -> None:
-        super().__init__()
-        self._settingsRegistry = settingsRegistry
-
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> SettingsPresenter:
-        presenter = cls(settingsRegistry)
-        return presenter
-
-    def openSettings(self, filePath: Path) -> None:
+    def read(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.read(filePath)
 
-        for settingsGroup in self._settingsRegistry:
+        for settingsGroup in self._groupList:
             if not config.has_section(settingsGroup.name):
                 continue
 
@@ -156,13 +145,13 @@ class SettingsPresenter(Observable):
                 settingsEntry.setValueFromString(optionValueString)
 
         # FIXME need to load dataset, etc.
-        self._settingsRegistry.notifyObservers()
+        self.notifyObservers()
 
-    def saveSettings(self, filePath: Path) -> None:
+    def write(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.optionxform = lambda option: option
 
-        for settingsGroup in self._settingsRegistry:
+        for settingsGroup in self._groupList:
             config.add_section(settingsGroup.name)
 
             for settingsEntry in settingsGroup:
