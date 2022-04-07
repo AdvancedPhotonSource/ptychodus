@@ -34,10 +34,13 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
+        self._velociprobeReader = VelociprobeReader()
+        self._scanFileReader = VelociprobeScanReader(self._velociprobeReader)
+
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
         self._scan = Scan.createInstance(self._scanSettings)
-        self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan,
+        self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan, self._scanFileReader,
                                                                self.settingsRegistry)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings, self._probeSizer)
@@ -55,7 +58,6 @@ class ModelCore:
                                                                    self.settingsRegistry)
 
         self.h5FileReader = H5FileReader()
-        self._velociprobeReader = VelociprobeReader()
         self._velociprobeImageSequence = VelociprobeImageSequence.createInstance(
             self._velociprobeReader)
         self._croppedImageSequence = CroppedImageSequence.createInstance(

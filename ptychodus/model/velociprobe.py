@@ -1,7 +1,11 @@
 from __future__ import annotations
+from collections import defaultdict
 from dataclasses import dataclass, field
+from decimal import Decimal
+from enum import IntEnum
 from pathlib import Path
 from typing import Optional, Tuple
+import csv
 import logging
 
 import h5py
@@ -13,6 +17,7 @@ from .detector import DetectorSettings
 from .image import ImageSequence
 from .observer import Observable, Observer
 from .probe import ProbeSettings
+from .scan import ScanFileReader, ScanPoint, ScanPointParseError
 from .settings import SettingsGroup
 
 logger = logging.getLogger(__name__)
@@ -58,6 +63,10 @@ class InstrumentGroup:
 @dataclass(frozen=True)
 class GoniometerGroup:
     chi_deg: float
+
+    @property
+    def chi_rad(self) -> float:
+        return numpy.deg2rad(self.chi_deg)
 
 
 @dataclass(frozen=True)
@@ -146,7 +155,7 @@ class VelociprobeReader(DataFileReader, Observable):
         h5ChiDataset = h5GoniometerGroup['chi']
         assert h5ChiDataset.attrs['units'] == b'degree'
 
-        goniometer = GoniometerGroup(chi_deg=h5ChiDataset[0])
+        goniometer = GoniometerGroup(chi_deg=float(h5ChiDataset[0]))
         return SampleGroup(goniometer=goniometer)
 
     def read(self, rootGroup: h5py.Group) -> None:
@@ -165,6 +174,75 @@ class VelociprobeReader(DataFileReader, Observable):
             self.entryGroup = None
 
         self.notifyObservers()
+
+
+class VelociprobeScanYPositionSource(IntEnum):
+    LASER_INTERFEROMETER = 2
+    ENCODER = 5
+
+
+class VelociprobeScanPointList:
+    def __init__(self) -> None:
+        self.xInNanometers: list[int] = list()
+        self.yInNanometers: list[int] = list()
+
+    def append(self, x_nm: int, y_nm: int) -> None:
+        self.xInNanometers.append(x_nm)
+        self.yInNanometers.append(y_nm)
+
+    def mean(self) -> ScanPoint:
+        nanometersToMeters = Decimal('1e-9')
+        x_nm = Decimal(sum(self.xInNanometers)) / Decimal(len(self.xInNanometers))
+        y_nm = Decimal(sum(self.yInNanometers)) / Decimal(len(self.yInNanometers))
+        return ScanPoint(x_nm * nanometersToMeters, y_nm * nanometersToMeters)
+
+
+class VelociprobeScanReader(ScanFileReader):
+    FILE_FILTER = 'Velociprobe Scan Files (*.txt)'
+    X_COLUMN = 1
+    TRIGGER_COLUMN = 7
+
+    def __init__(self, velociprobeReader: VelociprobeReader) -> None:
+        self._velociprobeReader = velociprobeReader
+        self._yPositionSource = VelociprobeScanYPositionSource.ENCODER
+
+    def read(self, filePath: Path) -> Iterable[ScanPoint]:
+        scanPointDict = defaultdict(VelociprobeScanPointList)
+
+        with open(filePath, newline='') as csvFile:
+            csvReader = csv.reader(csvFile, delimiter=',')
+
+            for row in csvReader:
+                if row[0].startswith('#'):
+                    continue
+
+                if len(row) != 8:
+                    raise ScanPointParseError()
+
+                trigger = int(row[VelociprobeScanReader.TRIGGER_COLUMN])
+                x_nm = int(row[VelociprobeScanReader.X_COLUMN])
+                y_nm = int(row[self._yPositionSource.value])
+
+                if self._yPositionSource == VelociprobeScanYPositionSource.ENCODER:
+                    y_nm = -y_nm
+
+                scanPointDict[trigger].append(x_nm, y_nm)
+
+        scanPointList = [scanPointList.mean() for _, scanPointList in sorted(scanPointDict.items())]
+        xMeanInMeters = sum(point.x for point in scanPointList) / len(scanPointList)
+        yMeanInMeters = sum(point.y for point in scanPointList) / len(scanPointList)
+
+        for idx, scanPoint in enumerate(scanPointList):
+            chi_rad = 0.
+
+            if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.sample.goniometer:
+                chi_rad = self._velociprobeReader.entryGroup.sample.goniometer.chi_rad
+
+            x_m = (scanPoint.x - xMeanInMeters) * Decimal(numpy.cos(chi_rad))
+            y_m = (scanPoint.y - yMeanInMeters)
+            scanPointList[idx] = ScanPoint(x_m, y_m)
+
+        return scanPointList
 
 
 class VelociprobeImageSequence(ImageSequence):

@@ -480,7 +480,7 @@ class TikeReconstructor:
         logger.debug(f'object pixel size x = {px_m} m')
         logger.debug(f'object pixel size y = {py_m} m')
 
-        for point in iter(self._scan):
+        for point in self._scan:
             xvalues.append(point.x / px_m)
             yvalues.append(point.y / py_m)
 
@@ -491,7 +491,7 @@ class TikeReconstructor:
         xvalues = [x + ux for x in xvalues]
         yvalues = [y + uy for y in yvalues]
 
-        return numpy.column_stack((xvalues, yvalues)).astype('float32')
+        return numpy.column_stack((yvalues, xvalues)).astype('float32')
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings

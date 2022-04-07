@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -185,10 +186,6 @@ class ScanPointTransform(Enum):
         return f'{yp}{xp}' if self.swapXY else f'{xp}{yp}'
 
 
-class ScanPointParseError(Exception):
-    pass
-
-
 class Scan(Sequence[ScanPoint], Observable, Observer):
     MIME_TYPE = 'text/csv'
 
@@ -239,76 +236,6 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
         self._updateBoundingBox()
         self.notifyObservers()
 
-    def read8col(self, filePath: Path) -> list[ScanPoint]:  # FIXME
-        xy_columns = (5, 1)
-        trigger_column = 7
-        chi = 0.
-
-        # Load data from six column file
-        raw_position = numpy.genfromtxt(
-            str(filePath),
-            usecols=(*xy_columns, trigger_column),
-            delimiter=',',
-            dtype='int',
-        )
-
-        # Split positions where trigger number increases by 1. Assumes that
-        # positions are ordered by trigger number in file. Shift indices by 1
-        # because of how numpy.diff is defined.
-        sections = numpy.nonzero(numpy.diff(raw_position[:, -1]))[0] + 1
-        groups = numpy.split(
-            raw_position[:, :-1],
-            indices_or_sections=sections,
-            axis=0,
-        )
-
-        # Apply a reduction function to handle multiple positions per trigger
-        def position_reduce(g):
-            """Average of the first and last position in each trigger group."""
-            # return numpy.mean(g, axis=0, keepdims=True)
-            return (g[:1] + g[-1:]) / 2
-
-        groups = list(map(position_reduce, groups))
-        scan = numpy.concatenate(groups, axis=0)
-
-        # Rescale according to geometry of velociprobe
-        scan[:, 0] *= -1e-9
-        scan -= numpy.mean(scan, axis=0, keepdims=True)
-        scan[:, 1] *= 1e-9 * numpy.cos(chi / 180 * numpy.pi)
-
-        scanPointList = list()
-
-        for row in scan:
-            x = Decimal(row[0])
-            y = Decimal(row[1])
-            point = ScanPoint(x, y)
-            scanPointList.append(point)
-
-        self._settings.customFilePath.value = filePath
-        self.setScanPoints(scanPointList)
-
-    def read(self, filePath: Path) -> list[ScanPoint]:
-        scanPointList = list()
-
-        with open(filePath, newline='') as csvFile:
-            csvReader = csv.reader(csvFile, delimiter=',')
-
-            for row in csvReader:
-                if row[0].startswith('#'):
-                    continue
-
-                if len(row) < 2:
-                    raise ScanPointParseError()
-
-                x = Decimal(row[1])
-                y = Decimal(row[0])
-                point = ScanPoint(x, y)
-
-                scanPointList.append(point)
-
-        self._settings.customFilePath.value = filePath
-        self.setScanPoints(scanPointList)
-
     def write(self, filePath: Path) -> None:
         with open(filePath, 'wt') as csvFile:
             for point in self._scanPointList:
@@ -317,7 +244,7 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
     def getBoundingBoxInMeters(self) -> Optional[Box[Decimal]]:
         return self._boundingBoxInMeters
 
-    def _updateBoundingBox(self) -> None:  # FIXME
+    def _updateBoundingBox(self) -> None:
         boundingBoxInMeters = None
         scanPointIterator = iter(self)
 
@@ -341,20 +268,54 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
             self.setTransformFromSettings()
 
 
+class ScanFileReader(ABC):
+    @abstractmethod
+    def read(self, filePath: Path) -> Iterable[ScanPoint]:
+        pass
+
+
+class ScanPointParseError(Exception):
+    pass
+
+
+class CSVScanFileReader(ScanFileReader):
+    def read(self, filePath: Path) -> Iterable[ScanPoint]:
+        scanPointList = list()
+
+        with open(filePath, newline='') as csvFile:
+            csvReader = csv.reader(csvFile, delimiter=',')
+
+            for row in csvReader:
+                if row[0].startswith('#'):
+                    continue
+
+                if len(row) < 2:
+                    raise ScanPointParseError()
+
+                x = Decimal(row[1])
+                y = Decimal(row[0])
+                point = ScanPoint(x, y)
+
+                scanPointList.append(point)
+
+        return scanPointList
+
+
 class ScanInitializer(Observable, Observer):
-    def __init__(self, settings: ScanSettings, scan: Scan, reinitObservable: Observable) -> None:
+    def __init__(self, settings: ScanSettings, scan: Scan, scanFileReader: ScanFileReader, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._scan = scan
+        self._scanFileReader = scanFileReader
         self._reinitObservable = reinitObservable
         self._customInitializer = CustomScanInitializer()
         self._initializer = self._customInitializer
         self._initializerList: list[Sequence[ScanPoint]] = [self._customInitializer]
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings, scan: Scan,
+    def createInstance(cls, settings: ScanSettings, scan: Scan, scanFileReader: ScanFileReader,
                        reinitObservable: Observable) -> ScanInitializer:
-        initializer = cls(settings, scan, reinitObservable)
+        initializer = cls(settings, scan, scanFileReader, reinitObservable)
         initializer.addInitializer(CartesianScanInitializer.createRasterInstance(settings))
         initializer.addInitializer(CartesianScanInitializer.createSnakeInstance(settings))
         initializer.addInitializer(SpiralScanInitializer(settings))
@@ -394,18 +355,18 @@ class ScanInitializer(Observable, Observer):
     def initializeScan(self) -> None:
         self._scan.setScanPoints(self._initializer)
 
-    def openScan(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        self._scan.read(filePath)
-        self._customInitializer.setScanPoints(self._scan)
-        self._setInitializer(self._customInitializer)
-
     def _preloadScanFromCustomFile(self) -> None:
         customFilePath = self._settings.customFilePath.value
 
         if customFilePath is not None and customFilePath.is_file():
-            self._scan.read(customFilePath)
-            self._customInitializer.setScanPoints(self._scan)
+            scanPointIterable = self._scanFileReader.read(customFilePath)
+            self._customInitializer.setScanPoints(scanPointIterable)
+
+    def openScan(self, filePath: Path) -> None:
+        self._settings.customFilePath.value = filePath
+        self._preloadScanFromCustomFile()
+        self._setInitializer(self._customInitializer)
+        self.initializeScan()
 
     def saveScan(self, filePath: Path) -> None:
         self._scan.write(filePath)
