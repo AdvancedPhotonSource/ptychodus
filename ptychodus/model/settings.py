@@ -1,3 +1,4 @@
+from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
 from typing import Callable, Generic, Optional, TypeVar
@@ -89,7 +90,7 @@ class SettingsGroup(Observable, Observer):
 
         return candidateEntry
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[SettingsEntry]:
         return iter(self._entryList)
 
     def __getitem__(self, index: int) -> SettingsEntry:
@@ -104,6 +105,8 @@ class SettingsGroup(Observable, Observer):
 
 
 class SettingsRegistry(Observable):
+    FILE_FILTER = 'Initialization Files (*.ini)'
+
     def __init__(self) -> None:
         super().__init__()
         self._groupList: list[SettingsGroup] = list()
@@ -115,11 +118,9 @@ class SettingsRegistry(Observable):
 
         group = SettingsGroup(name)
         self._groupList.append(group)
-        self.notifyObservers()
-
         return group
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[SettingsGroup]:
         return iter(self._groupList)
 
     def __getitem__(self, index: int) -> SettingsGroup:
@@ -128,24 +129,11 @@ class SettingsRegistry(Observable):
     def __len__(self) -> int:
         return len(self._groupList)
 
-
-class SettingsPresenter(Observable):
-    FILE_FILTER = 'Initialization Files (*.ini)'
-
-    def __init__(self, settingsRegistry: SettingsRegistry) -> None:
-        super().__init__()
-        self._settingsRegistry = settingsRegistry
-
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry):
-        presenter = cls(settingsRegistry)
-        return presenter
-
-    def openSettings(self, filePath: Path) -> None:
+    def read(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.read(filePath)
 
-        for settingsGroup in self._settingsRegistry:
+        for settingsGroup in self._groupList:
             if not config.has_section(settingsGroup.name):
                 continue
 
@@ -156,14 +144,14 @@ class SettingsPresenter(Observable):
                 optionValueString = config.get(settingsGroup.name, settingsEntry.name)
                 settingsEntry.setValueFromString(optionValueString)
 
-        # FIXME need to load dataset, load scan, init probe, init object, etc.
-        self._settingsRegistry.notifyObservers()
+        # FIXME need to load dataset, etc.
+        self.notifyObservers()
 
-    def saveSettings(self, filePath: Path) -> None:
+    def write(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.optionxform = lambda option: option
 
-        for settingsGroup in self._settingsRegistry:
+        for settingsGroup in self._groupList:
             config.add_section(settingsGroup.name)
 
             for settingsEntry in settingsGroup:

@@ -25,13 +25,8 @@ class TikeAdaptiveMomentController(Observer):
         view.setCheckable(True)
         view.toggled.connect(presenter.setAdaptiveMomentEnabled)
 
-        view.mdecaySpinBox.valueChanged.connect(presenter.setMDecay)
-        view.mdecaySpinBox.setDecimals(3)
-        view.mdecaySpinBox.setSingleStep(1.e-3)
-
-        view.vdecaySpinBox.valueChanged.connect(presenter.setVDecay)
-        view.vdecaySpinBox.setDecimals(3)
-        view.vdecaySpinBox.setSingleStep(1.e-3)
+        view.mdecaySlider.valueChanged.connect(presenter.setMDecay)
+        view.vdecaySlider.valueChanged.connect(presenter.setVDecay)
 
         controller._syncModelToView()
 
@@ -40,17 +35,14 @@ class TikeAdaptiveMomentController(Observer):
     def _syncModelToView(self) -> None:
         self._view.setChecked(self._presenter.isAdaptiveMomentEnabled())
 
-        self._view.mdecaySpinBox.blockSignals(True)
-        self._view.mdecaySpinBox.setRange(self._presenter.getMinMDecay(),
-                                          self._presenter.getMaxMDecay())
-        self._view.mdecaySpinBox.setValue(self._presenter.getMDecay())
-        self._view.mdecaySpinBox.blockSignals(False)
-
-        self._view.vdecaySpinBox.blockSignals(True)
-        self._view.vdecaySpinBox.setRange(self._presenter.getMinVDecay(),
-                                          self._presenter.getMaxVDecay())
-        self._view.vdecaySpinBox.setValue(self._presenter.getVDecay())
-        self._view.vdecaySpinBox.blockSignals(False)
+        self._view.mdecaySlider.setValueAndRange(self._presenter.getMDecay(),
+                                                 self._presenter.getMinMDecay(),
+                                                 self._presenter.getMaxMDecay(),
+                                                 blockValueChangedSignal=True)
+        self._view.vdecaySlider.setValueAndRange(self._presenter.getVDecay(),
+                                                 self._presenter.getMinVDecay(),
+                                                 self._presenter.getMaxVDecay(),
+                                                 blockValueChangedSignal=True)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -75,10 +67,7 @@ class TikeProbeCorrectionController(Observer):
         view.setCheckable(True)
         view.toggled.connect(presenter.setProbeCorrectionEnabled)
 
-        view.sparsityConstraintSpinBox.valueChanged.connect(presenter.setSparsityConstraint)
-        view.sparsityConstraintSpinBox.setDecimals(3)
-        view.sparsityConstraintSpinBox.setSingleStep(1.e-3)
-
+        view.sparsityConstraintSlider.valueChanged.connect(presenter.setSparsityConstraint)
         view.orthogonalityConstraintCheckBox.toggled.connect(
             presenter.setOrthogonalityConstraintEnabled)
         view.centeredIntensityConstraintCheckBox.toggled.connect(
@@ -91,12 +80,11 @@ class TikeProbeCorrectionController(Observer):
     def _syncModelToView(self) -> None:
         self._view.setChecked(self._presenter.isProbeCorrectionEnabled())
 
-        self._view.sparsityConstraintSpinBox.blockSignals(True)
-        self._view.sparsityConstraintSpinBox.setRange(self._presenter.getMinSparsityConstraint(),
-                                                      self._presenter.getMaxSparsityConstraint())
-        self._view.sparsityConstraintSpinBox.setValue(self._presenter.getSparsityConstraint())
-        self._view.sparsityConstraintSpinBox.blockSignals(False)
-
+        self._view.sparsityConstraintSlider.setValueAndRange(
+            self._presenter.getSparsityConstraint(),
+            self._presenter.getMinSparsityConstraint(),
+            self._presenter.getMaxSparsityConstraint(),
+            blockValueChangedSignal=True)
         self._view.orthogonalityConstraintCheckBox.setChecked(
             self._presenter.isOrthogonalityConstraintEnabled())
         self._view.centeredIntensityConstraintCheckBox.setChecked(
@@ -124,14 +112,8 @@ class TikeObjectCorrectionController(Observer):
 
         view.setCheckable(True)
         view.toggled.connect(presenter.setObjectCorrectionEnabled)
-
-        view.positivityConstraintSpinBox.valueChanged.connect(presenter.setPositivityConstraint)
-        view.positivityConstraintSpinBox.setDecimals(3)
-        view.positivityConstraintSpinBox.setSingleStep(1.e-3)
-
-        view.smoothnessConstraintSpinBox.valueChanged.connect(presenter.setSmoothnessConstraint)
-        view.smoothnessConstraintSpinBox.setDecimals(3)
-        view.smoothnessConstraintSpinBox.setSingleStep(1.e-3)
+        view.positivityConstraintSlider.valueChanged.connect(presenter.setPositivityConstraint)
+        view.smoothnessConstraintSlider.valueChanged.connect(presenter.setSmoothnessConstraint)
 
         controller._syncModelToView()
 
@@ -140,19 +122,16 @@ class TikeObjectCorrectionController(Observer):
     def _syncModelToView(self) -> None:
         self._view.setChecked(self._presenter.isObjectCorrectionEnabled())
 
-        self._view.positivityConstraintSpinBox.blockSignals(True)
-        self._view.positivityConstraintSpinBox.setRange(
+        self._view.positivityConstraintSlider.setValueAndRange(
+            self._presenter.getPositivityConstraint(),
             self._presenter.getMinPositivityConstraint(),
-            self._presenter.getMaxPositivityConstraint())
-        self._view.positivityConstraintSpinBox.setValue(self._presenter.getPositivityConstraint())
-        self._view.positivityConstraintSpinBox.blockSignals(False)
-
-        self._view.smoothnessConstraintSpinBox.blockSignals(True)
-        self._view.smoothnessConstraintSpinBox.setRange(
+            self._presenter.getMaxPositivityConstraint(),
+            blockValueChangedSignal=True)
+        self._view.smoothnessConstraintSlider.setValueAndRange(
+            self._presenter.getSmoothnessConstraint(),
             self._presenter.getMinSmoothnessConstraint(),
-            self._presenter.getMaxSmoothnessConstraint())
-        self._view.smoothnessConstraintSpinBox.setValue(self._presenter.getSmoothnessConstraint())
-        self._view.smoothnessConstraintSpinBox.blockSignals(False)
+            self._presenter.getMaxSmoothnessConstraint(),
+            blockValueChangedSignal=True)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -220,13 +199,8 @@ class TikeBasicParametersController(Observer):
         view.numIterSpinBox.valueChanged.connect(presenter.setNumIter)
         view.cgIterSpinBox.valueChanged.connect(presenter.setCgIter)
 
-        view.alphaSpinBox.valueChanged.connect(presenter.setAlpha)
-        view.alphaSpinBox.setDecimals(3)
-        view.alphaSpinBox.setSingleStep(1.e-3)
-
-        view.stepLengthSpinBox.valueChanged.connect(presenter.setStepLength)
-        view.stepLengthSpinBox.setDecimals(3)
-        view.stepLengthSpinBox.setSingleStep(1.e-3)
+        view.alphaSlider.valueChanged.connect(presenter.setAlpha)
+        view.stepLengthSlider.valueChanged.connect(presenter.setStepLength)
 
         controller._syncModelToView()
 
@@ -267,17 +241,14 @@ class TikeBasicParametersController(Observer):
         self._view.cgIterSpinBox.setValue(self._presenter.getCgIter())
         self._view.cgIterSpinBox.blockSignals(False)
 
-        self._view.alphaSpinBox.blockSignals(True)
-        self._view.alphaSpinBox.setRange(self._presenter.getMinAlpha(),
-                                         self._presenter.getMaxAlpha())
-        self._view.alphaSpinBox.setValue(self._presenter.getAlpha())
-        self._view.alphaSpinBox.blockSignals(False)
-
-        self._view.stepLengthSpinBox.blockSignals(True)
-        self._view.stepLengthSpinBox.setRange(self._presenter.getMinStepLength(),
-                                              self._presenter.getMaxStepLength())
-        self._view.stepLengthSpinBox.setValue(self._presenter.getStepLength())
-        self._view.stepLengthSpinBox.blockSignals(False)
+        self._view.alphaSlider.setValueAndRange(self._presenter.getAlpha(),
+                                                self._presenter.getMinAlpha(),
+                                                self._presenter.getMaxAlpha(),
+                                                blockValueChangedSignal=True)
+        self._view.stepLengthSlider.setValueAndRange(self._presenter.getStepLength(),
+                                                     self._presenter.getMinStepLength(),
+                                                     self._presenter.getMaxStepLength(),
+                                                     blockValueChangedSignal=True)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

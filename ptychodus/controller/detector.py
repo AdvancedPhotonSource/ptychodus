@@ -6,7 +6,7 @@ from PyQt5.QtGui import QFont
 
 from ..model import Observable, Observer, DetectorPresenter, DatasetState
 from ..view import DetectorView
-from .data_file import FileDialogFactory
+from .data import FileDialogFactory
 from .image import ImageController
 
 

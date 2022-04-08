@@ -3,14 +3,19 @@ from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Callable
+import logging
 
 import numpy
 
+from .crop import CropSizer
 from .detector import DetectorSettings
 from .fzp import single_probe
-from .crop import CropSizer
+from .geometry import Interval
+from .image import ImageExtent
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
+
+logger = logging.getLogger(__name__)
 
 
 class ProbeSettings(Observable, Observer):
@@ -44,7 +49,7 @@ class ProbeSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class ProbeSizer(Observable, Observer): # FIXME use this
+class ProbeSizer(Observable, Observer):
     def __init__(self, settings: ProbeSettings, cropSizer: CropSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -57,43 +62,24 @@ class ProbeSizer(Observable, Observer): # FIXME use this
         cropSizer.addObserver(sizer)
         return sizer
 
-    def getProbeSizeLimits(self) -> Interval[int]:
+    @property
+    def _probeSizeMax(self) -> int:
         cropX = self._cropSizer.getExtentX()
         cropY = self._cropSizer.getExtentY()
-        probeSizeMax = min(cropX, cropY)
-        return Interval[int](1, probeSizeMax)
+        return min(cropX, cropY)
+
+    def getProbeSizeLimits(self) -> Interval[int]:
+        return Interval[int](1, self._probeSizeMax)
 
     def getProbeSize(self) -> int:
-        return self._settings.probeSize.value
+        limits = self.getProbeSizeLimits()
+        return limits.clamp(self._settings.probeSize.value)
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._settings:
-            self.notifyObservers()
-        elif observable is self._cropSizer:
-            self.notifyObservers()
+    def getProbeExtent(self) -> ImageExtent:
+        size = self.getProbeSize()
+        return ImageExtent(width=size, height=size)
 
-
-class Probe(Observable, Observer):
-    FILE_FILTER = 'NumPy Binary Files (*.npy)'
-
-    def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__()
-        self._settings = settings
-        self._array = numpy.zeros((0, 0), dtype=complex)
-
-    @classmethod
-    def createInstance(cls, settings: ProbeSettings) -> Probe:
-        probe = cls(settings)
-        settings.probeSize.addObserver(probe)
-        settings.probeEnergyInElectronVolts.addObserver(probe)
-        return probe
-
-    @property
-    def extentInPixels(self) -> int: # FIXME REMOVE
-        return self._settings.probeSize.value
-
-    @property
-    def wavelengthInMeters(self) -> Decimal:
+    def getWavelengthInMeters(self) -> Decimal:
         # Source: https://physics.nist.gov/cuu/Constants/index.html
         planck_constant_eV_per_Hz = Decimal(4.135667696e-15)
         light_speed_m_per_s = Decimal(299792458)
@@ -101,34 +87,21 @@ class Probe(Observable, Observer):
         probe_wavelength_m = hc_eVm / self._settings.probeEnergyInElectronVolts.value
         return probe_wavelength_m
 
-    def getArray(self) -> numpy.ndarray:
-        return self._array
+    def _updateProbeSize(self) -> None:
+        if self._settings.automaticProbeSizeEnabled.value:
+            self._settings.probeSize.value = self._probeSizeMax
 
-    def setArray(self, array: numpy.ndarray) -> None:
-        if not numpy.iscomplexobj(array):
-            raise TypeError('Probe must be a complex-valued ndarray')
-
-        self._array = array
         self.notifyObservers()
 
-    def read(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        array = numpy.load(filePath)
-        self.setArray(array)
-
-    def write(self, filePath: Path) -> None:
-        numpy.save(filePath, self._array)
-
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.probeSize:
-            self.notifyObservers()
-        elif observable is self._settings.probeEnergyInElectronVolts:
-            self.notifyObservers()
+        if observable is self._settings:
+            self._updateProbeSize()
+        elif observable is self._cropSizer:
+            self._updateProbeSize()
 
 
 class GaussianBeamProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings) -> None:
-        super().__init__()
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
 
@@ -157,15 +130,14 @@ class GaussianBeamProbeInitializer:
 
 class FresnelZonePlateProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
-                 probe: Probe) -> None:
-        super().__init__()
+                 sizer: ProbeSizer) -> None:
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
-        self._probe = probe
+        self._sizer = sizer
 
     def __call__(self) -> numpy.ndarray:
-        shape = self._probeSettings.probeSize.value
-        lambda0 = self._probe.wavelengthInMeters
+        shape = self._sizer.getProbeSize()
+        lambda0 = self._sizer.getWavelengthInMeters()
         dx_dec = self._detectorSettings.pixelSizeXInMeters.value  # TODO non-square pixels are unsupported
         dis_defocus = self._detectorSettings.defocusDistanceInMeters.value
         dis_StoD = self._detectorSettings.detectorDistanceInMeters.value
@@ -188,99 +160,188 @@ class FresnelZonePlateProbeInitializer:
 
 
 class CustomProbeInitializer:
-    def __init__(self) -> None:
-        super().__init__()
-        self._initialProbe = numpy.zeros((64, 64), dtype=complex)
+    def __init__(self, sizer: ProbeSizer) -> None:
+        self._sizer = sizer
+        self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
 
-    def cacheProbe(self, probe: numpy.ndarray) -> None:
-        if not numpy.iscomplexobj(probe):
+    def setArray(self, array: numpy.ndarray) -> None:
+        if not numpy.iscomplexobj(array):
             raise TypeError('Probe must be a complex-valued ndarray')
 
-        self._probe = probe
+        self._array = array
 
     def __call__(self) -> numpy.ndarray:
-        return self._initialProbe
+        return self._array
 
     def __str__(self) -> str:
         return 'Custom'
 
 
-class ProbePresenter(Observable, Observer):
-    MAX_INT = 0x7FFFFFFF
+class Probe(Observable):
+    FILE_FILTER = 'NumPy Binary Files (*.npy)'
 
-    def __init__(self, settings: ProbeSettings, probe: Probe,
-                 initializerList: Sequence[Callable]) -> None:
+    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer) -> None:
+        super().__init__()
+        self._settings = settings
+        self._sizer = sizer
+        self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
+
+    def getArray(self) -> numpy.ndarray:
+        return self._array
+
+    def setArray(self, array: numpy.ndarray) -> None:
+        if not numpy.iscomplexobj(array):
+            raise TypeError('Probe must be a complex-valued ndarray')
+
+        self._array = array
+        self.notifyObservers()
+
+    def read(self, filePath: Path) -> None:
+        self._settings.customFilePath.value = filePath
+        array = numpy.load(filePath)
+        self.setArray(array)
+
+    def write(self, filePath: Path) -> None:
+        numpy.save(filePath, self._array)
+
+
+class ProbeInitializer(Observable, Observer):
+    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
+                 reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._probe = probe
-        self._initializerList = initializerList
-        self._initializer = initializerList[0]
+        self._reinitObservable = reinitObservable
+        self._customInitializer = CustomProbeInitializer(sizer)
+        self._initializer = self._customInitializer
+        self._initializerList: list[Callable[[], numpy.ndarray]] = [self._customInitializer]
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
-                       probe: Probe) -> ProbePresenter:
-        initializerList = list()
-        initializerList.append(GaussianBeamProbeInitializer(detectorSettings, probeSettings))
-        initializerList.append(
-            FresnelZonePlateProbeInitializer(detectorSettings, probeSettings, probe))
-        initializerList.append(CustomProbeInitializer())
+                       sizer: ProbeSizer, probe: Probe,
+                       reinitObservable: Observable) -> ProbeInitializer:
+        initializer = cls(probeSettings, sizer, probe, reinitObservable)
 
-        presenter = cls(probeSettings, probe, initializerList)
-        presenter.setCurrentInitializerFromSettings()
-        probeSettings.initializer.addObserver(presenter)
-        probeSettings.addObserver(presenter)
+        gaussInit = GaussianBeamProbeInitializer(detectorSettings, probeSettings)
+        initializer.addInitializer(gaussInit)
+        fzpInit = FresnelZonePlateProbeInitializer(detectorSettings, probeSettings, sizer)
+        initializer.addInitializer(fzpInit)
 
-        return presenter
+        initializer.setInitializerFromSettings()
+        probeSettings.initializer.addObserver(initializer)
+        reinitObservable.addObserver(initializer)
+
+        return initializer
+
+    def addInitializer(self, initializer: Callable[[], numpy.ndarray]) -> None:
+        self._initializerList.append(initializer)
 
     def getInitializerList(self) -> list[str]:
         return [str(initializer) for initializer in self._initializerList]
 
-    def getCurrentInitializer(self) -> str:
+    def getInitializer(self) -> str:
         return str(self._initializer)
 
-    def setCurrentInitializer(self, name: str) -> None:
-        try:
-            initializer = next(ini for ini in self._initializerList
-                               if name.casefold() == str(ini).casefold())
-        except StopIteration:
-            return
-
+    def _setInitializer(self, initializer: Callable[[], numpy.ndarray]) -> None:
         if initializer is not self._initializer:
             self._initializer = initializer
             self._settings.initializer.value = str(self._initializer)
             self.notifyObservers()
 
-    def setCurrentInitializerFromSettings(self) -> None:
-        self.setCurrentInitializer(self._settings.initializer.value)
+    def setInitializer(self, name: str) -> None:
+        try:
+            initializer = next(ini for ini in self._initializerList
+                               if name.casefold() == str(ini).casefold())
+        except StopIteration:
+            logger.debug(f'Invalid initializer \"{name}\"')
+            return
+
+        self._setInitializer(initializer)
+
+    def setInitializerFromSettings(self) -> None:
+        self.setInitializer(self._settings.initializer.value)
+
+    def initializeProbe(self) -> None:
+        self._probe.setArray(self._initializer())
 
     def openProbe(self, filePath: Path) -> None:
+        self._settings.customFilePath.value = filePath
         self._probe.read(filePath)
-        self.setCurrentInitializer('Custom')
-        self._initializer.cacheProbe(self._probe.getArray())
-        self.notifyObservers()
+        self._customInitializer.setArray(self._probe.getArray())
+        self._setInitializer(self._customInitializer)
+
+    def _preloadProbeFromCustomFile(self) -> None:
+        customFilePath = self._settings.customFilePath.value
+
+        if customFilePath is not None and customFilePath.is_file():
+            self._probe.read(customFilePath)
+            self._customInitializer.setArray(self._probe.getArray())
 
     def saveProbe(self, filePath: Path) -> None:
         self._probe.write(filePath)
 
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings.initializer:
+            self.setInitializerFromSettings()
+        elif observable is self._reinitObservable:
+            self._preloadProbeFromCustomFile()
+            self.initializeProbe()
+
+
+class ProbePresenter(Observable, Observer):
+    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
+                 initializer: ProbeInitializer) -> None:
+        super().__init__()
+        self._settings = settings
+        self._sizer = sizer
+        self._probe = probe
+        self._initializer = initializer
+
+    @classmethod
+    def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
+                       initializer: ProbeInitializer) -> ProbePresenter:
+        presenter = cls(settings, sizer, probe, initializer)
+        settings.addObserver(presenter)
+        sizer.addObserver(presenter)
+        probe.addObserver(presenter)
+        initializer.addObserver(presenter)
+        return presenter
+
+    def getInitializerList(self) -> list[str]:
+        return self._initializer.getInitializerList()
+
+    def getInitializer(self) -> str:
+        return self._initializer.getInitializer()
+
+    def setInitializer(self, name: str) -> None:
+        self._initializer.setInitializer(name)
+
+    def openProbe(self, filePath: Path) -> None:
+        self._initializer.openProbe(filePath)
+
+    def saveProbe(self, filePath: Path) -> None:
+        self._initializer.saveProbe(filePath)
+
     def initializeProbe(self) -> None:
-        self._probe.setArray(self._initializer())
-        self.notifyObservers()
+        self._initializer.initializeProbe()
+
+    def isAutomaticProbeSizeEnabled(self) -> bool:
+        return self._settings.automaticProbeSizeEnabled.value
+
+    def setAutomaticProbeSizeEnabled(self, enabled: bool) -> None:
+        self._settings.automaticProbeSizeEnabled.value = enabled
 
     def getProbeMinSize(self) -> int:
-        return 0
+        return self._sizer.getProbeSizeLimits().lower
 
     def getProbeMaxSize(self) -> int:
-        return self.MAX_INT
+        return self._sizer.getProbeSizeLimits().upper
 
     def setProbeSize(self, value: int) -> None:
         self._settings.probeSize.value = value
 
     def getProbeSize(self) -> int:
-        valueMin = self.getProbeMinSize()
-        valueMax = self.getProbeMaxSize()
-        value = self._settings.probeSize.value
-        valueClamp = max(valueMin, min(value, valueMax))
-        return valueClamp
+        return self._sizer.getProbeSize()
 
     def setProbeEnergyInElectronVolts(self, value: Decimal) -> None:
         self._settings.probeEnergyInElectronVolts.value = value
@@ -289,7 +350,7 @@ class ProbePresenter(Observable, Observer):
         return self._settings.probeEnergyInElectronVolts.value
 
     def getProbeWavelengthInMeters(self) -> Decimal:
-        return self._probe.wavelengthInMeters
+        return self._sizer.getWavelengthInMeters()
 
     def setProbeDiameterInMeters(self, value: Decimal) -> None:
         self._settings.probeDiameterInMeters.value = value
@@ -319,7 +380,11 @@ class ProbePresenter(Observable, Observer):
         return self._probe.getArray()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.initializer:
-            self.setCurrentInitializerFromSettings()
-        elif observable is self._settings:
+        if observable is self._settings:
+            self.notifyObservers()
+        elif observable is self._sizer:
+            self.notifyObservers()
+        elif observable is self._probe:
+            self.notifyObservers()
+        elif observable is self._initializer:
             self.notifyObservers()

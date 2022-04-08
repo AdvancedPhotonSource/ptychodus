@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QApplication, QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
-from .data_file import *
+from .data import *
 from .detector import *
 from .object import *
 from .probe import *
@@ -24,9 +24,9 @@ class ControllerCore:
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeBackend)
 
         self._importSettingsController = ImportSettingsController.createInstance(
-            model.velociprobePresenter, view.importSettingsDialog)
+            model.probePresenter, model.objectPresenter, model.velociprobePresenter,
+            view.importSettingsDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
-                                                                     model.settingsPresenter,
                                                                      view.settingsGroupView,
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
@@ -44,7 +44,7 @@ class ControllerCore:
         self._probeImageController = ProbeImageController.createInstance(
             model.probePresenter, view.probeImageView, self._fileDialogFactory)
         self._scanParametersController = ScanParametersController.createInstance(
-            model.scanPresenter, view.scanParametersView.scanView, self._fileDialogFactory)
+            model.scanPresenter, view.scanParametersView, self._fileDialogFactory)
         self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter,
                                                                      view.scanPlotView)
         self._objectParametersController = ObjectParametersController.createInstance(
@@ -52,7 +52,7 @@ class ControllerCore:
         self._objectImageController = ObjectImageController.createInstance(
             model.objectPresenter, view.objectImageView, self._fileDialogFactory)
         self._dataFileController = DataFileController.createInstance(model.dataFilePresenter,
-                                                                     model.h5FileTreeReader,
+                                                                     model.h5FileReader,
                                                                      view.dataFileTreeView,
                                                                      view.dataFileTableView,
                                                                      self._fileDialogFactory)

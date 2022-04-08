@@ -1,9 +1,8 @@
 from __future__ import annotations
-from PyQt5.QtGui import QStandardItemModel
 
 from ..model import Observer, Observable, Probe, ProbePresenter
 from ..view import ImageView, ProbeProbeView, ProbeInitializerView, ProbeZonePlateView, ProbeParametersView
-from .data_file import FileDialogFactory
+from .data import FileDialogFactory
 from .image import ImageController
 
 
@@ -20,6 +19,7 @@ class ProbeProbeController(Observer):
         presenter.addObserver(controller)
 
         view.sizeSpinBox.valueChanged.connect(presenter.setProbeSize)
+        view.sizeSpinBox.autoToggled.connect(presenter.setAutomaticProbeSizeEnabled)
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setEnabled(False)
         view.diameterWidget.lengthChanged.connect(presenter.setProbeDiameterInMeters)
@@ -29,9 +29,10 @@ class ProbeProbeController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.sizeSpinBox.setAutomatic(self._presenter.isAutomaticProbeSizeEnabled())
         self._view.sizeSpinBox.setValueAndRange(self._presenter.getProbeSize(),
-                                                 self._presenter.getProbeMinSize(),
-                                                 self._presenter.getProbeMaxSize())
+                                                self._presenter.getProbeMinSize(),
+                                                self._presenter.getProbeMaxSize())
         self._view.energyWidget.setEnergyInElectronVolts(
             self._presenter.getProbeEnergyInElectronVolts())
         self._view.wavelengthWidget.setLengthInMeters(self._presenter.getProbeWavelengthInMeters())
@@ -81,7 +82,6 @@ class ProbeInitializerController(Observer):
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._initComboBoxModel = QStandardItemModel()
 
     @classmethod
     def createInstance(cls, presenter: ProbePresenter,
@@ -92,7 +92,7 @@ class ProbeInitializerController(Observer):
         for initializer in presenter.getInitializerList():
             view.initializerComboBox.addItem(initializer)
 
-        view.initializerComboBox.currentTextChanged.connect(presenter.setCurrentInitializer)
+        view.initializerComboBox.currentTextChanged.connect(presenter.setInitializer)
         view.initializeButton.clicked.connect(presenter.initializeProbe)
 
         controller._syncModelToView()
@@ -100,7 +100,7 @@ class ProbeInitializerController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(self._presenter.getCurrentInitializer())
+        self._view.initializerComboBox.setCurrentText(self._presenter.getInitializer())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -126,15 +126,17 @@ class ProbeParametersController:
         return controller
 
     def openProbe(self) -> None:
-        filePath = self._fileDialogFactory.getOpenFilePath(self._view, 'Open Probe',
-                                                           Probe.FILE_FILTER)
+        filePath = self._fileDialogFactory.getOpenFilePath(self._view,
+                                                           'Open Probe',
+                                                           nameFilters=[Probe.FILE_FILTER])
 
         if filePath:
             self._presenter.openProbe(filePath)
 
     def saveProbe(self) -> None:
-        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Probe',
-                                                           Probe.FILE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(self._view,
+                                                           'Save Probe',
+                                                           nameFilters=[Probe.FILE_FILTER])
 
         if filePath:
             self._presenter.saveProbe(filePath)

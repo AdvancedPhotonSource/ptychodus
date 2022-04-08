@@ -1,17 +1,21 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Optional, Tuple
+from typing import Optional
 import csv
+import logging
 
 import numpy
 
 from .geometry import Interval, Box
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
+
+logger = logging.getLogger(__name__)
 
 
 class ScanSettings(Observable, Observer):
@@ -25,7 +29,7 @@ class ScanSettings(Observable, Observer):
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')
         self.stepSizeYInMeters = settingsGroup.createRealEntry('StepSizeYInMeters', '1e-6')
         self.jitterRadiusInPixels = settingsGroup.createRealEntry('JitterRadiusInPixels', '0')
-        self.transformXY = settingsGroup.createStringEntry('TransformXY', '+X+Y')
+        self.transform = settingsGroup.createStringEntry('Transform', '+X+Y')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ScanSettings:
@@ -44,82 +48,19 @@ class ScanPoint:
     y: Decimal
 
 
-class ScanPointParseError(Exception):
-    pass
-
-
-class ScanPointIO:
-    FILE_FILTER = 'Comma-Separated Values Files (*.csv)'
-
-    def write(self, filePath: Path, scanPointList: list[ScanPoint]) -> None:
-        with open(filePath, 'wt') as csv_file:
-            for point in scanPointList:
-                csv_file.write(f'{point.y},{point.x}\n')
-
-    def read(self, filePath: Path) -> list[ScanPoint]:
-        point_list = list()
-
-        with open(filePath, newline='') as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=',')
-
-            for row in csv_reader:
-                if row[0].startswith('#'):
-                    continue
-
-                if len(row) < 2:
-                    raise ScanPointParseError()
-
-                x = Decimal(row[1])
-                y = Decimal(row[0])
-                point = ScanPoint(x, y)
-
-                point_list.append(point)
-
-        return point_list
-
-
-class ScanSequence(Sequence, Observable, Observer):
-    def getBoundingBox(self) -> Optional[Box[Decimal]]:
-        pointIter = iter(self)
-
-        try:
-            point = next(pointIter)
-        except StopIteration:
-            return None
-
-        xint = Interval(point.x, point.x)
-        yint = Interval(point.y, point.y)
-
-        for point in pointIter:
-            xint.hull(point.x)
-            yint.hull(point.y)
-
-        return Box[Decimal]((xint, yint))
-
-
-class CartesianScanSequence(ScanSequence):
+class CartesianScanInitializer(Sequence[ScanPoint]):
     def __init__(self, settings: ScanSettings, snake: bool) -> None:
         super().__init__()
         self._settings = settings
         self._snake = snake
 
     @classmethod
-    def createRasterInstance(cls, settings: ScanSettings) -> CartesianScanSequence:
-        generator = cls(settings, False)
-        settings.extentX.addObserver(generator)
-        settings.extentY.addObserver(generator)
-        settings.stepSizeXInMeters.addObserver(generator)
-        settings.stepSizeYInMeters.addObserver(generator)
-        return generator
+    def createRasterInstance(cls, settings: ScanSettings) -> CartesianScanInitializer:
+        return cls(settings, False)
 
     @classmethod
-    def createSnakeInstance(cls, settings: ScanSettings) -> CartesianScanSequence:
-        generator = cls(settings, True)
-        settings.extentX.addObserver(generator)
-        settings.extentY.addObserver(generator)
-        settings.stepSizeXInMeters.addObserver(generator)
-        settings.stepSizeYInMeters.addObserver(generator)
-        return generator
+    def createSnakeInstance(cls, settings: ScanSettings) -> CartesianScanInitializer:
+        return cls(settings, True)
 
     def __getitem__(self, index: int) -> ScanPoint:
         if index >= len(self):
@@ -144,23 +85,11 @@ class CartesianScanSequence(ScanSequence):
     def __str__(self) -> str:
         return 'Snake' if self._snake else 'Raster'
 
-    def update(self, observable: Observable) -> None:
-        self.notifyObservers()
 
-
-class SpiralScanSequence(ScanSequence):
+class SpiralScanInitializer(Sequence[ScanPoint]):
     def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
         self._settings = settings
-
-    @classmethod
-    def createInstance(cls, settings: ScanSettings) -> SpiralScanSequence:
-        generator = cls(settings)
-        settings.extentX.addObserver(generator)
-        settings.extentY.addObserver(generator)
-        settings.stepSizeXInMeters.addObserver(generator)
-        settings.stepSizeYInMeters.addObserver(generator)
-        return generator
 
     def __getitem__(self, index: int) -> ScanPoint:
         if index >= len(self):
@@ -191,97 +120,26 @@ class SpiralScanSequence(ScanSequence):
     def __str__(self) -> str:
         return 'Spiral'
 
-    def update(self, observable: Observable) -> None:
-        self.notifyObservers()
 
-
-class CustomScanSequence(ScanSequence):
+class CustomScanInitializer(Sequence[ScanPoint]):
     def __init__(self) -> None:
         super().__init__()
-        self._pointList: list[ScanPoint] = list()
+        self._scanPointList: list[ScanPoint] = list()
+
+    def setScanPoints(self, scanPointIterable: Iterable[ScanPoint]) -> None:
+        self._scanPointList = [point for point in scanPointIterable]
 
     def __getitem__(self, index: int) -> ScanPoint:
-        return self._pointList[index]
+        return self._scanPointList[index]
 
     def __len__(self) -> int:
-        return len(self._pointList)
+        return len(self._scanPointList)
 
     def __str__(self) -> str:
         return 'Custom'
 
-    def setPointList(self, pointList: list[ScanPoint]) -> None:
-        self._pointList = pointList
-        self.notifyObservers()
 
-    def update(self, observable: Observable) -> None:
-        pass
-
-
-class SelectableScanSequence(ScanSequence):
-    def __init__(self, settings: ScanSettings, sequenceList: list[ScanSequence]) -> None:
-        super().__init__()
-        self._settings = settings
-        self._sequenceList = sequenceList
-        self._sequence = sequenceList[0]
-
-    @classmethod
-    def createInstance(cls, settings: ScanSettings) -> SelectableScanSequence:
-        sequenceList = list()
-        sequenceList.append(CartesianScanSequence.createRasterInstance(settings))
-        sequenceList.append(CartesianScanSequence.createSnakeInstance(settings))
-        sequenceList.append(SpiralScanSequence.createInstance(settings))
-        sequenceList.append(CustomScanSequence())
-
-        selectableSequence = cls(settings, sequenceList)
-        selectableSequence.setCurrentScanSequenceFromSettings()
-        settings.initializer.addObserver(selectableSequence)
-
-        return selectableSequence
-
-    def getScanSequenceList(self) -> list[str]:
-        return [str(sequence) for sequence in self._sequenceList]
-
-    def getCurrentScanSequence(self) -> str:
-        return str(self._sequence)
-
-    def setCurrentScanSequence(self, name: str) -> None:
-        try:
-            sequence = next(seq for seq in self._sequenceList
-                            if name.casefold() == str(seq).casefold())
-        except StopIteration:
-            return
-
-        if sequence is not self._sequence:
-            self._sequence.removeObserver(self)
-            self._sequence = sequence
-            self._settings.initializer.value = str(self._sequence)
-            self._sequence.addObserver(self)
-            self.notifyObservers()
-
-    def setCurrentScanSequenceFromSettings(self) -> None:
-        self.setCurrentScanSequence(self._settings.initializer.value)
-
-    def setCurrentScanSequenceToCustomPointList(self, pointList: list[ScanPoint]) -> None:
-        self.setCurrentScanSequence('Custom')
-        self._sequence.setPointList(pointList)
-
-    def __getitem__(self, index: int) -> ScanPoint:
-        return self._sequence[index]
-
-    def __len__(self) -> int:
-        return len(self._sequence)
-
-    def __str__(self) -> str:
-        return str(self._sequence)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._settings.initializer:
-            self.setCurrentScanSequenceFromSettings()
-        if observable is self._sequence:
-            self.notifyObservers()
-
-
-class TransformXY(Enum):
+class ScanPointTransform(Enum):
     PXPY = 0x0
     MXPY = 0x1
     PXMY = 0x2
@@ -290,6 +148,18 @@ class TransformXY(Enum):
     PYMX = 0x5
     MYPX = 0x6
     MYMX = 0x7
+
+    @property
+    def negateX(self) -> bool:
+        return self.value & 1 != 0
+
+    @property
+    def negateY(self) -> bool:
+        return self.value & 2 != 0
+
+    @property
+    def swapXY(self) -> bool:
+        return self.value & 4 != 0
 
     def isNameMatchFor(self, query: str) -> bool:
         queryCaseFolded = query.casefold()
@@ -301,142 +171,285 @@ class TransformXY(Enum):
         return isMatch
 
     def __call__(self, point: ScanPoint) -> ScanPoint:
-        xp = -point.x if self.value & 1 else point.x
-        yp = -point.y if self.value & 2 else point.y
-        return ScanPoint(yp, xp) if self.value & 4 else ScanPoint(xp, yp)
+        xp = -point.x if self.negateX else point.x
+        yp = -point.y if self.negateY else point.y
+        return ScanPoint(yp, xp) if self.swapXY else ScanPoint(xp, yp)
 
     def __str__(self) -> str:
-        xp = '\u2212x' if self.value & 1 else '\u002Bx'
-        yp = '\u2212y' if self.value & 2 else '\u002By'
-        return f'({yp}, {xp})' if self.value & 4 else f'({xp}, {yp})'
+        xp = '\u2212x' if self.negateX else '\u002Bx'
+        yp = '\u2212y' if self.negateY else '\u002By'
+        return f'({yp}, {xp})' if self.swapXY else f'({xp}, {yp})'
 
     def __repr__(self) -> str:
-        xp = '-x' if self.value & 1 else '+x'
-        yp = '-y' if self.value & 2 else '+y'
-        return f'{yp}{xp}' if self.value & 4 else f'{xp}{yp}'
+        xp = '-x' if self.negateX else '+x'
+        yp = '-y' if self.negateY else '+y'
+        return f'{yp}{xp}' if self.swapXY else f'{xp}{yp}'
 
 
-class TransformedScanSequence(ScanSequence):
-    def __init__(self, settings: ScanSettings, sequence: ScanSequence) -> None:
+class Scan(Sequence[ScanPoint], Observable, Observer):
+    MIME_TYPE = 'text/csv'
+
+    def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._sequence = sequence
-        self._transform: Optional[TransformXY] = None
+        self._scanPointList: list[ScanPoint] = list()
+        self._boundingBoxInMeters: Optional[Box[Decimal]] = None
+        self._transform = ScanPointTransform.PXPY
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings,
-                       sequence: ScanSequence) -> TransformedScanSequence:
-        transformedSequence = cls(settings, sequence)
-        transformedSequence.setCurrentTransformXYFromSettings()
-        settings.transformXY.addObserver(transformedSequence)
-        sequence.addObserver(transformedSequence)
-        return transformedSequence
-
-    def getCurrentTransformXY(self) -> str:
-        return str(self._transform)
-
-    def setCurrentTransformXY(self, transform: TransformXY) -> None:
-        if transform != self._transform:
-            self._transform = transform
-            self._settings.transformXY.value = repr(self._transform)
-            self.notifyObservers()
-
-    def setCurrentTransformXYByName(self, name: str) -> None:
-        try:
-            transform = next(xform for xform in TransformXY if xform.isNameMatchFor(name))
-        except StopIteration:
-            return
-
-        self.setCurrentTransformXY(transform)
-
-    def setCurrentTransformXYFromSettings(self) -> None:
-        self.setCurrentTransformXYByName(self._settings.transformXY.value)
+    def createInstance(cls, settings: ScanSettings) -> Scan:
+        scan = cls(settings)
+        scan.setTransformFromSettings()
+        settings.transform.addObserver(scan)
+        return scan
 
     def __getitem__(self, index: int) -> ScanPoint:
-        return self._transform(self._sequence[index])
+        return self._transform(self._scanPointList[index])
 
     def __len__(self) -> int:
-        return len(self._sequence)
+        return len(self._scanPointList)
 
-    def __str__(self) -> str:
-        return str(self._sequence)
+    def getTransform(self) -> str:
+        return str(self._transform)
+
+    def _setTransform(self, transform: ScanPointTransform) -> None:
+        if transform != self._transform:
+            self._transform = transform
+            self._settings.transform.value = repr(self._transform)
+            self._updateBoundingBox()
+            self.notifyObservers()
+
+    def setTransform(self, name: str) -> None:
+        try:
+            transform = next(xform for xform in ScanPointTransform if xform.isNameMatchFor(name))
+        except StopIteration:
+            logger.debug(f'Invalid transform \"{name}\"')
+            return
+
+        self._setTransform(transform)
+
+    def setTransformFromSettings(self) -> None:
+        self.setTransform(self._settings.transform.value)
+
+    def setScanPoints(self, scanPointIterable: Iterable[ScanPoint]) -> None:
+        self._scanPointList = [scanPoint for scanPoint in scanPointIterable]
+        self._updateBoundingBox()
+        self.notifyObservers()
+
+    def write(self, filePath: Path) -> None:
+        with open(filePath, 'wt') as csvFile:
+            for point in self._scanPointList:
+                csvFile.write(f'{point.y},{point.x}\n')
+
+    def getBoundingBoxInMeters(self) -> Optional[Box[Decimal]]:
+        return self._boundingBoxInMeters
+
+    def _updateBoundingBox(self) -> None:
+        boundingBoxInMeters = None
+        scanPointIterator = iter(self)
+
+        try:
+            scanPoint = next(scanPointIterator)
+            xint = Interval(scanPoint.x, scanPoint.x)
+            yint = Interval(scanPoint.y, scanPoint.y)
+            boundingBoxInMeters = Box[Decimal]((xint, yint))
+
+            while True:
+                scanPoint = next(scanPointIterator)
+                boundingBoxInMeters[0].hull(scanPoint.x)
+                boundingBoxInMeters[1].hull(scanPoint.y)
+        except StopIteration:
+            pass
+
+        self._boundingBoxInMeters = boundingBoxInMeters
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.transformXY:
-            self.setCurrentTransformXYFromSettings()
-        elif observable is self._sequence:
+        if observable is self._settings.transform:
+            self.setTransformFromSettings()
+
+
+class ScanFileReader(ABC):
+    @abstractmethod
+    def read(self, filePath: Path) -> Iterable[ScanPoint]:
+        pass
+
+
+class ScanPointParseError(Exception):
+    pass
+
+
+class CSVScanFileReader(ScanFileReader):
+    def read(self, filePath: Path) -> Iterable[ScanPoint]:
+        scanPointList = list()
+
+        with open(filePath, newline='') as csvFile:
+            csvReader = csv.reader(csvFile, delimiter=',')
+
+            for row in csvReader:
+                if row[0].startswith('#'):
+                    continue
+
+                if len(row) < 2:
+                    raise ScanPointParseError()
+
+                x = Decimal(row[1])
+                y = Decimal(row[0])
+                point = ScanPoint(x, y)
+
+                scanPointList.append(point)
+
+        return scanPointList
+
+
+class ScanInitializer(Observable, Observer):
+    def __init__(self, settings: ScanSettings, scan: Scan, scanFileReader: ScanFileReader, reinitObservable: Observable) -> None:
+        super().__init__()
+        self._settings = settings
+        self._scan = scan
+        self._scanFileReader = scanFileReader
+        self._reinitObservable = reinitObservable
+        self._customInitializer = CustomScanInitializer()
+        self._initializer = self._customInitializer
+        self._initializerList: list[Sequence[ScanPoint]] = [self._customInitializer]
+
+    @classmethod
+    def createInstance(cls, settings: ScanSettings, scan: Scan, scanFileReader: ScanFileReader,
+                       reinitObservable: Observable) -> ScanInitializer:
+        initializer = cls(settings, scan, scanFileReader, reinitObservable)
+        initializer.addInitializer(CartesianScanInitializer.createRasterInstance(settings))
+        initializer.addInitializer(CartesianScanInitializer.createSnakeInstance(settings))
+        initializer.addInitializer(SpiralScanInitializer(settings))
+        initializer.setInitializerFromSettings()
+        settings.initializer.addObserver(initializer)
+        reinitObservable.addObserver(initializer)
+        return initializer
+
+    def addInitializer(self, initializer: Sequence[ScanPoint]) -> None:
+        self._initializerList.append(initializer)
+
+    def getInitializerList(self) -> list[str]:
+        return [str(initializer) for initializer in self._initializerList]
+
+    def getInitializer(self) -> str:
+        return str(self._initializer)
+
+    def _setInitializer(self, initializer: Sequence[ScanPoint]) -> None:
+        if initializer is not self._initializer:
+            self._initializer = initializer
+            self._settings.initializer.value = str(self._initializer)
             self.notifyObservers()
+
+    def setInitializer(self, name: str) -> None:
+        try:
+            initializer = next(ini for ini in self._initializerList
+                               if name.casefold() == str(ini).casefold())
+        except StopIteration:
+            logger.debug(f'Invalid initializer \"{name}\"')
+            return
+
+        self._setInitializer(initializer)
+
+    def setInitializerFromSettings(self) -> None:
+        self.setInitializer(self._settings.initializer.value)
+
+    def initializeScan(self) -> None:
+        self._scan.setScanPoints(self._initializer)
+
+    def _preloadScanFromCustomFile(self) -> None:
+        customFilePath = self._settings.customFilePath.value
+
+        if customFilePath is not None and customFilePath.is_file():
+            scanPointIterable = self._scanFileReader.read(customFilePath)
+            self._customInitializer.setScanPoints(scanPointIterable)
+
+    def openScan(self, filePath: Path) -> None:
+        self._settings.customFilePath.value = filePath
+        self._preloadScanFromCustomFile()
+        self._setInitializer(self._customInitializer)
+        self.initializeScan()
+
+    def saveScan(self, filePath: Path) -> None:
+        self._scan.write(filePath)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings.initializer:
+            self.setInitializerFromSettings()
+        elif observable is self._reinitObservable:
+            self._preloadScanFromCustomFile()
+            self.initializeScan()
 
 
 class ScanPresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
-    def __init__(self, settings: ScanSettings, selectableSequence: SelectableScanSequence,
-                 transformedSequence: TransformedScanSequence) -> None:
+    def __init__(self, settings: ScanSettings, scan: Scan, initializer: ScanInitializer) -> None:
         super().__init__()
         self._settings = settings
-        self._selectableSequence = selectableSequence
-        self._transformedSequence = transformedSequence
-        self._scanPointIO = ScanPointIO()
+        self._scan = scan
+        self._initializer = initializer
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings, selectableSequence: SelectableScanSequence,
-                       transformedSequence: TransformedScanSequence) -> ScanPresenter:
-        presenter = cls(settings, selectableSequence, transformedSequence)
-        transformedSequence.addObserver(presenter)
+    def createInstance(cls, settings: ScanSettings, scan: Scan,
+                       initializer: ScanInitializer) -> ScanPresenter:
+        presenter = cls(settings, scan, initializer)
+        settings.addObserver(presenter)
+        scan.addObserver(presenter)
+        initializer.addObserver(presenter)
         return presenter
 
-    def getMinNumberOfScanPoints(self) -> int:
-        return 0
-
-    def getMaxNumberOfScanPoints(self) -> int:
-        return self.MAX_INT
-
-    def getNumberOfScanPoints(self) -> int:
-        return len(self._transformedSequence)
-
-    def getScanPointList(self) -> list[ScanPoint]:
-        return [point for point in iter(self._transformedSequence)]
-
     def openScan(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        pointList = self._scanPointIO.read(filePath)
-        self._selectableSequence.setCurrentScanSequenceToCustomPointList(pointList)
+        self._initializer.openScan(filePath)
 
     def saveScan(self, filePath: Path) -> None:
-        self._scanPointIO.write(filePath, self.getScanPointList())
+        self._initializer.saveScan(filePath)
 
-    def getScanSequenceList(self) -> list[str]:
-        return self._selectableSequence.getScanSequenceList()
+    def getInitializerList(self) -> list[str]:
+        return self._initializer.getInitializerList()
 
-    def getCurrentScanSequence(self) -> str:
-        return self._selectableSequence.getCurrentScanSequence()
+    def getInitializer(self) -> str:
+        return self._initializer.getInitializer()
 
-    def setCurrentScanSequence(self, name: str) -> None:
-        self._selectableSequence.setCurrentScanSequence(name)
+    def setInitializer(self, name: str) -> None:
+        self._initializer.setInitializer(name)
 
-    def getMinExtentX(self) -> int:
-        return 1
+    def initializeScan(self) -> None:
+        self._initializer.initializeScan()
 
-    def getMaxExtentX(self) -> int:
-        return self.MAX_INT
+    def getTransformList(self) -> list[str]:
+        return [str(xform) for xform in ScanPointTransform]
+
+    def getTransform(self) -> str:
+        return self._scan.getTransform()
+
+    def setTransform(self, name: str) -> None:
+        self._scan.setTransform(name)
+
+    def getScanPointList(self) -> list[ScanPoint]:
+        return [scanPoint for scanPoint in self._scan]
+
+    def getNumberOfScanPointsLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
+
+    def getNumberOfScanPoints(self) -> int:
+        limits = self.getNumberOfScanPointsLimits()
+        return limits.clamp(len(self._scan))
+
+    def getExtentXLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
 
     def getExtentX(self) -> int:
-        return self._clamp(self._settings.extentX.value, self.getMinExtentX(),
-                           self.getMaxExtentX())
+        limits = self.getExtentXLimits()
+        return limits.clamp(self._settings.extentX.value)
 
     def setExtentX(self, value: int) -> None:
         self._settings.extentX.value = value
 
-    def getMinExtentY(self) -> int:
-        return 1
-
-    def getMaxExtentY(self) -> int:
-        return self.MAX_INT
+    def getExtentYLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
 
     def getExtentY(self) -> int:
-        return self._clamp(self._settings.extentY.value, self.getMinExtentY(),
-                           self.getMaxExtentY())
+        limits = self.getExtentYLimits()
+        return limits.clamp(self._settings.extentY.value)
 
     def setExtentY(self, value: int) -> None:
         self._settings.extentY.value = value
@@ -459,20 +472,10 @@ class ScanPresenter(Observable, Observer):
     def setJitterRadiusInPixels(self, value: Decimal) -> None:
         self._settings.jitterRadiusInPixels.value = value
 
-    def getTransformXYList(self) -> list[str]:
-        return [str(xform) for xform in TransformXY]
-
-    def getCurrentTransformXY(self) -> str:
-        return self._transformedSequence.getCurrentTransformXY()
-
-    def setCurrentTransformXY(self, name: str) -> None:
-        self._transformedSequence.setCurrentTransformXYByName(name)
-
-    @staticmethod
-    def _clamp(x, xmin, xmax):
-        assert xmin <= xmax
-        return max(xmin, min(x, xmax))
-
     def update(self, observable: Observable) -> None:
-        if observable is self._transformedSequence:
+        if observable is self._settings:
+            self.notifyObservers()
+        elif observable is self._scan:
+            self.notifyObservers()
+        elif observable is self._initializer:
             self.notifyObservers()

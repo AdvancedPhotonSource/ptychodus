@@ -4,9 +4,9 @@ import logging
 import numpy
 
 from .crop import *
-from .data_file import *
+from .data import *
 from .detector import *
-from .h5tree import *
+from .h5file import *
 from .image import *
 from .object import *
 from .observer import *
@@ -34,18 +34,30 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
-        self._selectableScanSequence = SelectableScanSequence.createInstance(self._scanSettings)
-        self._scanSequence = TransformedScanSequence.createInstance(self._scanSettings,
-                                                                    self._selectableScanSequence)
+        self._velociprobeReader = VelociprobeReader()
+        self._scanFileReader = VelociprobeScanReader(self._velociprobeReader)
+
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
-        self._probe = Probe.createInstance(self._probeSettings)
-        self._objectSizer = ObjectSizer.createInstance(self._scanSequence, self._detector,
-                                                       self._probe)
-        self._object = Object.createInstance(self._objectSettings)
+        self._scan = Scan.createInstance(self._scanSettings)
+        self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan, self._scanFileReader,
+                                                               self.settingsRegistry)
+        self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
+        self._probe = Probe(self._probeSettings, self._probeSizer)
+        self._probeInitializer = ProbeInitializer.createInstance(self._detectorSettings,
+                                                                 self._probeSettings,
+                                                                 self._probeSizer, self._probe,
+                                                                 self.settingsRegistry)
+        self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
+                                                       self._probeSizer)
+        self._object = Object(self._objectSettings, self._objectSizer)
+        self._objectInitializer = ObjectInitializer.createInstance(self.rng,
+                                                                   self._detectorSettings,
+                                                                   self._objectSettings,
+                                                                   self._objectSizer, self._object,
+                                                                   self.settingsRegistry)
 
-        self.h5FileTreeReader = H5FileTreeReader()
-        self._velociprobeReader = VelociprobeReader()
+        self.h5FileReader = H5FileReader()
         self._velociprobeImageSequence = VelociprobeImageSequence.createInstance(
             self._velociprobeReader)
         self._croppedImageSequence = CroppedImageSequence.createInstance(
@@ -55,8 +67,9 @@ class ModelCore:
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSizer,
-                                                      self._velociprobeReader, self._scanSequence,
-                                                      self._probe, self._objectSizer, self._object,
+                                                      self._velociprobeReader, self._scan,
+                                                      self._probeSizer, self._probe,
+                                                      self._objectSizer, self._object,
                                                       isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
@@ -65,7 +78,6 @@ class ModelCore:
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
 
         self.dataFilePresenter = DataFilePresenter()
-        self.settingsPresenter = SettingsPresenter.createInstance(self.settingsRegistry)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.detectorImagePresenter = DetectorImagePresenter.createInstance(
@@ -73,20 +85,20 @@ class ModelCore:
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
             self._probeSettings)
-        self.probePresenter = ProbePresenter.createInstance(self._detectorSettings,
-                                                            self._probeSettings, self._probe)
-        self.scanPresenter = ScanPresenter.createInstance(self._scanSettings,
-                                                          self._selectableScanSequence,
-                                                          self._scanSequence)
-        self.objectPresenter = ObjectPresenter.createInstance(self.rng, self._objectSettings,
-                                                              self._objectSizer, self._object)
+        self.probePresenter = ProbePresenter.createInstance(self._probeSettings, self._probeSizer,
+                                                            self._probe, self._probeInitializer)
+        self.scanPresenter = ScanPresenter.createInstance(self._scanSettings, self._scan,
+                                                          self._scanInitializer)
+        self.objectPresenter = ObjectPresenter.createInstance(self._objectSettings,
+                                                              self._objectSizer, self._object,
+                                                              self._objectInitializer)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 
     @classmethod
     def createInstance(cls, isDeveloperModeEnabled: bool = False) -> ModelCore:
         model = cls(isDeveloperModeEnabled)
-        model.dataFilePresenter.addReader(model.h5FileTreeReader)
+        model.dataFilePresenter.addReader(model.h5FileReader)
         model.dataFilePresenter.addReader(model._velociprobeReader)
         return model
 

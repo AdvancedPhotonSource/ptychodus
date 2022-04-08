@@ -18,7 +18,7 @@ class ProbeProbeView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Size:', view.sizeSpinBox)
+        layout.addRow('Size [px]:', view.sizeSpinBox)
         layout.addRow('Energy:', view.energyWidget)
         layout.addRow('Wavelength:', view.wavelengthWidget)
         layout.addRow('Diameter:', view.diameterWidget)
@@ -68,18 +68,18 @@ class ProbeInitializerView(QGroupBox):
 class ProbeParametersView(QWidget):
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
+        self.initializerView = ProbeInitializerView.createInstance()
         self.probeView = ProbeProbeView.createInstance()
         self.zonePlateView = ProbeZonePlateView.createInstance()
-        self.initializerView = ProbeInitializerView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: QWidget = None) -> ProbeParametersView:
         view = cls(parent)
 
         layout = QVBoxLayout()
+        layout.addWidget(view.initializerView)
         layout.addWidget(view.probeView)
         layout.addWidget(view.zonePlateView)
-        layout.addWidget(view.initializerView)
         layout.addStretch()
         view.setLayout(layout)
 

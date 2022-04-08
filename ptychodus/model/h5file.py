@@ -6,12 +6,12 @@ import numpy
 
 from .observer import Observable
 from .tree import SimpleTreeNode
-from .data_file import DataFileReader
+from .data import DataFileReader
 
 logger = logging.getLogger(__name__)
 
 
-class H5FileTreeReader(DataFileReader, Observable):
+class H5FileReader(DataFileReader, Observable):
     FILE_FILTER = 'Hierarchical Data Format 5 Files (*.h5)'
 
     @staticmethod
@@ -20,7 +20,7 @@ class H5FileTreeReader(DataFileReader, Observable):
 
     def __init__(self) -> None:
         super().__init__()
-        self._rootNode = H5FileTreeReader.createRootNode()
+        self._rootNode = H5FileReader.createRootNode()
 
     def getTree(self) -> SimpleTreeNode:
         return self._rootNode
@@ -43,7 +43,7 @@ class H5FileTreeReader(DataFileReader, Observable):
             treeNode.createChild([str(name), 'Attribute', valueStr])
 
     def read(self, rootGroup: h5py.Group) -> None:
-        self._rootNode = H5FileTreeReader.createRootNode()
+        self._rootNode = H5FileReader.createRootNode()
         unvisited = [(self._rootNode, rootGroup)]
 
         while unvisited:
@@ -62,11 +62,11 @@ class H5FileTreeReader(DataFileReader, Observable):
 
                     if isinstance(h5Item, h5py.Group):
                         itemType = 'Group'
-                        H5FileTreeReader._addAttributes(treeNode, h5Item.attrs)
+                        H5FileReader._addAttributes(treeNode, h5Item.attrs)
                         unvisited.append((treeNode, h5Item))
                     elif isinstance(h5Item, h5py.Dataset):
                         itemType = 'Dataset'
-                        H5FileTreeReader._addAttributes(treeNode, h5Item.attrs)
+                        H5FileReader._addAttributes(treeNode, h5Item.attrs)
                         spaceId = h5Item.id.get_space()
 
                         if spaceId.get_simple_extent_type() == h5py.h5s.SCALAR:

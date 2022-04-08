@@ -20,7 +20,7 @@ from .object import Object, ObjectSizer
 from .observer import Observable, Observer
 from .probe import Probe
 from .reconstructor import Reconstructor, NullReconstructor
-from .scan import ScanSequence
+from .scan import Scan
 from .settings import SettingsRegistry, SettingsGroup
 from .velociprobe import VelociprobeReader
 
@@ -391,15 +391,16 @@ class TikeReconstructor:
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
-                 velociprobeReader: VelociprobeReader, scanSequence: ScanSequence, probe: Probe,
-                 objectSizer: ObjectSizer, obj: Object) -> None:
+                 velociprobeReader: VelociprobeReader, scan: Scan, probeSizer: ProbeSizer,
+                 probe: Probe, objectSizer: ObjectSizer, obj: Object) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
         self._cropSizer = cropSizer
         self._velociprobeReader = velociprobeReader
-        self._scanSequence = scanSequence
+        self._scan = scan
+        self._probeSizer = probeSizer
         self._probe = probe
         self._objectSizer = objectSizer
         self._object = obj
@@ -428,15 +429,12 @@ class TikeReconstructor:
                             dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
                             dataList.append(dataShifted)
                         else:
-                            logger.debug(
-                                f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.'
-                            )
+                            message = f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.'
+                            logger.debug(message)
                 except FileNotFoundError:
                     logger.debug(f'File {datafile.filePath} not found!')
 
-        data = numpy.concatenate(dataList)
-
-        return data
+        return numpy.concatenate(dataList).astype('float32')
 
     def getProbe(self) -> numpy.ndarray:
         numAdditionalProbeModes = self._settings.numProbeModes.value - 1
@@ -450,12 +448,16 @@ class TikeReconstructor:
         return probe
 
     def getTikeObjectExtent(self) -> ImageExtent:
-        pad = 2 * (self._probe.extentInPixels + 2)
+        pad = 2 * (self._probeSizer.getProbeSize() + 2)
         paddingExtent = ImageExtent(width=pad, height=pad)
-        return self._objectSizer.getScanExtent() + paddingExtent
+        extent = self._objectSizer.getScanExtent() + paddingExtent
+        logger.debug(f'tike object extent = {extent}')
+        return extent
 
     def getPtychodusObjectExtent(self) -> ImageExtent:
-        return self._objectSizer.getObjectExtent()
+        extent = self._objectSizer.getObjectExtent()
+        logger.debug(f'ptychodus object extent = {extent}')
+        return extent
 
     def getInitialObject(self) -> numpy.ndarray:
         delta = self.getTikeObjectExtent() - self.getPtychodusObjectExtent()
@@ -472,15 +474,24 @@ class TikeReconstructor:
         xvalues = list()
         yvalues = list()
 
-        tikeObjectExtent = self.getTikeObjectExtent()
-        scanBBox_m = self._objectSizer.getScanBoundingBoxInMeters()
-        py_m, px_m = self._objectSizer.objectPlanePixelShapeInMeters
+        px_m = self._objectSizer.getPixelSizeXInMeters()
+        py_m = self._objectSizer.getPixelSizeYInMeters()
 
-        for point in iter(self._scanSequence):
-            xvalues.append(float((point.x - scanBBox_m[0].lower) / px_m) + 2)
-            yvalues.append(float((point.y - scanBBox_m[1].upper) / py_m) + 2)
+        logger.debug(f'object pixel size x = {px_m} m')
+        logger.debug(f'object pixel size y = {py_m} m')
 
-        return numpy.column_stack((xvalues, yvalues))
+        for point in self._scan:
+            xvalues.append(point.x / px_m)
+            yvalues.append(point.y / py_m)
+
+        probeSize = self._probeSizer.getProbeSize()
+        ux = probeSize - min(xvalues)
+        uy = probeSize - min(yvalues)
+
+        xvalues = [x + ux for x in xvalues]
+        yvalues = [y + uy for y in yvalues]
+
+        return numpy.column_stack((yvalues, xvalues)).astype('float32')
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings
@@ -503,7 +514,7 @@ class TikeReconstructor:
 
         if settings.usePositionCorrection.value:
             options = tike.ptycho.PositionOptions(
-                num_positions=len(self._scanSequence),
+                num_positions=len(self._scan),
                 initial_scan=self.getScan(),
                 use_adaptive_moment=settings.useAdaptiveMoment.value,
                 vdecay=float(settings.vdecay.value),
@@ -535,6 +546,14 @@ class TikeReconstructor:
         probe = self.getProbe()
         initialObject = self.getInitialObject()
 
+        logger.debug(f'data shape={data.shape}')
+        logger.debug(f'scan shape={scan.shape}')
+        logger.debug(f'probe shape={probe.shape}')
+        logger.debug(f'object shape={initialObject.shape}')
+
+        #with numpy.printoptions(threshold=numpy.inf):
+        #    print(scan)
+
         if len(data) != len(scan):
             numFrame = min(len(data), len(scan))
             scan = scan[:numFrame, ...]
@@ -544,23 +563,19 @@ class TikeReconstructor:
         positionOptions = self.getPositionOptions()
         probeOptions = self.getProbeOptions()
 
-        try:
-            result = tike.ptycho.reconstruct(
-                data=data,
-                probe=probe,
-                scan=scan,
-                algorithm_options=algorithmOptions,
-                model=self._settings.noiseModel.value,
-                num_gpu=self._settings.numGpus.value,
-                object_options=objectOptions,
-                position_options=positionOptions,
-                probe_options=probeOptions,
-                psi=initialObject,
-                use_mpi=self._settings.useMpi.value,
-            )
-        except ValueError as err:
-            print(err)
-            return -1
+        result = tike.ptycho.reconstruct(
+            data=data,
+            probe=probe,
+            scan=scan,
+            algorithm_options=algorithmOptions,
+            model=self._settings.noiseModel.value,
+            num_gpu=self._settings.numGpus.value,
+            object_options=objectOptions,
+            position_options=positionOptions,
+            probe_options=probeOptions,
+            psi=initialObject,
+            use_mpi=self._settings.useMpi.value,
+        )
 
         self._probe.setArray(result['probe'][0, 0, 0, :, :])
         self._object.setArray(result['psi'])
@@ -696,7 +711,8 @@ class TikeBackend:
                        settingsRegistry: SettingsRegistry,
                        cropSizer: CropSizer,
                        velociprobeReader: VelociprobeReader,
-                       scanSequence: ScanSequence,
+                       scan: Scan,
+                       probeSizer: ProbeSizer,
                        probe: Probe,
                        objectSizer: ObjectSizer,
                        obj: Object,
@@ -709,7 +725,7 @@ class TikeBackend:
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, cropSizer,
-                                                  velociprobeReader, scanSequence, probe,
+                                                  velociprobeReader, scan, probeSizer, probe,
                                                   objectSizer, obj)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(

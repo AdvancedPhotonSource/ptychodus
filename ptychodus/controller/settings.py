@@ -3,9 +3,9 @@ from typing import Optional
 from PyQt5.QtCore import Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QDialog, QListView, QTableView
 
-from ..model import Observable, Observer, SettingsGroup, SettingsPresenter, SettingsRegistry, VelociprobePresenter
+from ..model import ObjectPresenter, Observable, Observer, ProbePresenter, SettingsGroup, SettingsRegistry, VelociprobePresenter
 from ..view import ImportSettingsDialog
-from .data_file import FileDialogFactory
+from .data import FileDialogFactory
 
 
 class SettingsGroupListModel(QAbstractListModel):
@@ -68,23 +68,19 @@ class SettingsEntryTableModel(QAbstractTableModel):
 
 
 class SettingsController(Observer):
-    def __init__(self, settingsRegistry: SettingsRegistry, presenter: SettingsPresenter,
-                 groupListView: QListView, entryTableView: QTableView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, groupListView: QListView,
+                 entryTableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._settingsRegistry = settingsRegistry
-        self._presenter = presenter
         self._groupListModel = SettingsGroupListModel(settingsRegistry)
         self._groupListView = groupListView
         self._entryTableView = entryTableView
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry, presenter: SettingsPresenter,
-                       groupListView: QListView, entryTableView: QTableView,
-                       fileDialogFactory: FileDialogFactory) -> None:
-        controller = cls(settingsRegistry, presenter, groupListView, entryTableView,
-                         fileDialogFactory)
+    def createInstance(cls, settingsRegistry: SettingsRegistry, groupListView: QListView,
+                       entryTableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
+        controller = cls(settingsRegistry, groupListView, entryTableView, fileDialogFactory)
         settingsRegistry.addObserver(controller)
 
         controller._groupListView.setModel(controller._groupListModel)
@@ -94,18 +90,18 @@ class SettingsController(Observer):
         return controller
 
     def openSettings(self) -> None:
-        filePath = self._fileDialogFactory.getOpenFilePath(self._groupListView, 'Open Settings',
-                                                           SettingsPresenter.FILE_FILTER)
+        filePath = self._fileDialogFactory.getOpenFilePath(
+            self._groupListView, 'Open Settings', nameFilters=[SettingsRegistry.FILE_FILTER])
 
         if filePath:
-            self._presenter.openSettings(filePath)
+            self._settingsRegistry.read(filePath)
 
     def saveSettings(self) -> None:
-        filePath = self._fileDialogFactory.getSaveFilePath(self._groupListView, 'Save Settings',
-                                                           SettingsPresenter.FILE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(
+            self._groupListView, 'Save Settings', nameFilters=[SettingsRegistry.FILE_FILTER])
 
         if filePath:
-            self._presenter.saveSettings(filePath)
+            self._settingsRegistry.write(filePath)
 
     def _updateEntryTable(self) -> None:
         current = self._groupListView.currentIndex()
@@ -121,15 +117,19 @@ class SettingsController(Observer):
 
 
 class ImportSettingsController(Observer):
-    def __init__(self, presenter: VelociprobePresenter, dialog: ImportSettingsDialog) -> None:
+    def __init__(self, probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
+                 velociprobePresenter: VelociprobePresenter, dialog: ImportSettingsDialog) -> None:
         super().__init__()
-        self._presenter = presenter
+        self._probePresenter = probePresenter
+        self._objectPresenter = objectPresenter
+        self._velociprobePresenter = velociprobePresenter
         self._dialog = dialog
 
     @classmethod
-    def createInstance(cls, presenter: VelociprobePresenter, dialog: ImportSettingsDialog):
-        controller = cls(presenter, dialog)
-        presenter.addObserver(controller)
+    def createInstance(cls, probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
+                       velociprobePresenter: VelociprobePresenter, dialog: ImportSettingsDialog):
+        controller = cls(probePresenter, objectPresenter, velociprobePresenter, dialog)
+        velociprobePresenter.addObserver(controller)
         dialog.finished.connect(controller._importSettings)
         return controller
 
@@ -138,22 +138,28 @@ class ImportSettingsController(Observer):
             return
 
         if self._dialog.valuesGroupBox.detectorPixelCountCheckBox.isChecked():
-            self._presenter.syncDetectorPixelCount()
+            self._velociprobePresenter.syncDetectorPixelCount()
 
         if self._dialog.valuesGroupBox.detectorPixelSizeCheckBox.isChecked():
-            self._presenter.syncDetectorPixelSize()
+            self._velociprobePresenter.syncDetectorPixelSize()
 
         if self._dialog.valuesGroupBox.detectorDistanceCheckBox.isChecked():
             override = self._dialog.optionsGroupBox.fixDetectorDistanceUnitsCheckBox.isChecked()
-            self._presenter.syncDetectorDistance(override)
+            self._velociprobePresenter.syncDetectorDistance(override)
 
-        self._presenter.syncImageCrop(
+        self._velociprobePresenter.syncImageCrop(
             syncCenter=self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked(),
             syncExtent=self._dialog.valuesGroupBox.imageCropExtentCheckBox.isChecked())
 
         if self._dialog.valuesGroupBox.probeEnergyCheckBox.isChecked():
-            self._presenter.syncProbeEnergy()
+            self._velociprobePresenter.syncProbeEnergy()
+
+        if self._dialog.optionsGroupBox.reinitializeProbeCheckBox.isChecked():
+            self._probePresenter.initializeProbe()
+
+        if self._dialog.optionsGroupBox.reinitializeObjectCheckBox.isChecked():
+            self._objectPresenter.initializeObject()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._velociprobePresenter:
             self._dialog.open()

@@ -13,7 +13,7 @@ class CropSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.cropEnabled = settingsGroup.createBooleanEntry('CropEnabled', False)
+        self.cropEnabled = settingsGroup.createBooleanEntry('CropEnabled', True)
         self.centerXInPixels = settingsGroup.createIntegerEntry('CenterXInPixels', 32)
         self.centerYInPixels = settingsGroup.createIntegerEntry('CenterYInPixels', 32)
         self.extentXInPixels = settingsGroup.createIntegerEntry('ExtentXInPixels', 64)
@@ -53,6 +53,9 @@ class CropSizer(Observer, Observable):
         limits = self.getExtentXLimits()
         return limits.clamp(self._settings.extentXInPixels.value)
 
+    def getExtentXInMeters(self) -> Decimal:
+        return self.getExtentX() * self._detector.pixelSizeXInMeters
+
     def getCenterXLimits(self) -> Interval[int]:
         radius = self.getExtentX() // 2
         return Interval[int](radius, self._detector.numberOfPixelsX - 1 - radius)
@@ -64,7 +67,7 @@ class CropSizer(Observer, Observable):
     def getSliceX(self) -> slice:
         center = self.getCenterX()
         radius = self.getExtentX() // 2
-        return slice(center - radius, center + radius + 1)
+        return slice(center - radius, center + radius)
 
     def getExtentYLimits(self) -> Interval[int]:
         return Interval[int](1, self._detector.numberOfPixelsY)
@@ -72,6 +75,9 @@ class CropSizer(Observer, Observable):
     def getExtentY(self) -> int:
         limits = self.getExtentYLimits()
         return limits.clamp(self._settings.extentYInPixels.value)
+
+    def getExtentYInMeters(self) -> Decimal:
+        return self.getExtentY() * self._detector.pixelSizeYInMeters
 
     def getCenterYLimits(self) -> Interval[int]:
         radius = self.getExtentY() // 2
@@ -84,7 +90,7 @@ class CropSizer(Observer, Observable):
     def getSliceY(self) -> slice:
         center = self.getCenterY()
         radius = self.getExtentY() // 2
-        return slice(center - radius, center + radius + 1)
+        return slice(center - radius, center + radius)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

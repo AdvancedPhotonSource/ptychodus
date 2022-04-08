@@ -66,10 +66,7 @@ def main() -> int:
     result = 0
 
     if parsedArgs.settings:
-        result = model.settingsPresenter.openSettings(parsedArgs.settings)
-
-        if result != 0:
-            return result
+        model.settingsRegistry.read(parsedArgs.settings.name)
 
     if parsedArgs.batch:
         verifyAllArgumentsParsed(parser, unparsedArgs)

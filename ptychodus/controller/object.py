@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from PyQt5.QtGui import QStandardItemModel
-
 from ..model import Observer, Observable, Object, ObjectPresenter
 from ..view import ImageView, ObjectInitializerView, ObjectParametersView
-from .data_file import FileDialogFactory
+from .data import FileDialogFactory
 from .image import ImageController
 
 
@@ -13,7 +11,6 @@ class ObjectInitializerController(Observer):
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._initComboBoxModel = QStandardItemModel()
 
     @classmethod
     def createInstance(cls, presenter: ObjectPresenter,
@@ -55,15 +52,17 @@ class ObjectParametersController:
         return controller
 
     def openObject(self) -> None:
-        filePath = self._fileDialogFactory.getOpenFilePath(self._view, 'Open Object',
-                                                           Object.FILE_FILTER)
+        filePath = self._fileDialogFactory.getOpenFilePath(self._view,
+                                                           'Open Object',
+                                                           nameFilters=[Object.FILE_FILTER])
 
         if filePath:
             self._presenter.openObject(filePath)
 
     def saveObject(self) -> None:
-        filePath = self._fileDialogFactory.getSaveFilePath(self._view, 'Save Object',
-                                                           Object.FILE_FILTER)
+        filePath = self._fileDialogFactory.getSaveFilePath(self._view,
+                                                           'Save Object',
+                                                           nameFilters=[Object.FILE_FILTER])
 
         if filePath:
             self._presenter.saveObject(filePath)
