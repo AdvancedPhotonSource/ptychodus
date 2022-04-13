@@ -22,7 +22,8 @@ class ProbeSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.initializer = settingsGroup.createStringEntry('Initializer', 'Gaussian')
+        self.initializer = settingsGroup.createStringEntry(
+            'Initializer', 'Gaussian Beam')  # TODO need to match simple names
         self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
         self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
             'AutomaticProbeSizeEnabled', True)
@@ -159,7 +160,7 @@ class FresnelZonePlateProbeInitializer:
         return 'Fresnel Zone Plate'
 
 
-class CustomProbeInitializer:
+class CustomProbeInitializer:  # TODO rework like scan
     def __init__(self, sizer: ProbeSizer) -> None:
         self._sizer = sizer
         self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
@@ -222,10 +223,10 @@ class ProbeInitializer(Observable, Observer):
                        reinitObservable: Observable) -> ProbeInitializer:
         initializer = cls(probeSettings, sizer, probe, reinitObservable)
 
-        gaussInit = GaussianBeamProbeInitializer(detectorSettings, probeSettings)
-        initializer.addInitializer(gaussInit)
         fzpInit = FresnelZonePlateProbeInitializer(detectorSettings, probeSettings, sizer)
         initializer.addInitializer(fzpInit)
+        gaussInit = GaussianBeamProbeInitializer(detectorSettings, probeSettings)
+        initializer.addInitializer(gaussInit)
 
         initializer.setInitializerFromSettings()
         probeSettings.initializer.addObserver(initializer)
@@ -234,7 +235,7 @@ class ProbeInitializer(Observable, Observer):
         return initializer
 
     def addInitializer(self, initializer: Callable[[], numpy.ndarray]) -> None:
-        self._initializerList.append(initializer)
+        self._initializerList.insert(0, initializer)
 
     def getInitializerList(self) -> list[str]:
         return [str(initializer) for initializer in self._initializerList]

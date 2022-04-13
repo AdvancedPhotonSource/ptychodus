@@ -162,7 +162,7 @@ class DetectorImagePresenter(Observable, Observer):
         try:
             return self._imageSequence[index]
         except IndexError:
-            return numpy.empty((0,0))
+            return numpy.empty((0, 0))
 
     def update(self, observable: Observable) -> None:
         if observable is self._imageSequence:

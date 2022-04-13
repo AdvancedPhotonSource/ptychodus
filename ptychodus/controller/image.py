@@ -87,7 +87,7 @@ class ImageController:
         return controller
 
     def _saveImage(self) -> None:
-        filePath = self._fileDialogFactory.getSaveFilePath(
+        filePath, _ = self._fileDialogFactory.getSaveFilePath(
             self._view, 'Save Image', mimeTypeFilters=ImageController.MIME_TYPES)
 
         if filePath:

@@ -197,17 +197,25 @@ class VelociprobeScanPointList:
         return ScanPoint(x_nm * nanometersToMeters, y_nm * nanometersToMeters)
 
 
-class VelociprobeScanReader(ScanFileReader):
-    FILE_FILTER = 'Velociprobe Scan Files (*.txt)'
+class VelociprobeScanFileReader(ScanFileReader):
     X_COLUMN = 1
     TRIGGER_COLUMN = 7
 
-    def __init__(self, velociprobeReader: VelociprobeReader) -> None:
+    def __init__(self, velociprobeReader: VelociprobeReader,
+                 yPositionSource: VelociprobeScanYPositionSource) -> None:
         self._velociprobeReader = velociprobeReader
-        self._yPositionSource = VelociprobeScanYPositionSource.ENCODER
+        self._yPositionSource = yPositionSource
+
+    def getFileFilter(self) -> str:
+        yPositionSourceText = 'Encoder Y'
+
+        if self._yPositionSource == VelociprobeScanYPositionSource.LASER_INTERFEROMETER:
+            yPositionSourceText = 'Laser Interferometer Y'
+
+        return f'Velociprobe Scan Files - {yPositionSourceText} (*.txt)'
 
     def read(self, filePath: Path) -> Iterable[ScanPoint]:
-        scanPointDict: dict[int,VelociprobeScanPointList] = defaultdict(VelociprobeScanPointList)
+        scanPointDict: dict[int, VelociprobeScanPointList] = defaultdict(VelociprobeScanPointList)
 
         with open(filePath, newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
@@ -219,8 +227,8 @@ class VelociprobeScanReader(ScanFileReader):
                 if len(row) != 8:
                     raise ScanPointParseError()
 
-                trigger = int(row[VelociprobeScanReader.TRIGGER_COLUMN])
-                x_nm = int(row[VelociprobeScanReader.X_COLUMN])
+                trigger = int(row[VelociprobeScanFileReader.TRIGGER_COLUMN])
+                x_nm = int(row[VelociprobeScanFileReader.X_COLUMN])
                 y_nm = int(row[self._yPositionSource.value])
 
                 if self._yPositionSource == VelociprobeScanYPositionSource.ENCODER:
@@ -228,7 +236,9 @@ class VelociprobeScanReader(ScanFileReader):
 
                 scanPointDict[trigger].append(x_nm, y_nm)
 
-        scanPointList = [scanPointList.mean() for _, scanPointList in sorted(scanPointDict.items())]
+        scanPointList = [
+            scanPointList.mean() for _, scanPointList in sorted(scanPointDict.items())
+        ]
         xMeanInMeters = Decimal(sum(point.x for point in scanPointList)) / len(scanPointList)
         yMeanInMeters = Decimal(sum(point.y for point in scanPointList)) / len(scanPointList)
 
@@ -243,6 +253,14 @@ class VelociprobeScanReader(ScanFileReader):
             scanPointList[idx] = ScanPoint(x_m, y_m)
 
         return scanPointList
+
+    def __str__(self) -> str:
+        yPositionSourceText = 'EncoderY'
+
+        if self._yPositionSource == VelociprobeScanYPositionSource.LASER_INTERFEROMETER:
+            yPositionSourceText = 'LaserInterferometerY'
+
+        return f'VelociprobeWith{yPositionSourceText}'
 
 
 class VelociprobeImageSequence(ImageSequence):
