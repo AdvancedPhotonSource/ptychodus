@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
 import csv
 import logging
 
@@ -96,7 +96,7 @@ class VelociprobeReader(DataFileReader, Observable):
         for name, h5Item in h5DataGroup.items():
             h5Item = h5DataGroup.get(name, getlink=True)
 
-            if isinstance(h5Item, h5py.ExternalLink):
+            if isinstance(h5Item, h5py.ExternalLink) and self.masterFilePath is not None:
                 datafile = DataFile(name=name,
                                     filePath=self.masterFilePath.parent / h5Item.filename,
                                     dataPath=str(h5Item.path))
@@ -207,7 +207,7 @@ class VelociprobeScanReader(ScanFileReader):
         self._yPositionSource = VelociprobeScanYPositionSource.ENCODER
 
     def read(self, filePath: Path) -> Iterable[ScanPoint]:
-        scanPointDict = defaultdict(VelociprobeScanPointList)
+        scanPointDict: dict[int,VelociprobeScanPointList] = defaultdict(VelociprobeScanPointList)
 
         with open(filePath, newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
@@ -229,13 +229,13 @@ class VelociprobeScanReader(ScanFileReader):
                 scanPointDict[trigger].append(x_nm, y_nm)
 
         scanPointList = [scanPointList.mean() for _, scanPointList in sorted(scanPointDict.items())]
-        xMeanInMeters = sum(point.x for point in scanPointList) / len(scanPointList)
-        yMeanInMeters = sum(point.y for point in scanPointList) / len(scanPointList)
+        xMeanInMeters = Decimal(sum(point.x for point in scanPointList)) / len(scanPointList)
+        yMeanInMeters = Decimal(sum(point.y for point in scanPointList)) / len(scanPointList)
 
         for idx, scanPoint in enumerate(scanPointList):
             chi_rad = 0.
 
-            if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.sample.goniometer:
+            if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.sample and self._velociprobeReader.entryGroup.sample.goniometer:
                 chi_rad = self._velociprobeReader.entryGroup.sample.goniometer.chi_rad
 
             x_m = (scanPoint.x - xMeanInMeters) * Decimal(numpy.cos(chi_rad))

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 import csv
 import logging
 
