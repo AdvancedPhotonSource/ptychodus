@@ -23,6 +23,7 @@ class ScanSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
+        self.customFileType = settingsGroup.createStringEntry('CustomFileType', None)
         self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
         self.extentX = settingsGroup.createIntegerEntry('ExtentX', 10)
         self.extentY = settingsGroup.createIntegerEntry('ExtentY', 10)
@@ -121,13 +122,18 @@ class SpiralScanInitializer(Sequence[ScanPoint]):
         return 'Spiral'
 
 
-class CustomScanInitializer(Sequence[ScanPoint]):
-    def __init__(self) -> None:
+class CustomScanInitializer(Sequence[ScanPoint],Observer):
+    def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
+        self._settings = settings
         self._scanPointList: list[ScanPoint] = list()
 
-    def setScanPoints(self, scanPointIterable: Iterable[ScanPoint]) -> None:
-        self._scanPointList = [point for point in scanPointIterable]
+    @classmethod
+    def createInstance(cls, settings: ScanSettings) -> Scan:
+        initializer = cls(settings)
+        initializer._preloadScanFromSettings()
+        settings.customFilePath.addObserver(initializer)
+        return initializer
 
     def __getitem__(self, index: int) -> ScanPoint:
         return self._scanPointList[index]
@@ -137,6 +143,25 @@ class CustomScanInitializer(Sequence[ScanPoint]):
 
     def __str__(self) -> str:
         return 'Custom'
+
+    def openScan(self, filePath: Path, fileType: str) -> None:
+        # NOTE always set customFileType first
+        self._settings.customFileType.value = fileType
+        self._settings.customFilePath.value = filePath
+        # FIXME scanPointIterable = reader.read(filePath)
+        self._scanPointList = [point for point in scanPointIterable]
+
+    def _preloadScanFromSettings(self) -> None:
+        customFileType = self._settings.customFileType.value
+        customFilePath = self._settings.customFilePath.value
+
+        if customFilePath is not None and customFilePath.is_file():
+            scanPointIterable = self._scanFileReader.read(customFilePath)
+            self._customInitializer.setScanPoints(scanPointIterable)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings.customFilePath:
+            self._preloadScanFromSettings()
 
 
 class ScanPointTransform(Enum):
@@ -187,7 +212,7 @@ class ScanPointTransform(Enum):
 
 
 class Scan(Sequence[ScanPoint], Observable, Observer):
-    MIME_TYPE = 'text/csv'
+    MIME_TYPE = 'text/plain' # TODO text/csv
 
     def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
@@ -308,7 +333,7 @@ class ScanInitializer(Observable, Observer):
         self._scan = scan
         self._scanFileReader = scanFileReader
         self._reinitObservable = reinitObservable
-        self._customInitializer = CustomScanInitializer()
+        self._customInitializer = CustomScanInitializer.createInstance(settings)
         self._initializer = self._customInitializer
         self._initializerList: list[Sequence[ScanPoint]] = [self._customInitializer]
 
@@ -355,16 +380,7 @@ class ScanInitializer(Observable, Observer):
     def initializeScan(self) -> None:
         self._scan.setScanPoints(self._initializer)
 
-    def _preloadScanFromCustomFile(self) -> None:
-        customFilePath = self._settings.customFilePath.value
-
-        if customFilePath is not None and customFilePath.is_file():
-            scanPointIterable = self._scanFileReader.read(customFilePath)
-            self._customInitializer.setScanPoints(scanPointIterable)
-
     def openScan(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        self._preloadScanFromCustomFile()
         self._setInitializer(self._customInitializer)
         self.initializeScan()
 
@@ -375,7 +391,6 @@ class ScanInitializer(Observable, Observer):
         if observable is self._settings.initializer:
             self.setInitializerFromSettings()
         elif observable is self._reinitObservable:
-            self._preloadScanFromCustomFile()
             self.initializeScan()
 
 
