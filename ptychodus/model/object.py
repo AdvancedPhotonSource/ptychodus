@@ -23,7 +23,8 @@ class ObjectSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.initializer = settingsGroup.createStringEntry('Initializer', 'Random')
+        self.initializer = settingsGroup.createStringEntry(
+            'Initializer', 'Random')  # TODO need to match simple names
         self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
 
     @classmethod
@@ -116,7 +117,7 @@ class UniformRandomObjectInitializer:
         return 'Random'
 
 
-class CustomObjectInitializer:
+class CustomObjectInitializer:  # TODO rework like scan
     def __init__(self, sizer: ObjectSizer) -> None:
         self._sizer = sizer
         self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
@@ -189,7 +190,7 @@ class ObjectInitializer(Observable, Observer):
         return initializer
 
     def addInitializer(self, initializer: Callable[[], numpy.ndarray]) -> None:
-        self._initializerList.append(initializer)
+        self._initializerList.insert(0, initializer)
 
     def getInitializerList(self) -> list[str]:
         return [str(initializer) for initializer in self._initializerList]

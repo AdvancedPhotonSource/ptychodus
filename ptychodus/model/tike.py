@@ -18,7 +18,7 @@ from .crop import CropSizer
 from .image import ImageExtent
 from .object import Object, ObjectSizer
 from .observer import Observable, Observer
-from .probe import Probe
+from .probe import Probe, ProbeSizer
 from .reconstructor import Reconstructor, NullReconstructor
 from .scan import Scan
 from .settings import SettingsRegistry, SettingsGroup

@@ -35,12 +35,22 @@ class ModelCore:
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
         self._velociprobeReader = VelociprobeReader()
-        self._scanFileReader = VelociprobeScanReader(self._velociprobeReader)
+
+        scanFileReaderList = [
+            CSVScanFileReader(),
+            VelociprobeScanFileReader(self._velociprobeReader,
+                                      VelociprobeScanYPositionSource.ENCODER),
+            VelociprobeScanFileReader(self._velociprobeReader,
+                                      VelociprobeScanYPositionSource.LASER_INTERFEROMETER)
+        ]
+        self._customScanInitializer = CustomScanInitializer.createInstance(
+            self._scanSettings, scanFileReaderList)
 
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
         self._scan = Scan.createInstance(self._scanSettings)
-        self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan, self._scanFileReader,
+        self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan,
+                                                               self._customScanInitializer,
                                                                self.settingsRegistry)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings, self._probeSizer)

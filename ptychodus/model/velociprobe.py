@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
 import csv
 import logging
 
@@ -96,7 +96,7 @@ class VelociprobeReader(DataFileReader, Observable):
         for name, h5Item in h5DataGroup.items():
             h5Item = h5DataGroup.get(name, getlink=True)
 
-            if isinstance(h5Item, h5py.ExternalLink):
+            if isinstance(h5Item, h5py.ExternalLink) and self.masterFilePath is not None:
                 datafile = DataFile(name=name,
                                     filePath=self.masterFilePath.parent / h5Item.filename,
                                     dataPath=str(h5Item.path))
@@ -197,17 +197,25 @@ class VelociprobeScanPointList:
         return ScanPoint(x_nm * nanometersToMeters, y_nm * nanometersToMeters)
 
 
-class VelociprobeScanReader(ScanFileReader):
-    FILE_FILTER = 'Velociprobe Scan Files (*.txt)'
+class VelociprobeScanFileReader(ScanFileReader):
     X_COLUMN = 1
     TRIGGER_COLUMN = 7
 
-    def __init__(self, velociprobeReader: VelociprobeReader) -> None:
+    def __init__(self, velociprobeReader: VelociprobeReader,
+                 yPositionSource: VelociprobeScanYPositionSource) -> None:
         self._velociprobeReader = velociprobeReader
-        self._yPositionSource = VelociprobeScanYPositionSource.ENCODER
+        self._yPositionSource = yPositionSource
+
+    def getFileFilter(self) -> str:
+        yPositionSourceText = 'Encoder Y'
+
+        if self._yPositionSource == VelociprobeScanYPositionSource.LASER_INTERFEROMETER:
+            yPositionSourceText = 'Laser Interferometer Y'
+
+        return f'Velociprobe Scan Files - {yPositionSourceText} (*.txt)'
 
     def read(self, filePath: Path) -> Iterable[ScanPoint]:
-        scanPointDict = defaultdict(VelociprobeScanPointList)
+        scanPointDict: dict[int, VelociprobeScanPointList] = defaultdict(VelociprobeScanPointList)
 
         with open(filePath, newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
@@ -219,8 +227,8 @@ class VelociprobeScanReader(ScanFileReader):
                 if len(row) != 8:
                     raise ScanPointParseError()
 
-                trigger = int(row[VelociprobeScanReader.TRIGGER_COLUMN])
-                x_nm = int(row[VelociprobeScanReader.X_COLUMN])
+                trigger = int(row[VelociprobeScanFileReader.TRIGGER_COLUMN])
+                x_nm = int(row[VelociprobeScanFileReader.X_COLUMN])
                 y_nm = int(row[self._yPositionSource.value])
 
                 if self._yPositionSource == VelociprobeScanYPositionSource.ENCODER:
@@ -228,14 +236,16 @@ class VelociprobeScanReader(ScanFileReader):
 
                 scanPointDict[trigger].append(x_nm, y_nm)
 
-        scanPointList = [scanPointList.mean() for _, scanPointList in sorted(scanPointDict.items())]
-        xMeanInMeters = sum(point.x for point in scanPointList) / len(scanPointList)
-        yMeanInMeters = sum(point.y for point in scanPointList) / len(scanPointList)
+        scanPointList = [
+            scanPointList.mean() for _, scanPointList in sorted(scanPointDict.items())
+        ]
+        xMeanInMeters = Decimal(sum(point.x for point in scanPointList)) / len(scanPointList)
+        yMeanInMeters = Decimal(sum(point.y for point in scanPointList)) / len(scanPointList)
 
         for idx, scanPoint in enumerate(scanPointList):
             chi_rad = 0.
 
-            if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.sample.goniometer:
+            if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.sample and self._velociprobeReader.entryGroup.sample.goniometer:
                 chi_rad = self._velociprobeReader.entryGroup.sample.goniometer.chi_rad
 
             x_m = (scanPoint.x - xMeanInMeters) * Decimal(numpy.cos(chi_rad))
@@ -243,6 +253,14 @@ class VelociprobeScanReader(ScanFileReader):
             scanPointList[idx] = ScanPoint(x_m, y_m)
 
         return scanPointList
+
+    def __str__(self) -> str:
+        yPositionSourceText = 'EncoderY'
+
+        if self._yPositionSource == VelociprobeScanYPositionSource.LASER_INTERFEROMETER:
+            yPositionSourceText = 'LaserInterferometerY'
+
+        return f'VelociprobeWith{yPositionSourceText}'
 
 
 class VelociprobeImageSequence(ImageSequence):

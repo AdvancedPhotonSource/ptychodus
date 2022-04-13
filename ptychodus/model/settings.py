@@ -144,7 +144,7 @@ class SettingsRegistry(Observable):
                 optionValueString = config.get(settingsGroup.name, settingsEntry.name)
                 settingsEntry.setValueFromString(optionValueString)
 
-        # FIXME need to load dataset, etc.
+        # FIXME need something to load dataset on notify
         self.notifyObservers()
 
     def write(self, filePath: Path) -> None:

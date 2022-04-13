@@ -19,7 +19,7 @@ class FileDialogFactory:
                         parent: QWidget,
                         caption: str,
                         nameFilters: list[str] = None,
-                        mimeTypeFilters: list[str] = None) -> Optional[Path]:
+                        mimeTypeFilters: list[str] = None) -> Tuple[Optional[Path], str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._openWorkingDirectory))
@@ -40,13 +40,13 @@ class FileDialogFactory:
                 filePath = Path(fileName)
                 self._openWorkingDirectory = filePath.parent
 
-        return filePath
+        return filePath, dialog.selectedNameFilter()
 
     def getSaveFilePath(self,
                         parent: QWidget,
                         caption: str,
                         nameFilters: list[str] = None,
-                        mimeTypeFilters: list[str] = None) -> Optional[Path]:
+                        mimeTypeFilters: list[str] = None) -> Tuple[Optional[Path], str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._saveWorkingDirectory))
@@ -67,7 +67,7 @@ class FileDialogFactory:
                 filePath = Path(fileName)
                 self._saveWorkingDirectory = filePath.parent
 
-        return filePath
+        return filePath, dialog.selectedNameFilter()
 
 
 class DataArrayTableModel(QAbstractTableModel):
@@ -142,9 +142,8 @@ class DataFileController(Observer):
         return controller
 
     def openDataFile(self) -> None:
-        filePath = self._fileDialogFactory.getOpenFilePath(self._treeView,
-                                                           'Open Data File',
-                                                           nameFilters=[H5FileReader.FILE_FILTER])
+        filePath, _ = self._fileDialogFactory.getOpenFilePath(
+            self._treeView, 'Open Data File', nameFilters=[H5FileReader.FILE_FILTER])
 
         if filePath:
             self._presenter.readFile(filePath)
