@@ -51,7 +51,8 @@ def main() -> int:
     parsedArgs, unparsedArgs = parser.parse_known_args()
 
     logger = logging.getLogger(ptychodus.__name__)
-    logger.setLevel(logging.DEBUG)
+    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
     logger.debug(versionString())
     logger.debug(f'\tNumPy {numpy.__version__}')

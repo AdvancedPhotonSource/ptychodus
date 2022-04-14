@@ -447,28 +447,15 @@ class TikeReconstructor:
 
         return probe
 
-    def getTikeObjectExtent(self) -> ImageExtent:
-        pad = 2 * (self._probeSizer.getProbeSize() + 2)
-        paddingExtent = ImageExtent(width=pad, height=pad)
-        extent = self._objectSizer.getScanExtent() + paddingExtent
-        logger.debug(f'tike object extent = {extent}')
-        return extent
-
-    def getPtychodusObjectExtent(self) -> ImageExtent:
-        extent = self._objectSizer.getObjectExtent()
-        logger.debug(f'ptychodus object extent = {extent}')
-        return extent
-
     def getInitialObject(self) -> numpy.ndarray:
-        delta = self.getTikeObjectExtent() - self.getPtychodusObjectExtent()
+        delta = self._probeSizer.getProbeExtent()
         before = delta // 2
         after = delta - before
 
         widthPad = (before.width, after.width)
         heightPad = (before.height, after.height)
-        tikeObject = numpy.pad(self._object.getArray(), (heightPad, widthPad)).astype('complex64')
 
-        return tikeObject
+        return numpy.pad(self._object.getArray(), (heightPad, widthPad)).astype('complex64')
 
     def getScan(self) -> numpy.ndarray:
         xvalues = list()
@@ -484,9 +471,9 @@ class TikeReconstructor:
             xvalues.append(point.x / px_m)
             yvalues.append(point.y / py_m)
 
-        probeSize = self._probeSizer.getProbeSize()
-        ux = probeSize - min(xvalues)
-        uy = probeSize - min(yvalues)
+        pad = self._probeSizer.getProbeExtent() // 2
+        ux = pad.width - min(xvalues)
+        uy = pad.height - min(yvalues)
 
         xvalues = [x + ux for x in xvalues]
         yvalues = [y + uy for y in yvalues]
@@ -544,20 +531,19 @@ class TikeReconstructor:
         data = self.getData()
         scan = self.getScan()
         probe = self.getProbe()
-        initialObject = self.getInitialObject()
-
-        logger.debug(f'data shape={data.shape}')
-        logger.debug(f'scan shape={scan.shape}')
-        logger.debug(f'probe shape={probe.shape}')
-        logger.debug(f'object shape={initialObject.shape}')
-
-        #with numpy.printoptions(threshold=numpy.inf):
-        #    print(scan)
+        psi = self.getInitialObject()
 
         if len(data) != len(scan):
             numFrame = min(len(data), len(scan))
             scan = scan[:numFrame, ...]
             data = data[:numFrame, ...]
+
+        psi, scan = tike.ptycho.object.get_padded_object(scan, probe) # TODO figure out how to remove
+
+        logger.debug(f'data shape={data.shape}')
+        logger.debug(f'scan shape={scan.shape}')
+        logger.debug(f'probe shape={probe.shape}')
+        logger.debug(f'object shape={psi.shape}')
 
         objectOptions = self.getObjectOptions()
         positionOptions = self.getPositionOptions()
@@ -573,11 +559,11 @@ class TikeReconstructor:
             object_options=objectOptions,
             position_options=positionOptions,
             probe_options=probeOptions,
-            psi=initialObject,
+            psi=psi,
             use_mpi=self._settings.useMpi.value,
         )
 
-        self._probe.setArray(result['probe'][0, 0, 0, :, :])
+        self._probe.setArray(result['probe'][0, 0, 0])
         self._object.setArray(result['psi'])
 
         print(result)

@@ -85,11 +85,11 @@ class ObjectSizer(Observable, Observer):
         return ImageExtent(width=scanWidth_px, height=scanHeight_px)
 
     def getPaddingExtent(self) -> ImageExtent:
-        pad = 2 * (self._probeSizer.getProbeSize() // 2)
-        return ImageExtent(width=pad, height=pad)
+        return 2 * (self._probeSizer.getProbeExtent() // 2)
 
     def getObjectExtent(self) -> ImageExtent:
         return self.getScanExtent() + self.getPaddingExtent()
+
 
     def update(self, observable: Observable) -> None:
         if observable is self._detector:

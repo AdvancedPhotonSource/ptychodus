@@ -95,11 +95,26 @@ class ImageExtent:
             h = self.height - other.height
             return ImageExtent(width=w, height=h)
 
+    def __mul__(self, other: int) -> ImageExtent:
+        if isinstance(other, int):
+            w = self.width * other
+            h = self.height * other
+            return ImageExtent(width=w, height=h)
+
+    def __rmul__(self, other: int) -> ImageExtent:
+        if isinstance(other, int):
+            w = other * self.width
+            h = other * self.height
+            return ImageExtent(width=w, height=h)
+
     def __floordiv__(self, other: int) -> ImageExtent:
         if isinstance(other, int):
             w = self.width // other
             h = self.height // other
             return ImageExtent(width=w, height=h)
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.width}, {self.height})'
 
 
 class ImageSequence(Sequence, Observable, Observer):
