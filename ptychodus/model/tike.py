@@ -242,7 +242,7 @@ class TikeSettings(Observable, Observer):
         self.numGpus = settingsGroup.createIntegerEntry('NumGpus', 1)
         self.noiseModel = settingsGroup.createStringEntry('NoiseModel', 'gaussian')
         self.numProbeModes = settingsGroup.createIntegerEntry('NumProbeModes', 1)
-        self.numBatch = settingsGroup.createIntegerEntry('NumBatch', 1)
+        self.numBatch = settingsGroup.createIntegerEntry('NumBatch', 10)
         self.numIter = settingsGroup.createIntegerEntry('NumIter', 1)
         self.cgIter = settingsGroup.createIntegerEntry('CgIter', 2)
         self.alpha = settingsGroup.createRealEntry('Alpha', '0.05')
