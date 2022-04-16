@@ -126,17 +126,15 @@ class ProbeParametersController:
         return controller
 
     def openProbe(self) -> None:
-        filePath, _ = self._fileDialogFactory.getOpenFilePath(self._view,
-                                                              'Open Probe',
-                                                              nameFilters=[Probe.FILE_FILTER])
+        filePath, _ = self._fileDialogFactory.getOpenFilePath(
+            self._view, 'Open Probe', nameFilters=self._presenter.getOpenFileFilterList())
 
         if filePath:
             self._presenter.openProbe(filePath)
 
     def saveProbe(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(self._view,
-                                                              'Save Probe',
-                                                              nameFilters=[Probe.FILE_FILTER])
+        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+            self._view, 'Save Probe', nameFilters=self._presenter.getSaveFileFilterList())
 
         if filePath:
             self._presenter.saveProbe(filePath)

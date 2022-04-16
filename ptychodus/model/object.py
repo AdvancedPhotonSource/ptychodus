@@ -10,7 +10,7 @@ import numpy.typing
 
 from .chooser import StrategyChooser, StrategyEntry
 from .crop import CropSizer
-from .detector import Detector, DetectorSettings
+from .detector import Detector
 from .geometry import Box, Interval
 from .image import ImageExtent
 from .observer import Observable, Observer
@@ -146,6 +146,7 @@ class CustomObjectInitializer(Observer):
         customFilePath = self._settings.customFilePath.value
 
         if customFilePath is not None and customFilePath.is_file():
+            logger.debug(f'Reading {customFilePath}')
             self._array = numpy.load(customFilePath)
 
     def update(self, observable: Observable) -> None:
@@ -178,9 +179,9 @@ class ObjectInitializer(Observable, Observer):
         self._settings = settings
         self._object = obj
         self._reinitObservable = reinitObservable
-        self._customObjectInitializer = CustomObjectInitializer.createInstance(settings, sizer)
-        self._initializerChooser = StrategyChooser[ObjectInitializer](StrategyEntry(
-            simpleName='Custom', displayName='Custom', strategy=self._customObjectInitializer))
+        self._customInitializer = CustomObjectInitializer.createInstance(settings, sizer)
+        self._initializerChooser = StrategyChooser[ObjectInitializerType](StrategyEntry(
+            simpleName='Custom', displayName='Custom', strategy=self._customInitializer))
 
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings,
@@ -218,10 +219,10 @@ class ObjectInitializer(Observable, Observer):
         self._object.setArray(initializer())
 
     def getOpenFileFilterList(self) -> list[str]:
-        return [self._customObjectInitializer.getOpenFileFilter()]
+        return [self._customInitializer.getOpenFileFilter()]
 
     def openObject(self, filePath: Path) -> None:
-        self._customObjectInitializer.openObject(filePath)
+        self._customInitializer.openObject(filePath)
         self._initializerChooser.setToDefault()
         self.initializeObject()
 
@@ -260,10 +261,10 @@ class ObjectPresenter(Observable, Observer):
     def getInitializerList(self) -> list[str]:
         return self._initializer.getInitializerList()
 
-    def getCurrentInitializer(self) -> str:
+    def getInitializer(self) -> str:
         return self._initializer.getInitializer()
 
-    def setCurrentInitializer(self, name: str) -> None:
+    def setInitializer(self, name: str) -> None:
         self._initializer.setInitializer(name)
 
     def getOpenFileFilterList(self) -> list[str]:
@@ -276,6 +277,7 @@ class ObjectPresenter(Observable, Observer):
         return self._initializer.getSaveFileFilterList()
 
     def saveObject(self, filePath: Path) -> None:
+        logger.debug(f'Writing {filePath}')
         self._initializer.saveObject(filePath)
 
     def initializeObject(self) -> None:

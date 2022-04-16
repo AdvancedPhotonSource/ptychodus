@@ -6,7 +6,9 @@ from typing import Callable
 import logging
 
 import numpy
+import numpy.typing
 
+from .chooser import StrategyChooser, StrategyEntry
 from .crop import CropSizer
 from .detector import DetectorSettings
 from .fzp import single_probe
@@ -22,8 +24,7 @@ class ProbeSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.initializer = settingsGroup.createStringEntry(
-            'Initializer', 'Gaussian Beam')  # TODO need to match simple names
+        self.initializer = settingsGroup.createStringEntry('Initializer', 'Gaussian')
         self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
         self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
             'AutomaticProbeSizeEnabled', True)
@@ -101,12 +102,16 @@ class ProbeSizer(Observable, Observer):
             self._updateProbeSize()
 
 
+ComplexNumpyArrayType = numpy.typing.NDArray[numpy.complexfloating]
+ProbeInitializerType = Callable[[], ComplexNumpyArrayType]
+
+
 class GaussianBeamProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings) -> None:
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
 
-    def _createCircularMask(self) -> numpy.ndarray:
+    def _createCircularMask(self) -> ComplexNumpyArrayType:
         width_px = self._probeSettings.probeSize.value
         height_px = width_px
 
@@ -119,14 +124,11 @@ class GaussianBeamProbeInitializer:
 
         return (R_m <= probeRadius_m)
 
-    def __call__(self) -> numpy.ndarray:
+    def __call__(self) -> ComplexNumpyArrayType:
         mask = self._createCircularMask()
         ft = numpy.fft.fft2(mask)
         ft = numpy.fft.fftshift(ft)
         return ft
-
-    def __str__(self) -> str:
-        return 'Gaussian Beam'
 
 
 class FresnelZonePlateProbeInitializer:
@@ -136,7 +138,7 @@ class FresnelZonePlateProbeInitializer:
         self._probeSettings = probeSettings
         self._sizer = sizer
 
-    def __call__(self) -> numpy.ndarray:
+    def __call__(self) -> ComplexNumpyArrayType:
         shape = self._sizer.getProbeSize()
         lambda0 = self._sizer.getWavelengthInMeters()
         dx_dec = self._detectorSettings.pixelSizeXInMeters.value  # TODO non-square pixels are unsupported
@@ -156,54 +158,58 @@ class FresnelZonePlateProbeInitializer:
                              beamstop=float(beamstop))
         return probe
 
-    def __str__(self) -> str:
-        return 'Fresnel Zone Plate'
 
-
-class CustomProbeInitializer:  # TODO rework like scan
-    def __init__(self, sizer: ProbeSizer) -> None:
-        self._sizer = sizer
-        self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
-
-    def setArray(self, array: numpy.ndarray) -> None:
-        if not numpy.iscomplexobj(array):
-            raise TypeError('Probe must be a complex-valued ndarray')
-
-        self._array = array
-
-    def __call__(self) -> numpy.ndarray:
-        return self._array
-
-    def __str__(self) -> str:
-        return 'Custom'
-
-
-class Probe(Observable):
-    FILE_FILTER = 'NumPy Binary Files (*.npy)'
-
+class CustomProbeInitializer(Observer):
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
         self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
 
-    def getArray(self) -> numpy.ndarray:
+    @classmethod
+    def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer) -> CustomProbeInitializer:
+        initializer = cls(settings, sizer)
+        initializer._openProbeFromSettings()
+        settings.customFilePath.addObserver(initializer)
+        return initializer
+
+    def __call__(self) -> ComplexNumpyArrayType:
         return self._array
 
-    def setArray(self, array: numpy.ndarray) -> None:
+    def getOpenFileFilter(self) -> str:
+        return 'NumPy Binary Files (*.npy)'
+
+    def openProbe(self, filePath: Path) -> None:
+        self._settings.customFilePath.value = filePath
+
+    def _openProbeFromSettings(self) -> None:
+        customFilePath = self._settings.customFilePath.value
+
+        if customFilePath is not None and customFilePath.is_file():
+            logger.debug(f'Reading {customFilePath}')
+            self._array = numpy.load(customFilePath)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings.customFilePath:
+            self._openProbeFromSettings()
+
+
+class Probe(Observable):
+    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer) -> None:
+        super().__init__()
+        self._settings = settings
+        self._sizer = sizer
+        self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
+
+    def getArray(self) -> ComplexNumpyArrayType:
+        return self._array
+
+    def setArray(self, array: ComplexNumpyArrayType) -> None:
         if not numpy.iscomplexobj(array):
             raise TypeError('Probe must be a complex-valued ndarray')
 
         self._array = array
         self.notifyObservers()
-
-    def read(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        array = numpy.load(filePath)
-        self.setArray(array)
-
-    def write(self, filePath: Path) -> None:
-        numpy.save(filePath, self._array)
 
 
 class ProbeInitializer(Observable, Observer):
@@ -213,9 +219,9 @@ class ProbeInitializer(Observable, Observer):
         self._settings = settings
         self._probe = probe
         self._reinitObservable = reinitObservable
-        self._customInitializer = CustomProbeInitializer(sizer)
-        self._initializer = self._customInitializer
-        self._initializerList: list[Callable[[], numpy.ndarray]] = [self._customInitializer]
+        self._customInitializer = CustomProbeInitializer.createInstance(settings, sizer)
+        self._initializerChooser = StrategyChooser[ProbeInitializerType](StrategyEntry(
+            simpleName='Custom', displayName='Custom', strategy=self._customInitializer))
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
@@ -223,10 +229,17 @@ class ProbeInitializer(Observable, Observer):
                        reinitObservable: Observable) -> ProbeInitializer:
         initializer = cls(probeSettings, sizer, probe, reinitObservable)
 
-        fzpInit = FresnelZonePlateProbeInitializer(detectorSettings, probeSettings, sizer)
-        initializer.addInitializer(fzpInit)
-        gaussInit = GaussianBeamProbeInitializer(detectorSettings, probeSettings)
-        initializer.addInitializer(gaussInit)
+        fzpInit = StrategyEntry(simpleName='FresnelZonePlate',
+                                displayName='Fresnel Zone Plate',
+                                strategy=FresnelZonePlateProbeInitializer(
+                                    detectorSettings, probeSettings, sizer))
+        initializer._initializerChooser.addStrategy(fzpInit)
+
+        gaussInit = StrategyEntry(simpleName='GaussianBeam',
+                                  displayName='Gaussian Beam',
+                                  strategy=GaussianBeamProbeInitializer(
+                                      detectorSettings, probeSettings))
+        initializer._initializerChooser.addStrategy(gaussInit)
 
         initializer.setInitializerFromSettings()
         probeSettings.initializer.addObserver(initializer)
@@ -234,58 +247,43 @@ class ProbeInitializer(Observable, Observer):
 
         return initializer
 
-    def addInitializer(self, initializer: Callable[[], numpy.ndarray]) -> None:
-        self._initializerList.insert(0, initializer)
-
     def getInitializerList(self) -> list[str]:
-        return [str(initializer) for initializer in self._initializerList]
+        return self._initializerChooser.getDisplayNameList()
 
     def getInitializer(self) -> str:
-        return str(self._initializer)
-
-    def _setInitializer(self, initializer: Callable[[], numpy.ndarray]) -> None:
-        if initializer is not self._initializer:
-            self._initializer = initializer
-            self._settings.initializer.value = str(self._initializer)
-            self.notifyObservers()
+        return self._initializerChooser.getCurrentDisplayName()
 
     def setInitializer(self, name: str) -> None:
-        try:
-            initializer = next(ini for ini in self._initializerList
-                               if name.casefold() == str(ini).casefold())
-        except StopIteration:
-            logger.debug(f'Invalid initializer \"{name}\"')
-            return
-
-        self._setInitializer(initializer)
+        self._initializerChooser.setFromDisplayName(name)
+        self._settings.initializer.value = self._initializerChooser.getCurrentSimpleName()
 
     def setInitializerFromSettings(self) -> None:
-        self.setInitializer(self._settings.initializer.value)
+        self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
+        # FIXME self.notifyObservers()
 
     def initializeProbe(self) -> None:
-        self._probe.setArray(self._initializer())
+        initializer = self._initializerChooser.getCurrentStrategy()
+        self._probe.setArray(initializer())
+
+    def getOpenFileFilterList(self) -> list[str]:
+        return [self._customInitializer.getOpenFileFilter()]
 
     def openProbe(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        self._probe.read(filePath)
-        self._customInitializer.setArray(self._probe.getArray())
-        self._setInitializer(self._customInitializer)
+        self._customInitializer.openProbe(filePath)
+        self._initializerChooser.setToDefault()
+        self.initializeProbe()
 
-    def _preloadProbeFromCustomFile(self) -> None:
-        customFilePath = self._settings.customFilePath.value
-
-        if customFilePath is not None and customFilePath.is_file():
-            self._probe.read(customFilePath)
-            self._customInitializer.setArray(self._probe.getArray())
+    def getSaveFileFilterList(self) -> list[str]:
+        return ['NumPy Binary Files (*.npy)']
 
     def saveProbe(self, filePath: Path) -> None:
-        self._probe.write(filePath)
+        logger.debug(f'Writing {filePath}')
+        numpy.save(filePath, self._probe.getArray())
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.initializer:
             self.setInitializerFromSettings()
         elif observable is self._reinitObservable:
-            self._preloadProbeFromCustomFile()
             self.initializeProbe()
 
 
@@ -317,8 +315,14 @@ class ProbePresenter(Observable, Observer):
     def setInitializer(self, name: str) -> None:
         self._initializer.setInitializer(name)
 
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._initializer.getOpenFileFilterList()
+
     def openProbe(self, filePath: Path) -> None:
         self._initializer.openProbe(filePath)
+
+    def getSaveFileFilterList(self) -> list[str]:
+        return self._initializer.getSaveFileFilterList()
 
     def saveProbe(self, filePath: Path) -> None:
         self._initializer.saveProbe(filePath)
@@ -377,7 +381,7 @@ class ProbePresenter(Observable, Observer):
     def getBeamstopDiameterInMeters(self) -> Decimal:
         return self._settings.beamstopDiameterInMeters.value
 
-    def getProbe(self) -> numpy.ndarray:
+    def getProbe(self) -> ComplexNumpyArrayType:
         return self._probe.getArray()
 
     def update(self, observable: Observable) -> None:
