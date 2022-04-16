@@ -61,9 +61,7 @@ class ModelCore:
         self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
                                                        self._probeSizer)
         self._object = Object(self._objectSettings, self._objectSizer)
-        self._objectInitializer = ObjectInitializer.createInstance(self.rng,
-                                                                   self._detectorSettings,
-                                                                   self._objectSettings,
+        self._objectInitializer = ObjectInitializer.createInstance(self.rng, self._objectSettings,
                                                                    self._objectSizer, self._object,
                                                                    self.settingsRegistry)
 

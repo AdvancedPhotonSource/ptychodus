@@ -183,7 +183,8 @@ class CustomScanInitializer(Sequence[ScanPoint], Observer):
         self._pointList: list[ScanPoint] = list()
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings, fileReaderList: list[ScanFileReader]) -> Scan:
+    def createInstance(cls, settings: ScanSettings,
+                       fileReaderList: list[ScanFileReader]) -> CustomScanInitializer:
         initializer = cls(settings, fileReaderList)
         initializer._updateFileReader()
         initializer._openScanFromSettings()

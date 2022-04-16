@@ -1,7 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Callable, Generic, Iterator, Optional, TypeVar
 import configparser
 
 from .observer import Observable, Observer

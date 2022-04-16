@@ -52,17 +52,15 @@ class ObjectParametersController:
         return controller
 
     def openObject(self) -> None:
-        filePath, _ = self._fileDialogFactory.getOpenFilePath(self._view,
-                                                              'Open Object',
-                                                              nameFilters=[Object.FILE_FILTER])
+        filePath, _ = self._fileDialogFactory.getOpenFilePath(
+            self._view, 'Open Object', nameFilters=self._presenter.getOpenFileFilterList())
 
         if filePath:
             self._presenter.openObject(filePath)
 
     def saveObject(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(self._view,
-                                                              'Save Object',
-                                                              nameFilters=[Object.FILE_FILTER])
+        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+            self._view, 'Save Object', nameFilters=self._presenter.getSaveFileFilterList())
 
         if filePath:
             self._presenter.saveObject(filePath)

@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 from typing import Generic, TypeVar
+import logging
 
 from .observer import Observable
 
 T = TypeVar('T')
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -15,6 +18,7 @@ class StrategyEntry(Generic[T]):
 
 class StrategyChooser(Generic[T], Observable):
     def __init__(self, defaultEntry: StrategyEntry[T]) -> None:
+        super().__init__()
         self._entryList: list[StrategyEntry[T]] = [defaultEntry]
         self._entry = defaultEntry
 

@@ -538,7 +538,8 @@ class TikeReconstructor:
             scan = scan[:numFrame, ...]
             data = data[:numFrame, ...]
 
-        psi, scan = tike.ptycho.object.get_padded_object(scan, probe) # TODO figure out how to remove
+        psi, scan = tike.ptycho.object.get_padded_object(scan,
+                                                         probe)  # TODO figure out how to remove
 
         logger.debug(f'data shape={data.shape}')
         logger.debug(f'scan shape={scan.shape}')
