@@ -194,8 +194,9 @@ class ObjectInitializer(Observable, Observer):
                                   strategy=UniformRandomObjectInitializer(sizer, rng))
         initializer._initializerChooser.addStrategy(urandInit)
 
-        initializer.setInitializerFromSettings()
         settings.initializer.addObserver(initializer)
+        initializer._initializerChooser.addObserver(initializer)
+        initializer._syncInitializerFromSettings()
         reinitObservable.addObserver(initializer)
 
         return initializer
@@ -208,11 +209,6 @@ class ObjectInitializer(Observable, Observer):
 
     def setInitializer(self, name: str) -> None:
         self._initializerChooser.setFromDisplayName(name)
-        self._settings.initializer.value = self._initializerChooser.getCurrentSimpleName()
-
-    def setInitializerFromSettings(self) -> None:
-        self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
-        # FIXME self.notifyObservers()
 
     def initializeObject(self) -> None:
         initializer = self._initializerChooser.getCurrentStrategy()
@@ -230,11 +226,21 @@ class ObjectInitializer(Observable, Observer):
         return ['NumPy Binary Files (*.npy)']
 
     def saveObject(self, filePath: Path) -> None:
+        logger.debug(f'Writing {filePath}')
         numpy.save(filePath, self._object.getArray())
+
+    def _syncInitializerFromSettings(self) -> None:
+        self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
+
+    def _syncInitializerToSettings(self) -> None:
+        self._settings.initializer.value = self._initializerChooser.getCurrentSimpleName()
+        self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.initializer:
-            self.setInitializerFromSettings()
+            self._syncInitializerFromSettings()
+        elif observable is self._initializerChooser:
+            self._syncInitializerToSettings()
         elif observable is self._reinitObservable:
             self.initializeObject()
 

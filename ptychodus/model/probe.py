@@ -24,7 +24,7 @@ class ProbeSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.initializer = settingsGroup.createStringEntry('Initializer', 'Gaussian')
+        self.initializer = settingsGroup.createStringEntry('Initializer', 'GaussianBeam')
         self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
         self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
             'AutomaticProbeSizeEnabled', True)
@@ -241,8 +241,9 @@ class ProbeInitializer(Observable, Observer):
                                       detectorSettings, probeSettings))
         initializer._initializerChooser.addStrategy(gaussInit)
 
-        initializer.setInitializerFromSettings()
         probeSettings.initializer.addObserver(initializer)
+        initializer._initializerChooser.addObserver(initializer)
+        initializer._syncInitializerFromSettings()
         reinitObservable.addObserver(initializer)
 
         return initializer
@@ -255,11 +256,6 @@ class ProbeInitializer(Observable, Observer):
 
     def setInitializer(self, name: str) -> None:
         self._initializerChooser.setFromDisplayName(name)
-        self._settings.initializer.value = self._initializerChooser.getCurrentSimpleName()
-
-    def setInitializerFromSettings(self) -> None:
-        self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
-        # FIXME self.notifyObservers()
 
     def initializeProbe(self) -> None:
         initializer = self._initializerChooser.getCurrentStrategy()
@@ -280,9 +276,18 @@ class ProbeInitializer(Observable, Observer):
         logger.debug(f'Writing {filePath}')
         numpy.save(filePath, self._probe.getArray())
 
+    def _syncInitializerFromSettings(self) -> None:
+        self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
+
+    def _syncInitializerToSettings(self) -> None:
+        self._settings.initializer.value = self._initializerChooser.getCurrentSimpleName()
+        self.notifyObservers()
+
     def update(self, observable: Observable) -> None:
         if observable is self._settings.initializer:
-            self.setInitializerFromSettings()
+            self._syncInitializerFromSettings()
+        elif observable is self._initializerChooser:
+            self._syncInitializerToSettings()
         elif observable is self._reinitObservable:
             self.initializeProbe()
 

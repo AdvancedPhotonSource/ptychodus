@@ -11,6 +11,7 @@ import logging
 
 import numpy
 
+from .chooser import StrategyChooser, StrategyEntry
 from .geometry import Interval, Box
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
@@ -263,73 +264,53 @@ class ScanPointTransform(Enum):
     def swapXY(self) -> bool:
         return self.value & 4 != 0
 
-    def isNameMatchFor(self, query: str) -> bool:
-        queryCaseFolded = query.casefold()
+    @property
+    def simpleName(self) -> str:
+        xp = '-x' if self.negateX else '+x'
+        yp = '-y' if self.negateY else '+y'
+        return f'{yp}{xp}' if self.swapXY else f'{xp}{yp}'
 
-        isMatch = False
-        isMatch |= (queryCaseFolded == self.name.casefold())
-        isMatch |= (queryCaseFolded == repr(self))
-        isMatch |= (queryCaseFolded == str(self))
-        return isMatch
+    @property
+    def displayName(self) -> str:
+        xp = '\u2212x' if self.negateX else '\u002Bx'
+        yp = '\u2212y' if self.negateY else '\u002By'
+        return f'({yp}, {xp})' if self.swapXY else f'({xp}, {yp})'
 
     def __call__(self, point: ScanPoint) -> ScanPoint:
         xp = -point.x if self.negateX else point.x
         yp = -point.y if self.negateY else point.y
         return ScanPoint(yp, xp) if self.swapXY else ScanPoint(xp, yp)
 
-    def __str__(self) -> str:
-        xp = '\u2212x' if self.negateX else '\u002Bx'
-        yp = '\u2212y' if self.negateY else '\u002By'
-        return f'({yp}, {xp})' if self.swapXY else f'({xp}, {yp})'
-
-    def __repr__(self) -> str:  # TODO this is not correct usage of repr
-        xp = '-x' if self.negateX else '+x'
-        yp = '-y' if self.negateY else '+y'
-        return f'{yp}{xp}' if self.swapXY else f'{xp}{yp}'
-
 
 class Scan(Sequence[ScanPoint], Observable, Observer):
+    @staticmethod
+    def _createTransformEntry(xform: ScanPointTransform) -> StrategyEntry[ScanPointTransform]:
+        return StrategyEntry[ScanPointTransform](simpleName=xform.simpleName,
+                                                 displayName=xform.displayName,
+                                                 strategy=xform)
+
     def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
         self._settings = settings
         self._scanPointList: list[ScanPoint] = list()
         self._boundingBoxInMeters: Optional[Box[Decimal]] = None
-        self._transform = ScanPointTransform.PXPY
+        self._transformChooser = StrategyChooser[ScanPointTransform].createFromList(
+            [Scan._createTransformEntry(xform) for xform in ScanPointTransform])
 
     @classmethod
     def createInstance(cls, settings: ScanSettings) -> Scan:
         scan = cls(settings)
-        scan.setTransformFromSettings()
         settings.transform.addObserver(scan)
+        scan._transformChooser.addObserver(scan)
+        scan._syncTransformFromSettings()
         return scan
 
     def __getitem__(self, index: int) -> ScanPoint:
-        return self._transform(self._scanPointList[index])
+        transform = self._transformChooser.getCurrentStrategy()
+        return transform(self._scanPointList[index])
 
     def __len__(self) -> int:
         return len(self._scanPointList)
-
-    def getTransform(self) -> str:
-        return str(self._transform)
-
-    def _setTransform(self, transform: ScanPointTransform) -> None:
-        if transform != self._transform:
-            self._transform = transform
-            self._settings.transform.value = repr(self._transform)
-            self._updateBoundingBox()
-            self.notifyObservers()
-
-    def setTransform(self, name: str) -> None:
-        try:
-            transform = next(xform for xform in ScanPointTransform if xform.isNameMatchFor(name))
-        except StopIteration:
-            logger.debug(f'Invalid transform \"{name}\"')
-            return
-
-        self._setTransform(transform)
-
-    def setTransformFromSettings(self) -> None:
-        self.setTransform(self._settings.transform.value)
 
     def setScanPoints(self, scanPointIterable: Iterable[ScanPoint]) -> None:
         self._scanPointList = [scanPoint for scanPoint in scanPointIterable]
@@ -366,9 +347,25 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
 
         self._boundingBoxInMeters = boundingBoxInMeters
 
+    def getTransform(self) -> str:
+        return self._transformChooser.getCurrentDisplayName()
+
+    def setTransform(self, name: str) -> None:
+        self._transformChooser.setFromDisplayName(name)
+
+    def _syncTransformFromSettings(self) -> None:
+        self._transformChooser.setFromSimpleName(self._settings.transform.value)
+
+    def _syncTransformToSettings(self) -> None:
+        self._updateBoundingBox()
+        self._settings.transform.value = self._transformChooser.getCurrentSimpleName()
+        self.notifyObservers()
+
     def update(self, observable: Observable) -> None:
         if observable is self._settings.transform:
-            self.setTransformFromSettings()
+            self._syncTransformFromSettings()
+        elif observable is self._transformChooser:
+            self._syncTransformToSettings()
 
 
 class ScanInitializer(Observable, Observer):

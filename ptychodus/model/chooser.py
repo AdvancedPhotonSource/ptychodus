@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 import logging
@@ -21,6 +22,12 @@ class StrategyChooser(Generic[T], Observable):
         super().__init__()
         self._entryList: list[StrategyEntry[T]] = [defaultEntry]
         self._entry = defaultEntry
+
+    @classmethod
+    def createFromList(cls, entryList: list[StrategyEntry[T]]) -> StrategyChooser:
+        chooser = cls(entryList[0])
+        chooser._entryList = entryList.copy()
+        return chooser
 
     def addStrategy(self, entry: StrategyEntry[T]) -> None:
         self._entryList.insert(0, entry)
