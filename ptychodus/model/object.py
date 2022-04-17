@@ -1,12 +1,14 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from decimal import Decimal
+from decimal import Decimal, ROUND_CEILING
 from pathlib import Path
 from typing import Callable
 import logging
 
 import numpy
+import numpy.typing
 
+from .chooser import StrategyChooser, StrategyEntry
 from .crop import CropSizer
 from .detector import Detector
 from .geometry import Box, Interval
@@ -23,8 +25,7 @@ class ObjectSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.initializer = settingsGroup.createStringEntry(
-            'Initializer', 'Random')  # TODO need to match simple names
+        self.initializer = settingsGroup.createStringEntry('Initializer', 'Random')
         self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
 
     @classmethod
@@ -76,11 +77,11 @@ class ObjectSizer(Observable, Observer):
         if scanBox_m:
             assert len(scanBox_m) == 2
 
-            scanWidth_px = scanBox_m[0].length / self.getPixelSizeXInMeters()
-            scanWidth_px = int(numpy.ceil(scanWidth_px))
+            scanWidthf_px = scanBox_m[0].length / self.getPixelSizeXInMeters()
+            scanWidth_px = int(scanWidthf_px.to_integral_exact(rounding=ROUND_CEILING))
 
-            scanHeight_px = scanBox_m[1].length / self.getPixelSizeYInMeters()
-            scanHeight_px = int(numpy.ceil(scanHeight_px))
+            scanHeightf_px = scanBox_m[1].length / self.getPixelSizeYInMeters()
+            scanHeight_px = int(scanHeightf_px.to_integral_exact(rounding=ROUND_CEILING))
 
         return ImageExtent(width=scanWidth_px, height=scanHeight_px)
 
@@ -89,7 +90,6 @@ class ObjectSizer(Observable, Observer):
 
     def getObjectExtent(self) -> ImageExtent:
         return self.getScanExtent() + self.getPaddingExtent()
-
 
     def update(self, observable: Observable) -> None:
         if observable is self._detector:
@@ -102,65 +102,78 @@ class ObjectSizer(Observable, Observer):
             self.notifyObservers()
 
 
+ComplexNumpyArrayType = numpy.typing.NDArray[numpy.complexfloating]
+ObjectInitializerType = Callable[[], ComplexNumpyArrayType]
+
+
 class UniformRandomObjectInitializer:
     def __init__(self, sizer: ObjectSizer, rng: numpy.random.Generator) -> None:
         self._sizer = sizer
         self._rng = rng
 
-    def __call__(self) -> numpy.ndarray:
+    def __call__(self) -> ComplexNumpyArrayType:
         size = self._sizer.getObjectExtent().shape
         magnitude = numpy.sqrt(self._rng.uniform(low=0., high=1., size=size))
         phase = self._rng.uniform(low=0., high=2. * numpy.pi, size=size)
         return magnitude * numpy.exp(1.j * phase)
 
-    def __str__(self) -> str:
-        return 'Random'
 
-
-class CustomObjectInitializer:  # TODO rework like scan
-    def __init__(self, sizer: ObjectSizer) -> None:
-        self._sizer = sizer
-        self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
-
-    def setArray(self, array: numpy.ndarray) -> None:
-        if not numpy.iscomplexobj(array):
-            raise TypeError('Object must be a complex-valued ndarray')
-
-        self._array = array
-
-    def __call__(self) -> numpy.ndarray:
-        return self._array
-
-    def __str__(self) -> str:
-        return 'Custom'
-
-
-class Object(Observable):
-    FILE_FILTER = 'NumPy Binary Files (*.npy)'
-
+class CustomObjectInitializer(Observer):
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
         self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
 
-    def getArray(self) -> numpy.ndarray:
+    @classmethod
+    def createInstance(cls, settings: ObjectSettings,
+                       sizer: ObjectSizer) -> CustomObjectInitializer:
+        initializer = cls(settings, sizer)
+        initializer._openObjectFromSettings()
+        settings.customFilePath.addObserver(initializer)
+        return initializer
+
+    def __call__(self) -> ComplexNumpyArrayType:
         return self._array
 
-    def setArray(self, array: numpy.ndarray) -> None:
+    def getOpenFileFilter(self) -> str:
+        return 'NumPy Binary Files (*.npy)'
+
+    def _openObject(self, filePath: Path) -> None:
+        if filePath is not None and filePath.is_file():
+            logger.debug(f'Reading {filePath}')
+            self._array = numpy.load(filePath)
+
+    def openObject(self, filePath: Path) -> None:
+        if self._settings.customFilePath.value == filePath:
+            self._openObject(filePath)
+
+        self._settings.customFilePath.value = filePath
+
+    def _openObjectFromSettings(self) -> None:
+        self._openObject(self._settings.customFilePath.value)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings.customFilePath:
+            self._openObjectFromSettings()
+
+
+class Object(Observable):
+    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer) -> None:
+        super().__init__()
+        self._settings = settings
+        self._sizer = sizer
+        self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
+
+    def getArray(self) -> ComplexNumpyArrayType:
+        return self._array
+
+    def setArray(self, array: ComplexNumpyArrayType) -> None:
         if not numpy.iscomplexobj(array):
             raise TypeError('Object must be a complex-valued ndarray')
 
         self._array = array
         self.notifyObservers()
-
-    def read(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        array = numpy.load(filePath)
-        self.setArray(array)
-
-    def write(self, filePath: Path) -> None:
-        numpy.save(filePath, self._array)
 
 
 class ObjectInitializer(Observable, Observer):
@@ -170,77 +183,74 @@ class ObjectInitializer(Observable, Observer):
         self._settings = settings
         self._object = obj
         self._reinitObservable = reinitObservable
-        self._customInitializer = CustomObjectInitializer(sizer)
-        self._initializer = self._customInitializer
-        self._initializerList: list[Callable[[], numpy.ndarray]] = [self._customInitializer]
+        self._customInitializer = CustomObjectInitializer.createInstance(settings, sizer)
+        self._initializerChooser = StrategyChooser[ObjectInitializerType](
+            StrategyEntry[ObjectInitializerType](simpleName='Custom',
+                                                 displayName='Custom',
+                                                 strategy=self._customInitializer))
 
     @classmethod
-    def createInstance(cls, rng: numpy.random.Generator, detectorSettings: DetectorSettings,
-                       objectSettings: ObjectSettings, sizer: ObjectSizer, obj: Object,
+    def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings,
+                       sizer: ObjectSizer, obj: Object,
                        reinitObservable: Observable) -> ObjectInitializer:
-        initializer = cls(objectSettings, sizer, obj, reinitObservable)
+        initializer = cls(settings, sizer, obj, reinitObservable)
 
-        urandInit = UniformRandomObjectInitializer(sizer, rng)
-        initializer.addInitializer(urandInit)
+        urandInit = StrategyEntry[ObjectInitializerType](simpleName='Random',
+                                                         displayName='Random',
+                                                         strategy=UniformRandomObjectInitializer(
+                                                             sizer, rng))
+        initializer._initializerChooser.addStrategy(urandInit)
 
-        initializer.setInitializerFromSettings()
-        objectSettings.initializer.addObserver(initializer)
+        settings.initializer.addObserver(initializer)
+        initializer._initializerChooser.addObserver(initializer)
+        initializer._syncInitializerFromSettings()
         reinitObservable.addObserver(initializer)
 
         return initializer
 
-    def addInitializer(self, initializer: Callable[[], numpy.ndarray]) -> None:
-        self._initializerList.insert(0, initializer)
-
     def getInitializerList(self) -> list[str]:
-        return [str(initializer) for initializer in self._initializerList]
+        return self._initializerChooser.getDisplayNameList()
 
     def getInitializer(self) -> str:
-        return str(self._initializer)
-
-    def _setInitializer(self, initializer: Callable[[], numpy.ndarray]) -> None:
-        if initializer is not self._initializer:
-            self._initializer = initializer
-            self._settings.initializer.value = str(self._initializer)
-            self.notifyObservers()
+        return self._initializerChooser.getCurrentDisplayName()
 
     def setInitializer(self, name: str) -> None:
-        try:
-            initializer = next(ini for ini in self._initializerList
-                               if name.casefold() == str(ini).casefold())
-        except StopIteration:
-            logger.debug(f'Invalid initializer \"{name}\"')
-            return
-
-        self._setInitializer(initializer)
-
-    def setInitializerFromSettings(self) -> None:
-        self.setInitializer(self._settings.initializer.value)
+        self._initializerChooser.setFromDisplayName(name)
 
     def initializeObject(self) -> None:
-        self._object.setArray(self._initializer())
+        initializer = self._initializerChooser.getCurrentStrategy()
+        simpleName = self._initializerChooser.getCurrentSimpleName()
+        logger.debug(f'Initializing {simpleName} Object')
+        self._object.setArray(initializer())
+
+    def getOpenFileFilterList(self) -> list[str]:
+        return [self._customInitializer.getOpenFileFilter()]
 
     def openObject(self, filePath: Path) -> None:
-        self._settings.customFilePath.value = filePath
-        self._object.read(filePath)
-        self._customInitializer.setArray(self._object.getArray())
-        self._setInitializer(self._customInitializer)
+        self._customInitializer.openObject(filePath)
+        self._initializerChooser.setToDefault()
+        self.initializeObject()
 
-    def _preloadObjectFromCustomFile(self) -> None:
-        customFilePath = self._settings.customFilePath.value
-
-        if customFilePath is not None and customFilePath.is_file():
-            self._object.read(customFilePath)
-            self._customInitializer.setArray(self._object.getArray())
+    def getSaveFileFilterList(self) -> list[str]:
+        return ['NumPy Binary Files (*.npy)']
 
     def saveObject(self, filePath: Path) -> None:
-        self._object.write(filePath)
+        logger.debug(f'Writing {filePath}')
+        numpy.save(filePath, self._object.getArray())
+
+    def _syncInitializerFromSettings(self) -> None:
+        self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
+
+    def _syncInitializerToSettings(self) -> None:
+        self._settings.initializer.value = self._initializerChooser.getCurrentSimpleName()
+        self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.initializer:
-            self.setInitializerFromSettings()
+            self._syncInitializerFromSettings()
+        elif observable is self._initializerChooser:
+            self._syncInitializerToSettings()
         elif observable is self._reinitObservable:
-            self._preloadObjectFromCustomFile()
             self.initializeObject()
 
 
@@ -266,14 +276,20 @@ class ObjectPresenter(Observable, Observer):
     def getInitializerList(self) -> list[str]:
         return self._initializer.getInitializerList()
 
-    def getCurrentInitializer(self) -> str:
+    def getInitializer(self) -> str:
         return self._initializer.getInitializer()
 
-    def setCurrentInitializer(self, name: str) -> None:
+    def setInitializer(self, name: str) -> None:
         self._initializer.setInitializer(name)
+
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._initializer.getOpenFileFilterList()
 
     def openObject(self, filePath: Path) -> None:
         self._initializer.openObject(filePath)
+
+    def getSaveFileFilterList(self) -> list[str]:
+        return self._initializer.getSaveFileFilterList()
 
     def saveObject(self, filePath: Path) -> None:
         self._initializer.saveObject(filePath)
@@ -281,7 +297,7 @@ class ObjectPresenter(Observable, Observer):
     def initializeObject(self) -> None:
         self._initializer.initializeObject()
 
-    def getObject(self) -> numpy.ndarray:
+    def getObject(self) -> ComplexNumpyArrayType:
         return self._object.getArray()
 
     def update(self, observable: Observable) -> None:

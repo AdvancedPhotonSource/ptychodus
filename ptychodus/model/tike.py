@@ -242,7 +242,7 @@ class TikeSettings(Observable, Observer):
         self.numGpus = settingsGroup.createIntegerEntry('NumGpus', 1)
         self.noiseModel = settingsGroup.createStringEntry('NoiseModel', 'gaussian')
         self.numProbeModes = settingsGroup.createIntegerEntry('NumProbeModes', 1)
-        self.numBatch = settingsGroup.createIntegerEntry('NumBatch', 1)
+        self.numBatch = settingsGroup.createIntegerEntry('NumBatch', 10)
         self.numIter = settingsGroup.createIntegerEntry('NumIter', 1)
         self.cgIter = settingsGroup.createIntegerEntry('CgIter', 2)
         self.alpha = settingsGroup.createRealEntry('Alpha', '0.05')
@@ -538,7 +538,8 @@ class TikeReconstructor:
             scan = scan[:numFrame, ...]
             data = data[:numFrame, ...]
 
-        psi, scan = tike.ptycho.object.get_padded_object(scan, probe) # TODO figure out how to remove
+        # FIXME figure out how to remove the next line
+        psi, scan = tike.ptycho.object.get_padded_object(scan, probe)
 
         logger.debug(f'data shape={data.shape}')
         logger.debug(f'scan shape={scan.shape}')

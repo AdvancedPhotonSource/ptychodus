@@ -21,7 +21,7 @@ class ObjectInitializerController(Observer):
         for initializer in presenter.getInitializerList():
             view.initializerComboBox.addItem(initializer)
 
-        view.initializerComboBox.currentTextChanged.connect(presenter.setCurrentInitializer)
+        view.initializerComboBox.currentTextChanged.connect(presenter.setInitializer)
         view.initializeButton.clicked.connect(presenter.initializeObject)
 
         controller._syncModelToView()
@@ -29,7 +29,7 @@ class ObjectInitializerController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(self._presenter.getCurrentInitializer())
+        self._view.initializerComboBox.setCurrentText(self._presenter.getInitializer())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -52,17 +52,15 @@ class ObjectParametersController:
         return controller
 
     def openObject(self) -> None:
-        filePath, _ = self._fileDialogFactory.getOpenFilePath(self._view,
-                                                              'Open Object',
-                                                              nameFilters=[Object.FILE_FILTER])
+        filePath, _ = self._fileDialogFactory.getOpenFilePath(
+            self._view, 'Open Object', nameFilters=self._presenter.getOpenFileFilterList())
 
         if filePath:
             self._presenter.openObject(filePath)
 
     def saveObject(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(self._view,
-                                                              'Save Object',
-                                                              nameFilters=[Object.FILE_FILTER])
+        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+            self._view, 'Save Object', nameFilters=self._presenter.getSaveFileFilterList())
 
         if filePath:
             self._presenter.saveObject(filePath)
@@ -80,14 +78,14 @@ class ObjectImageController(Observer):
                        fileDialogFactory: FileDialogFactory) -> ObjectImageController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
-        controller.renderImageData()
+        controller._syncModelToView()
         view.imageRibbon.frameGroupBox.setVisible(False)
         return controller
 
-    def renderImageData(self) -> None:
+    def _syncModelToView(self) -> None:
         estimate = self._presenter.getObject()
         self._image_controller.renderImageData(estimate)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self.renderImageData()
+            self._syncModelToView()

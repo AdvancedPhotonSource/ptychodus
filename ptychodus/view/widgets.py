@@ -1,5 +1,5 @@
 from __future__ import annotations
-from decimal import Decimal
+from decimal import Decimal, ROUND_FLOOR
 from typing import Optional
 import logging
 
@@ -215,7 +215,7 @@ class LengthWidget(QWidget):
 
     def setLengthInMeters(self, lengthInMeters: Decimal) -> None:
         self.lengthInMeters = lengthInMeters
-        exponent = 3 * numpy.floor(numpy.log10(lengthInMeters) / 3)
+        exponent = 3 * int((lengthInMeters.log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
         index = self.unitsComboBox.findData(exponent)
 
         if index != -1:
@@ -282,7 +282,8 @@ class EnergyWidget(QWidget):
 
     def setEnergyInElectronVolts(self, energyInElectronVolts: Decimal) -> None:
         self.energyInElectronVolts = energyInElectronVolts
-        exponent = 3 * numpy.floor(numpy.log10(energyInElectronVolts) / 3)
+        exponent = 3 * int(
+            (energyInElectronVolts.log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
         index = self.unitsComboBox.findData(exponent)
 
         if index != -1:

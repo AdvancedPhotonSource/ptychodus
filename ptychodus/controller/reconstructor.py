@@ -45,7 +45,7 @@ class ReconstructorParametersController(Observer):
         for reconstructorName, backendName in presenter.getAlgorithmDict().items():
             controller._addReconstructor(reconstructorName, backendName)
 
-        view.algorithmComboBox.currentTextChanged.connect(presenter.setCurrentAlgorithm)
+        view.algorithmComboBox.currentTextChanged.connect(presenter.setAlgorithm)
         view.algorithmComboBox.currentIndexChanged.connect(
             view.reconstructorStackedWidget.setCurrentIndex)
         view.reconstructButton.clicked.connect(controller._reconstruct)
@@ -87,7 +87,7 @@ class ReconstructorParametersController(Observer):
         print(result)  # TODO
 
     def _syncModelToView(self) -> None:
-        self._view.algorithmComboBox.setCurrentText(self._presenter.getCurrentAlgorithm())
+        self._view.algorithmComboBox.setCurrentText(self._presenter.getAlgorithm())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
