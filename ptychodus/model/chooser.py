@@ -73,3 +73,12 @@ class StrategyChooser(Generic[T], Observable):
         if self._entry is not entry:
             self._entry = entry
             self.notifyObservers()
+
+    def __iter__(self) -> Iterator[StrategyEntry[T]]:
+        return iter(self._entryList)
+
+    def __getitem__(self, index: int) -> StrategyEntry[T]:
+        return self._entryList[index]
+
+    def __len__(self) -> int:
+        return len(self._entryList)

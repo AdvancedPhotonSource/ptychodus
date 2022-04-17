@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
 
+from .chooser import StrategyChooser, StrategyEntry
 from .observer import Observable, Observer
 from .settings import SettingsGroup, SettingsRegistry
 
@@ -56,12 +57,20 @@ class NullReconstructor(Reconstructor):
 
 
 class SelectableReconstructor(Reconstructor, Observer):
+    @staticmethod
+    def _createAlgorithmEntry(reconstructor: Reconstructor) -> StrategyEntry[Reconstructor]:
+        return StrategyEntry[Reconstructor](simpleName=reconstructor.name,
+                                            displayName=reconstructor.name,
+                                            strategy=reconstructor)
+
     def __init__(self, settings: ReconstructorSettings,
                  reconstructorList: list[Reconstructor]) -> None:
         super().__init__()
         self._settings = settings
-        self._reconstructorList = reconstructorList
-        self._reconstructor = reconstructorList[0]
+        self._algorithmChooser = StrategyChooser[Reconstructor].createFromList([
+            SelectableReconstructor._createAlgorithmEntry(reconstructor)
+            for reconstructor in reconstructorList
+        ])
 
     @classmethod
     def createInstance(cls, settings: ReconstructorSettings,
@@ -69,51 +78,46 @@ class SelectableReconstructor(Reconstructor, Observer):
         if not reconstructorList:
             reconstructorList.append(NullReconstructor())
 
-        selectableReconstructor = cls(settings, reconstructorList)
-        selectableReconstructor.setCurrentAlgorithmFromSettings()
-        settings.algorithm.addObserver(selectableReconstructor)
-        return selectableReconstructor
+        reconstructor = cls(settings, reconstructorList)
+        settings.algorithm.addObserver(reconstructor)
+        reconstructor._algorithmChooser.addObserver(reconstructor)
+        reconstructor._syncAlgorithmFromSettings()
+        return reconstructor
 
     @property
     def name(self) -> str:
-        return self._reconstructor.name
+        return self._algorithmChooser.getCurrentDisplayName()
 
     @property
     def backendName(self) -> str:
-        return self._reconstructor.backendName
+        algorithm = self._algorithmChooser.getCurrentStrategy()
+        return algorithm.backendName
 
     def reconstruct(self) -> int:
-        return self._reconstructor.reconstruct()
+        algorithm = self._algorithmChooser.getCurrentStrategy()
+        return algorithm.reconstruct()
 
     def getAlgorithmDict(self) -> dict[str, str]:
-        return {
-            reconstructor.name: reconstructor.backendName
-            for reconstructor in self._reconstructorList
-        }
+        return {entry.displayName: entry.strategy.backendName for entry in self._algorithmChooser}
 
-    def getCurrentAlgorithm(self) -> str:
-        return self.name
+    def getAlgorithm(self) -> str:
+        return self._algorithmChooser.getCurrentDisplayName()
 
-    def setCurrentAlgorithm(self, name: str) -> None:
-        try:
-            reconstructor = next(recon for recon in self._reconstructorList
-                                 if name.casefold() == recon.name.casefold())
-        except StopIteration:
-            return
+    def setAlgorithm(self, name: str) -> None:
+        self._algorithmChooser.setFromDisplayName(name)
 
-        if reconstructor is not self._reconstructor:
-            self._reconstructor.removeObserver(self)
-            self._reconstructor = reconstructor
-            self._settings.algorithm.value = self._reconstructor.name
-            self._reconstructor.addObserver(self)
-            self.notifyObservers()
+    def _syncAlgorithmFromSettings(self) -> None:
+        self._algorithmChooser.setFromSimpleName(self._settings.algorithm.value)
 
-    def setCurrentAlgorithmFromSettings(self) -> None:
-        self.setCurrentAlgorithm(self._settings.algorithm.value)
+    def _syncAlgorithmToSettings(self) -> None:
+        self._settings.algorithm.value = self._algorithmChooser.getCurrentSimpleName()
+        self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.algorithm:
-            self.setCurrentAlgorithmFromSettings()
+            self._syncAlgorithmFromSettings()
+        elif observable is self._algorithmChooser:
+            self._syncAlgorithmToSettings()
 
 
 class ReconstructorPresenter(Observable, Observer):
@@ -133,11 +137,11 @@ class ReconstructorPresenter(Observable, Observer):
     def getAlgorithmDict(self) -> dict[str, str]:
         return self._selectableReconstructor.getAlgorithmDict()
 
-    def getCurrentAlgorithm(self) -> str:
-        return self._selectableReconstructor.getCurrentAlgorithm()
+    def getAlgorithm(self) -> str:
+        return self._selectableReconstructor.getAlgorithm()
 
-    def setCurrentAlgorithm(self, name: str) -> None:
-        self._selectableReconstructor.setCurrentAlgorithm(name)
+    def setAlgorithm(self, name: str) -> None:
+        self._selectableReconstructor.setAlgorithm(name)
 
     def reconstruct(self) -> int:
         return self._selectableReconstructor.reconstruct()
