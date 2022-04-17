@@ -50,6 +50,9 @@ class ScanPoint:
     y: Decimal
 
 
+ScanInitializerType = Sequence[ScanPoint]
+
+
 class CartesianScanInitializer(Sequence[ScanPoint]):
     def __init__(self, settings: ScanSettings, snake: bool) -> None:
         super().__init__()
@@ -84,9 +87,6 @@ class CartesianScanInitializer(Sequence[ScanPoint]):
         ny = self._settings.extentY.value
         return nx * ny
 
-    def __str__(self) -> str:
-        return 'Snake' if self._snake else 'Raster'
-
 
 class SpiralScanInitializer(Sequence[ScanPoint]):
     def __init__(self, settings: ScanSettings) -> None:
@@ -118,9 +118,6 @@ class SpiralScanInitializer(Sequence[ScanPoint]):
         nx = self._settings.extentX.value
         ny = self._settings.extentY.value
         return nx * ny
-
-    def __str__(self) -> str:
-        return 'Spiral'
 
 
 class ScanFileReader(ABC):
@@ -198,9 +195,6 @@ class CustomScanInitializer(Sequence[ScanPoint], Observer):
 
     def __len__(self) -> int:
         return len(self._pointList)
-
-    def __str__(self) -> str:
-        return 'Custom'
 
     def getOpenFileFilterList(self) -> list[str]:
         return [reader.getFileFilter() for reader in self._fileReaderList]
@@ -376,70 +370,81 @@ class ScanInitializer(Observable, Observer):
         self._scan = scan
         self._reinitObservable = reinitObservable
         self._customInitializer = customInitializer
-        self._initializer = customInitializer
-        self._initializerList: list[Sequence[ScanPoint]] = [customInitializer]
+        self._initializerChooser = StrategyChooser[ScanInitializerType](
+            StrategyEntry[ScanInitializerType](simpleName='Custom',
+                                               displayName='Custom',
+                                               strategy=self._customInitializer))
 
     @classmethod
     def createInstance(cls, settings: ScanSettings, scan: Scan,
                        customInitializer: CustomScanInitializer,
                        reinitObservable: Observable) -> ScanInitializer:
         initializer = cls(settings, scan, customInitializer, reinitObservable)
-        initializer.addInitializer(SpiralScanInitializer(settings))
-        initializer.addInitializer(CartesianScanInitializer.createSnakeInstance(settings))
-        initializer.addInitializer(CartesianScanInitializer.createRasterInstance(settings))
-        initializer.setInitializerFromSettings()
+
+        spiralInit = StrategyEntry[ScanInitializerType](simpleName='Spiral',
+                                                        displayName='Spiral',
+                                                        strategy=SpiralScanInitializer(settings))
+        initializer._initializerChooser.addStrategy(spiralInit)
+
+        snakeInit = StrategyEntry[ScanInitializerType](
+            simpleName='Snake',
+            displayName='Snake',
+            strategy=CartesianScanInitializer.createSnakeInstance(settings))
+        initializer._initializerChooser.addStrategy(snakeInit)
+
+        rasterInit = StrategyEntry[ScanInitializerType](
+            simpleName='Raster',
+            displayName='Raster',
+            strategy=CartesianScanInitializer.createRasterInstance(settings))
+        initializer._initializerChooser.addStrategy(rasterInit)
+
         settings.initializer.addObserver(initializer)
+        initializer._initializerChooser.addObserver(initializer)
+        initializer._syncInitializerFromSettings()
         reinitObservable.addObserver(initializer)
+
         return initializer
 
-    def addInitializer(self, initializer: Sequence[ScanPoint]) -> None:
-        self._initializerList.insert(0, initializer)
-
     def getInitializerList(self) -> list[str]:
-        return [str(initializer) for initializer in self._initializerList]
+        return self._initializerChooser.getDisplayNameList()
 
     def getInitializer(self) -> str:
-        return str(self._initializer)
-
-    def _setInitializer(self, initializer: Sequence[ScanPoint]) -> None:
-        if initializer is not self._initializer:
-            self._initializer = initializer
-            self._settings.initializer.value = str(self._initializer)
-            self.notifyObservers()
+        return self._initializerChooser.getCurrentDisplayName()
 
     def setInitializer(self, name: str) -> None:
-        try:
-            initializer = next(ini for ini in self._initializerList
-                               if name.casefold() == str(ini).casefold())
-        except StopIteration:
-            logger.debug(f'Invalid initializer \"{name}\"')
-            return
-
-        self._setInitializer(initializer)
-
-    def setInitializerFromSettings(self) -> None:
-        self.setInitializer(self._settings.initializer.value)
+        self._initializerChooser.setFromDisplayName(name)
 
     def initializeScan(self) -> None:
-        self._scan.setScanPoints(self._initializer)
+        initializer = self._initializerChooser.getCurrentStrategy()
+        self._scan.setScanPoints(initializer)
 
     def getOpenFileFilterList(self) -> list[str]:
         return self._customInitializer.getOpenFileFilterList()
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self._customInitializer.openScan(filePath, fileFilter)
-        self._setInitializer(self._customInitializer)
+        self._initializerChooser.setToDefault()
         self.initializeScan()
 
     def getSaveFileFilterList(self) -> list[str]:
         return [self._scan.getSaveFileFilter()]
 
     def saveScan(self, filePath: Path, fileFilter: str) -> None:
+        logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
         self._scan.write(filePath)
+
+    def _syncInitializerFromSettings(self) -> None:
+        self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
+
+    def _syncInitializerToSettings(self) -> None:
+        self._settings.initializer.value = self._initializerChooser.getCurrentSimpleName()
+        self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.initializer:
-            self.setInitializerFromSettings()
+            self._syncInitializerFromSettings()
+        elif observable is self._initializerChooser:
+            self._syncInitializerToSettings()
         elif observable is self._reinitObservable:
             self.initializeScan()
 

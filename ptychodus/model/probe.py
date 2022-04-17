@@ -220,8 +220,10 @@ class ProbeInitializer(Observable, Observer):
         self._probe = probe
         self._reinitObservable = reinitObservable
         self._customInitializer = CustomProbeInitializer.createInstance(settings, sizer)
-        self._initializerChooser = StrategyChooser[ProbeInitializerType](StrategyEntry(
-            simpleName='Custom', displayName='Custom', strategy=self._customInitializer))
+        self._initializerChooser = StrategyChooser[ProbeInitializerType](
+            StrategyEntry[ProbeInitializerType](simpleName='Custom',
+                                                displayName='Custom',
+                                                strategy=self._customInitializer))
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
@@ -229,16 +231,16 @@ class ProbeInitializer(Observable, Observer):
                        reinitObservable: Observable) -> ProbeInitializer:
         initializer = cls(probeSettings, sizer, probe, reinitObservable)
 
-        fzpInit = StrategyEntry(simpleName='FresnelZonePlate',
-                                displayName='Fresnel Zone Plate',
-                                strategy=FresnelZonePlateProbeInitializer(
-                                    detectorSettings, probeSettings, sizer))
+        fzpInit = StrategyEntry[ProbeInitializerType](simpleName='FresnelZonePlate',
+                                                      displayName='Fresnel Zone Plate',
+                                                      strategy=FresnelZonePlateProbeInitializer(
+                                                          detectorSettings, probeSettings, sizer))
         initializer._initializerChooser.addStrategy(fzpInit)
 
-        gaussInit = StrategyEntry(simpleName='GaussianBeam',
-                                  displayName='Gaussian Beam',
-                                  strategy=GaussianBeamProbeInitializer(
-                                      detectorSettings, probeSettings))
+        gaussInit = StrategyEntry[ProbeInitializerType](simpleName='GaussianBeam',
+                                                        displayName='Gaussian Beam',
+                                                        strategy=GaussianBeamProbeInitializer(
+                                                            detectorSettings, probeSettings))
         initializer._initializerChooser.addStrategy(gaussInit)
 
         probeSettings.initializer.addObserver(initializer)

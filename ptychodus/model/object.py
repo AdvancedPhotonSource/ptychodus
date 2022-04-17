@@ -180,8 +180,10 @@ class ObjectInitializer(Observable, Observer):
         self._object = obj
         self._reinitObservable = reinitObservable
         self._customInitializer = CustomObjectInitializer.createInstance(settings, sizer)
-        self._initializerChooser = StrategyChooser[ObjectInitializerType](StrategyEntry(
-            simpleName='Custom', displayName='Custom', strategy=self._customInitializer))
+        self._initializerChooser = StrategyChooser[ObjectInitializerType](
+            StrategyEntry[ObjectInitializerType](simpleName='Custom',
+                                                 displayName='Custom',
+                                                 strategy=self._customInitializer))
 
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings,
@@ -189,9 +191,10 @@ class ObjectInitializer(Observable, Observer):
                        reinitObservable: Observable) -> ObjectInitializer:
         initializer = cls(settings, sizer, obj, reinitObservable)
 
-        urandInit = StrategyEntry(simpleName='Random',
-                                  displayName='Random',
-                                  strategy=UniformRandomObjectInitializer(sizer, rng))
+        urandInit = StrategyEntry[ObjectInitializerType](simpleName='Random',
+                                                         displayName='Random',
+                                                         strategy=UniformRandomObjectInitializer(
+                                                             sizer, rng))
         initializer._initializerChooser.addStrategy(urandInit)
 
         settings.initializer.addObserver(initializer)
