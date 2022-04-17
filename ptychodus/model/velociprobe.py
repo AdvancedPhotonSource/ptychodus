@@ -206,7 +206,17 @@ class VelociprobeScanFileReader(ScanFileReader):
         self._velociprobeReader = velociprobeReader
         self._yPositionSource = yPositionSource
 
-    def getFileFilter(self) -> str:
+    @property
+    def simpleName(self) -> str:
+        yPositionSourceText = 'EncoderY'
+
+        if self._yPositionSource == VelociprobeScanYPositionSource.LASER_INTERFEROMETER:
+            yPositionSourceText = 'LaserInterferometerY'
+
+        return f'VelociprobeWith{yPositionSourceText}'
+
+    @property
+    def fileFilter(self) -> str:
         yPositionSourceText = 'Encoder Y'
 
         if self._yPositionSource == VelociprobeScanYPositionSource.LASER_INTERFEROMETER:
@@ -253,14 +263,6 @@ class VelociprobeScanFileReader(ScanFileReader):
             scanPointList[idx] = ScanPoint(x_m, y_m)
 
         return scanPointList
-
-    def __str__(self) -> str:
-        yPositionSourceText = 'EncoderY'
-
-        if self._yPositionSource == VelociprobeScanYPositionSource.LASER_INTERFEROMETER:
-            yPositionSourceText = 'LaserInterferometerY'
-
-        return f'VelociprobeWith{yPositionSourceText}'
 
 
 class VelociprobeImageSequence(ImageSequence):

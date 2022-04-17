@@ -139,15 +139,19 @@ class CustomObjectInitializer(Observer):
     def getOpenFileFilter(self) -> str:
         return 'NumPy Binary Files (*.npy)'
 
+    def _openObject(self, filePath: Path) -> None:
+        if filePath is not None and filePath.is_file():
+            logger.debug(f'Reading {filePath}')
+            self._array = numpy.load(filePath)
+
     def openObject(self, filePath: Path) -> None:
+        if self._settings.customFilePath.value == filePath:
+            self._openObject(filePath)
+
         self._settings.customFilePath.value = filePath
 
     def _openObjectFromSettings(self) -> None:
-        customFilePath = self._settings.customFilePath.value
-
-        if customFilePath is not None and customFilePath.is_file():
-            logger.debug(f'Reading {customFilePath}')
-            self._array = numpy.load(customFilePath)
+        self._openObject(self._settings.customFilePath.value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.customFilePath:
@@ -215,6 +219,8 @@ class ObjectInitializer(Observable, Observer):
 
     def initializeObject(self) -> None:
         initializer = self._initializerChooser.getCurrentStrategy()
+        simpleName = self._initializerChooser.getCurrentSimpleName()
+        logger.debug(f'Initializing {simpleName} Object')
         self._object.setArray(initializer())
 
     def getOpenFileFilterList(self) -> list[str]:
@@ -286,7 +292,6 @@ class ObjectPresenter(Observable, Observer):
         return self._initializer.getSaveFileFilterList()
 
     def saveObject(self, filePath: Path) -> None:
-        logger.debug(f'Writing {filePath}')
         self._initializer.saveObject(filePath)
 
     def initializeObject(self) -> None:

@@ -179,15 +179,19 @@ class CustomProbeInitializer(Observer):
     def getOpenFileFilter(self) -> str:
         return 'NumPy Binary Files (*.npy)'
 
+    def _openProbe(self, filePath: Path) -> None:
+        if filePath is not None and filePath.is_file():
+            logger.debug(f'Reading {filePath}')
+            self._array = numpy.load(filePath)
+
     def openProbe(self, filePath: Path) -> None:
+        if self._settings.customFilePath.value == filePath:
+            self._openProbe(filePath)
+
         self._settings.customFilePath.value = filePath
 
     def _openProbeFromSettings(self) -> None:
-        customFilePath = self._settings.customFilePath.value
-
-        if customFilePath is not None and customFilePath.is_file():
-            logger.debug(f'Reading {customFilePath}')
-            self._array = numpy.load(customFilePath)
+        self._openProbe(self._settings.customFilePath.value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.customFilePath:
@@ -261,6 +265,8 @@ class ProbeInitializer(Observable, Observer):
 
     def initializeProbe(self) -> None:
         initializer = self._initializerChooser.getCurrentStrategy()
+        simpleName = self._initializerChooser.getCurrentSimpleName()
+        logger.debug(f'Initializing {simpleName} Probe')
         self._probe.setArray(initializer())
 
     def getOpenFileFilterList(self) -> list[str]:
