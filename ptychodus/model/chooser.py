@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic, Iterator, TypeVar
 import logging
 
 from .observer import Observable

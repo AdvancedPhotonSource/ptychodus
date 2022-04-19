@@ -1,4 +1,6 @@
 from __future__ import annotations
+from types import TracebackType
+from typing import overload
 import logging
 
 import numpy
@@ -110,9 +112,20 @@ class ModelCore:
         model.dataFilePresenter.addReader(model._velociprobeReader)
         return model
 
-    def start(self) -> None:
+    def __enter__(self) -> ModelCore:
         self._dataDirectoryWatcher.start()
+        return self
 
-    def stop(self) -> None:
+    @overload
+    def __exit__(self, exception_type: None, exception_value: None, traceback: None) -> None:
+        ...
+
+    @overload
+    def __exit__(self, exception_type: type[BaseException], exception_value: BaseException,
+                 traceback: TracebackType) -> None:
+        ...
+
+    def __exit__(self, exception_type: type[BaseException] | None,
+                 exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataDirectoryWatcher.stop()
         self._dataDirectoryWatcher.join()
