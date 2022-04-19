@@ -87,6 +87,14 @@ class VelociprobeReader(DataFileReader, Observable):
         self.masterFilePath: Optional[Path] = None
         self.entryGroup: Optional[EntryGroup] = None
 
+    @property
+    def simpleName(self) -> str:
+        return 'Velociprobe'
+
+    @property
+    def fileFilter(self) -> str:
+        return f'Velociprobe Master Files (*.h5)'
+
     def _readDataGroup(self, h5DataGroup: Optional[h5py.Group]) -> Optional[DataGroup]:
         if h5DataGroup is None:
             return None
@@ -158,22 +166,26 @@ class VelociprobeReader(DataFileReader, Observable):
         goniometer = GoniometerGroup(chi_deg=float(h5ChiDataset[0]))
         return SampleGroup(goniometer=goniometer)
 
-    def read(self, rootGroup: h5py.Group) -> None:
-        self.masterFilePath = Path(rootGroup.filename)
-        h5EntryGroup = rootGroup.get('entry')
+    def read(self, filePath: Path) -> None:
+        if filePath is None:
+            return
 
-        if h5EntryGroup:
-            dataGroup = self._readDataGroup(h5EntryGroup.get('data'))
-            instrumentGroup = self._readInstrumentGroup(h5EntryGroup.get('instrument'))
-            sampleGroup = self._readSampleGroup(h5EntryGroup.get('sample'))
-            self.entryGroup = EntryGroup(data=dataGroup,
-                                         instrument=instrumentGroup,
-                                         sample=sampleGroup)
-        else:
-            logger.debug(f'File {self.masterFilePath} is not a velociprobe data file.')
-            self.entryGroup = None
+        with h5py.File(filePath, 'r') as h5File:
+            self.masterFilePath = Path(h5File.filename)
+            h5EntryGroup = h5File.get('entry')
 
-        self.notifyObservers()
+            if h5EntryGroup:
+                dataGroup = self._readDataGroup(h5EntryGroup.get('data'))
+                instrumentGroup = self._readInstrumentGroup(h5EntryGroup.get('instrument'))
+                sampleGroup = self._readSampleGroup(h5EntryGroup.get('sample'))
+                self.entryGroup = EntryGroup(data=dataGroup,
+                                             instrument=instrumentGroup,
+                                             sample=sampleGroup)
+            else:
+                logger.debug(f'File {self.masterFilePath} is not a velociprobe data file.')
+                self.entryGroup = None
+
+            self.notifyObservers()
 
 
 class VelociprobeScanYPositionSource(IntEnum):
@@ -435,7 +447,7 @@ class VelociprobePresenter(Observable, Observer):
 
     def _syncDataPath(self) -> None:
         if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.instrument:
-            self._detectorSettings.dataPath.value = self._velociprobeReader.masterFilePath
+            self._detectorSettings.dataPath.value = self._velociprobeReader.masterFilePath  # FIXME
             self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
