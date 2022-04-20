@@ -11,8 +11,9 @@ import logging
 import h5py
 import numpy
 
+from .h5file import H5FileReader
 from .crop import CropSettings
-from .data import DataFile, DataFileReader
+from .data import DataFile
 from .detector import DetectorSettings
 from .image import ImageSequence
 from .observer import Observable, Observer
@@ -81,19 +82,11 @@ class EntryGroup:
     sample: Optional[SampleGroup]
 
 
-class VelociprobeReader(DataFileReader, Observable):
+class VelociprobeReader(H5FileReader):
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(simpleName='Velociprobe',fileFilter='Velociprobe Master Files (*.h5)')
         self.masterFilePath: Optional[Path] = None
         self.entryGroup: Optional[EntryGroup] = None
-
-    @property
-    def simpleName(self) -> str:
-        return 'Velociprobe'
-
-    @property
-    def fileFilter(self) -> str:
-        return f'Velociprobe Master Files (*.h5)'
 
     def _readDataGroup(self, h5DataGroup: Optional[h5py.Group]) -> Optional[DataGroup]:
         if h5DataGroup is None:
@@ -166,26 +159,20 @@ class VelociprobeReader(DataFileReader, Observable):
         goniometer = GoniometerGroup(chi_deg=float(h5ChiDataset[0]))
         return SampleGroup(goniometer=goniometer)
 
-    def read(self, filePath: Path) -> None:
-        if not filePath:
-            return
+    def readRootGroup(self, rootGroup: h5py.Group) -> None:
+        self.masterFilePath = Path(rootGroup.filename)
+        h5EntryGroup = rootGroup.get('entry')
 
-        with h5py.File(filePath, 'r') as h5File:
-            self.masterFilePath = Path(h5File.filename)
-            h5EntryGroup = h5File.get('entry')
-
-            if h5EntryGroup:
-                dataGroup = self._readDataGroup(h5EntryGroup.get('data'))
-                instrumentGroup = self._readInstrumentGroup(h5EntryGroup.get('instrument'))
-                sampleGroup = self._readSampleGroup(h5EntryGroup.get('sample'))
-                self.entryGroup = EntryGroup(data=dataGroup,
-                                             instrument=instrumentGroup,
-                                             sample=sampleGroup)
-            else:
-                logger.debug(f'File {self.masterFilePath} is not a velociprobe data file.')
-                self.entryGroup = None
-
-            self.notifyObservers()
+        if h5EntryGroup:
+            dataGroup = self._readDataGroup(h5EntryGroup.get('data'))
+            instrumentGroup = self._readInstrumentGroup(h5EntryGroup.get('instrument'))
+            sampleGroup = self._readSampleGroup(h5EntryGroup.get('sample'))
+            self.entryGroup = EntryGroup(data=dataGroup,
+                                         instrument=instrumentGroup,
+                                         sample=sampleGroup)
+        else:
+            logger.debug(f'File {self.masterFilePath} is not a velociprobe data file.')
+            self.entryGroup = None
 
 
 class VelociprobeScanYPositionSource(IntEnum):

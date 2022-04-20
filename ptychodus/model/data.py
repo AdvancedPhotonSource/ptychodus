@@ -15,6 +15,7 @@ import watchdog.observers
 from .chooser import StrategyChooser, StrategyEntry
 from .observer import Observable, Observer
 from .settings import SettingsRegistry, SettingsGroup
+from .tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,10 @@ class DataFileReader(ABC):
 
     @abstractproperty
     def fileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def getTree(self) -> SimpleTreeNode:
         pass
 
     @abstractmethod

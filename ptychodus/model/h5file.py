@@ -16,20 +16,22 @@ class H5FileReader(DataFileReader, Observable):
     def createRootNode() -> SimpleTreeNode:
         return SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
 
-    def __init__(self) -> None:
+    def __init__(self, simpleName: str = 'HDF5', fileFilter: str = 'Hierarchical Data Format 5 Files (*.h5)') -> None:
         super().__init__()
         self._rootNode = H5FileReader.createRootNode()
+        self._simpleName = simpleName
+        self._fileFilter = fileFilter
 
     def getTree(self) -> SimpleTreeNode:
         return self._rootNode
 
     @property
     def simpleName(self) -> str:
-        return 'HDF5'
+        return self._simpleName
 
     @property
     def fileFilter(self) -> str:
-        return 'Hierarchical Data Format 5 Files (*.h5)'
+        return self._fileFilter
 
     @staticmethod
     def _addAttributes(treeNode: SimpleTreeNode, attributeManager: h5py.AttributeManager) -> None:
@@ -82,9 +84,10 @@ class H5FileReader(DataFileReader, Observable):
 
                             if spaceId.get_simple_extent_type() == h5py.h5s.SCALAR:
                                 value = h5Item[()]
+                                stringInfo = h5py.check_string_dtype(value.dtype)
 
-                                if isinstance(value, numpy.bytes_):
-                                    valueStr = 'STRING = "' + value.decode('utf-8') + '"'
+                                if stringInfo:
+                                    valueStr = f'STRING = "{value.decode(stringInfo.encoding)}"'
                                 elif numpy.isscalar(value):
                                     valueStr = f'SCALAR {value.dtype} = {value}'
                                 else:
@@ -103,4 +106,9 @@ class H5FileReader(DataFileReader, Observable):
 
                     treeNode.itemData = [itemName, itemType, itemDetails]
 
+            self.readRootGroup(h5File)
+
         self.notifyObservers()
+
+    def readRootGroup(self, rootGroup: h5py.Group) -> None:
+        pass
