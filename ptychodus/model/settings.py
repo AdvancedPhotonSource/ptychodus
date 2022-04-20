@@ -1,7 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
-from typing import Callable, Generic, Iterator, Optional, TypeVar
+from typing import Callable, Generic, Iterator, TypeVar
 import configparser
 
 from .observer import Observable, Observer
@@ -55,7 +55,7 @@ class SettingsGroup(Observable, Observer):
                                             lambda valueString: str(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 
-    def createPathEntry(self, name: str, defaultValue: Optional[Path]) -> SettingsEntry[Path]:
+    def createPathEntry(self, name: str, defaultValue: Path) -> SettingsEntry[Path]:
         candidateEntry = SettingsEntry[Path](name, defaultValue,
                                              lambda valueString: Path(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
@@ -105,11 +105,10 @@ class SettingsGroup(Observable, Observer):
 
 
 class SettingsRegistry(Observable):
-    FILE_FILTER = 'Initialization Files (*.ini)'
-
     def __init__(self) -> None:
         super().__init__()
         self._groupList: list[SettingsGroup] = list()
+        self._fileFilterList: list[str] = ['Initialization Files (*.ini)']
 
     def createGroup(self, name: str) -> SettingsGroup:
         for existingGroup in self._groupList:
@@ -129,7 +128,10 @@ class SettingsRegistry(Observable):
     def __len__(self) -> int:
         return len(self._groupList)
 
-    def read(self, filePath: Path) -> None:
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._fileFilterList
+
+    def openSettings(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.read(filePath)
 
@@ -144,10 +146,12 @@ class SettingsRegistry(Observable):
                 optionValueString = config.get(settingsGroup.name, settingsEntry.name)
                 settingsEntry.setValueFromString(optionValueString)
 
-        # FIXME need something to load dataset on notify
         self.notifyObservers()
 
-    def write(self, filePath: Path) -> None:
+    def getSaveFileFilterList(self) -> list[str]:
+        return self._fileFilterList
+
+    def saveSettings(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.optionxform = lambda option: option
 

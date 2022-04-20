@@ -62,33 +62,30 @@ def main() -> int:
     logger.debug('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
     logger.debug('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
 
-    model = ptychodus.model.ModelCore.createInstance(isDeveloperModeEnabled=parsedArgs.dev)
-    model.start()
     result = 0
 
-    if parsedArgs.settings:
-        model.settingsRegistry.read(parsedArgs.settings.name)
+    with ptychodus.model.ModelCore(isDeveloperModeEnabled=parsedArgs.dev) as model:
+        if parsedArgs.settings:
+            model.settingsRegistry.openSettings(parsedArgs.settings.name)
 
-    if parsedArgs.batch:
-        verifyAllArgumentsParsed(parser, unparsedArgs)
-        result = model.reconstructorPresenter.reconstruct()
-    elif PyQt5:
-        # QApplication expects the first argument to be the program name
-        qtArgs = sys.argv[:1] + unparsedArgs
-        app = QApplication(qtArgs)
-        verifyAllArgumentsParsed(parser, app.arguments()[1:])
+        if parsedArgs.batch:
+            verifyAllArgumentsParsed(parser, unparsedArgs)
+            result = model.reconstructorPresenter.reconstruct()
+        elif PyQt5:
+            # QApplication expects the first argument to be the program name
+            qtArgs = sys.argv[:1] + unparsedArgs
+            app = QApplication(qtArgs)
+            verifyAllArgumentsParsed(parser, app.arguments()[1:])
 
-        view = ptychodus.view.ViewCore.createInstance()
-        controller = ptychodus.controller.ControllerCore.createInstance(model, view)
+            view = ptychodus.view.ViewCore.createInstance()
+            controller = ptychodus.controller.ControllerCore.createInstance(model, view)
 
-        view.setWindowTitle(versionString())
-        view.show()
-        result = app.exec_()
-    else:
-        logger.error('PyQt5 ' + NOT_FOUND_STR)
-        result = -1
-
-    model.stop()
+            view.setWindowTitle(versionString())
+            view.show()
+            result = app.exec_()
+        else:
+            logger.error('PyQt5 ' + NOT_FOUND_STR)
+            result = -1
 
     return result
 

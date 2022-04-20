@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
@@ -12,7 +12,30 @@ import numpy
 import watchdog.events
 import watchdog.observers
 
+from .chooser import StrategyChooser, StrategyEntry
+from .observer import Observable, Observer
+from .settings import SettingsRegistry, SettingsGroup
+from .tree import SimpleTreeNode
+
 logger = logging.getLogger(__name__)
+
+
+class DataSettings(Observable, Observer):
+    def __init__(self, settingsGroup: SettingsGroup) -> None:
+        super().__init__()
+        self._settingsGroup = settingsGroup
+        self.fileType = settingsGroup.createStringEntry('FileType', 'HDF5')
+        self.filePath = settingsGroup.createPathEntry('FilePath', None)
+
+    @classmethod
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> DataSettings:
+        settings = cls(settingsRegistry.createGroup('Data'))
+        settings._settingsGroup.addObserver(settings)
+        return settings
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
 
 
 class H5FileEventHandler(watchdog.events.PatternMatchingEventHandler):
@@ -83,32 +106,51 @@ class DataFile:
 
 
 class DataFileReader(ABC):
+    @abstractproperty
+    def simpleName(self) -> str:
+        pass
+
+    @abstractproperty
+    def fileFilter(self) -> str:
+        pass
+
     @abstractmethod
-    def read(self, rootGroup: h5py.Group) -> None:
+    def getTree(self) -> SimpleTreeNode:
+        pass
+
+    @abstractmethod
+    def read(self, filePath: Path) -> None:
         pass
 
 
-class DataFilePresenter:
-    def __init__(self) -> None:
+class DataFilePresenter(Observer):
+    @staticmethod
+    def _createFileReaderEntry(fileReader: DataFileReader) -> StrategyEntry[DataFileReader]:
+        return StrategyEntry(simpleName=fileReader.simpleName,
+                             displayName=fileReader.fileFilter,
+                             strategy=fileReader)
+
+    def __init__(self, settings: DataSettings, fileReaderList: list[DataFileReader]) -> None:
         super().__init__()
-        self._readerList: list[DataFileReader] = list()
+        self._settings = settings
+        self._fileReaderChooser = StrategyChooser[DataFileReader].createFromList([
+            DataFilePresenter._createFileReaderEntry(fileReader) for fileReader in fileReaderList
+        ])
         self._filePath: Optional[Path] = None
 
-    def addReader(self, reader: DataFileReader) -> None:
-        if reader not in self._readerList:
-            self._readerList.append(reader)
+    @classmethod
+    def createInstance(cls, settings: DataSettings, fileReaderList: list[DataFileReader]) -> None:
+        presenter = cls(settings, fileReaderList)
+        settings.fileType.addObserver(presenter)
+        presenter._fileReaderChooser.addObserver(presenter)
+        presenter._syncFileReaderFromSettings()
 
-    def readFile(self, filePath: Path) -> None:
-        if filePath is None:
-            return
+        settings.filePath.addObserver(presenter)
+        presenter._openDataFileFromSettings()
 
-        with h5py.File(filePath, 'r') as h5File:
-            self._filePath = filePath
+        return presenter
 
-            for reader in self._readerList:
-                reader.read(h5File)
-
-    def readData(self, dataPath: str) -> Any:
+    def openDataSet(self, dataPath: str) -> Any:
         data = None
 
         if self._filePath and dataPath:
@@ -125,9 +167,47 @@ class DataFilePresenter:
                         item = h5File.get(parentPath)
 
                         if attrName in item.attrs:
-                            data = item.attrs[attrName]
+                            attr = item.attrs[attrName]
+                            stringInfo = h5py.check_string_dtype(attr.dtype)
 
-        #if isinstance(data, numpy.bytes_): # TODO h5py.check_string_dtype
-        #    data = value.decode('utf-8')
+                            if stringInfo:
+                                data = attr.decode(stringInfo.encoding)
+                            else:
+                                data = attr
 
         return data
+
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._fileReaderChooser.getDisplayNameList()
+
+    def _syncFileReaderFromSettings(self) -> None:
+        self._fileReaderChooser.setFromSimpleName(self._settings.fileType.value)
+
+    def _syncFileReaderToSettings(self) -> None:
+        self._settings.fileType.value = self._fileReaderChooser.getCurrentSimpleName()
+
+    def _openDataFile(self, filePath: Path) -> None:
+        if filePath is not None and filePath.is_file():
+            self._filePath = filePath
+            logger.debug(f'Reading {filePath}')
+            fileReader = self._fileReaderChooser.getCurrentStrategy()
+            fileReader.read(filePath)
+
+    def openDataFile(self, filePath: Path, fileFilter: str) -> None:
+        self._fileReaderChooser.setFromDisplayName(fileFilter)
+
+        if self._settings.filePath.value == filePath:
+            self._openDataFile(filePath)
+
+        self._settings.filePath.value = filePath
+
+    def _openDataFileFromSettings(self) -> None:
+        self._openDataFile(self._settings.filePath.value)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings.fileType:
+            self._syncFileReaderFromSettings()
+        elif observable is self._fileReaderChooser:
+            self._syncFileReaderToSettings()
+        elif observable is self._settings.filePath:
+            self._openDataFileFromSettings()

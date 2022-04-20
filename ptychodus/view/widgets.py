@@ -25,7 +25,7 @@ class BottomTitledGroupBox(QGroupBox):
 class DecimalSlider(QWidget):
     valueChanged = pyqtSignal(Decimal)
 
-    def __init__(self, orientation: Qt.Orientation, parent: QWidget) -> None:
+    def __init__(self, orientation: Qt.Orientation, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self._slider = QSlider(orientation)
         self._label = QLabel()
@@ -34,14 +34,16 @@ class DecimalSlider(QWidget):
         self._maximum = Decimal()
 
     @classmethod
-    def createInstance(cls, orientation: Qt.Orientation, parent: QWidget = None) -> None:
+    def createInstance(cls,
+                       orientation: Qt.Orientation,
+                       parent: Optional[QWidget] = None) -> DecimalSlider:
         widget = cls(orientation, parent)
 
         widget._slider.setRange(0, 1000)
         widget._slider.setTickPosition(QSlider.TicksBelow)
         widget._slider.setTickInterval(100)
         widget._slider.valueChanged.connect(lambda value: widget._setValueFromSlider())
-        widget.setValueAndRange(0.5, 0, 1)
+        widget.setValueAndRange(Decimal(1) / 2, Decimal(0), Decimal(1))
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -97,8 +99,8 @@ class DecimalSlider(QWidget):
         shouldEmit = False
 
         alpha = (Decimal(value) - self._minimum) / (self._maximum - self._minimum)
-        ivalue = (1 - alpha) * self._slider.minimum() + alpha * self._slider.maximum()
-        ivalue = int(numpy.rint(float(ivalue)))
+        ivaluef = (1 - alpha) * self._slider.minimum() + alpha * self._slider.maximum()
+        ivalue = int(numpy.rint(float(ivaluef)))
 
         if value < self._minimum:
             value = self._minimum

@@ -227,7 +227,7 @@ class CustomScanInitializer(Sequence[ScanPoint], Observer):
             self._pointList = [point for point in pointIterable]
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
-        self._fileReaderChooser.setFromSimpleName(fileFilter)
+        self._fileReaderChooser.setFromDisplayName(fileFilter)
 
         if self._settings.customFilePath.value == filePath:
             self._openScan(filePath)

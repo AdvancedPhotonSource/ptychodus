@@ -13,7 +13,6 @@ class DetectorSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.dataPath = settingsGroup.createPathEntry('DataPath', None)
         self.numberOfPixelsX = settingsGroup.createIntegerEntry('NumberOfPixelsX', 1024)
         self.numberOfPixelsY = settingsGroup.createIntegerEntry('NumberOfPixelsY', 1024)
         self.pixelSizeXInMeters = settingsGroup.createRealEntry('PixelSizeXInMeters', '75e-6')

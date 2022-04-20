@@ -11,8 +11,9 @@ import logging
 import h5py
 import numpy
 
+from .h5file import H5FileReader
 from .crop import CropSettings
-from .data import DataFile, DataFileReader
+from .data import DataFile
 from .detector import DetectorSettings
 from .image import ImageSequence
 from .observer import Observable, Observer
@@ -81,9 +82,10 @@ class EntryGroup:
     sample: Optional[SampleGroup]
 
 
-class VelociprobeReader(DataFileReader, Observable):
+class VelociprobeReader(H5FileReader):
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(simpleName='Velociprobe',
+                         fileFilter='Velociprobe Master Files (*.h5 *.hdf5)')
         self.masterFilePath: Optional[Path] = None
         self.entryGroup: Optional[EntryGroup] = None
 
@@ -158,7 +160,7 @@ class VelociprobeReader(DataFileReader, Observable):
         goniometer = GoniometerGroup(chi_deg=float(h5ChiDataset[0]))
         return SampleGroup(goniometer=goniometer)
 
-    def read(self, rootGroup: h5py.Group) -> None:
+    def readRootGroup(self, rootGroup: h5py.Group) -> None:
         self.masterFilePath = Path(rootGroup.filename)
         h5EntryGroup = rootGroup.get('entry')
 
@@ -172,8 +174,6 @@ class VelociprobeReader(DataFileReader, Observable):
         else:
             logger.debug(f'File {self.masterFilePath} is not a velociprobe data file.')
             self.entryGroup = None
-
-        self.notifyObservers()
 
 
 class VelociprobeScanYPositionSource(IntEnum):
@@ -433,11 +433,6 @@ class VelociprobePresenter(Observable, Observer):
         self._probeSettings.probeEnergyInElectronVolts.value = \
                 SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
 
-    def _syncDataPath(self) -> None:
-        if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.instrument:
-            self._detectorSettings.dataPath.value = self._velociprobeReader.masterFilePath
-            self.notifyObservers()
-
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:
-            self._syncDataPath()
+            self.notifyObservers()

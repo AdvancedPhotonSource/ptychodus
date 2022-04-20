@@ -142,11 +142,11 @@ class DataFileController(Observer):
         return controller
 
     def openDataFile(self) -> None:
-        filePath, _ = self._fileDialogFactory.getOpenFilePath(
-            self._treeView, 'Open Data File', nameFilters=[H5FileReader.FILE_FILTER])
+        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+            self._treeView, 'Open Data File', nameFilters=self._presenter.getOpenFileFilterList())
 
         if filePath:
-            self._presenter.readFile(filePath)
+            self._presenter.openDataFile(filePath, nameFilter)
 
     def updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
         names = list()
@@ -157,7 +157,7 @@ class DataFileController(Observer):
             nodeItem = nodeItem.parentItem
 
         dataPath = '/' + '/'.join(reversed(names))
-        data = self._presenter.readData(dataPath)
+        data = self._presenter.openDataSet(dataPath)
         self._tableModel.setArray(data)
 
     def update(self, observable: Observable) -> None:
