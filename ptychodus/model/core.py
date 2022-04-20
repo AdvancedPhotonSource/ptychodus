@@ -25,10 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 class ModelCore:
-    def __init__(self, isDeveloperModeEnabled: bool) -> None:
+    def __init__(self, isDeveloperModeEnabled: bool = False) -> None:
         self.rng = numpy.random.default_rng()
 
         self.settingsRegistry = SettingsRegistry()
+        self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
         self._scanSettings = ScanSettings.createInstance(self.settingsRegistry)
@@ -87,7 +88,10 @@ class ModelCore:
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
 
-        self.dataFilePresenter = DataFilePresenter()
+        dataFileReaderList = [self.h5FileReader, self._velociprobeReader]
+
+        self.dataFilePresenter = DataFilePresenter.createInstance(self._dataSettings,
+                                                                  dataFileReaderList)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.detectorImagePresenter = DetectorImagePresenter.createInstance(
@@ -104,13 +108,6 @@ class ModelCore:
                                                               self._objectInitializer)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
-
-    @classmethod
-    def createInstance(cls, isDeveloperModeEnabled: bool = False) -> ModelCore:
-        model = cls(isDeveloperModeEnabled)
-        model.dataFilePresenter.addReader(model.h5FileReader)
-        model.dataFilePresenter.addReader(model._velociprobeReader)
-        return model
 
     def __enter__(self) -> ModelCore:
         self._dataDirectoryWatcher.start()

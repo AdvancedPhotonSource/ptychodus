@@ -91,17 +91,21 @@ class SettingsController(Observer):
 
     def openSettings(self) -> None:
         filePath, _ = self._fileDialogFactory.getOpenFilePath(
-            self._groupListView, 'Open Settings', nameFilters=[SettingsRegistry.FILE_FILTER])
+            self._groupListView,
+            'Open Settings',
+            nameFilters=self._settingsRegistry.getOpenFileFilterList())
 
         if filePath:
-            self._settingsRegistry.read(filePath)
+            self._settingsRegistry.openSettings(filePath)
 
     def saveSettings(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._groupListView, 'Save Settings', nameFilters=[SettingsRegistry.FILE_FILTER])
+            self._groupListView,
+            'Save Settings',
+            nameFilters=self._settingsRegistry.getSaveFileFilterList())
 
         if filePath:
-            self._settingsRegistry.write(filePath)
+            self._settingsRegistry.saveSettings(filePath)
 
     def _updateEntryTable(self) -> None:
         current = self._groupListView.currentIndex()

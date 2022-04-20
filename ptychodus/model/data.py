@@ -118,29 +118,30 @@ class DataFileReader(ABC):
         pass
 
 
-class DataFilePresenter:
+class DataFilePresenter(Observer):
     @staticmethod
     def _createFileReaderEntry(fileReader: DataFileReader) -> StrategyEntry[DataFileReader]:
         return StrategyEntry(simpleName=fileReader.simpleName,
                              displayName=fileReader.fileFilter,
                              strategy=fileReader)
 
-    def __init__(self, settings: DataSettings, fileReaderList: list[DataFileReader],
-                 reinitObservable: Observable) -> None:
+    def __init__(self, settings: DataSettings, fileReaderList: list[DataFileReader]) -> None:
         super().__init__()
         self._settings = settings
-        self._reinitObservable = reinitObservable
         self._fileReaderChooser = StrategyChooser[DataFileReader].createFromList([
             DataFilePresenter._createFileReaderEntry(fileReader) for fileReader in fileReaderList
         ])
         self._filePath: Optional[Path] = None
 
     @classmethod
-    def createInstance(cls, settings: DataSettings, fileReaderList: list[DataFileReader],
-                       reinitObservable: Observable) -> None:
-        pass  # FIXME need something to load dataset on notify from SettingsRegistry
+    def createInstance(cls, settings: DataSettings, fileReaderList: list[DataFileReader]) -> None:
+        presenter = cls(settings, fileReaderList)
+        settings.fileType.addObserver(presenter)
+        presenter._fileReaderChooser.addObserver(presenter)
+        settings.filePath.addObserver(presenter)
+        return presenter
 
-    def readData(self, dataPath: str) -> Any:
+    def openDataSet(self, dataPath: str) -> Any:
         data = None
 
         if self._filePath and dataPath:
@@ -173,23 +174,23 @@ class DataFilePresenter:
     def _syncFileReaderToSettings(self) -> None:
         self._settings.fileType.value = self._fileReaderChooser.getCurrentSimpleName()
 
-    def _openData(self, filePath: Path) -> None:
+    def _openDataFile(self, filePath: Path) -> None:
         if filePath is not None and filePath.is_file():
             self._filePath = filePath
             logger.debug(f'Reading {filePath}')
             fileReader = self._fileReaderChooser.getCurrentStrategy()
             fileReader.read(filePath)
 
-    def openData(self, filePath: Path, fileFilter: str) -> None:
-        self._fileReaderChooser.setFromSimpleName(fileFilter)
+    def openDataFile(self, filePath: Path, fileFilter: str) -> None:
+        self._fileReaderChooser.setFromDisplayName(fileFilter)
 
         if self._settings.filePath.value == filePath:
-            self._openData(filePath)
+            self._openDataFile(filePath)
 
         self._settings.filePath.value = filePath
 
-    def _openDataFromSettings(self) -> None:
-        self._openData(self._settings.filePath.value)
+    def _openDataFileFromSettings(self) -> None:
+        self._openDataFile(self._settings.filePath.value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.fileType:
@@ -197,4 +198,4 @@ class DataFilePresenter:
         elif observable is self._fileReaderChooser:
             self._syncFileReaderToSettings()
         elif observable is self._settings.filePath:
-            self._openDataFromSettings()
+            self._openDataFileFromSettings()

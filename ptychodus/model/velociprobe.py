@@ -445,11 +445,6 @@ class VelociprobePresenter(Observable, Observer):
         self._probeSettings.probeEnergyInElectronVolts.value = \
                 SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
 
-    def _syncDataPath(self) -> None:
-        if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.instrument:
-            self._detectorSettings.dataPath.value = self._velociprobeReader.masterFilePath  # FIXME
-            self.notifyObservers()
-
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:
-            self._syncDataPath()
+            self.notifyObservers()

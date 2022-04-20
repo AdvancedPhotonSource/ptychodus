@@ -12,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class H5FileReader(DataFileReader, Observable):
-    FILE_FILTER = 'Hierarchical Data Format 5 Files (*.h5)'
-
     @staticmethod
     def createRootNode() -> SimpleTreeNode:
         return SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
@@ -24,6 +22,14 @@ class H5FileReader(DataFileReader, Observable):
 
     def getTree(self) -> SimpleTreeNode:
         return self._rootNode
+
+    @property
+    def simpleName(self) -> str:
+        return 'HDF5'
+
+    @property
+    def fileFilter(self) -> str:
+        return 'Hierarchical Data Format 5 Files (*.h5)'
 
     @staticmethod
     def _addAttributes(treeNode: SimpleTreeNode, attributeManager: h5py.AttributeManager) -> None:
@@ -42,54 +48,58 @@ class H5FileReader(DataFileReader, Observable):
 
             treeNode.createChild([str(name), 'Attribute', valueStr])
 
-    def read(self, rootGroup: h5py.Group) -> None:
-        self._rootNode = H5FileReader.createRootNode()
-        unvisited = [(self._rootNode, rootGroup)]
+    def read(self, filePath: Path) -> None:
+        if filePath is None:
+            return
 
-        while unvisited:
-            parentItem, h5Group = unvisited.pop()
+        with h5py.File(filePath, 'r') as h5File:
+            self._rootNode = H5FileReader.createRootNode()
+            unvisited = [(self._rootNode, h5File)]
 
-            for itemName in h5Group:
-                itemType = 'Unknown'
-                itemDetails = ''
-                h5Item = h5Group.get(itemName, getlink=True)
+            while unvisited:
+                parentItem, h5Group = unvisited.pop()
 
-                treeNode = parentItem.createChild(None)
+                for itemName in h5Group:
+                    itemType = 'Unknown'
+                    itemDetails = ''
+                    h5Item = h5Group.get(itemName, getlink=True)
 
-                if isinstance(h5Item, h5py.HardLink):
-                    itemType = 'Hard Link'
-                    h5Item = h5Group.get(itemName, getlink=False)
+                    treeNode = parentItem.createChild(None)
 
-                    if isinstance(h5Item, h5py.Group):
-                        itemType = 'Group'
-                        H5FileReader._addAttributes(treeNode, h5Item.attrs)
-                        unvisited.append((treeNode, h5Item))
-                    elif isinstance(h5Item, h5py.Dataset):
-                        itemType = 'Dataset'
-                        H5FileReader._addAttributes(treeNode, h5Item.attrs)
-                        spaceId = h5Item.id.get_space()
+                    if isinstance(h5Item, h5py.HardLink):
+                        itemType = 'Hard Link'
+                        h5Item = h5Group.get(itemName, getlink=False)
 
-                        if spaceId.get_simple_extent_type() == h5py.h5s.SCALAR:
-                            value = h5Item[()]
+                        if isinstance(h5Item, h5py.Group):
+                            itemType = 'Group'
+                            H5FileReader._addAttributes(treeNode, h5Item.attrs)
+                            unvisited.append((treeNode, h5Item))
+                        elif isinstance(h5Item, h5py.Dataset):
+                            itemType = 'Dataset'
+                            H5FileReader._addAttributes(treeNode, h5Item.attrs)
+                            spaceId = h5Item.id.get_space()
 
-                            if isinstance(value, numpy.bytes_):
-                                valueStr = 'STRING = "' + value.decode('utf-8') + '"'
-                            elif numpy.isscalar(value):
-                                valueStr = f'SCALAR {value.dtype} = {value}'
+                            if spaceId.get_simple_extent_type() == h5py.h5s.SCALAR:
+                                value = h5Item[()]
+
+                                if isinstance(value, numpy.bytes_):
+                                    valueStr = 'STRING = "' + value.decode('utf-8') + '"'
+                                elif numpy.isscalar(value):
+                                    valueStr = f'SCALAR {value.dtype} = {value}'
+                                else:
+                                    logger.debug(f'UNKNOWN: {value} {type(value)}')
+                                    valueStr = 'UNKNOWN'
                             else:
-                                logger.debug(f'UNKNOWN: {value} {type(value)}')
-                                valueStr = 'UNKNOWN'
-                        else:
-                            itemDetails = f'{h5Item.shape} {h5Item.dtype}'
-                elif isinstance(h5Item, h5py.SoftLink):
-                    itemType = 'Soft Link'
-                    itemDetails = f'{h5Item.path}'
-                elif isinstance(h5Item, h5py.ExternalLink):
-                    itemType = 'External Link'
-                    itemDetails = f'{h5Item.filename}/{h5Item.path}'
-                else:
-                    logger.debug(f'Unknown item "{itemName}"')
+                                itemDetails = f'{h5Item.shape} {h5Item.dtype}'
+                    elif isinstance(h5Item, h5py.SoftLink):
+                        itemType = 'Soft Link'
+                        itemDetails = f'{h5Item.path}'
+                    elif isinstance(h5Item, h5py.ExternalLink):
+                        itemType = 'External Link'
+                        itemDetails = f'{h5Item.filename}/{h5Item.path}'
+                    else:
+                        logger.debug(f'Unknown item "{itemName}"')
 
-                treeNode.itemData = [itemName, itemType, itemDetails]
+                    treeNode.itemData = [itemName, itemType, itemDetails]
 
         self.notifyObservers()

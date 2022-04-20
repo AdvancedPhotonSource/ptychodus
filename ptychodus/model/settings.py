@@ -105,11 +105,10 @@ class SettingsGroup(Observable, Observer):
 
 
 class SettingsRegistry(Observable):
-    FILE_FILTER = 'Initialization Files (*.ini)'
-
     def __init__(self) -> None:
         super().__init__()
         self._groupList: list[SettingsGroup] = list()
+        self._fileFilterList: list[str] = ['Initialization Files (*.ini)']
 
     def createGroup(self, name: str) -> SettingsGroup:
         for existingGroup in self._groupList:
@@ -129,7 +128,10 @@ class SettingsRegistry(Observable):
     def __len__(self) -> int:
         return len(self._groupList)
 
-    def read(self, filePath: Path) -> None:
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._fileFilterList
+
+    def openSettings(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.read(filePath)
 
@@ -146,7 +148,10 @@ class SettingsRegistry(Observable):
 
         self.notifyObservers()
 
-    def write(self, filePath: Path) -> None:
+    def getSaveFileFilterList(self) -> list[str]:
+        return self._fileFilterList
+
+    def saveSettings(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.optionxform = lambda option: option
 

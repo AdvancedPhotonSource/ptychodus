@@ -64,7 +64,7 @@ def main() -> int:
 
     result = 0
 
-    with ptychodus.model.ModelCore.createInstance(isDeveloperModeEnabled=parsedArgs.dev) as model:
+    with ptychodus.model.ModelCore(isDeveloperModeEnabled=parsedArgs.dev) as model:
         if parsedArgs.settings:
             model.settingsRegistry.read(parsedArgs.settings.name)
 
