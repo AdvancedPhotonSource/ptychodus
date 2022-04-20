@@ -84,7 +84,8 @@ class EntryGroup:
 
 class VelociprobeReader(H5FileReader):
     def __init__(self) -> None:
-        super().__init__(simpleName='Velociprobe',fileFilter='Velociprobe Master Files (*.h5)')
+        super().__init__(simpleName='Velociprobe',
+                         fileFilter='Velociprobe Master Files (*.h5 *.hdf5)')
         self.masterFilePath: Optional[Path] = None
         self.entryGroup: Optional[EntryGroup] = None
 

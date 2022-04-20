@@ -16,7 +16,9 @@ class H5FileReader(DataFileReader, Observable):
     def createRootNode() -> SimpleTreeNode:
         return SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
 
-    def __init__(self, simpleName: str = 'HDF5', fileFilter: str = 'Hierarchical Data Format 5 Files (*.h5)') -> None:
+    def __init__(self,
+                 simpleName: str = 'HDF5',
+                 fileFilter: str = 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)') -> None:
         super().__init__()
         self._rootNode = H5FileReader.createRootNode()
         self._simpleName = simpleName

@@ -24,7 +24,7 @@ class DataSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.fileType = settingsGroup.createStringEntry('FileType', 'Velociprobe')
+        self.fileType = settingsGroup.createStringEntry('FileType', 'HDF5')
         self.filePath = settingsGroup.createPathEntry('FilePath', None)
 
     @classmethod
@@ -143,7 +143,11 @@ class DataFilePresenter(Observer):
         presenter = cls(settings, fileReaderList)
         settings.fileType.addObserver(presenter)
         presenter._fileReaderChooser.addObserver(presenter)
+        presenter._syncFileReaderFromSettings()
+
         settings.filePath.addObserver(presenter)
+        presenter._openDataFileFromSettings()
+
         return presenter
 
     def openDataSet(self, dataPath: str) -> Any:

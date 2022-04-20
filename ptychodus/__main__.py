@@ -66,7 +66,7 @@ def main() -> int:
 
     with ptychodus.model.ModelCore(isDeveloperModeEnabled=parsedArgs.dev) as model:
         if parsedArgs.settings:
-            model.settingsRegistry.read(parsedArgs.settings.name)
+            model.settingsRegistry.openSettings(parsedArgs.settings.name)
 
         if parsedArgs.batch:
             verifyAllArgumentsParsed(parser, unparsedArgs)
