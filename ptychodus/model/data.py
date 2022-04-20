@@ -158,10 +158,13 @@ class DataFilePresenter(Observer):
                         item = h5File.get(parentPath)
 
                         if attrName in item.attrs:
-                            data = item.attrs[attrName]
+                            attr = item.attrs[attrName]
+                            stringInfo = h5py.check_string_dtype(attr.dtype)
 
-        #if isinstance(data, numpy.bytes_): # TODO h5py.check_string_dtype
-        #    data = value.decode('utf-8')
+                            if stringInfo:
+                                data = attr.decode(stringInfo.encoding)
+                            else:
+                                data = attr
 
         return data
 

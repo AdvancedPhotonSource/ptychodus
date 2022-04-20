@@ -34,10 +34,11 @@ class H5FileReader(DataFileReader, Observable):
     @staticmethod
     def _addAttributes(treeNode: SimpleTreeNode, attributeManager: h5py.AttributeManager) -> None:
         for name, value in attributeManager.items():
+            stringInfo = h5py.check_string_dtype(value.dtype)
             valueStr = None
 
-            if isinstance(value, numpy.bytes_):
-                valueStr = 'STRING = "' + value.decode('utf-8') + '"'
+            if stringInfo:
+                valueStr = f'STRING = "{value.decode(stringInfo.encoding)}"'
             elif numpy.isscalar(value):
                 valueStr = f'SCALAR {value.dtype} = {value}'
             elif isinstance(value, numpy.ndarray):
@@ -49,7 +50,7 @@ class H5FileReader(DataFileReader, Observable):
             treeNode.createChild([str(name), 'Attribute', valueStr])
 
     def read(self, filePath: Path) -> None:
-        if filePath is None:
+        if not filePath:
             return
 
         with h5py.File(filePath, 'r') as h5File:

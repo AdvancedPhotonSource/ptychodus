@@ -167,7 +167,7 @@ class VelociprobeReader(DataFileReader, Observable):
         return SampleGroup(goniometer=goniometer)
 
     def read(self, filePath: Path) -> None:
-        if filePath is None:
+        if not filePath:
             return
 
         with h5py.File(filePath, 'r') as h5File:
