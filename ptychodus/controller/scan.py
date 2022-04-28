@@ -1,8 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from PyQt5.QtGui import QDoubleValidator
-
 from ..model import Observer, Observable, Scan, ScanPresenter
 from ..view import ScanScanView, ScanInitializerView, ScanParametersView, ScanPlotView
 from .data import FileDialogFactory
@@ -13,12 +11,6 @@ class ScanScanController(Observer):
         super().__init__()
         self._presenter = presenter
         self._view = view
-
-    @staticmethod
-    def createPositiveRealValidator() -> QDoubleValidator:
-        validator = QDoubleValidator()
-        validator.setBottom(0.)
-        return validator
 
     @classmethod
     def createInstance(cls, presenter: ScanPresenter, view: ScanScanView) -> ScanScanController:
@@ -31,10 +23,7 @@ class ScanScanController(Observer):
 
         view.stepSizeXWidget.lengthChanged.connect(presenter.setStepSizeXInMeters)
         view.stepSizeYWidget.lengthChanged.connect(presenter.setStepSizeYInMeters)
-
-        view.jitterRadiusLineEdit.setValidator(cls.createPositiveRealValidator())
-        view.jitterRadiusLineEdit.editingFinished.connect(controller._syncJitterRadiusV2M)
-        view.jitterRadiusLineEdit.setEnabled(False)
+        view.jitterRadiusWidget.lengthChanged.connect(presenter.setJitterRadiusInMeters)
 
         controller._syncModelToView()
 
@@ -62,10 +51,7 @@ class ScanScanController(Observer):
 
         self._view.stepSizeXWidget.setLengthInMeters(self._presenter.getStepSizeXInMeters())
         self._view.stepSizeYWidget.setLengthInMeters(self._presenter.getStepSizeYInMeters())
-        self._view.jitterRadiusLineEdit.setText(str(self._presenter.getJitterRadiusInPixels()))
-
-    def _syncJitterRadiusV2M(self) -> None:
-        self._presenter.setJitterRadiusInPixels(Decimal(self._view.jitterRadiusLineEdit.text()))
+        self._view.jitterRadiusWidget.setLengthInMeters(self._presenter.getJitterRadiusInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

@@ -107,9 +107,9 @@ ObjectInitializerType = Callable[[], ComplexNumpyArrayType]
 
 
 class UniformRandomObjectInitializer:
-    def __init__(self, sizer: ObjectSizer, rng: numpy.random.Generator) -> None:
-        self._sizer = sizer
+    def __init__(self, rng: numpy.random.Generator, sizer: ObjectSizer) -> None:
         self._rng = rng
+        self._sizer = sizer
 
     def __call__(self) -> ComplexNumpyArrayType:
         size = self._sizer.getObjectExtent().shape
@@ -198,7 +198,7 @@ class ObjectInitializer(Observable, Observer):
         urandInit = StrategyEntry[ObjectInitializerType](simpleName='Random',
                                                          displayName='Random',
                                                          strategy=UniformRandomObjectInitializer(
-                                                             sizer, rng))
+                                                             rng, sizer))
         initializer._initializerChooser.addStrategy(urandInit)
 
         settings.initializer.addObserver(initializer)

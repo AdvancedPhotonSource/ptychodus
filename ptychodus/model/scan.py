@@ -30,7 +30,7 @@ class ScanSettings(Observable, Observer):
         self.extentY = settingsGroup.createIntegerEntry('ExtentY', 10)
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')
         self.stepSizeYInMeters = settingsGroup.createRealEntry('StepSizeYInMeters', '1e-6')
-        self.jitterRadiusInPixels = settingsGroup.createRealEntry('JitterRadiusInPixels', '0')
+        self.jitterRadiusInMeters = settingsGroup.createRealEntry('JitterRadiusInMeters', '0')
         self.transform = settingsGroup.createStringEntry('Transform', '+X+Y')
 
     @classmethod
@@ -118,6 +118,32 @@ class SpiralScanInitializer(Sequence[ScanPoint]):
         nx = self._settings.extentX.value
         ny = self._settings.extentY.value
         return nx * ny
+
+
+class JitteredScanInitializer(Sequence[ScanPoint]):
+    def __init__(self, rng: numpy.random.Generator, settings: ScanSettings,
+                 scanPointSequence: Sequence[ScanPoint]) -> None:
+        super().__init__()
+        self._rng = rng
+        self._settings = settings
+        self._scanPointSequence = scanPointSequence
+
+    def __getitem__(self, index: int) -> ScanPoint:
+        scanPoint = self._scanPointSequence[index]
+
+        if self._settings.jitterRadiusInMeters.value > 0:
+            rad = Decimal(self._rng.uniform())
+            dirX = Decimal(self._rng.normal())
+            dirY = Decimal(self._rng.normal())
+
+            scalar = self._settings.jitterRadiusInMeters.value \
+                    * (rad / (dirX ** 2 + dirY ** 2)).sqrt()
+            scanPoint = ScanPoint(scanPoint.x + scalar * dirX, scanPoint.y + scalar * dirY)
+
+        return scanPoint
+
+    def __len__(self) -> int:
+        return len(self._scanPointSequence)
 
 
 class ScanFileReader(ABC):
@@ -389,26 +415,30 @@ class ScanInitializer(Observable, Observer):
                                                strategy=self._customInitializer))
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings, scan: Scan,
+    def createInstance(cls, rng: numpy.random.Generator, settings: ScanSettings, scan: Scan,
                        customInitializer: CustomScanInitializer,
                        reinitObservable: Observable) -> ScanInitializer:
         initializer = cls(settings, scan, customInitializer, reinitObservable)
 
         spiralInit = StrategyEntry[ScanInitializerType](simpleName='Spiral',
                                                         displayName='Spiral',
-                                                        strategy=SpiralScanInitializer(settings))
+                                                        strategy=JitteredScanInitializer(
+                                                            rng, settings,
+                                                            SpiralScanInitializer(settings)))
         initializer._initializerChooser.addStrategy(spiralInit)
 
         snakeInit = StrategyEntry[ScanInitializerType](
             simpleName='Snake',
             displayName='Snake',
-            strategy=CartesianScanInitializer.createSnakeInstance(settings))
+            strategy=JitteredScanInitializer(
+                rng, settings, CartesianScanInitializer.createSnakeInstance(settings)))
         initializer._initializerChooser.addStrategy(snakeInit)
 
         rasterInit = StrategyEntry[ScanInitializerType](
             simpleName='Raster',
             displayName='Raster',
-            strategy=CartesianScanInitializer.createRasterInstance(settings))
+            strategy=JitteredScanInitializer(
+                rng, settings, CartesianScanInitializer.createRasterInstance(settings)))
         initializer._initializerChooser.addStrategy(rasterInit)
 
         settings.initializer.addObserver(initializer)
@@ -557,11 +587,11 @@ class ScanPresenter(Observable, Observer):
     def setStepSizeYInMeters(self, value: Decimal) -> None:
         self._settings.stepSizeYInMeters.value = value
 
-    def getJitterRadiusInPixels(self) -> Decimal:
-        return self._settings.jitterRadiusInPixels.value
+    def getJitterRadiusInMeters(self) -> Decimal:
+        return self._settings.jitterRadiusInMeters.value
 
-    def setJitterRadiusInPixels(self, value: Decimal) -> None:
-        self._settings.jitterRadiusInPixels.value = value
+    def setJitterRadiusInMeters(self, value: Decimal) -> None:
+        self._settings.jitterRadiusInMeters.value = value
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLineEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QComboBox, QFormLayout, QGroupBox, QPushButton, QSpinBox, QVBoxLayout, QWidget
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -18,7 +18,7 @@ class ScanScanView(QGroupBox):
         self.extentYSpinBox = QSpinBox()
         self.stepSizeXWidget = LengthWidget.createInstance()
         self.stepSizeYWidget = LengthWidget.createInstance()
-        self.jitterRadiusLineEdit = QLineEdit()
+        self.jitterRadiusWidget = LengthWidget.createInstance()
 
     @classmethod
     def createInstance(cls, parent: QWidget = None) -> ScanScanView:
@@ -30,7 +30,7 @@ class ScanScanView(QGroupBox):
         layout.addRow('Extent Y:', view.extentYSpinBox)
         layout.addRow('Step Size X:', view.stepSizeXWidget)
         layout.addRow('Step Size Y:', view.stepSizeYWidget)
-        layout.addRow('Jitter Radius [px]:', view.jitterRadiusLineEdit)
+        layout.addRow('Jitter Radius:', view.jitterRadiusWidget)
         view.setLayout(layout)
 
         return view

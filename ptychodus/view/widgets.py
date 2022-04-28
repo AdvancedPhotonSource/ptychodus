@@ -217,11 +217,14 @@ class LengthWidget(QWidget):
 
     def setLengthInMeters(self, lengthInMeters: Decimal) -> None:
         self.lengthInMeters = lengthInMeters
-        exponent = 3 * int((lengthInMeters.log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
-        index = self.unitsComboBox.findData(exponent)
 
-        if index != -1:
-            self.unitsComboBox.setCurrentIndex(index)
+        if lengthInMeters > 0:
+            exponent = 3 * int(
+                (lengthInMeters.log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
+            index = self.unitsComboBox.findData(exponent)
+
+            if index != -1:
+                self.unitsComboBox.setCurrentIndex(index)
 
         self._updateDisplay()
         self.lengthChanged.emit(self.getLengthInMeters())
@@ -284,12 +287,14 @@ class EnergyWidget(QWidget):
 
     def setEnergyInElectronVolts(self, energyInElectronVolts: Decimal) -> None:
         self.energyInElectronVolts = energyInElectronVolts
-        exponent = 3 * int(
-            (energyInElectronVolts.log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
-        index = self.unitsComboBox.findData(exponent)
 
-        if index != -1:
-            self.unitsComboBox.setCurrentIndex(index)
+        if energyInElectronVolts > 0:
+            exponent = 3 * int(
+                (energyInElectronVolts.log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
+            index = self.unitsComboBox.findData(exponent)
+
+            if index != -1:
+                self.unitsComboBox.setCurrentIndex(index)
 
         self._updateDisplay()
         self.energyChanged.emit(self.getEnergyInElectronVolts())

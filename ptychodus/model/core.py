@@ -52,7 +52,8 @@ class ModelCore:
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
         self._scan = Scan.createInstance(self._scanSettings)
-        self._scanInitializer = ScanInitializer.createInstance(self._scanSettings, self._scan,
+        self._scanInitializer = ScanInitializer.createInstance(self.rng, self._scanSettings,
+                                                               self._scan,
                                                                self._customScanInitializer,
                                                                self.settingsRegistry)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
