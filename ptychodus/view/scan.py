@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from PyQt5.QtWidgets import QComboBox, QFormLayout, QGroupBox, QPushButton, QSpinBox, QVBoxLayout, QWidget
 
@@ -11,7 +12,7 @@ from .widgets import LengthWidget
 
 
 class ScanScanView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Parameters', parent)
         self.numberOfScanPointsSpinBox = QSpinBox()
         self.extentXSpinBox = QSpinBox()
@@ -21,7 +22,7 @@ class ScanScanView(QGroupBox):
         self.jitterRadiusWidget = LengthWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ScanScanView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanScanView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -37,13 +38,13 @@ class ScanScanView(QGroupBox):
 
 
 class ScanInitializerView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Initializer', parent)
         self.initializerComboBox = QComboBox()
         self.initializeButton = QPushButton('Initialize')
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ScanInitializerView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanInitializerView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -55,12 +56,12 @@ class ScanInitializerView(QGroupBox):
 
 
 class ScanTransformView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Transform', parent)
         self.transformComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ScanTransformView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanTransformView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -71,14 +72,14 @@ class ScanTransformView(QGroupBox):
 
 
 class ScanParametersView(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.initializerView = ScanInitializerView.createInstance()
         self.scanView = ScanScanView.createInstance()
         self.transformView = ScanTransformView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ScanParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanParametersView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -92,7 +93,7 @@ class ScanParametersView(QWidget):
 
 
 class ScanPlotView(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         width = 1
         height = 1
@@ -103,7 +104,7 @@ class ScanPlotView(QWidget):
         self.axes = self.figure.add_subplot(111)
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ScanPlotView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanPlotView:
         view = cls(parent)
 
         layout = QVBoxLayout()

@@ -19,7 +19,7 @@ from .image import ImageExtent
 from .object import Object, ObjectSizer
 from .observer import Observable, Observer
 from .probe import Probe, ProbeSizer
-from .reconstructor import Reconstructor, NullReconstructor
+from .reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
 from .scan import Scan
 from .settings import SettingsRegistry, SettingsGroup
 from .velociprobe import VelociprobeReader
@@ -392,7 +392,7 @@ class TikeReconstructor:
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
                  velociprobeReader: VelociprobeReader, scan: Scan, probeSizer: ProbeSizer,
-                 probe: Probe, objectSizer: ObjectSizer, obj: Object) -> None:
+                 probe: Probe, objectSizer: ObjectSizer, obj: Object, reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
@@ -404,6 +404,7 @@ class TikeReconstructor:
         self._probe = probe
         self._objectSizer = objectSizer
         self._object = obj
+        self._reconstructorPlotPresenter = reconstructorPlotPresenter
 
     @property
     def backendName(self) -> str:
@@ -437,13 +438,11 @@ class TikeReconstructor:
         return numpy.concatenate(dataList).astype('float32')
 
     def getProbe(self) -> numpy.ndarray:
-        numAdditionalProbeModes = self._settings.numProbeModes.value - 1
-
         probe = self._probe.getArray()
-        probe = probe[numpy.newaxis, numpy.newaxis, numpy.newaxis, :, :].astype('complex64')
+        probe = probe[numpy.newaxis, numpy.newaxis, :, :].astype('complex64')
 
-        if numAdditionalProbeModes > 0:
-            probe = tike.ptycho.probe.add_modes_random_phase(probe, numAdditionalProbeModes)
+        if self._settings.numProbeModes.value > 0:
+            probe = tike.ptycho.probe.add_modes_random_phase(probe, self._settings.numProbeModes.value)
 
         return probe
 
@@ -564,8 +563,16 @@ class TikeReconstructor:
             use_mpi=self._settings.useMpi.value,
         )
 
-        self._probe.setArray(result['probe'][0, 0, 0])
+        self._probe.setArray(result['probe'][0, 0])
         self._object.setArray(result['psi'])
+
+        #self._reconstructorPlotPresenter.xlabel = 'Iteration'
+        #self._reconstructorPlotPresenter.ylabel = 'Objective'
+        #self._reconstructorPlotPresenter.setValues(
+        #        ...,
+        #        result['algorithm_options'].costs)
+        # TODO ax1.semilogy()
+        # TODO ax1.plot(costs, linestyle='--', color=color)
 
         print(result)
 
@@ -703,6 +710,7 @@ class TikeBackend:
                        probe: Probe,
                        objectSizer: ObjectSizer,
                        obj: Object,
+                       reconstructorPlotPresenter: ReconstructorPlotPresenter,
                        isDeveloperModeEnabled: bool = False) -> TikeBackend:
         core = cls(settingsRegistry)
 
@@ -713,7 +721,7 @@ class TikeBackend:
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, cropSizer,
                                                   velociprobeReader, scan, probeSizer, probe,
-                                                  objectSizer, obj)
+                                                  objectSizer, obj, reconstructorPlotPresenter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

@@ -75,6 +75,7 @@ class ModelCore:
         self._croppedImageSequence = CroppedImageSequence.createInstance(
             self._cropSizer, self._velociprobeImageSequence)
         self._dataDirectoryWatcher = DataDirectoryWatcher()
+        self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
@@ -82,6 +83,7 @@ class ModelCore:
                                                       self._velociprobeReader, self._scan,
                                                       self._probeSizer, self._probe,
                                                       self._objectSizer, self._object,
+                                                      self.reconstructorPlotPresenter,
                                                       isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
@@ -89,7 +91,7 @@ class ModelCore:
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
 
-        dataFileReaderList = [self.h5FileReader, self._velociprobeReader]
+        dataFileReaderList: list[DataFileReader] = [self.h5FileReader, self._velociprobeReader]
 
         self.dataFilePresenter = DataFilePresenter.createInstance(self._dataSettings,
                                                                   dataFileReaderList)

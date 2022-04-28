@@ -347,7 +347,7 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
         self._updateBoundingBox()
         self.notifyObservers()
 
-    def getSaveFileFilter() -> str:
+    def getSaveFileFilter(self) -> str:
         return 'Comma-Separated Values Files (*.csv)'
 
     def write(self, filePath: Path) -> None:

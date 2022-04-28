@@ -145,6 +145,7 @@ class ProbeImageController(Observer):
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
+        self._view = view
         self._image_controller = ImageController.createInstance(view, fileDialogFactory)
 
     @classmethod
@@ -153,13 +154,22 @@ class ProbeImageController(Observer):
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
         controller._syncModelToView()
-        view.imageRibbon.frameGroupBox.setVisible(False)
+        view.imageRibbon.imageSpinBox.valueChanged.connect(controller._renderImageData)
         return controller
 
+    def _renderImageData(self, index: int) -> None:
+        image = self._presenter.getProbeMode(index)
+        self._image_controller.renderImageData(image)
+
     def _syncModelToView(self) -> None:
-        estimate = self._presenter.getProbe()
-        self._image_controller.renderImageData(estimate)
+        numberOfProbeModes = self._presenter.getNumberOfProbeModes()
+        self._view.imageRibbon.imageSpinBox.setEnabled(numberOfProbeModes > 0)
+        self._view.imageRibbon.imageSpinBox.setRange(0, numberOfProbeModes - 1)
+
+        index = self._view.imageRibbon.imageSpinBox.value()
+        self._renderImageData(index)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
+

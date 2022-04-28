@@ -203,24 +203,22 @@ class DetectorImageController(Observer):
                        fileDialogFactory: FileDialogFactory) -> DetectorImageController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
-
-        controller.updateView()
-        view.imageRibbon.imageSpinBox.valueChanged.connect(controller.renderImageData)
-
+        controller._syncModelToView()
+        view.imageRibbon.imageSpinBox.valueChanged.connect(controller._renderImageData)
         return controller
 
-    def renderImageData(self, index: int) -> None:
+    def _renderImageData(self, index: int) -> None:
         image = self._presenter.getImage(index)
         self._image_controller.renderImageData(image)
 
-    def updateView(self) -> None:
+    def _syncModelToView(self) -> None:
         numberOfImages = self._presenter.getNumberOfImages()
         self._view.imageRibbon.imageSpinBox.setEnabled(numberOfImages > 0)
         self._view.imageRibbon.imageSpinBox.setRange(0, numberOfImages - 1)
 
         index = self._view.imageRibbon.imageSpinBox.value()
-        self.renderImageData(index)
+        self._renderImageData(index)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self.updateView()
+            self._syncModelToView()

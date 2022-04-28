@@ -13,7 +13,7 @@ import numpy
 
 from .h5file import H5FileReader
 from .crop import CropSettings
-from .data import DataFile
+from .data import DataFile, DatasetState
 from .detector import DetectorSettings
 from .image import ImageSequence
 from .observer import Observable, Observer
@@ -365,12 +365,22 @@ class VelociprobePresenter(Observable, Observer):
         return presenter
 
     def getDatasetName(self, index: int) -> str:
-        datafile = self._velociprobeReader.entryGroup.data[index]
-        return datafile.name
+        datasetName = ''
+
+        if self._velociprobeReader.entryGroup:
+            datafile = self._velociprobeReader.entryGroup.data[index]
+            datasetName = datafile.name
+
+        return datasetName
 
     def getDatasetState(self, index: int) -> DatasetState:
-        datafile = self._velociprobeReader.entryGroup.data[index]
-        return datafile.getState()
+        state = DatasetState.MISSING
+
+        if self._velociprobeReader.entryGroup:
+            datafile = self._velociprobeReader.entryGroup.data[index]
+            state = datafile.getState()
+
+        return state
 
     def getNumberOfDatasets(self) -> int:
         return 0 if self._velociprobeReader.entryGroup is None \

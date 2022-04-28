@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import Optional
 
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWidgets import QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu, QSplitter, QStyle, QTableView, QToolBar, QToolButton, QTreeView
@@ -14,7 +15,7 @@ from .settings import *
 
 
 class ViewCore(QMainWindow):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
 
         pixmapi = getattr(QStyle, 'SP_FileIcon')
@@ -75,7 +76,7 @@ class ViewCore(QMainWindow):
         self.monitorObjectView = MonitorObjectView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ViewCore:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ViewCore:
         view = cls(parent)
 
         view.navigationToolBar.setContextMenuPolicy(Qt.PreventContextMenu)
@@ -139,7 +140,7 @@ class ViewCore(QMainWindow):
         view.setCentralWidget(view.splitter)
 
         availableSize = QApplication.desktop().availableGeometry().size()
-        view.resize(availableSize * 2 / 3)
-        view.statusBar().showMessage('Ready')  # TODO
+        view.resize(availableSize * 2 / 3) # TODO mypy does not like this
+        view.statusBar().showMessage('Ready')  # TODO make better use of the statusBar
 
         return view

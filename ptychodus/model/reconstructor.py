@@ -149,3 +149,46 @@ class ReconstructorPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._selectableReconstructor:
             self.notifyObservers()
+
+
+class ReconstructorPlotPresenter(Observable):
+    def __init__(self) -> None:
+        super().__init__()
+        self._xlabel: str = 'X'
+        self._xvalues: list[float] = list()
+        self._ylabel: str = 'Y'
+        self._yvalues: list[float] = list()
+
+    @property
+    def xlabel(self) -> str:
+        return self._xlabel
+
+    @xlabel.setter
+    def xlabel(self, value: str) -> None:
+        if self._xlabel != value:
+            self._xlabel = value
+            self.notifyObservers()
+
+    @property
+    def ylabel(self) -> str:
+        return self._ylabel
+
+    @ylabel.setter
+    def ylabel(self, value: str) -> None:
+        if self._ylabel != value:
+            self._ylabel = value
+            self.notifyObservers()
+
+    @property
+    def xvalues(self) -> list[float]:
+        return self._xvalues
+
+    @property
+    def yvalues(self) -> list[float]:
+        return self._yvalues
+
+    def setValues(self, xvalues: list[float], yvalues: list[float]) -> None:
+        self._xvalues = xvalues
+        self._yvalues = yvalues
+        self.notifyObservers()
+
