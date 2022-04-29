@@ -115,7 +115,7 @@ class DataFileReader(ABC):
         pass
 
     @abstractmethod
-    def getTree(self) -> SimpleTreeNode:
+    def getFileContentsTree(self) -> SimpleTreeNode:
         pass
 
     @abstractmethod
@@ -123,7 +123,7 @@ class DataFileReader(ABC):
         pass
 
 
-class DataFilePresenter(Observer):
+class DataFilePresenter(Observable, Observer):
     @staticmethod
     def _createFileReaderEntry(fileReader: DataFileReader) -> StrategyEntry[DataFileReader]:
         return StrategyEntry(simpleName=fileReader.simpleName,
@@ -139,7 +139,8 @@ class DataFilePresenter(Observer):
         self._filePath: Optional[Path] = None
 
     @classmethod
-    def createInstance(cls, settings: DataSettings, fileReaderList: list[DataFileReader]) -> DataFilePresenter:
+    def createInstance(cls, settings: DataSettings,
+                       fileReaderList: list[DataFileReader]) -> DataFilePresenter:
         presenter = cls(settings, fileReaderList)
         settings.fileType.addObserver(presenter)
         presenter._fileReaderChooser.addObserver(presenter)
@@ -149,6 +150,10 @@ class DataFilePresenter(Observer):
         presenter._openDataFileFromSettings()
 
         return presenter
+
+    def getFileContentsTree(self) -> SimpleTreeNode:
+        fileReader = self._fileReaderChooser.getCurrentStrategy()
+        return fileReader.getFileContentsTree()
 
     def openDataSet(self, dataPath: str) -> Any:
         data = None
@@ -192,6 +197,7 @@ class DataFilePresenter(Observer):
             logger.debug(f'Reading {filePath}')
             fileReader = self._fileReaderChooser.getCurrentStrategy()
             fileReader.read(filePath)
+            self.notifyObservers()
 
     def openDataFile(self, filePath: Path, fileFilter: str) -> None:
         self._fileReaderChooser.setFromDisplayName(fileFilter)

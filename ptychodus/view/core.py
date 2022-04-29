@@ -140,7 +140,7 @@ class ViewCore(QMainWindow):
         view.setCentralWidget(view.splitter)
 
         availableSize = QApplication.desktop().availableGeometry().size()
-        view.resize(availableSize * 2 / 3) # TODO mypy does not like this
+        view.resize(availableSize * 2 / 3)  # TODO mypy does not like this
         view.statusBar().showMessage('Ready')  # TODO make better use of the statusBar
 
         return view

@@ -173,4 +173,3 @@ class ProbeImageController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
-

@@ -195,4 +195,3 @@ class ReconstructorPlotPresenter(Observable):
     def setEnumeratedYValues(self, yvalues: list[float]) -> None:
         xvalues = [idx for idx, _ in enumerate(yvalues)]
         self.setValues(xvalues, yvalues)
-

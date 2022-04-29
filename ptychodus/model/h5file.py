@@ -24,7 +24,7 @@ class H5FileReader(DataFileReader, Observable):
         self._simpleName = simpleName
         self._fileFilter = fileFilter
 
-    def getTree(self) -> SimpleTreeNode:
+    def getFileContentsTree(self) -> SimpleTreeNode:
         return self._rootNode
 
     @property

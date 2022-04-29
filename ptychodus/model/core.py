@@ -69,7 +69,7 @@ class ModelCore:
                                                                    self._objectSizer, self._object,
                                                                    self.settingsRegistry)
 
-        self.h5FileReader = H5FileReader()
+        self._h5FileReader = H5FileReader()
         self._velociprobeImageSequence = VelociprobeImageSequence.createInstance(
             self._velociprobeReader)
         self._croppedImageSequence = CroppedImageSequence.createInstance(
@@ -91,7 +91,7 @@ class ModelCore:
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
 
-        dataFileReaderList: list[DataFileReader] = [self.h5FileReader, self._velociprobeReader]
+        dataFileReaderList: list[DataFileReader] = [self._h5FileReader, self._velociprobeReader]
 
         self.dataFilePresenter = DataFilePresenter.createInstance(self._dataSettings,
                                                                   dataFileReaderList)

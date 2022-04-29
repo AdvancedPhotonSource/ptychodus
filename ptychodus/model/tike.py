@@ -392,7 +392,8 @@ class TikeReconstructor:
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
                  velociprobeReader: VelociprobeReader, scan: Scan, probeSizer: ProbeSizer,
-                 probe: Probe, objectSizer: ObjectSizer, obj: Object, reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
+                 probe: Probe, objectSizer: ObjectSizer, obj: Object,
+                 reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
@@ -442,7 +443,8 @@ class TikeReconstructor:
         probe = probe[numpy.newaxis, numpy.newaxis, :, :].astype('complex64')
 
         if self._settings.numProbeModes.value > 0:
-            probe = tike.ptycho.probe.add_modes_random_phase(probe, self._settings.numProbeModes.value)
+            probe = tike.ptycho.probe.add_modes_random_phase(probe,
+                                                             self._settings.numProbeModes.value)
 
         return probe
 
@@ -565,8 +567,7 @@ class TikeReconstructor:
 
         self._probe.setArray(result['probe'][0, 0])
         self._object.setArray(result['psi'])
-        self._reconstructorPlotPresenter.setEnumeratedYValues(
-                result['algorithm_options'].costs)
+        self._reconstructorPlotPresenter.setEnumeratedYValues(result['algorithm_options'].costs)
 
         logger.debug(result)
 

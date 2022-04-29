@@ -6,7 +6,7 @@ import numpy
 from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QDialog, QFileDialog, QTableView, QTreeView, QWidget
 
-from ..model import DataFilePresenter, H5FileReader, Observable, Observer
+from ..model import DataFilePresenter, Observable, Observer
 from .tree import SimpleTreeModel
 
 
@@ -120,25 +120,24 @@ class DataArrayTableModel(QAbstractTableModel):
 
 
 class DataFileController(Observer):
-    def __init__(self, presenter: DataFilePresenter, treeReader: H5FileReader, treeView: QTreeView,
-                 tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, presenter: DataFilePresenter, treeView: QTreeView, tableView: QTableView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
-        self._treeReader = treeReader
-        self._treeModel = SimpleTreeModel(treeReader.getTree())
+        self._treeModel = SimpleTreeModel(presenter.getFileContentsTree())
         self._treeView = treeView
         self._tableModel = DataArrayTableModel()
         self._tableView = tableView
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, presenter: DataFilePresenter, treeReader: H5FileReader,
-                       treeView: QTreeView, tableView: QTableView,
+    def createInstance(cls, presenter: DataFilePresenter, treeView: QTreeView,
+                       tableView: QTableView,
                        fileDialogFactory: FileDialogFactory) -> DataFileController:
-        controller = cls(presenter, treeReader, treeView, tableView, fileDialogFactory)
+        controller = cls(presenter, treeView, tableView, fileDialogFactory)
         treeView.setModel(controller._treeModel)
         treeView.selectionModel().currentChanged.connect(controller.updateDataArrayInTableView)
         tableView.setModel(controller._tableModel)
-        treeReader.addObserver(controller)
+        presenter.addObserver(controller)
         return controller
 
     def openDataFile(self) -> None:
@@ -161,5 +160,5 @@ class DataFileController(Observer):
         self._tableModel.setArray(data)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._treeReader:
-            self._treeModel.setRootNode(self._treeReader.getTree())
+        if observable is self._presenter:
+            self._treeModel.setRootNode(self._presenter.getFileContentsTree())

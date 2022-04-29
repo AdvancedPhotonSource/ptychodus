@@ -52,7 +52,6 @@ class ControllerCore:
         self._objectImageController = ObjectImageController.createInstance(
             model.objectPresenter, view.objectImageView, self._fileDialogFactory)
         self._dataFileController = DataFileController.createInstance(model.dataFilePresenter,
-                                                                     model.h5FileReader,
                                                                      view.dataFileTreeView,
                                                                      view.dataFileTableView,
                                                                      self._fileDialogFactory)
