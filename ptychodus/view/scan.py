@@ -95,10 +95,7 @@ class ScanParametersView(QWidget):
 class ScanPlotView(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        width = 1
-        height = 1
-        dpi = 200
-        self.figure = Figure(figsize=(width, height), dpi=dpi)
+        self.figure = Figure()
         self.figureCanvas = FigureCanvas(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)

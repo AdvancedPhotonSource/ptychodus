@@ -565,16 +565,10 @@ class TikeReconstructor:
 
         self._probe.setArray(result['probe'][0, 0])
         self._object.setArray(result['psi'])
+        self._reconstructorPlotPresenter.setEnumeratedYValues(
+                result['algorithm_options'].costs)
 
-        #self._reconstructorPlotPresenter.xlabel = 'Iteration'
-        #self._reconstructorPlotPresenter.ylabel = 'Objective'
-        #self._reconstructorPlotPresenter.setValues(
-        #        ...,
-        #        result['algorithm_options'].costs)
-        # TODO ax1.semilogy()
-        # TODO ax1.plot(costs, linestyle='--', color=color)
-
-        print(result)
+        logger.debug(result)
 
         return 0
 
