@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from PyQt5.QtWidgets import QComboBox, QFormLayout, QGroupBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget
 
@@ -9,13 +10,13 @@ from matplotlib.figure import Figure
 
 
 class ReconstructorView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Reconstructor', parent)
         self.reconstructorComboBox = QComboBox()
         self.reconstructButton = QPushButton('Reconstruct')
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ReconstructorView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -27,7 +28,7 @@ class ReconstructorView(QGroupBox):
 
 
 class ReconstructorParametersView(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.reconstructorView = ReconstructorView.createInstance()
         self.reconstructorStackedWidget = QStackedWidget()
@@ -41,7 +42,7 @@ class ReconstructorParametersView(QWidget):
         return self.reconstructorView.reconstructButton
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ReconstructorParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorParametersView:
         view = cls(parent)
 
         view.reconstructorStackedWidget.layout().setContentsMargins(0, 0, 0, 0)
@@ -55,18 +56,15 @@ class ReconstructorParametersView(QWidget):
 
 
 class ReconstructorPlotView(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        width = 1
-        height = 1
-        dpi = 200
-        self.figure = Figure(figsize=(width, height), dpi=dpi)
+        self.figure = Figure()
         self.figureCanvas = FigureCanvas(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ReconstructorPlotView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorPlotView:
         view = cls(parent)
 
         layout = QVBoxLayout()

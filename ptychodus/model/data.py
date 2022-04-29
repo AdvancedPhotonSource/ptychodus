@@ -139,7 +139,7 @@ class DataFilePresenter(Observer):
         self._filePath: Optional[Path] = None
 
     @classmethod
-    def createInstance(cls, settings: DataSettings, fileReaderList: list[DataFileReader]) -> None:
+    def createInstance(cls, settings: DataSettings, fileReaderList: list[DataFileReader]) -> DataFilePresenter:
         presenter = cls(settings, fileReaderList)
         settings.fileType.addObserver(presenter)
         presenter._fileReaderChooser.addObserver(presenter)

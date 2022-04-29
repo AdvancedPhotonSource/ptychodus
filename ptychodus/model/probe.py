@@ -203,7 +203,13 @@ class Probe(Observable):
         super().__init__()
         self._settings = settings
         self._sizer = sizer
-        self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
+        self._array = numpy.zeros((1, *sizer.getProbeExtent().shape), dtype=complex)
+
+    def getNumberOfProbeModes(self) -> int:
+        return self._array.shape[0]
+
+    def getProbeMode(self, index: int) -> ComplexNumpyArrayType:
+        return self._array[index, ...]
 
     def getArray(self) -> ComplexNumpyArrayType:
         return self._array
@@ -212,7 +218,13 @@ class Probe(Observable):
         if not numpy.iscomplexobj(array):
             raise TypeError('Probe must be a complex-valued ndarray')
 
-        self._array = array
+        if array.ndim == 2:
+            self._array = array[numpy.newaxis, ...]
+        elif array.ndim == 3:
+            self._array = array
+        else:
+            raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
+
         self.notifyObservers()
 
 
@@ -394,8 +406,11 @@ class ProbePresenter(Observable, Observer):
     def getBeamstopDiameterInMeters(self) -> Decimal:
         return self._settings.beamstopDiameterInMeters.value
 
-    def getProbe(self) -> ComplexNumpyArrayType:
-        return self._probe.getArray()
+    def getNumberOfProbeModes(self) -> int:
+        return self._probe.getNumberOfProbeModes()
+
+    def getProbeMode(self, index: int) -> ComplexNumpyArrayType:
+        return self._probe.getProbeMode(index)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

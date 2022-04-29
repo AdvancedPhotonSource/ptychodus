@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from PyQt5.QtWidgets import QGroupBox, QWidget, QSpinBox, QFormLayout, QComboBox, QPushButton, QVBoxLayout
 
@@ -6,7 +7,7 @@ from .widgets import SemiautomaticSpinBox, LengthWidget, EnergyWidget
 
 
 class ProbeProbeView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Parameters', parent)
         self.sizeSpinBox = SemiautomaticSpinBox.createInstance()
         self.energyWidget = EnergyWidget.createInstance()
@@ -14,7 +15,7 @@ class ProbeProbeView(QGroupBox):
         self.diameterWidget = LengthWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ProbeProbeView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeProbeView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -28,14 +29,14 @@ class ProbeProbeView(QGroupBox):
 
 
 class ProbeZonePlateView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Zone Plate', parent)
         self.zonePlateRadiusWidget = LengthWidget.createInstance()
         self.outermostZoneWidthWidget = LengthWidget.createInstance()
         self.beamstopDiameterWidget = LengthWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ProbeZonePlateView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeZonePlateView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -48,13 +49,13 @@ class ProbeZonePlateView(QGroupBox):
 
 
 class ProbeInitializerView(QGroupBox):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Initializer', parent)
         self.initializerComboBox = QComboBox()
         self.initializeButton = QPushButton('Initialize')
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ProbeInitializerView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeInitializerView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -66,14 +67,14 @@ class ProbeInitializerView(QGroupBox):
 
 
 class ProbeParametersView(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.initializerView = ProbeInitializerView.createInstance()
         self.probeView = ProbeProbeView.createInstance()
         self.zonePlateView = ProbeZonePlateView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ProbeParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeParametersView:
         view = cls(parent)
 
         layout = QVBoxLayout()

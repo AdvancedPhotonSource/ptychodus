@@ -60,7 +60,7 @@ class ControllerCore:
             model.reconstructorPresenter, view.reconstructorParametersView,
             [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
-            model.reconstructorPresenter, view.reconstructorPlotView)
+            model.reconstructorPlotPresenter, view.reconstructorPlotView)
         self._monitorProbeController = ProbeImageController.createInstance(
             model.probePresenter, view.monitorProbeView.imageView, self._fileDialogFactory)
         self._monitorObjectController = ObjectImageController.createInstance(

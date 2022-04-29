@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QWheelEvent
@@ -11,7 +12,7 @@ from .widgets import BottomTitledGroupBox
 
 
 class ImageRibbon(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
 
         self.imageFileGroupBox = BottomTitledGroupBox('Image')
@@ -32,11 +33,11 @@ class ImageRibbon(QWidget):
         self.colorMapGroupBox = BottomTitledGroupBox('Color Map')
         self.colorMapComboBox = QComboBox()
 
-        self.frameGroupBox = BottomTitledGroupBox('Frame')
-        self.imageSpinBox = QSpinBox()
+        self.indexGroupBox = BottomTitledGroupBox('Index')
+        self.indexSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ImageRibbon:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageRibbon:
         view = cls(parent)
 
         imageFileLayout = QVBoxLayout()
@@ -65,10 +66,10 @@ class ImageRibbon(QWidget):
         colorMapLayout.addWidget(view.colorMapComboBox)
         view.colorMapGroupBox.setLayout(colorMapLayout)
 
-        frameLayout = QVBoxLayout()
-        frameLayout.setContentsMargins(10, 10, 10, 50)
-        frameLayout.addWidget(view.imageSpinBox)
-        view.frameGroupBox.setLayout(frameLayout)
+        indexLayout = QVBoxLayout()
+        indexLayout.setContentsMargins(10, 10, 10, 50)
+        indexLayout.addWidget(view.indexSpinBox)
+        view.indexGroupBox.setLayout(indexLayout)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -76,7 +77,7 @@ class ImageRibbon(QWidget):
         layout.addWidget(view.scalarTransformGroupBox)
         layout.addWidget(view.normalizationGroupBox)
         layout.addWidget(view.colorMapGroupBox)
-        layout.addWidget(view.frameGroupBox)
+        layout.addWidget(view.indexGroupBox)
         layout.addStretch(1)
         view.setLayout(layout)
 
@@ -114,12 +115,12 @@ class ImageItem(QGraphicsPixmapItem):
 
 
 class ImageWidget(QGraphicsView):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._pixmapItem = ImageItem()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ImageWidget:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageWidget:
         widget = cls(parent)
 
         scene = QGraphicsScene()
@@ -148,13 +149,13 @@ class ImageWidget(QGraphicsView):
 
 
 class ImageView(QWidget):
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.imageRibbon = ImageRibbon.createInstance()
         self.imageWidget = ImageWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget = None) -> ImageView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageView:
         view = cls(parent)
 
         layout = QVBoxLayout()

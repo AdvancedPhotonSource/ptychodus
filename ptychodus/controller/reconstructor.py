@@ -108,7 +108,15 @@ class ReconstructorPlotController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        pass  # TODO
+        x = self._presenter.xvalues
+        y = self._presenter.yvalues
+
+        self._view.axes.clear()
+        self._view.axes.semilogy(x, y, '.-', linewidth=1.5)
+        self._view.axes.grid(True)
+        self._view.axes.set_xlabel(self._presenter.xlabel)
+        self._view.axes.set_ylabel(self._presenter.ylabel)
+        self._view.figureCanvas.draw()
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
