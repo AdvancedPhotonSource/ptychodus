@@ -33,8 +33,8 @@ class ImageRibbon(QWidget):
         self.colorMapGroupBox = BottomTitledGroupBox('Color Map')
         self.colorMapComboBox = QComboBox()
 
-        self.frameGroupBox = BottomTitledGroupBox('Frame')
-        self.imageSpinBox = QSpinBox()
+        self.indexGroupBox = BottomTitledGroupBox('Index')
+        self.indexSpinBox = QSpinBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageRibbon:
@@ -66,10 +66,10 @@ class ImageRibbon(QWidget):
         colorMapLayout.addWidget(view.colorMapComboBox)
         view.colorMapGroupBox.setLayout(colorMapLayout)
 
-        frameLayout = QVBoxLayout()
-        frameLayout.setContentsMargins(10, 10, 10, 50)
-        frameLayout.addWidget(view.imageSpinBox)
-        view.frameGroupBox.setLayout(frameLayout)
+        indexLayout = QVBoxLayout()
+        indexLayout.setContentsMargins(10, 10, 10, 50)
+        indexLayout.addWidget(view.indexSpinBox)
+        view.indexGroupBox.setLayout(indexLayout)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -77,7 +77,7 @@ class ImageRibbon(QWidget):
         layout.addWidget(view.scalarTransformGroupBox)
         layout.addWidget(view.normalizationGroupBox)
         layout.addWidget(view.colorMapGroupBox)
-        layout.addWidget(view.frameGroupBox)
+        layout.addWidget(view.indexGroupBox)
         layout.addStretch(1)
         view.setLayout(layout)
 

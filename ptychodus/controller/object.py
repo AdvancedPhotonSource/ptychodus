@@ -79,7 +79,7 @@ class ObjectImageController(Observer):
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
         controller._syncModelToView()
-        view.imageRibbon.frameGroupBox.setVisible(False)
+        view.imageRibbon.indexGroupBox.setVisible(False)
         return controller
 
     def _syncModelToView(self) -> None:
