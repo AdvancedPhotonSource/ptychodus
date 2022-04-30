@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod, abstractproperty
 from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
@@ -7,6 +8,7 @@ import logging
 
 import numpy
 import numpy.typing
+import scipy.io
 
 from .chooser import StrategyChooser, StrategyEntry
 from .crop import CropSizer
@@ -25,6 +27,7 @@ class ProbeSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'GaussianBeam')
+        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
         self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
             'AutomaticProbeSizeEnabled', True)
@@ -161,32 +164,113 @@ class FresnelZonePlateProbeInitializer:
         return probe
 
 
+class ProbeFileReader(ABC):
+    @abstractproperty
+    def simpleName(self) -> str:
+        pass
+
+    @abstractproperty
+    def fileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def read(self, filePath: Path) -> ComplexNumpyArrayType:
+        pass
+
+
+class NPYProbeFileReader(ProbeFileReader):
+    @property
+    def simpleName(self) -> str:
+        return 'NPY'
+
+    @property
+    def fileFilter(self) -> str:
+        return 'NumPy Binary Files (*.npy)'
+
+    def read(self, filePath: Path) -> ComplexNumpyArrayType:
+        return numpy.load(filePath)
+
+
+class CSVProbeFileReader(ProbeFileReader):
+    @property
+    def simpleName(self) -> str:
+        return 'CSV'
+
+    @property
+    def fileFilter(self) -> str:
+        return 'Comma-Separated Values Files (*.csv)'
+
+    def read(self, filePath: Path) -> ComplexNumpyArrayType:
+        return numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
+
+
+class MATProbeFileReader(ProbeFileReader):
+    @property
+    def simpleName(self) -> str:
+        return 'MAT'
+
+    @property
+    def fileFilter(self) -> str:
+        return 'MAT Files (*.mat)'
+
+    def read(self, filePath: Path) -> ComplexNumpyArrayType:
+        matDict = scipy.io.loadmat(filePath)
+        return matDict['probe']
+
+
 class FileProbeInitializer(Observer):
-    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer) -> None:
+    @staticmethod
+    def _createFileReaderEntry(fileReader: ProbeFileReader) -> StrategyEntry[ProbeFileReader]:
+        return StrategyEntry(simpleName=fileReader.simpleName,
+                             displayName=fileReader.fileFilter,
+                             strategy=fileReader)
+
+    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer,
+                 fileReaderList: list[ProbeFileReader]) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
+        self._fileReaderChooser = StrategyChooser[ProbeFileReader].createFromList([
+            FileProbeInitializer._createFileReaderEntry(fileReader)
+            for fileReader in fileReaderList
+        ])
         self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
 
     @classmethod
-    def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer) -> FileProbeInitializer:
-        initializer = cls(settings, sizer)
-        initializer._openProbeFromSettings()
+    def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer,
+                       fileReaderList: list[ProbeFileReader]) -> FileProbeInitializer:
+        initializer = cls(settings, sizer, fileReaderList)
+
+        settings.inputFileType.addObserver(initializer)
+        initializer._fileReaderChooser.addObserver(initializer)
+        initializer._syncFileReaderFromSettings()
+
         settings.inputFilePath.addObserver(initializer)
+        initializer._openProbeFromSettings()
+
         return initializer
 
     def __call__(self) -> ComplexNumpyArrayType:
         return self._array
 
-    def getOpenFileFilter(self) -> str:
-        return 'NumPy Binary Files (*.npy)'
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._fileReaderChooser.getDisplayNameList()
+
+    def _syncFileReaderFromSettings(self) -> None:
+        self._fileReaderChooser.setFromSimpleName(self._settings.inputFileType.value)
+
+    def _syncFileReaderToSettings(self) -> None:
+        self._settings.inputFileType.value = self._fileReaderChooser.getCurrentSimpleName()
 
     def _openProbe(self, filePath: Path) -> None:
         if filePath is not None and filePath.is_file():
             logger.debug(f'Reading {filePath}')
-            self._array = numpy.load(filePath)
+            fileReader = self._fileReaderChooser.getCurrentStrategy()
+            self._array = fileReader.read(filePath)
 
-    def openProbe(self, filePath: Path) -> None:
+    def openProbe(self, filePath: Path, fileFilter: str) -> None:
+        self._fileReaderChooser.setFromDisplayName(fileFilter)
+
         if self._settings.inputFilePath.value == filePath:
             self._openProbe(filePath)
 
@@ -196,7 +280,11 @@ class FileProbeInitializer(Observer):
         self._openProbe(self._settings.inputFilePath.value)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.inputFilePath:
+        if observable is self._settings.inputFileType:
+            self._syncFileReaderFromSettings()
+        elif observable is self._fileReaderChooser:
+            self._syncFileReaderToSettings()
+        elif observable is self._settings.inputFilePath:
             self._openProbeFromSettings()
 
 
@@ -232,12 +320,12 @@ class Probe(Observable):
 
 class ProbeInitializer(Observable, Observer):
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
-                 reinitObservable: Observable) -> None:
+                 fileInitializer: FileProbeInitializer, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._probe = probe
         self._reinitObservable = reinitObservable
-        self._fileInitializer = FileProbeInitializer.createInstance(settings, sizer)
+        self._fileInitializer = fileInitializer
         self._initializerChooser = StrategyChooser[ProbeInitializerType](
             StrategyEntry[ProbeInitializerType](simpleName='FromFile',
                                                 displayName='From File',
@@ -245,9 +333,9 @@ class ProbeInitializer(Observable, Observer):
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
-                       sizer: ProbeSizer, probe: Probe,
+                       sizer: ProbeSizer, probe: Probe, fileInitializer: FileProbeInitializer,
                        reinitObservable: Observable) -> ProbeInitializer:
-        initializer = cls(probeSettings, sizer, probe, reinitObservable)
+        initializer = cls(probeSettings, sizer, probe, fileInitializer, reinitObservable)
 
         fzpInit = StrategyEntry[ProbeInitializerType](simpleName='FresnelZonePlate',
                                                       displayName='Fresnel Zone Plate',
@@ -284,7 +372,7 @@ class ProbeInitializer(Observable, Observer):
         self._probe.setArray(initializer())
 
     def getOpenFileFilterList(self) -> list[str]:
-        return [self._fileInitializer.getOpenFileFilter()]
+        return self._fileInitializer.getOpenFileFilterList()
 
     def openProbe(self, filePath: Path) -> None:
         self._fileInitializer.openProbe(filePath)

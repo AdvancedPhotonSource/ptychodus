@@ -58,9 +58,14 @@ class ModelCore:
                                                                self.settingsRegistry)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings, self._probeSizer)
+
+        probeFileReaderList = [NPYProbeFileReader(), CSVProbeFileReader(), MATProbeFileReader()]
+        self._fileProbeInitializer = FileProbeInitializer.createInstance(
+            self._probeSettings, self._probeSizer, probeFileReaderList)
         self._probeInitializer = ProbeInitializer.createInstance(self._detectorSettings,
                                                                  self._probeSettings,
                                                                  self._probeSizer, self._probe,
+                                                                 self._fileProbeInitializer,
                                                                  self.settingsRegistry)
         self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
                                                        self._probeSizer)
