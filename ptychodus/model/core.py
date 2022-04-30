@@ -46,7 +46,7 @@ class ModelCore:
             VelociprobeScanFileReader(self._velociprobeReader,
                                       VelociprobeScanYPositionSource.LASER_INTERFEROMETER)
         ]
-        self._customScanInitializer = CustomScanInitializer.createInstance(
+        self._fileScanInitializer = FileScanInitializer.createInstance(
             self._scanSettings, scanFileReaderList)
 
         self._detector = Detector.createInstance(self._detectorSettings)
@@ -54,7 +54,7 @@ class ModelCore:
         self._scan = Scan.createInstance(self._scanSettings)
         self._scanInitializer = ScanInitializer.createInstance(self.rng, self._scanSettings,
                                                                self._scan,
-                                                               self._customScanInitializer,
+                                                               self._fileScanInitializer,
                                                                self.settingsRegistry)
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings, self._probeSizer)

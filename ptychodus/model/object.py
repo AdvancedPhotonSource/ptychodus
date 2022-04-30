@@ -26,7 +26,7 @@ class ObjectSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Random')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:
@@ -118,7 +118,7 @@ class UniformRandomObjectInitializer:
         return magnitude * numpy.exp(1.j * phase)
 
 
-class CustomObjectInitializer(Observer):
+class FileObjectInitializer(Observer):
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -126,11 +126,10 @@ class CustomObjectInitializer(Observer):
         self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
 
     @classmethod
-    def createInstance(cls, settings: ObjectSettings,
-                       sizer: ObjectSizer) -> CustomObjectInitializer:
+    def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer) -> FileObjectInitializer:
         initializer = cls(settings, sizer)
         initializer._openObjectFromSettings()
-        settings.customFilePath.addObserver(initializer)
+        settings.inputFilePath.addObserver(initializer)
         return initializer
 
     def __call__(self) -> ComplexNumpyArrayType:
@@ -145,16 +144,16 @@ class CustomObjectInitializer(Observer):
             self._array = numpy.load(filePath)
 
     def openObject(self, filePath: Path) -> None:
-        if self._settings.customFilePath.value == filePath:
+        if self._settings.inputFilePath.value == filePath:
             self._openObject(filePath)
 
-        self._settings.customFilePath.value = filePath
+        self._settings.inputFilePath.value = filePath
 
     def _openObjectFromSettings(self) -> None:
-        self._openObject(self._settings.customFilePath.value)
+        self._openObject(self._settings.inputFilePath.value)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.customFilePath:
+        if observable is self._settings.inputFilePath:
             self._openObjectFromSettings()
 
 
@@ -183,11 +182,11 @@ class ObjectInitializer(Observable, Observer):
         self._settings = settings
         self._object = obj
         self._reinitObservable = reinitObservable
-        self._customInitializer = CustomObjectInitializer.createInstance(settings, sizer)
+        self._fileInitializer = FileObjectInitializer.createInstance(settings, sizer)
         self._initializerChooser = StrategyChooser[ObjectInitializerType](
-            StrategyEntry[ObjectInitializerType](simpleName='Custom',
-                                                 displayName='Custom',
-                                                 strategy=self._customInitializer))
+            StrategyEntry[ObjectInitializerType](simpleName='FromFile',
+                                                 displayName='From File',
+                                                 strategy=self._fileInitializer))
 
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings,
@@ -224,10 +223,10 @@ class ObjectInitializer(Observable, Observer):
         self._object.setArray(initializer())
 
     def getOpenFileFilterList(self) -> list[str]:
-        return [self._customInitializer.getOpenFileFilter()]
+        return [self._fileInitializer.getOpenFileFilter()]
 
     def openObject(self, filePath: Path) -> None:
-        self._customInitializer.openObject(filePath)
+        self._fileInitializer.openObject(filePath)
         self._initializerChooser.setToDefault()
         self.initializeObject()
 

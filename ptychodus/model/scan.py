@@ -24,8 +24,8 @@ class ScanSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
-        self.customFileType = settingsGroup.createStringEntry('CustomFileType', 'CSV')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
+        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
         self.extentX = settingsGroup.createIntegerEntry('ExtentX', 10)
         self.extentY = settingsGroup.createIntegerEntry('ExtentY', 10)
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')
@@ -200,7 +200,7 @@ class CSVScanFileReader(ScanFileReader):
         return scanPointList
 
 
-class CustomScanInitializer(Sequence[ScanPoint], Observer):
+class FileScanInitializer(Sequence[ScanPoint], Observer):
     @staticmethod
     def _createFileReaderEntry(fileReader: ScanFileReader) -> StrategyEntry[ScanFileReader]:
         return StrategyEntry(simpleName=fileReader.simpleName,
@@ -211,21 +211,20 @@ class CustomScanInitializer(Sequence[ScanPoint], Observer):
         super().__init__()
         self._settings = settings
         self._fileReaderChooser = StrategyChooser[ScanFileReader].createFromList([
-            CustomScanInitializer._createFileReaderEntry(fileReader)
-            for fileReader in fileReaderList
+            FileScanInitializer._createFileReaderEntry(fileReader) for fileReader in fileReaderList
         ])
         self._pointList: list[ScanPoint] = list()
 
     @classmethod
     def createInstance(cls, settings: ScanSettings,
-                       fileReaderList: list[ScanFileReader]) -> CustomScanInitializer:
+                       fileReaderList: list[ScanFileReader]) -> FileScanInitializer:
         initializer = cls(settings, fileReaderList)
 
-        settings.customFileType.addObserver(initializer)
+        settings.inputFileType.addObserver(initializer)
         initializer._fileReaderChooser.addObserver(initializer)
         initializer._syncFileReaderFromSettings()
 
-        settings.customFilePath.addObserver(initializer)
+        settings.inputFilePath.addObserver(initializer)
         initializer._openScanFromSettings()
 
         return initializer
@@ -240,10 +239,10 @@ class CustomScanInitializer(Sequence[ScanPoint], Observer):
         return self._fileReaderChooser.getDisplayNameList()
 
     def _syncFileReaderFromSettings(self) -> None:
-        self._fileReaderChooser.setFromSimpleName(self._settings.customFileType.value)
+        self._fileReaderChooser.setFromSimpleName(self._settings.inputFileType.value)
 
     def _syncFileReaderToSettings(self) -> None:
-        self._settings.customFileType.value = self._fileReaderChooser.getCurrentSimpleName()
+        self._settings.inputFileType.value = self._fileReaderChooser.getCurrentSimpleName()
 
     def _openScan(self, filePath: Path) -> None:
         if filePath is not None and filePath.is_file():
@@ -255,20 +254,20 @@ class CustomScanInitializer(Sequence[ScanPoint], Observer):
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self._fileReaderChooser.setFromDisplayName(fileFilter)
 
-        if self._settings.customFilePath.value == filePath:
+        if self._settings.inputFilePath.value == filePath:
             self._openScan(filePath)
 
-        self._settings.customFilePath.value = filePath
+        self._settings.inputFilePath.value = filePath
 
     def _openScanFromSettings(self) -> None:
-        self._openScan(self._settings.customFilePath.value)
+        self._openScan(self._settings.inputFilePath.value)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.customFileType:
+        if observable is self._settings.inputFileType:
             self._syncFileReaderFromSettings()
         elif observable is self._fileReaderChooser:
             self._syncFileReaderToSettings()
-        elif observable is self._settings.customFilePath:
+        elif observable is self._settings.inputFilePath:
             self._openScanFromSettings()
 
 
@@ -402,23 +401,23 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
 
 
 class ScanInitializer(Observable, Observer):
-    def __init__(self, settings: ScanSettings, scan: Scan,
-                 customInitializer: CustomScanInitializer, reinitObservable: Observable) -> None:
+    def __init__(self, settings: ScanSettings, scan: Scan, fileInitializer: FileScanInitializer,
+                 reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._scan = scan
         self._reinitObservable = reinitObservable
-        self._customInitializer = customInitializer
+        self._fileInitializer = fileInitializer
         self._initializerChooser = StrategyChooser[ScanInitializerType](
-            StrategyEntry[ScanInitializerType](simpleName='Custom',
-                                               displayName='Custom',
-                                               strategy=self._customInitializer))
+            StrategyEntry[ScanInitializerType](simpleName='FromFile',
+                                               displayName='From File',
+                                               strategy=self._fileInitializer))
 
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ScanSettings, scan: Scan,
-                       customInitializer: CustomScanInitializer,
+                       fileInitializer: FileScanInitializer,
                        reinitObservable: Observable) -> ScanInitializer:
-        initializer = cls(settings, scan, customInitializer, reinitObservable)
+        initializer = cls(settings, scan, fileInitializer, reinitObservable)
 
         spiralInit = StrategyEntry[ScanInitializerType](simpleName='Spiral',
                                                         displayName='Spiral',
@@ -464,10 +463,10 @@ class ScanInitializer(Observable, Observer):
         self._scan.setScanPoints(initializer)
 
     def getOpenFileFilterList(self) -> list[str]:
-        return self._customInitializer.getOpenFileFilterList()
+        return self._fileInitializer.getOpenFileFilterList()
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
-        self._customInitializer.openScan(filePath, fileFilter)
+        self._fileInitializer.openScan(filePath, fileFilter)
         self._initializerChooser.setToDefault()
         self.initializeScan()
 

@@ -25,7 +25,7 @@ class ProbeSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'GaussianBeam')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
         self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
             'AutomaticProbeSizeEnabled', True)
         self.probeSize = settingsGroup.createIntegerEntry('ProbeSize', 64)
@@ -161,7 +161,7 @@ class FresnelZonePlateProbeInitializer:
         return probe
 
 
-class CustomProbeInitializer(Observer):
+class FileProbeInitializer(Observer):
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -169,10 +169,10 @@ class CustomProbeInitializer(Observer):
         self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
 
     @classmethod
-    def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer) -> CustomProbeInitializer:
+    def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer) -> FileProbeInitializer:
         initializer = cls(settings, sizer)
         initializer._openProbeFromSettings()
-        settings.customFilePath.addObserver(initializer)
+        settings.inputFilePath.addObserver(initializer)
         return initializer
 
     def __call__(self) -> ComplexNumpyArrayType:
@@ -187,16 +187,16 @@ class CustomProbeInitializer(Observer):
             self._array = numpy.load(filePath)
 
     def openProbe(self, filePath: Path) -> None:
-        if self._settings.customFilePath.value == filePath:
+        if self._settings.inputFilePath.value == filePath:
             self._openProbe(filePath)
 
-        self._settings.customFilePath.value = filePath
+        self._settings.inputFilePath.value = filePath
 
     def _openProbeFromSettings(self) -> None:
-        self._openProbe(self._settings.customFilePath.value)
+        self._openProbe(self._settings.inputFilePath.value)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.customFilePath:
+        if observable is self._settings.inputFilePath:
             self._openProbeFromSettings()
 
 
@@ -237,11 +237,11 @@ class ProbeInitializer(Observable, Observer):
         self._settings = settings
         self._probe = probe
         self._reinitObservable = reinitObservable
-        self._customInitializer = CustomProbeInitializer.createInstance(settings, sizer)
+        self._fileInitializer = FileProbeInitializer.createInstance(settings, sizer)
         self._initializerChooser = StrategyChooser[ProbeInitializerType](
-            StrategyEntry[ProbeInitializerType](simpleName='Custom',
-                                                displayName='Custom',
-                                                strategy=self._customInitializer))
+            StrategyEntry[ProbeInitializerType](simpleName='FromFile',
+                                                displayName='From File',
+                                                strategy=self._fileInitializer))
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
@@ -284,10 +284,10 @@ class ProbeInitializer(Observable, Observer):
         self._probe.setArray(initializer())
 
     def getOpenFileFilterList(self) -> list[str]:
-        return [self._customInitializer.getOpenFileFilter()]
+        return [self._fileInitializer.getOpenFileFilter()]
 
     def openProbe(self, filePath: Path) -> None:
-        self._customInitializer.openProbe(filePath)
+        self._fileInitializer.openProbe(filePath)
         self._initializerChooser.setToDefault()
         self.initializeProbe()
 
