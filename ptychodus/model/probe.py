@@ -39,6 +39,8 @@ class ProbeSettings(Observable, Observer):
             'OutermostZoneWidthInMeters', '50e-9')
         self.beamstopDiameterInMeters = settingsGroup.createRealEntry(
             'BeamstopDiameterInMeters', '60e-6')
+        self.defocusDistanceInMeters = settingsGroup.createRealEntry('DefocusDistanceInMeters',
+                                                                     '800e-6')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ProbeSettings:
@@ -142,7 +144,7 @@ class FresnelZonePlateProbeInitializer:
         shape = self._sizer.getProbeSize()
         lambda0 = self._sizer.getWavelengthInMeters()
         dx_dec = self._detectorSettings.pixelSizeXInMeters.value  # TODO non-square pixels are unsupported
-        dis_defocus = self._detectorSettings.defocusDistanceInMeters.value
+        dis_defocus = self._probeSettings.defocusDistanceInMeters.value
         dis_StoD = self._detectorSettings.detectorDistanceInMeters.value
         radius = self._probeSettings.zonePlateRadiusInMeters.value
         outmost = self._probeSettings.outermostZoneWidthInMeters.value
@@ -405,6 +407,12 @@ class ProbePresenter(Observable, Observer):
 
     def getBeamstopDiameterInMeters(self) -> Decimal:
         return self._settings.beamstopDiameterInMeters.value
+
+    def getDefocusDistanceInMeters(self) -> Decimal:
+        return self._settings.defocusDistanceInMeters.value
+
+    def setDefocusDistanceInMeters(self, value: Decimal) -> None:
+        self._settings.defocusDistanceInMeters.value = value
 
     def getNumberOfProbeModes(self) -> int:
         return self._probe.getNumberOfProbeModes()

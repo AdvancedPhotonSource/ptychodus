@@ -34,6 +34,7 @@ class ProbeZonePlateView(QGroupBox):
         self.zonePlateRadiusWidget = LengthWidget.createInstance()
         self.outermostZoneWidthWidget = LengthWidget.createInstance()
         self.beamstopDiameterWidget = LengthWidget.createInstance()
+        self.defocusDistanceWidget = LengthWidget.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeZonePlateView:
@@ -43,6 +44,7 @@ class ProbeZonePlateView(QGroupBox):
         layout.addRow('Zone Plate Radius:', view.zonePlateRadiusWidget)
         layout.addRow('Outermost Zone Width:', view.outermostZoneWidthWidget)
         layout.addRow('Beamstop Diameter:', view.beamstopDiameterWidget)
+        layout.addRow('Defocus Distance:', view.defocusDistanceWidget)
         view.setLayout(layout)
 
         return view

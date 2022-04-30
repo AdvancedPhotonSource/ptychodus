@@ -27,7 +27,6 @@ class DetectorController(Observer):
         view.pixelSizeXWidget.lengthChanged.connect(presenter.setPixelSizeXInMeters)
         view.pixelSizeYWidget.lengthChanged.connect(presenter.setPixelSizeYInMeters)
         view.detectorDistanceWidget.lengthChanged.connect(presenter.setDetectorDistanceInMeters)
-        view.defocusDistanceWidget.lengthChanged.connect(presenter.setDefocusDistanceInMeters)
 
         controller._syncModelToView()
 
@@ -50,8 +49,6 @@ class DetectorController(Observer):
         self._view.pixelSizeYWidget.setLengthInMeters(self._presenter.getPixelSizeYInMeters())
         self._view.detectorDistanceWidget.setLengthInMeters(
             self._presenter.getDetectorDistanceInMeters())
-        self._view.defocusDistanceWidget.setLengthInMeters(
-            self._presenter.getDefocusDistanceInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

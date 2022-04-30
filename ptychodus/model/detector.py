@@ -19,8 +19,6 @@ class DetectorSettings(Observable, Observer):
         self.pixelSizeYInMeters = settingsGroup.createRealEntry('PixelSizeYInMeters', '75e-6')
         self.detectorDistanceInMeters = settingsGroup.createRealEntry(
             'DetectorDistanceInMeters', '2')
-        self.defocusDistanceInMeters = settingsGroup.createRealEntry('DefocusDistanceInMeters',
-                                                                     '800e-6')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DetectorSettings:
@@ -125,12 +123,6 @@ class DetectorPresenter(Observer, Observable):
 
     def setDetectorDistanceInMeters(self, value: Decimal) -> None:
         self._settings.detectorDistanceInMeters.value = value
-
-    def getDefocusDistanceInMeters(self) -> Decimal:
-        return self._settings.defocusDistanceInMeters.value
-
-    def setDefocusDistanceInMeters(self, value: Decimal) -> None:
-        self._settings.defocusDistanceInMeters.value = value
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
