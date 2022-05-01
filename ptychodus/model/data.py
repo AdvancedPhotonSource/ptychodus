@@ -1,5 +1,4 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
@@ -12,10 +11,11 @@ import numpy
 import watchdog.events
 import watchdog.observers
 
+from ..api.data import DataFileReader
+from ..api.tree import SimpleTreeNode
 from .chooser import StrategyChooser, StrategyEntry
-from .observer import Observable, Observer
-from .settings import SettingsRegistry, SettingsGroup
-from .tree import SimpleTreeNode
+from ..api.observer import Observable, Observer
+from ..api.settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
 
@@ -103,24 +103,6 @@ class DataFile:
                 pass
 
         return state
-
-
-class DataFileReader(ABC):
-    @abstractproperty
-    def simpleName(self) -> str:
-        pass
-
-    @abstractproperty
-    def fileFilter(self) -> str:
-        pass
-
-    @abstractmethod
-    def getFileContentsTree(self) -> SimpleTreeNode:
-        pass
-
-    @abstractmethod
-    def read(self, filePath: Path) -> None:
-        pass
 
 
 class DataFilePresenter(Observable, Observer):

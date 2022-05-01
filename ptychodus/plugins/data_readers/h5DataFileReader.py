@@ -4,14 +4,14 @@ import logging
 import h5py
 import numpy
 
-from .observer import Observable
-from .tree import SimpleTreeNode
-from .data import DataFileReader
+from ptychodus.api.tree import SimpleTreeNode
+from ptychodus.api.data import DataFileReader
+from ptychodus.api.observer import Observable
 
 logger = logging.getLogger(__name__)
 
 
-class H5FileReader(DataFileReader, Observable):
+class H5DataFileReader(DataFileReader, Observable):
     @staticmethod
     def createRootNode() -> SimpleTreeNode:
         return SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
@@ -20,7 +20,7 @@ class H5FileReader(DataFileReader, Observable):
                  simpleName: str = 'HDF5',
                  fileFilter: str = 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)') -> None:
         super().__init__()
-        self._rootNode = H5FileReader.createRootNode()
+        self._rootNode = H5DataFileReader.createRootNode()
         self._simpleName = simpleName
         self._fileFilter = fileFilter
 
@@ -58,7 +58,7 @@ class H5FileReader(DataFileReader, Observable):
             return
 
         with h5py.File(filePath, 'r') as h5File:
-            self._rootNode = H5FileReader.createRootNode()
+            self._rootNode = H5DataFileReader.createRootNode()
             unvisited = [(self._rootNode, h5File)]
 
             while unvisited:
@@ -77,11 +77,11 @@ class H5FileReader(DataFileReader, Observable):
 
                         if isinstance(h5Item, h5py.Group):
                             itemType = 'Group'
-                            H5FileReader._addAttributes(treeNode, h5Item.attrs)
+                            H5DataFileReader._addAttributes(treeNode, h5Item.attrs)
                             unvisited.append((treeNode, h5Item))
                         elif isinstance(h5Item, h5py.Dataset):
                             itemType = 'Dataset'
-                            H5FileReader._addAttributes(treeNode, h5Item.attrs)
+                            H5DataFileReader._addAttributes(treeNode, h5Item.attrs)
                             spaceId = h5Item.id.get_space()
 
                             if spaceId.get_simple_extent_type() == h5py.h5s.SCALAR:
@@ -114,3 +114,7 @@ class H5FileReader(DataFileReader, Observable):
 
     def readRootGroup(self, rootGroup: h5py.Group) -> None:
         pass
+
+
+def registrable_plugins() -> list[DataFileReader]:
+    return [H5DataFileReader()]

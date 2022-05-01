@@ -1,5 +1,4 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -11,10 +10,11 @@ import logging
 
 import numpy
 
+from ..api.observer import Observable, Observer
+from ..api.scan import ScanPoint, ScanFileReader
+from ..api.settings import SettingsRegistry, SettingsGroup
 from .chooser import StrategyChooser, StrategyEntry
 from .geometry import Interval, Box
-from .observer import Observable, Observer
-from .settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +42,6 @@ class ScanSettings(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
             self.notifyObservers()
-
-
-@dataclass(frozen=True)
-class ScanPoint:
-    x: Decimal
-    y: Decimal
 
 
 ScanInitializerType = Sequence[ScanPoint]
@@ -144,60 +138,6 @@ class JitteredScanInitializer(Sequence[ScanPoint]):
 
     def __len__(self) -> int:
         return len(self._scanPointSequence)
-
-
-class ScanFileReader(ABC):
-    @abstractproperty
-    def simpleName(self) -> str:
-        pass
-
-    @abstractproperty
-    def fileFilter(self) -> str:
-        pass
-
-    @abstractmethod
-    def read(self, filePath: Path) -> Iterable[ScanPoint]:
-        pass
-
-
-class ScanPointParseError(Exception):
-    pass
-
-
-class CSVScanFileReader(ScanFileReader):
-    def __init__(self) -> None:
-        self._xcol = 1
-        self._ycol = 0
-
-    @property
-    def simpleName(self) -> str:
-        return 'CSV'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Comma-Separated Values Files (*.csv)'
-
-    def read(self, filePath: Path) -> Iterable[ScanPoint]:
-        scanPointList = list()
-        minimumColumnCount = max(self._xcol, self._ycol) + 1
-
-        with open(filePath, newline='') as csvFile:
-            csvReader = csv.reader(csvFile, delimiter=',')
-
-            for row in csvReader:
-                if row[0].startswith('#'):
-                    continue
-
-                if len(row) < minimumColumnCount:
-                    raise ScanPointParseError()
-
-                x = Decimal(row[self._xcol])
-                y = Decimal(row[self._ycol])
-                point = ScanPoint(x, y)
-
-                scanPointList.append(point)
-
-        return scanPointList
 
 
 class FileScanInitializer(Sequence[ScanPoint], Observer):

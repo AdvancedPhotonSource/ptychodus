@@ -7,7 +7,7 @@ from typing import Callable, Tuple
 
 import numpy
 
-from .observer import Observable, Observer
+from ..api.observer import Observable, Observer
 
 
 class ColorMapCategory(Enum):

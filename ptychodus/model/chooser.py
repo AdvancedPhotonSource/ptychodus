@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Generic, Iterator, TypeVar
 import logging
 
-from .observer import Observable
+from ..api.observer import Observable
 
 T = TypeVar('T')
 

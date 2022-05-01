@@ -6,8 +6,8 @@ import numpy
 from .detector import Detector
 from .geometry import Interval
 from .image import ImageSequence
-from .observer import Observable, Observer
-from .settings import SettingsGroup, SettingsRegistry
+from ..api.observer import Observable, Observer
+from ..api.settings import SettingsGroup, SettingsRegistry
 
 
 class CropSettings(Observable, Observer):

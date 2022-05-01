@@ -1,23 +1,20 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
 from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Callable
 import logging
 
 import numpy
-import numpy.typing
-import scipy.io
 
+from ..api.observer import Observable, Observer
+from ..api.probe import *
+from ..api.settings import SettingsRegistry, SettingsGroup
 from .chooser import StrategyChooser, StrategyEntry
 from .crop import CropSizer
 from .detector import DetectorSettings
 from .fzp import single_probe
 from .geometry import Interval
 from .image import ImageExtent
-from .observer import Observable, Observer
-from .settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
 
@@ -107,16 +104,12 @@ class ProbeSizer(Observable, Observer):
             self._updateProbeSize()
 
 
-ComplexNumpyArrayType = numpy.typing.NDArray[numpy.complexfloating]
-ProbeInitializerType = Callable[[], ComplexNumpyArrayType]
-
-
 class GaussianBeamProbeInitializer:
     def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings) -> None:
         self._detectorSettings = detectorSettings
         self._probeSettings = probeSettings
 
-    def _createCircularMask(self) -> ComplexNumpyArrayType:
+    def _createCircularMask(self) -> ProbeArrayType:
         width_px = self._probeSettings.probeSize.value
         height_px = width_px
 
@@ -129,7 +122,7 @@ class GaussianBeamProbeInitializer:
 
         return (R_m <= probeRadius_m)
 
-    def __call__(self) -> ComplexNumpyArrayType:
+    def __call__(self) -> ProbeArrayType:
         mask = self._createCircularMask()
         ft = numpy.fft.fft2(mask)
         ft = numpy.fft.fftshift(ft)
@@ -143,7 +136,7 @@ class FresnelZonePlateProbeInitializer:
         self._probeSettings = probeSettings
         self._sizer = sizer
 
-    def __call__(self) -> ComplexNumpyArrayType:
+    def __call__(self) -> ProbeArrayType:
         shape = self._sizer.getProbeSize()
         lambda0 = self._sizer.getWavelengthInMeters()
         dx_dec = self._detectorSettings.pixelSizeXInMeters.value  # TODO non-square pixels are unsupported
@@ -162,60 +155,6 @@ class FresnelZonePlateProbeInitializer:
                              outmost=float(outmost),
                              beamstop=float(beamstop))
         return probe
-
-
-class ProbeFileReader(ABC):
-    @abstractproperty
-    def simpleName(self) -> str:
-        pass
-
-    @abstractproperty
-    def fileFilter(self) -> str:
-        pass
-
-    @abstractmethod
-    def read(self, filePath: Path) -> ComplexNumpyArrayType:
-        pass
-
-
-class NPYProbeFileReader(ProbeFileReader):
-    @property
-    def simpleName(self) -> str:
-        return 'NPY'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'NumPy Binary Files (*.npy)'
-
-    def read(self, filePath: Path) -> ComplexNumpyArrayType:
-        return numpy.load(filePath)
-
-
-class CSVProbeFileReader(ProbeFileReader):
-    @property
-    def simpleName(self) -> str:
-        return 'CSV'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Comma-Separated Values Files (*.csv)'
-
-    def read(self, filePath: Path) -> ComplexNumpyArrayType:
-        return numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
-
-
-class MATProbeFileReader(ProbeFileReader):
-    @property
-    def simpleName(self) -> str:
-        return 'MAT'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'MAT Files (*.mat)'
-
-    def read(self, filePath: Path) -> ComplexNumpyArrayType:
-        matDict = scipy.io.loadmat(filePath)
-        return matDict['probe']
 
 
 class FileProbeInitializer(Observer):
@@ -250,7 +189,7 @@ class FileProbeInitializer(Observer):
 
         return initializer
 
-    def __call__(self) -> ComplexNumpyArrayType:
+    def __call__(self) -> ProbeArrayType:
         return self._array
 
     def getOpenFileFilterList(self) -> list[str]:
@@ -298,13 +237,13 @@ class Probe(Observable):
     def getNumberOfProbeModes(self) -> int:
         return self._array.shape[0]
 
-    def getProbeMode(self, index: int) -> ComplexNumpyArrayType:
+    def getProbeMode(self, index: int) -> ProbeArrayType:
         return self._array[index, ...]
 
-    def getArray(self) -> ComplexNumpyArrayType:
+    def getArray(self) -> ProbeArrayType:
         return self._array
 
-    def setArray(self, array: ComplexNumpyArrayType) -> None:
+    def setArray(self, array: ProbeArrayType) -> None:
         if not numpy.iscomplexobj(array):
             raise TypeError('Probe must be a complex-valued ndarray')
 
@@ -380,7 +319,7 @@ class ProbeInitializer(Observable, Observer):
         self.initializeProbe()
 
     def getSaveFileFilterList(self) -> list[str]:
-        return ['NumPy Binary Files (*.npy)']
+        return ['NumPy Binary Files (*.npy)']  # TODO from plugins
 
     def saveProbe(self, filePath: Path) -> None:
         logger.debug(f'Writing {filePath}')
@@ -505,7 +444,7 @@ class ProbePresenter(Observable, Observer):
     def getNumberOfProbeModes(self) -> int:
         return self._probe.getNumberOfProbeModes()
 
-    def getProbeMode(self, index: int) -> ComplexNumpyArrayType:
+    def getProbeMode(self, index: int) -> ProbeArrayType:
         return self._probe.getProbeMode(index)
 
     def update(self, observable: Observable) -> None:

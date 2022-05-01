@@ -5,9 +5,10 @@ import argparse
 import logging
 import sys
 
-import ptychodus.model
-import ptychodus.view
 import ptychodus.controller
+import ptychodus.model
+import ptychodus.plugins.probe_readers
+import ptychodus.view
 
 import h5py
 import matplotlib
@@ -54,13 +55,13 @@ def main() -> int:
     logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
-    logger.debug(versionString())
-    logger.debug(f'\tNumPy {numpy.__version__}')
-    logger.debug(f'\tMatplotlib {matplotlib.__version__}')
-    logger.debug(f'\tHDF5 {h5py.version.hdf5_version}')
-    logger.debug(f'\tH5Py {h5py.__version__}')
-    logger.debug('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
-    logger.debug('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
+    logger.info(versionString())
+    logger.info(f'\tNumPy {numpy.__version__}')
+    logger.info(f'\tMatplotlib {matplotlib.__version__}')
+    logger.info(f'\tHDF5 {h5py.version.hdf5_version}')
+    logger.info(f'\tH5Py {h5py.__version__}')
+    logger.info('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
+    logger.info('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
 
     result = 0
 

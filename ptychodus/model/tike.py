@@ -17,11 +17,11 @@ except ImportError:
 from .crop import CropSizer
 from .image import ImageExtent
 from .object import Object, ObjectSizer
-from .observer import Observable, Observer
+from ..api.observer import Observable, Observer
 from .probe import Probe, ProbeSizer
 from .reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
 from .scan import Scan
-from .settings import SettingsRegistry, SettingsGroup
+from ..api.settings import SettingsRegistry, SettingsGroup
 from .velociprobe import VelociprobeReader
 
 logger = logging.getLogger(__name__)
@@ -392,7 +392,7 @@ class TikeReconstructor:
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
                  velociprobeReader: VelociprobeReader, scan: Scan, probeSizer: ProbeSizer,
-                 probe: Probe, objectSizer: ObjectSizer, obj: Object,
+                 probe: Probe, objectSizer: ObjectSizer, object_: Object,
                  reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
@@ -404,7 +404,7 @@ class TikeReconstructor:
         self._probeSizer = probeSizer
         self._probe = probe
         self._objectSizer = objectSizer
-        self._object = obj
+        self._object = object_
         self._reconstructorPlotPresenter = reconstructorPlotPresenter
 
     @property
@@ -704,7 +704,7 @@ class TikeBackend:
                        probeSizer: ProbeSizer,
                        probe: Probe,
                        objectSizer: ObjectSizer,
-                       obj: Object,
+                       object_: Object,
                        reconstructorPlotPresenter: ReconstructorPlotPresenter,
                        isDeveloperModeEnabled: bool = False) -> TikeBackend:
         core = cls(settingsRegistry)
@@ -716,7 +716,7 @@ class TikeBackend:
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, cropSizer,
                                                   velociprobeReader, scan, probeSizer, probe,
-                                                  objectSizer, obj, reconstructorPlotPresenter)
+                                                  objectSizer, object_, reconstructorPlotPresenter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

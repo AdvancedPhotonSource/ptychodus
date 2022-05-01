@@ -5,8 +5,8 @@ from decimal import Decimal
 import numpy
 
 from .image import ImageSequence
-from .observer import Observable, Observer
-from .settings import SettingsRegistry, SettingsGroup
+from ..api.observer import Observable, Observer
+from ..api.settings import SettingsRegistry, SettingsGroup
 
 
 class DetectorSettings(Observable, Observer):

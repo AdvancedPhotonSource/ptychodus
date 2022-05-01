@@ -1,30 +1,48 @@
 from __future__ import annotations
-from types import TracebackType
+from types import ModuleType, TracebackType
 from typing import overload
+import importlib
 import logging
+import pkgutil
 
 import numpy
 
+from ..api.observer import *
+from ..api.settings import *
 from .crop import *
 from .data import *
 from .detector import *
-from .h5file import *
 from .image import *
 from .object import *
-from .observer import *
 from .probe import *
-from .ptychonn import PtychoNNBackend
-from .ptychopy import PtychoPyBackend
 from .reconstructor import *
 from .scan import *
-from .settings import *
-from .tike import TikeBackend
 from .velociprobe import *
+
+import ptychodus.plugins.data_readers
+import ptychodus.plugins.scan_readers
+import ptychodus.plugins.probe_readers
+import ptychodus.plugins.object_readers
 
 logger = logging.getLogger(__name__)
 
 
 class ModelCore:
+    @staticmethod
+    def loadPlugins(ns_pkg: ModuleType) -> list:  # TODO typing
+        plugin_list = list()
+
+        # Specifying the second argument (prefix) to iter_modules makes the
+        # returned name an absolute name instead of a relative one. This allows
+        # import_module to work without having to do additional modification to
+        # the name.
+        for moduleInfo in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + '.'):
+            logger.info(f'Importing plugin {moduleInfo.name}')
+            module = importlib.import_module(moduleInfo.name)
+            plugin_list.extend(module.registrable_plugins())
+
+        return plugin_list
+
     def __init__(self, isDeveloperModeEnabled: bool = False) -> None:
         self.rng = numpy.random.default_rng()
 
@@ -37,29 +55,21 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
-        self._velociprobeReader = VelociprobeReader()
-
-        scanFileReaderList = [
-            CSVScanFileReader(),
-            VelociprobeScanFileReader(self._velociprobeReader,
-                                      VelociprobeScanYPositionSource.ENCODER),
-            VelociprobeScanFileReader(self._velociprobeReader,
-                                      VelociprobeScanYPositionSource.LASER_INTERFEROMETER)
-        ]
-        self._fileScanInitializer = FileScanInitializer.createInstance(
-            self._scanSettings, scanFileReaderList)
-
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
+
         self._scan = Scan.createInstance(self._scanSettings)
+        scanFileReaderList = ModelCore.loadPlugins(ptychodus.plugins.scan_readers)
+        self._fileScanInitializer = FileScanInitializer.createInstance(
+            self._scanSettings, scanFileReaderList)
         self._scanInitializer = ScanInitializer.createInstance(self.rng, self._scanSettings,
                                                                self._scan,
                                                                self._fileScanInitializer,
                                                                self.settingsRegistry)
+
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings, self._probeSizer)
-
-        probeFileReaderList = [NPYProbeFileReader(), CSVProbeFileReader(), MATProbeFileReader()]
+        probeFileReaderList = ModelCore.loadPlugins(ptychodus.plugins.probe_readers)
         self._fileProbeInitializer = FileProbeInitializer.createInstance(
             self._probeSettings, self._probeSizer, probeFileReaderList)
         self._probeInitializer = ProbeInitializer.createInstance(self._detectorSettings,
@@ -67,14 +77,19 @@ class ModelCore:
                                                                  self._probeSizer, self._probe,
                                                                  self._fileProbeInitializer,
                                                                  self.settingsRegistry)
+
         self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
                                                        self._probeSizer)
         self._object = Object(self._objectSettings, self._objectSizer)
+        objectFileReaderList = ModelCore.loadPlugins(ptychodus.plugins.object_readers)
+        self._fileObjectInitializer = FileObjectInitializer.createInstance(
+            self._objectSettings, self._objectSizer, objectFileReaderList)
         self._objectInitializer = ObjectInitializer.createInstance(self.rng, self._objectSettings,
                                                                    self._objectSizer, self._object,
+                                                                   self._fileObjectInitializer,
                                                                    self.settingsRegistry)
 
-        self._h5FileReader = H5FileReader()
+        self._velociprobeReader = None  # FIXME
         self._velociprobeImageSequence = VelociprobeImageSequence.createInstance(
             self._velociprobeReader)
         self._croppedImageSequence = CroppedImageSequence.createInstance(
@@ -96,8 +111,7 @@ class ModelCore:
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
 
-        dataFileReaderList: list[DataFileReader] = [self._h5FileReader, self._velociprobeReader]
-
+        dataFileReaderList = ModelCore.loadPlugins(ptychodus.plugins.data_readers)
         self.dataFilePresenter = DataFilePresenter.createInstance(self._dataSettings,
                                                                   dataFileReaderList)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
