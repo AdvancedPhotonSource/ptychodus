@@ -9,7 +9,7 @@ import numpy
 from ..api.object import *
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .chooser import StrategyChooser, StrategyEntry
+from ..api.plugins import PluginChooser, PluginEntry
 from .crop import CropSizer
 from .detector import Detector
 from .geometry import Box, Interval
@@ -115,27 +115,18 @@ class UniformRandomObjectInitializer:
 
 
 class FileObjectInitializer(Observer):
-    @staticmethod
-    def _createFileReaderEntry(fileReader: ObjectFileReader) -> StrategyEntry[ObjectFileReader]:
-        return StrategyEntry(simpleName=fileReader.simpleName,
-                             displayName=fileReader.fileFilter,
-                             strategy=fileReader)
-
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer,
-                 fileReaderList: list[ObjectFileReader]) -> None:
+                 fileReaderChooser: PluginChooser[ObjectFileReader]) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
-        self._fileReaderChooser = StrategyChooser[ObjectFileReader].createFromList([
-            FileObjectInitializer._createFileReaderEntry(fileReader)
-            for fileReader in fileReaderList
-        ])
+        self._fileReaderChooser = fileReaderChooser
         self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
 
     @classmethod
     def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer,
-                       fileReaderList: list[ObjectFileReader]) -> FileObjectInitializer:
-        initializer = cls(settings, sizer, fileReaderList)
+                       fileReaderChooser: PluginChooser[ObjectFileReader]) -> FileObjectInitializer:
+        initializer = cls(settings, sizer, fileReaderChooser)
 
         settings.inputFileType.addObserver(initializer)
         initializer._fileReaderChooser.addObserver(initializer)
@@ -210,10 +201,10 @@ class ObjectInitializer(Observable, Observer):
         self._object = object_
         self._reinitObservable = reinitObservable
         self._fileInitializer = fileInitializer
-        self._initializerChooser = StrategyChooser[ObjectInitializerType](
-            StrategyEntry[ObjectInitializerType](simpleName='FromFile',
-                                                 displayName='From File',
-                                                 strategy=self._fileInitializer))
+        self._initializerChooser = PluginChooser[ObjectInitializerType](
+            PluginEntry[ObjectInitializerType](simpleName='FromFile',
+                                               displayName='From File',
+                                               strategy=self._fileInitializer))
 
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings,
@@ -221,10 +212,10 @@ class ObjectInitializer(Observable, Observer):
                        reinitObservable: Observable) -> ObjectInitializer:
         initializer = cls(settings, sizer, object_, fileInitializer, reinitObservable)
 
-        urandInit = StrategyEntry[ObjectInitializerType](simpleName='Random',
-                                                         displayName='Random',
-                                                         strategy=UniformRandomObjectInitializer(
-                                                             rng, sizer))
+        urandInit = PluginEntry[ObjectInitializerType](simpleName='Random',
+                                                       displayName='Random',
+                                                       strategy=UniformRandomObjectInitializer(
+                                                           rng, sizer))
         initializer._initializerChooser.addStrategy(urandInit)
 
         settings.initializer.addObserver(initializer)

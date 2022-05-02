@@ -8,7 +8,6 @@ import numpy
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup
 from .crop import CropSettings
-from .data import DataFile, DatasetState
 from .detector import DetectorSettings
 from .image import ImageSequence
 from .probe import ProbeSettings
@@ -65,7 +64,7 @@ class VelociprobeImageSequence(ImageSequence):
     def _updateImages(self) -> None:
         self._datasetImageList = list()
 
-        if self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.data:
+        if self._velociprobeReader and self._velociprobeReader.entryGroup and self._velociprobeReader.entryGroup.data:
             if self._datasetIndex >= len(self._velociprobeReader.entryGroup.data):
                 self._datasetIndex = 0
         else:

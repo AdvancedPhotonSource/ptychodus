@@ -2,6 +2,7 @@ from pathlib import Path
 
 import scipy.io
 
+from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeFileReader, ProbeArrayType
 
 
@@ -19,5 +20,5 @@ class MATProbeFileReader(ProbeFileReader):
         return matDict['probe']
 
 
-def registrable_plugins() -> list[ProbeFileReader]:
-    return [MATProbeFileReader()]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(MATProbeFileReader())

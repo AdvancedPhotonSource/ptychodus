@@ -8,6 +8,7 @@ import csv
 import numpy
 
 from ptychodus.api.scan import ScanFileReader, ScanPoint, ScanPointParseError
+from ptychodus.api.plugins import PluginRegistry
 
 
 class VelociprobeScanYPositionSource(IntEnum):
@@ -97,8 +98,7 @@ class VelociprobeScanFileReader(ScanFileReader):
         return scanPointList
 
 
-def registrable_plugins() -> list[ScanFileReader]:
-    return [
-        VelociprobeScanFileReader(VelociprobeScanYPositionSource.ENCODER),
-        VelociprobeScanFileReader(VelociprobeScanYPositionSource.LASER_INTERFEROMETER)
-    ]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(VelociprobeScanFileReader(VelociprobeScanYPositionSource.ENCODER))
+    registry.registerPlugin(
+        VelociprobeScanFileReader(VelociprobeScanYPositionSource.LASER_INTERFEROMETER))

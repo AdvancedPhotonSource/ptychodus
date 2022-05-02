@@ -9,7 +9,7 @@ import numpy
 from ..api.observer import Observable, Observer
 from ..api.probe import *
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .chooser import StrategyChooser, StrategyEntry
+from ..api.plugins import PluginChooser, PluginEntry
 from .crop import CropSizer
 from .detector import DetectorSettings
 from .fzp import single_probe
@@ -158,27 +158,18 @@ class FresnelZonePlateProbeInitializer:
 
 
 class FileProbeInitializer(Observer):
-    @staticmethod
-    def _createFileReaderEntry(fileReader: ProbeFileReader) -> StrategyEntry[ProbeFileReader]:
-        return StrategyEntry(simpleName=fileReader.simpleName,
-                             displayName=fileReader.fileFilter,
-                             strategy=fileReader)
-
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer,
-                 fileReaderList: list[ProbeFileReader]) -> None:
+                 fileReaderChooser: PluginChooser[ProbeFileReader]) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
-        self._fileReaderChooser = StrategyChooser[ProbeFileReader].createFromList([
-            FileProbeInitializer._createFileReaderEntry(fileReader)
-            for fileReader in fileReaderList
-        ])
+        self._fileReaderChooser = fileReaderChooser
         self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
 
     @classmethod
     def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer,
-                       fileReaderList: list[ProbeFileReader]) -> FileProbeInitializer:
-        initializer = cls(settings, sizer, fileReaderList)
+                       fileReaderChooser: PluginChooser[ProbeFileReader]) -> FileProbeInitializer:
+        initializer = cls(settings, sizer, fileReaderChooser)
 
         settings.inputFileType.addObserver(initializer)
         initializer._fileReaderChooser.addObserver(initializer)
@@ -265,10 +256,10 @@ class ProbeInitializer(Observable, Observer):
         self._probe = probe
         self._reinitObservable = reinitObservable
         self._fileInitializer = fileInitializer
-        self._initializerChooser = StrategyChooser[ProbeInitializerType](
-            StrategyEntry[ProbeInitializerType](simpleName='FromFile',
-                                                displayName='From File',
-                                                strategy=self._fileInitializer))
+        self._initializerChooser = PluginChooser[ProbeInitializerType](
+            PluginEntry[ProbeInitializerType](simpleName='FromFile',
+                                              displayName='From File',
+                                              strategy=self._fileInitializer))
 
     @classmethod
     def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
@@ -276,16 +267,16 @@ class ProbeInitializer(Observable, Observer):
                        reinitObservable: Observable) -> ProbeInitializer:
         initializer = cls(probeSettings, sizer, probe, fileInitializer, reinitObservable)
 
-        fzpInit = StrategyEntry[ProbeInitializerType](simpleName='FresnelZonePlate',
-                                                      displayName='Fresnel Zone Plate',
-                                                      strategy=FresnelZonePlateProbeInitializer(
-                                                          detectorSettings, probeSettings, sizer))
+        fzpInit = PluginEntry[ProbeInitializerType](simpleName='FresnelZonePlate',
+                                                    displayName='Fresnel Zone Plate',
+                                                    strategy=FresnelZonePlateProbeInitializer(
+                                                        detectorSettings, probeSettings, sizer))
         initializer._initializerChooser.addStrategy(fzpInit)
 
-        gaussInit = StrategyEntry[ProbeInitializerType](simpleName='GaussianBeam',
-                                                        displayName='Gaussian Beam',
-                                                        strategy=GaussianBeamProbeInitializer(
-                                                            detectorSettings, probeSettings))
+        gaussInit = PluginEntry[ProbeInitializerType](simpleName='GaussianBeam',
+                                                      displayName='Gaussian Beam',
+                                                      strategy=GaussianBeamProbeInitializer(
+                                                          detectorSettings, probeSettings))
         initializer._initializerChooser.addStrategy(gaussInit)
 
         probeSettings.initializer.addObserver(initializer)

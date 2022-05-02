@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy
 
+from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeFileReader, ProbeArrayType
 
 
@@ -18,5 +19,5 @@ class NPYProbeFileReader(ProbeFileReader):
         return numpy.load(filePath)
 
 
-def registrable_plugins() -> list[ProbeFileReader]:
-    return [NPYProbeFileReader()]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(NPYProbeFileReader())

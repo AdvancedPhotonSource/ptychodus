@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Optional
 import logging
@@ -13,7 +12,7 @@ import watchdog.observers
 
 from ..api.data import DataFileReader
 from ..api.tree import SimpleTreeNode
-from .chooser import StrategyChooser, StrategyEntry
+from ..api.plugins import PluginChooser
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
 
@@ -77,53 +76,17 @@ class DataDirectoryWatcher(threading.Thread):
         self._stopEvent.set()
 
 
-class DatasetState(Enum):
-    MISSING = auto()
-    FOUND = auto()
-    VALID = auto()
-
-
-@dataclass(frozen=True)
-class DataFile:
-    name: str
-    filePath: Path
-    dataPath: str
-
-    def getState(self) -> DatasetState:
-        state = DatasetState.MISSING
-
-        if self.filePath.is_file():
-            state = DatasetState.FOUND
-
-            try:
-                with h5py.File(self.filePath, 'r') as h5File:
-                    if self.dataPath in h5File:
-                        state = DatasetState.VALID
-            except OSError:
-                pass
-
-        return state
-
-
 class DataFilePresenter(Observable, Observer):
-    @staticmethod
-    def _createFileReaderEntry(fileReader: DataFileReader) -> StrategyEntry[DataFileReader]:
-        return StrategyEntry(simpleName=fileReader.simpleName,
-                             displayName=fileReader.fileFilter,
-                             strategy=fileReader)
-
-    def __init__(self, settings: DataSettings, fileReaderList: list[DataFileReader]) -> None:
+    def __init__(self, settings: DataSettings, fileReaderChooser: PluginChooser[DataFileReader]) -> None:
         super().__init__()
         self._settings = settings
-        self._fileReaderChooser = StrategyChooser[DataFileReader].createFromList([
-            DataFilePresenter._createFileReaderEntry(fileReader) for fileReader in fileReaderList
-        ])
+        self._fileReaderChooser = fileReaderChooser
         self._filePath: Optional[Path] = None
 
     @classmethod
     def createInstance(cls, settings: DataSettings,
-                       fileReaderList: list[DataFileReader]) -> DataFilePresenter:
-        presenter = cls(settings, fileReaderList)
+                       fileReaderChooser: PluginChooser[DataFileReader]) -> DataFilePresenter:
+        presenter = cls(settings, fileReaderChooser)
         settings.fileType.addObserver(presenter)
         presenter._fileReaderChooser.addObserver(presenter)
         presenter._syncFileReaderFromSettings()

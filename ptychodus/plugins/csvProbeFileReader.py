@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy
 
+from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeFileReader, ProbeArrayType
 
 
@@ -18,5 +19,5 @@ class CSVProbeFileReader(ProbeFileReader):
         return numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
 
 
-def registrable_plugins() -> list[ProbeFileReader]:
-    return [CSVProbeFileReader()]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(CSVProbeFileReader())

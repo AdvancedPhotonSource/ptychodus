@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy
 
 from ptychodus.api.object import ObjectFileReader, ObjectArrayType
+from ptychodus.api.plugins import PluginRegistry
 
 
 class NPYObjectFileReader(ObjectFileReader):
@@ -18,5 +19,5 @@ class NPYObjectFileReader(ObjectFileReader):
         return numpy.load(filePath)
 
 
-def registrable_plugins() -> list[ObjectFileReader]:
-    return [NPYObjectFileReader()]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(NPYObjectFileReader())

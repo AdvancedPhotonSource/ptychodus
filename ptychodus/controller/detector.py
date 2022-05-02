@@ -4,7 +4,7 @@ from decimal import Decimal
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ..model import Observable, Observer, DetectorPresenter, DatasetState
+from ..model import Observable, Observer, DetectorPresenter  # FIXME , DatasetState
 from ..view import DetectorView
 from .data import FileDialogFactory
 from .image import ImageController

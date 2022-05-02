@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Iterable
 import csv
 
+from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import ScanFileReader, ScanPoint, ScanPointParseError
 
 
@@ -42,5 +43,5 @@ class CSVScanFileReader(ScanFileReader):
         return scanPointList
 
 
-def registrable_plugins() -> list[ScanFileReader]:
-    return [CSVScanFileReader()]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(CSVScanFileReader())

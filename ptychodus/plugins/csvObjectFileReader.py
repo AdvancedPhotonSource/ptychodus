@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy
 
 from ptychodus.api.object import ObjectFileReader, ObjectArrayType
+from ptychodus.api.plugins import PluginRegistry
 
 
 class CSVObjectFileReader(ObjectFileReader):
@@ -18,5 +19,5 @@ class CSVObjectFileReader(ObjectFileReader):
         return numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
 
 
-def registrable_plugins() -> list[ObjectFileReader]:
-    return [CSVObjectFileReader()]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(CSVObjectFileReader())

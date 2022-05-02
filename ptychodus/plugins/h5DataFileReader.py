@@ -4,9 +4,10 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.tree import SimpleTreeNode
 from ptychodus.api.data import DataFileReader
 from ptychodus.api.observer import Observable
+from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -116,5 +117,5 @@ class H5DataFileReader(DataFileReader, Observable):
         pass
 
 
-def registrable_plugins() -> list[DataFileReader]:
-    return [H5DataFileReader()]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(H5DataFileReader())

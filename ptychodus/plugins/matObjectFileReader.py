@@ -3,6 +3,7 @@ from pathlib import Path
 import scipy.io
 
 from ptychodus.api.object import ObjectFileReader, ObjectArrayType
+from ptychodus.api.plugins import PluginRegistry
 
 
 class MATObjectFileReader(ObjectFileReader):
@@ -19,5 +20,5 @@ class MATObjectFileReader(ObjectFileReader):
         return matDict['object']
 
 
-def registrable_plugins() -> list[ObjectFileReader]:
-    return [MATObjectFileReader()]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(MATObjectFileReader())

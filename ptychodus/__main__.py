@@ -7,7 +7,6 @@ import sys
 
 import ptychodus.controller
 import ptychodus.model
-import ptychodus.plugins.probe_readers
 import ptychodus.view
 
 import h5py

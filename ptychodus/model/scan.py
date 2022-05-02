@@ -13,7 +13,7 @@ import numpy
 from ..api.observer import Observable, Observer
 from ..api.scan import ScanPoint, ScanFileReader
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .chooser import StrategyChooser, StrategyEntry
+from ..api.plugins import PluginChooser, PluginEntry
 from .geometry import Interval, Box
 
 logger = logging.getLogger(__name__)
@@ -141,24 +141,16 @@ class JitteredScanInitializer(Sequence[ScanPoint]):
 
 
 class FileScanInitializer(Sequence[ScanPoint], Observer):
-    @staticmethod
-    def _createFileReaderEntry(fileReader: ScanFileReader) -> StrategyEntry[ScanFileReader]:
-        return StrategyEntry(simpleName=fileReader.simpleName,
-                             displayName=fileReader.fileFilter,
-                             strategy=fileReader)
-
-    def __init__(self, settings: ScanSettings, fileReaderList: list[ScanFileReader]) -> None:
+    def __init__(self, settings: ScanSettings, fileReaderChooser: PluginChooser[ScanFileReader]) -> None:
         super().__init__()
         self._settings = settings
-        self._fileReaderChooser = StrategyChooser[ScanFileReader].createFromList([
-            FileScanInitializer._createFileReaderEntry(fileReader) for fileReader in fileReaderList
-        ])
+        self._fileReaderChooser = fileReaderChooser
         self._pointList: list[ScanPoint] = list()
 
     @classmethod
     def createInstance(cls, settings: ScanSettings,
-                       fileReaderList: list[ScanFileReader]) -> FileScanInitializer:
-        initializer = cls(settings, fileReaderList)
+            fileReaderChooser: PluginChooser[ScanFileReader]) -> FileScanInitializer:
+        initializer = cls(settings, fileReaderChooser)
 
         settings.inputFileType.addObserver(initializer)
         initializer._fileReaderChooser.addObserver(initializer)
@@ -253,17 +245,17 @@ class ScanPointTransform(Enum):
 
 class Scan(Sequence[ScanPoint], Observable, Observer):
     @staticmethod
-    def _createTransformEntry(xform: ScanPointTransform) -> StrategyEntry[ScanPointTransform]:
-        return StrategyEntry[ScanPointTransform](simpleName=xform.simpleName,
-                                                 displayName=xform.displayName,
-                                                 strategy=xform)
+    def _createTransformEntry(xform: ScanPointTransform) -> PluginEntry[ScanPointTransform]:
+        return PluginEntry[ScanPointTransform](simpleName=xform.simpleName,
+                                               displayName=xform.displayName,
+                                               strategy=xform)
 
     def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
         self._settings = settings
         self._scanPointList: list[ScanPoint] = list()
         self._boundingBoxInMeters: Optional[Box[Decimal]] = None
-        self._transformChooser = StrategyChooser[ScanPointTransform].createFromList(
+        self._transformChooser = PluginChooser[ScanPointTransform].createFromList(
             [Scan._createTransformEntry(xform) for xform in ScanPointTransform])
 
     @classmethod
@@ -348,10 +340,10 @@ class ScanInitializer(Observable, Observer):
         self._scan = scan
         self._reinitObservable = reinitObservable
         self._fileInitializer = fileInitializer
-        self._initializerChooser = StrategyChooser[ScanInitializerType](
-            StrategyEntry[ScanInitializerType](simpleName='FromFile',
-                                               displayName='From File',
-                                               strategy=self._fileInitializer))
+        self._initializerChooser = PluginChooser[ScanInitializerType](
+            PluginEntry[ScanInitializerType](simpleName='FromFile',
+                                             displayName='From File',
+                                             strategy=self._fileInitializer))
 
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ScanSettings, scan: Scan,
@@ -359,21 +351,21 @@ class ScanInitializer(Observable, Observer):
                        reinitObservable: Observable) -> ScanInitializer:
         initializer = cls(settings, scan, fileInitializer, reinitObservable)
 
-        spiralInit = StrategyEntry[ScanInitializerType](simpleName='Spiral',
-                                                        displayName='Spiral',
-                                                        strategy=JitteredScanInitializer(
-                                                            rng, settings,
-                                                            SpiralScanInitializer(settings)))
+        spiralInit = PluginEntry[ScanInitializerType](simpleName='Spiral',
+                                                      displayName='Spiral',
+                                                      strategy=JitteredScanInitializer(
+                                                          rng, settings,
+                                                          SpiralScanInitializer(settings)))
         initializer._initializerChooser.addStrategy(spiralInit)
 
-        snakeInit = StrategyEntry[ScanInitializerType](
+        snakeInit = PluginEntry[ScanInitializerType](
             simpleName='Snake',
             displayName='Snake',
             strategy=JitteredScanInitializer(
                 rng, settings, CartesianScanInitializer.createSnakeInstance(settings)))
         initializer._initializerChooser.addStrategy(snakeInit)
 
-        rasterInit = StrategyEntry[ScanInitializerType](
+        rasterInit = PluginEntry[ScanInitializerType](
             simpleName='Raster',
             displayName='Raster',
             strategy=JitteredScanInitializer(

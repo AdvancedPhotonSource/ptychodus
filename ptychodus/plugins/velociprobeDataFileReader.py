@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from pathlib import Path
 from typing import Optional
 import logging
@@ -7,8 +8,37 @@ import h5py
 import numpy
 
 from .h5DataFileReader import H5DataFileReader
+from ptychodus.api.plugins import PluginRegistry
 
 logger = logging.getLogger(__name__)
+
+
+class DatasetState(Enum):
+    MISSING = auto()
+    FOUND = auto()
+    VALID = auto()
+
+
+@dataclass(frozen=True)
+class DataFile:
+    name: str
+    filePath: Path
+    dataPath: str
+
+    def getState(self) -> DatasetState:
+        state = DatasetState.MISSING
+
+        if self.filePath.is_file():
+            state = DatasetState.FOUND
+
+            try:
+                with h5py.File(self.filePath, 'r') as h5File:
+                    if self.dataPath in h5File:
+                        state = DatasetState.VALID
+            except OSError:
+                pass
+
+        return state
 
 
 @dataclass(frozen=True)
@@ -163,5 +193,5 @@ class VelociprobeDataFileReader(H5DataFileReader):
             self.entryGroup = None
 
 
-def registrable_plugins() -> list[DataFileReader]:
-    return [VelociprobeDataFileReader()]
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(VelociprobeDataFileReader())
