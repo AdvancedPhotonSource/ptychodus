@@ -1,7 +1,14 @@
 from abc import ABC, abstractmethod, abstractproperty
+from enum import Enum, auto
 from pathlib import Path
 
 from .tree import SimpleTreeNode
+
+
+class DatasetState(Enum):
+    MISSING = auto()
+    FOUND = auto()
+    VALID = auto()
 
 
 class DataFileReader(ABC):

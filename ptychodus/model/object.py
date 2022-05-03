@@ -124,8 +124,9 @@ class FileObjectInitializer(Observer):
         self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
 
     @classmethod
-    def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer,
-                       fileReaderChooser: PluginChooser[ObjectFileReader]) -> FileObjectInitializer:
+    def createInstance(
+            cls, settings: ObjectSettings, sizer: ObjectSizer,
+            fileReaderChooser: PluginChooser[ObjectFileReader]) -> FileObjectInitializer:
         initializer = cls(settings, sizer, fileReaderChooser)
 
         settings.inputFileType.addObserver(initializer)
@@ -241,7 +242,7 @@ class ObjectInitializer(Observable, Observer):
         self._object.setArray(initializer())
 
     def getOpenFileFilterList(self) -> list[str]:
-        return [self._fileInitializer.getOpenFileFilter()]
+        return self._fileInitializer.getOpenFileFilterList()
 
     def openObject(self, filePath: Path) -> None:
         self._fileInitializer.openObject(filePath)

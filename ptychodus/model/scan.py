@@ -141,7 +141,8 @@ class JitteredScanInitializer(Sequence[ScanPoint]):
 
 
 class FileScanInitializer(Sequence[ScanPoint], Observer):
-    def __init__(self, settings: ScanSettings, fileReaderChooser: PluginChooser[ScanFileReader]) -> None:
+    def __init__(self, settings: ScanSettings,
+                 fileReaderChooser: PluginChooser[ScanFileReader]) -> None:
         super().__init__()
         self._settings = settings
         self._fileReaderChooser = fileReaderChooser
@@ -149,7 +150,7 @@ class FileScanInitializer(Sequence[ScanPoint], Observer):
 
     @classmethod
     def createInstance(cls, settings: ScanSettings,
-            fileReaderChooser: PluginChooser[ScanFileReader]) -> FileScanInitializer:
+                       fileReaderChooser: PluginChooser[ScanFileReader]) -> FileScanInitializer:
         initializer = cls(settings, fileReaderChooser)
 
         settings.inputFileType.addObserver(initializer)
@@ -279,7 +280,7 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
         self.notifyObservers()
 
     def getSaveFileFilter(self) -> str:
-        return 'Comma-Separated Values Files (*.csv)'
+        return 'Comma-Separated Values Files (*.csv)'  # TODO from plugins
 
     def write(self, filePath: Path) -> None:
         with open(filePath, 'wt') as csvFile:

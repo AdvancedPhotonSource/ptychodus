@@ -5,17 +5,19 @@ import logging
 
 import numpy
 
-from ..api.observer import *
 from ..api.plugins import PluginRegistry
-from ..api.settings import *
+from ..api.settings import SettingsRegistry
 from .crop import *
 from .data import *
 from .detector import *
 from .image import *
 from .object import *
 from .probe import *
+from .ptychonn import PtychoNNBackend
+from .ptychopy import PtychoPyBackend
 from .reconstructor import *
 from .scan import *
+from .tike import TikeBackend
 from .velociprobe import *
 
 import ptychodus.plugins
@@ -71,7 +73,10 @@ class ModelCore:
                                                                    self._fileObjectInitializer,
                                                                    self.settingsRegistry)
 
-        self._velociprobeReader = None  # FIXME
+        self._velociprobeReader = next(entry.strategy
+                                       for entry in self._pluginRegistry.dataFileReaders
+                                       if type(entry.strategy).__name__ ==
+                                       'VelociprobeDataFileReader')  # TODO remove when able
         self._velociprobeImageSequence = VelociprobeImageSequence.createInstance(
             self._velociprobeReader)
         self._croppedImageSequence = CroppedImageSequence.createInstance(

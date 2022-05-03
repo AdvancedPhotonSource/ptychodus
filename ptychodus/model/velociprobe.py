@@ -5,6 +5,7 @@ import logging
 import h5py
 import numpy
 
+from ..api.data import DatasetState
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup
 from .crop import CropSettings

@@ -42,7 +42,7 @@ class NullReconstructor(Reconstructor):
         return 0
 
 
-class SelectableReconstructor(Reconstructor, Observer):  # TODO refactor
+class SelectableReconstructor(Reconstructor, Observable, Observer):  # TODO refactor
     @staticmethod
     def _createAlgorithmEntry(reconstructor: Reconstructor) -> PluginEntry[Reconstructor]:
         return PluginEntry[Reconstructor](simpleName=reconstructor.name,

@@ -77,7 +77,8 @@ class DataDirectoryWatcher(threading.Thread):
 
 
 class DataFilePresenter(Observable, Observer):
-    def __init__(self, settings: DataSettings, fileReaderChooser: PluginChooser[DataFileReader]) -> None:
+    def __init__(self, settings: DataSettings,
+                 fileReaderChooser: PluginChooser[DataFileReader]) -> None:
         super().__init__()
         self._settings = settings
         self._fileReaderChooser = fileReaderChooser

@@ -22,7 +22,6 @@ from .probe import Probe, ProbeSizer
 from .reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
 from .scan import Scan
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .velociprobe import VelociprobeReader
 
 logger = logging.getLogger(__name__)
 
