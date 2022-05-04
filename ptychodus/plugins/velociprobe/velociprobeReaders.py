@@ -18,28 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class DataFile:
-    name: str
-    filePath: Path
-    dataPath: str
-
-    def getState(self) -> DatasetState:
-        state = DatasetState.MISSING
-
-        if self.filePath.is_file():
-            state = DatasetState.FOUND
-
-            try:
-                with h5py.File(self.filePath, 'r') as h5File:
-                    if self.dataPath in h5File:
-                        state = DatasetState.VALID
-            except OSError:
-                pass
-
-        return state
-
-
-@dataclass(frozen=True)
 class DataGroup:
     datafileList: list[DataFile] = field(default_factory=list)
 

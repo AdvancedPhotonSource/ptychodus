@@ -410,30 +410,19 @@ class TikeReconstructor:
     def backendName(self) -> str:
         return 'Tike'
 
-    def getData(self) -> numpy.ndarray:
-        dataList: list[numpy.ndarray] = list()
+    def getData(self) -> numpy.ndarray:  # FIXME extract and share with other backends
+        dataList: list[ImageArrayType] = list()
 
-        if self._velociprobeReader.entryGroup:
-            for datafile in self._velociprobeReader.entryGroup.data:
-                try:
-                    with h5py.File(datafile.filePath, 'r') as h5File:
-                        item = h5File.get(datafile.dataPath)
+        for dataset in self._dataFile:
+            data = dataset.getArray()
 
-                        if isinstance(item, h5py.Dataset):
-                            data = item[()]
+            if self._cropSizer.isCropEnabled():
+                sliceX = self._cropSizer.getSliceX()
+                sliceY = self._cropSizer.getSliceY()
+                data = numpy.copy(data[..., sliceY, sliceX])
 
-                            if self._cropSizer.isCropEnabled():
-                                sliceX = self._cropSizer.getSliceX()
-                                sliceY = self._cropSizer.getSliceY()
-                                data = numpy.copy(data[..., sliceY, sliceX])
-
-                            dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
-                            dataList.append(dataShifted)
-                        else:
-                            message = f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.'
-                            logger.debug(message)
-                except FileNotFoundError:
-                    logger.debug(f'File {datafile.filePath} not found!')
+            dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
+            dataList.append(dataShifted)
 
         return numpy.concatenate(dataList).astype('float32')
 

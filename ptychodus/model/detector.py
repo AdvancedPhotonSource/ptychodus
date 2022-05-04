@@ -1,10 +1,7 @@
 from __future__ import annotations
-from pathlib import Path
 from decimal import Decimal
 
-import numpy
-
-from .image import ImageSequence
+from ..api.data import DiffractionDataset, ImageArrayType
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
 
@@ -130,31 +127,41 @@ class DetectorPresenter(Observer, Observable):
 
 
 class DetectorImagePresenter(Observable, Observer):
-    def __init__(self, imageSequence: ImageSequence) -> None:
+    def __init__(self, dataFile: DataFile) -> None:
         super().__init__()
-        self._imageSequence = imageSequence
+        self._dataFile = dataFile
+        self._currentDatasetIndex = 0
+        self._currentDataset = None
 
     @classmethod
-    def createInstance(cls, imageSequence: ImageSequence) -> DetectorImagePresenter:
-        presenter = cls(imageSequence)
-        imageSequence.addObserver(presenter)
+    def createInstance(cls, dataFile: DataFile) -> DetectorImagePresenter:
+        presenter = cls(dataFile)
+        dataFile.addObserver(presenter)
         return presenter
 
     def setCurrentDatasetIndex(self, index: int) -> None:
-        self._imageSequence.setCurrentDatasetIndex(index)
+        self._currentDatasetIndex = index
+        self._currentDataset = self._dataFile[index]
 
     def getCurrentDatasetIndex(self) -> int:
-        return self._imageSequence.getCurrentDatasetIndex()
+        return self._currentDatasetIndex
 
     def getNumberOfImages(self) -> int:
-        return len(self._imageSequence)
+        return len(self._currentDataset) if self._currentDataset else 0
 
-    def getImage(self, index: int) -> numpy.ndarray:
-        try:
-            return self._imageSequence[index]
-        except IndexError:
-            return numpy.empty((0, 0))
+    def getImage(self, index: int) -> ImageArrayType:
+        image = numpy.empty((0, 0))
+
+        if self._currentDataset:
+            try:
+                image = self._dataFile[index]
+            except IndexError:
+                pass
+
+        return image
 
     def update(self, observable: Observable) -> None:
-        if observable is self._imageSequence:
+        if observable is self._dataFile:
+            self._currentDatasetIndex = 0
+            self._currentDataset = None
             self.notifyObservers()

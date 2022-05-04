@@ -1,14 +1,33 @@
 from abc import ABC, abstractmethod, abstractproperty
+from collections.abc import Sequence
 from enum import Enum, auto
 from pathlib import Path
 
+import numpy
+
 from .tree import SimpleTreeNode
+
+ImageArrayType = numpy.typing.NDArray[numpy.integers]
 
 
 class DatasetState(Enum):
     MISSING = auto()
     FOUND = auto()
     VALID = auto()
+
+
+class DiffractionDataset(Sequence[ImageArrayType]):
+    @abstractmethod
+    def getState(self) -> DatasetState:
+        pass
+
+    @abstractmethod
+    def getArray(self) -> ImageArrayType:
+        pass
+
+
+class DataFile(Sequence[DiffractionDataset]):
+    pass
 
 
 class DataFileReader(ABC):
@@ -25,5 +44,5 @@ class DataFileReader(ABC):
         pass
 
     @abstractmethod
-    def read(self, filePath: Path) -> None:
+    def read(self, filePath: Path) -> DataFile:
         pass

@@ -98,34 +98,22 @@ class CropSizer(Observer, Observable):
             self.notifyObservers()
 
 
-class CroppedImageSequence(ImageSequence):
-    def __init__(self, sizer: CropSizer, imageSequence: ImageSequence) -> None:
+class CroppedDiffractionDataset(DiffractionDataset):
+    def __init__(self, sizer: CropSizer, dataset: DiffractionDataset) -> None:
         super().__init__()
         self._sizer = sizer
-        self._imageSequence = imageSequence
+        self._dataset = dataset
 
     @classmethod
     def createInstance(cls, sizer: CropSizer,
-                       imageSequence: ImageSequence) -> CroppedImageSequence:
-        croppedImageSequence = cls(sizer, imageSequence)
-        sizer.addObserver(croppedImageSequence)
-        imageSequence.addObserver(croppedImageSequence)
-        return croppedImageSequence
-
-    def setCurrentDatasetIndex(self, index: int) -> None:
-        self._imageSequence.setCurrentDatasetIndex(index)
-
-    def getCurrentDatasetIndex(self) -> int:
-        return self._imageSequence.getCurrentDatasetIndex()
-
-    def getWidth(self) -> int:
-        return self._imageSequence.getWidth()
-
-    def getHeight(self) -> int:
-        return self._imageSequence.getHeight()
+                       dataset: DiffractionDataset) -> CroppedDiffractionDataset:
+        croppedDataset = cls(sizer, dataset)
+        sizer.addObserver(croppedDataset)
+        dataset.addObserver(croppedDataset)
+        return croppedDataset
 
     def __getitem__(self, index: int) -> numpy.ndarray:
-        img = self._imageSequence[index]
+        img = self._dataset[index]
 
         if self._sizer.isCropEnabled():
             sliceX = self._sizer.getSliceX()
@@ -135,12 +123,12 @@ class CroppedImageSequence(ImageSequence):
         return img
 
     def __len__(self) -> int:
-        return len(self._imageSequence)
+        return len(self._dataset)
 
     def update(self, observable: Observable) -> None:
         if observable is self._sizer:
             self.notifyObservers()
-        elif observable is self._imageSequence:
+        elif observable is self._dataset:
             self.notifyObservers()
 
 
