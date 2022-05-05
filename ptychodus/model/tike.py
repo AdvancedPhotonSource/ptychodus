@@ -14,14 +14,15 @@ except ImportError:
         ptycho = None
 
 
+from ..api.data import DataFile, DiffractionDataset
+from ..api.observer import Observable, Observer
+from ..api.settings import SettingsRegistry, SettingsGroup
 from .crop import CropSizer
 from .image import ImageExtent
 from .object import Object, ObjectSizer
-from ..api.observer import Observable, Observer
 from .probe import Probe, ProbeSizer
 from .reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
 from .scan import Scan
-from ..api.settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
 
@@ -390,15 +391,15 @@ class TikeReconstructor:
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
-                 velociprobeReader: VelociprobeReader, scan: Scan, probeSizer: ProbeSizer,
-                 probe: Probe, objectSizer: ObjectSizer, object_: Object,
+                 dataFile: DataFile, scan: Scan, probeSizer: ProbeSizer, probe: Probe,
+                 objectSizer: ObjectSizer, object_: Object,
                  reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
         self._cropSizer = cropSizer
-        self._velociprobeReader = velociprobeReader
+        self._dataFile = dataFile
         self._scan = scan
         self._probeSizer = probeSizer
         self._probe = probe
@@ -410,7 +411,7 @@ class TikeReconstructor:
     def backendName(self) -> str:
         return 'Tike'
 
-    def getData(self) -> numpy.ndarray:  # FIXME extract and share with other backends
+    def getData(self) -> ImageArrayType:  # FIXME extract and share with other backends
         dataList: list[ImageArrayType] = list()
 
         for dataset in self._dataFile:
@@ -687,7 +688,7 @@ class TikeBackend:
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
                        cropSizer: CropSizer,
-                       velociprobeReader: VelociprobeReader,
+                       dataFile: DataFile,
                        scan: Scan,
                        probeSizer: ProbeSizer,
                        probe: Probe,
@@ -703,8 +704,8 @@ class TikeBackend:
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, cropSizer,
-                                                  velociprobeReader, scan, probeSizer, probe,
-                                                  objectSizer, object_, reconstructorPlotPresenter)
+                                                  dataFile, scan, probeSizer, probe, objectSizer,
+                                                  object_, reconstructorPlotPresenter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

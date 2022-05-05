@@ -40,6 +40,7 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
+        self._dataDirectoryWatcher = DataDirectoryWatcher()
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
 
@@ -77,11 +78,10 @@ class ModelCore:
                                        for entry in self._pluginRegistry.dataFileReaders
                                        if type(entry.strategy).__name__ ==
                                        'VelociprobeDataFileReader')  # TODO remove when able
-        self._velociprobeImageSequence = VelociprobeImageSequence.createInstance(
-            self._velociprobeReader)
-        self._croppedImageSequence = CroppedImageSequence.createInstance(
-            self._cropSizer, self._velociprobeImageSequence)
-        self._dataDirectoryWatcher = DataDirectoryWatcher()
+        self._activeDiffractionDataset = None  # FIXME
+        self._croppedDiffractionDataset = CroppedDiffractionDataset.createInstance(
+            self._cropSizer, self._activeDiffractionDataset)
+
         self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
@@ -103,7 +103,7 @@ class ModelCore:
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.detectorImagePresenter = DetectorImagePresenter.createInstance(
-            self._croppedImageSequence)
+            self._croppedDiffractionDataset)
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
             self._probeSettings)

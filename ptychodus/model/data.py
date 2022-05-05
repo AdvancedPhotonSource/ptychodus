@@ -76,6 +76,10 @@ class DataDirectoryWatcher(threading.Thread):
         self._stopEvent.set()
 
 
+class ActiveDiffractionDataset(DiffractionDataset, Observable):  # FIXME
+    pass
+
+
 class DataFilePresenter(Observable, Observer):
     def __init__(self, settings: DataSettings,
                  fileReaderChooser: PluginChooser[DataFileReader]) -> None:

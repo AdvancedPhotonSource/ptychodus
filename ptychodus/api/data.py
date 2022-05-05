@@ -4,6 +4,7 @@ from enum import Enum, auto
 from pathlib import Path
 
 import numpy
+import numpy.typing
 
 from .tree import SimpleTreeNode
 

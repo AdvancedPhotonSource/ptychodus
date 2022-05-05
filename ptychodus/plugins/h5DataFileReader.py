@@ -4,7 +4,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.data import DataFileReader
+from ptychodus.api.data import *
 from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -12,7 +12,7 @@ from ptychodus.api.tree import SimpleTreeNode
 logger = logging.getLogger(__name__)
 
 
-class H5DataFileReader(DataFileReader, Observable):
+class H5DataFileReader(DataFileReader):
     @staticmethod
     def createRootNode() -> SimpleTreeNode:
         return SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
@@ -110,8 +110,6 @@ class H5DataFileReader(DataFileReader, Observable):
                     treeNode.itemData = [itemName, itemType, itemDetails]
 
             self.readRootGroup(h5File)
-
-        self.notifyObservers()
 
     def readRootGroup(self, rootGroup: h5py.Group) -> None:
         pass

@@ -99,14 +99,14 @@ class CropSizer(Observer, Observable):
 
 
 class CroppedDiffractionDataset(DiffractionDataset):
-    def __init__(self, sizer: CropSizer, dataset: DiffractionDataset) -> None:
+    def __init__(self, sizer: CropSizer, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._sizer = sizer
         self._dataset = dataset
 
     @classmethod
     def createInstance(cls, sizer: CropSizer,
-                       dataset: DiffractionDataset) -> CroppedDiffractionDataset:
+                       dataset: ActiveDiffractionDataset) -> CroppedDiffractionDataset:
         croppedDataset = cls(sizer, dataset)
         sizer.addObserver(croppedDataset)
         dataset.addObserver(croppedDataset)
