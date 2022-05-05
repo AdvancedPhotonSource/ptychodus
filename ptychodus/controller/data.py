@@ -156,7 +156,7 @@ class DataFileController(Observer):
             nodeItem = nodeItem.parentItem
 
         dataPath = '/' + '/'.join(reversed(names))
-        data = self._presenter.openDataSet(dataPath)
+        data = self._presenter.openDataset(dataPath)
         self._tableModel.setArray(data)
 
     def update(self, observable: Observable) -> None:

@@ -1,5 +1,4 @@
 from .core import ModelCore
-from .crop import *
 from .data import *
 from .detector import *
 from .image import *

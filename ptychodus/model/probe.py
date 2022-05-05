@@ -7,11 +7,10 @@ import logging
 import numpy
 
 from ..api.observer import Observable, Observer
+from ..api.plugins import PluginChooser, PluginEntry
 from ..api.probe import *
 from ..api.settings import SettingsRegistry, SettingsGroup
-from ..api.plugins import PluginChooser, PluginEntry
-from .crop import CropSizer
-from .detector import DetectorSettings
+from .detector import CropSizer, Detector
 from .fzp import single_probe
 from .geometry import Interval
 from .image import ImageExtent
@@ -105,8 +104,8 @@ class ProbeSizer(Observable, Observer):
 
 
 class GaussianBeamProbeInitializer:
-    def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings) -> None:
-        self._detectorSettings = detectorSettings
+    def __init__(self, detector: Detector, probeSettings: ProbeSettings) -> None:
+        self._detector = detector
         self._probeSettings = probeSettings
 
     def _createCircularMask(self) -> ProbeArrayType:
@@ -114,8 +113,8 @@ class GaussianBeamProbeInitializer:
         height_px = width_px
 
         Y_px, X_px = numpy.ogrid[:height_px, :width_px]
-        X_m = (X_px - width_px / 2) * float(self._detectorSettings.pixelSizeXInMeters.value)
-        Y_m = (Y_px - height_px / 2) * float(self._detectorSettings.pixelSizeYInMeters.value)
+        X_m = (X_px - width_px / 2) * float(self._detector.pixelSizeXInMeters)
+        Y_m = (Y_px - height_px / 2) * float(self._detector.pixelSizeYInMeters)
 
         probeRadius_m = self._probeSettings.probeDiameterInMeters.value / 2
         R_m = numpy.hypot(X_m, Y_m)
@@ -130,18 +129,18 @@ class GaussianBeamProbeInitializer:
 
 
 class FresnelZonePlateProbeInitializer:
-    def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
+    def __init__(self, detector: Detector, probeSettings: ProbeSettings,
                  sizer: ProbeSizer) -> None:
-        self._detectorSettings = detectorSettings
+        self._detector = detector
         self._probeSettings = probeSettings
         self._sizer = sizer
 
     def __call__(self) -> ProbeArrayType:
         shape = self._sizer.getProbeSize()
         lambda0 = self._sizer.getWavelengthInMeters()
-        dx_dec = self._detectorSettings.pixelSizeXInMeters.value  # TODO non-square pixels are unsupported
+        dx_dec = self._detector.pixelSizeXInMeters  # TODO non-square pixels are unsupported
         dis_defocus = self._probeSettings.defocusDistanceInMeters.value
-        dis_StoD = self._detectorSettings.detectorDistanceInMeters.value
+        dis_StoD = self._detector.distanceToObjectInMeters
         radius = self._probeSettings.zonePlateRadiusInMeters.value
         outmost = self._probeSettings.outermostZoneWidthInMeters.value
         beamstop = self._probeSettings.beamstopDiameterInMeters.value
@@ -262,21 +261,21 @@ class ProbeInitializer(Observable, Observer):
                                               strategy=self._fileInitializer))
 
     @classmethod
-    def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
-                       sizer: ProbeSizer, probe: Probe, fileInitializer: FileProbeInitializer,
+    def createInstance(cls, detector: Detector, probeSettings: ProbeSettings, sizer: ProbeSizer,
+                       probe: Probe, fileInitializer: FileProbeInitializer,
                        reinitObservable: Observable) -> ProbeInitializer:
         initializer = cls(probeSettings, sizer, probe, fileInitializer, reinitObservable)
 
         fzpInit = PluginEntry[ProbeInitializerType](simpleName='FresnelZonePlate',
                                                     displayName='Fresnel Zone Plate',
                                                     strategy=FresnelZonePlateProbeInitializer(
-                                                        detectorSettings, probeSettings, sizer))
+                                                        detector, probeSettings, sizer))
         initializer._initializerChooser.addStrategy(fzpInit)
 
         gaussInit = PluginEntry[ProbeInitializerType](simpleName='GaussianBeam',
                                                       displayName='Gaussian Beam',
                                                       strategy=GaussianBeamProbeInitializer(
-                                                          detectorSettings, probeSettings))
+                                                          detector, probeSettings))
         initializer._initializerChooser.addStrategy(gaussInit)
 
         probeSettings.initializer.addObserver(initializer)

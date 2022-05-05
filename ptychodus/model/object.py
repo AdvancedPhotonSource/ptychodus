@@ -10,8 +10,7 @@ from ..api.object import *
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
 from ..api.plugins import PluginChooser, PluginEntry
-from .crop import CropSizer
-from .detector import Detector
+from .detector import CropSizer, Detector
 from .geometry import Box, Interval
 from .image import ImageExtent
 from .probe import ProbeSizer

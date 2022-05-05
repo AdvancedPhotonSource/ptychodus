@@ -6,9 +6,10 @@ from pathlib import Path
 import numpy
 import numpy.typing
 
+from .observer import Observable
 from .tree import SimpleTreeNode
 
-ImageArrayType = numpy.typing.NDArray[numpy.integers]
+DataArrayType = numpy.typing.NDArray[numpy.integer]
 
 
 class DatasetState(Enum):
@@ -17,18 +18,20 @@ class DatasetState(Enum):
     VALID = auto()
 
 
-class DiffractionDataset(Sequence[ImageArrayType]):
+class DiffractionDataset(Sequence[DataArrayType], Observable):
     @abstractmethod
     def getState(self) -> DatasetState:
         pass
 
     @abstractmethod
-    def getArray(self) -> ImageArrayType:
+    def getArray(self) -> DataArrayType:
         pass
 
 
 class DataFile(Sequence[DiffractionDataset]):
-    pass
+    @abstractmethod
+    def getFileContentsTree(self) -> SimpleTreeNode:
+        pass
 
 
 class DataFileReader(ABC):
@@ -38,10 +41,6 @@ class DataFileReader(ABC):
 
     @abstractproperty
     def fileFilter(self) -> str:
-        pass
-
-    @abstractmethod
-    def getFileContentsTree(self) -> SimpleTreeNode:
         pass
 
     @abstractmethod

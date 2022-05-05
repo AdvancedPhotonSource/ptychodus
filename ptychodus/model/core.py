@@ -7,10 +7,8 @@ import numpy
 
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
-from .crop import *
 from .data import *
 from .detector import *
-from .image import *
 from .object import *
 from .probe import *
 from .ptychonn import PtychoNNBackend
@@ -32,7 +30,7 @@ class ModelCore:
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
         self.settingsRegistry = SettingsRegistry()
-        self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
+        self._dataSettings = Datasettings.createInstance(self.settingsRegistry)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
         self._scanSettings = ScanSettings.createInstance(self.settingsRegistry)
@@ -57,7 +55,7 @@ class ModelCore:
         self._fileProbeInitializer = FileProbeInitializer.createInstance(
             self._probeSettings, self._probeSizer,
             self._pluginRegistry.buildProbeFileReaderChooser())
-        self._probeInitializer = ProbeInitializer.createInstance(self._detectorSettings,
+        self._probeInitializer = ProbeInitializer.createInstance(self._detector,
                                                                  self._probeSettings,
                                                                  self._probeSizer, self._probe,
                                                                  self._fileProbeInitializer,
@@ -78,16 +76,17 @@ class ModelCore:
                                        for entry in self._pluginRegistry.dataFileReaders
                                        if type(entry.strategy).__name__ ==
                                        'VelociprobeDataFileReader')  # TODO remove when able
-        self._activeDiffractionDataset = None  # FIXME
-        self._croppedDiffractionDataset = CroppedDiffractionDataset.createInstance(
-            self._cropSizer, self._activeDiffractionDataset)
+
+        self._activeDataFile = ActiveDataFile()
+        self._activeDiffractionDataset = ActiveDiffractionDataset.createInstance(
+            self._activeDataFile, self._cropSizer)
 
         self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSizer,
-                                                      self._velociprobeReader, self._scan,
+                                                      self._activeDataFile, self._scan,
                                                       self._probeSizer, self._probe,
                                                       self._objectSizer, self._object,
                                                       self.reconstructorPlotPresenter,
@@ -99,11 +98,12 @@ class ModelCore:
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
 
         self.dataFilePresenter = DataFilePresenter.createInstance(
-            self._dataSettings, self._pluginRegistry.buildDataFileReaderChooser())
+            self._dataSettings, self._activeDataFile,
+            self._pluginRegistry.buildDataFileReaderChooser())
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.detectorImagePresenter = DetectorImagePresenter.createInstance(
-            self._croppedDiffractionDataset)
+            self._activeDiffractionDataset)
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
             self._probeSettings)

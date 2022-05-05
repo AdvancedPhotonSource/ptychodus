@@ -3,7 +3,9 @@ from typing import Optional
 from PyQt5.QtCore import Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QDialog, QListView, QTableView
 
-from ..model import ObjectPresenter, Observable, Observer, ProbePresenter, SettingsGroup, SettingsRegistry, VelociprobePresenter
+from ..api.observer import Observable, Observer
+from ..api.settings import SettingsGroup, SettingsRegistry
+from ..model import ObjectPresenter, ProbePresenter, VelociprobePresenter
 from ..view import ImportSettingsDialog
 from .data import FileDialogFactory
 

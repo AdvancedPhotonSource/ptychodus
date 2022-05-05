@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from PyQt5.QtWidgets import QWidget
 
-from ..model import Observable, Observer  # FIXME, TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter
+from ..model import Observable, Observer  # TODO, TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter
 from ..view import TikeAdaptiveMomentView, TikeBasicParametersView, TikeObjectCorrectionView, \
         TikeParametersView, TikePositionCorrectionView, TikeProbeCorrectionView
 from .reconstructor import ReconstructorViewControllerFactory

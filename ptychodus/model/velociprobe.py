@@ -2,15 +2,12 @@ from __future__ import annotations
 from pathlib import Path
 import logging
 
-import h5py
 import numpy
 
 from ..api.data import DatasetState
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup
-from .crop import CropSettings
-from .detector import DetectorSettings
-from .image import ImageSequence
+from .detector import CropSettings, DetectorSettings
 from .probe import ProbeSettings
 
 logger = logging.getLogger(__name__)

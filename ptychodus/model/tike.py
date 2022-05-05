@@ -4,7 +4,6 @@ from typing import Any
 import logging
 
 import numpy
-import h5py
 
 try:
     import tike.ptycho
@@ -17,7 +16,7 @@ except ImportError:
 from ..api.data import DataFile, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .crop import CropSizer
+from .detector import CropSizer
 from .image import ImageExtent
 from .object import Object, ObjectSizer
 from .probe import Probe, ProbeSizer
@@ -411,8 +410,8 @@ class TikeReconstructor:
     def backendName(self) -> str:
         return 'Tike'
 
-    def getData(self) -> ImageArrayType:  # FIXME extract and share with other backends
-        dataList: list[ImageArrayType] = list()
+    def getData(self) -> DataArrayType:  # TODO extract and share with other backends
+        dataList: list[DataArrayType] = list()
 
         for dataset in self._dataFile:
             data = dataset.getArray()
@@ -420,7 +419,7 @@ class TikeReconstructor:
             if self._cropSizer.isCropEnabled():
                 sliceX = self._cropSizer.getSliceX()
                 sliceY = self._cropSizer.getSliceY()
-                data = numpy.copy(data[..., sliceY, sliceX])
+                data = data[..., sliceY, sliceX].copy()
 
             dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
             dataList.append(dataShifted)
@@ -528,7 +527,7 @@ class TikeReconstructor:
             scan = scan[:numFrame, ...]
             data = data[:numFrame, ...]
 
-        # FIXME figure out how to remove the next line
+        # FIXME figure out how to remove the next line (get_padded_object)
         psi, scan = tike.ptycho.object.get_padded_object(scan, probe)
 
         logger.debug(f'data shape={data.shape}')

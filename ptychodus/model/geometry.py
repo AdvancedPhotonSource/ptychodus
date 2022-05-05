@@ -42,18 +42,18 @@ class Box(Generic[T]):
         return iter(self._intervalList)
 
     @overload
-    def __getitem__(self, idx: int) -> Interval[T]:
+    def __getitem__(self, index: int) -> Interval[T]:
         ...
 
     @overload
-    def __getitem__(self, idx: slice) -> Box[T]:
+    def __getitem__(self, index: slice) -> Box[T]:
         ...
 
-    def __getitem__(self, idx: Union[slice, int]) -> Union[Box[T], Interval[T]]:
-        if isinstance(idx, slice):
-            return Box(self._intervalList[idx])
+    def __getitem__(self, index: Union[slice, int]) -> Union[Box[T], Interval[T]]:
+        if isinstance(index, slice):
+            return Box(self._intervalList[index])
         else:
-            return self._intervalList[idx]
+            return self._intervalList[index]
 
     def __len__(self) -> int:
         return len(self._intervalList)
