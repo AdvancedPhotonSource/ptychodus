@@ -2,6 +2,8 @@ from __future__ import annotations
 from decimal import Decimal
 import logging
 
+import numpy
+
 from ..api.data import DiffractionDataset, DataArrayType
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup

@@ -10,7 +10,7 @@ import logging
 import h5py
 import numpy
 
-from ..h5DataFileReader import H5DataFileReader
+from ..h5DataFileReader import H5DataFileTreeBuilder, H5DataFile
 from ptychodus.api.data import *
 from ptychodus.api.scan import ScanFileReader, ScanPoint, ScanPointParseError
 
@@ -19,16 +19,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DataGroup:
-    datafileList: list[DataFile] = field(default_factory=list)
+    datasetList: list[DiffractionDataset] = field(default_factory=list)
 
     def __iter__(self):
-        return iter(self.datafileList)
+        return iter(self.datasetList)
 
     def __getitem__(self, index: int) -> DataFile:
-        return self.datafileList[index]
+        return self.datasetList[index]
 
     def __len__(self) -> int:
-        return len(self.datafileList)
+        return len(self.datasetList)
 
 
 @dataclass(frozen=True)
@@ -70,39 +70,47 @@ class SampleGroup:
 
 @dataclass(frozen=True)
 class EntryGroup:
-    data: Optional[DataGroup]
-    instrument: Optional[InstrumentGroup]
-    sample: Optional[SampleGroup]
+    data: DataGroup
+    instrument: InstrumentGroup
+    sample: SampleGroup
 
 
-class VelociprobeDataFileReader(H5DataFileReader):
+class VelociprobeDataFileReader(DataFileReader, Observable):
     def __init__(self) -> None:
-        super().__init__(simpleName='Velociprobe',
-                         fileFilter='Velociprobe Master Files (*.h5 *.hdf5)')
+        super().__init__()
+        self._treeBuilder = H5DataFileTreeBuilder()
         self.masterFilePath: Optional[Path] = None
         self.entryGroup: Optional[EntryGroup] = None
 
-    def _readDataGroup(self, h5DataGroup: Optional[h5py.Group]) -> Optional[DataGroup]:
+    @property
+    def simpleName(self) -> str:
+        return 'Velociprobe'
+
+    @property
+    def fileFilter(self) -> str:
+        return 'Velociprobe Master Files (*.h5 *.hdf5)'
+
+    def _readDataGroup(self, h5DataGroup: h5py.Group) -> DataGroup:
         if h5DataGroup is None:
             return None
 
-        datafileList = list()
+        datasetList = list()
 
         for name, h5Item in h5DataGroup.items():
             h5Item = h5DataGroup.get(name, getlink=True)
 
             if isinstance(h5Item, h5py.ExternalLink) and self.masterFilePath is not None:
-                datafile = DataFile(name=name,
+                dataset = DataFile(name=name,
                                     filePath=self.masterFilePath.parent / h5Item.filename,
                                     dataPath=str(h5Item.path))
-                datafileList.append(datafile)
+                datasetList.append(dataset)
 
-        datafileList.sort(key=lambda x: x.name)
+        datasetList.sort(key=lambda x: x.name)
 
-        return DataGroup(datafileList)
+        return DataGroup(datasetList)
 
     @staticmethod
-    def _readInstrumentGroup(h5InstrumentGroup: Optional[h5py.Group]) -> Optional[InstrumentGroup]:
+    def _readInstrumentGroup(h5InstrumentGroup: h5py.Group) -> InstrumentGroup:
         if h5InstrumentGroup is None:
             return None
 
@@ -141,7 +149,7 @@ class VelociprobeDataFileReader(H5DataFileReader):
         return InstrumentGroup(detector=detector)
 
     @staticmethod
-    def _readSampleGroup(h5SampleGroup: Optional[h5py.Group]) -> Optional[SampleGroup]:
+    def _readSampleGroup(h5SampleGroup: h5py.Group) -> SampleGroup:
         if h5SampleGroup is None:
             return None
 
@@ -153,20 +161,41 @@ class VelociprobeDataFileReader(H5DataFileReader):
         goniometer = GoniometerGroup(chi_deg=float(h5ChiDataset[0]))
         return SampleGroup(goniometer=goniometer)
 
-    def readRootGroup(self, rootGroup: h5py.Group) -> None:
-        self.masterFilePath = Path(rootGroup.filename)
-        h5EntryGroup = rootGroup.get('entry')
+    def read(self, filePath: Path) -> DataFile:
+        contentsTree = self._treeBuilder.createRootNode()
+        datasetList: list[DiffractionDataset] = list()
 
-        if h5EntryGroup:
-            dataGroup = self._readDataGroup(h5EntryGroup.get('data'))
-            instrumentGroup = self._readInstrumentGroup(h5EntryGroup.get('instrument'))
-            sampleGroup = self._readSampleGroup(h5EntryGroup.get('sample'))
-            self.entryGroup = EntryGroup(data=dataGroup,
-                                         instrument=instrumentGroup,
-                                         sample=sampleGroup)
-        else:
-            logger.debug(f'File {self.masterFilePath} is not a velociprobe data file.')
-            self.entryGroup = None
+        if filePath:
+            self.masterFilePath = filePath
+
+            with h5py.File(filePath, 'r') as h5File:
+                contentsTree = self._treeBuilder.build(h5File)
+                h5EntryGroup = h5File.get('entry')
+
+                if h5EntryGroup:
+                    try:
+                        h5DataGroup = h5EntryGroup['data']
+                        h5InstrumentGroup = h5EntryGroup['instrument']
+                        h5SampleGroup = h5EntryGroup['sample']
+                    except KeyError:
+                        logger.info(f'File {filePath} is not a velociprobe data file.')
+                        self.entryGroup = None
+                    else:
+                        dataGroup = self._readDataGroup(h5DataGroup)
+                        instrumentGroup = self._readInstrumentGroup(h5InstrumentGroup)
+                        sampleGroup = self._readSampleGroup(h5SampleGroup)
+
+                        self.entryGroup = EntryGroup(data=dataGroup,
+                                                     instrument=instrumentGroup,
+                                                     sample=sampleGroup)
+                        datasetList = list(dataGroup.datasetList)
+                else:
+                    logger.info(f'File {filePath} is not a velociprobe data file.')
+                    self.entryGroup = None
+
+            self.notifyObservers()
+
+        return H5DataFile(contentsTree, datasetList)
 
 
 class VelociprobeScanYPositionSource(IntEnum):
@@ -248,7 +277,7 @@ class VelociprobeScanFileReader(ScanFileReader):
         for idx, scanPoint in enumerate(scanPointList):
             chi_rad = 0.
 
-            if self._dataFileReader.entryGroup and self._dataFileReader.entryGroup.sample and self._dataFileReader.entryGroup.sample.goniometer:
+            if self._dataFileReader.entryGroup:
                 chi_rad = self._dataFileReader.entryGroup.sample.goniometer.chi_rad
 
             x_m = (scanPoint.x - xMeanInMeters) * Decimal(numpy.cos(chi_rad))

@@ -28,7 +28,7 @@ class PluginChooser(Generic[T], Observable):
     def __init__(self, defaultEntry: PluginEntry[T]) -> None:
         super().__init__()
         self._entryList: list[PluginEntry[T]] = [defaultEntry]
-        self._entry = defaultEntry
+        self._entry: PluginEntry[T] = defaultEntry
 
     @classmethod
     def createFromList(cls, entryList: list[PluginEntry[T]]) -> PluginChooser:
@@ -93,17 +93,17 @@ class PluginChooser(Generic[T], Observable):
 
 class PluginRegistry:
     def __init__(self) -> None:
-        self.dataFileReaders: list[StrategyChoser[DataFileReader]] = list()
-        self.scanFileReaders: list[PluginChooser[ScanFileReader]] = list()
-        self.probeFileReaders: list[PluginChooser[ProbeFileReader]] = list()
-        self.objectFileReaders: list[PluginChooser[ObjectFileReader]] = list()
+        self.dataFileReaders: list[PluginEntry[DataFileReader]] = list()
+        self.scanFileReaders: list[PluginEntry[ScanFileReader]] = list()
+        self.probeFileReaders: list[PluginEntry[ProbeFileReader]] = list()
+        self.objectFileReaders: list[PluginEntry[ObjectFileReader]] = list()
 
     @classmethod
     def loadPlugins(cls) -> PluginRegistry:
         registry = cls()
 
         import ptychodus.plugins
-        ns_pkg: ModuleName = ptychodus.plugins
+        ns_pkg: ModuleType = ptychodus.plugins
 
         # Specifying the second argument (prefix) to iter_modules makes the
         # returned name an absolute name instead of a relative one. This allows
@@ -118,24 +118,24 @@ class PluginRegistry:
 
     def registerPlugin(self, plugin: T) -> None:
         if isinstance(plugin, DataFileReader):
-            entry = PluginEntry(simpleName=plugin.simpleName,
-                                displayName=plugin.fileFilter,
-                                strategy=plugin)
+            entry = PluginEntry[DataFileReader](simpleName=plugin.simpleName,
+                                                displayName=plugin.fileFilter,
+                                                strategy=plugin)
             self.dataFileReaders.append(entry)
         elif isinstance(plugin, ScanFileReader):
-            entry = PluginEntry(simpleName=plugin.simpleName,
-                                displayName=plugin.fileFilter,
-                                strategy=plugin)
+            entry = PluginEntry[ScanFileReader](simpleName=plugin.simpleName,
+                                                displayName=plugin.fileFilter,
+                                                strategy=plugin)
             self.scanFileReaders.append(entry)
         elif isinstance(plugin, ProbeFileReader):
-            entry = PluginEntry(simpleName=plugin.simpleName,
-                                displayName=plugin.fileFilter,
-                                strategy=plugin)
+            entry = PluginEntry[ProbeFileReader](simpleName=plugin.simpleName,
+                                                 displayName=plugin.fileFilter,
+                                                 strategy=plugin)
             self.probeFileReaders.append(entry)
         elif isinstance(plugin, ObjectFileReader):
-            entry = PluginEntry(simpleName=plugin.simpleName,
-                                displayName=plugin.fileFilter,
-                                strategy=plugin)
+            entry = PluginEntry[ObjectFileReader](simpleName=plugin.simpleName,
+                                                  displayName=plugin.fileFilter,
+                                                  strategy=plugin)
             self.objectFileReaders.append(entry)
         else:
             raise TypeError(f'Invalid plugin type \"{type(plugin).__name__}\".')

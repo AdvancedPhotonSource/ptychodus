@@ -81,8 +81,8 @@ class ActiveDataFile(DataFile, Observable):
         super().__init__()
         self._dataFile: Optional[DataFile] = None
 
-    def getFileContentsTree(self) -> SimpleTreeNode:
-        return self._dataFile.getFileContentsTree() if self._dataFile else None
+    def getContentsTree(self) -> SimpleTreeNode:
+        return self._dataFile.getContentsTree() if self._dataFile else SimpleTreeNode(None, list())
 
     def __getitem__(self, index: int) -> DiffractionDataset:
         return self._dataFile[index] if self._dataFile else None
@@ -117,8 +117,8 @@ class DataFilePresenter(Observable, Observer):
 
         return presenter
 
-    def getFileContentsTree(self) -> SimpleTreeNode:
-        return self._activeDataFile.getFileContentsTree()
+    def getContentsTree(self) -> SimpleTreeNode:
+        return self._activeDataFile.getContentsTree()
 
     def openDataset(self, dataPath: str) -> Any:  # TODO hdf5-only
         data = None

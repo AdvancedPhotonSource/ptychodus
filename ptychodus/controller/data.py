@@ -123,7 +123,7 @@ class DataFileController(Observer):
     def __init__(self, presenter: DataFilePresenter, treeView: QTreeView, tableView: QTableView,
                  fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
-        self._treeModel = SimpleTreeModel(presenter.getFileContentsTree())
+        self._treeModel = SimpleTreeModel(presenter.getContentsTree())
         self._treeView = treeView
         self._tableModel = DataArrayTableModel()
         self._tableView = tableView
@@ -161,4 +161,4 @@ class DataFileController(Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._treeModel.setRootNode(self._presenter.getFileContentsTree())
+            self._treeModel.setRootNode(self._presenter.getContentsTree())

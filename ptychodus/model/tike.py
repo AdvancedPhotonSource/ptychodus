@@ -13,7 +13,7 @@ except ImportError:
         ptycho = None
 
 
-from ..api.data import DataFile, DiffractionDataset
+from ..api.data import DataArrayType, DataFile, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
 from .detector import CropSizer
