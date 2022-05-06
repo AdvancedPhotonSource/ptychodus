@@ -75,6 +75,44 @@ class EntryGroup:
     sample: SampleGroup
 
 
+class VelociprobeDiffractionDataset(DiffractionDataset):
+    def __init__(self, name: str, filePath: Path, dataPath: str) -> None:
+        self._name = name
+        self._filePath = filePath
+        self._dataPath = dataPath
+        self._dataset: Optional[DiffractionDataset] = None
+
+    @property
+    def datasetName(self) -> str:
+        return self._name
+
+    @property
+    def datasetState(self) -> DatasetState:
+        state = DatasetState.NOT_FOUND
+
+        if self._dataset is not None:
+            state = DatasetState.VALID
+        elif self._filePath.is_file():
+            state = DatasetState.EXISTS
+
+        return state
+
+    def getArray(self) -> DataArrayType:
+        if self._dataset is None:
+            try:
+                with h5py.File(self._filePath, 'r') as h5File:
+                    item = h5File.get(self._dataPath)
+
+                    if isinstance(item, h5py.Dataset):
+                        data = item[()]
+                    else:
+                        logger.error(f'Symlink {self.filePath}:{self.dataPath} is not a dataset!')
+            except FileNotFoundError:
+                logger.exception(f'File {self.filePath} not found!')
+
+        return self._dataset
+
+
 class VelociprobeDataFileReader(DataFileReader, Observable):
     def __init__(self) -> None:
         super().__init__()
@@ -96,14 +134,14 @@ class VelociprobeDataFileReader(DataFileReader, Observable):
 
         datasetList = list()
 
-        for name, h5Item in h5DataGroup.items():
-            h5Item = h5DataGroup.get(name, getlink=True)
-
-            if isinstance(h5Item, h5py.ExternalLink) and self.masterFilePath is not None:
-                dataset = DataFile(name=name,
-                                    filePath=self.masterFilePath.parent / h5Item.filename,
-                                    dataPath=str(h5Item.path))
-                datasetList.append(dataset)
+        #for name, h5Item in h5DataGroup.items(): # FIXME
+        #    h5Item = h5DataGroup.get(name, getlink=True)
+        #
+        #    if isinstance(h5Item, h5py.ExternalLink) and self.masterFilePath is not None:
+        #        dataset = DataFile(name=name,
+        #                            filePath=self.masterFilePath.parent / h5Item.filename,
+        #                            dataPath=str(h5Item.path))
+        #        datasetList.append(dataset)
 
         datasetList.sort(key=lambda x: x.name)
 

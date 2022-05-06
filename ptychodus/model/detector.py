@@ -244,7 +244,7 @@ class ActiveDiffractionDataset(DiffractionDataset, Observable):
             logger.exception('Invalid Dataset Index')
             return
 
-        if self._dataset:
+        if self._dataset is not None:
             self._dataset.removeObserver(self)
 
         self._dataset = dataset
@@ -254,16 +254,21 @@ class ActiveDiffractionDataset(DiffractionDataset, Observable):
     def getDatasetIndex(self) -> int:
         return self._datasetIndex
 
-    def getState(self) -> DatasetState:
-        return self._dataset.getState() if self._dataset else DatasetState.MISSING
+    @property
+    def datasetName(self) -> str:
+        return '' if self._dataset is None else self._dataset.datasetName
+
+    @property
+    def datasetState(self) -> DatasetState:
+        return DatasetState.NOT_FOUND if self._dataset is None else self._dataset.datasetState
 
     def getArray(self) -> DataArrayType:
-        return self._dataset.getArray() if self._dataset else numpy.empty((0, 0, 0))
+        return numpy.empty((0,0,0)) if self._dataset is None else self._dataset.getArray()
 
     def __getitem__(self, index: int) -> DataArrayType:
         data = numpy.empty((0, 0))
 
-        if self._dataset:
+        if self._dataset is not None:
             try:
                 data = self._dataset[index]
             except IndexError:
@@ -277,7 +282,7 @@ class ActiveDiffractionDataset(DiffractionDataset, Observable):
         return data
 
     def __len__(self) -> int:
-        return len(self._dataset) if self._dataset else 0
+        return 0 if self._dataset is None else len(self._dataset)
 
     def update(self, observable: Observable) -> None:
         if observable is self._dataFile:

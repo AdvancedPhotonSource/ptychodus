@@ -82,13 +82,13 @@ class ActiveDataFile(DataFile, Observable):
         self._dataFile: Optional[DataFile] = None
 
     def getContentsTree(self) -> SimpleTreeNode:
-        return self._dataFile.getContentsTree() if self._dataFile else SimpleTreeNode(None, list())
+        return SimpleTreeNode(None, list()) if self._dataFile is None else self._dataFile.getContentsTree()
 
     def __getitem__(self, index: int) -> DiffractionDataset:
-        return self._dataFile[index] if self._dataFile else None
+        return None if self._dataFile is None else self._dataFile[index]
 
     def __len__(self) -> int:
-        return len(self._dataFile) if self._dataFile else 0
+        return 0 if self._dataFile is None else len(self._dataFile)
 
     def setActive(self, dataFile: DataFile) -> None:
         self._dataFile = dataFile
@@ -115,10 +115,13 @@ class DataFilePresenter(Observable, Observer):
         settings.filePath.addObserver(presenter)
         presenter._openDataFileFromSettings()
 
+        activeDataFile.addObserver(presenter)
+
         return presenter
 
     def getContentsTree(self) -> SimpleTreeNode:
-        return self._activeDataFile.getContentsTree()
+        contentsTree = self._activeDataFile.getContentsTree()
+        return contentsTree
 
     def openDataset(self, dataPath: str) -> Any:  # TODO hdf5-only
         data = None
@@ -163,7 +166,6 @@ class DataFilePresenter(Observable, Observer):
             fileReader = self._fileReaderChooser.getCurrentStrategy()
             dataFile = fileReader.read(filePath)
             self._activeDataFile.setActive(dataFile)
-            self.notifyObservers()
 
     def openDataFile(self, filePath: Path, fileFilter: str) -> None:
         self._fileReaderChooser.setFromDisplayName(fileFilter)
@@ -183,3 +185,5 @@ class DataFilePresenter(Observable, Observer):
             self._syncFileReaderToSettings()
         elif observable is self._settings.filePath:
             self._openDataFileFromSettings()
+        elif observable is self._activeDataFile:
+            self.notifyObservers()

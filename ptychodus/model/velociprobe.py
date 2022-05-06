@@ -40,7 +40,7 @@ class VelociprobePresenter(Observable, Observer):
         return datasetName
 
     def getDatasetState(self, index: int) -> DatasetState:
-        state = DatasetState.MISSING
+        state = DatasetState.NOT_FOUND
 
         if self._velociprobeReader.entryGroup:
             datafile = self._velociprobeReader.entryGroup.data[index]

@@ -13,14 +13,18 @@ DataArrayType = numpy.typing.NDArray[numpy.integer]
 
 
 class DatasetState(Enum):
-    MISSING = auto()
-    FOUND = auto()
+    NOT_FOUND = auto()
+    EXISTS = auto()
     VALID = auto()
 
 
 class DiffractionDataset(Sequence[DataArrayType], Observable):
-    @abstractmethod
-    def getState(self) -> DatasetState:
+    @abstractproperty
+    def datasetName(self) -> str:
+        pass
+
+    @abstractproperty
+    def datasetState(self) -> DatasetState:
         pass
 
     @abstractmethod

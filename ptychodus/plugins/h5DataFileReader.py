@@ -84,7 +84,7 @@ class H5DataFileTreeBuilder:
 
                 treeNode.itemData = [itemName, itemType, itemDetails]
 
-        return treeNode
+        return rootNode
 
 
 class H5DataFile:
