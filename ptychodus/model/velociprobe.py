@@ -35,7 +35,7 @@ class VelociprobePresenter(Observable, Observer):
 
         if self._velociprobeReader.entryGroup:
             datafile = self._velociprobeReader.entryGroup.data[index]
-            datasetName = datafile.name
+            datasetName = datafile.datasetName
 
         return datasetName
 
@@ -44,7 +44,7 @@ class VelociprobePresenter(Observable, Observer):
 
         if self._velociprobeReader.entryGroup:
             datafile = self._velociprobeReader.entryGroup.data[index]
-            state = datafile.getState()
+            state = datafile.datasetState
 
         return state
 

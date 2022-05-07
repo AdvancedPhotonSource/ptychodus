@@ -97,8 +97,26 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
 
         return state
 
+    def __getitem__(self, index: int) -> DataArrayType:
+        if self._dataset is None:
+            self._reloadDataset()
+
+        return self._dataset[index, ...]
+
+    def __len__(self) -> int:
+        if self._dataset is None:
+            self._reloadDataset()
+
+        return 0 if self._dataset is None else self._dataset.shape[0]
+
     def getArray(self) -> DataArrayType:
         if self._dataset is None:
+            self._reloadDataset()
+
+        return self._dataset
+
+    def _reloadDataset(self) -> None:
+        if self._filePath.is_file():
             try:
                 with h5py.File(self._filePath, 'r') as h5File:
                     item = h5File.get(self._dataPath)
@@ -110,14 +128,11 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
             except FileNotFoundError:
                 logger.exception(f'File {self.filePath} not found!')
 
-        return self._dataset
-
 
 class VelociprobeDataFileReader(DataFileReader, Observable):
     def __init__(self) -> None:
         super().__init__()
         self._treeBuilder = H5DataFileTreeBuilder()
-        self.masterFilePath: Optional[Path] = None
         self.entryGroup: Optional[EntryGroup] = None
 
     @property
@@ -128,22 +143,20 @@ class VelociprobeDataFileReader(DataFileReader, Observable):
     def fileFilter(self) -> str:
         return 'Velociprobe Master Files (*.h5 *.hdf5)'
 
-    def _readDataGroup(self, h5DataGroup: h5py.Group) -> DataGroup:
+    def _readDataGroup(self, h5DataGroup: h5py.Group, filePath: Path) -> DataGroup:
         if h5DataGroup is None:
             return None
 
         datasetList = list()
 
-        #for name, h5Item in h5DataGroup.items(): # FIXME
-        #    h5Item = h5DataGroup.get(name, getlink=True)
-        #
-        #    if isinstance(h5Item, h5py.ExternalLink) and self.masterFilePath is not None:
-        #        dataset = DataFile(name=name,
-        #                            filePath=self.masterFilePath.parent / h5Item.filename,
-        #                            dataPath=str(h5Item.path))
-        #        datasetList.append(dataset)
+        for name, h5Item in h5DataGroup.items():
+            h5Item = h5DataGroup.get(name, getlink=True)
 
-        datasetList.sort(key=lambda x: x.name)
+            if isinstance(h5Item, h5py.ExternalLink):
+                dataset = VelociprobeDiffractionDataset(name=name, filePath=filePath.parent / h5Item.filename, dataPath=str(h5Item.path))
+                datasetList.append(dataset)
+
+        datasetList.sort(key=lambda x: x.datasetName)
 
         return DataGroup(datasetList)
 
@@ -203,9 +216,7 @@ class VelociprobeDataFileReader(DataFileReader, Observable):
         contentsTree = self._treeBuilder.createRootNode()
         datasetList: list[DiffractionDataset] = list()
 
-        if filePath:
-            self.masterFilePath = filePath
-
+        if filePath is not None:
             with h5py.File(filePath, 'r') as h5File:
                 contentsTree = self._treeBuilder.build(h5File)
                 h5EntryGroup = h5File.get('entry')
@@ -219,7 +230,7 @@ class VelociprobeDataFileReader(DataFileReader, Observable):
                         logger.info(f'File {filePath} is not a velociprobe data file.')
                         self.entryGroup = None
                     else:
-                        dataGroup = self._readDataGroup(h5DataGroup)
+                        dataGroup = self._readDataGroup(h5DataGroup, filePath)
                         instrumentGroup = self._readInstrumentGroup(h5InstrumentGroup)
                         sampleGroup = self._readSampleGroup(h5SampleGroup)
 
