@@ -1,9 +1,11 @@
+from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
 from typing import Iterable, Optional
+import concurrent.futures
 import csv
 import logging
 
@@ -15,6 +17,61 @@ from ptychodus.api.data import *
 from ptychodus.api.scan import ScanFileReader, ScanPoint, ScanPointParseError
 
 logger = logging.getLogger(__name__)
+
+
+class VelociprobeDiffractionDataset(DiffractionDataset):
+    def __init__(self, name: str, filePath: Path, dataPath: str) -> None:
+        super().__init__()
+        self._name = name
+        self._state = DatasetState.NOT_FOUND
+        self._filePath = filePath
+        self._dataPath = dataPath
+        self._dataset: Optional[DiffractionDataset] = None
+
+    @property
+    def datasetName(self) -> str:
+        return self._name
+
+    @property
+    def datasetState(self) -> DatasetState:
+        return self._state
+
+    def __getitem__(self, index: int) -> DataArrayType:
+        if self._dataset is None:
+            self.reloadDataset()
+
+        return numpy.empty((0, 0, 0)) if self._dataset is None else self._dataset[index, ...]
+
+    def __len__(self) -> int:
+        if self._dataset is None:
+            self.reloadDataset()
+
+        return 0 if self._dataset is None else self._dataset.shape[0]
+
+    def getArray(self) -> DataArrayType:
+        if self._dataset is None:
+            self.reloadDataset()
+
+        return self._dataset
+
+    def reloadDataset(self) -> VelociprobeDiffractionDataset:
+        if self._filePath.is_file():
+            self._dataset = None
+            self._state = DatasetState.EXISTS
+
+            with h5py.File(self._filePath, 'r') as h5File:
+                item = h5File.get(self._dataPath)
+
+                if isinstance(item, h5py.Dataset):
+                    self._dataset = item[()]
+                    self._state = DatasetState.VALID
+                else:
+                    logger.error(f'Symlink {self.filePath}:{self.dataPath} is not a dataset!')
+        else:
+            self._dataset = None
+            self._state = DatasetState.NOT_FOUND
+
+        return self
 
 
 @dataclass(frozen=True)
@@ -75,60 +132,6 @@ class EntryGroup:
     sample: SampleGroup
 
 
-class VelociprobeDiffractionDataset(DiffractionDataset):
-    def __init__(self, name: str, filePath: Path, dataPath: str) -> None:
-        self._name = name
-        self._filePath = filePath
-        self._dataPath = dataPath
-        self._dataset: Optional[DiffractionDataset] = None
-
-    @property
-    def datasetName(self) -> str:
-        return self._name
-
-    @property
-    def datasetState(self) -> DatasetState:
-        state = DatasetState.NOT_FOUND
-
-        if self._dataset is not None:
-            state = DatasetState.VALID
-        elif self._filePath.is_file():
-            state = DatasetState.EXISTS
-
-        return state
-
-    def __getitem__(self, index: int) -> DataArrayType:
-        if self._dataset is None:
-            self._reloadDataset()
-
-        return self._dataset[index, ...]
-
-    def __len__(self) -> int:
-        if self._dataset is None:
-            self._reloadDataset()
-
-        return 0 if self._dataset is None else self._dataset.shape[0]
-
-    def getArray(self) -> DataArrayType:
-        if self._dataset is None:
-            self._reloadDataset()
-
-        return self._dataset
-
-    def _reloadDataset(self) -> None:
-        if self._filePath.is_file():
-            try:
-                with h5py.File(self._filePath, 'r') as h5File:
-                    item = h5File.get(self._dataPath)
-
-                    if isinstance(item, h5py.Dataset):
-                        data = item[()]
-                    else:
-                        logger.error(f'Symlink {self.filePath}:{self.dataPath} is not a dataset!')
-            except FileNotFoundError:
-                logger.exception(f'File {self.filePath} not found!')
-
-
 class VelociprobeDataFileReader(DataFileReader, Observable):
     def __init__(self) -> None:
         super().__init__()
@@ -149,12 +152,30 @@ class VelociprobeDataFileReader(DataFileReader, Observable):
 
         datasetList = list()
 
-        for name, h5Item in h5DataGroup.items():
-            h5Item = h5DataGroup.get(name, getlink=True)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futureList = list()
 
-            if isinstance(h5Item, h5py.ExternalLink):
-                dataset = VelociprobeDiffractionDataset(name=name, filePath=filePath.parent / h5Item.filename, dataPath=str(h5Item.path))
-                datasetList.append(dataset)
+            for name, h5Item in h5DataGroup.items():
+                h5Item = h5DataGroup.get(name, getlink=True)
+
+                if isinstance(h5Item, h5py.ExternalLink):
+                    dataset = VelociprobeDiffractionDataset(name=name,
+                                                            filePath=filePath.parent /
+                                                            h5Item.filename,
+                                                            dataPath=str(h5Item.path))
+                    future = executor.submit(dataset.reloadDataset)
+                    futureList.append(future)
+
+            for future in concurrent.futures.as_completed(futureList):
+                try:
+                    dataset = future.result()
+                except OSError as err:
+                    logger.error(err)
+                    continue
+
+                if dataset is not None:
+                    logger.debug(f'Read {dataset.datasetName}')
+                    datasetList.append(dataset)
 
         datasetList.sort(key=lambda x: x.datasetName)
 

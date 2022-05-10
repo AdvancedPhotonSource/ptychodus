@@ -221,7 +221,7 @@ class DetectorPresenter(Observer, Observable):
             self.notifyObservers()
 
 
-class ActiveDiffractionDataset(DiffractionDataset, Observable):
+class ActiveDiffractionDataset(DiffractionDataset):
     def __init__(self, dataFile: ActiveDataFile, cropSizer: CropSizer) -> None:
         super().__init__()
         self._dataFile = dataFile
@@ -251,6 +251,8 @@ class ActiveDiffractionDataset(DiffractionDataset, Observable):
         self._dataset.addObserver(self)
         self._datasetIndex = index
 
+        self.notifyObservers()
+
     def getDatasetIndex(self) -> int:
         return self._datasetIndex
 
@@ -263,7 +265,7 @@ class ActiveDiffractionDataset(DiffractionDataset, Observable):
         return DatasetState.NOT_FOUND if self._dataset is None else self._dataset.datasetState
 
     def getArray(self) -> DataArrayType:
-        return numpy.empty((0,0,0)) if self._dataset is None else self._dataset.getArray()
+        return numpy.empty((0, 0, 0)) if self._dataset is None else self._dataset.getArray()
 
     def __getitem__(self, index: int) -> DataArrayType:
         data = numpy.empty((0, 0))

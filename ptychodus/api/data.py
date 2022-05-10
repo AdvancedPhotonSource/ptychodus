@@ -32,7 +32,7 @@ class DiffractionDataset(Sequence[DataArrayType], Observable):
         pass
 
 
-class DataFile(Sequence[DiffractionDataset]):
+class DataFile(Sequence[DiffractionDataset], Observable):
     @abstractmethod
     def getContentsTree(self) -> SimpleTreeNode:
         pass

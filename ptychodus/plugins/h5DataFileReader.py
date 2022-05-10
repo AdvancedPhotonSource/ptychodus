@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class H5DataFileTreeBuilder:
-    def _addAttributes(self, treeNode: SimpleTreeNode, attributeManager: h5py.AttributeManager) -> None:
+    def _addAttributes(self, treeNode: SimpleTreeNode,
+                       attributeManager: h5py.AttributeManager) -> None:
         for name, value in attributeManager.items():
             stringInfo = h5py.check_string_dtype(value.dtype)
             valueStr = None
@@ -88,7 +89,8 @@ class H5DataFileTreeBuilder:
 
 
 class H5DataFile:
-    def __init__(self, contentsTree: SimpleTreeNode, datasetList: list[DiffractionDataset]) -> None:
+    def __init__(self, contentsTree: SimpleTreeNode,
+                 datasetList: list[DiffractionDataset]) -> None:
         self._contentsTree = contentsTree
         self._datasetList = datasetList
 

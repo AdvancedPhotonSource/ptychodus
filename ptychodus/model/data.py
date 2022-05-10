@@ -76,13 +76,14 @@ class DataDirectoryWatcher(threading.Thread):
         self._stopEvent.set()
 
 
-class ActiveDataFile(DataFile, Observable):
+class ActiveDataFile(DataFile):
     def __init__(self) -> None:
         super().__init__()
         self._dataFile: Optional[DataFile] = None
 
     def getContentsTree(self) -> SimpleTreeNode:
-        return SimpleTreeNode(None, list()) if self._dataFile is None else self._dataFile.getContentsTree()
+        return SimpleTreeNode(
+            None, list()) if self._dataFile is None else self._dataFile.getContentsTree()
 
     def __getitem__(self, index: int) -> DiffractionDataset:
         return None if self._dataFile is None else self._dataFile[index]
