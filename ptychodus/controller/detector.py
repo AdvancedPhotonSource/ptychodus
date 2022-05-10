@@ -4,7 +4,9 @@ from decimal import Decimal
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ..model import Observable, Observer, DetectorPresenter, DatasetState
+from ..api.data import DatasetState
+from ..api.observer import Observable, Observer
+from ..model import DetectorPresenter
 from ..view import DetectorView
 from .data import FileDialogFactory
 from .image import ImageController
@@ -27,7 +29,6 @@ class DetectorController(Observer):
         view.pixelSizeXWidget.lengthChanged.connect(presenter.setPixelSizeXInMeters)
         view.pixelSizeYWidget.lengthChanged.connect(presenter.setPixelSizeYInMeters)
         view.detectorDistanceWidget.lengthChanged.connect(presenter.setDetectorDistanceInMeters)
-        view.defocusDistanceWidget.lengthChanged.connect(presenter.setDefocusDistanceInMeters)
 
         controller._syncModelToView()
 
@@ -50,8 +51,6 @@ class DetectorController(Observer):
         self._view.pixelSizeYWidget.setLengthInMeters(self._presenter.getPixelSizeYInMeters())
         self._view.detectorDistanceWidget.setLengthInMeters(
             self._presenter.getDetectorDistanceInMeters())
-        self._view.defocusDistanceWidget.setLengthInMeters(
-            self._presenter.getDefocusDistanceInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -86,7 +85,7 @@ class DatasetListModel(QAbstractListModel):
                 state = self._presenter.getDatasetState(index.row())
                 value = QFont()
 
-                if state == DatasetState.FOUND:
+                if state == DatasetState.EXISTS:
                     value.setItalic(True)
 
         return value

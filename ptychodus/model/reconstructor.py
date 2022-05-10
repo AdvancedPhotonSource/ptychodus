@@ -1,9 +1,9 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
 
-from .chooser import StrategyChooser, StrategyEntry
-from .observer import Observable, Observer
-from .settings import SettingsGroup, SettingsRegistry
+from ..api.observer import Observable, Observer
+from ..api.reconstructor import Reconstructor
+from ..api.settings import SettingsGroup, SettingsRegistry
+from ..api.plugins import PluginChooser, PluginEntry
 
 
 class ReconstructorSettings(Observable, Observer):
@@ -21,20 +21,6 @@ class ReconstructorSettings(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
             self.notifyObservers()
-
-
-class Reconstructor(Observable, ABC):
-    @abstractproperty
-    def name(self) -> str:
-        pass
-
-    @abstractproperty
-    def backendName(self) -> str:
-        pass
-
-    @abstractmethod
-    def reconstruct(self) -> int:
-        pass
 
 
 class NullReconstructor(Reconstructor):
@@ -56,18 +42,18 @@ class NullReconstructor(Reconstructor):
         return 0
 
 
-class SelectableReconstructor(Reconstructor, Observer):
+class SelectableReconstructor(Reconstructor, Observable, Observer):  # TODO refactor
     @staticmethod
-    def _createAlgorithmEntry(reconstructor: Reconstructor) -> StrategyEntry[Reconstructor]:
-        return StrategyEntry[Reconstructor](simpleName=reconstructor.name,
-                                            displayName=reconstructor.name,
-                                            strategy=reconstructor)
+    def _createAlgorithmEntry(reconstructor: Reconstructor) -> PluginEntry[Reconstructor]:
+        return PluginEntry[Reconstructor](simpleName=reconstructor.name,
+                                          displayName=reconstructor.name,
+                                          strategy=reconstructor)
 
     def __init__(self, settings: ReconstructorSettings,
                  reconstructorList: list[Reconstructor]) -> None:
         super().__init__()
         self._settings = settings
-        self._algorithmChooser = StrategyChooser[Reconstructor].createFromList([
+        self._algorithmChooser = PluginChooser[Reconstructor].createFromList([
             SelectableReconstructor._createAlgorithmEntry(reconstructor)
             for reconstructor in reconstructorList
         ])

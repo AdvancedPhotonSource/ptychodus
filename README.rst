@@ -18,19 +18,24 @@ Installation
     $ conda create -c conda-forge -n ptychodus --file ptychodus/requirements.txt
     $ conda activate ptychodus
     $ pip install -e ./ptychodus
-    $ ptychodus
 
 * To install the `tike` backend:
 
 .. code-block:: shell
 
-    $ conda install -c conda-forge tike
+    $ conda install -n ptychodus -c conda-forge tike
 
 * To install the `PtychoNN` backend:
 
 .. code-block:: shell
 
-    $ conda install -c conda-forge pytorch
+    $ conda install -n ptychodus -c conda-forge pytorch
+
+* To launch the `ptychodus` GUI (with the "ptychodus" conda environment activated):
+
+.. code-block:: shell
+
+    $ ptychodus
 
 Tips
 ----

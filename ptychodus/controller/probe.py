@@ -59,6 +59,7 @@ class ProbeZonePlateController(Observer):
         view.outermostZoneWidthWidget.lengthChanged.connect(
             presenter.setOutermostZoneWidthInMeters)
         view.beamstopDiameterWidget.lengthChanged.connect(presenter.setBeamstopDiameterInMeters)
+        view.defocusDistanceWidget.lengthChanged.connect(presenter.setDefocusDistanceInMeters)
 
         controller._syncModelToView()
 
@@ -71,6 +72,8 @@ class ProbeZonePlateController(Observer):
             self._presenter.getOutermostZoneWidthInMeters())
         self._view.beamstopDiameterWidget.setLengthInMeters(
             self._presenter.getBeamstopDiameterInMeters())
+        self._view.defocusDistanceWidget.setLengthInMeters(
+            self._presenter.getDefocusDistanceInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

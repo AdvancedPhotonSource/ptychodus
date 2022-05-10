@@ -2,21 +2,19 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal, ROUND_CEILING
 from pathlib import Path
-from typing import Callable
 import logging
 
 import numpy
-import numpy.typing
 
-from .chooser import StrategyChooser, StrategyEntry
-from .crop import CropSizer
-from .detector import Detector
+from ..api.object import *
+from ..api.observer import Observable, Observer
+from ..api.settings import SettingsRegistry, SettingsGroup
+from ..api.plugins import PluginChooser, PluginEntry
+from .detector import CropSizer, Detector
 from .geometry import Box, Interval
 from .image import ImageExtent
-from .observer import Observable, Observer
 from .probe import ProbeSizer
 from .scan import Scan
-from .settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +24,8 @@ class ObjectSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Random')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
+        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:
@@ -102,59 +101,77 @@ class ObjectSizer(Observable, Observer):
             self.notifyObservers()
 
 
-ComplexNumpyArrayType = numpy.typing.NDArray[numpy.complexfloating]
-ObjectInitializerType = Callable[[], ComplexNumpyArrayType]
-
-
 class UniformRandomObjectInitializer:
     def __init__(self, rng: numpy.random.Generator, sizer: ObjectSizer) -> None:
         self._rng = rng
         self._sizer = sizer
 
-    def __call__(self) -> ComplexNumpyArrayType:
+    def __call__(self) -> ObjectArrayType:
         size = self._sizer.getObjectExtent().shape
         magnitude = numpy.sqrt(self._rng.uniform(low=0., high=1., size=size))
         phase = self._rng.uniform(low=0., high=2. * numpy.pi, size=size)
         return magnitude * numpy.exp(1.j * phase)
 
 
-class CustomObjectInitializer(Observer):
-    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer) -> None:
+class FileObjectInitializer(Observer):
+    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer,
+                 fileReaderChooser: PluginChooser[ObjectFileReader]) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
+        self._fileReaderChooser = fileReaderChooser
         self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
 
     @classmethod
-    def createInstance(cls, settings: ObjectSettings,
-                       sizer: ObjectSizer) -> CustomObjectInitializer:
-        initializer = cls(settings, sizer)
+    def createInstance(
+            cls, settings: ObjectSettings, sizer: ObjectSizer,
+            fileReaderChooser: PluginChooser[ObjectFileReader]) -> FileObjectInitializer:
+        initializer = cls(settings, sizer, fileReaderChooser)
+
+        settings.inputFileType.addObserver(initializer)
+        initializer._fileReaderChooser.addObserver(initializer)
+        initializer._syncFileReaderFromSettings()
+
+        settings.inputFilePath.addObserver(initializer)
         initializer._openObjectFromSettings()
-        settings.customFilePath.addObserver(initializer)
+
         return initializer
 
-    def __call__(self) -> ComplexNumpyArrayType:
+    def __call__(self) -> ObjectArrayType:
         return self._array
 
-    def getOpenFileFilter(self) -> str:
-        return 'NumPy Binary Files (*.npy)'
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._fileReaderChooser.getDisplayNameList()
+
+    def _syncFileReaderFromSettings(self) -> None:
+        self._fileReaderChooser.setFromSimpleName(self._settings.inputFileType.value)
+
+    def _syncFileReaderToSettings(self) -> None:
+        self._settings.inputFileType.value = self._fileReaderChooser.getCurrentSimpleName()
 
     def _openObject(self, filePath: Path) -> None:
         if filePath is not None and filePath.is_file():
             logger.debug(f'Reading {filePath}')
-            self._array = numpy.load(filePath)
+            fileReader = self._fileReaderChooser.getCurrentStrategy()
+            self._array = fileReader.read(filePath)
 
-    def openObject(self, filePath: Path) -> None:
-        if self._settings.customFilePath.value == filePath:
+    def openObject(self, filePath: Path, fileFilter: str) -> None:
+        self._fileReaderChooser.setFromDisplayName(fileFilter)
+
+        if self._settings.inputFilePath.value == filePath:
             self._openObject(filePath)
 
-        self._settings.customFilePath.value = filePath
+        self._settings.inputFilePath.value = filePath
 
     def _openObjectFromSettings(self) -> None:
-        self._openObject(self._settings.customFilePath.value)
+        self._openObject(self._settings.inputFilePath.value)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.customFilePath:
+        if observable is self._settings.inputFileType:
+            self._syncFileReaderFromSettings()
+        elif observable is self._fileReaderChooser:
+            self._syncFileReaderToSettings()
+        elif observable is self._settings.inputFilePath:
             self._openObjectFromSettings()
 
 
@@ -165,10 +182,10 @@ class Object(Observable):
         self._sizer = sizer
         self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
 
-    def getArray(self) -> ComplexNumpyArrayType:
+    def getArray(self) -> ObjectArrayType:
         return self._array
 
-    def setArray(self, array: ComplexNumpyArrayType) -> None:
+    def setArray(self, array: ObjectArrayType) -> None:
         if not numpy.iscomplexobj(array):
             raise TypeError('Object must be a complex-valued ndarray')
 
@@ -177,28 +194,28 @@ class Object(Observable):
 
 
 class ObjectInitializer(Observable, Observer):
-    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, obj: Object,
-                 reinitObservable: Observable) -> None:
+    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, object_: Object,
+                 fileInitializer: FileObjectInitializer, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
-        self._object = obj
+        self._object = object_
         self._reinitObservable = reinitObservable
-        self._customInitializer = CustomObjectInitializer.createInstance(settings, sizer)
-        self._initializerChooser = StrategyChooser[ObjectInitializerType](
-            StrategyEntry[ObjectInitializerType](simpleName='Custom',
-                                                 displayName='Custom',
-                                                 strategy=self._customInitializer))
+        self._fileInitializer = fileInitializer
+        self._initializerChooser = PluginChooser[ObjectInitializerType](
+            PluginEntry[ObjectInitializerType](simpleName='FromFile',
+                                               displayName='From File',
+                                               strategy=self._fileInitializer))
 
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings,
-                       sizer: ObjectSizer, obj: Object,
+                       sizer: ObjectSizer, object_: Object, fileInitializer: FileObjectInitializer,
                        reinitObservable: Observable) -> ObjectInitializer:
-        initializer = cls(settings, sizer, obj, reinitObservable)
+        initializer = cls(settings, sizer, object_, fileInitializer, reinitObservable)
 
-        urandInit = StrategyEntry[ObjectInitializerType](simpleName='Random',
-                                                         displayName='Random',
-                                                         strategy=UniformRandomObjectInitializer(
-                                                             rng, sizer))
+        urandInit = PluginEntry[ObjectInitializerType](simpleName='Random',
+                                                       displayName='Random',
+                                                       strategy=UniformRandomObjectInitializer(
+                                                           rng, sizer))
         initializer._initializerChooser.addStrategy(urandInit)
 
         settings.initializer.addObserver(initializer)
@@ -224,15 +241,15 @@ class ObjectInitializer(Observable, Observer):
         self._object.setArray(initializer())
 
     def getOpenFileFilterList(self) -> list[str]:
-        return [self._customInitializer.getOpenFileFilter()]
+        return self._fileInitializer.getOpenFileFilterList()
 
     def openObject(self, filePath: Path) -> None:
-        self._customInitializer.openObject(filePath)
+        self._fileInitializer.openObject(filePath)
         self._initializerChooser.setToDefault()
         self.initializeObject()
 
     def getSaveFileFilterList(self) -> list[str]:
-        return ['NumPy Binary Files (*.npy)']
+        return ['NumPy Binary Files (*.npy)']  # TODO from plugins
 
     def saveObject(self, filePath: Path) -> None:
         logger.debug(f'Writing {filePath}')
@@ -297,7 +314,7 @@ class ObjectPresenter(Observable, Observer):
     def initializeObject(self) -> None:
         self._initializer.initializeObject()
 
-    def getObject(self) -> ComplexNumpyArrayType:
+    def getObject(self) -> ObjectArrayType:
         return self._object.getArray()
 
     def update(self, observable: Observable) -> None:

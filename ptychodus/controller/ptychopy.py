@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from PyQt5.QtWidgets import QWidget
 
-from ..model import Observer, Observable  # FIXME , PtychoPyBackend, PtychoPyPresenter
+from ..model import Observer, Observable  # TODO , PtychoPyBackend, PtychoPyPresenter
 from ..view import PtychoPyParametersView, PtychoPyBasicView, PtychoPyAdvancedView
 from .reconstructor import ReconstructorViewControllerFactory
 

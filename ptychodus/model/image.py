@@ -1,13 +1,9 @@
 from __future__ import annotations
-from abc import abstractmethod
-from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Tuple
 
 import numpy
-
-from .observer import Observable, Observer
 
 
 class ColorMapCategory(Enum):
@@ -115,21 +111,3 @@ class ImageExtent:
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.width}, {self.height})'
-
-
-class ImageSequence(Sequence, Observable, Observer):
-    @abstractmethod
-    def setCurrentDatasetIndex(self, index: int) -> None:
-        pass
-
-    @abstractmethod
-    def getCurrentDatasetIndex(self) -> int:
-        pass
-
-    @abstractmethod
-    def getWidth(self) -> int:
-        pass
-
-    @abstractmethod
-    def getHeight(self) -> int:
-        pass

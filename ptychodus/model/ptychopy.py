@@ -7,9 +7,9 @@ try:
 except ImportError:
     ptychopy = None
 
-from .observer import Observable, Observer
+from ..api.observer import Observable, Observer
 from .reconstructor import Reconstructor
-from .settings import SettingsRegistry, SettingsGroup
+from ..api.settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
 

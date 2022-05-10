@@ -1,7 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
-from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Optional
 import logging
@@ -12,15 +10,16 @@ import numpy
 import watchdog.events
 import watchdog.observers
 
-from .chooser import StrategyChooser, StrategyEntry
-from .observer import Observable, Observer
-from .settings import SettingsRegistry, SettingsGroup
-from .tree import SimpleTreeNode
+from ..api.data import DataFile, DataFileReader
+from ..api.observer import Observable, Observer
+from ..api.plugins import PluginChooser
+from ..api.settings import SettingsRegistry, SettingsGroup
+from ..api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
 
 
-class DataSettings(Observable, Observer):
+class Datasettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -28,7 +27,7 @@ class DataSettings(Observable, Observer):
         self.filePath = settingsGroup.createPathEntry('FilePath', None)
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> DataSettings:
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> Datasettings:
         settings = cls(settingsRegistry.createGroup('Data'))
         settings._settingsGroup.addObserver(settings)
         return settings
@@ -66,9 +65,9 @@ class DataDirectoryWatcher(threading.Thread):
             while not self._stopEvent.wait(self._waitTimeInSeconds):
                 pass
 
-        except:
+        except Exception:
+            logger.exception('Watchdog Thread Exception!')
             self._observer.stop()
-            logger.error('Watchdog Thread Error')  # TODO improve message
 
         self._observer.join()
 
@@ -77,71 +76,39 @@ class DataDirectoryWatcher(threading.Thread):
         self._stopEvent.set()
 
 
-class DatasetState(Enum):
-    MISSING = auto()
-    FOUND = auto()
-    VALID = auto()
+class ActiveDataFile(DataFile):
+    def __init__(self) -> None:
+        super().__init__()
+        self._dataFile: Optional[DataFile] = None
 
+    def getContentsTree(self) -> SimpleTreeNode:
+        return SimpleTreeNode(
+            None, list()) if self._dataFile is None else self._dataFile.getContentsTree()
 
-@dataclass(frozen=True)
-class DataFile:
-    name: str
-    filePath: Path
-    dataPath: str
+    def __getitem__(self, index: int) -> DiffractionDataset:
+        return None if self._dataFile is None else self._dataFile[index]
 
-    def getState(self) -> DatasetState:
-        state = DatasetState.MISSING
+    def __len__(self) -> int:
+        return 0 if self._dataFile is None else len(self._dataFile)
 
-        if self.filePath.is_file():
-            state = DatasetState.FOUND
-
-            try:
-                with h5py.File(self.filePath, 'r') as h5File:
-                    if self.dataPath in h5File:
-                        state = DatasetState.VALID
-            except OSError:
-                pass
-
-        return state
-
-
-class DataFileReader(ABC):
-    @abstractproperty
-    def simpleName(self) -> str:
-        pass
-
-    @abstractproperty
-    def fileFilter(self) -> str:
-        pass
-
-    @abstractmethod
-    def getFileContentsTree(self) -> SimpleTreeNode:
-        pass
-
-    @abstractmethod
-    def read(self, filePath: Path) -> None:
-        pass
+    def setActive(self, dataFile: DataFile) -> None:
+        self._dataFile = dataFile
+        self.notifyObservers()
 
 
 class DataFilePresenter(Observable, Observer):
-    @staticmethod
-    def _createFileReaderEntry(fileReader: DataFileReader) -> StrategyEntry[DataFileReader]:
-        return StrategyEntry(simpleName=fileReader.simpleName,
-                             displayName=fileReader.fileFilter,
-                             strategy=fileReader)
-
-    def __init__(self, settings: DataSettings, fileReaderList: list[DataFileReader]) -> None:
+    def __init__(self, settings: Datasettings, activeDataFile: ActiveDataFile,
+                 fileReaderChooser: PluginChooser[DataFileReader]) -> None:
         super().__init__()
         self._settings = settings
-        self._fileReaderChooser = StrategyChooser[DataFileReader].createFromList([
-            DataFilePresenter._createFileReaderEntry(fileReader) for fileReader in fileReaderList
-        ])
+        self._activeDataFile = activeDataFile
+        self._fileReaderChooser = fileReaderChooser
         self._filePath: Optional[Path] = None
 
     @classmethod
-    def createInstance(cls, settings: DataSettings,
-                       fileReaderList: list[DataFileReader]) -> DataFilePresenter:
-        presenter = cls(settings, fileReaderList)
+    def createInstance(cls, settings: Datasettings, activeDataFile: ActiveDataFile,
+                       fileReaderChooser: PluginChooser[DataFileReader]) -> DataFilePresenter:
+        presenter = cls(settings, activeDataFile, fileReaderChooser)
         settings.fileType.addObserver(presenter)
         presenter._fileReaderChooser.addObserver(presenter)
         presenter._syncFileReaderFromSettings()
@@ -149,13 +116,15 @@ class DataFilePresenter(Observable, Observer):
         settings.filePath.addObserver(presenter)
         presenter._openDataFileFromSettings()
 
+        activeDataFile.addObserver(presenter)
+
         return presenter
 
-    def getFileContentsTree(self) -> SimpleTreeNode:
-        fileReader = self._fileReaderChooser.getCurrentStrategy()
-        return fileReader.getFileContentsTree()
+    def getContentsTree(self) -> SimpleTreeNode:
+        contentsTree = self._activeDataFile.getContentsTree()
+        return contentsTree
 
-    def openDataSet(self, dataPath: str) -> Any:
+    def openDataset(self, dataPath: str) -> Any:  # TODO hdf5-only
         data = None
 
         if self._filePath and dataPath:
@@ -196,8 +165,8 @@ class DataFilePresenter(Observable, Observer):
             self._filePath = filePath
             logger.debug(f'Reading {filePath}')
             fileReader = self._fileReaderChooser.getCurrentStrategy()
-            fileReader.read(filePath)
-            self.notifyObservers()
+            dataFile = fileReader.read(filePath)
+            self._activeDataFile.setActive(dataFile)
 
     def openDataFile(self, filePath: Path, fileFilter: str) -> None:
         self._fileReaderChooser.setFromDisplayName(fileFilter)
@@ -217,3 +186,5 @@ class DataFilePresenter(Observable, Observer):
             self._syncFileReaderToSettings()
         elif observable is self._settings.filePath:
             self._openDataFileFromSettings()
+        elif observable is self._activeDataFile:
+            self.notifyObservers()

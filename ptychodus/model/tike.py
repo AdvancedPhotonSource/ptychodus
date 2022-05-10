@@ -4,7 +4,6 @@ from typing import Any
 import logging
 
 import numpy
-import h5py
 
 try:
     import tike.ptycho
@@ -14,15 +13,15 @@ except ImportError:
         ptycho = None
 
 
-from .crop import CropSizer
+from ..api.data import DataArrayType, DataFile, DiffractionDataset
+from ..api.observer import Observable, Observer
+from ..api.settings import SettingsRegistry, SettingsGroup
+from .detector import CropSizer
 from .image import ImageExtent
 from .object import Object, ObjectSizer
-from .observer import Observable, Observer
 from .probe import Probe, ProbeSizer
 from .reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
 from .scan import Scan
-from .settings import SettingsRegistry, SettingsGroup
-from .velociprobe import VelociprobeReader
 
 logger = logging.getLogger(__name__)
 
@@ -391,50 +390,42 @@ class TikeReconstructor:
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
-                 velociprobeReader: VelociprobeReader, scan: Scan, probeSizer: ProbeSizer,
-                 probe: Probe, objectSizer: ObjectSizer, obj: Object,
+                 dataFile: DataFile, scan: Scan, probeSizer: ProbeSizer, probe: Probe,
+                 objectSizer: ObjectSizer, object_: Object,
                  reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
         self._cropSizer = cropSizer
-        self._velociprobeReader = velociprobeReader
+        self._dataFile = dataFile
         self._scan = scan
         self._probeSizer = probeSizer
         self._probe = probe
         self._objectSizer = objectSizer
-        self._object = obj
+        self._object = object_
         self._reconstructorPlotPresenter = reconstructorPlotPresenter
 
     @property
     def backendName(self) -> str:
         return 'Tike'
 
-    def getData(self) -> numpy.ndarray:
-        dataList: list[numpy.ndarray] = list()
+    def getData(self) -> DataArrayType:  # TODO extract and share with other backends
+        dataList: list[DataArrayType] = list()
 
-        if self._velociprobeReader.entryGroup:
-            for datafile in self._velociprobeReader.entryGroup.data:
-                try:
-                    with h5py.File(datafile.filePath, 'r') as h5File:
-                        item = h5File.get(datafile.dataPath)
+        for dataset in self._dataFile:
+            data = dataset.getArray()
 
-                        if isinstance(item, h5py.Dataset):
-                            data = item[()]
+            if data is None:
+                continue
 
-                            if self._cropSizer.isCropEnabled():
-                                sliceX = self._cropSizer.getSliceX()
-                                sliceY = self._cropSizer.getSliceY()
-                                data = numpy.copy(data[..., sliceY, sliceX])
+            if self._cropSizer.isCropEnabled():
+                sliceX = self._cropSizer.getSliceX()
+                sliceY = self._cropSizer.getSliceY()
+                data = data[..., sliceY, sliceX].copy()
 
-                            dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
-                            dataList.append(dataShifted)
-                        else:
-                            message = f'Symlink {datafile.filePath}:{datafile.dataPath} is not a dataset.'
-                            logger.debug(message)
-                except FileNotFoundError:
-                    logger.debug(f'File {datafile.filePath} not found!')
+            dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
+            dataList.append(dataShifted)
 
         return numpy.concatenate(dataList).astype('float32')
 
@@ -539,7 +530,7 @@ class TikeReconstructor:
             scan = scan[:numFrame, ...]
             data = data[:numFrame, ...]
 
-        # FIXME figure out how to remove the next line
+        # FIXME figure out how to remove the next line (get_padded_object)
         psi, scan = tike.ptycho.object.get_padded_object(scan, probe)
 
         logger.debug(f'data shape={data.shape}')
@@ -699,12 +690,12 @@ class TikeBackend:
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
                        cropSizer: CropSizer,
-                       velociprobeReader: VelociprobeReader,
+                       dataFile: DataFile,
                        scan: Scan,
                        probeSizer: ProbeSizer,
                        probe: Probe,
                        objectSizer: ObjectSizer,
-                       obj: Object,
+                       object_: Object,
                        reconstructorPlotPresenter: ReconstructorPlotPresenter,
                        isDeveloperModeEnabled: bool = False) -> TikeBackend:
         core = cls(settingsRegistry)
@@ -715,8 +706,8 @@ class TikeBackend:
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, cropSizer,
-                                                  velociprobeReader, scan, probeSizer, probe,
-                                                  objectSizer, obj, reconstructorPlotPresenter)
+                                                  dataFile, scan, probeSizer, probe, objectSizer,
+                                                  object_, reconstructorPlotPresenter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

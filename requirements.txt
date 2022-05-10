@@ -6,5 +6,6 @@ numpy
 pylint
 pyqt
 python>=3.9
+scipy
 setuptools>=46.4.0
 watchdog

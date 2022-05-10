@@ -2,20 +2,18 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Callable
 import logging
 
 import numpy
-import numpy.typing
 
-from .chooser import StrategyChooser, StrategyEntry
-from .crop import CropSizer
-from .detector import DetectorSettings
+from ..api.observer import Observable, Observer
+from ..api.plugins import PluginChooser, PluginEntry
+from ..api.probe import *
+from ..api.settings import SettingsRegistry, SettingsGroup
+from .detector import CropSizer, Detector
 from .fzp import single_probe
 from .geometry import Interval
 from .image import ImageExtent
-from .observer import Observable, Observer
-from .settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +23,8 @@ class ProbeSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'GaussianBeam')
-        self.customFilePath = settingsGroup.createPathEntry('CustomFilePath', None)
+        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
         self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
             'AutomaticProbeSizeEnabled', True)
         self.probeSize = settingsGroup.createIntegerEntry('ProbeSize', 64)
@@ -39,6 +38,8 @@ class ProbeSettings(Observable, Observer):
             'OutermostZoneWidthInMeters', '50e-9')
         self.beamstopDiameterInMeters = settingsGroup.createRealEntry(
             'BeamstopDiameterInMeters', '60e-6')
+        self.defocusDistanceInMeters = settingsGroup.createRealEntry('DefocusDistanceInMeters',
+                                                                     '800e-6')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ProbeSettings:
@@ -102,29 +103,25 @@ class ProbeSizer(Observable, Observer):
             self._updateProbeSize()
 
 
-ComplexNumpyArrayType = numpy.typing.NDArray[numpy.complexfloating]
-ProbeInitializerType = Callable[[], ComplexNumpyArrayType]
-
-
 class GaussianBeamProbeInitializer:
-    def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings) -> None:
-        self._detectorSettings = detectorSettings
+    def __init__(self, detector: Detector, probeSettings: ProbeSettings) -> None:
+        self._detector = detector
         self._probeSettings = probeSettings
 
-    def _createCircularMask(self) -> ComplexNumpyArrayType:
+    def _createCircularMask(self) -> ProbeArrayType:
         width_px = self._probeSettings.probeSize.value
         height_px = width_px
 
         Y_px, X_px = numpy.ogrid[:height_px, :width_px]
-        X_m = (X_px - width_px / 2) * float(self._detectorSettings.pixelSizeXInMeters.value)
-        Y_m = (Y_px - height_px / 2) * float(self._detectorSettings.pixelSizeYInMeters.value)
+        X_m = (X_px - width_px / 2) * float(self._detector.pixelSizeXInMeters)
+        Y_m = (Y_px - height_px / 2) * float(self._detector.pixelSizeYInMeters)
 
         probeRadius_m = self._probeSettings.probeDiameterInMeters.value / 2
         R_m = numpy.hypot(X_m, Y_m)
 
         return (R_m <= probeRadius_m)
 
-    def __call__(self) -> ComplexNumpyArrayType:
+    def __call__(self) -> ProbeArrayType:
         mask = self._createCircularMask()
         ft = numpy.fft.fft2(mask)
         ft = numpy.fft.fftshift(ft)
@@ -132,18 +129,18 @@ class GaussianBeamProbeInitializer:
 
 
 class FresnelZonePlateProbeInitializer:
-    def __init__(self, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
+    def __init__(self, detector: Detector, probeSettings: ProbeSettings,
                  sizer: ProbeSizer) -> None:
-        self._detectorSettings = detectorSettings
+        self._detector = detector
         self._probeSettings = probeSettings
         self._sizer = sizer
 
-    def __call__(self) -> ComplexNumpyArrayType:
+    def __call__(self) -> ProbeArrayType:
         shape = self._sizer.getProbeSize()
         lambda0 = self._sizer.getWavelengthInMeters()
-        dx_dec = self._detectorSettings.pixelSizeXInMeters.value  # TODO non-square pixels are unsupported
-        dis_defocus = self._detectorSettings.defocusDistanceInMeters.value
-        dis_StoD = self._detectorSettings.detectorDistanceInMeters.value
+        dx_dec = self._detector.pixelSizeXInMeters  # TODO non-square pixels are unsupported
+        dis_defocus = self._probeSettings.defocusDistanceInMeters.value
+        dis_StoD = self._detector.distanceToObjectInMeters
         radius = self._probeSettings.zonePlateRadiusInMeters.value
         outmost = self._probeSettings.outermostZoneWidthInMeters.value
         beamstop = self._probeSettings.beamstopDiameterInMeters.value
@@ -159,42 +156,64 @@ class FresnelZonePlateProbeInitializer:
         return probe
 
 
-class CustomProbeInitializer(Observer):
-    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer) -> None:
+class FileProbeInitializer(Observer):
+    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer,
+                 fileReaderChooser: PluginChooser[ProbeFileReader]) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
+        self._fileReaderChooser = fileReaderChooser
         self._array = numpy.zeros(sizer.getProbeExtent().shape, dtype=complex)
 
     @classmethod
-    def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer) -> CustomProbeInitializer:
-        initializer = cls(settings, sizer)
+    def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer,
+                       fileReaderChooser: PluginChooser[ProbeFileReader]) -> FileProbeInitializer:
+        initializer = cls(settings, sizer, fileReaderChooser)
+
+        settings.inputFileType.addObserver(initializer)
+        initializer._fileReaderChooser.addObserver(initializer)
+        initializer._syncFileReaderFromSettings()
+
+        settings.inputFilePath.addObserver(initializer)
         initializer._openProbeFromSettings()
-        settings.customFilePath.addObserver(initializer)
+
         return initializer
 
-    def __call__(self) -> ComplexNumpyArrayType:
+    def __call__(self) -> ProbeArrayType:
         return self._array
 
-    def getOpenFileFilter(self) -> str:
-        return 'NumPy Binary Files (*.npy)'
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._fileReaderChooser.getDisplayNameList()
+
+    def _syncFileReaderFromSettings(self) -> None:
+        self._fileReaderChooser.setFromSimpleName(self._settings.inputFileType.value)
+
+    def _syncFileReaderToSettings(self) -> None:
+        self._settings.inputFileType.value = self._fileReaderChooser.getCurrentSimpleName()
 
     def _openProbe(self, filePath: Path) -> None:
         if filePath is not None and filePath.is_file():
             logger.debug(f'Reading {filePath}')
-            self._array = numpy.load(filePath)
+            fileReader = self._fileReaderChooser.getCurrentStrategy()
+            self._array = fileReader.read(filePath)
 
-    def openProbe(self, filePath: Path) -> None:
-        if self._settings.customFilePath.value == filePath:
+    def openProbe(self, filePath: Path, fileFilter: str) -> None:
+        self._fileReaderChooser.setFromDisplayName(fileFilter)
+
+        if self._settings.inputFilePath.value == filePath:
             self._openProbe(filePath)
 
-        self._settings.customFilePath.value = filePath
+        self._settings.inputFilePath.value = filePath
 
     def _openProbeFromSettings(self) -> None:
-        self._openProbe(self._settings.customFilePath.value)
+        self._openProbe(self._settings.inputFilePath.value)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.customFilePath:
+        if observable is self._settings.inputFileType:
+            self._syncFileReaderFromSettings()
+        elif observable is self._fileReaderChooser:
+            self._syncFileReaderToSettings()
+        elif observable is self._settings.inputFilePath:
             self._openProbeFromSettings()
 
 
@@ -208,13 +227,13 @@ class Probe(Observable):
     def getNumberOfProbeModes(self) -> int:
         return self._array.shape[0]
 
-    def getProbeMode(self, index: int) -> ComplexNumpyArrayType:
+    def getProbeMode(self, index: int) -> ProbeArrayType:
         return self._array[index, ...]
 
-    def getArray(self) -> ComplexNumpyArrayType:
+    def getArray(self) -> ProbeArrayType:
         return self._array
 
-    def setArray(self, array: ComplexNumpyArrayType) -> None:
+    def setArray(self, array: ProbeArrayType) -> None:
         if not numpy.iscomplexobj(array):
             raise TypeError('Probe must be a complex-valued ndarray')
 
@@ -230,33 +249,33 @@ class Probe(Observable):
 
 class ProbeInitializer(Observable, Observer):
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
-                 reinitObservable: Observable) -> None:
+                 fileInitializer: FileProbeInitializer, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._probe = probe
         self._reinitObservable = reinitObservable
-        self._customInitializer = CustomProbeInitializer.createInstance(settings, sizer)
-        self._initializerChooser = StrategyChooser[ProbeInitializerType](
-            StrategyEntry[ProbeInitializerType](simpleName='Custom',
-                                                displayName='Custom',
-                                                strategy=self._customInitializer))
+        self._fileInitializer = fileInitializer
+        self._initializerChooser = PluginChooser[ProbeInitializerType](
+            PluginEntry[ProbeInitializerType](simpleName='FromFile',
+                                              displayName='From File',
+                                              strategy=self._fileInitializer))
 
     @classmethod
-    def createInstance(cls, detectorSettings: DetectorSettings, probeSettings: ProbeSettings,
-                       sizer: ProbeSizer, probe: Probe,
+    def createInstance(cls, detector: Detector, probeSettings: ProbeSettings, sizer: ProbeSizer,
+                       probe: Probe, fileInitializer: FileProbeInitializer,
                        reinitObservable: Observable) -> ProbeInitializer:
-        initializer = cls(probeSettings, sizer, probe, reinitObservable)
+        initializer = cls(probeSettings, sizer, probe, fileInitializer, reinitObservable)
 
-        fzpInit = StrategyEntry[ProbeInitializerType](simpleName='FresnelZonePlate',
-                                                      displayName='Fresnel Zone Plate',
-                                                      strategy=FresnelZonePlateProbeInitializer(
-                                                          detectorSettings, probeSettings, sizer))
+        fzpInit = PluginEntry[ProbeInitializerType](simpleName='FresnelZonePlate',
+                                                    displayName='Fresnel Zone Plate',
+                                                    strategy=FresnelZonePlateProbeInitializer(
+                                                        detector, probeSettings, sizer))
         initializer._initializerChooser.addStrategy(fzpInit)
 
-        gaussInit = StrategyEntry[ProbeInitializerType](simpleName='GaussianBeam',
-                                                        displayName='Gaussian Beam',
-                                                        strategy=GaussianBeamProbeInitializer(
-                                                            detectorSettings, probeSettings))
+        gaussInit = PluginEntry[ProbeInitializerType](simpleName='GaussianBeam',
+                                                      displayName='Gaussian Beam',
+                                                      strategy=GaussianBeamProbeInitializer(
+                                                          detector, probeSettings))
         initializer._initializerChooser.addStrategy(gaussInit)
 
         probeSettings.initializer.addObserver(initializer)
@@ -282,15 +301,15 @@ class ProbeInitializer(Observable, Observer):
         self._probe.setArray(initializer())
 
     def getOpenFileFilterList(self) -> list[str]:
-        return [self._customInitializer.getOpenFileFilter()]
+        return self._fileInitializer.getOpenFileFilterList()
 
     def openProbe(self, filePath: Path) -> None:
-        self._customInitializer.openProbe(filePath)
+        self._fileInitializer.openProbe(filePath)
         self._initializerChooser.setToDefault()
         self.initializeProbe()
 
     def getSaveFileFilterList(self) -> list[str]:
-        return ['NumPy Binary Files (*.npy)']
+        return ['NumPy Binary Files (*.npy)']  # TODO from plugins
 
     def saveProbe(self, filePath: Path) -> None:
         logger.debug(f'Writing {filePath}')
@@ -406,10 +425,16 @@ class ProbePresenter(Observable, Observer):
     def getBeamstopDiameterInMeters(self) -> Decimal:
         return self._settings.beamstopDiameterInMeters.value
 
+    def getDefocusDistanceInMeters(self) -> Decimal:
+        return self._settings.defocusDistanceInMeters.value
+
+    def setDefocusDistanceInMeters(self, value: Decimal) -> None:
+        self._settings.defocusDistanceInMeters.value = value
+
     def getNumberOfProbeModes(self) -> int:
         return self._probe.getNumberOfProbeModes()
 
-    def getProbeMode(self, index: int) -> ComplexNumpyArrayType:
+    def getProbeMode(self, index: int) -> ProbeArrayType:
         return self._probe.getProbeMode(index)
 
     def update(self, observable: Observable) -> None:

@@ -15,7 +15,6 @@ class DetectorView(QGroupBox):
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
         self.detectorDistanceWidget = LengthWidget.createInstance()
-        self.defocusDistanceWidget = LengthWidget.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorView:
@@ -27,7 +26,6 @@ class DetectorView(QGroupBox):
         layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
         layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
         layout.addRow('Detector-Object Distance:', view.detectorDistanceWidget)
-        layout.addRow('Defocus Distance:', view.defocusDistanceWidget)
         view.setLayout(layout)
 
         return view
