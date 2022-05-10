@@ -416,6 +416,9 @@ class TikeReconstructor:
         for dataset in self._dataFile:
             data = dataset.getArray()
 
+            if data is None:
+                continue
+
             if self._cropSizer.isCropEnabled():
                 sliceX = self._cropSizer.getSliceX()
                 sliceY = self._cropSizer.getSliceY()
