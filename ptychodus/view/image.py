@@ -30,8 +30,8 @@ class ImageRibbon(QWidget):
         self.vmaxLineEdit = QLineEdit()
         self.vmaxAutoCheckBox = QCheckBox('Auto')
 
-        self.colorMapGroupBox = BottomTitledGroupBox('Color Map')
-        self.colorMapComboBox = QComboBox()
+        self.colormapGroupBox = BottomTitledGroupBox('Color Map')
+        self.colormapComboBox = QComboBox()
 
         self.indexGroupBox = BottomTitledGroupBox('Index')
         self.indexSpinBox = QSpinBox()
@@ -61,10 +61,10 @@ class ImageRibbon(QWidget):
         normalizationLayout.addWidget(view.vmaxAutoCheckBox, 1, 3)
         view.normalizationGroupBox.setLayout(normalizationLayout)
 
-        colorMapLayout = QVBoxLayout()
-        colorMapLayout.setContentsMargins(10, 10, 10, 50)
-        colorMapLayout.addWidget(view.colorMapComboBox)
-        view.colorMapGroupBox.setLayout(colorMapLayout)
+        colormapLayout = QVBoxLayout()
+        colormapLayout.setContentsMargins(10, 10, 10, 50)
+        colormapLayout.addWidget(view.colormapComboBox)
+        view.colormapGroupBox.setLayout(colormapLayout)
 
         indexLayout = QVBoxLayout()
         indexLayout.setContentsMargins(10, 10, 10, 50)
@@ -76,7 +76,7 @@ class ImageRibbon(QWidget):
         layout.addWidget(view.imageFileGroupBox)
         layout.addWidget(view.scalarTransformGroupBox)
         layout.addWidget(view.normalizationGroupBox)
-        layout.addWidget(view.colorMapGroupBox)
+        layout.addWidget(view.colormapGroupBox)
         layout.addWidget(view.indexGroupBox)
         layout.addStretch(1)
         view.setLayout(layout)

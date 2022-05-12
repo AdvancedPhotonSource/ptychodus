@@ -22,4 +22,3 @@ class ScalarTransformation(Callable[[RealArrayType], RealArrayType]):
     @abstractproperty
     def name(self) -> str:
         pass
-
