@@ -3,7 +3,8 @@ from PyQt5.QtGui import QDoubleValidator, QImage, QPixmap, QStandardItem, QStand
 import matplotlib
 import numpy
 
-from ..model import ColorMapListFactory, ScalarTransformation, ComplexToRealStrategy
+from ..api.image import ScalarTransformation, ComplexToRealStrategy
+from ..model import ColorMapListFactory
 from ..view import ImageView
 from .data import FileDialogFactory
 

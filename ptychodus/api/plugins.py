@@ -7,12 +7,14 @@ import logging
 import pkgutil
 
 from .data import DataFileReader
+from .image import ComplexToRealStrategy, ScalarTransformation
 from .object import ObjectFileReader
 from .observer import Observable
 from .probe import ProbeFileReader
 from .scan import ScanFileReader
 
-T = TypeVar('T', DataFileReader, ScanFileReader, ProbeFileReader, ObjectFileReader)
+T = TypeVar('T', DataFileReader, ComplexToRealStrategy, ScalarTransformation, ScanFileReader,
+            ProbeFileReader, ObjectFileReader)
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +96,8 @@ class PluginChooser(Generic[T], Observable):
 class PluginRegistry:
     def __init__(self) -> None:
         self.dataFileReaders: list[PluginEntry[DataFileReader]] = list()
+        self.complexToRealStrategies: list[PluginEntry[ComplexToRealStrategy]] = list()
+        self.scalarTransformations: list[PluginEntry[ScalarTransformation]] = list()
         self.scanFileReaders: list[PluginEntry[ScanFileReader]] = list()
         self.probeFileReaders: list[PluginEntry[ProbeFileReader]] = list()
         self.objectFileReaders: list[PluginEntry[ObjectFileReader]] = list()
@@ -122,6 +126,16 @@ class PluginRegistry:
                                                 displayName=plugin.fileFilter,
                                                 strategy=plugin)
             self.dataFileReaders.append(entry)
+        elif isinstance(plugin, ComplexToRealStrategy):
+            entry = PluginEntry[ComplexToRealStrategy](simpleName=plugin.name,
+                                                       displayName=plugin.name,
+                                                       strategy=plugin)
+            self.complexToRealStrategies.append(entry)
+        elif isinstance(plugin, ScalarTransformation):
+            entry = PluginEntry[ScalarTransformation](simpleName=plugin.name,
+                                                      displayName=plugin.name,
+                                                      strategy=plugin)
+            self.scalarTransformations.append(entry)
         elif isinstance(plugin, ScanFileReader):
             entry = PluginEntry[ScanFileReader](simpleName=plugin.simpleName,
                                                 displayName=plugin.fileFilter,
@@ -142,6 +156,12 @@ class PluginRegistry:
 
     def buildDataFileReaderChooser(self) -> PluginChooser[DataFileReader]:
         return PluginChooser[DataFileReader].createFromList(self.dataFileReaders)
+
+    def buildComplexToRealStrategyChooser(self) -> PluginChooser[ComplexToRealStrategy]:
+        return PluginChooser[ComplexToRealStrategy].createFromList(self.complexToRealStrategies)
+
+    def buildScalarTransformationChooser(self) -> PluginChooser[ScalarTransformation]:
+        return PluginChooser[ScalarTransformation].createFromList(self.scalarTransformations)
 
     def buildScanFileReaderChooser(self) -> PluginChooser[ScanFileReader]:
         return PluginChooser[ScanFileReader].createFromList(self.scanFileReaders)
