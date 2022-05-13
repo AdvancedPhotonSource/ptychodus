@@ -9,6 +9,7 @@ from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
 from .data import *
 from .detector import *
+from .image import *
 from .object import *
 from .probe import *
 from .ptychonn import PtychoNNBackend
@@ -26,8 +27,18 @@ logger = logging.getLogger(__name__)
 class ModelCore:
     def __init__(self, isDeveloperModeEnabled: bool = False) -> None:
         self.rng = numpy.random.default_rng()
-
         self._pluginRegistry = PluginRegistry.loadPlugins()
+        self._colormapChooserFactory = ColormapChooserFactory()
+
+        self.detectorImagePresenter = ImagePresenter.createInstance(
+            self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
+            self._pluginRegistry.buildComplexToRealStrategyChooser())
+        self.probeImagePresenter = ImagePresenter.createInstance(
+            self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
+            self._pluginRegistry.buildComplexToRealStrategyChooser())
+        self.objectImagePresenter = ImagePresenter.createInstance(
+            self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
+            self._pluginRegistry.buildComplexToRealStrategyChooser())
 
         self.settingsRegistry = SettingsRegistry()
         self._dataSettings = Datasettings.createInstance(self.settingsRegistry)
@@ -102,7 +113,7 @@ class ModelCore:
             self._pluginRegistry.buildDataFileReaderChooser())
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
-        self.detectorImagePresenter = DetectorImagePresenter.createInstance(
+        self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
             self._activeDiffractionDataset)
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,

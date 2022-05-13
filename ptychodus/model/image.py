@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional, Tuple
 
-import matplotlib
+import matplotlib.pyplot
 import numpy
 import numpy.typing
 
-from ..api.observer import Observable
+from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
 
 
@@ -59,7 +59,7 @@ class ColormapChooserFactory:
         # See https://matplotlib.org/stable/gallery/color/colormap_reference.html
         self._cyclicColormapList = ['twilight', 'twilight_shifted', 'hsv']
         self._acyclicColormapList = [
-            cm for cm in matplotlib.pyplot.colormaps() if cm not in self._cyclicColormaps
+            cm for cm in matplotlib.pyplot.colormaps() if cm not in self._cyclicColormapList
         ]
 
     def createCyclicColormapChooser(self) -> PluginChooser[matplotlib.colors.Colormap]:
@@ -76,7 +76,7 @@ class ColormapChooserFactory:
                                                        strategy=matplotlib.cm.get_cmap(cmap))
 
 
-class ImagePresenter(Observable):
+class ImagePresenter(Observable, Observer):
     def __init__(self, colormapChooserFactory: ColormapChooserFactory,
                  scalarTransformationChooser: PluginChooser[ScalarTransformation],
                  complexToRealStrategyChooser: PluginChooser[ComplexToRealStrategy]) -> None:
@@ -91,42 +91,51 @@ class ImagePresenter(Observable):
         self._complexToRealStrategyChooser = complexToRealStrategyChooser
         self._array: Optional[numpy.typing.NDArray] = None
         self._image: Optional[numpy.typing.NDArray] = None
-        self._vminIsAuto = True
+        self._vminIsAuto = False
         self._vmin = Decimal(0)
-        self._vmaxIsAuto = True
+        self._vmaxIsAuto = False
         self._vmax = Decimal(1)
+
+    @classmethod
+    def createInstance(cls, colormapChooserFactory: ColormapChooserFactory,
+                       scalarTransformationChooser: PluginChooser[ScalarTransformation],
+                       complexToRealStrategyChooser: PluginChooser[ComplexToRealStrategy]) -> None:
+        presenter = cls(colormapChooserFactory, scalarTransformationChooser,
+                        complexToRealStrategyChooser)
+        presenter._cyclicColormapChooser.addObserver(presenter)
+        presenter._acyclicColormapChooser.addObserver(presenter)
+        scalarTransformationChooser.addObserver(presenter)
+        complexToRealStrategyChooser.addObserver(presenter)
+        return presenter
 
     def getColormapList(self) -> list[str]:
         return self._colormapChooser.getDisplayNameList()
 
     def getColormap(self) -> str:
-        return self_colormapChooser.getCurrentDisplayName()
+        return self._colormapChooser.getCurrentDisplayName()
 
     def setColormap(self, name: str) -> None:
         self._colormapChooser.setFromDisplayName(name)
-        self.notifyObservers()
 
     def getScalarTransformationList(self) -> list[str]:
         return self._scalarTransformationChooser.getDisplayNameList()
 
     def getScalarTransformation(self) -> str:
-        return self_scalarTransformationChooser.getCurrentDisplayName()
+        return self._scalarTransformationChooser.getCurrentDisplayName()
 
     def setScalarTransformation(self, name: str) -> None:
         self._scalarTransformationChooser.setFromDisplayName(name)
-        self._updateImageAndNotifyObservers()
 
     def getComplexToRealStrategyList(self) -> list[str]:
         return self._complexToRealStrategyChooser.getDisplayNameList()
 
     def getComplexToRealStrategy(self) -> str:
-        return self_complexToRealStrategyChooser.getCurrentDisplayName()
+        return self._complexToRealStrategyChooser.getCurrentDisplayName()
 
     def setComplexToRealStrategy(self, name: str) -> None:
         self._complexToRealStrategyChooser.setFromDisplayName(name)
-        self._colormapChooser = self._cyclicColormapChooser if self._complexToRealStrategyChooser.getCurrentStrategy(
-        ).isCyclic else self._acyclicColormapChooser
-        self._updateImageAndNotifyObservers()
+        isCyclic = self._complexToRealStrategyChooser.getCurrentStrategy().isCyclic
+        self._colormapChooser = self._cyclicColormapChooser if isCyclic else self._acyclicColormapChooser
 
     def isAutomaticVMinEnabled(self) -> bool:
         return self._vminIsAuto
@@ -170,23 +179,36 @@ class ImagePresenter(Observable):
         realArray = complexToRealStrategy(self._array) if numpy.iscomplexobj(
             self._array) else self._array
 
-        scalarTransform = self._scalarTransformChooser.getCurrentStrategy()
+        scalarTransform = self._scalarTransformationChooser.getCurrentStrategy()
         self._image = scalarTransform(realArray)
 
         if self._vminIsAuto:
-            self._vmin = self._image.min()
+            self._vmin = Decimal(repr(self._image.min()))
 
         if self._vmaxIsAuto:
-            self._vmax = self._image.max()
+            self._vmax = Decimal(repr(self._image.max()))
 
         self.notifyObservers()
 
     def getImage(self) -> Optional[numpy.typing.NDArray]:
-        if self._image is None or self._vmax <= self._vmin:
+        if self._image is None:
+            return
+
+        if self._vmax <= self._vmin:
             return
 
         cnorm = matplotlib.colors.Normalize(vmin=self._vmin, vmax=self._vmax, clip=False)
         cmap = self._colormapChooser.getCurrentStrategy()
         scalarMappable = matplotlib.cm.ScalarMappable(norm=cnorm, cmap=cmap)
 
-        return scalarMappable.to_rgba(image_data)
+        return scalarMappable.to_rgba(self._image)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._cyclicColormapChooser:
+            self.notifyObservers()
+        elif observable is self._acyclicColormapChooser:
+            self.notifyObservers()
+        elif observable is self._scalarTransformationChooser:
+            self._updateImageAndNotifyObservers()
+        elif observable is self._complexToRealStrategyChooser:
+            self._updateImageAndNotifyObservers()

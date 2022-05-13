@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+from PyQt5.QtCore import QStringListModel
 from PyQt5.QtGui import QDoubleValidator, QImage, QPixmap, QStandardItem, QStandardItemModel
 
 import matplotlib
@@ -26,27 +29,27 @@ class ImageController(Observer):
     def createInstance(cls, presenter: ImagePresenter, view: ImageView,
                        fileDialogFactory: FileDialogFactory):
         controller = cls(presenter, view, fileDialogFactory)
-        controller._syncModelToView()
-        presenter.addObserver(controller)
 
         view.imageRibbon.saveButton.clicked.connect(controller._saveImage)
 
         view.imageRibbon.scalarTransformComboBox.setModel(controller._scalarTransformationModel)
+        view.imageRibbon.complexComponentComboBox.setModel(controller._complexToRealStrategyModel)
+        view.imageRibbon.colormapComboBox.setModel(controller._colormapModel)
+        view.imageRibbon.vminLineEdit.setValidator(QDoubleValidator())
+        view.imageRibbon.vmaxLineEdit.setValidator(QDoubleValidator())
+
+        controller._syncModelToView()
+        presenter.addObserver(controller)
+
         view.imageRibbon.scalarTransformComboBox.currentTextChanged.connect(
             presenter.setScalarTransformation)
-
-        view.imageRibbon.complexComponentComboBox.setModel(controller._complexToRealStrategyModel)
         view.imageRibbon.complexComponentComboBox.currentTextChanged.connect(
             presenter.setComplexToRealStrategy)
-
-        view.imageRibbon.colormapComboBox.setModel(controller._colormapModel)
         view.imageRibbon.colormapComboBox.currentTextChanged.connect(presenter.setColormap)
 
-        view.imageRibbon.vminLineEdit.setValidator(QDoubleValidator())
         view.imageRibbon.vminLineEdit.editingFinished.connect(controller._syncVMinToModel)
         view.imageRibbon.vminAutoCheckBox.toggled.connect(presenter.setAutomaticVMinEnabled)
 
-        view.imageRibbon.vmaxLineEdit.setValidator(QDoubleValidator())
         view.imageRibbon.vmaxLineEdit.editingFinished.connect(controller._syncVMaxToModel)
         view.imageRibbon.vmaxAutoCheckBox.toggled.connect(presenter.setAutomaticVMaxEnabled)
 
@@ -81,7 +84,7 @@ class ImageController(Observer):
         self._colormapModel.setStringList(self._presenter.getColormapList())
         self._view.imageRibbon.colormapComboBox.setCurrentText(self._presenter.getColormap())
 
-        self._view.imageRibbon.vmaxAutoCheckBox.setChecked(
+        self._view.imageRibbon.vminAutoCheckBox.setChecked(
             self._presenter.isAutomaticVMinEnabled())
         self._view.imageRibbon.vminLineEdit.setEnabled(
             not self._presenter.isAutomaticVMinEnabled())

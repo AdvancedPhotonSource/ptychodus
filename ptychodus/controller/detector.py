@@ -94,24 +94,24 @@ class DatasetListModel(QAbstractListModel):
         return self._presenter.getNumberOfDatasets()
 
 
-class DatasetController(Observer):
+class DatasetParametersController(Observer):
     def __init__(self, velociprobePresenter: VelociprobePresenter,
-                 imagePresenter: DetectorImagePresenter, view: DatasetView) -> None:
+                 datasetPresenter: DiffractionDatasetPresenter, view: DatasetView) -> None:
         super().__init__()
         self._velociprobePresenter = velociprobePresenter
-        self._imagePresenter = imagePresenter
+        self._datasetPresenter = datasetPresenter
         self._listModel = DatasetListModel(velociprobePresenter)
         self._view = view
 
     @classmethod
     def createInstance(cls, velociprobePresenter: VelociprobePresenter,
-                       imagePresenter: DetectorImagePresenter,
-                       view: DatasetView) -> DatasetController:
-        controller = cls(velociprobePresenter, imagePresenter, view)
+                       datasetPresenter: DiffractionDatasetPresenter,
+                       view: DatasetView) -> DatasetParametersController:
+        controller = cls(velociprobePresenter, datasetPresenter, view)
 
         view.dataFileListView.setModel(controller._listModel)
         velociprobePresenter.addObserver(controller)
-        imagePresenter.addObserver(controller)
+        datasetPresenter.addObserver(controller)
 
         view.dataFileListView.selectionModel().currentChanged.connect(
             controller._updateCurrentDatasetIndex)
@@ -119,10 +119,10 @@ class DatasetController(Observer):
         return controller
 
     def _updateCurrentDatasetIndex(self, index: QModelIndex) -> None:
-        self._imagePresenter.setCurrentDatasetIndex(index.row())
+        self._datasetPresenter.setCurrentDatasetIndex(index.row())
 
     def _updateSelection(self) -> None:
-        row = self._imagePresenter.getCurrentDatasetIndex()
+        row = self._datasetPresenter.getCurrentDatasetIndex()
         index = self._listModel.index(row, 0)
         self._view.dataFileListView.setCurrentIndex(index)
 
@@ -130,7 +130,7 @@ class DatasetController(Observer):
         if observable is self._velociprobePresenter:
             self._listModel.beginResetModel()
             self._listModel.endResetModel()
-        elif observable is self._imagePresenter:
+        elif observable is self._datasetPresenter:
             self._updateSelection()
 
 
@@ -189,30 +189,34 @@ class CropController(Observer):
             self._syncModelToView()
 
 
-class DetectorImageController(Observer):
-    def __init__(self, presenter: DetectorImagePresenter, view: ImageView,
+class DatasetImageController(Observer):
+    def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
+                 imagePresenter: ImagePresenter, view: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
-        self._presenter = presenter
+        self._datasetPresenter = datasetPresenter
+        self._imagePresenter = imagePresenter
         self._view = view
-        self._image_controller = ImageController.createInstance(view, fileDialogFactory)
+        self._imageController = ImageController.createInstance(imagePresenter, view,
+                                                               fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, presenter: DetectorImagePresenter, view: ImageView,
-                       fileDialogFactory: FileDialogFactory) -> DetectorImageController:
-        controller = cls(presenter, view, fileDialogFactory)
-        presenter.addObserver(controller)
+    def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
+                       imagePresenter: ImagePresenter, view: ImageView,
+                       fileDialogFactory: FileDialogFactory) -> DatasetImageController:
+        controller = cls(datasetPresenter, imagePresenter, view, fileDialogFactory)
+        datasetPresenter.addObserver(controller)
         controller._syncModelToView()
         view.imageRibbon.indexGroupBox.setTitle('Frame')
         view.imageRibbon.indexSpinBox.valueChanged.connect(controller._renderImageData)
         return controller
 
     def _renderImageData(self, index: int) -> None:
-        image = self._presenter.getImage(index)
-        self._image_controller.renderImageData(image)
+        array = self._datasetPresenter.getImage(index)
+        self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
-        numberOfImages = self._presenter.getNumberOfImages()
+        numberOfImages = self._datasetPresenter.getNumberOfImages()
         self._view.imageRibbon.indexSpinBox.setEnabled(numberOfImages > 0)
         self._view.imageRibbon.indexSpinBox.setRange(0, numberOfImages - 1)
 
@@ -220,5 +224,5 @@ class DetectorImageController(Observer):
         self._renderImageData(index)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._datasetPresenter:
             self._syncModelToView()

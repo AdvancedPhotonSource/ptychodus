@@ -36,7 +36,7 @@ class LogScalarTransformation(ScalarTransformation):
 class Log2ScalarTransformation(ScalarTransformation):
     @property
     def name(self) -> str:
-        return 'Logarithm (Base 2)',
+        return 'Logarithm (Base 2)'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -46,7 +46,7 @@ class Log2ScalarTransformation(ScalarTransformation):
 class Log10ScalarTransformation(ScalarTransformation):
     @property
     def name(self) -> str:
-        return 'Logarithm (Base 10)',
+        return 'Logarithm (Base 10)'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)

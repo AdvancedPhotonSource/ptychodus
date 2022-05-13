@@ -144,17 +144,20 @@ class ProbeParametersController:
 
 
 class ProbeImageController(Observer):
-    def __init__(self, presenter: ProbePresenter, view: ImageView,
+    def __init__(self, presenter: ProbePresenter, imagePresenter: ImagePresenter, view: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
+        self._imagePresenter = imagePresenter
         self._view = view
-        self._image_controller = ImageController.createInstance(view, fileDialogFactory)
+        self._imageController = ImageController.createInstance(imagePresenter, view,
+                                                               fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ImageView,
+    def createInstance(cls, presenter: ProbePresenter, imagePresenter: ImagePresenter,
+                       view: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ProbeImageController:
-        controller = cls(presenter, view, fileDialogFactory)
+        controller = cls(presenter, imagePresenter, view, fileDialogFactory)
         presenter.addObserver(controller)
         controller._syncModelToView()
         view.imageRibbon.indexGroupBox.setTitle('Probe Mode')
@@ -162,8 +165,8 @@ class ProbeImageController(Observer):
         return controller
 
     def _renderImageData(self, index: int) -> None:
-        image = self._presenter.getProbeMode(index)
-        self._image_controller.renderImageData(image)
+        array = self._presenter.getProbeMode(index)
+        self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
         numberOfProbeModes = self._presenter.getNumberOfProbeModes()

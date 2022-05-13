@@ -368,13 +368,13 @@ class CropPresenter(Observer, Observable):
             self.notifyObservers()
 
 
-class DetectorImagePresenter(Observable, Observer):
+class DiffractionDatasetPresenter(Observable, Observer):
     def __init__(self, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._dataset = dataset
 
     @classmethod
-    def createInstance(cls, dataset: ActiveDiffractionDataset) -> DetectorImagePresenter:
+    def createInstance(cls, dataset: ActiveDiffractionDataset) -> DiffractionDatasetPresenter:
         presenter = cls(dataset)
         dataset.addObserver(presenter)
         return presenter

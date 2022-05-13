@@ -32,17 +32,19 @@ class ControllerCore:
                                                                      self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
             model.detectorPresenter, view.detectorParametersView.detectorView)
-        self._datasetController = DatasetController.createInstance(
-            model.velociprobePresenter, model.detectorImagePresenter,
+        self._datasetParametersController = DatasetParametersController.createInstance(
+            model.velociprobePresenter, model.diffractionDatasetPresenter,
             view.detectorParametersView.datasetView)
         self._cropController = CropController.createInstance(
             model.cropPresenter, view.detectorParametersView.imageCropView)
-        self._detectorImageController = DetectorImageController.createInstance(
-            model.detectorImagePresenter, view.detectorImageView, self._fileDialogFactory)
+        self._datasetImageController = DatasetImageController.createInstance(
+            model.diffractionDatasetPresenter, model.detectorImagePresenter,
+            view.detectorImageView, self._fileDialogFactory)
         self._probeParametersController = ProbeParametersController.createInstance(
             model.probePresenter, view.probeParametersView, self._fileDialogFactory)
         self._probeImageController = ProbeImageController.createInstance(
-            model.probePresenter, view.probeImageView, self._fileDialogFactory)
+            model.probePresenter, model.probeImagePresenter, view.probeImageView,
+            self._fileDialogFactory)
         self._scanParametersController = ScanParametersController.createInstance(
             model.scanPresenter, view.scanParametersView, self._fileDialogFactory)
         self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter,
@@ -50,7 +52,8 @@ class ControllerCore:
         self._objectParametersController = ObjectParametersController.createInstance(
             model.objectPresenter, view.objectParametersView, self._fileDialogFactory)
         self._objectImageController = ObjectImageController.createInstance(
-            model.objectPresenter, view.objectImageView, self._fileDialogFactory)
+            model.objectPresenter, model.objectImagePresenter, view.objectImageView,
+            self._fileDialogFactory)
         self._dataFileController = DataFileController.createInstance(model.dataFilePresenter,
                                                                      view.dataFileTreeView,
                                                                      view.dataFileTableView,
@@ -61,9 +64,11 @@ class ControllerCore:
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
             model.reconstructorPlotPresenter, view.reconstructorPlotView)
         self._monitorProbeController = ProbeImageController.createInstance(
-            model.probePresenter, view.monitorProbeView.imageView, self._fileDialogFactory)
+            model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
+            self._fileDialogFactory)
         self._monitorObjectController = ObjectImageController.createInstance(
-            model.objectPresenter, view.monitorObjectView.imageView, self._fileDialogFactory)
+            model.objectPresenter, model.objectImagePresenter, view.monitorObjectView.imageView,
+            self._fileDialogFactory)
 
     @classmethod
     def createInstance(cls, model: ModelCore, view: ViewCore):
