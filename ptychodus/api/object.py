@@ -21,3 +21,17 @@ class ObjectFileReader(ABC):
     @abstractmethod
     def read(self, filePath: Path) -> ObjectArrayType:
         pass
+
+
+class ObjectFileWriter(ABC):
+    @abstractproperty
+    def simpleName(self) -> str:
+        pass
+
+    @abstractproperty
+    def fileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def write(self, filePath: Path, array: ObjectArrayType) -> None:
+        pass

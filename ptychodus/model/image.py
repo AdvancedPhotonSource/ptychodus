@@ -10,6 +10,8 @@ import numpy.typing
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
 
+# FIXME encode magnitude/phase in rgb/hsv channels
+
 
 @dataclass(frozen=True)
 class ImageExtent:

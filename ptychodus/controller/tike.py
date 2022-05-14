@@ -49,6 +49,7 @@ class TikeAdaptiveMomentController(Observer):
             self._syncModelToView()
 
 
+# TODO add finite probe support constraint
 class TikeProbeCorrectionController(Observer):
     def __init__(self, presenter: TikeProbeCorrectionPresenter,
                  view: TikeProbeCorrectionView) -> None:

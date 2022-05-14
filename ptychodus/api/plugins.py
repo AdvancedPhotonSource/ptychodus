@@ -8,13 +8,13 @@ import pkgutil
 
 from .data import DataFileReader
 from .image import ComplexToRealStrategy, ScalarTransformation
-from .object import ObjectFileReader
+from .object import ObjectFileReader, ObjectFileWriter
 from .observer import Observable
-from .probe import ProbeFileReader
-from .scan import ScanFileReader
+from .probe import ProbeFileReader, ProbeFileWriter
+from .scan import ScanFileReader, ScanFileWriter
 
 T = TypeVar('T', DataFileReader, ComplexToRealStrategy, ScalarTransformation, ScanFileReader,
-            ProbeFileReader, ObjectFileReader)
+            ScanFileWriter, ProbeFileReader, ProbeFileWriter, ObjectFileReader, ObjectFileWriter)
 
 logger = logging.getLogger(__name__)
 
@@ -99,8 +99,11 @@ class PluginRegistry:
         self.complexToRealStrategies: list[PluginEntry[ComplexToRealStrategy]] = list()
         self.scalarTransformations: list[PluginEntry[ScalarTransformation]] = list()
         self.scanFileReaders: list[PluginEntry[ScanFileReader]] = list()
+        self.scanFileWriters: list[PluginEntry[ScanFileWriter]] = list()
         self.probeFileReaders: list[PluginEntry[ProbeFileReader]] = list()
+        self.probeFileWriters: list[PluginEntry[ProbeFileWriter]] = list()
         self.objectFileReaders: list[PluginEntry[ObjectFileReader]] = list()
+        self.objectFileWriters: list[PluginEntry[ObjectFileWriter]] = list()
 
     @classmethod
     def loadPlugins(cls) -> PluginRegistry:
@@ -141,16 +144,31 @@ class PluginRegistry:
                                                 displayName=plugin.fileFilter,
                                                 strategy=plugin)
             self.scanFileReaders.append(entry)
+        elif isinstance(plugin, ScanFileWriter):
+            entry = PluginEntry[ScanFileWriter](simpleName=plugin.simpleName,
+                                                displayName=plugin.fileFilter,
+                                                strategy=plugin)
+            self.scanFileWriters.append(entry)
         elif isinstance(plugin, ProbeFileReader):
             entry = PluginEntry[ProbeFileReader](simpleName=plugin.simpleName,
                                                  displayName=plugin.fileFilter,
                                                  strategy=plugin)
             self.probeFileReaders.append(entry)
+        elif isinstance(plugin, ProbeFileWriter):
+            entry = PluginEntry[ProbeFileWriter](simpleName=plugin.simpleName,
+                                                 displayName=plugin.fileFilter,
+                                                 strategy=plugin)
+            self.probeFileWriters.append(entry)
         elif isinstance(plugin, ObjectFileReader):
             entry = PluginEntry[ObjectFileReader](simpleName=plugin.simpleName,
                                                   displayName=plugin.fileFilter,
                                                   strategy=plugin)
             self.objectFileReaders.append(entry)
+        elif isinstance(plugin, ObjectFileWriter):
+            entry = PluginEntry[ObjectFileWriter](simpleName=plugin.simpleName,
+                                                  displayName=plugin.fileFilter,
+                                                  strategy=plugin)
+            self.objectFileWriters.append(entry)
         else:
             raise TypeError(f'Invalid plugin type \"{type(plugin).__name__}\".')
 
@@ -166,8 +184,17 @@ class PluginRegistry:
     def buildScanFileReaderChooser(self) -> PluginChooser[ScanFileReader]:
         return PluginChooser[ScanFileReader].createFromList(self.scanFileReaders)
 
+    def buildScanFileWriterChooser(self) -> PluginChooser[ScanFileWriter]:
+        return PluginChooser[ScanFileWriter].createFromList(self.scanFileWriters)
+
     def buildProbeFileReaderChooser(self) -> PluginChooser[ProbeFileReader]:
         return PluginChooser[ProbeFileReader].createFromList(self.probeFileReaders)
 
+    def buildProbeFileWriterChooser(self) -> PluginChooser[ProbeFileWriter]:
+        return PluginChooser[ProbeFileWriter].createFromList(self.probeFileWriters)
+
     def buildObjectFileReaderChooser(self) -> PluginChooser[ObjectFileReader]:
         return PluginChooser[ObjectFileReader].createFromList(self.objectFileReaders)
+
+    def buildObjectFileWriterChooser(self) -> PluginChooser[ObjectFileWriter]:
+        return PluginChooser[ObjectFileWriter].createFromList(self.objectFileWriters)

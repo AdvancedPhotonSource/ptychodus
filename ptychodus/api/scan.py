@@ -27,3 +27,17 @@ class ScanFileReader(ABC):
 
 class ScanPointParseError(Exception):
     pass
+
+
+class ScanFileWriter(ABC):
+    @abstractproperty
+    def simpleName(self) -> str:
+        pass
+
+    @abstractproperty
+    def fileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def write(self, filePath: Path, scanPoints: Iterable[ScanPoint]) -> None:
+        pass

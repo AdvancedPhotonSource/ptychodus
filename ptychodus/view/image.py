@@ -11,6 +11,8 @@ from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, \
 from .widgets import BottomTitledGroupBox
 
 
+# FIXME support both float and integer values in ImageRibbon
+# FIXME vmin/vmax sliders like ImageJ
 class ImageRibbon(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)

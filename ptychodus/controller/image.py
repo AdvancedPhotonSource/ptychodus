@@ -13,6 +13,7 @@ from ..view import ImageView
 from .data import FileDialogFactory
 
 
+# FIXME set input file type in file choosers
 class ImageController(Observer):
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 

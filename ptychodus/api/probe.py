@@ -21,3 +21,17 @@ class ProbeFileReader(ABC):
     @abstractmethod
     def read(self, filePath: Path) -> ProbeArrayType:
         pass
+
+
+class ProbeFileWriter(ABC):
+    @abstractproperty
+    def simpleName(self) -> str:
+        pass
+
+    @abstractproperty
+    def fileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def write(self, filePath: Path, array: ProbeArrayType) -> None:
+        pass

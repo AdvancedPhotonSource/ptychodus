@@ -12,7 +12,7 @@ import logging
 import h5py
 import numpy
 
-from ..h5DataFileReader import H5DataFileTreeBuilder, H5DataFile
+from ..h5DataFile import H5DataFileTreeBuilder, H5DataFile
 from ptychodus.api.data import *
 from ptychodus.api.scan import ScanFileReader, ScanPoint, ScanPointParseError
 
