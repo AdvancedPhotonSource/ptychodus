@@ -71,19 +71,25 @@ class ImageController(Observer):
         self._presenter.setVMaxValue(Decimal(self._view.imageRibbon.vmaxLineEdit.text()))
 
     def _syncModelToView(self) -> None:
+        self._view.imageRibbon.scalarTransformComboBox.blockSignals(True)
         self._scalarTransformationModel.setStringList(
             self._presenter.getScalarTransformationList())
         self._view.imageRibbon.scalarTransformComboBox.setCurrentText(
             self._presenter.getScalarTransformation())
+        self._view.imageRibbon.scalarTransformComboBox.blockSignals(False)
 
+        self._view.imageRibbon.complexComponentComboBox.blockSignals(True)
         self._complexToRealStrategyModel.setStringList(
             self._presenter.getComplexToRealStrategyList())
         self._view.imageRibbon.complexComponentComboBox.setCurrentText(
             self._presenter.getComplexToRealStrategy())
+        self._view.imageRibbon.complexComponentComboBox.blockSignals(False)
         self._view.imageRibbon.complexComponentComboBox.setVisible(True)  # FIXME iscomplexobj
 
+        self._view.imageRibbon.colormapComboBox.blockSignals(True)
         self._colormapModel.setStringList(self._presenter.getColormapList())
         self._view.imageRibbon.colormapComboBox.setCurrentText(self._presenter.getColormap())
+        self._view.imageRibbon.colormapComboBox.blockSignals(False)
 
         self._view.imageRibbon.vminAutoCheckBox.setChecked(
             self._presenter.isAutomaticVMinEnabled())
