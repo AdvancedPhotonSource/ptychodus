@@ -131,6 +131,9 @@ class SettingsRegistry(Observable):
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileFilterList
 
+    def getOpenFileFilter(self) -> str:
+        return self._fileFilterList[0]
+
     def openSettings(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         config.read(filePath)
@@ -150,6 +153,9 @@ class SettingsRegistry(Observable):
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._fileFilterList
+
+    def getSaveFileFilter(self) -> str:
+        return self._fileFilterList[0]
 
     def saveSettings(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)

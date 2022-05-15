@@ -137,14 +137,20 @@ class ScanParametersController:
 
     def openScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view, 'Open Scan', nameFilters=self._presenter.getOpenFileFilterList())
+            self._view,
+            'Open Scan',
+            nameFilters=self._presenter.getOpenFileFilterList(),
+            selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
             self._presenter.openScan(filePath, nameFilter)
 
     def saveScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._view, 'Save Scan', nameFilters=self._presenter.getSaveFileFilterList())
+            self._view,
+            'Save Scan',
+            nameFilters=self._presenter.getSaveFileFilterList(),
+            selectedNameFilter=self._presenter.getSaveFileFilter())
 
         if filePath:
             self._presenter.saveScan(filePath, nameFilter)

@@ -185,6 +185,9 @@ class FileProbeInitializer(Observer):
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
+    def getOpenFileFilter(self) -> str:
+        return self._fileReaderChooser.getCurrentDisplayName()
+
     def _syncFileReaderFromSettings(self) -> None:
         self._fileReaderChooser.setFromSimpleName(self._settings.inputFileType.value)
 
@@ -308,6 +311,9 @@ class ProbeInitializer(Observable, Observer):
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileInitializer.getOpenFileFilterList()
 
+    def getOpenFileFilter(self) -> str:
+        return self._fileInitializer.getOpenFileFilter()
+
     def openProbe(self, filePath: Path) -> None:
         self._fileInitializer.openProbe(filePath)
         self._initializerChooser.setToDefault()
@@ -315,6 +321,9 @@ class ProbeInitializer(Observable, Observer):
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._fileWriterChooser.getDisplayNameList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._fileWriterChooser.getCurrentDisplayName()
 
     def saveProbe(self, filePath: Path) -> None:
         logger.debug(f'Writing {filePath}')
@@ -369,11 +378,17 @@ class ProbePresenter(Observable, Observer):
     def getOpenFileFilterList(self) -> list[str]:
         return self._initializer.getOpenFileFilterList()
 
+    def getOpenFileFilter(self) -> str:
+        return self._initializer.getOpenFileFilter()
+
     def openProbe(self, filePath: Path) -> None:
         self._initializer.openProbe(filePath)
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._initializer.getSaveFileFilterList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._initializer.getSaveFileFilter()
 
     def saveProbe(self, filePath: Path) -> None:
         self._initializer.saveProbe(filePath)

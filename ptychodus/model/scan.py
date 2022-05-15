@@ -171,6 +171,9 @@ class FileScanInitializer(Sequence[ScanPoint], Observer):
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
+    def getOpenFileFilter(self) -> str:
+        return self._fileReaderChooser.getCurrentDisplayName()
+
     def _syncFileReaderFromSettings(self) -> None:
         self._fileReaderChooser.setFromSimpleName(self._settings.inputFileType.value)
 
@@ -393,6 +396,9 @@ class ScanInitializer(Observable, Observer):
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileInitializer.getOpenFileFilterList()
 
+    def getOpenFileFilter(self) -> str:
+        return self._fileInitializer.getOpenFileFilter()
+
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self._fileInitializer.openScan(filePath, fileFilter)
         self._initializerChooser.setToDefault()
@@ -400,6 +406,9 @@ class ScanInitializer(Observable, Observer):
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._fileWriterChooser.getDisplayNameList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._fileWriterChooser.getCurrentDisplayName()
 
     def saveScan(self, filePath: Path, fileFilter: str) -> None:
         logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')

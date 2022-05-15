@@ -95,7 +95,8 @@ class SettingsController(Observer):
         filePath, _ = self._fileDialogFactory.getOpenFilePath(
             self._groupListView,
             'Open Settings',
-            nameFilters=self._settingsRegistry.getOpenFileFilterList())
+            nameFilters=self._settingsRegistry.getOpenFileFilterList(),
+            selectedNameFilter=self._settingsRegistry.getOpenFileFilter())
 
         if filePath:
             self._settingsRegistry.openSettings(filePath)
@@ -104,7 +105,8 @@ class SettingsController(Observer):
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
             self._groupListView,
             'Save Settings',
-            nameFilters=self._settingsRegistry.getSaveFileFilterList())
+            nameFilters=self._settingsRegistry.getSaveFileFilterList(),
+            selectedNameFilter=self._settingsRegistry.getSaveFileFilter())
 
         if filePath:
             self._settingsRegistry.saveSettings(filePath)

@@ -154,6 +154,9 @@ class DataFilePresenter(Observable, Observer):
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
+    def getOpenFileFilter(self) -> str:
+        return self._fileReaderChooser.getCurrentDisplayName()
+
     def _syncFileReaderFromSettings(self) -> None:
         self._fileReaderChooser.setFromSimpleName(self._settings.fileType.value)
 

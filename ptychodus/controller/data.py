@@ -18,8 +18,9 @@ class FileDialogFactory:
     def getOpenFilePath(self,
                         parent: QWidget,
                         caption: str,
-                        nameFilters: list[str] = None,
-                        mimeTypeFilters: list[str] = None) -> Tuple[Optional[Path], str]:
+                        nameFilters: Optional[list[str]] = None,
+                        mimeTypeFilters: Optional[list[str]] = None,
+                        selectedNameFilter: Optional[str] = None) -> Tuple[Optional[Path], str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._openWorkingDirectory))
@@ -31,6 +32,9 @@ class FileDialogFactory:
 
         if mimeTypeFilters is not None:
             dialog.setMimeTypeFilters(mimeTypeFilters)
+
+        if selectedNameFilter is not None:
+            dialog.selectNameFilter(selectedNameFilter)
 
         if dialog.exec_() == QDialog.Accepted:
             fileNameList = dialog.selectedFiles()
@@ -45,8 +49,9 @@ class FileDialogFactory:
     def getSaveFilePath(self,
                         parent: QWidget,
                         caption: str,
-                        nameFilters: list[str] = None,
-                        mimeTypeFilters: list[str] = None) -> Tuple[Optional[Path], str]:
+                        nameFilters: Optional[list[str]] = None,
+                        mimeTypeFilters: Optional[list[str]] = None,
+                        selectedNameFilter: Optional[str] = None) -> Tuple[Optional[Path], str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._saveWorkingDirectory))
@@ -58,6 +63,9 @@ class FileDialogFactory:
 
         if mimeTypeFilters is not None:
             dialog.setMimeTypeFilters(mimeTypeFilters)
+
+        if selectedNameFilter is not None:
+            dialog.selectNameFilter(selectedNameFilter)
 
         if dialog.exec_() == QDialog.Accepted:
             fileNameList = dialog.selectedFiles()
@@ -142,7 +150,10 @@ class DataFileController(Observer):
 
     def openDataFile(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._treeView, 'Open Data File', nameFilters=self._presenter.getOpenFileFilterList())
+            self._treeView,
+            'Open Data File',
+            nameFilters=self._presenter.getOpenFileFilterList(),
+            selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
             self._presenter.openDataFile(filePath, nameFilter)
