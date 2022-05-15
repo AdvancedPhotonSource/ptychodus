@@ -65,11 +65,10 @@ class ModelCore:
         self._fileProbeInitializer = FileProbeInitializer.createInstance(
             self._probeSettings, self._probeSizer,
             self._pluginRegistry.buildProbeFileReaderChooser())
-        self._probeInitializer = ProbeInitializer.createInstance(self._detector,
-                                                                 self._probeSettings,
-                                                                 self._probeSizer, self._probe,
-                                                                 self._fileProbeInitializer,
-                                                                 self.settingsRegistry)
+        self._probeInitializer = ProbeInitializer.createInstance(
+            self._detector, self._probeSettings, self._probeSizer,
+            self._probe, self._fileProbeInitializer,
+            self._pluginRegistry.buildProbeFileWriterChooser(), self.settingsRegistry)
 
         self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
                                                        self._probeSizer)
@@ -77,10 +76,10 @@ class ModelCore:
         self._fileObjectInitializer = FileObjectInitializer.createInstance(
             self._objectSettings, self._objectSizer,
             self._pluginRegistry.buildObjectFileReaderChooser())
-        self._objectInitializer = ObjectInitializer.createInstance(self.rng, self._objectSettings,
-                                                                   self._objectSizer, self._object,
-                                                                   self._fileObjectInitializer,
-                                                                   self.settingsRegistry)
+        self._objectInitializer = ObjectInitializer.createInstance(
+            self.rng, self._objectSettings, self._objectSizer,
+            self._object, self._fileObjectInitializer,
+            self._pluginRegistry.buildObjectFileWriterChooser(), self.settingsRegistry)
 
         self._velociprobeReader = next(entry.strategy
                                        for entry in self._pluginRegistry.dataFileReaders

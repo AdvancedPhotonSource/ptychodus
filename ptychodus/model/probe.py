@@ -249,10 +249,13 @@ class Probe(Observable):
 
 class ProbeInitializer(Observable, Observer):
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
-                 fileInitializer: FileProbeInitializer, reinitObservable: Observable) -> None:
+                 fileInitializer: FileProbeInitializer,
+                 fileWriterChooser: PluginChooser[ProbeFileWriter],
+                 reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._probe = probe
+        self._fileWriterChooser = fileWriterChooser
         self._reinitObservable = reinitObservable
         self._fileInitializer = fileInitializer
         self._initializerChooser = PluginChooser[ProbeInitializerType](
@@ -263,8 +266,10 @@ class ProbeInitializer(Observable, Observer):
     @classmethod
     def createInstance(cls, detector: Detector, probeSettings: ProbeSettings, sizer: ProbeSizer,
                        probe: Probe, fileInitializer: FileProbeInitializer,
+                       fileWriterChooser: PluginChooser[ProbeFileWriter],
                        reinitObservable: Observable) -> ProbeInitializer:
-        initializer = cls(probeSettings, sizer, probe, fileInitializer, reinitObservable)
+        initializer = cls(probeSettings, sizer, probe, fileInitializer, fileWriterChooser,
+                          reinitObservable)
 
         fzpInit = PluginEntry[ProbeInitializerType](simpleName='FresnelZonePlate',
                                                     displayName='Fresnel Zone Plate',
@@ -309,11 +314,13 @@ class ProbeInitializer(Observable, Observer):
         self.initializeProbe()
 
     def getSaveFileFilterList(self) -> list[str]:
-        return ['NumPy Binary Files (*.npy)']  # TODO from plugins
+        return self._fileWriterChooser.getDisplayNameList()
 
     def saveProbe(self, filePath: Path) -> None:
         logger.debug(f'Writing {filePath}')
-        numpy.save(filePath, self._probe.getArray())
+        self._fileWriterChooser.setFromDisplayName(fileFilter)
+        writer = self._fileWriterChooser.getCurrentStrategy()
+        writer.write(filePath, self._probe.getArray())
 
     def _syncInitializerFromSettings(self) -> None:
         self._initializerChooser.setFromSimpleName(self._settings.initializer.value)

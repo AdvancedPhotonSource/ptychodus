@@ -195,10 +195,13 @@ class Object(Observable):
 
 class ObjectInitializer(Observable, Observer):
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, object_: Object,
-                 fileInitializer: FileObjectInitializer, reinitObservable: Observable) -> None:
+                 fileInitializer: FileObjectInitializer,
+                 fileWriterChooser: PluginChooser[ObjectFileWriter],
+                 reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._object = object_
+        self._fileWriterChooser = fileWriterChooser
         self._reinitObservable = reinitObservable
         self._fileInitializer = fileInitializer
         self._initializerChooser = PluginChooser[ObjectInitializerType](
@@ -209,8 +212,10 @@ class ObjectInitializer(Observable, Observer):
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ObjectSettings,
                        sizer: ObjectSizer, object_: Object, fileInitializer: FileObjectInitializer,
+                       fileWriterChooser: PluginChooser[ObjectFileWriter],
                        reinitObservable: Observable) -> ObjectInitializer:
-        initializer = cls(settings, sizer, object_, fileInitializer, reinitObservable)
+        initializer = cls(settings, sizer, object_, fileInitializer, fileWriterChooser,
+                          reinitObservable)
 
         urandInit = PluginEntry[ObjectInitializerType](simpleName='Random',
                                                        displayName='Random',
@@ -249,11 +254,13 @@ class ObjectInitializer(Observable, Observer):
         self.initializeObject()
 
     def getSaveFileFilterList(self) -> list[str]:
-        return ['NumPy Binary Files (*.npy)']  # TODO from plugins
+        return self._fileWriterChooser.getDisplayNameList()
 
     def saveObject(self, filePath: Path) -> None:
         logger.debug(f'Writing {filePath}')
-        numpy.save(filePath, self._object.getArray())
+        self._fileWriterChooser.setFromDisplayName(fileFilter)
+        writer = self._fileWriterChooser.getCurrentStrategy()
+        writer.write(filePath, self._object.getArray())
 
     def _syncInitializerFromSettings(self) -> None:
         self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
