@@ -279,14 +279,6 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
         self._updateBoundingBox()
         self.notifyObservers()
 
-    def getSaveFileFilter(self) -> str:
-        return 'Comma-Separated Values Files (*.csv)'  # TODO from plugins
-
-    def write(self, filePath: Path) -> None:
-        with open(filePath, 'wt') as csvFile:
-            for point in self._scanPointList:
-                csvFile.write(f'{point.y},{point.x}\n')
-
     def getBoundingBoxInMeters(self) -> Optional[Box[Decimal]]:
         return self._boundingBoxInMeters
 
@@ -335,10 +327,12 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
 
 class ScanInitializer(Observable, Observer):
     def __init__(self, settings: ScanSettings, scan: Scan, fileInitializer: FileScanInitializer,
+                 fileWriterChooser: PluginChooser[ScanFileWriter],
                  reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._scan = scan
+        self._fileWriterChooser = fileWriterChooser
         self._reinitObservable = reinitObservable
         self._fileInitializer = fileInitializer
         self._initializerChooser = PluginChooser[ScanInitializerType](
@@ -349,8 +343,9 @@ class ScanInitializer(Observable, Observer):
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ScanSettings, scan: Scan,
                        fileInitializer: FileScanInitializer,
+                       fileWriterChooser: PluginChooser[ScanFileWriter],
                        reinitObservable: Observable) -> ScanInitializer:
-        initializer = cls(settings, scan, fileInitializer, reinitObservable)
+        initializer = cls(settings, scan, fileInitializer, fileWriterChooser, reinitObservable)
 
         spiralInit = PluginEntry[ScanInitializerType](simpleName='Spiral',
                                                       displayName='Spiral',
@@ -404,11 +399,13 @@ class ScanInitializer(Observable, Observer):
         self.initializeScan()
 
     def getSaveFileFilterList(self) -> list[str]:
-        return [self._scan.getSaveFileFilter()]
+        return self._fileWriterChooser.getDisplayNameList()
 
     def saveScan(self, filePath: Path, fileFilter: str) -> None:
         logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
-        self._scan.write(filePath)
+        self._fileWriterChooser.setFromDisplayName(fileFilter)
+        writer = self._fileWriterChooser.getCurrentStrategy()
+        writer.write(filePath, self._scan)
 
     def _syncInitializerFromSettings(self) -> None:
         self._initializerChooser.setFromSimpleName(self._settings.initializer.value)

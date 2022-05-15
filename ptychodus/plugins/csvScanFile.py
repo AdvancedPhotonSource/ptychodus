@@ -4,7 +4,7 @@ from typing import Iterable
 import csv
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import ScanFileReader, ScanPoint, ScanPointParseError
+from ptychodus.api.scan import ScanFileReader, ScanFileWriter, ScanPoint, ScanPointParseError
 
 
 class CSVScanFileReader(ScanFileReader):
@@ -43,5 +43,21 @@ class CSVScanFileReader(ScanFileReader):
         return scanPointList
 
 
+class CSVScanFileWriter(ScanFileWriter):
+    @property
+    def simpleName(self) -> str:
+        return 'CSV'
+
+    @property
+    def fileFilter(self) -> str:
+        return 'Comma-Separated Values Files (*.csv)'
+
+    def write(self, filePath: Path, scanPoints: Iterable[ScanPoint]) -> None:
+        with open(filePath, 'wt') as csvFile:
+            for point in scanPoints:
+                csvFile.write(f'{point.y},{point.x}\n')
+
+
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.registerPlugin(CSVScanFileReader())
+    registry.registerPlugin(CSVScanFileWriter())

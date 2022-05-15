@@ -56,10 +56,9 @@ class ModelCore:
         self._scan = Scan.createInstance(self._scanSettings)
         self._fileScanInitializer = FileScanInitializer.createInstance(
             self._scanSettings, self._pluginRegistry.buildScanFileReaderChooser())
-        self._scanInitializer = ScanInitializer.createInstance(self.rng, self._scanSettings,
-                                                               self._scan,
-                                                               self._fileScanInitializer,
-                                                               self.settingsRegistry)
+        self._scanInitializer = ScanInitializer.createInstance(
+            self.rng, self._scanSettings, self._scan, self._fileScanInitializer,
+            self._pluginRegistry.buildScanFileWriterChooser(), self.settingsRegistry)
 
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings, self._probeSizer)
