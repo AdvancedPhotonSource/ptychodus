@@ -453,11 +453,17 @@ class ScanPresenter(Observable, Observer):
     def getOpenFileFilterList(self) -> list[str]:
         return self._initializer.getOpenFileFilterList()
 
+    def getOpenFileFilter(self) -> str:
+        return self._initializer.getOpenFileFilter()
+
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self._initializer.openScan(filePath, fileFilter)
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._initializer.getSaveFileFilterList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._initializer.getSaveFileFilter()
 
     def saveScan(self, filePath: Path, fileFilter: str) -> None:
         self._initializer.saveScan(filePath, fileFilter)
