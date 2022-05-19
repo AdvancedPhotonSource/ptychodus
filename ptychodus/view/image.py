@@ -3,12 +3,36 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QWheelEvent
-from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QFormLayout, \
+from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, \
         QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
         QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout, \
         QLabel, QLineEdit, QPushButton, QSizePolicy, QSpinBox, QStyle, QVBoxLayout, QWidget
 
 from .widgets import BottomTitledGroupBox, DecimalSlider
+
+
+class ImageDisplayRangeDialog(QDialog):
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.minWidget = QLineEdit()
+        self.maxWidget = QLineEdit()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDisplayRangeDialog:
+        dialog = cls(parent)
+        dialog.setWindowTitle('Set Display Range')
+
+        # TODO self.buttonBox.accepted.connect(self.accept)
+        # TODO self.buttonBox.rejected.connect(self.reject)
+
+        layout = QFormLayout()
+        layout.addRow('Minimum Displayed Value:', dialog.minWidget)
+        layout.addRow('Maximum Displayed Value:', dialog.maxWidget)
+        layout.addRow(dialog.buttonBox)
+        dialog.setLayout(layout)
+
+        return dialog
 
 
 class ImageFileGroupBox(BottomTitledGroupBox):
@@ -69,6 +93,7 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.autoButton = QPushButton('Auto')
+        self.setButton = QPushButton('Set')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDataRangeGroupBox:
@@ -76,13 +101,19 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
 
         view.minDisplayValueSlider.setToolTip('Minimum Display Value')
         view.maxDisplayValueSlider.setToolTip('Maximum Display Value')
-        view.autoButton.setToolTip('Autoscale Display Range to Data Range')
+        view.autoButton.setToolTip('Rescale to Data Range')
+        view.setButton.setToolTip('Rescale to Custom Range')
+
+        buttonLayout = QHBoxLayout()
+        buttonLayout.setContentsMargins(0, 0, 0, 0)
+        buttonLayout.addWidget(view.autoButton)
+        buttonLayout.addWidget(view.setButton)
 
         layout = QFormLayout()
         layout.setContentsMargins(10, 10, 10, 25)
         layout.addRow('Min:', view.minDisplayValueSlider)
         layout.addRow('Max:', view.maxDisplayValueSlider)
-        layout.addRow(view.autoButton)
+        layout.addRow(buttonLayout)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -98,6 +129,8 @@ class IndexGroupBox(BottomTitledGroupBox):
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> IndexGroupBox:
         view = cls(parent)
+
+        view.indexSpinBox.setToolTip('Image Index')
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 25)

@@ -89,15 +89,14 @@ class ImagePresenter(Observable, Observer):
         self._cyclicColormapChooser.setFromSimpleName('hsv')
         self._acyclicColormapChooser = colormapChooserFactory.createAcyclicColormapChooser()
         self._acyclicColormapChooser.setFromSimpleName('viridis')
-        self._colormapChooser = self._cyclicColormapChooser if complexToRealStrategyChooser.getCurrentStrategy(
-        ).isCyclic else self._acyclicColormapChooser
+        self._colormapChooser = self._acyclicColormapChooser
         self._scalarTransformationChooser = scalarTransformationChooser
         self._complexToRealStrategyChooser = complexToRealStrategyChooser
         self._array: Optional[numpy.typing.NDArray] = None
         self._image: Optional[numpy.typing.NDArray] = None
-        self._dataRangeIsAuto = False
         self._dataRange = Interval[Decimal](Decimal(0), Decimal(1))
         self._displayRange = Interval[Decimal](Decimal(0), Decimal(1))
+        self._displayRangeLimits = Interval[Decimal](Decimal(0), Decimal(1))
 
     @classmethod
     def createInstance(cls, colormapChooserFactory: ColormapChooserFactory,
@@ -105,6 +104,7 @@ class ImagePresenter(Observable, Observer):
                        complexToRealStrategyChooser: PluginChooser[ComplexToRealStrategy]) -> None:
         presenter = cls(colormapChooserFactory, scalarTransformationChooser,
                         complexToRealStrategyChooser)
+        presenter._updateColormapAndNotifyObserversIfChanged()
         presenter._cyclicColormapChooser.addObserver(presenter)
         presenter._acyclicColormapChooser.addObserver(presenter)
         scalarTransformationChooser.addObserver(presenter)
@@ -141,34 +141,32 @@ class ImagePresenter(Observable, Observer):
 
     def setComplexToRealStrategy(self, name: str) -> None:
         self._complexToRealStrategyChooser.setFromDisplayName(name)
-        isCyclic = self._complexToRealStrategyChooser.getCurrentStrategy().isCyclic
-        self._colormapChooser = self._cyclicColormapChooser if isCyclic else self._acyclicColormapChooser
-
-    def isAutomaticDataRangeEnabled(self) -> bool:
-        return self._dataRangeIsAuto
-
-    def setAutomaticDataRangeEnabled(self, enabled: bool) -> None:
-        self._dataRangeIsAuto = enabled
-        self._updateImageAndNotifyObservers()
 
     def getMinDisplayValueLimits(self) -> Interval[Decimal]:
-        return self._dataRange  # TODO allow arbitrary limits
+        return self._displayRangeLimits
 
     def getMinDisplayValue(self) -> Decimal:
-        return self._displayRange.lower
+        limits = self.getMinDisplayValueLimits()
+        return limits.clamp(self._displayRange.lower)
 
     def setMinDisplayValue(self, value: Decimal) -> None:
         self._displayRange.lower = value
         self.notifyObservers()
 
     def getMaxDisplayValueLimits(self) -> Interval[Decimal]:
-        return self._dataRange  # TODO allow arbitrary limits
+        return self._displayRangeLimits
 
     def getMaxDisplayValue(self) -> Decimal:
-        return self._displayRange.upper
+        limits = self.getMaxDisplayValueLimits()
+        return limits.clamp(self._displayRange.upper)
 
     def setMaxDisplayValue(self, value: Decimal) -> None:
         self._displayRange.upper = value
+        self.notifyObservers()
+
+    def setDisplayRangeToDataRange(self) -> None:
+        self._displayRange = self._dataRange.copy()
+        self._displayRangeLimits = self._dataRange.copy()
         self.notifyObservers()
 
     # TODO do this via dependency injection
@@ -176,11 +174,9 @@ class ImagePresenter(Observable, Observer):
         self._array = array
         self._updateImageAndNotifyObservers()
 
-    def _updateImageAndNotifyObservers(self) -> None:
+    def _updateImage(self) -> None:
         if self._array is None:
             self._image = None
-            self._dataRange = Interval[Decimal](Decimal(0), Decimal(1))
-            self._displayRange = Interval[Decimal](Decimal(0), Decimal(1))
         else:
             complexToRealStrategy = self._complexToRealStrategyChooser.getCurrentStrategy()
             scalarTransform = self._scalarTransformationChooser.getCurrentStrategy()
@@ -190,25 +186,36 @@ class ImagePresenter(Observable, Observer):
             else:
                 self._image = scalarTransform(self._array)
 
-            if self._image is not None and numpy.size(self._image) > 0:
-                vmin = Decimal(repr(self._image.min()))
-                vmax = Decimal(repr(self._image.max()))
+    def _updateDataRange(self) -> None:
+        if self._image is None or numpy.size(self._image) <= 0:
+            self._dataRange = Interval[Decimal](Decimal(0), Decimal(1))
+        else:
+            vmin = Decimal(repr(self._image.min()))
+            vmax = Decimal(repr(self._image.max()))
 
-                if vmin == vmax:
-                    vmax += 1
+            if vmin == vmax:
+                vmax += 1
 
-                self._dataRange = Interval[Decimal](vmin, vmax)
+            self._dataRange = Interval[Decimal](vmin, vmax)
 
-                if self._dataRangeIsAuto:
-                    self._displayRange = self._dataRange.copy()
-
+    def _updateImageAndNotifyObservers(self) -> None:
+        self._updateImage()
+        self._updateDataRange()
         self.notifyObservers()
+
+    def _updateColormapAndNotifyObserversIfChanged(self) -> None:
+        isCyclic = self._complexToRealStrategyChooser.getCurrentStrategy().isCyclic
+        nextColormapChooser = self._cyclicColormapChooser if isCyclic else self._acyclicColormapChooser
+
+        if self._colormapChooser is not nextColormapChooser:
+            self._colormapChooser = nextColormapChooser
+            self._notifyObservers()
 
     def getImage(self) -> Optional[numpy.typing.NDArray]:
         if self._image is None or self._displayRange.isEmpty:
             return
 
-        # FIXME redo to support pre-colorized images
+# FIXME BEGIN redo to support pre-colorized images
         cnorm = matplotlib.colors.Normalize(vmin=self._displayRange.lower,
                                             vmax=self._displayRange.upper,
                                             clip=False)
@@ -216,16 +223,16 @@ class ImagePresenter(Observable, Observer):
         scalarMappable = matplotlib.cm.ScalarMappable(norm=cnorm, cmap=cmap)
 
         return scalarMappable.to_rgba(self._image)
+# FIXME END
 
     def isComplexValued(self) -> bool:
         return False if self._array is None else numpy.iscomplexobj(self._array)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._cyclicColormapChooser:
-            self.notifyObservers()
-        elif observable is self._acyclicColormapChooser:
+        if observable is self._colormapChooser:
             self.notifyObservers()
         elif observable is self._scalarTransformationChooser:
             self._updateImageAndNotifyObservers()
+            self._updateColormapAndNotifyObserversIfChanged()
         elif observable is self._complexToRealStrategyChooser:
             self._updateImageAndNotifyObservers()

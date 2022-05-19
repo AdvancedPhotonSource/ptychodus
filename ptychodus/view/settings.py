@@ -81,7 +81,7 @@ class ImportSettingsDialog(QDialog):
         view.centerWidget.setLayout(centerLayout)
 
         view.buttonBox.addButton(QDialogButtonBox.Apply)
-        view.buttonBox.addButton(QDialogButtonBox.Discard)
+        view.buttonBox.addButton(QDialogButtonBox.Cancel)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()

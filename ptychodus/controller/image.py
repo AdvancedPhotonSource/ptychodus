@@ -10,7 +10,8 @@ import numpy
 from ..api.image import ScalarTransformation, ComplexToRealStrategy
 from ..api.observer import Observable, Observer
 from ..model import ImagePresenter
-from ..view import ImageView, ImageColormapGroupBox, ImageFileGroupBox
+from ..view import ImageDisplayRangeDialog, ImageColormapGroupBox, \
+        ImageDataRangeGroupBox, ImageFileGroupBox, ImageView
 from .data import FileDialogFactory
 
 
@@ -105,25 +106,25 @@ class ImageDataRangeController(Observer):
 
         view.minDisplayValueSlider.valueChanged.connect(presenter.setMinDisplayValue)
         view.maxDisplayValueSlider.valueChanged.connect(presenter.setMaxDisplayValue)
-        view.autoButton.setCheckable(True)
-        view.autoButton.toggled.connect(presenter.setAutomaticDataRangeEnabled)
+        view.autoButton.clicked.connect(presenter.setDisplayRangeToDataRange)
+        view.setButton.clicked.connect(controller._setCustomDisplayRange)
 
         return controller
 
-    def _syncModelToView(self) -> None:
-        isAuto = self._presenter.isAutomaticDataRangeEnabled()
+    def _setCustomDisplayRange(self) -> None:
+        parent = self._view.parentWidget()
+        dialog = ImageDisplayRangeDialog.createInstance(parent)
+        dialog.exec_() # FIXME
 
-        self._view.minDisplayValueSlider.setEnabled(not isAuto)
+    def _syncModelToView(self) -> None:
         self._view.minDisplayValueSlider.setValueAndRange(
             self._presenter.getMinDisplayValue(),
             self._presenter.getMinDisplayValueLimits().lower,
             self._presenter.getMinDisplayValueLimits().upper)
-        self._view.maxDisplayValueSlider.setEnabled(not isAuto)
         self._view.maxDisplayValueSlider.setValueAndRange(
             self._presenter.getMaxDisplayValue(),
             self._presenter.getMaxDisplayValueLimits().lower,
             self._presenter.getMaxDisplayValueLimits().upper)
-        self._view.autoButton.setChecked(isAuto)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
