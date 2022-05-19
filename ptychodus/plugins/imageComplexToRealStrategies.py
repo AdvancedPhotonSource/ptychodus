@@ -1,7 +1,10 @@
 import numpy
 
-from ptychodus.api.image import ComplexToRealStrategy, RealArrayType, ComplexArrayType
+from ptychodus.api.image import ComplexArrayType, ComplexToRealStrategy, \
+        RealArrayType, ScalarTransformation
 from ptychodus.api.plugins import PluginRegistry
+
+# FIXME encode magnitude/phase in hsv/hsl channels
 
 
 class ComplexMagnitudeStrategy(ComplexToRealStrategy):
@@ -13,8 +16,14 @@ class ComplexMagnitudeStrategy(ComplexToRealStrategy):
     def isCyclic(self) -> bool:
         return False
 
-    def __call__(self, array: ComplexArrayType) -> RealArrayType:
-        return numpy.absolute(array)
+    @property
+    def isColorized(self) -> bool:
+        return False
+
+    def __call__(self, array: ComplexArrayType,
+                 transformation: ScalarTransformation) -> RealArrayType:
+        values = numpy.absolute(array)
+        return transformation(values)
 
 
 class ComplexPhaseStrategy(ComplexToRealStrategy):
@@ -26,8 +35,14 @@ class ComplexPhaseStrategy(ComplexToRealStrategy):
     def isCyclic(self) -> bool:
         return True
 
-    def __call__(self, array: ComplexArrayType) -> RealArrayType:
-        return numpy.angle(array)
+    @property
+    def isColorized(self) -> bool:
+        return False
+
+    def __call__(self, array: ComplexArrayType,
+                 transformation: ScalarTransformation) -> RealArrayType:
+        values = numpy.angle(array)
+        return transformation(values)
 
 
 class ComplexRealComponentStrategy(ComplexToRealStrategy):
@@ -39,8 +54,14 @@ class ComplexRealComponentStrategy(ComplexToRealStrategy):
     def isCyclic(self) -> bool:
         return False
 
-    def __call__(self, array: ComplexArrayType) -> RealArrayType:
-        return numpy.real(array)
+    @property
+    def isColorized(self) -> bool:
+        return False
+
+    def __call__(self, array: ComplexArrayType,
+                 transformation: ScalarTransformation) -> RealArrayType:
+        values = numpy.real(array)
+        return transformation(values)
 
 
 class ComplexImaginaryComponentStrategy(ComplexToRealStrategy):
@@ -52,8 +73,14 @@ class ComplexImaginaryComponentStrategy(ComplexToRealStrategy):
     def isCyclic(self) -> bool:
         return False
 
-    def __call__(self, array: ComplexArrayType) -> RealArrayType:
-        return numpy.imag(array)
+    @property
+    def isColorized(self) -> bool:
+        return False
+
+    def __call__(self, array: ComplexArrayType,
+                 transformation: ScalarTransformation) -> RealArrayType:
+        values = numpy.imag(array)
+        return transformation(values)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

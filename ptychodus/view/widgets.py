@@ -68,7 +68,7 @@ class DecimalSlider(QWidget):
         shouldEmit = False
 
         if maximum <= minimum:
-            raise ValueError('maximum <= minimum')
+            raise ValueError(f'maximum <= minimum ({maximum} <= {minimum})')
 
         if minimum != self._minimum:
             self._minimum = Decimal(minimum)

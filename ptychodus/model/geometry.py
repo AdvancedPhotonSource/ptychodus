@@ -10,6 +10,10 @@ class Interval(Generic[T]):
         self.lower: T = lower
         self.upper: T = upper
 
+    @property
+    def isEmpty(self) -> bool:
+        return self.upper < self.lower
+
     def clamp(self, value: T) -> T:
         return max(self.lower, min(value, self.upper))
 
@@ -29,6 +33,9 @@ class Interval(Generic[T]):
         fullLength = self.length
         halfLength = fullLength // 2 if isinstance(fullLength, int) else fullLength / 2
         return self.lower + halfLength
+
+    def copy(self) -> Interval[T]:
+        return Interval[T](self.lower, self.upper)
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.lower}, {self.upper})'

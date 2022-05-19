@@ -291,8 +291,8 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
 
         try:
             scanPoint = next(scanPointIterator)
-            xint = Interval(scanPoint.x, scanPoint.x)
-            yint = Interval(scanPoint.y, scanPoint.y)
+            xint = Interval[Decimal](scanPoint.x, scanPoint.x)
+            yint = Interval[Decimal](scanPoint.y, scanPoint.y)
             boundingBoxInMeters = Box[Decimal]((xint, yint))
 
             while True:

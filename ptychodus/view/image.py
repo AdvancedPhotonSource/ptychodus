@@ -23,10 +23,11 @@ class ImageFileGroupBox(BottomTitledGroupBox):
         pixmapi = getattr(QStyle, 'SP_DialogSaveButton')
         saveIcon = view.style().standardIcon(pixmapi)
         view.saveButton.setIcon(saveIcon)
+        view.saveButton.setMinimumSize(48, 48)
         view.saveButton.setToolTip('Save Image')
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 50)
+        layout.setContentsMargins(10, 10, 10, 25)
         layout.addWidget(view.saveButton)
         view.setLayout(layout)
 
@@ -38,18 +39,22 @@ class ImageFileGroupBox(BottomTitledGroupBox):
 class ImageColormapGroupBox(BottomTitledGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Color Map', parent)
-        self.complexComponentComboBox = QComboBox()
-        self.scalarTransformComboBox = QComboBox()
+        self.complexToRealStrategyComboBox = QComboBox()
+        self.scalarTransformationComboBox = QComboBox()
         self.colormapComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColormapGroupBox:
         view = cls(parent)
 
+        view.complexToRealStrategyComboBox.setToolTip('Complex to Real Strategy')
+        view.scalarTransformationComboBox.setToolTip('Scalar Transformation')
+        view.colormapComboBox.setToolTip('Colormap')
+
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 50)
-        layout.addWidget(view.complexComponentComboBox)
-        layout.addWidget(view.scalarTransformComboBox)
+        layout.setContentsMargins(10, 10, 10, 25)
+        layout.addWidget(view.complexToRealStrategyComboBox)
+        layout.addWidget(view.scalarTransformationComboBox)
         layout.addWidget(view.colormapComboBox)
         view.setLayout(layout)
 
@@ -61,18 +66,22 @@ class ImageColormapGroupBox(BottomTitledGroupBox):
 class ImageDataRangeGroupBox(BottomTitledGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Data Range', parent)
-        self.vminSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.vmaxSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.autoButton = QPushButton('Auto')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDataRangeGroupBox:
         view = cls(parent)
 
+        view.minDisplayValueSlider.setToolTip('Minimum Display Value')
+        view.maxDisplayValueSlider.setToolTip('Maximum Display Value')
+        view.autoButton.setToolTip('Autoscale Display Range to Data Range')
+
         layout = QFormLayout()
-        layout.setContentsMargins(10, 10, 10, 50)
-        layout.addRow('Min:', view.vminSlider)
-        layout.addRow('Max:', view.vmaxSlider)
+        layout.setContentsMargins(10, 10, 10, 25)
+        layout.addRow('Min:', view.minDisplayValueSlider)
+        layout.addRow('Max:', view.maxDisplayValueSlider)
         layout.addRow(view.autoButton)
         view.setLayout(layout)
 
@@ -91,7 +100,7 @@ class IndexGroupBox(BottomTitledGroupBox):
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 50)
+        layout.setContentsMargins(10, 10, 10, 25)
         layout.addWidget(view.indexSpinBox)
         view.setLayout(layout)
 

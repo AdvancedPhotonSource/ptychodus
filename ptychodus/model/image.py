@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional, Tuple
+import logging
 
 import matplotlib.pyplot
 import numpy
@@ -9,8 +10,9 @@ import numpy.typing
 
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
+from .geometry import Interval
 
-# TODO encode magnitude/phase in rgb/hsv channels
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -94,8 +96,8 @@ class ImagePresenter(Observable, Observer):
         self._array: Optional[numpy.typing.NDArray] = None
         self._image: Optional[numpy.typing.NDArray] = None
         self._dataRangeIsAuto = False
-        self._vmin = Decimal(0)
-        self._vmax = Decimal(1)
+        self._dataRange = Interval[Decimal](Decimal(0), Decimal(1))
+        self._displayRange = Interval[Decimal](Decimal(0), Decimal(1))
 
     @classmethod
     def createInstance(cls, colormapChooserFactory: ColormapChooserFactory,
@@ -117,6 +119,10 @@ class ImagePresenter(Observable, Observer):
 
     def setColormap(self, name: str) -> None:
         self._colormapChooser.setFromDisplayName(name)
+
+    def isColormapEnabled(self) -> bool:
+        isColorized = self._complexToRealStrategyChooser.getCurrentStrategy().isColorized
+        return (not isColorized)
 
     def getScalarTransformationList(self) -> list[str]:
         return self._scalarTransformationChooser.getDisplayNameList()
@@ -145,18 +151,24 @@ class ImagePresenter(Observable, Observer):
         self._dataRangeIsAuto = enabled
         self._updateImageAndNotifyObservers()
 
-    def getVMinValue(self) -> Decimal:
-        return self._vmin
+    def getMinDisplayValueLimits(self) -> Interval[Decimal]:
+        return self._dataRange  # TODO allow arbitrary limits
 
-    def setVMinValue(self, vmin: Decimal) -> None:
-        self._vmin = vmin
+    def getMinDisplayValue(self) -> Decimal:
+        return self._displayRange.lower
+
+    def setMinDisplayValue(self, value: Decimal) -> None:
+        self._displayRange.lower = value
         self.notifyObservers()
 
-    def getVMaxValue(self) -> Decimal:
-        return self._vmax
+    def getMaxDisplayValueLimits(self) -> Interval[Decimal]:
+        return self._dataRange  # TODO allow arbitrary limits
 
-    def setVMaxValue(self, vmax: Decimal) -> None:
-        self._vmax = vmax
+    def getMaxDisplayValue(self) -> Decimal:
+        return self._displayRange.upper
+
+    def setMaxDisplayValue(self, value: Decimal) -> None:
+        self._displayRange.upper = value
         self.notifyObservers()
 
     # TODO do this via dependency injection
@@ -167,31 +179,39 @@ class ImagePresenter(Observable, Observer):
     def _updateImageAndNotifyObservers(self) -> None:
         if self._array is None:
             self._image = None
+            self._dataRange = Interval[Decimal](Decimal(0), Decimal(1))
+            self._displayRange = Interval[Decimal](Decimal(0), Decimal(1))
         else:
             complexToRealStrategy = self._complexToRealStrategyChooser.getCurrentStrategy()
-            realArray = complexToRealStrategy(self._array) if numpy.iscomplexobj(
-                self._array) else self._array
-
             scalarTransform = self._scalarTransformationChooser.getCurrentStrategy()
-            self._image = scalarTransform(realArray)
 
-            if self._image is None:
-                return
+            if numpy.iscomplexobj(self._array):
+                self._image = complexToRealStrategy(self._array, scalarTransform)
+            else:
+                self._image = scalarTransform(self._array)
 
-            if self._dataRangeIsAuto and self._image is not None and numpy.size(self._image) > 0:
-                self._vmin = Decimal(repr(self._image.min()))
-                self._vmax = Decimal(repr(self._image.max()))
+            if self._image is not None and numpy.size(self._image) > 0:
+                vmin = Decimal(repr(self._image.min()))
+                vmax = Decimal(repr(self._image.max()))
+
+                if vmin == vmax:
+                    vmax += 1
+
+                self._dataRange = Interval[Decimal](vmin, vmax)
+
+                if self._dataRangeIsAuto:
+                    self._displayRange = self._dataRange.copy()
 
         self.notifyObservers()
 
     def getImage(self) -> Optional[numpy.typing.NDArray]:
-        if self._image is None:
+        if self._image is None or self._displayRange.isEmpty:
             return
 
-        if self._vmax <= self._vmin:
-            return
-
-        cnorm = matplotlib.colors.Normalize(vmin=self._vmin, vmax=self._vmax, clip=False)
+        # FIXME redo to support pre-colorized images
+        cnorm = matplotlib.colors.Normalize(vmin=self._displayRange.lower,
+                                            vmax=self._displayRange.upper,
+                                            clip=False)
         cmap = self._colormapChooser.getCurrentStrategy()
         scalarMappable = matplotlib.cm.ScalarMappable(norm=cnorm, cmap=cmap)
 

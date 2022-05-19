@@ -1,10 +1,8 @@
 h5py
 hdf5-external-filter-plugins-lz4
 matplotlib
-mypy
 numpy
-pylint
-pyqt
+pyqt>=5.12
 python>=3.9
 scipy
 setuptools>=46.4.0

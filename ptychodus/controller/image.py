@@ -30,7 +30,7 @@ class ImageFileController:
 
     def _saveImage(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view, 'Save Image', mimeTypeFilters=ImageController.MIME_TYPES)
+            self._view, 'Save Image', mimeTypeFilters=ImageFileController.MIME_TYPES)
 
         if filePath:
             pixmap = self._view.imageWidget.getPixmap()
@@ -50,38 +50,40 @@ class ImageColormapController:
                        view: ImageColormapGroupBox) -> ImageColormapController:
         controller = cls(presenter, view)
 
-        view.complexComponentComboBox.setModel(controller._complexToRealStrategyModel)
-        view.scalarTransformComboBox.setModel(controller._scalarTransformationModel)
+        view.complexToRealStrategyComboBox.setModel(controller._complexToRealStrategyModel)
+        view.scalarTransformationComboBox.setModel(controller._scalarTransformationModel)
         view.colormapComboBox.setModel(controller._colormapModel)
 
         controller._syncModelToView()
         presenter.addObserver(controller)
 
-        view.scalarTransformComboBox.currentTextChanged.connect(presenter.setScalarTransformation)
-        view.complexComponentComboBox.currentTextChanged.connect(
+        view.complexToRealStrategyComboBox.currentTextChanged.connect(
             presenter.setComplexToRealStrategy)
+        view.scalarTransformationComboBox.currentTextChanged.connect(
+            presenter.setScalarTransformation)
         view.colormapComboBox.currentTextChanged.connect(presenter.setColormap)
 
     def _syncModelToView(self) -> None:
-        self._view.scalarTransformComboBox.blockSignals(True)
-        self._scalarTransformationModel.setStringList(
-            self._presenter.getScalarTransformationList())
-        self._view.scalarTransformComboBox.setCurrentText(
-            self._presenter.getScalarTransformation())
-        self._view.scalarTransformComboBox.blockSignals(False)
-
-        self._view.complexComponentComboBox.blockSignals(True)
+        self._view.complexToRealStrategyComboBox.blockSignals(True)
         self._complexToRealStrategyModel.setStringList(
             self._presenter.getComplexToRealStrategyList())
-        self._view.complexComponentComboBox.setCurrentText(
+        self._view.complexToRealStrategyComboBox.setCurrentText(
             self._presenter.getComplexToRealStrategy())
-        self._view.complexComponentComboBox.blockSignals(False)
-        self._view.complexComponentComboBox.setVisible(self._presenter.isComplexValued())
+        self._view.complexToRealStrategyComboBox.blockSignals(False)
+        self._view.complexToRealStrategyComboBox.setVisible(self._presenter.isComplexValued())
+
+        self._view.scalarTransformationComboBox.blockSignals(True)
+        self._scalarTransformationModel.setStringList(
+            self._presenter.getScalarTransformationList())
+        self._view.scalarTransformationComboBox.setCurrentText(
+            self._presenter.getScalarTransformation())
+        self._view.scalarTransformationComboBox.blockSignals(False)
 
         self._view.colormapComboBox.blockSignals(True)
         self._colormapModel.setStringList(self._presenter.getColormapList())
         self._view.colormapComboBox.setCurrentText(self._presenter.getColormap())
         self._view.colormapComboBox.blockSignals(False)
+        self._view.colormapComboBox.setEnabled(self._presenter.isColormapEnabled())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -101,8 +103,8 @@ class ImageDataRangeController(Observer):
         controller._syncModelToView()
         presenter.addObserver(controller)
 
-        view.vminSlider.valueChanged.connect(presenter.setVMinValue)
-        view.vmaxSlider.valueChanged.connect(presenter.setVMaxValue)
+        view.minDisplayValueSlider.valueChanged.connect(presenter.setMinDisplayValue)
+        view.maxDisplayValueSlider.valueChanged.connect(presenter.setMaxDisplayValue)
         view.autoButton.setCheckable(True)
         view.autoButton.toggled.connect(presenter.setAutomaticDataRangeEnabled)
 
@@ -111,10 +113,16 @@ class ImageDataRangeController(Observer):
     def _syncModelToView(self) -> None:
         isAuto = self._presenter.isAutomaticDataRangeEnabled()
 
-        self._view.vminSlider.setEnabled(not isAuto)
-        # FIXME self._view.vminSlider.setValueAndRange(value, minimum, maximum) # FIXME typing
-        self._view.vmaxSlider.setEnabled(not isAuto)
-        # FIXME self._view.vmaxSlider.setValueAndRange(value, minimum, maximum) # FIXME typing
+        self._view.minDisplayValueSlider.setEnabled(not isAuto)
+        self._view.minDisplayValueSlider.setValueAndRange(
+            self._presenter.getMinDisplayValue(),
+            self._presenter.getMinDisplayValueLimits().lower,
+            self._presenter.getMinDisplayValueLimits().upper)
+        self._view.maxDisplayValueSlider.setEnabled(not isAuto)
+        self._view.maxDisplayValueSlider.setValueAndRange(
+            self._presenter.getMaxDisplayValue(),
+            self._presenter.getMaxDisplayValueLimits().lower,
+            self._presenter.getMaxDisplayValueLimits().upper)
         self._view.autoButton.setChecked(isAuto)
 
     def update(self, observable: Observable) -> None:
@@ -144,15 +152,15 @@ class ImageController(Observer):
 
     def _syncModelToView(self) -> None:
         realImage = self._presenter.getImage()
+        qpixmap = QPixmap()
 
-        if realImage is None:
-            return
+        if realImage is not None:
+            integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8)
 
-        integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8)
+            qimage = QImage(integerImage.data, integerImage.shape[1], integerImage.shape[0],
+                            integerImage.strides[0], QImage.Format_RGBA8888)
+            qpixmap = QPixmap.fromImage(qimage)
 
-        qimage = QImage(integerImage.data, integerImage.shape[1], integerImage.shape[0],
-                        integerImage.strides[0], QImage.Format_RGBA8888)
-        qpixmap = QPixmap.fromImage(qimage)
         self._view.imageWidget.setPixmap(qpixmap)
 
     def update(self, observable: Observable) -> None:
