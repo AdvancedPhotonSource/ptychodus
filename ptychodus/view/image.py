@@ -3,84 +3,121 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QWheelEvent
-from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, \
+from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QFormLayout, \
         QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
         QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout, \
-        QLabel, QLineEdit, QPushButton, QSizePolicy, QSpinBox, QVBoxLayout, QWidget
+        QLabel, QLineEdit, QPushButton, QSizePolicy, QSpinBox, QStyle, QVBoxLayout, QWidget
 
-from .widgets import BottomTitledGroupBox
+from .widgets import BottomTitledGroupBox, DecimalSlider
 
 
-# FIXME support both float and integer values in ImageRibbon
-# FIXME vmin/vmax sliders like ImageJ
-class ImageRibbon(QWidget):
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
+class ImageFileGroupBox(BottomTitledGroupBox):
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('File', parent)
+        self.saveButton = QPushButton()
 
-        self.imageFileGroupBox = BottomTitledGroupBox('Image')
-        self.saveButton = QPushButton('Save')
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageFileGroupBox:
+        view = cls(parent)
 
-        self.scalarTransformGroupBox = BottomTitledGroupBox('Scalar Transform')
-        self.scalarTransformComboBox = QComboBox()
+        pixmapi = getattr(QStyle, 'SP_DialogSaveButton')
+        saveIcon = view.style().standardIcon(pixmapi)
+        view.saveButton.setIcon(saveIcon)
+        view.saveButton.setToolTip('Save Image')
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 50)
+        layout.addWidget(view.saveButton)
+        view.setLayout(layout)
+
+        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+
+        return view
+
+
+class ImageColormapGroupBox(BottomTitledGroupBox):
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Color Map', parent)
         self.complexComponentComboBox = QComboBox()
-
-        self.normalizationGroupBox = BottomTitledGroupBox('Normalization')
-        self.vminLabel = QLabel('Min:')
-        self.vminLineEdit = QLineEdit()
-        self.vminAutoCheckBox = QCheckBox('Auto')
-        self.vmaxLabel = QLabel('Max:')
-        self.vmaxLineEdit = QLineEdit()
-        self.vmaxAutoCheckBox = QCheckBox('Auto')
-
-        self.colormapGroupBox = BottomTitledGroupBox('Color Map')
+        self.scalarTransformComboBox = QComboBox()
         self.colormapComboBox = QComboBox()
 
-        self.indexGroupBox = BottomTitledGroupBox('Index')
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColormapGroupBox:
+        view = cls(parent)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 50)
+        layout.addWidget(view.complexComponentComboBox)
+        layout.addWidget(view.scalarTransformComboBox)
+        layout.addWidget(view.colormapComboBox)
+        view.setLayout(layout)
+
+        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+
+        return view
+
+
+class ImageDataRangeGroupBox(BottomTitledGroupBox):
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Data Range', parent)
+        self.vminSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.vmaxSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.autoButton = QPushButton('Auto')
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDataRangeGroupBox:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.setContentsMargins(10, 10, 10, 50)
+        layout.addRow('Min:', view.vminSlider)
+        layout.addRow('Max:', view.vmaxSlider)
+        layout.addRow(view.autoButton)
+        view.setLayout(layout)
+
+        view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        return view
+
+
+class IndexGroupBox(BottomTitledGroupBox):
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Index', parent)
         self.indexSpinBox = QSpinBox()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> IndexGroupBox:
+        view = cls(parent)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 50)
+        layout.addWidget(view.indexSpinBox)
+        view.setLayout(layout)
+
+        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+
+        return view
+
+
+class ImageRibbon(QWidget):
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.imageFileGroupBox = ImageFileGroupBox.createInstance()
+        self.colormapGroupBox = ImageColormapGroupBox.createInstance()
+        self.dataRangeGroupBox = ImageDataRangeGroupBox.createInstance()
+        self.indexGroupBox = IndexGroupBox.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageRibbon:
         view = cls(parent)
 
-        imageFileLayout = QVBoxLayout()
-        imageFileLayout.setContentsMargins(10, 10, 10, 50)
-        imageFileLayout.addWidget(view.saveButton)
-        view.imageFileGroupBox.setLayout(imageFileLayout)
-
-        scalarTransformLayout = QVBoxLayout()
-        scalarTransformLayout.setContentsMargins(10, 10, 10, 50)
-        scalarTransformLayout.addWidget(view.scalarTransformComboBox)
-        scalarTransformLayout.addWidget(view.complexComponentComboBox)
-        view.scalarTransformGroupBox.setLayout(scalarTransformLayout)
-
-        normalizationLayout = QGridLayout()
-        normalizationLayout.setContentsMargins(10, 10, 10, 50)
-        normalizationLayout.addWidget(view.vminLabel, 0, 1)
-        normalizationLayout.addWidget(view.vminLineEdit, 0, 2)
-        normalizationLayout.addWidget(view.vminAutoCheckBox, 0, 3)
-        normalizationLayout.addWidget(view.vmaxLabel, 1, 1)
-        normalizationLayout.addWidget(view.vmaxLineEdit, 1, 2)
-        normalizationLayout.addWidget(view.vmaxAutoCheckBox, 1, 3)
-        view.normalizationGroupBox.setLayout(normalizationLayout)
-
-        colormapLayout = QVBoxLayout()
-        colormapLayout.setContentsMargins(10, 10, 10, 50)
-        colormapLayout.addWidget(view.colormapComboBox)
-        view.colormapGroupBox.setLayout(colormapLayout)
-
-        indexLayout = QVBoxLayout()
-        indexLayout.setContentsMargins(10, 10, 10, 50)
-        indexLayout.addWidget(view.indexSpinBox)
-        view.indexGroupBox.setLayout(indexLayout)
-
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.imageFileGroupBox)
-        layout.addWidget(view.scalarTransformGroupBox)
-        layout.addWidget(view.normalizationGroupBox)
         layout.addWidget(view.colormapGroupBox)
+        layout.addWidget(view.dataRangeGroupBox)
         layout.addWidget(view.indexGroupBox)
-        layout.addStretch(1)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
@@ -117,7 +154,7 @@ class ImageItem(QGraphicsPixmapItem):
 
 
 class ImageWidget(QGraphicsView):
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self._pixmapItem = ImageItem()
 
@@ -151,7 +188,7 @@ class ImageWidget(QGraphicsView):
 
 
 class ImageView(QWidget):
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.imageRibbon = ImageRibbon.createInstance()
         self.imageWidget = ImageWidget.createInstance()

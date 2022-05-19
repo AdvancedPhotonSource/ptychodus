@@ -8,6 +8,7 @@ ComplexArrayType = numpy.typing.NDArray[numpy.complexfloating]
 RealArrayType = numpy.typing.NDArray[numpy.floating]
 
 
+# FIXME ComplexToImageStrategy; pass in ScalarTransformation?
 class ComplexToRealStrategy(Callable[[ComplexArrayType], RealArrayType]):
     @abstractproperty
     def name(self) -> str:

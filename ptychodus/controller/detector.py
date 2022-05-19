@@ -208,7 +208,8 @@ class DatasetImageController(Observer):
         datasetPresenter.addObserver(controller)
         controller._syncModelToView()
         view.imageRibbon.indexGroupBox.setTitle('Frame')
-        view.imageRibbon.indexSpinBox.valueChanged.connect(controller._renderImageData)
+        view.imageRibbon.indexGroupBox.indexSpinBox.valueChanged.connect(
+            controller._renderImageData)
         return controller
 
     def _renderImageData(self, index: int) -> None:
@@ -217,10 +218,10 @@ class DatasetImageController(Observer):
 
     def _syncModelToView(self) -> None:
         numberOfImages = self._datasetPresenter.getNumberOfImages()
-        self._view.imageRibbon.indexSpinBox.setEnabled(numberOfImages > 0)
-        self._view.imageRibbon.indexSpinBox.setRange(0, numberOfImages - 1)
+        self._view.imageRibbon.indexGroupBox.indexSpinBox.setEnabled(numberOfImages > 0)
+        self._view.imageRibbon.indexGroupBox.indexSpinBox.setRange(0, numberOfImages - 1)
 
-        index = self._view.imageRibbon.indexSpinBox.value()
+        index = self._view.imageRibbon.indexGroupBox.indexSpinBox.value()
         self._renderImageData(index)
 
     def update(self, observable: Observable) -> None:

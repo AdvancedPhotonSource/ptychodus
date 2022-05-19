@@ -93,9 +93,8 @@ class ImagePresenter(Observable, Observer):
         self._complexToRealStrategyChooser = complexToRealStrategyChooser
         self._array: Optional[numpy.typing.NDArray] = None
         self._image: Optional[numpy.typing.NDArray] = None
-        self._vminIsAuto = False
+        self._dataRangeIsAuto = False
         self._vmin = Decimal(0)
-        self._vmaxIsAuto = False
         self._vmax = Decimal(1)
 
     @classmethod
@@ -139,11 +138,11 @@ class ImagePresenter(Observable, Observer):
         isCyclic = self._complexToRealStrategyChooser.getCurrentStrategy().isCyclic
         self._colormapChooser = self._cyclicColormapChooser if isCyclic else self._acyclicColormapChooser
 
-    def isAutomaticVMinEnabled(self) -> bool:
-        return self._vminIsAuto
+    def isAutomaticDataRangeEnabled(self) -> bool:
+        return self._dataRangeIsAuto
 
-    def setAutomaticVMinEnabled(self, enabled: bool) -> None:
-        self._vminIsAuto = enabled
+    def setAutomaticDataRangeEnabled(self, enabled: bool) -> None:
+        self._dataRangeIsAuto = enabled
         self._updateImageAndNotifyObservers()
 
     def getVMinValue(self) -> Decimal:
@@ -152,13 +151,6 @@ class ImagePresenter(Observable, Observer):
     def setVMinValue(self, vmin: Decimal) -> None:
         self._vmin = vmin
         self.notifyObservers()
-
-    def isAutomaticVMaxEnabled(self) -> bool:
-        return self._vmaxIsAuto
-
-    def setAutomaticVMaxEnabled(self, enabled: bool) -> None:
-        self._vmaxIsAuto = enabled
-        self._updateImageAndNotifyObservers()
 
     def getVMaxValue(self) -> Decimal:
         return self._vmax
@@ -175,20 +167,20 @@ class ImagePresenter(Observable, Observer):
     def _updateImageAndNotifyObservers(self) -> None:
         if self._array is None:
             self._image = None
-            return
+        else:
+            complexToRealStrategy = self._complexToRealStrategyChooser.getCurrentStrategy()
+            realArray = complexToRealStrategy(self._array) if numpy.iscomplexobj(
+                self._array) else self._array
 
-        complexToRealStrategy = self._complexToRealStrategyChooser.getCurrentStrategy()
-        realArray = complexToRealStrategy(self._array) if numpy.iscomplexobj(
-            self._array) else self._array
+            scalarTransform = self._scalarTransformationChooser.getCurrentStrategy()
+            self._image = scalarTransform(realArray)
 
-        scalarTransform = self._scalarTransformationChooser.getCurrentStrategy()
-        self._image = scalarTransform(realArray)
+            if self._image is None:
+                return
 
-        if self._vminIsAuto:
-            self._vmin = Decimal(repr(self._image.min()))
-
-        if self._vmaxIsAuto:
-            self._vmax = Decimal(repr(self._image.max()))
+            if self._dataRangeIsAuto and self._image is not None and numpy.size(self._image) > 0:
+                self._vmin = Decimal(repr(self._image.min()))
+                self._vmax = Decimal(repr(self._image.max()))
 
         self.notifyObservers()
 
@@ -204,6 +196,9 @@ class ImagePresenter(Observable, Observer):
         scalarMappable = matplotlib.cm.ScalarMappable(norm=cnorm, cmap=cmap)
 
         return scalarMappable.to_rgba(self._image)
+
+    def isComplexValued(self) -> bool:
+        return False if self._array is None else numpy.iscomplexobj(self._array)
 
     def update(self, observable: Observable) -> None:
         if observable is self._cyclicColormapChooser:
