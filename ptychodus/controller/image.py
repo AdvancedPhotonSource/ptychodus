@@ -112,19 +112,22 @@ class ImageDataRangeController(Observer):
         return controller
 
     def _setCustomDisplayRange(self) -> None:
-        parent = self._view.parentWidget()
-        dialog = ImageDisplayRangeDialog.createInstance(parent)
-        dialog.exec_() # FIXME
+        if self._view.displayRangeDialog.exec_():
+            minValue = self._view.displayRangeDialog.minValue()
+            maxValue = self._view.displayRangeDialog.maxValue()
+            self._presenter.setCustomDisplayRange(minValue, maxValue)
 
     def _syncModelToView(self) -> None:
-        self._view.minDisplayValueSlider.setValueAndRange(
-            self._presenter.getMinDisplayValue(),
-            self._presenter.getMinDisplayValueLimits().lower,
-            self._presenter.getMinDisplayValueLimits().upper)
-        self._view.maxDisplayValueSlider.setValueAndRange(
-            self._presenter.getMaxDisplayValue(),
-            self._presenter.getMaxDisplayValueLimits().lower,
-            self._presenter.getMaxDisplayValueLimits().upper)
+        displayRangeLimits = self._presenter.getDisplayRangeLimits()
+
+        self._view.minDisplayValueSlider.setValueAndRange(self._presenter.getMinDisplayValue(),
+                                                          displayRangeLimits.lower,
+                                                          displayRangeLimits.upper)
+        self._view.maxDisplayValueSlider.setValueAndRange(self._presenter.getMaxDisplayValue(),
+                                                          displayRangeLimits.lower,
+                                                          displayRangeLimits.upper)
+        self._view.displayRangeDialog.setMinAndMaxValues(displayRangeLimits.lower,
+                                                         displayRangeLimits.upper)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

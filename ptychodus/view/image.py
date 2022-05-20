@@ -1,34 +1,49 @@
 from __future__ import annotations
+from decimal import Decimal
 from typing import Optional
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap, QWheelEvent
-from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, \
-        QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
+from PyQt5.QtGui import QDoubleValidator, QPixmap, QWheelEvent
+from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, \
+        QFormLayout, QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
         QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout, \
         QLabel, QLineEdit, QPushButton, QSizePolicy, QSpinBox, QStyle, QVBoxLayout, QWidget
-
 from .widgets import BottomTitledGroupBox, DecimalSlider
 
 
 class ImageDisplayRangeDialog(QDialog):
+    @staticmethod
+    def createRealLineEdit() -> QLineEdit:
+        lineEdit = QLineEdit()
+        lineEdit.setValidator(QDoubleValidator())
+        return lineEdit
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        self.minWidget = QLineEdit()
-        self.maxWidget = QLineEdit()
+        self.minValueWidget = ImageDisplayRangeDialog.createRealLineEdit()
+        self.maxValueWidget = ImageDisplayRangeDialog.createRealLineEdit()
+
+    def setMinAndMaxValues(self, minValue: Decimal, maxValue: Decimal) -> None:
+        self.minValueWidget.setText(str(minValue))
+        self.maxValueWidget.setText(str(maxValue))
+
+    def minValue(self) -> Decimal:
+        return Decimal(self.minValueWidget.text())
+
+    def maxValue(self) -> Decimal:
+        return Decimal(self.maxValueWidget.text())
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDisplayRangeDialog:
         dialog = cls(parent)
         dialog.setWindowTitle('Set Display Range')
-
-        # TODO self.buttonBox.accepted.connect(self.accept)
-        # TODO self.buttonBox.rejected.connect(self.reject)
+        dialog.buttonBox.accepted.connect(dialog.accept)
+        dialog.buttonBox.rejected.connect(dialog.reject)
 
         layout = QFormLayout()
-        layout.addRow('Minimum Displayed Value:', dialog.minWidget)
-        layout.addRow('Maximum Displayed Value:', dialog.maxWidget)
+        layout.addRow('Minimum Displayed Value:', dialog.minValueWidget)
+        layout.addRow('Maximum Displayed Value:', dialog.maxValueWidget)
         layout.addRow(dialog.buttonBox)
         dialog.setLayout(layout)
 
@@ -51,7 +66,7 @@ class ImageFileGroupBox(BottomTitledGroupBox):
         view.saveButton.setToolTip('Save Image')
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 25)
+        layout.setContentsMargins(10, 10, 10, 35)
         layout.addWidget(view.saveButton)
         view.setLayout(layout)
 
@@ -76,7 +91,7 @@ class ImageColormapGroupBox(BottomTitledGroupBox):
         view.colormapComboBox.setToolTip('Colormap')
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 25)
+        layout.setContentsMargins(10, 10, 10, 35)
         layout.addWidget(view.complexToRealStrategyComboBox)
         layout.addWidget(view.scalarTransformationComboBox)
         layout.addWidget(view.colormapComboBox)
@@ -94,6 +109,7 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.autoButton = QPushButton('Auto')
         self.setButton = QPushButton('Set')
+        self.displayRangeDialog = ImageDisplayRangeDialog.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDataRangeGroupBox:
@@ -110,7 +126,7 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         buttonLayout.addWidget(view.setButton)
 
         layout = QFormLayout()
-        layout.setContentsMargins(10, 10, 10, 25)
+        layout.setContentsMargins(10, 10, 10, 35)
         layout.addRow('Min:', view.minDisplayValueSlider)
         layout.addRow('Max:', view.maxDisplayValueSlider)
         layout.addRow(buttonLayout)
@@ -133,7 +149,7 @@ class IndexGroupBox(BottomTitledGroupBox):
         view.indexSpinBox.setToolTip('Image Index')
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 25)
+        layout.setContentsMargins(10, 10, 10, 35)
         layout.addWidget(view.indexSpinBox)
         view.setLayout(layout)
 

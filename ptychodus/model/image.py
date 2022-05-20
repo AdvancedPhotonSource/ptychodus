@@ -142,22 +142,19 @@ class ImagePresenter(Observable, Observer):
     def setComplexToRealStrategy(self, name: str) -> None:
         self._complexToRealStrategyChooser.setFromDisplayName(name)
 
-    def getMinDisplayValueLimits(self) -> Interval[Decimal]:
+    def getDisplayRangeLimits(self) -> Interval[Decimal]:
         return self._displayRangeLimits
 
     def getMinDisplayValue(self) -> Decimal:
-        limits = self.getMinDisplayValueLimits()
+        limits = self.getDisplayRangeLimits()
         return limits.clamp(self._displayRange.lower)
 
     def setMinDisplayValue(self, value: Decimal) -> None:
         self._displayRange.lower = value
         self.notifyObservers()
 
-    def getMaxDisplayValueLimits(self) -> Interval[Decimal]:
-        return self._displayRangeLimits
-
     def getMaxDisplayValue(self) -> Decimal:
-        limits = self.getMaxDisplayValueLimits()
+        limits = self.getDisplayRangeLimits()
         return limits.clamp(self._displayRange.upper)
 
     def setMaxDisplayValue(self, value: Decimal) -> None:
@@ -167,6 +164,10 @@ class ImagePresenter(Observable, Observer):
     def setDisplayRangeToDataRange(self) -> None:
         self._displayRange = self._dataRange.copy()
         self._displayRangeLimits = self._dataRange.copy()
+        self.notifyObservers()
+
+    def setCustomDisplayRange(self, minValue: Decimal, maxValue) -> None:
+        self._displayRangeLimits = Interval[Decimal](minValue, maxValue)
         self.notifyObservers()
 
     # TODO do this via dependency injection
@@ -212,18 +213,17 @@ class ImagePresenter(Observable, Observer):
             self._notifyObservers()
 
     def getImage(self) -> Optional[numpy.typing.NDArray]:
-        if self._image is None or self._displayRange.isEmpty:
+        if self._complexToRealStrategyChooser.getCurrentStrategy().isColorized:
+            return self._image
+        elif self._image is None or self._displayRange.isEmpty:
             return
-
-# FIXME BEGIN redo to support pre-colorized images
-        cnorm = matplotlib.colors.Normalize(vmin=self._displayRange.lower,
-                                            vmax=self._displayRange.upper,
-                                            clip=False)
-        cmap = self._colormapChooser.getCurrentStrategy()
-        scalarMappable = matplotlib.cm.ScalarMappable(norm=cnorm, cmap=cmap)
-
-        return scalarMappable.to_rgba(self._image)
-# FIXME END
+        else:
+            cnorm = matplotlib.colors.Normalize(vmin=self._displayRange.lower,
+                                                vmax=self._displayRange.upper,
+                                                clip=False)
+            cmap = self._colormapChooser.getCurrentStrategy()
+            scalarMappable = matplotlib.cm.ScalarMappable(norm=cnorm, cmap=cmap)
+            return scalarMappable.to_rgba(self._image)
 
     def isComplexValued(self) -> bool:
         return False if self._array is None else numpy.iscomplexobj(self._array)
