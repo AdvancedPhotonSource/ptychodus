@@ -1,5 +1,0 @@
-mypy
-pylint
-pytest
-toml
-yapf
