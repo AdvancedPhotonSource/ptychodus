@@ -1,3 +1,10 @@
-__name__ = 'Ptychodus'
-__version__ = '0.0.0.dev0'
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("ptychodus")
+except PackageNotFoundError:
+    # package is not installed
+    pass
+
+__name__ = 'ptychodus'
 __all__ = ['api', 'model', 'view', 'controller']
