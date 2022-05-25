@@ -8,6 +8,7 @@ from ptychodus.api.plugins import PluginRegistry
 
 
 class ComplexHSVMagnitudeInSaturation(ComplexToRealStrategy):
+
     @property
     def name(self) -> str:
         return 'HSV Saturation'
@@ -30,6 +31,7 @@ class ComplexHSVMagnitudeInSaturation(ComplexToRealStrategy):
 
 
 class ComplexHSVMagnitudeInValue(ComplexToRealStrategy):
+
     @property
     def name(self) -> str:
         return 'HSV Value'
@@ -52,6 +54,7 @@ class ComplexHSVMagnitudeInValue(ComplexToRealStrategy):
 
 
 class ComplexHLSMagnitudeInLightness(ComplexToRealStrategy):
+
     @property
     def name(self) -> str:
         return 'HLS Lightness'
@@ -74,6 +77,7 @@ class ComplexHLSMagnitudeInLightness(ComplexToRealStrategy):
 
 
 class ComplexHLSMagnitudeInSaturation(ComplexToRealStrategy):
+
     @property
     def name(self) -> str:
         return 'HLS Saturation'
@@ -96,6 +100,7 @@ class ComplexHLSMagnitudeInSaturation(ComplexToRealStrategy):
 
 
 class ComplexMagnitudeStrategy(ComplexToRealStrategy):
+
     @property
     def name(self) -> str:
         return 'Magnitude'
@@ -115,6 +120,7 @@ class ComplexMagnitudeStrategy(ComplexToRealStrategy):
 
 
 class ComplexPhaseStrategy(ComplexToRealStrategy):
+
     @property
     def name(self) -> str:
         return 'Phase'
@@ -134,6 +140,7 @@ class ComplexPhaseStrategy(ComplexToRealStrategy):
 
 
 class ComplexRealComponentStrategy(ComplexToRealStrategy):
+
     @property
     def name(self) -> str:
         return 'Real'
@@ -153,6 +160,7 @@ class ComplexRealComponentStrategy(ComplexToRealStrategy):
 
 
 class ComplexImaginaryComponentStrategy(ComplexToRealStrategy):
+
     @property
     def name(self) -> str:
         return 'Imaginary'
@@ -176,7 +184,7 @@ def registerPlugins(registry: PluginRegistry) -> None:
     registry.registerPlugin(ComplexPhaseStrategy())
     registry.registerPlugin(ComplexRealComponentStrategy())
     registry.registerPlugin(ComplexImaginaryComponentStrategy())
-    registry.registerPlugin(ComplexHSVMagnitudeInSaturation())
-    registry.registerPlugin(ComplexHSVMagnitudeInValue())
-    registry.registerPlugin(ComplexHLSMagnitudeInLightness())
-    registry.registerPlugin(ComplexHLSMagnitudeInSaturation())
+    # TODO registry.registerPlugin(ComplexHSVMagnitudeInSaturation())
+    # TODO registry.registerPlugin(ComplexHSVMagnitudeInValue())
+    # TODO registry.registerPlugin(ComplexHLSMagnitudeInLightness())
+    # TODO registry.registerPlugin(ComplexHLSMagnitudeInSaturation())

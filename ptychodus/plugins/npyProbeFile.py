@@ -7,6 +7,7 @@ from ptychodus.api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 
 
 class NPYProbeFileReader(ProbeFileReader):
+
     @property
     def simpleName(self) -> str:
         return 'NPY'
@@ -20,6 +21,7 @@ class NPYProbeFileReader(ProbeFileReader):
 
 
 class NPYProbeFileWriter(ProbeFileWriter):
+
     @property
     def simpleName(self) -> str:
         return 'NPY'

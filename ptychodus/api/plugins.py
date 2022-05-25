@@ -27,6 +27,7 @@ class PluginEntry(Generic[T]):
 
 
 class PluginChooser(Generic[T], Observable):
+
     def __init__(self, defaultEntry: PluginEntry[T]) -> None:
         super().__init__()
         self._entryList: list[PluginEntry[T]] = [defaultEntry]
@@ -94,6 +95,7 @@ class PluginChooser(Generic[T], Observable):
 
 
 class PluginRegistry:
+
     def __init__(self) -> None:
         self.dataFileReaders: list[PluginEntry[DataFileReader]] = list()
         self.complexToRealStrategies: list[PluginEntry[ComplexToRealStrategy]] = list()

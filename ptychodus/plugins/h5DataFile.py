@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class H5DataFileTreeBuilder:
+
     def _addAttributes(self, treeNode: SimpleTreeNode,
                        attributeManager: h5py.AttributeManager) -> None:
         for name, value in attributeManager.items():
@@ -89,10 +90,15 @@ class H5DataFileTreeBuilder:
 
 
 class H5DataFile(DataFile):
-    def __init__(self, contentsTree: SimpleTreeNode,
+
+    def __init__(self, filePath: Path, contentsTree: SimpleTreeNode,
                  datasetList: list[DiffractionDataset]) -> None:
+        self._filePath = filePath
         self._contentsTree = contentsTree
         self._datasetList = datasetList
+
+    def getFilePath(self) -> Path:
+        return self._filePath
 
     def getContentsTree(self) -> SimpleTreeNode:
         return self._contentsTree
@@ -105,6 +111,7 @@ class H5DataFile(DataFile):
 
 
 class H5DataFileReader(DataFileReader):
+
     def __init__(self) -> None:
         self._treeBuilder = H5DataFileTreeBuilder()
 
@@ -124,7 +131,7 @@ class H5DataFileReader(DataFileReader):
             with h5py.File(filePath, 'r') as h5File:
                 contentsTree = self._treeBuilder.build(h5File)
 
-        return H5DataFile(contentsTree, datasetList)
+        return H5DataFile(filePath, contentsTree, datasetList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

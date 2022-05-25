@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeSettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -54,6 +55,7 @@ class ProbeSettings(Observable, Observer):
 
 
 class ProbeSizer(Observable, Observer):
+
     def __init__(self, settings: ProbeSettings, cropSizer: CropSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -105,6 +107,7 @@ class ProbeSizer(Observable, Observer):
 
 
 class GaussianBeamProbeInitializer:
+
     def __init__(self, detector: Detector, probeSettings: ProbeSettings) -> None:
         self._detector = detector
         self._probeSettings = probeSettings
@@ -130,6 +133,7 @@ class GaussianBeamProbeInitializer:
 
 
 class FresnelZonePlateProbeInitializer:
+
     def __init__(self, detector: Detector, probeSettings: ProbeSettings,
                  sizer: ProbeSizer) -> None:
         self._detector = detector
@@ -158,6 +162,7 @@ class FresnelZonePlateProbeInitializer:
 
 
 class FileProbeInitializer(Observer):
+
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer,
                  fileReaderChooser: PluginChooser[ProbeFileReader]) -> None:
         super().__init__()
@@ -222,6 +227,7 @@ class FileProbeInitializer(Observer):
 
 
 class Probe(Observable):
+
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -252,6 +258,7 @@ class Probe(Observable):
 
 
 class ProbeInitializer(Observable, Observer):
+
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
                  fileInitializer: FileProbeInitializer,
                  fileWriterChooser: PluginChooser[ProbeFileWriter],
@@ -349,6 +356,7 @@ class ProbeInitializer(Observable, Observer):
 
 
 class ProbePresenter(Observable, Observer):
+
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
                  initializer: ProbeInitializer) -> None:
         super().__init__()

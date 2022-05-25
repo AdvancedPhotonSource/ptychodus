@@ -15,6 +15,7 @@ from .settings import *
 
 
 class ViewCore(QMainWindow):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
 

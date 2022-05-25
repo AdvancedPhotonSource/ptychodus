@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class ModelCore:
+
     def __init__(self, isDeveloperModeEnabled: bool = False) -> None:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
@@ -41,7 +42,7 @@ class ModelCore:
             self._pluginRegistry.buildComplexToRealStrategyChooser())
 
         self.settingsRegistry = SettingsRegistry()
-        self._dataSettings = Datasettings.createInstance(self.settingsRegistry)
+        self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
         self._scanSettings = ScanSettings.createInstance(self.settingsRegistry)
@@ -81,11 +82,6 @@ class ModelCore:
             self._object, self._fileObjectInitializer,
             self._pluginRegistry.buildObjectFileWriterChooser(), self.settingsRegistry)
 
-        self._velociprobeReader = next(entry.strategy
-                                       for entry in self._pluginRegistry.dataFileReaders
-                                       if type(entry.strategy).__name__ ==
-                                       'VelociprobeDataFileReader')  # TODO remove when able
-
         self._activeDataFile = ActiveDataFile()
         self._activeDiffractionDataset = ActiveDiffractionDataset.createInstance(
             self._activeDataFile, self._cropSizer)
@@ -113,6 +109,10 @@ class ModelCore:
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
             self._activeDiffractionDataset)
+        self._velociprobeReader = next(entry.strategy
+                                       for entry in self._pluginRegistry.dataFileReaders
+                                       if type(entry.strategy).__name__ ==
+                                       'VelociprobeDataFileReader')  # TODO remove when able
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
             self._probeSettings)

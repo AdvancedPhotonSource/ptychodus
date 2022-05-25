@@ -7,13 +7,14 @@ import numpy
 from ..api.data import DataArrayType, DatasetState, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .data import ActiveDataFile
+from .data import ActiveDataFile, NullDiffractionDataset
 from .geometry import Interval
 
 logger = logging.getLogger(__name__)
 
 
 class DetectorSettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -36,6 +37,7 @@ class DetectorSettings(Observable, Observer):
 
 
 class CropSettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -57,6 +59,7 @@ class CropSettings(Observable, Observer):
 
 
 class Detector(Observable, Observer):
+
     def __init__(self, settings: DetectorSettings) -> None:
         super().__init__()
         self._settings = settings
@@ -95,6 +98,7 @@ class Detector(Observable, Observer):
 
 
 class CropSizer(Observer, Observable):
+
     def __init__(self, settings: CropSettings, detector: Detector) -> None:
         super().__init__()
         self._settings = settings
@@ -222,12 +226,13 @@ class DetectorPresenter(Observer, Observable):
 
 
 class ActiveDiffractionDataset(DiffractionDataset):
+
     def __init__(self, dataFile: ActiveDataFile, cropSizer: CropSizer) -> None:
         super().__init__()
         self._dataFile = dataFile
         self._cropSizer = cropSizer
         self._datasetIndex = 0
-        self._dataset: Optional[DiffractionDataset] = None
+        self._dataset = NullDiffractionDataset()
 
     @classmethod
     def createInstance(cls, dataFile: ActiveDataFile,
@@ -258,38 +263,37 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     @property
     def datasetName(self) -> str:
-        return '' if self._dataset is None else self._dataset.datasetName
+        return self._dataset.datasetName
 
     @property
     def datasetState(self) -> DatasetState:
-        return DatasetState.NOT_FOUND if self._dataset is None else self._dataset.datasetState
+        return self._dataset.datasetState
 
     def getArray(self) -> DataArrayType:
-        return numpy.empty((0, 0, 0)) if self._dataset is None else self._dataset.getArray()
+        return self._dataset.getArray()
 
     def __getitem__(self, index: int) -> DataArrayType:
-        data = numpy.empty((0, 0))
+        data = numpy.empty((0, 0), dtype=int)
 
-        if self._dataset is not None:
-            try:
-                data = self._dataset[index]
-            except IndexError:
-                pass
-            else:
-                if self._cropSizer.isCropEnabled():
-                    sliceX = self._cropSizer.getSliceX()
-                    sliceY = self._cropSizer.getSliceY()
-                    data = data[sliceY, sliceX].copy()
+        try:
+            data = self._dataset[index]
+        except IndexError:
+            pass
+        else:
+            if self._cropSizer.isCropEnabled():
+                sliceX = self._cropSizer.getSliceX()
+                sliceY = self._cropSizer.getSliceY()
+                data = data[sliceY, sliceX].copy()
 
         return data
 
     def __len__(self) -> int:
-        return 0 if self._dataset is None else len(self._dataset)
+        return len(self._dataset)
 
     def update(self, observable: Observable) -> None:
         if observable is self._dataFile:
             self._datasetIndex = 0
-            self._dataset = None
+            self._dataset = NullDiffractionDataset()
             self.notifyObservers()
         elif observable is self._cropSizer:
             self.notifyObservers()
@@ -298,6 +302,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
 
 class CropPresenter(Observer, Observable):
+
     def __init__(self, settings: CropSettings, sizer: CropSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -369,6 +374,7 @@ class CropPresenter(Observer, Observable):
 
 
 class DiffractionDatasetPresenter(Observable, Observer):
+
     def __init__(self, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._dataset = dataset

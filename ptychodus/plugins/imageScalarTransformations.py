@@ -5,6 +5,7 @@ from ptychodus.api.plugins import PluginRegistry
 
 
 class IdentityScalarTransformation(ScalarTransformation):
+
     @property
     def name(self) -> str:
         return 'Identity'
@@ -14,6 +15,7 @@ class IdentityScalarTransformation(ScalarTransformation):
 
 
 class SquareRootScalarTransformation(ScalarTransformation):
+
     @property
     def name(self) -> str:
         return 'Square Root'
@@ -24,6 +26,7 @@ class SquareRootScalarTransformation(ScalarTransformation):
 
 
 class LogScalarTransformation(ScalarTransformation):
+
     @property
     def name(self) -> str:
         return 'Natural Logarithm'
@@ -34,6 +37,7 @@ class LogScalarTransformation(ScalarTransformation):
 
 
 class Log2ScalarTransformation(ScalarTransformation):
+
     @property
     def name(self) -> str:
         return 'Logarithm (Base 2)'
@@ -44,6 +48,7 @@ class Log2ScalarTransformation(ScalarTransformation):
 
 
 class Log10ScalarTransformation(ScalarTransformation):
+
     @property
     def name(self) -> str:
         return 'Logarithm (Base 10)'

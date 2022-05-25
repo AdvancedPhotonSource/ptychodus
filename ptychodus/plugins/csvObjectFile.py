@@ -7,6 +7,7 @@ from ptychodus.api.plugins import PluginRegistry
 
 
 class CSVObjectFileReader(ObjectFileReader):
+
     @property
     def simpleName(self) -> str:
         return 'CSV'
@@ -20,6 +21,7 @@ class CSVObjectFileReader(ObjectFileReader):
 
 
 class CSVObjectFileWriter(ObjectFileWriter):
+
     @property
     def simpleName(self) -> str:
         return 'CSV'

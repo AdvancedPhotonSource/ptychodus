@@ -8,6 +8,7 @@ from ptychodus.api.scan import ScanFileReader, ScanFileWriter, ScanPoint, ScanPo
 
 
 class CSVScanFileReader(ScanFileReader):
+
     def __init__(self) -> None:
         self._xcol = 1
         self._ycol = 0
@@ -44,6 +45,7 @@ class CSVScanFileReader(ScanFileReader):
 
 
 class CSVScanFileWriter(ScanFileWriter):
+
     @property
     def simpleName(self) -> str:
         return 'CSV'

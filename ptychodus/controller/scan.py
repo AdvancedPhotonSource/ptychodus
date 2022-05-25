@@ -7,6 +7,7 @@ from .data import FileDialogFactory
 
 
 class ScanScanController(Observer):
+
     def __init__(self, presenter: ScanPresenter, view: ScanScanView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -59,6 +60,7 @@ class ScanScanController(Observer):
 
 
 class ScanInitializerController(Observer):
+
     def __init__(self, presenter: ScanPresenter, view: ScanInitializerView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -89,6 +91,7 @@ class ScanInitializerController(Observer):
 
 
 class ScanTransformController(Observer):
+
     def __init__(self, presenter: ScanPresenter, view: ScanTransformView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -118,6 +121,7 @@ class ScanTransformController(Observer):
 
 
 class ScanParametersController:
+
     def __init__(self, presenter: ScanPresenter, view: ScanParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
@@ -157,6 +161,7 @@ class ScanParametersController:
 
 
 class ScanPlotController(Observer):
+
     def __init__(self, presenter: ScanPresenter, view: ScanPlotView) -> None:
         super().__init__()
         self._presenter = presenter

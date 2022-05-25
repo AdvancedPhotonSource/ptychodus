@@ -10,6 +10,7 @@ ProbeInitializerType = Callable[[], ProbeArrayType]
 
 
 class ProbeFileReader(ABC):
+
     @abstractproperty
     def simpleName(self) -> str:
         pass
@@ -24,6 +25,7 @@ class ProbeFileReader(ABC):
 
 
 class ProbeFileWriter(ABC):
+
     @abstractproperty
     def simpleName(self) -> str:
         pass

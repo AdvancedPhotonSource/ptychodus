@@ -10,6 +10,7 @@ T = TypeVar('T')
 
 
 class SettingsEntry(Generic[T], Observable):
+
     def __init__(self, name: str, defaultValue: T, stringConverter: Callable[[str], T]) -> None:
         super().__init__()
         self._name = name
@@ -37,6 +38,7 @@ class SettingsEntry(Generic[T], Observable):
 
 
 class SettingsGroup(Observable, Observer):
+
     def __init__(self, name: str) -> None:
         super().__init__()
         self._name = name
@@ -105,6 +107,7 @@ class SettingsGroup(Observable, Observer):
 
 
 class SettingsRegistry(Observable):
+
     def __init__(self) -> None:
         super().__init__()
         self._groupList: list[SettingsGroup] = list()

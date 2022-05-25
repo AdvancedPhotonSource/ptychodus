@@ -14,6 +14,7 @@ from .tike import TikeViewControllerFactory
 
 
 class ControllerCore:
+
     def __init__(self, model: ModelCore, view: ViewCore) -> None:
         self.model = model
         self.view = view
@@ -24,8 +25,8 @@ class ControllerCore:
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeBackend)
 
         self._importSettingsController = ImportSettingsController.createInstance(
-            model.scanPresenter, model.probePresenter, model.objectPresenter,
-            model.velociprobePresenter, view.importSettingsDialog)
+            model.probePresenter, model.objectPresenter, model.velociprobePresenter,
+            view.importSettingsDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
                                                                      view.settingsGroupView,
                                                                      view.settingsEntryView,

@@ -39,6 +39,7 @@ class ImageFileController:
 
 
 class ImageColormapController:
+
     def __init__(self, presenter: ImagePresenter, view: ImageColormapGroupBox) -> None:
         self._presenter = presenter
         self._view = view
@@ -92,6 +93,7 @@ class ImageColormapController:
 
 
 class ImageDataRangeController(Observer):
+
     def __init__(self, presenter: ImagePresenter, view: ImageDataRangeGroupBox) -> None:
         self._presenter = presenter
         self._view = view
@@ -135,6 +137,7 @@ class ImageDataRangeController(Observer):
 
 
 class ImageController(Observer):
+
     def __init__(self, presenter: ImagePresenter, view: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter

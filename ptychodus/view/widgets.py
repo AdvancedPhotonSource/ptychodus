@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class BottomTitledGroupBox(QGroupBox):
+
     def __init__(self, title: str, parent: Optional[QWidget] = None) -> None:
         super().__init__(title, parent)
         self.setStyleSheet("""

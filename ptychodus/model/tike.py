@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class TikeAdaptiveMomentSettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -41,6 +42,7 @@ class TikeAdaptiveMomentSettings(Observable, Observer):
 
 
 class TikeAdaptiveMomentPresenter(Observable, Observer):
+
     def __init__(self, settings: TikeAdaptiveMomentSettings) -> None:
         super().__init__()
         self._settings = settings
@@ -87,6 +89,7 @@ class TikeAdaptiveMomentPresenter(Observable, Observer):
 
 
 class TikeProbeCorrectionSettings(TikeAdaptiveMomentSettings):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
         self.useProbeCorrection = settingsGroup.createBooleanEntry('UseProbeCorrection', False)
@@ -102,6 +105,7 @@ class TikeProbeCorrectionSettings(TikeAdaptiveMomentSettings):
 
 
 class TikeProbeCorrectionPresenter(TikeAdaptiveMomentPresenter):
+
     def __init__(self, settings: TikeProbeCorrectionSettings) -> None:
         super().__init__(settings)
 
@@ -143,6 +147,7 @@ class TikeProbeCorrectionPresenter(TikeAdaptiveMomentPresenter):
 
 
 class TikeObjectCorrectionSettings(TikeAdaptiveMomentSettings):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
         self.useObjectCorrection = settingsGroup.createBooleanEntry('UseObjectCorrection', False)
@@ -155,6 +160,7 @@ class TikeObjectCorrectionSettings(TikeAdaptiveMomentSettings):
 
 
 class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
+
     def __init__(self, settings: TikeObjectCorrectionSettings) -> None:
         super().__init__(settings)
 
@@ -198,6 +204,7 @@ class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
 
 
 class TikePositionCorrectionSettings(TikeAdaptiveMomentSettings):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
         self.usePositionCorrection = settingsGroup.createBooleanEntry(
@@ -211,6 +218,7 @@ class TikePositionCorrectionSettings(TikeAdaptiveMomentSettings):
 
 
 class TikePositionCorrectionPresenter(TikeAdaptiveMomentPresenter):
+
     def __init__(self, settings: TikePositionCorrectionSettings) -> None:
         super().__init__(settings)
 
@@ -234,6 +242,7 @@ class TikePositionCorrectionPresenter(TikeAdaptiveMomentPresenter):
 
 
 class TikeSettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -386,6 +395,7 @@ class TikePresenter(Observable, Observer):
 
 
 class TikeReconstructor:
+
     def __init__(self, settings: TikeSettings,
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
@@ -566,6 +576,7 @@ class TikeReconstructor:
 
 
 class RegularizedPIEReconstructor(Reconstructor):
+
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.RpieOptions()
@@ -591,6 +602,7 @@ class RegularizedPIEReconstructor(Reconstructor):
 
 
 class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
+
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.AdamOptions()
@@ -617,6 +629,7 @@ class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
 
 
 class ConjugateGradientReconstructor(Reconstructor):
+
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.CgradOptions()
@@ -643,6 +656,7 @@ class ConjugateGradientReconstructor(Reconstructor):
 
 
 class IterativeLeastSquaresReconstructor(Reconstructor):
+
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.LstsqOptions()
@@ -667,6 +681,7 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
 
 
 class TikeBackend:
+
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         self._settings = TikeSettings.createInstance(settingsRegistry)
         self._positionCorrectionSettings = TikePositionCorrectionSettings.createInstance(

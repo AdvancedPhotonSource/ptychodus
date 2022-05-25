@@ -7,6 +7,7 @@ from .widgets import LengthWidget
 
 
 class ObjectInitializerView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Initializer', parent)
         self.initializerComboBox = QComboBox()
@@ -25,6 +26,7 @@ class ObjectInitializerView(QGroupBox):
 
 
 class ObjectParametersView(QWidget):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.initializerView = ObjectInitializerView.createInstance()

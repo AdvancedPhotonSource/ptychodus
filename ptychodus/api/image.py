@@ -9,12 +9,14 @@ RealArrayType = numpy.typing.NDArray[numpy.floating]
 
 
 class ScalarTransformation(Callable[[RealArrayType], RealArrayType]):
+
     @abstractproperty
     def name(self) -> str:
         pass
 
 
 class ComplexToRealStrategy(Callable[[ComplexArrayType, ScalarTransformation], RealArrayType]):
+
     @abstractproperty
     def name(self) -> str:
         pass

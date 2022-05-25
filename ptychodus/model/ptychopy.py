@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPySettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -41,6 +42,7 @@ class PtychoPySettings(Observable, Observer):
 
 
 class CommandStringBuilder:
+
     def __init__(self, jobID: str, algorithm: str) -> None:
         self._sb = [f'./ptycho -jobID={jobID} -algorithm={algorithm}']
 
@@ -322,6 +324,7 @@ class PtychoPyPresenter(Observable, Observer):
 
 
 class ExtendedPIEReconstructor(Reconstructor):
+
     @property
     def name(self) -> str:
         return 'ePIE'
@@ -349,6 +352,7 @@ class ExtendedPIEReconstructor(Reconstructor):
 
 
 class DifferenceMapReconstructor(Reconstructor):
+
     @property
     def name(self) -> str:
         return 'DM'
@@ -367,6 +371,7 @@ class DifferenceMapReconstructor(Reconstructor):
 
 
 class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
+
     @property
     def name(self) -> str:
         return 'MLs'
@@ -397,6 +402,7 @@ class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
 
 
 class PtychoPyBackend:
+
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         self._settings = PtychoPySettings.createInstance(settingsRegistry)
         self.presenter = PtychoPyPresenter.createInstance(self._settings)

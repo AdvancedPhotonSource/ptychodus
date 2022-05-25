@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectSettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -39,6 +40,7 @@ class ObjectSettings(Observable, Observer):
 
 
 class ObjectSizer(Observable, Observer):
+
     def __init__(self, detector: Detector, cropSizer: CropSizer, scan: Scan,
                  probeSizer: ProbeSizer) -> None:
         super().__init__()
@@ -102,6 +104,7 @@ class ObjectSizer(Observable, Observer):
 
 
 class UniformRandomObjectInitializer:
+
     def __init__(self, rng: numpy.random.Generator, sizer: ObjectSizer) -> None:
         self._rng = rng
         self._sizer = sizer
@@ -114,6 +117,7 @@ class UniformRandomObjectInitializer:
 
 
 class FileObjectInitializer(Observer):
+
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer,
                  fileReaderChooser: PluginChooser[ObjectFileReader]) -> None:
         super().__init__()
@@ -179,6 +183,7 @@ class FileObjectInitializer(Observer):
 
 
 class Object(Observable):
+
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -197,6 +202,7 @@ class Object(Observable):
 
 
 class ObjectInitializer(Observable, Observer):
+
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, object_: Object,
                  fileInitializer: FileObjectInitializer,
                  fileWriterChooser: PluginChooser[ObjectFileWriter],
@@ -288,6 +294,7 @@ class ObjectInitializer(Observable, Observer):
 
 
 class ObjectPresenter(Observable, Observer):
+
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, obj: Object,
                  initializer: ObjectInitializer) -> None:
         super().__init__()

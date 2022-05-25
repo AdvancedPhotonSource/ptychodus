@@ -10,6 +10,7 @@ ObjectInitializerType = Callable[[], ObjectArrayType]
 
 
 class ObjectFileReader(ABC):
+
     @abstractproperty
     def simpleName(self) -> str:
         pass
@@ -24,6 +25,7 @@ class ObjectFileReader(ABC):
 
 
 class ObjectFileWriter(ABC):
+
     @abstractproperty
     def simpleName(self) -> str:
         pass

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScanSettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -48,6 +49,7 @@ ScanInitializerType = Sequence[ScanPoint]
 
 
 class CartesianScanInitializer(Sequence[ScanPoint]):
+
     def __init__(self, settings: ScanSettings, snake: bool) -> None:
         super().__init__()
         self._settings = settings
@@ -83,6 +85,7 @@ class CartesianScanInitializer(Sequence[ScanPoint]):
 
 
 class SpiralScanInitializer(Sequence[ScanPoint]):
+
     def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
         self._settings = settings
@@ -115,6 +118,7 @@ class SpiralScanInitializer(Sequence[ScanPoint]):
 
 
 class JitteredScanInitializer(Sequence[ScanPoint]):
+
     def __init__(self, rng: numpy.random.Generator, settings: ScanSettings,
                  scanPointSequence: Sequence[ScanPoint]) -> None:
         super().__init__()
@@ -141,6 +145,7 @@ class JitteredScanInitializer(Sequence[ScanPoint]):
 
 
 class FileScanInitializer(Sequence[ScanPoint], Observer):
+
     def __init__(self, settings: ScanSettings,
                  fileReaderChooser: PluginChooser[ScanFileReader]) -> None:
         super().__init__()
@@ -248,6 +253,7 @@ class ScanPointTransform(Enum):
 
 
 class Scan(Sequence[ScanPoint], Observable, Observer):
+
     @staticmethod
     def _createTransformEntry(xform: ScanPointTransform) -> PluginEntry[ScanPointTransform]:
         return PluginEntry[ScanPointTransform](simpleName=xform.simpleName,
@@ -329,6 +335,7 @@ class Scan(Sequence[ScanPoint], Observable, Observer):
 
 
 class ScanInitializer(Observable, Observer):
+
     def __init__(self, settings: ScanSettings, scan: Scan, fileInitializer: FileScanInitializer,
                  fileWriterChooser: PluginChooser[ScanFileWriter],
                  reinitObservable: Observable) -> None:

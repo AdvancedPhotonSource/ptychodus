@@ -6,6 +6,7 @@ T = TypeVar('T', int, float, Decimal)
 
 
 class Interval(Generic[T]):
+
     def __init__(self, lower: T, upper: T) -> None:
         self.lower: T = lower
         self.upper: T = upper
@@ -42,6 +43,7 @@ class Interval(Generic[T]):
 
 
 class Box(Generic[T]):
+
     def __init__(self, intervals: Iterable[Interval[T]]) -> None:
         self._intervalList: list[Interval[T]] = [x for x in intervals]
 

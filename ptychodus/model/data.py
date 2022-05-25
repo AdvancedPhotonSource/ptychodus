@@ -19,7 +19,8 @@ from ..api.tree import SimpleTreeNode
 logger = logging.getLogger(__name__)
 
 
-class Datasettings(Observable, Observer):
+class DataSettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -27,7 +28,7 @@ class Datasettings(Observable, Observer):
         self.filePath = settingsGroup.createPathEntry('FilePath', None)
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> Datasettings:
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> DataSettings:
         settings = cls(settingsRegistry.createGroup('Data'))
         settings._settingsGroup.addObserver(settings)
         return settings
@@ -38,6 +39,7 @@ class Datasettings(Observable, Observer):
 
 
 class H5FileEventHandler(watchdog.events.PatternMatchingEventHandler):
+
     def __init__(self) -> None:
         super().__init__(patterns=['*.h5', '*.hdf5'],
                          ignore_directories=True,
@@ -48,6 +50,7 @@ class H5FileEventHandler(watchdog.events.PatternMatchingEventHandler):
 
 
 class DataDirectoryWatcher(threading.Thread):
+
     def __init__(self) -> None:
         super().__init__()
         self._directoryPath: Path = Path.home()
@@ -76,20 +79,60 @@ class DataDirectoryWatcher(threading.Thread):
         self._stopEvent.set()
 
 
-class ActiveDataFile(DataFile):
-    def __init__(self) -> None:
-        super().__init__()
-        self._dataFile: Optional[DataFile] = None
+class NullDiffractionDataset(DiffractionDataset):
 
-    def getContentsTree(self) -> SimpleTreeNode:
-        return SimpleTreeNode(
-            None, list()) if self._dataFile is None else self._dataFile.getContentsTree()
+    def datasetName(self) -> str:
+        return str()
 
-    def __getitem__(self, index: int) -> DiffractionDataset:
-        return None if self._dataFile is None else self._dataFile[index]
+    @property
+    def datasetState(self) -> DatasetState:
+        return DatasetState.NOT_FOUND
+
+    def getArray(self) -> DataArrayType:
+        return numpy.empty((0, 0, 0), dtype=int)
+
+    def __getitem__(self, index: int) -> DataArrayType:
+        return numpy.empty((0, 0), dtype=int)
 
     def __len__(self) -> int:
-        return 0 if self._dataFile is None else len(self._dataFile)
+        return 0
+
+
+class NullDataFile(DataFile):
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def getFilePath(self) -> Path:
+        return Path('/dev/null')
+
+    def getContentsTree(self) -> SimpleTreeNode:
+        return SimpleTreeNode(None, list())
+
+    def __getitem__(self, index: int) -> DiffractionDataset:
+        return NullDiffractionDataset()
+
+    def __len__(self) -> int:
+        return 0
+
+
+class ActiveDataFile(DataFile):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._dataFile: DataFile = NullDataFile()
+
+    def getFilePath(self) -> Path:
+        return self._dataFile.getFilePath()
+
+    def getContentsTree(self) -> SimpleTreeNode:
+        return self._dataFile.getContentsTree()
+
+    def __getitem__(self, index: int) -> DiffractionDataset:
+        return self._dataFile[index]
+
+    def __len__(self) -> int:
+        return len(self._dataFile)
 
     def setActive(self, dataFile: DataFile) -> None:
         self._dataFile = dataFile
@@ -97,7 +140,8 @@ class ActiveDataFile(DataFile):
 
 
 class DataFilePresenter(Observable, Observer):
-    def __init__(self, settings: Datasettings, activeDataFile: ActiveDataFile,
+
+    def __init__(self, settings: DataSettings, activeDataFile: ActiveDataFile,
                  fileReaderChooser: PluginChooser[DataFileReader]) -> None:
         super().__init__()
         self._settings = settings
@@ -106,7 +150,7 @@ class DataFilePresenter(Observable, Observer):
         self._filePath: Optional[Path] = None
 
     @classmethod
-    def createInstance(cls, settings: Datasettings, activeDataFile: ActiveDataFile,
+    def createInstance(cls, settings: DataSettings, activeDataFile: ActiveDataFile,
                        fileReaderChooser: PluginChooser[DataFileReader]) -> DataFilePresenter:
         presenter = cls(settings, activeDataFile, fileReaderChooser)
         settings.fileType.addObserver(presenter)

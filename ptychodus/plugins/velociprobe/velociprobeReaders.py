@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class VelociprobeDiffractionDataset(DiffractionDataset):
+
     def __init__(self, name: str, filePath: Path, dataPath: str) -> None:
         super().__init__()
         self._name = name
@@ -133,6 +134,7 @@ class EntryGroup:
 
 
 class VelociprobeDataFileReader(DataFileReader, Observable):
+
     def __init__(self) -> None:
         super().__init__()
         self._treeBuilder = H5DataFileTreeBuilder()
@@ -265,7 +267,7 @@ class VelociprobeDataFileReader(DataFileReader, Observable):
 
             self.notifyObservers()
 
-        return H5DataFile(contentsTree, datasetList)
+        return H5DataFile(filePath, contentsTree, datasetList)
 
 
 class VelociprobeScanYPositionSource(IntEnum):
@@ -274,6 +276,7 @@ class VelociprobeScanYPositionSource(IntEnum):
 
 
 class VelociprobeScanPointList:
+
     def __init__(self) -> None:
         self.xInNanometers: list[int] = list()
         self.yInNanometers: list[int] = list()

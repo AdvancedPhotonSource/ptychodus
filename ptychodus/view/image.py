@@ -12,6 +12,7 @@ from .widgets import BottomTitledGroupBox, DecimalSlider
 
 
 class ImageDisplayRangeDialog(QDialog):
+
     @staticmethod
     def createRealLineEdit() -> QLineEdit:
         lineEdit = QLineEdit()
@@ -53,6 +54,7 @@ class ImageDisplayRangeDialog(QDialog):
 
 
 class ImageFileGroupBox(BottomTitledGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('File', parent)
         self.saveButton = QPushButton()
@@ -78,6 +80,7 @@ class ImageFileGroupBox(BottomTitledGroupBox):
 
 
 class ImageColormapGroupBox(BottomTitledGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Color Map', parent)
         self.complexToRealStrategyComboBox = QComboBox()
@@ -105,6 +108,7 @@ class ImageColormapGroupBox(BottomTitledGroupBox):
 
 
 class ImageDataRangeGroupBox(BottomTitledGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Data Range', parent)
         self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
@@ -140,6 +144,7 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
 
 
 class IndexGroupBox(BottomTitledGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Index', parent)
         self.indexSpinBox = QSpinBox()
@@ -161,6 +166,7 @@ class IndexGroupBox(BottomTitledGroupBox):
 
 
 class ImageRibbon(QWidget):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.imageFileGroupBox = ImageFileGroupBox.createInstance()
@@ -186,6 +192,7 @@ class ImageRibbon(QWidget):
 
 
 class ImageItem(QGraphicsPixmapItem):
+
     def __init__(self) -> None:
         super().__init__()
         self.setTransformationMode(Qt.FastTransformation)
@@ -214,6 +221,7 @@ class ImageItem(QGraphicsPixmapItem):
 
 
 class ImageWidget(QGraphicsView):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self._pixmapItem = ImageItem()
@@ -248,6 +256,7 @@ class ImageWidget(QGraphicsView):
 
 
 class ImageView(QWidget):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.imageRibbon = ImageRibbon.createInstance()

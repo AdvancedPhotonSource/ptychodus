@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructorViewControllerFactory(ABC):
+
     @abstractproperty
     def backendName(self) -> str:
         pass
@@ -24,6 +25,7 @@ class ReconstructorViewControllerFactory(ABC):
 
 
 class ReconstructorParametersController(Observer):
+
     def __init__(self, presenter: ReconstructorPresenter, view: ReconstructorParametersView,
                  viewControllerFactoryList: list[ReconstructorViewControllerFactory]) -> None:
         super().__init__()
@@ -95,6 +97,7 @@ class ReconstructorParametersController(Observer):
 
 
 class ReconstructorPlotController(Observer):
+
     def __init__(self, presenter: ReconstructorPresenter, view: ReconstructorPlotView) -> None:
         super().__init__()
         self._presenter = presenter

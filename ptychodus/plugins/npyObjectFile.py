@@ -7,6 +7,7 @@ from ptychodus.api.plugins import PluginRegistry
 
 
 class NPYObjectFileReader(ObjectFileReader):
+
     @property
     def simpleName(self) -> str:
         return 'NPY'
@@ -20,6 +21,7 @@ class NPYObjectFileReader(ObjectFileReader):
 
 
 class NPYObjectFileWriter(ObjectFileWriter):
+
     @property
     def simpleName(self) -> str:
         return 'NPY'

@@ -94,6 +94,7 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoNNReconstructor(Reconstructor):
+
     @property
     def name(self) -> str:
         return 'PNN'
@@ -111,6 +112,7 @@ class PtychoNNReconstructor(Reconstructor):
 
 
 class PtychoNNBackend:
+
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         self.reconstructorList: list[Reconstructor] = list()
 

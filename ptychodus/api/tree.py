@@ -3,6 +3,7 @@ from typing import Optional
 
 
 class SimpleTreeNode:
+
     def __init__(self, parentItem: Optional[SimpleTreeNode], itemData: list[str]) -> None:
         self.parentItem = parentItem
         self.itemData = itemData

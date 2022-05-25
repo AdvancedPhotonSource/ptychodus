@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import QCheckBox, QFormLayout, QGroupBox, QSpinBox, QVBoxLa
 
 
 class PtychoPyBasicView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Basic Parameters', parent)
         self.probeModesSpinBox = QSpinBox()
@@ -36,6 +37,7 @@ class PtychoPyBasicView(QGroupBox):
 
 
 class PtychoPyAdvancedView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Advanced Parameters', parent)
         self.calculateRMSCheckBox = QCheckBox('Calculate RMS')
@@ -66,6 +68,7 @@ class PtychoPyAdvancedView(QGroupBox):
 
 
 class PtychoPyParametersView(QWidget):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.basicView = PtychoPyBasicView.createInstance()

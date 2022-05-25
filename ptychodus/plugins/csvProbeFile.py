@@ -7,6 +7,7 @@ from ptychodus.api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 
 
 class CSVProbeFileReader(ProbeFileReader):
+
     @property
     def simpleName(self) -> str:
         return 'CSV'
@@ -27,6 +28,7 @@ class CSVProbeFileReader(ProbeFileReader):
 
 
 class CSVProbeFileWriter(ProbeFileWriter):
+
     @property
     def simpleName(self) -> str:
         return 'CSV'

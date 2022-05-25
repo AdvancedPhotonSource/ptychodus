@@ -7,6 +7,7 @@ from .widgets import SemiautomaticSpinBox, LengthWidget, EnergyWidget
 
 
 class ProbeProbeView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Parameters', parent)
         self.sizeSpinBox = SemiautomaticSpinBox.createInstance()
@@ -29,6 +30,7 @@ class ProbeProbeView(QGroupBox):
 
 
 class ProbeZonePlateView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Zone Plate', parent)
         self.zonePlateRadiusWidget = LengthWidget.createInstance()
@@ -51,6 +53,7 @@ class ProbeZonePlateView(QGroupBox):
 
 
 class ProbeInitializerView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Initializer', parent)
         self.initializerComboBox = QComboBox()
@@ -69,6 +72,7 @@ class ProbeInitializerView(QGroupBox):
 
 
 class ProbeParametersView(QWidget):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.initializerView = ProbeInitializerView.createInstance()

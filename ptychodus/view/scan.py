@@ -12,6 +12,7 @@ from .widgets import LengthWidget
 
 
 class ScanScanView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Parameters', parent)
         self.numberOfScanPointsSpinBox = QSpinBox()
@@ -38,6 +39,7 @@ class ScanScanView(QGroupBox):
 
 
 class ScanInitializerView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Initializer', parent)
         self.initializerComboBox = QComboBox()
@@ -56,6 +58,7 @@ class ScanInitializerView(QGroupBox):
 
 
 class ScanTransformView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Transform', parent)
         self.transformComboBox = QComboBox()
@@ -72,6 +75,7 @@ class ScanTransformView(QGroupBox):
 
 
 class ScanParametersView(QWidget):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.initializerView = ScanInitializerView.createInstance()
@@ -93,6 +97,7 @@ class ScanParametersView(QWidget):
 
 
 class ScanPlotView(QWidget):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.figure = Figure()

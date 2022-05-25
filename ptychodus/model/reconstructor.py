@@ -7,6 +7,7 @@ from ..api.plugins import PluginChooser, PluginEntry
 
 
 class ReconstructorSettings(Observable, Observer):
+
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
@@ -24,6 +25,7 @@ class ReconstructorSettings(Observable, Observer):
 
 
 class NullReconstructor(Reconstructor):
+
     def __init__(self, name: str = 'None', backendName: str = 'Backend') -> None:
         super().__init__()
         self._name = name
@@ -43,6 +45,7 @@ class NullReconstructor(Reconstructor):
 
 
 class SelectableReconstructor(Reconstructor, Observable, Observer):  # TODO refactor
+
     @staticmethod
     def _createAlgorithmEntry(reconstructor: Reconstructor) -> PluginEntry[Reconstructor]:
         return PluginEntry[Reconstructor](simpleName=reconstructor.name,
@@ -107,6 +110,7 @@ class SelectableReconstructor(Reconstructor, Observable, Observer):  # TODO refa
 
 
 class ReconstructorPresenter(Observable, Observer):
+
     def __init__(self, settings: ReconstructorSettings,
                  selectableReconstructor: SelectableReconstructor) -> None:
         super().__init__()
@@ -138,6 +142,7 @@ class ReconstructorPresenter(Observable, Observer):
 
 
 class ReconstructorPlotPresenter(Observable):
+
     def __init__(self) -> None:
         super().__init__()
         self._xlabel: str = 'Iteration'

@@ -7,6 +7,7 @@ from ptychodus.api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 
 
 class MATProbeFileReader(ProbeFileReader):
+
     @property
     def simpleName(self) -> str:
         return 'MAT'
@@ -21,6 +22,7 @@ class MATProbeFileReader(ProbeFileReader):
 
 
 class MATProbeFileWriter(ProbeFileWriter):
+
     @property
     def simpleName(self) -> str:
         return 'MAT'

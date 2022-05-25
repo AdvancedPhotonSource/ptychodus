@@ -7,6 +7,7 @@ from .image import ImageController
 
 
 class ObjectInitializerController(Observer):
+
     def __init__(self, presenter: ObjectPresenter, view: ObjectInitializerView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -37,6 +38,7 @@ class ObjectInitializerController(Observer):
 
 
 class ObjectParametersController:
+
     def __init__(self, presenter: ObjectPresenter, view: ObjectParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
@@ -73,6 +75,7 @@ class ObjectParametersController:
 
 
 class ObjectImageController(Observer):
+
     def __init__(self, presenter: ObjectPresenter, imagePresenter: ImagePresenter, view: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()

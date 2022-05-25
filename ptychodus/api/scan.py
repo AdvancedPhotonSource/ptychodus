@@ -12,6 +12,7 @@ class ScanPoint:
 
 
 class ScanFileReader(ABC):
+
     @abstractproperty
     def simpleName(self) -> str:
         pass
@@ -30,6 +31,7 @@ class ScanPointParseError(Exception):
 
 
 class ScanFileWriter(ABC):
+
     @abstractproperty
     def simpleName(self) -> str:
         pass

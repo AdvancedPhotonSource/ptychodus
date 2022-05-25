@@ -9,6 +9,7 @@ from .reconstructor import ReconstructorViewControllerFactory
 
 
 class PtychoPyBasicParametersController(Observer):
+
     def __init__(self, presenter: PtychoPyPresenter, view: PtychoPyBasicView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -60,6 +61,7 @@ class PtychoPyBasicParametersController(Observer):
 
 
 class PtychoPyAdvancedParametersController(Observer):
+
     def __init__(self, presenter: PtychoPyPresenter, view: PtychoPyAdvancedView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -107,6 +109,7 @@ class PtychoPyAdvancedParametersController(Observer):
 
 
 class PtychoPyParametersController:
+
     def __init__(self, model: PtychoPyBackend, view: PtychoPyParametersView) -> None:
         self._model = model
         self._view = view
@@ -123,6 +126,7 @@ class PtychoPyParametersController:
 
 
 class PtychoPyViewControllerFactory(ReconstructorViewControllerFactory):
+
     def __init__(self, model: PtychoPyBackend) -> None:
         super().__init__()
         self._model = model

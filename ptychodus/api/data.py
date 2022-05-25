@@ -19,6 +19,7 @@ class DatasetState(Enum):
 
 
 class DiffractionDataset(Sequence[DataArrayType], Observable):
+
     @abstractproperty
     def datasetName(self) -> str:
         pass
@@ -33,12 +34,18 @@ class DiffractionDataset(Sequence[DataArrayType], Observable):
 
 
 class DataFile(Sequence[DiffractionDataset], Observable):
+
+    @abstractmethod
+    def getFilePath(self) -> Path:
+        pass
+
     @abstractmethod
     def getContentsTree(self) -> SimpleTreeNode:
         pass
 
 
 class DataFileReader(ABC):
+
     @abstractproperty
     def simpleName(self) -> str:
         pass

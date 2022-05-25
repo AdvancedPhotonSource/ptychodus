@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class VelociprobePresenter(Observable, Observer):
+
     def __init__(self, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
                  cropSettings: CropSettings, probeSettings: ProbeSettings) -> None:
         super().__init__()
@@ -108,6 +109,9 @@ class VelociprobePresenter(Observable, Observer):
     def syncProbeEnergy(self) -> None:
         self._probeSettings.probeEnergyInElectronVolts.value = \
                 SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
+
+    def loadScanFile(self) -> None:
+        print('Load velociprobe scan file...')  # FIXME
 
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:

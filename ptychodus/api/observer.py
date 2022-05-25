@@ -3,12 +3,14 @@ from abc import ABC, abstractmethod
 
 
 class Observer(ABC):
+
     @abstractmethod
     def update(self, observable: Observable) -> None:
         pass
 
 
 class Observable:
+
     def __init__(self) -> None:
         self._observerList: list[Observer] = list()
 

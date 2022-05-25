@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod, abstractproperty
 
 
 class Reconstructor(ABC):
+
     @abstractproperty
     def name(self) -> str:
         pass

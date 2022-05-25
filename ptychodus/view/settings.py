@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import QAbstractButton, QCheckBox, QDialog, QDialogButtonBo
 
 
 class ImportSettingsValuesGroupBox(QGroupBox):
+
     @staticmethod
     def createCheckBox(text: str) -> QCheckBox:
         widget = QCheckBox(text)
@@ -38,6 +39,7 @@ class ImportSettingsValuesGroupBox(QGroupBox):
 
 
 class ImportSettingsOptionsGroupBox(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Additional Options', parent)
         self.fixDetectorDistanceUnitsCheckBox = QCheckBox('Fix Detector Distance Units')
@@ -64,6 +66,7 @@ class ImportSettingsOptionsGroupBox(QGroupBox):
 
 
 class ImportSettingsDialog(QDialog):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.valuesGroupBox = ImportSettingsValuesGroupBox.createInstance()

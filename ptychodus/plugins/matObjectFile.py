@@ -7,6 +7,7 @@ from ptychodus.api.plugins import PluginRegistry
 
 
 class MATObjectFileReader(ObjectFileReader):
+
     @property
     def simpleName(self) -> str:
         return 'MAT'
@@ -21,6 +22,7 @@ class MATObjectFileReader(ObjectFileReader):
 
 
 class MATObjectFileWriter(ObjectFileWriter):
+
     @property
     def simpleName(self) -> str:
         return 'MAT'

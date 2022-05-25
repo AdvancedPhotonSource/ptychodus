@@ -11,6 +11,7 @@ from .tree import SimpleTreeModel
 
 
 class FileDialogFactory:
+
     def __init__(self) -> None:
         self._openWorkingDirectory = Path.cwd()
         self._saveWorkingDirectory = Path.cwd()
@@ -79,6 +80,7 @@ class FileDialogFactory:
 
 
 class DataArrayTableModel(QAbstractTableModel):
+
     def __init__(self, parent: QObject = None) -> None:
         super().__init__(parent)
         self._array = None
@@ -128,6 +130,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
 
 class DataFileController(Observer):
+
     def __init__(self, presenter: DataFilePresenter, treeView: QTreeView, tableView: QTableView,
                  fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter

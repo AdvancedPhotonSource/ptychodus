@@ -8,6 +8,7 @@ from .widgets import DecimalSlider
 
 
 class TikeBasicParametersView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Basic Parameters', parent)
         self.useMpiCheckBox = QCheckBox('Use MPI')
@@ -68,6 +69,7 @@ class TikeBasicParametersView(QGroupBox):
 
 
 class TikeAdaptiveMomentView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(' Use Adaptive Moment', parent)
         self.mdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
@@ -91,6 +93,7 @@ class TikeAdaptiveMomentView(QGroupBox):
 
 
 class TikePositionCorrectionView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Position Correction', parent)
         self.positionRegularizationCheckBox = QCheckBox('Use Regularization')
@@ -112,6 +115,7 @@ class TikePositionCorrectionView(QGroupBox):
 
 
 class TikeProbeCorrectionView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Probe Correction', parent)
         self.sparsityConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
@@ -141,6 +145,7 @@ class TikeProbeCorrectionView(QGroupBox):
 
 
 class TikeObjectCorrectionView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Object Correction', parent)
         self.positivityConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
@@ -161,6 +166,7 @@ class TikeObjectCorrectionView(QGroupBox):
 
 
 class TikeParametersView(QWidget):
+
     def __init__(self, showCgIter: bool, showAlpha: bool, showStepLength: bool,
                  parent: Optional[QWidget]) -> None:
         super().__init__(parent)

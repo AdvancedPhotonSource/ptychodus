@@ -7,6 +7,7 @@ from .image import ImageController
 
 
 class ProbeProbeController(Observer):
+
     def __init__(self, presenter: ProbePresenter, view: ProbeProbeView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -44,6 +45,7 @@ class ProbeProbeController(Observer):
 
 
 class ProbeZonePlateController(Observer):
+
     def __init__(self, presenter: ProbePresenter, view: ProbeZonePlateView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -81,6 +83,7 @@ class ProbeZonePlateController(Observer):
 
 
 class ProbeInitializerController(Observer):
+
     def __init__(self, presenter: ProbePresenter, view: ProbeInitializerView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -111,6 +114,7 @@ class ProbeInitializerController(Observer):
 
 
 class ProbeParametersController:
+
     def __init__(self, presenter: ProbePresenter, view: ProbeParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
@@ -150,6 +154,7 @@ class ProbeParametersController:
 
 
 class ProbeImageController(Observer):
+
     def __init__(self, presenter: ProbePresenter, imagePresenter: ImagePresenter, view: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()

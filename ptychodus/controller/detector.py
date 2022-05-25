@@ -13,6 +13,7 @@ from .image import ImageController
 
 
 class DetectorController(Observer):
+
     def __init__(self, presenter: DetectorPresenter, view: DetectorView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -58,6 +59,7 @@ class DetectorController(Observer):
 
 
 class DatasetListModel(QAbstractListModel):
+
     def __init__(self, presenter: VelociprobePresenter, parent: QObject = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
@@ -95,6 +97,7 @@ class DatasetListModel(QAbstractListModel):
 
 
 class DatasetParametersController(Observer):
+
     def __init__(self, velociprobePresenter: VelociprobePresenter,
                  datasetPresenter: DiffractionDatasetPresenter, view: DatasetView) -> None:
         super().__init__()
@@ -135,6 +138,7 @@ class DatasetParametersController(Observer):
 
 
 class CropController(Observer):
+
     def __init__(self, presenter: CropPresenter, view: CropView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -190,6 +194,7 @@ class CropController(Observer):
 
 
 class DatasetImageController(Observer):
+
     def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
                  imagePresenter: ImagePresenter, view: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:

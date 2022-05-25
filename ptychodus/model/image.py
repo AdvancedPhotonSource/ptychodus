@@ -60,6 +60,7 @@ class ImageExtent:
 
 
 class ColormapChooserFactory:
+
     def __init__(self):
         # See https://matplotlib.org/stable/gallery/color/colormap_reference.html
         self._cyclicColormapList = ['twilight', 'twilight_shifted', 'hsv']
@@ -82,6 +83,7 @@ class ColormapChooserFactory:
 
 
 class ImagePresenter(Observable, Observer):
+
     def __init__(self, colormapChooserFactory: ColormapChooserFactory,
                  scalarTransformationChooser: PluginChooser[ScalarTransformation],
                  complexToRealStrategyChooser: PluginChooser[ComplexToRealStrategy]) -> None:

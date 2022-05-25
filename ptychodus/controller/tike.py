@@ -10,6 +10,7 @@ from .reconstructor import ReconstructorViewControllerFactory
 
 
 class TikeAdaptiveMomentController(Observer):
+
     def __init__(self, presenter: TikeAdaptiveMomentPresenter,
                  view: TikeAdaptiveMomentView) -> None:
         super().__init__()
@@ -51,6 +52,7 @@ class TikeAdaptiveMomentController(Observer):
 
 # TODO add finite probe support constraint
 class TikeProbeCorrectionController(Observer):
+
     def __init__(self, presenter: TikeProbeCorrectionPresenter,
                  view: TikeProbeCorrectionView) -> None:
         super().__init__()
@@ -97,6 +99,7 @@ class TikeProbeCorrectionController(Observer):
 
 
 class TikeObjectCorrectionController(Observer):
+
     def __init__(self, presenter: TikeObjectCorrectionPresenter,
                  view: TikeObjectCorrectionView) -> None:
         super().__init__()
@@ -140,6 +143,7 @@ class TikeObjectCorrectionController(Observer):
 
 
 class TikePositionCorrectionController(Observer):
+
     def __init__(self, presenter: TikePositionCorrectionPresenter,
                  view: TikePositionCorrectionView) -> None:
         super().__init__()
@@ -176,6 +180,7 @@ class TikePositionCorrectionController(Observer):
 
 
 class TikeBasicParametersController(Observer):
+
     def __init__(self, presenter: TikePresenter, view: TikeBasicParametersView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -257,6 +262,7 @@ class TikeBasicParametersController(Observer):
 
 
 class TikeParametersController:
+
     def __init__(self, model: TikeBackend, view: TikeParametersView) -> None:
         self._model = model
         self._view = view
@@ -277,6 +283,7 @@ class TikeParametersController:
 
 
 class TikeViewControllerFactory(ReconstructorViewControllerFactory):
+
     def __init__(self, model: TikeBackend) -> None:
         super().__init__()
         self._model = model

@@ -8,6 +8,7 @@ from .widgets import BottomTitledGroupBox
 
 
 class MonitorProbeView(BottomTitledGroupBox):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Probe', parent)
         self.imageView = ImageView.createInstance()
@@ -25,6 +26,7 @@ class MonitorProbeView(BottomTitledGroupBox):
 
 
 class MonitorObjectView(BottomTitledGroupBox):
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Object', parent)
         self.imageView = ImageView.createInstance()
