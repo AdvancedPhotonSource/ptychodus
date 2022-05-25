@@ -16,7 +16,14 @@ class CSVProbeFileReader(ProbeFileReader):
         return 'Comma-Separated Values Files (*.csv)'
 
     def read(self, filePath: Path) -> ProbeArrayType:
-        return numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
+        probe = numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
+        # TODO add size checks
+        numberOfProbeModes = probe.shape[0] // probe.shape[1]
+
+        if numberOfProbeModes > 1:
+            probe = probe.reshape(numberOfProbeModes, probe.shape[1], probe.shape[1])
+
+        return probe
 
 
 class CSVProbeFileWriter(ProbeFileWriter):
