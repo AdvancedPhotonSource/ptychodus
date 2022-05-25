@@ -20,7 +20,7 @@ class ImageDisplayRangeDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttonBox = QDialogButtonBox()
         self.minValueWidget = ImageDisplayRangeDialog.createRealLineEdit()
         self.maxValueWidget = ImageDisplayRangeDialog.createRealLineEdit()
 
@@ -38,7 +38,9 @@ class ImageDisplayRangeDialog(QDialog):
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDisplayRangeDialog:
         dialog = cls(parent)
         dialog.setWindowTitle('Set Display Range')
+        dialog.buttonBox.addButton(QDialogButtonBox.Ok)
         dialog.buttonBox.accepted.connect(dialog.accept)
+        dialog.buttonBox.addButton(QDialogButtonBox.Cancel)
         dialog.buttonBox.rejected.connect(dialog.reject)
 
         layout = QFormLayout()

@@ -125,50 +125,49 @@ class PluginRegistry:
 
     def registerPlugin(self, plugin: T) -> None:
         if isinstance(plugin, DataFileReader):
-            entry = PluginEntry[DataFileReader](simpleName=plugin.simpleName,
-                                                displayName=plugin.fileFilter,
-                                                strategy=plugin)
-            self.dataFileReaders.append(entry)
+            dataFileReaderEntry = PluginEntry[DataFileReader](simpleName=plugin.simpleName,
+                                                              displayName=plugin.fileFilter,
+                                                              strategy=plugin)
+            self.dataFileReaders.append(dataFileReaderEntry)
         elif isinstance(plugin, ComplexToRealStrategy):
-            entry = PluginEntry[ComplexToRealStrategy](simpleName=plugin.name,
-                                                       displayName=plugin.name,
-                                                       strategy=plugin)
-            self.complexToRealStrategies.append(entry)
+            complexToRealStrategyEntry = PluginEntry[ComplexToRealStrategy](
+                simpleName=plugin.name, displayName=plugin.name, strategy=plugin)
+            self.complexToRealStrategies.append(complexToRealStrategyEntry)
         elif isinstance(plugin, ScalarTransformation):
-            entry = PluginEntry[ScalarTransformation](simpleName=plugin.name,
-                                                      displayName=plugin.name,
-                                                      strategy=plugin)
-            self.scalarTransformations.append(entry)
+            scalarTransformationEntry = PluginEntry[ScalarTransformation](simpleName=plugin.name,
+                                                                          displayName=plugin.name,
+                                                                          strategy=plugin)
+            self.scalarTransformations.append(scalarTransformationEntry)
         elif isinstance(plugin, ScanFileReader):
-            entry = PluginEntry[ScanFileReader](simpleName=plugin.simpleName,
-                                                displayName=plugin.fileFilter,
-                                                strategy=plugin)
-            self.scanFileReaders.append(entry)
+            scanFileReaderEntry = PluginEntry[ScanFileReader](simpleName=plugin.simpleName,
+                                                              displayName=plugin.fileFilter,
+                                                              strategy=plugin)
+            self.scanFileReaders.append(scanFileReaderEntry)
         elif isinstance(plugin, ScanFileWriter):
-            entry = PluginEntry[ScanFileWriter](simpleName=plugin.simpleName,
-                                                displayName=plugin.fileFilter,
-                                                strategy=plugin)
-            self.scanFileWriters.append(entry)
+            scanFileWriterEntry = PluginEntry[ScanFileWriter](simpleName=plugin.simpleName,
+                                                              displayName=plugin.fileFilter,
+                                                              strategy=plugin)
+            self.scanFileWriters.append(scanFileWriterEntry)
         elif isinstance(plugin, ProbeFileReader):
-            entry = PluginEntry[ProbeFileReader](simpleName=plugin.simpleName,
-                                                 displayName=plugin.fileFilter,
-                                                 strategy=plugin)
-            self.probeFileReaders.append(entry)
+            probeFileReaderEntry = PluginEntry[ProbeFileReader](simpleName=plugin.simpleName,
+                                                                displayName=plugin.fileFilter,
+                                                                strategy=plugin)
+            self.probeFileReaders.append(probeFileReaderEntry)
         elif isinstance(plugin, ProbeFileWriter):
-            entry = PluginEntry[ProbeFileWriter](simpleName=plugin.simpleName,
-                                                 displayName=plugin.fileFilter,
-                                                 strategy=plugin)
-            self.probeFileWriters.append(entry)
+            probeFileWriterEntry = PluginEntry[ProbeFileWriter](simpleName=plugin.simpleName,
+                                                                displayName=plugin.fileFilter,
+                                                                strategy=plugin)
+            self.probeFileWriters.append(probeFileWriterEntry)
         elif isinstance(plugin, ObjectFileReader):
-            entry = PluginEntry[ObjectFileReader](simpleName=plugin.simpleName,
-                                                  displayName=plugin.fileFilter,
-                                                  strategy=plugin)
-            self.objectFileReaders.append(entry)
+            objectFileReaderEntry = PluginEntry[ObjectFileReader](simpleName=plugin.simpleName,
+                                                                  displayName=plugin.fileFilter,
+                                                                  strategy=plugin)
+            self.objectFileReaders.append(objectFileReaderEntry)
         elif isinstance(plugin, ObjectFileWriter):
-            entry = PluginEntry[ObjectFileWriter](simpleName=plugin.simpleName,
-                                                  displayName=plugin.fileFilter,
-                                                  strategy=plugin)
-            self.objectFileWriters.append(entry)
+            objectFileWriterEntry = PluginEntry[ObjectFileWriter](simpleName=plugin.simpleName,
+                                                                  displayName=plugin.fileFilter,
+                                                                  strategy=plugin)
+            self.objectFileWriters.append(objectFileWriterEntry)
         else:
             raise TypeError(f'Invalid plugin type \"{type(plugin).__name__}\".')
 

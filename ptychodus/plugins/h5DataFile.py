@@ -88,7 +88,7 @@ class H5DataFileTreeBuilder:
         return rootNode
 
 
-class H5DataFile:
+class H5DataFile(DataFile):
     def __init__(self, contentsTree: SimpleTreeNode,
                  datasetList: list[DiffractionDataset]) -> None:
         self._contentsTree = contentsTree

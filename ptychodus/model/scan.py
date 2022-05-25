@@ -11,7 +11,7 @@ import logging
 import numpy
 
 from ..api.observer import Observable, Observer
-from ..api.scan import ScanPoint, ScanFileReader
+from ..api.scan import ScanPoint, ScanFileReader, ScanFileWriter
 from ..api.settings import SettingsRegistry, SettingsGroup
 from ..api.plugins import PluginChooser, PluginEntry
 from .geometry import Interval, Box

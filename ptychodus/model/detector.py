@@ -4,7 +4,7 @@ import logging
 
 import numpy
 
-from ..api.data import DiffractionDataset, DataArrayType
+from ..api.data import DataArrayType, DatasetState, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
 from .data import ActiveDataFile

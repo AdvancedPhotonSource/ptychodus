@@ -29,7 +29,7 @@ class CSVObjectFileWriter(ObjectFileWriter):
         return 'Comma-Separated Values Files (*.csv)'
 
     def write(self, filePath: Path, array: ObjectArrayType) -> None:
-        numpy.savetxt(array, delimiter=',')
+        numpy.savetxt(filePath, array, delimiter=',')
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

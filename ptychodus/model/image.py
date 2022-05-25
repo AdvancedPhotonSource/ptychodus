@@ -8,6 +8,7 @@ import matplotlib.pyplot
 import numpy
 import numpy.typing
 
+from ..api.image import ScalarTransformation, ComplexToRealStrategy
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
 from .geometry import Interval
@@ -210,7 +211,7 @@ class ImagePresenter(Observable, Observer):
 
         if self._colormapChooser is not nextColormapChooser:
             self._colormapChooser = nextColormapChooser
-            self._notifyObservers()
+            self.notifyObservers()
 
     def getImage(self) -> Optional[numpy.typing.NDArray]:
         if self._complexToRealStrategyChooser.getCurrentStrategy().isColorized:

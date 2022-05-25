@@ -5,6 +5,7 @@ from pathlib import Path
 import logging
 
 import numpy
+import numpy.typing
 
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
@@ -108,7 +109,7 @@ class GaussianBeamProbeInitializer:
         self._detector = detector
         self._probeSettings = probeSettings
 
-    def _createCircularMask(self) -> ProbeArrayType:
+    def _createCircularMask(self) -> numpy.typing.NDArray[numpy.bool_]:
         width_px = self._probeSettings.probeSize.value
         height_px = width_px
 
@@ -314,8 +315,8 @@ class ProbeInitializer(Observable, Observer):
     def getOpenFileFilter(self) -> str:
         return self._fileInitializer.getOpenFileFilter()
 
-    def openProbe(self, filePath: Path) -> None:
-        self._fileInitializer.openProbe(filePath)
+    def openProbe(self, filePath: Path, fileFilter: str) -> None:
+        self._fileInitializer.openProbe(filePath, fileFilter)
         self._initializerChooser.setToDefault()
         self.initializeProbe()
 
@@ -325,7 +326,7 @@ class ProbeInitializer(Observable, Observer):
     def getSaveFileFilter(self) -> str:
         return self._fileWriterChooser.getCurrentDisplayName()
 
-    def saveProbe(self, filePath: Path) -> None:
+    def saveProbe(self, filePath: Path, fileFilter: str) -> None:
         logger.debug(f'Writing {filePath}')
         self._fileWriterChooser.setFromDisplayName(fileFilter)
         writer = self._fileWriterChooser.getCurrentStrategy()
@@ -381,8 +382,8 @@ class ProbePresenter(Observable, Observer):
     def getOpenFileFilter(self) -> str:
         return self._initializer.getOpenFileFilter()
 
-    def openProbe(self, filePath: Path) -> None:
-        self._initializer.openProbe(filePath)
+    def openProbe(self, filePath: Path, fileFilter: str) -> None:
+        self._initializer.openProbe(filePath, fileFilter)
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._initializer.getSaveFileFilterList()
@@ -390,8 +391,8 @@ class ProbePresenter(Observable, Observer):
     def getSaveFileFilter(self) -> str:
         return self._initializer.getSaveFileFilter()
 
-    def saveProbe(self, filePath: Path) -> None:
-        self._initializer.saveProbe(filePath)
+    def saveProbe(self, filePath: Path, fileFilter: str) -> None:
+        self._initializer.saveProbe(filePath, fileFilter)
 
     def initializeProbe(self) -> None:
         self._initializer.initializeProbe()

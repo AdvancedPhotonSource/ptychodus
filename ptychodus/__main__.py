@@ -23,7 +23,7 @@ except ImportError:
 
 
 def versionString() -> str:
-    return f'{ptychodus.__name__} ({ptychodus.__version__})'
+    return f'{ptychodus.__name__.title()} ({ptychodus.__version__})'
 
 
 def verifyAllArgumentsParsed(parser: argparse.ArgumentParser, argv: list[str]) -> None:

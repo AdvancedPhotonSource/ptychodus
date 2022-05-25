@@ -10,7 +10,7 @@ import numpy
 import watchdog.events
 import watchdog.observers
 
-from ..api.data import DataFile, DataFileReader
+from ..api.data import DataFile, DataFileReader, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser
 from ..api.settings import SettingsRegistry, SettingsGroup

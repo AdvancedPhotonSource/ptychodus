@@ -254,8 +254,8 @@ class ObjectInitializer(Observable, Observer):
     def getOpenFileFilter(self) -> str:
         return self._fileInitializer.getOpenFileFilter()
 
-    def openObject(self, filePath: Path) -> None:
-        self._fileInitializer.openObject(filePath)
+    def openObject(self, filePath: Path, fileFilter: str) -> None:
+        self._fileInitializer.openObject(filePath, fileFilter)
         self._initializerChooser.setToDefault()
         self.initializeObject()
 
@@ -265,7 +265,7 @@ class ObjectInitializer(Observable, Observer):
     def getSaveFileFilter(self) -> str:
         return self._fileWriterChooser.getCurrentDisplayName()
 
-    def saveObject(self, filePath: Path) -> None:
+    def saveObject(self, filePath: Path, fileFilter: str) -> None:
         logger.debug(f'Writing {filePath}')
         self._fileWriterChooser.setFromDisplayName(fileFilter)
         writer = self._fileWriterChooser.getCurrentStrategy()
@@ -321,8 +321,8 @@ class ObjectPresenter(Observable, Observer):
     def getOpenFileFilter(self) -> str:
         return self._initializer.getOpenFileFilter()
 
-    def openObject(self, filePath: Path) -> None:
-        self._initializer.openObject(filePath)
+    def openObject(self, filePath: Path, fileFilter: str) -> None:
+        self._initializer.openObject(filePath, fileFilter)
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._initializer.getSaveFileFilterList()
@@ -330,8 +330,8 @@ class ObjectPresenter(Observable, Observer):
     def getSaveFileFilter(self) -> str:
         return self._initializer.getSaveFileFilter()
 
-    def saveObject(self, filePath: Path) -> None:
-        self._initializer.saveObject(filePath)
+    def saveObject(self, filePath: Path, fileFilter: str) -> None:
+        self._initializer.saveObject(filePath, fileFilter)
 
     def initializeObject(self) -> None:
         self._initializer.initializeObject()

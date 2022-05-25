@@ -24,8 +24,8 @@ class ControllerCore:
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeBackend)
 
         self._importSettingsController = ImportSettingsController.createInstance(
-            model.probePresenter, model.objectPresenter, model.velociprobePresenter,
-            view.importSettingsDialog)
+            model.scanPresenter, model.probePresenter, model.objectPresenter,
+            model.velociprobePresenter, view.importSettingsDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
                                                                      view.settingsGroupView,
                                                                      view.settingsEntryView,

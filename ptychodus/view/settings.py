@@ -41,6 +41,7 @@ class ImportSettingsOptionsGroupBox(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Additional Options', parent)
         self.fixDetectorDistanceUnitsCheckBox = QCheckBox('Fix Detector Distance Units')
+        self.loadScanCheckBox = QCheckBox('Load Scan')
         self.reinitializeProbeCheckBox = QCheckBox('Reinitialize Probe')
         self.reinitializeObjectCheckBox = QCheckBox('Reinitialize Object')
 
@@ -53,6 +54,7 @@ class ImportSettingsOptionsGroupBox(QGroupBox):
 
         layout = QVBoxLayout()
         layout.addWidget(view.fixDetectorDistanceUnitsCheckBox)
+        layout.addWidget(view.loadScanCheckBox)
         layout.addWidget(view.reinitializeProbeCheckBox)
         layout.addWidget(view.reinitializeObjectCheckBox)
         layout.addStretch()

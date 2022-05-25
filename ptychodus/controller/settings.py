@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QDialog, QListView, QTableView
 
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup, SettingsRegistry
-from ..model import ObjectPresenter, ProbePresenter, VelociprobePresenter
+from ..model import ObjectPresenter, ProbePresenter, ScanPresenter, VelociprobePresenter
 from ..view import ImportSettingsDialog
 from .data import FileDialogFactory
 
@@ -125,18 +125,22 @@ class SettingsController(Observer):
 
 
 class ImportSettingsController(Observer):
-    def __init__(self, probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
-                 velociprobePresenter: VelociprobePresenter, dialog: ImportSettingsDialog) -> None:
+    def __init__(self, scanPresenter: ScanPresenter, probePresenter: ProbePresenter,
+                 objectPresenter: ObjectPresenter, velociprobePresenter: VelociprobePresenter,
+                 dialog: ImportSettingsDialog) -> None:
         super().__init__()
+        self._scanPresenter = scanPresenter
         self._probePresenter = probePresenter
         self._objectPresenter = objectPresenter
         self._velociprobePresenter = velociprobePresenter
         self._dialog = dialog
 
     @classmethod
-    def createInstance(cls, probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
+    def createInstance(cls, scanPresenter: ScanPresenter, probePresenter: ProbePresenter,
+                       objectPresenter: ObjectPresenter,
                        velociprobePresenter: VelociprobePresenter, dialog: ImportSettingsDialog):
-        controller = cls(probePresenter, objectPresenter, velociprobePresenter, dialog)
+        controller = cls(scanPresenter, probePresenter, objectPresenter, velociprobePresenter,
+                         dialog)
         velociprobePresenter.addObserver(controller)
         dialog.finished.connect(controller._importSettings)
         return controller
@@ -161,6 +165,11 @@ class ImportSettingsController(Observer):
 
         if self._dialog.valuesGroupBox.probeEnergyCheckBox.isChecked():
             self._velociprobePresenter.syncProbeEnergy()
+
+        if self._dialog.optionsGroupBox.loadScanCheckBox.isChecked():
+            filePath = 'foo.csv'  # FIXME
+            fileFilter = 'csv'  # FIXME
+            self._scanPresenter.openScan(filePath, fileFilter)
 
         if self._dialog.optionsGroupBox.reinitializeProbeCheckBox.isChecked():
             self._probePresenter.initializeProbe()
