@@ -9,6 +9,7 @@ from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup
 from .detector import CropSettings, DetectorSettings
 from .probe import ProbeSettings
+from .scan import ScanInitializer
 
 logger = logging.getLogger(__name__)
 
@@ -16,18 +17,20 @@ logger = logging.getLogger(__name__)
 class VelociprobePresenter(Observable, Observer):
 
     def __init__(self, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
-                 cropSettings: CropSettings, probeSettings: ProbeSettings) -> None:
+            cropSettings: CropSettings, probeSettings: ProbeSettings, dataFile: DataFile, scanInitializer: ScanInitializer) -> None:
         super().__init__()
         self._velociprobeReader = velociprobeReader
         self._detectorSettings = detectorSettings
         self._cropSettings = cropSettings
         self._probeSettings = probeSettings
+        self._dataFile = dataFile
+        self._scanInitializer = scanInitializer
 
     @classmethod
     def createInstance(cls, velociprobeReader: VelociprobeReader,
                        detectorSettings: DetectorSettings, cropSettings: CropSettings,
-                       probeSettings: ProbeSettings):
-        presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings)
+                       probeSettings: ProbeSettings, dataFile: DataFile, scanInitializer: ScanInitializer):
+        presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings, dataFile, scanInitializer)
         velociprobeReader.addObserver(presenter)
         return presenter
 
@@ -111,7 +114,12 @@ class VelociprobePresenter(Observable, Observer):
                 SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
 
     def loadScanFile(self) -> None:
-        print('Load velociprobe scan file...')  # FIXME
+        filePathMaster = self._dataFile.getFilePath()
+        fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
+        filePath = filePathMaster.parents[2] / 'positions' / fileName
+        print(filePath.resolve())
+        fileFilter = 'Comma-Separated Values Files (*.csv)' # TODO refactor; get from somewhere
+        self._scanInitializer.openScan(filePath, fileFilter)
 
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:

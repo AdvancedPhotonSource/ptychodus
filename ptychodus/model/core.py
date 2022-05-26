@@ -115,7 +115,7 @@ class ModelCore:
                                        'VelociprobeDataFileReader')  # TODO remove when able
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
-            self._probeSettings)
+            self._probeSettings, self._activeDataFile, self._scanInitializer)
         self.probePresenter = ProbePresenter.createInstance(self._probeSettings, self._probeSizer,
                                                             self._probe, self._probeInitializer)
         self.scanPresenter = ScanPresenter.createInstance(self._scanSettings, self._scan,
