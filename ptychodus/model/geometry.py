@@ -1,6 +1,7 @@
 from __future__ import annotations
-from typing import Generic, Iterable, Iterator, overload, TypeVar, Union
+from collections.abc import Sequence
 from decimal import Decimal
+from typing import Generic, Iterable, Iterator, overload, TypeVar, Union
 
 T = TypeVar('T', int, float, Decimal)
 
@@ -42,13 +43,10 @@ class Interval(Generic[T]):
         return f'{type(self).__name__}({self.lower}, {self.upper})'
 
 
-class Box(Generic[T]):
+class Box(Sequence[Interval[T]]):
 
     def __init__(self, intervals: Iterable[Interval[T]]) -> None:
         self._intervalList: list[Interval[T]] = [x for x in intervals]
-
-    def __iter__(self) -> Iterator[Interval[T]]:
-        return iter(self._intervalList)
 
     @overload
     def __getitem__(self, index: int) -> Interval[T]:
@@ -58,7 +56,7 @@ class Box(Generic[T]):
     def __getitem__(self, index: slice) -> Box[T]:
         ...
 
-    def __getitem__(self, index: Union[slice, int]) -> Union[Box[T], Interval[T]]:
+    def __getitem__(self, index: Union[int, slice]) -> Union[Interval[T], Box[T]]:
         if isinstance(index, slice):
             return Box(self._intervalList[index])
         else:

@@ -2,7 +2,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import Enum
 from pathlib import Path
 from typing import Iterable, Optional
 import csv
@@ -11,7 +10,7 @@ import logging
 import numpy
 
 from ..api.observer import Observable, Observer
-from ..api.scan import ScanPoint, ScanFileReader, ScanFileWriter
+from ..api.scan import ScanPoint, ScanPointSequence, ScanPointTransform, ScanFileReader, ScanFileWriter
 from ..api.settings import SettingsRegistry, SettingsGroup
 from ..api.plugins import PluginChooser, PluginEntry
 from .geometry import Interval, Box
@@ -26,7 +25,7 @@ class ScanSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
-        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', Path('/path/to/scan.csv'))
         self.extentX = settingsGroup.createIntegerEntry('ExtentX', 10)
         self.extentY = settingsGroup.createIntegerEntry('ExtentY', 10)
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')
@@ -45,10 +44,7 @@ class ScanSettings(Observable, Observer):
             self.notifyObservers()
 
 
-ScanInitializerType = Sequence[ScanPoint]
-
-
-class CartesianScanInitializer(Sequence[ScanPoint]):
+class CartesianScanInitializer(ScanPointSequence):
 
     def __init__(self, settings: ScanSettings, snake: bool) -> None:
         super().__init__()
@@ -73,10 +69,10 @@ class CartesianScanInitializer(Sequence[ScanPoint]):
         if self._snake and y & 1:
             x = nx - 1 - x
 
-        x *= self._settings.stepSizeXInMeters.value
-        y *= self._settings.stepSizeYInMeters.value
+        xf = x * self._settings.stepSizeXInMeters.value
+        yf = y * self._settings.stepSizeYInMeters.value
 
-        return ScanPoint(x, y)
+        return ScanPoint(xf, yf)
 
     def __len__(self) -> int:
         nx = self._settings.extentX.value
@@ -84,7 +80,7 @@ class CartesianScanInitializer(Sequence[ScanPoint]):
         return nx * ny
 
 
-class SpiralScanInitializer(Sequence[ScanPoint]):
+class SpiralScanInitializer(ScanPointSequence):
 
     def __init__(self, settings: ScanSettings) -> None:
         super().__init__()
@@ -117,10 +113,10 @@ class SpiralScanInitializer(Sequence[ScanPoint]):
         return nx * ny
 
 
-class JitteredScanInitializer(Sequence[ScanPoint]):
+class JitteredScanInitializer(ScanPointSequence):
 
     def __init__(self, rng: numpy.random.Generator, settings: ScanSettings,
-                 scanPointSequence: Sequence[ScanPoint]) -> None:
+                 scanPointSequence: ScanPointSequence) -> None:
         super().__init__()
         self._rng = rng
         self._settings = settings
@@ -144,7 +140,7 @@ class JitteredScanInitializer(Sequence[ScanPoint]):
         return len(self._scanPointSequence)
 
 
-class FileScanInitializer(Sequence[ScanPoint], Observer):
+class FileScanInitializer(ScanPointSequence, Observer):
 
     def __init__(self, settings: ScanSettings,
                  fileReaderChooser: PluginChooser[ScanFileReader]) -> None:
@@ -212,47 +208,7 @@ class FileScanInitializer(Sequence[ScanPoint], Observer):
             self._openScanFromSettings()
 
 
-class ScanPointTransform(Enum):
-    PXPY = 0x0
-    MXPY = 0x1
-    PXMY = 0x2
-    MXMY = 0x3
-    PYPX = 0x4
-    PYMX = 0x5
-    MYPX = 0x6
-    MYMX = 0x7
-
-    @property
-    def negateX(self) -> bool:
-        return self.value & 1 != 0
-
-    @property
-    def negateY(self) -> bool:
-        return self.value & 2 != 0
-
-    @property
-    def swapXY(self) -> bool:
-        return self.value & 4 != 0
-
-    @property
-    def simpleName(self) -> str:
-        xp = '-x' if self.negateX else '+x'
-        yp = '-y' if self.negateY else '+y'
-        return f'{yp}{xp}' if self.swapXY else f'{xp}{yp}'
-
-    @property
-    def displayName(self) -> str:
-        xp = '\u2212x' if self.negateX else '\u002Bx'
-        yp = '\u2212y' if self.negateY else '\u002By'
-        return f'({yp}, {xp})' if self.swapXY else f'({xp}, {yp})'
-
-    def __call__(self, point: ScanPoint) -> ScanPoint:
-        xp = -point.x if self.negateX else point.x
-        yp = -point.y if self.negateY else point.y
-        return ScanPoint(yp, xp) if self.swapXY else ScanPoint(xp, yp)
-
-
-class Scan(Sequence[ScanPoint], Observable, Observer):
+class Scan(ScanPointSequence, Observable, Observer):
 
     @staticmethod
     def _createTransformEntry(xform: ScanPointTransform) -> PluginEntry[ScanPointTransform]:
@@ -345,10 +301,8 @@ class ScanInitializer(Observable, Observer):
         self._fileWriterChooser = fileWriterChooser
         self._reinitObservable = reinitObservable
         self._fileInitializer = fileInitializer
-        self._initializerChooser = PluginChooser[ScanInitializerType](
-            PluginEntry[ScanInitializerType](simpleName='FromFile',
-                                             displayName='From File',
-                                             strategy=self._fileInitializer))
+        self._initializerChooser = PluginChooser[ScanPointSequence](PluginEntry[ScanPointSequence](
+            simpleName='FromFile', displayName='From File', strategy=self._fileInitializer))
 
     @classmethod
     def createInstance(cls, rng: numpy.random.Generator, settings: ScanSettings, scan: Scan,
@@ -357,21 +311,21 @@ class ScanInitializer(Observable, Observer):
                        reinitObservable: Observable) -> ScanInitializer:
         initializer = cls(settings, scan, fileInitializer, fileWriterChooser, reinitObservable)
 
-        spiralInit = PluginEntry[ScanInitializerType](simpleName='Spiral',
-                                                      displayName='Spiral',
-                                                      strategy=JitteredScanInitializer(
-                                                          rng, settings,
-                                                          SpiralScanInitializer(settings)))
+        spiralInit = PluginEntry[ScanPointSequence](simpleName='Spiral',
+                                                    displayName='Spiral',
+                                                    strategy=JitteredScanInitializer(
+                                                        rng, settings,
+                                                        SpiralScanInitializer(settings)))
         initializer._initializerChooser.addStrategy(spiralInit)
 
-        snakeInit = PluginEntry[ScanInitializerType](
+        snakeInit = PluginEntry[ScanPointSequence](
             simpleName='Snake',
             displayName='Snake',
             strategy=JitteredScanInitializer(
                 rng, settings, CartesianScanInitializer.createSnakeInstance(settings)))
         initializer._initializerChooser.addStrategy(snakeInit)
 
-        rasterInit = PluginEntry[ScanInitializerType](
+        rasterInit = PluginEntry[ScanPointSequence](
             simpleName='Raster',
             displayName='Raster',
             strategy=JitteredScanInitializer(

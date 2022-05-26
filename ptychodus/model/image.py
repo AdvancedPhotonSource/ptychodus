@@ -102,9 +102,10 @@ class ImagePresenter(Observable, Observer):
         self._displayRangeLimits = Interval[Decimal](Decimal(0), Decimal(1))
 
     @classmethod
-    def createInstance(cls, colormapChooserFactory: ColormapChooserFactory,
-                       scalarTransformationChooser: PluginChooser[ScalarTransformation],
-                       complexToRealStrategyChooser: PluginChooser[ComplexToRealStrategy]) -> None:
+    def createInstance(
+            cls, colormapChooserFactory: ColormapChooserFactory,
+            scalarTransformationChooser: PluginChooser[ScalarTransformation],
+            complexToRealStrategyChooser: PluginChooser[ComplexToRealStrategy]) -> ImagePresenter:
         presenter = cls(colormapChooserFactory, scalarTransformationChooser,
                         complexToRealStrategyChooser)
         presenter._updateColormapAndNotifyObserversIfChanged()
@@ -219,7 +220,7 @@ class ImagePresenter(Observable, Observer):
         if self._complexToRealStrategyChooser.getCurrentStrategy().isColorized:
             return self._image
         elif self._image is None or self._displayRange.isEmpty:
-            return
+            return None
         else:
             cnorm = matplotlib.colors.Normalize(vmin=self._displayRange.lower,
                                                 vmax=self._displayRange.upper,

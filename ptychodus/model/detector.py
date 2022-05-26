@@ -1,5 +1,7 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from decimal import Decimal
+from typing import overload, Union
 import logging
 
 import numpy
@@ -272,7 +274,17 @@ class ActiveDiffractionDataset(DiffractionDataset):
     def getArray(self) -> DataArrayType:
         return self._dataset.getArray()
 
+    @overload
     def __getitem__(self, index: int) -> DataArrayType:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[DataArrayType]:
+        ...
+
+    def __getitem__(self, index: Union[int,
+                                       slice]) -> Union[DataArrayType, Sequence[DataArrayType]]:
+        # FIXME: does not handle slices properly
         data = numpy.empty((0, 0), dtype=int)
 
         try:

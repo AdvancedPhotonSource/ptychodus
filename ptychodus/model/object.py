@@ -25,8 +25,8 @@ class ObjectSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Random')
-        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
-        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
+        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', Path('/path/to/object.npy'))
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:

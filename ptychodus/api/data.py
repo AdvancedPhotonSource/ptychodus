@@ -34,9 +34,20 @@ class DiffractionDataset(Sequence[DataArrayType], Observable):
 
 
 class DataFile(Sequence[DiffractionDataset], Observable):
+    @abstractproperty
+    def filePath(self) -> Path:
+        pass
 
-    @abstractmethod
-    def getFilePath(self) -> Path:
+    @abstractproperty
+    def imageWidth(self) -> int:
+        pass
+
+    @abstractproperty
+    def imageHeight(self) -> int:
+        pass
+
+    @abstractproperty
+    def totalNumberOfImages(self) -> int:
         pass
 
     @abstractmethod

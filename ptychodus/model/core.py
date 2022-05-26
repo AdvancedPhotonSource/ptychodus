@@ -82,7 +82,7 @@ class ModelCore:
             self._object, self._fileObjectInitializer,
             self._pluginRegistry.buildObjectFileWriterChooser(), self.settingsRegistry)
 
-        self._activeDataFile = ActiveDataFile()
+        self._activeDataFile = ActiveDataFile(self._dataSettings)
         self._activeDiffractionDataset = ActiveDiffractionDataset.createInstance(
             self._activeDataFile, self._cropSizer)
 

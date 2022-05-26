@@ -11,10 +11,12 @@ from .image import ComplexToRealStrategy, ScalarTransformation
 from .object import ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .probe import ProbeFileReader, ProbeFileWriter
-from .scan import ScanFileReader, ScanFileWriter
+from .reconstructor import Reconstructor
+from .scan import ScanPointSequence, ScanPointTransform, ScanFileReader, ScanFileWriter
 
-T = TypeVar('T', DataFileReader, ComplexToRealStrategy, ScalarTransformation, ScanFileReader,
-            ScanFileWriter, ProbeFileReader, ProbeFileWriter, ObjectFileReader, ObjectFileWriter)
+T = TypeVar('T', ComplexToRealStrategy, DataFileReader, ObjectFileReader, ObjectFileWriter,
+            ProbeFileReader, ProbeFileWriter, Reconstructor, ScalarTransformation, ScanFileReader,
+            ScanFileWriter, ScanPointSequence, ScanPointTransform)
 
 logger = logging.getLogger(__name__)
 
