@@ -36,21 +36,11 @@ class VelociprobePresenter(Observable, Observer):
         presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings,
                         activeDataFile, scanInitializer)
         velociprobeReader.addObserver(presenter)
-        activeDataFile.addObserver(presenter)
         return presenter
-
-    def getDatasetName(self, index: int) -> str:
-        return self._activeDataFile[index].datasetName
-
-    def getDatasetState(self, index: int) -> DatasetState:
-        return self._activeDataFile[index].datasetState
-
-    def getNumberOfDatasets(self) -> int:
-        return len(self._activeDataFile)
 
     @property
     def _detectorGroup(self) -> DetectorGroup:
-        return self._velociprobeReader.entryGroup.instrument.detector
+        return self._velociprobeReader.entry.instrument.detector
 
     @property
     def _detectorSpecificGroup(self) -> DetectorSpecificGroup:
@@ -116,5 +106,3 @@ class VelociprobePresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:
             self.notifyObservers()
-        elif observable is self._activeDataFile:
-            pass # TODO self.notifyObservers()

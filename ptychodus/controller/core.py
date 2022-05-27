@@ -34,7 +34,7 @@ class ControllerCore:
         self._detectorController = DetectorController.createInstance(
             model.detectorPresenter, view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
-            model.velociprobePresenter, model.diffractionDatasetPresenter,
+            model.dataFilePresenter, model.diffractionDatasetPresenter,
             view.detectorParametersView.datasetView)
         self._cropController = CropController.createInstance(
             model.cropPresenter, view.detectorParametersView.imageCropView)

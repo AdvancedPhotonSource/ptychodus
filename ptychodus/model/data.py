@@ -28,7 +28,8 @@ class DataSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.fileType = settingsGroup.createStringEntry('FileType', 'HDF5')
         self.filePath = settingsGroup.createPathEntry('FilePath', Path('/path/to/data.h5'))
-        self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory', Path(tempfile.gettempdir()))
+        self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory',
+                                                              Path(tempfile.gettempdir()))
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DataSettings:
@@ -120,8 +121,9 @@ class NullDataFile(DataFile):
     def __init__(self) -> None:
         super().__init__()
 
-    def getFilePath(self) -> Path:
-        return Path('/dev/null')
+    @property
+    def metadata(self) -> DataFileMetadata:
+        return DataFileMetadata(Path('/dev/null'), 0, 0, 0)
 
     def getContentsTree(self) -> SimpleTreeNode:
         return SimpleTreeNode(None, list())
@@ -155,8 +157,9 @@ class ActiveDataFile(DataFile):
         self._datasetList: list[DiffractionDataset] = list()
         self._dataArray = numpy.empty((0, 0, 0), dtype=int)
 
-    def getFilePath(self) -> Path:
-        return self._dataFile.getFilePath()
+    @property
+    def metadata(self) -> DataFileMetadata:
+        return self._dataFile.metadata
 
     def getContentsTree(self) -> SimpleTreeNode:
         return self._dataFile.getContentsTree()
@@ -182,12 +185,13 @@ class ActiveDataFile(DataFile):
         self._datasetList.clear()
         self._dataArray = numpy.empty((0, 0, 0), dtype=int)
 
-        npyTempFile = tempfile.NamedTemporaryFile(dir=self._settings.scratchDirectory.value, suffix='.npy')
-        logger.debug(f'Scratch data file is {npyTempFile.name}')
-        datasetShape = (99, 99, 99) # FIXME
+        npyTempFile = tempfile.NamedTemporaryFile(dir=self._settings.scratchDirectory.value,
+                                                  suffix='.npy')
+        datasetShape = (self.totalNumberOfImages, self.imageHeight, self.imageWidth)
+        logger.debug(f'Scratch data file {npyTempFile.name} is {datasetShape}')
         self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=datasetShape)
 
-        # TODO dst[:] = src[:]
+        # FIXME dst[:] = src[:]
 
         self.notifyObservers()
 
@@ -220,6 +224,15 @@ class DataFilePresenter(Observable, Observer):
     def getContentsTree(self) -> SimpleTreeNode:
         contentsTree = self._activeDataFile.getContentsTree()
         return contentsTree
+
+    def getDatasetName(self, index: int) -> str:
+        return self._activeDataFile[index].datasetName
+
+    def getDatasetState(self, index: int) -> DatasetState:
+        return self._activeDataFile[index].datasetState
+
+    def getNumberOfDatasets(self) -> int:
+        return len(self._activeDataFile)
 
     def openDataset(self, dataPath: str) -> Any:  # TODO hdf5-only
         data = None

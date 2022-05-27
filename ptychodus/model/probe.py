@@ -26,7 +26,8 @@ class ProbeSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'GaussianBeam')
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
-        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', Path('/path/to/probe.npy'))
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
+                                                           Path('/path/to/probe.npy'))
         self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
             'AutomaticProbeSizeEnabled', True)
         self.probeSize = settingsGroup.createIntegerEntry('ProbeSize', 64)
