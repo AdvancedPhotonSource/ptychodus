@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import overload, Any, Optional, Union
+import concurrent.futures
 import logging
 import tempfile
 import threading
@@ -187,11 +188,24 @@ class ActiveDataFile(DataFile):
 
         npyTempFile = tempfile.NamedTemporaryFile(dir=self._settings.scratchDirectory.value,
                                                   suffix='.npy')
-        datasetShape = (self.totalNumberOfImages, self.imageHeight, self.imageWidth)
+        datasetShape = (dataFile.metadata.totalNumberOfImages, dataFile.metadata.imageHeight,
+                        dataFile.metadata.imageWidth)
         logger.debug(f'Scratch data file {npyTempFile.name} is {datasetShape}')
         self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=datasetShape)
 
-        # FIXME dst[:] = src[:]
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futureList = list()
+
+            for dataset in dataFile:
+                future = executor.submit(lambda: (dataset.datasetName, dataset.getArray()))
+                futureList.append(future)
+
+            for future in concurrent.futures.as_completed(futureList):
+                name, array = future.result()
+
+                if array.size > 0:
+                    logger.debug(f'Read {name}: {array.shape}')
+                    # FIXME self._dataArray[:] = dataset[:]
 
         self.notifyObservers()
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
-import concurrent.futures
 import logging
 
 import h5py
@@ -19,7 +18,7 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
     def __init__(self, name: str, filePath: Path, dataPath: str) -> None:
         super().__init__()
         self._name = name
-        self._state = DatasetState.EXISTS if filePath.is_file() else DatasetState.NOT_FOUND
+        self._state = DatasetState.NOT_FOUND
         self._filePath = filePath
         self._dataPath = dataPath
 
@@ -66,33 +65,16 @@ class DataGroup:
     @classmethod
     def read(cls, group: h5py.Group) -> DataGroup:
         datasetList = list()
+        masterFilePath = Path(group.file.filename)
 
-# FIXME BEGIN
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futureList = list()
+        for name, h5Item in group.items():
+            h5Item = group.get(name, getlink=True)
 
-            for name, h5Item in h5DataGroup.items():
-                h5Item = h5DataGroup.get(name, getlink=True)
-
-                if isinstance(h5Item, h5py.ExternalLink):
-                    dataset = VelociprobeDiffractionDataset(name=name,
-                                                            filePath=filePath.parent /
-                                                            h5Item.filename,
-                                                            dataPath=str(h5Item.path))
-                    future = executor.submit(dataset.reloadDataset)
-                    futureList.append(future)
-
-            for future in concurrent.futures.as_completed(futureList):
-                try:
-                    dataset = future.result()
-                except OSError as err:
-                    logger.error(err)
-                    continue
-
-                if dataset is not None:
-                    logger.debug(f'Read {dataset.datasetName}')
-                    datasetList.append(dataset)
-# FIXME END
+            if isinstance(h5Item, h5py.ExternalLink):
+                filePath = masterFilePath.parent / h5Item.filename
+                dataPath = str(h5Item.path)
+                dataset = VelociprobeDiffractionDataset(name, filePath, dataPath)
+                datasetList.append(dataset)
 
         datasetList.sort(key=lambda x: x.datasetName)
 
