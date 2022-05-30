@@ -7,8 +7,7 @@ import numpy
 from ..api.data import DatasetState
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup
-from .data import ActiveDataFile
-from .detector import CropSettings, DetectorSettings
+from .data import ActiveDataFile, CropSettings, DetectorSettings
 from .probe import ProbeSettings
 from .scan import ScanInitializer
 

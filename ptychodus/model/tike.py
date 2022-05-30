@@ -16,7 +16,7 @@ except ImportError:
 from ..api.data import DataArrayType, DataFile, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .detector import CropSizer
+from .data import CropSizer
 from .image import ImageExtent
 from .object import Object, ObjectSizer
 from .probe import Probe, ProbeSizer

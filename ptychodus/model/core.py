@@ -82,9 +82,7 @@ class ModelCore:
             self._object, self._fileObjectInitializer,
             self._pluginRegistry.buildObjectFileWriterChooser(), self.settingsRegistry)
 
-        self._activeDataFile = ActiveDataFile(self._dataSettings)
-        self._activeDiffractionDataset = ActiveDiffractionDataset.createInstance(
-            self._activeDataFile, self._cropSizer)
+        self._activeDataFile = ActiveDataFile(self._dataSettings, self._cropSizer)
 
         self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
@@ -108,7 +106,7 @@ class ModelCore:
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._activeDiffractionDataset)
+            self._activeDataFile)
         self._velociprobeReader = next(entry.strategy
                                        for entry in self._pluginRegistry.dataFileReaders
                                        if type(entry.strategy).__name__ ==

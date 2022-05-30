@@ -11,7 +11,7 @@ from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
 from ..api.probe import *
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .detector import CropSizer, Detector
+from .data import CropSizer, Detector
 from .fzp import single_probe
 from .geometry import Interval
 from .image import ImageExtent
@@ -71,8 +71,8 @@ class ProbeSizer(Observable, Observer):
 
     @property
     def _probeSizeMax(self) -> int:
-        cropX = self._cropSizer.getExtentX()
-        cropY = self._cropSizer.getExtentY()
+        cropX = self._cropSizer.getExtentXInPixels()
+        cropY = self._cropSizer.getExtentYInPixels()
         return min(cropX, cropY)
 
     def getProbeSizeLimits(self) -> Interval[int]:
@@ -146,7 +146,7 @@ class FresnelZonePlateProbeInitializer:
         lambda0 = self._sizer.getWavelengthInMeters()
         dx_dec = self._detector.pixelSizeXInMeters  # TODO non-square pixels are unsupported
         dis_defocus = self._probeSettings.defocusDistanceInMeters.value
-        dis_StoD = self._detector.distanceToObjectInMeters
+        dis_StoD = self._detector.detectorDistanceInMeters
         radius = self._probeSettings.zonePlateRadiusInMeters.value
         outmost = self._probeSettings.outermostZoneWidthInMeters.value
         beamstop = self._probeSettings.beamstopDiameterInMeters.value

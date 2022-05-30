@@ -76,8 +76,6 @@ class DataGroup:
                 dataset = VelociprobeDiffractionDataset(name, filePath, dataPath)
                 datasetList.append(dataset)
 
-        datasetList.sort(key=lambda x: x.datasetName)
-
         return cls(datasetList)
 
     def __iter__(self):
