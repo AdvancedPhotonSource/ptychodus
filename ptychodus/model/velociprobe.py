@@ -95,7 +95,7 @@ class VelociprobePresenter(Observable, Observer):
                 SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
 
     def loadScanFile(self) -> None:
-        filePathMaster = self._activeDataFile.getFilePath()
+        filePathMaster = self._activeDataFile.metadata.filePath
         fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
         filePath = filePathMaster.parents[2] / 'positions' / fileName
         print(filePath.resolve())

@@ -161,6 +161,13 @@ class DataFileController(Observer):
         if filePath:
             self._presenter.openDataFile(filePath, nameFilter)
 
+    def chooseScratchDirectory(self) -> None:
+        scratchDir = QFileDialog.getExistingDirectory(self._treeView, 'Choose Scratch Directory',
+                                                      str(self._presenter.getScratchDirectory()))
+
+        if scratchDir:
+            self._presenter.setScratchDirectory(Path(scratchDir))
+
     def updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
         names = list()
         nodeItem = current.internalPointer()

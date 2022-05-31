@@ -88,9 +88,8 @@ class ModelCore:
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
-        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSizer,
-                                                      self._activeDataFile, self._scan,
-                                                      self._probeSizer, self._probe,
+        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._activeDataFile,
+                                                      self._scan, self._probeSizer, self._probe,
                                                       self._objectSizer, self._object,
                                                       self.reconstructorPlotPresenter,
                                                       isDeveloperModeEnabled)

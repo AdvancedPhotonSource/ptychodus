@@ -118,8 +118,8 @@ class GaussianBeamProbeInitializer:
         height_px = width_px
 
         Y_px, X_px = numpy.ogrid[:height_px, :width_px]
-        X_m = (X_px - width_px / 2) * float(self._detector.pixelSizeXInMeters)
-        Y_m = (Y_px - height_px / 2) * float(self._detector.pixelSizeYInMeters)
+        X_m = (X_px - width_px / 2) * float(self._detector.getPixelSizeXInMeters())
+        Y_m = (Y_px - height_px / 2) * float(self._detector.getPixelSizeYInMeters())
 
         probeRadius_m = self._probeSettings.probeDiameterInMeters.value / 2
         R_m = numpy.hypot(X_m, Y_m)
@@ -144,9 +144,9 @@ class FresnelZonePlateProbeInitializer:
     def __call__(self) -> ProbeArrayType:
         shape = self._sizer.getProbeSize()
         lambda0 = self._sizer.getWavelengthInMeters()
-        dx_dec = self._detector.pixelSizeXInMeters  # TODO non-square pixels are unsupported
+        dx_dec = self._detector.getPixelSizeXInMeters()  # TODO non-square pixels are unsupported
         dis_defocus = self._probeSettings.defocusDistanceInMeters.value
-        dis_StoD = self._detector.detectorDistanceInMeters
+        dis_StoD = self._detector.getDetectorDistanceInMeters()
         radius = self._probeSettings.zonePlateRadiusInMeters.value
         outmost = self._probeSettings.outermostZoneWidthInMeters.value
         beamstop = self._probeSettings.beamstopDiameterInMeters.value

@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Iterable
 import csv
 
+import numpy
+
 from .velociprobeDataFile import VelociprobeDataFileReader
 from ptychodus.api.scan import ScanFileReader, ScanPoint, ScanPointParseError
 
@@ -89,8 +91,8 @@ class VelociprobeScanFileReader(ScanFileReader):
         for idx, scanPoint in enumerate(scanPointList):
             chi_rad = 0.
 
-            if self._dataFileReader.entryGroup:
-                chi_rad = self._dataFileReader.entryGroup.sample.goniometer.chi_rad
+            if self._dataFileReader.entry:
+                chi_rad = self._dataFileReader.entry.sample.goniometer.chi_rad
 
             x_m = (scanPoint.x - xMeanInMeters) * Decimal(numpy.cos(chi_rad))
             y_m = (scanPoint.y - yMeanInMeters)

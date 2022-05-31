@@ -16,7 +16,6 @@ except ImportError:
 from ..api.data import DataArrayType, DataFile, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .data import CropSizer
 from .image import ImageExtent
 from .object import Object, ObjectSizer
 from .probe import Probe, ProbeSizer
@@ -399,15 +398,13 @@ class TikeReconstructor:
     def __init__(self, settings: TikeSettings,
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
-                 probeCorrectionSettings: TikeProbeCorrectionSettings, cropSizer: CropSizer,
-                 dataFile: DataFile, scan: Scan, probeSizer: ProbeSizer, probe: Probe,
-                 objectSizer: ObjectSizer, object_: Object,
-                 reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
+                 probeCorrectionSettings: TikeProbeCorrectionSettings, dataFile: DataFile,
+                 scan: Scan, probeSizer: ProbeSizer, probe: Probe, objectSizer: ObjectSizer,
+                 object_: Object, reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
-        self._cropSizer = cropSizer
         self._dataFile = dataFile
         self._scan = scan
         self._probeSizer = probeSizer
@@ -420,24 +417,9 @@ class TikeReconstructor:
     def backendName(self) -> str:
         return 'Tike'
 
-    def getData(self) -> DataArrayType:  # TODO extract and share with other backends
-        dataList: list[DataArrayType] = list()
-
-        for dataset in self._dataFile:
-            data = dataset.getArray()
-
-            if data is None:
-                continue
-
-            if self._cropSizer.isCropEnabled():
-                sliceX = self._cropSizer.getSliceX()
-                sliceY = self._cropSizer.getSliceY()
-                data = data[..., sliceY, sliceX].copy()
-
-            dataShifted = numpy.fft.ifftshift(data, axes=(-2, -1))
-            dataList.append(dataShifted)
-
-        return numpy.concatenate(dataList).astype('float32')
+    def getDiffractionData(self) -> DataArrayType:
+        data = self._dataFile.getDiffractionData()
+        return numpy.fft.ifftshift(data, axes=(-2, -1)).astype('float32')
 
     def getProbe(self) -> numpy.ndarray:
         probe = self._probe.getArray()
@@ -530,7 +512,7 @@ class TikeReconstructor:
         return options
 
     def __call__(self, algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> int:
-        data = self.getData()
+        data = self.getDiffractionData()
         scan = self.getScan()
         probe = self.getProbe()
         psi = self.getInitialObject()
@@ -704,7 +686,6 @@ class TikeBackend:
     @classmethod
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
-                       cropSizer: CropSizer,
                        dataFile: DataFile,
                        scan: Scan,
                        probeSizer: ProbeSizer,
@@ -720,9 +701,9 @@ class TikeBackend:
 
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
-                                                  core._probeCorrectionSettings, cropSizer,
-                                                  dataFile, scan, probeSizer, probe, objectSizer,
-                                                  object_, reconstructorPlotPresenter)
+                                                  core._probeCorrectionSettings, dataFile, scan,
+                                                  probeSizer, probe, objectSizer, object_,
+                                                  reconstructorPlotPresenter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

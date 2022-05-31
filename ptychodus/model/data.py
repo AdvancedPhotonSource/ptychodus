@@ -55,7 +55,9 @@ class DataSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.fileType = settingsGroup.createStringEntry('FileType', 'HDF5')
         self.filePath = settingsGroup.createPathEntry('FilePath', Path('/path/to/data.h5'))
-        self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory', Path.home())  # FIXME Path(tempfile.gettempdir()))
+        self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory',
+                                                              Path(tempfile.gettempdir()))
+        self.numberOfDataThreads = settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DataSettings:
@@ -365,6 +367,16 @@ class ActiveDataFile(DataFile):
     def getContentsTree(self) -> SimpleTreeNode:
         return self._dataFile.getContentsTree()
 
+    def getDiffractionData(self) -> DataArrayType:
+        data = self._dataArray
+
+        if self._cropSizer.isCropEnabled():
+            sliceX = self._cropSizer.getSliceX()
+            sliceY = self._cropSizer.getSliceY()
+            data = self._dataArray[:, sliceY, sliceX]
+
+        return data
+
     @overload
     def __getitem__(self, index: int) -> DiffractionDataset:
         ...
@@ -390,7 +402,7 @@ class ActiveDataFile(DataFile):
         if array.size <= 0:
             return None
 
-        numberOfDiffractionPatterns = array.shape[0]
+        numberOfDiffractionPatterns = array.shape[0]  # FIXME handle inconsistent shapes
         offset = index * numberOfDiffractionPatterns
         sliceZ = slice(offset, offset + numberOfDiffractionPatterns)
         self._dataArray[sliceZ, ...] = array[...]
@@ -414,8 +426,9 @@ class ActiveDataFile(DataFile):
                         dataFile.metadata.imageWidth)
         logger.debug(f'Scratch data file {npyTempFile.name} is {datasetShape}')
         self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=datasetShape)
+        maxWorkers = self._settings.numberOfDataThreads.value
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor(maxWorkers) as executor:
             futureList = list()
 
             for index, dataset in enumerate(dataFile):
@@ -425,7 +438,7 @@ class ActiveDataFile(DataFile):
             for future in concurrent.futures.as_completed(futureList):
                 dataset = future.result()
 
-                if dataset is not None: # FIXME handle dataset that is not yet written
+                if dataset is not None:  # FIXME handle dataset that is not yet written
                     self._datasetList.append(dataset)
 
         self._datasetList.sort(key=lambda x: x.datasetName)
@@ -452,6 +465,12 @@ class DataFilePresenter(Observable, Observer):
         presenter._openDataFileFromSettings()
         activeDataFile.addObserver(presenter)
         return presenter
+
+    def getScratchDirectory(self) -> Path:
+        return self._settings.scratchDirectory.value
+
+    def setScratchDirectory(self, directory: Path) -> None:
+        self._settings.scratchDirectory.value = directory
 
     def getContentsTree(self) -> SimpleTreeNode:
         return self._activeDataFile.getContentsTree()
