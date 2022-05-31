@@ -44,14 +44,17 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
         if self._filePath.is_file():
             self._state = DatasetState.EXISTS
 
-            with h5py.File(self._filePath, 'r') as h5File:
-                item = h5File.get(self._dataPath)
+            try:
+                with h5py.File(self._filePath, 'r') as h5File:
+                    item = h5File.get(self._dataPath)
 
-                if isinstance(item, h5py.Dataset):
-                    array = item[()]
-                    self._state = DatasetState.VALID
-                else:
-                    logger.error(f'Symlink {self.filePath}:{self.dataPath} is not a dataset!')
+                    if isinstance(item, h5py.Dataset):
+                        array = item[()]
+                        self._state = DatasetState.VALID
+                    else:
+                        logger.error(f'Symlink {self.filePath}:{self.dataPath} is not a dataset!')
+            except OSError as err:
+                logger.exception(err)
         else:
             self._state = DatasetState.NOT_FOUND
 

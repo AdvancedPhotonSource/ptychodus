@@ -1,10 +1,11 @@
 from __future__ import annotations
-from decimal import Decimal
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import overload, Any, Optional, Union
 import concurrent.futures
+import functools
 import logging
 import tempfile
 import threading
@@ -54,7 +55,7 @@ class DataSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.fileType = settingsGroup.createStringEntry('FileType', 'HDF5')
         self.filePath = settingsGroup.createPathEntry('FilePath', Path('/path/to/data.h5'))
-        self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory', Path.home()) # FIXME Path(tempfile.gettempdir()))
+        self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory', Path.home())  # FIXME Path(tempfile.gettempdir()))
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DataSettings:
@@ -287,14 +288,12 @@ class CachedDiffractionDataset(DiffractionDataset):
         return self._datasetState
 
     def getArray(self) -> DataArrayType:
-        array = self._array
-
         if self._cropSizer.isCropEnabled():
             sliceX = self._cropSizer.getSliceX()
             sliceY = self._cropSizer.getSliceY()
-            array = array[:, sliceY, sliceX]
+            return self._array[:, sliceY, sliceX]
 
-        return array
+        return self._array
 
     def __getitem__(self, index: int) -> DataArrayType:
         array = numpy.empty((0, 0), dtype=int)
@@ -303,15 +302,9 @@ class CachedDiffractionDataset(DiffractionDataset):
             sliceX = self._cropSizer.getSliceX()
             sliceY = self._cropSizer.getSliceY()
 
-            try:
-                array = array[index, sliceY, sliceX]
-            except IndexError:
-                pass
+            array = self._array[index, sliceY, sliceX]
         else:
-            try:
-                array = array[index, :, :]
-            except IndexError:
-                pass
+            array = self._array[index, :, :]
 
         return array
 
@@ -388,6 +381,28 @@ class ActiveDataFile(DataFile):
     def __len__(self) -> int:
         return len(self._datasetList)
 
+    def _loadDataset(self, index: int,
+                     dataset: DiffractionDataset) -> Optional[DiffractionDataset]:
+        logger.debug(f'Reading {dataset.datasetName}...')
+        array = dataset.getArray()
+        logger.debug(f'Read {dataset.datasetName}: {array.shape}')
+
+        if array.size <= 0:
+            return None
+
+        numberOfDiffractionPatterns = array.shape[0]
+        offset = index * numberOfDiffractionPatterns
+        sliceZ = slice(offset, offset + numberOfDiffractionPatterns)
+        self._dataArray[sliceZ, ...] = array[...]
+
+        array_slice = self._dataArray[sliceZ, ...].view()
+        array_slice.flags.writeable = False
+
+        cachedDataset = CachedDiffractionDataset.createInstance(dataset.datasetName,
+                                                                DatasetState.VALID, array_slice,
+                                                                self._cropSizer)
+        return cachedDataset
+
     def setActive(self, dataFile: DataFile) -> None:
         self._dataFile = dataFile
         self._datasetList.clear()
@@ -404,25 +419,14 @@ class ActiveDataFile(DataFile):
             futureList = list()
 
             for index, dataset in enumerate(dataFile):
-                future = executor.submit(lambda: (index, dataset.datasetName, dataset.getArray()))
+                future = executor.submit(functools.partial(self._loadDataset, index, dataset))
                 futureList.append(future)
 
             for future in concurrent.futures.as_completed(futureList):
-                index, name, array = future.result()
+                dataset = future.result()
 
-                if array.size > 0:
-                    logger.debug(f'Read {dataset.datasetName}: {array.shape}')
-                    numberOfDiffractionPatterns = array.shape[0]
-                    offset = index * numberOfDiffractionPatterns
-                    sliceZ = slice(offset, offset + numberOfDiffractionPatterns)
-                    self._dataArray[sliceZ, ...] = array[...]
-
-                    array_slice = self._dataArray[sliceZ, ...].view()
-                    array_slice.flags.writeable = False
-
-                    cachedDataset = CachedDiffractionDataset.createInstance(
-                        name, DatasetState.VALID, array_slice, self._cropSizer)
-                    self._datasetList.append(cachedDataset)
+                if dataset is not None: # FIXME handle dataset that is not yet written
+                    self._datasetList.append(dataset)
 
         self._datasetList.sort(key=lambda x: x.datasetName)
         self.notifyObservers()
