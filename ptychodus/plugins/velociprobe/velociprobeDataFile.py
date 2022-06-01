@@ -1,7 +1,8 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import overload, Optional, Union
 import logging
 
 import h5py
@@ -30,7 +31,16 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
     def datasetState(self) -> DatasetState:
         return self._state
 
+    @overload
     def __getitem__(self, index: int) -> DataArrayType:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[DataArrayType]:
+        ...
+
+    def __getitem__(self, index: Union[int,
+                                       slice]) -> Union[DataArrayType, Sequence[DataArrayType]]:
         array = self.getArray()
         return array[index, ...]
 
@@ -52,7 +62,8 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
                         array = item[()]
                         self._state = DatasetState.VALID
                     else:
-                        logger.error(f'Symlink {self.filePath}:{self.dataPath} is not a dataset!')
+                        logger.error(
+                            f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
             except OSError as err:
                 logger.exception(err)
         else:
@@ -67,7 +78,7 @@ class DataGroup:
 
     @classmethod
     def read(cls, group: h5py.Group) -> DataGroup:
-        datasetList = list()
+        datasetList: list[DiffractionDataset] = list()
         masterFilePath = Path(group.file.filename)
 
         for name, h5Item in group.items():
@@ -84,7 +95,7 @@ class DataGroup:
     def __iter__(self):
         return iter(self.datasetList)
 
-    def __getitem__(self, index: int) -> DataFile:
+    def __getitem__(self, index: int) -> DiffractionDataset:
         return self.datasetList[index]
 
     def __len__(self) -> int:

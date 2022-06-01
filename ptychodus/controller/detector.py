@@ -6,8 +6,9 @@ from PyQt5.QtGui import QFont
 
 from ..api.data import DatasetState
 from ..api.observer import Observable, Observer
-from ..model import DetectorPresenter
-from ..view import DetectorView
+from ..model import CropPresenter, DataFilePresenter, DetectorPresenter, \
+        DiffractionDatasetPresenter, ImagePresenter
+from ..view import CropView, DatasetView, DetectorView, ImageView
 from .data import FileDialogFactory
 from .image import ImageController
 

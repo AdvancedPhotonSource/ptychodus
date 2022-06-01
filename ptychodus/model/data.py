@@ -15,7 +15,7 @@ import numpy
 import watchdog.events
 import watchdog.observers
 
-from ..api.data import DatasetState, DataArrayType, DataFile, DataFileReader, DiffractionDataset
+from ..api.data import DatasetState, DataArrayType, DataFile, DataFileReader, DataFileMetadata, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser
 from ..api.settings import SettingsRegistry, SettingsGroup
@@ -264,7 +264,7 @@ class NullDiffractionDataset(DiffractionDataset):
         return 0
 
 
-class CachedDiffractionDataset(DiffractionDataset):
+class CachedDiffractionDataset(DiffractionDataset, Observer):
 
     def __init__(self, name: str, state: DatasetState, array: DataArrayType,
                  cropSizer: CropSizer) -> None:
@@ -436,10 +436,10 @@ class ActiveDataFile(DataFile):
                 futureList.append(future)
 
             for future in concurrent.futures.as_completed(futureList):
-                dataset = future.result()
+                optionalDataset = future.result()
 
-                if dataset is not None:  # FIXME handle dataset that is not yet written
-                    self._datasetList.append(dataset)
+                if optionalDataset is not None:  # FIXME handle dataset that is not yet written
+                    self._datasetList.append(optionalDataset)
 
         self._datasetList.sort(key=lambda x: x.datasetName)
         self.notifyObservers()

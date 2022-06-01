@@ -1,4 +1,6 @@
+from collections.abc import Sequence
 from pathlib import Path
+from typing import overload, Union
 import logging
 
 import h5py
@@ -47,7 +49,7 @@ class H5DataFileTreeBuilder:
                 itemDetails = ''
                 h5Item = h5Group.get(itemName, getlink=True)
 
-                treeNode = parentItem.createChild(None)
+                treeNode = parentItem.createChild(list())
 
                 if isinstance(h5Item, h5py.HardLink):
                     itemType = 'Hard Link'
@@ -104,7 +106,17 @@ class H5DataFile(DataFile):
     def getContentsTree(self) -> SimpleTreeNode:
         return self._contentsTree
 
+    @overload
     def __getitem__(self, index: int) -> DiffractionDataset:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[DiffractionDataset]:
+        ...
+
+    def __getitem__(
+            self, index: Union[int,
+                               slice]) -> Union[DiffractionDataset, Sequence[DiffractionDataset]]:
         return self._datasetList[index]
 
     def __len__(self) -> int:

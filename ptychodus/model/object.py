@@ -63,13 +63,17 @@ class ObjectSizer(Observable, Observer):
     @property
     def _lambdaZ_m2(self) -> Decimal:
         return self._probeSizer.getWavelengthInMeters() \
-                * self._detector.detectorDistanceInMeters
+                * self._detector.getDetectorDistanceInMeters()
 
     def getPixelSizeXInMeters(self) -> Decimal:
-        return self._lambdaZ_m2 / self._cropSizer.getExtentXInMeters()
+        extentXInMeters = self._cropSizer.getExtentXInPixels() \
+                * self._detector.getPixelSizeXInMeters()
+        return self._lambdaZ_m2 / extentXInMeters
 
     def getPixelSizeYInMeters(self) -> Decimal:
-        return self._lambdaZ_m2 / self._cropSizer.getExtentYInMeters()
+        extentYInMeters = self._cropSizer.getExtentYInPixels() \
+                * self._detector.getPixelSizeYInMeters()
+        return self._lambdaZ_m2 / extentYInMeters
 
     def getScanExtent(self) -> ImageExtent:
         scanBox_m = self._scan.getBoundingBoxInMeters()

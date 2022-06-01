@@ -9,7 +9,7 @@ import numpy
 from ..api.data import DataArrayType, DatasetState, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .data import ActiveDataFile, NullDiffractionDataset
+from .data import ActiveDataFile, DetectorSettings, NullDiffractionDataset
 from .geometry import Interval
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def __init__(self, dataFile: ActiveDataFile) -> None:
         super().__init__()
         self._dataFile = dataFile
-        self._dataset = NullDiffractionDataset()
+        self._dataset: DiffractionDataset = NullDiffractionDataset()
         self._datasetIndex = 0
 
     @classmethod
