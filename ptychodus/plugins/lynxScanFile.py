@@ -81,5 +81,6 @@ class LynxScanFileReader(ScanFileReader):
 
         return scanPointList
 
+
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.registerPlugin(LynxScanFileReader())

@@ -393,27 +393,27 @@ class ActiveDataFile(DataFile):
     def __len__(self) -> int:
         return len(self._datasetList)
 
-    def _loadDataset(self, index: int,
-                     dataset: DiffractionDataset) -> Optional[DiffractionDataset]:
+    def _loadDataset(self, index: int, stride: int,
+                     dataset: DiffractionDataset) -> DiffractionDataset:
         logger.debug(f'Reading {dataset.datasetName}...')
         array = dataset.getArray()
         logger.debug(f'Read {dataset.datasetName}: {array.shape}')
 
-        if array.size <= 0:
-            return None
+        if array.size > 0:
+            offset = index * stride
+            sliceZ = slice(offset, offset + array.shape[0])
+            print(sliceZ)
+            self._dataArray[sliceZ, ...] = array[...]
 
-        numberOfDiffractionPatterns = array.shape[0]  # FIXME handle inconsistent shapes
-        offset = index * numberOfDiffractionPatterns
-        sliceZ = slice(offset, offset + numberOfDiffractionPatterns)
-        self._dataArray[sliceZ, ...] = array[...]
+            array_slice = self._dataArray[sliceZ, ...].view()
+            array_slice.flags.writeable = False
 
-        array_slice = self._dataArray[sliceZ, ...].view()
-        array_slice.flags.writeable = False
+            cachedDataset = CachedDiffractionDataset.createInstance(dataset.datasetName,
+                                                                    DatasetState.VALID,
+                                                                    array_slice, self._cropSizer)
+            return cachedDataset
 
-        cachedDataset = CachedDiffractionDataset.createInstance(dataset.datasetName,
-                                                                DatasetState.VALID, array_slice,
-                                                                self._cropSizer)
-        return cachedDataset
+        return dataset
 
     def setActive(self, dataFile: DataFile) -> None:
         self._dataFile = dataFile
@@ -427,19 +427,19 @@ class ActiveDataFile(DataFile):
         logger.debug(f'Scratch data file {npyTempFile.name} is {datasetShape}')
         self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=datasetShape)
         maxWorkers = self._settings.numberOfDataThreads.value
+        stride = int(dataFile.metadata.totalNumberOfImages) // len(dataFile)
 
         with concurrent.futures.ThreadPoolExecutor(maxWorkers) as executor:
             futureList = list()
 
             for index, dataset in enumerate(dataFile):
-                future = executor.submit(functools.partial(self._loadDataset, index, dataset))
+                datasetLoader = functools.partial(self._loadDataset, index, stride, dataset)
+                future = executor.submit(datasetLoader)
                 futureList.append(future)
 
             for future in concurrent.futures.as_completed(futureList):
-                optionalDataset = future.result()
-
-                if optionalDataset is not None:  # FIXME handle dataset that is not yet written
-                    self._datasetList.append(optionalDataset)
+                dataset = future.result()
+                self._datasetList.append(dataset)
 
         self._datasetList.sort(key=lambda x: x.datasetName)
         self.notifyObservers()
