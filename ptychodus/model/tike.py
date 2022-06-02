@@ -530,27 +530,24 @@ class TikeReconstructor:
         logger.debug(f'probe shape={probe.shape}')
         logger.debug(f'object shape={psi.shape}')
 
-        objectOptions = self.getObjectOptions()
-        positionOptions = self.getPositionOptions()
-        probeOptions = self.getProbeOptions()
-
-        result = tike.ptycho.reconstruct(
-            data=data,
+        parameters = tike.ptycho.solvers.PtychoParameters(
             probe=probe,
+            psi=psi,
             scan=scan,
             algorithm_options=algorithmOptions,
-            model=self._settings.noiseModel.value,
-            num_gpu=self._settings.numGpus.value,
-            object_options=objectOptions,
-            position_options=positionOptions,
-            probe_options=probeOptions,
-            psi=psi,
-            use_mpi=self._settings.useMpi.value,
-        )
+            probe_options=self.getProbeOptions(),
+            object_options=self.getObjectOptions(),
+            position_options=self.getPositionOptions())
 
-        self._probe.setArray(result['probe'][0, 0])
-        self._object.setArray(result['psi'])
-        self._reconstructorPlotPresenter.setEnumeratedYValues(result['algorithm_options'].costs)
+        result = tike.ptycho.reconstruct(data=data,
+                                         parameters=parameters,
+                                         model=self._settings.noiseModel.value,
+                                         num_gpu=self._settings.numGpus.value,
+                                         use_mpi=self._settings.useMpi.value)
+
+        self._probe.setArray(result.probe[0, 0])
+        self._object.setArray(result.psi)
+        self._reconstructorPlotPresenter.setEnumeratedYValues(result.algorithm_options.costs)
 
         logger.debug(result)
 

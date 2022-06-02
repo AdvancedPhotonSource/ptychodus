@@ -368,14 +368,12 @@ class ActiveDataFile(DataFile):
         return self._dataFile.getContentsTree()
 
     def getDiffractionData(self) -> DataArrayType:
-        data = self._dataArray
-
         if self._cropSizer.isCropEnabled():
             sliceX = self._cropSizer.getSliceX()
             sliceY = self._cropSizer.getSliceY()
-            data = self._dataArray[:, sliceY, sliceX]
+            return self._dataArray[:, sliceY, sliceX]
 
-        return data
+        return self._dataArray
 
     @overload
     def __getitem__(self, index: int) -> DiffractionDataset:
@@ -397,12 +395,10 @@ class ActiveDataFile(DataFile):
                      dataset: DiffractionDataset) -> DiffractionDataset:
         logger.debug(f'Reading {dataset.datasetName}...')
         array = dataset.getArray()
-        logger.debug(f'Read {dataset.datasetName}: {array.shape}')
 
         if array.size > 0:
             offset = index * stride
             sliceZ = slice(offset, offset + array.shape[0])
-            print(sliceZ)
             self._dataArray[sliceZ, ...] = array[...]
 
             array_slice = self._dataArray[sliceZ, ...].view()
