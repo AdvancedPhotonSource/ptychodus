@@ -7,7 +7,7 @@ import numpy
 from ..api.data import DatasetState
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup
-from .detector import CropSettings, DetectorSettings
+from .data import ActiveDataFile, CropSettings, DetectorSettings
 from .probe import ProbeSettings
 from .scan import ScanInitializer
 
@@ -17,48 +17,29 @@ logger = logging.getLogger(__name__)
 class VelociprobePresenter(Observable, Observer):
 
     def __init__(self, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
-            cropSettings: CropSettings, probeSettings: ProbeSettings, dataFile: DataFile, scanInitializer: ScanInitializer) -> None:
+                 cropSettings: CropSettings, probeSettings: ProbeSettings,
+                 activeDataFile: ActiveDataFile, scanInitializer: ScanInitializer) -> None:
         super().__init__()
         self._velociprobeReader = velociprobeReader
         self._detectorSettings = detectorSettings
         self._cropSettings = cropSettings
         self._probeSettings = probeSettings
-        self._dataFile = dataFile
+        self._activeDataFile = activeDataFile
         self._scanInitializer = scanInitializer
 
     @classmethod
     def createInstance(cls, velociprobeReader: VelociprobeReader,
                        detectorSettings: DetectorSettings, cropSettings: CropSettings,
-                       probeSettings: ProbeSettings, dataFile: DataFile, scanInitializer: ScanInitializer):
-        presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings, dataFile, scanInitializer)
+                       probeSettings: ProbeSettings, activeDataFile: ActiveDataFile,
+                       scanInitializer: ScanInitializer):
+        presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings,
+                        activeDataFile, scanInitializer)
         velociprobeReader.addObserver(presenter)
         return presenter
 
-    def getDatasetName(self, index: int) -> str:
-        datasetName = ''
-
-        if self._velociprobeReader.entryGroup:
-            datafile = self._velociprobeReader.entryGroup.data[index]
-            datasetName = datafile.datasetName
-
-        return datasetName
-
-    def getDatasetState(self, index: int) -> DatasetState:
-        state = DatasetState.NOT_FOUND
-
-        if self._velociprobeReader.entryGroup:
-            datafile = self._velociprobeReader.entryGroup.data[index]
-            state = datafile.datasetState
-
-        return state
-
-    def getNumberOfDatasets(self) -> int:
-        return 0 if self._velociprobeReader.entryGroup is None \
-                else len(self._velociprobeReader.entryGroup.data)
-
     @property
     def _detectorGroup(self) -> DetectorGroup:
-        return self._velociprobeReader.entryGroup.instrument.detector
+        return self._velociprobeReader.entry.instrument.detector
 
     @property
     def _detectorSpecificGroup(self) -> DetectorSpecificGroup:
@@ -76,13 +57,9 @@ class VelociprobePresenter(Observable, Observer):
         self._detectorSettings.pixelSizeYInMeters.value = \
                 SettingsGroup.convertFloatToDecimal(self._detectorGroup.y_pixel_size_m)
 
-    def syncDetectorDistance(self, overrideDistanceUnits: bool = False) -> None:
-        value = SettingsGroup.convertFloatToDecimal(self._detectorGroup.detector_distance_m)
-
-        if overrideDistanceUnits:
-            value /= 1000
-
-        self._detectorSettings.detectorDistanceInMeters.value = value
+    def syncDetectorDistance(self) -> None:
+        self._detectorSettings.detectorDistanceInMeters.value = \
+                SettingsGroup.convertFloatToDecimal(self._detectorGroup.detector_distance_m)
 
     def syncImageCrop(self, syncCenter: bool, syncExtent: bool) -> None:
         if syncCenter:
@@ -114,11 +91,11 @@ class VelociprobePresenter(Observable, Observer):
                 SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
 
     def loadScanFile(self) -> None:
-        filePathMaster = self._dataFile.getFilePath()
+        filePathMaster = self._activeDataFile.metadata.filePath
         fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
         filePath = filePathMaster.parents[2] / 'positions' / fileName
         print(filePath.resolve())
-        fileFilter = 'Comma-Separated Values Files (*.csv)' # TODO refactor; get from somewhere
+        fileFilter = 'Comma-Separated Values Files (*.csv)'  # TODO refactor; get from somewhere
         self._scanInitializer.openScan(filePath, fileFilter)
 
     def update(self, observable: Observable) -> None:

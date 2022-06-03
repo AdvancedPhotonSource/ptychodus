@@ -82,17 +82,14 @@ class ModelCore:
             self._object, self._fileObjectInitializer,
             self._pluginRegistry.buildObjectFileWriterChooser(), self.settingsRegistry)
 
-        self._activeDataFile = ActiveDataFile()
-        self._activeDiffractionDataset = ActiveDiffractionDataset.createInstance(
-            self._activeDataFile, self._cropSizer)
+        self._activeDataFile = ActiveDataFile(self._dataSettings, self._cropSizer)
 
         self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               isDeveloperModeEnabled)
-        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._cropSizer,
-                                                      self._activeDataFile, self._scan,
-                                                      self._probeSizer, self._probe,
+        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._activeDataFile,
+                                                      self._scan, self._probeSizer, self._probe,
                                                       self._objectSizer, self._object,
                                                       self.reconstructorPlotPresenter,
                                                       isDeveloperModeEnabled)
@@ -108,7 +105,7 @@ class ModelCore:
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._activeDiffractionDataset)
+            self._activeDataFile)
         self._velociprobeReader = next(entry.strategy
                                        for entry in self._pluginRegistry.dataFileReaders
                                        if type(entry.strategy).__name__ ==
@@ -143,3 +140,27 @@ class ModelCore:
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataDirectoryWatcher.stop()
         self._dataDirectoryWatcher.join()
+
+    def batchModeReconstruct(self) -> int:
+        outputFilePath = self._reconstructorSettings.outputFilePath.value
+
+        if outputFilePath.exists():
+            logger.error('Output file path already exists!')
+            return -1
+
+        result = self.reconstructorPresenter.reconstruct()
+
+        pixelSizeXInMeters = float(self._objectSizer.getPixelSizeXInMeters())
+        pixelSizeYInMeters = float(self._objectSizer.getPixelSizeYInMeters())
+
+        scanXInMeters = [float(point.x) for point in self._scan]
+        scanYInMeters = [float(point.y) for point in self._scan]
+
+        dataDump = dict()
+        dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
+        dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
+        dataDump['probe'] = self._probe.getArray()
+        dataDump['object'] = self._object.getArray()
+        numpy.savez(outputFilePath, **dataDump)
+
+        return result

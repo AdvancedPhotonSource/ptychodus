@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy
 from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QVariant
@@ -160,6 +160,13 @@ class DataFileController(Observer):
 
         if filePath:
             self._presenter.openDataFile(filePath, nameFilter)
+
+    def chooseScratchDirectory(self) -> None:
+        scratchDir = QFileDialog.getExistingDirectory(self._treeView, 'Choose Scratch Directory',
+                                                      str(self._presenter.getScratchDirectory()))
+
+        if scratchDir:
+            self._presenter.setScratchDirectory(Path(scratchDir))
 
     def updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
         names = list()

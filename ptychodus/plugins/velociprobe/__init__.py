@@ -1,7 +1,7 @@
 from ptychodus.api.plugins import PluginRegistry
 
-from .velociprobeReaders import VelociprobeDataFileReader, VelociprobeScanFileReader, \
-        VelociprobeScanYPositionSource
+from .velociprobeDataFile import VelociprobeDataFileReader
+from .velociprobeScanFile import VelociprobeScanFileReader, VelociprobeScanYPositionSource
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

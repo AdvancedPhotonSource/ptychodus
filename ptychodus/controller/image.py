@@ -38,9 +38,10 @@ class ImageFileController:
             pixmap.save(str(filePath))
 
 
-class ImageColormapController:
+class ImageColormapController(Observer):
 
     def __init__(self, presenter: ImagePresenter, view: ImageColormapGroupBox) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
         self._complexToRealStrategyModel = QStringListModel()
@@ -64,6 +65,8 @@ class ImageColormapController:
         view.scalarTransformationComboBox.currentTextChanged.connect(
             presenter.setScalarTransformation)
         view.colormapComboBox.currentTextChanged.connect(presenter.setColormap)
+
+        return controller
 
     def _syncModelToView(self) -> None:
         self._view.complexToRealStrategyComboBox.blockSignals(True)

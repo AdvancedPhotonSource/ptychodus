@@ -8,9 +8,9 @@ import numpy
 
 from ..api.object import *
 from ..api.observer import Observable, Observer
-from ..api.settings import SettingsRegistry, SettingsGroup
 from ..api.plugins import PluginChooser, PluginEntry
-from .detector import CropSizer, Detector
+from ..api.settings import SettingsRegistry, SettingsGroup
+from .data import CropSizer, Detector
 from .geometry import Box, Interval
 from .image import ImageExtent
 from .probe import ProbeSizer
@@ -25,8 +25,9 @@ class ObjectSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Random')
-        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
-        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
+        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
+                                                           Path('/path/to/object.npy'))
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:
@@ -62,13 +63,17 @@ class ObjectSizer(Observable, Observer):
     @property
     def _lambdaZ_m2(self) -> Decimal:
         return self._probeSizer.getWavelengthInMeters() \
-                * self._detector.distanceToObjectInMeters
+                * self._detector.getDetectorDistanceInMeters()
 
     def getPixelSizeXInMeters(self) -> Decimal:
-        return self._lambdaZ_m2 / self._cropSizer.getExtentXInMeters()
+        extentXInMeters = self._cropSizer.getExtentXInPixels() \
+                * self._detector.getPixelSizeXInMeters()
+        return self._lambdaZ_m2 / extentXInMeters
 
     def getPixelSizeYInMeters(self) -> Decimal:
-        return self._lambdaZ_m2 / self._cropSizer.getExtentYInMeters()
+        extentYInMeters = self._cropSizer.getExtentYInPixels() \
+                * self._detector.getPixelSizeYInMeters()
+        return self._lambdaZ_m2 / extentYInMeters
 
     def getScanExtent(self) -> ImageExtent:
         scanBox_m = self._scan.getBoundingBoxInMeters()

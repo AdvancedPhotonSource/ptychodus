@@ -34,7 +34,7 @@ class ControllerCore:
         self._detectorController = DetectorController.createInstance(
             model.detectorPresenter, view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
-            model.velociprobePresenter, model.diffractionDatasetPresenter,
+            model.dataFilePresenter, model.diffractionDatasetPresenter,
             view.detectorParametersView.datasetView)
         self._cropController = CropController.createInstance(
             model.cropPresenter, view.detectorParametersView.imageCropView)
@@ -83,6 +83,8 @@ class ControllerCore:
             lambda checked: controller._settingsController.saveSettings())
         view.openDataFileAction.triggered.connect(
             lambda checked: controller._dataFileController.openDataFile())
+        view.chooseScratchDirectoryAction.triggered.connect(
+            lambda checked: controller._dataFileController.chooseScratchDirectory())
         view.openScanAction.triggered.connect(
             lambda checked: controller._scanParametersController.openScan())
         view.saveScanAction.triggered.connect(

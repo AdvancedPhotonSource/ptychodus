@@ -102,12 +102,13 @@ class ImagePresenter(Observable, Observer):
         self._displayRangeLimits = Interval[Decimal](Decimal(0), Decimal(1))
 
     @classmethod
-    def createInstance(cls, colormapChooserFactory: ColormapChooserFactory,
-                       scalarTransformationChooser: PluginChooser[ScalarTransformation],
-                       complexToRealStrategyChooser: PluginChooser[ComplexToRealStrategy]) -> None:
+    def createInstance(
+            cls, colormapChooserFactory: ColormapChooserFactory,
+            scalarTransformationChooser: PluginChooser[ScalarTransformation],
+            complexToRealStrategyChooser: PluginChooser[ComplexToRealStrategy]) -> ImagePresenter:
         presenter = cls(colormapChooserFactory, scalarTransformationChooser,
                         complexToRealStrategyChooser)
-        presenter._updateColormapAndNotifyObserversIfChanged()
+        presenter._updateColormap()
         presenter._cyclicColormapChooser.addObserver(presenter)
         presenter._acyclicColormapChooser.addObserver(presenter)
         scalarTransformationChooser.addObserver(presenter)
@@ -176,7 +177,8 @@ class ImagePresenter(Observable, Observer):
     # TODO do this via dependency injection
     def setArray(self, array: numpy.typing.NDArray) -> None:
         self._array = array
-        self._updateImageAndNotifyObservers()
+        self._updateImage()
+        self.notifyObservers()
 
     def _updateImage(self) -> None:
         if self._array is None:
@@ -190,7 +192,6 @@ class ImagePresenter(Observable, Observer):
             else:
                 self._image = scalarTransform(self._array)
 
-    def _updateDataRange(self) -> None:
         if self._image is None or numpy.size(self._image) <= 0:
             self._dataRange = Interval[Decimal](Decimal(0), Decimal(1))
         else:
@@ -202,24 +203,15 @@ class ImagePresenter(Observable, Observer):
 
             self._dataRange = Interval[Decimal](vmin, vmax)
 
-    def _updateImageAndNotifyObservers(self) -> None:
-        self._updateImage()
-        self._updateDataRange()
-        self.notifyObservers()
-
-    def _updateColormapAndNotifyObserversIfChanged(self) -> None:
+    def _updateColormap(self) -> None:
         isCyclic = self._complexToRealStrategyChooser.getCurrentStrategy().isCyclic
-        nextColormapChooser = self._cyclicColormapChooser if isCyclic else self._acyclicColormapChooser
-
-        if self._colormapChooser is not nextColormapChooser:
-            self._colormapChooser = nextColormapChooser
-            self.notifyObservers()
+        self._colormapChooser = self._cyclicColormapChooser if isCyclic else self._acyclicColormapChooser
 
     def getImage(self) -> Optional[numpy.typing.NDArray]:
         if self._complexToRealStrategyChooser.getCurrentStrategy().isColorized:
             return self._image
         elif self._image is None or self._displayRange.isEmpty:
-            return
+            return None
         else:
             cnorm = matplotlib.colors.Normalize(vmin=self._displayRange.lower,
                                                 vmax=self._displayRange.upper,
@@ -235,7 +227,9 @@ class ImagePresenter(Observable, Observer):
         if observable is self._colormapChooser:
             self.notifyObservers()
         elif observable is self._scalarTransformationChooser:
-            self._updateImageAndNotifyObservers()
-            self._updateColormapAndNotifyObserversIfChanged()
+            self._updateImage()
+            self.notifyObservers()
         elif observable is self._complexToRealStrategyChooser:
-            self._updateImageAndNotifyObservers()
+            self._updateImage()
+            self._updateColormap()
+            self.notifyObservers()

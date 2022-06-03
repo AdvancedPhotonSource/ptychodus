@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..model import Observer, Observable, Probe, ProbePresenter
+from ..model import Observer, Observable, ImagePresenter, Probe, ProbePresenter
 from ..view import ImageView, ProbeProbeView, ProbeInitializerView, ProbeZonePlateView, ProbeParametersView
 from .data import FileDialogFactory
 from .image import ImageController

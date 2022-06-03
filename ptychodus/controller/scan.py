@@ -2,7 +2,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from ..model import Observer, Observable, Scan, ScanPresenter
-from ..view import ScanScanView, ScanInitializerView, ScanParametersView, ScanPlotView
+from ..view import ScanScanView, ScanInitializerView, ScanParametersView, ScanPlotView, ScanTransformView
 from .data import FileDialogFactory
 
 

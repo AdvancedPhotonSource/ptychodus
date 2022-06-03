@@ -11,7 +11,7 @@ from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
 from ..api.probe import *
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .detector import CropSizer, Detector
+from .data import CropSizer, Detector
 from .fzp import single_probe
 from .geometry import Interval
 from .image import ImageExtent
@@ -25,8 +25,9 @@ class ProbeSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'GaussianBeam')
-        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
-        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath', None)
+        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
+                                                           Path('/path/to/probe.npy'))
         self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
             'AutomaticProbeSizeEnabled', True)
         self.probeSize = settingsGroup.createIntegerEntry('ProbeSize', 64)
@@ -70,8 +71,8 @@ class ProbeSizer(Observable, Observer):
 
     @property
     def _probeSizeMax(self) -> int:
-        cropX = self._cropSizer.getExtentX()
-        cropY = self._cropSizer.getExtentY()
+        cropX = self._cropSizer.getExtentXInPixels()
+        cropY = self._cropSizer.getExtentYInPixels()
         return min(cropX, cropY)
 
     def getProbeSizeLimits(self) -> Interval[int]:
@@ -117,8 +118,8 @@ class GaussianBeamProbeInitializer:
         height_px = width_px
 
         Y_px, X_px = numpy.ogrid[:height_px, :width_px]
-        X_m = (X_px - width_px / 2) * float(self._detector.pixelSizeXInMeters)
-        Y_m = (Y_px - height_px / 2) * float(self._detector.pixelSizeYInMeters)
+        X_m = (X_px - width_px / 2) * float(self._detector.getPixelSizeXInMeters())
+        Y_m = (Y_px - height_px / 2) * float(self._detector.getPixelSizeYInMeters())
 
         probeRadius_m = self._probeSettings.probeDiameterInMeters.value / 2
         R_m = numpy.hypot(X_m, Y_m)
@@ -143,9 +144,9 @@ class FresnelZonePlateProbeInitializer:
     def __call__(self) -> ProbeArrayType:
         shape = self._sizer.getProbeSize()
         lambda0 = self._sizer.getWavelengthInMeters()
-        dx_dec = self._detector.pixelSizeXInMeters  # TODO non-square pixels are unsupported
+        dx_dec = self._detector.getPixelSizeXInMeters()  # TODO non-square pixels are unsupported
         dis_defocus = self._probeSettings.defocusDistanceInMeters.value
-        dis_StoD = self._detector.distanceToObjectInMeters
+        dis_StoD = self._detector.getDetectorDistanceInMeters()
         radius = self._probeSettings.zonePlateRadiusInMeters.value
         outmost = self._probeSettings.outermostZoneWidthInMeters.value
         beamstop = self._probeSettings.beamstopDiameterInMeters.value

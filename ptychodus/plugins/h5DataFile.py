@@ -1,10 +1,12 @@
+from collections.abc import Sequence
 from pathlib import Path
+from typing import overload, Union
 import logging
 
 import h5py
 import numpy
 
-from ptychodus.api.data import DataFileReader, DataFile, DiffractionDataset
+from ptychodus.api.data import DataFileReader, DataFile, DataFileMetadata, DiffractionDataset
 from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -47,7 +49,7 @@ class H5DataFileTreeBuilder:
                 itemDetails = ''
                 h5Item = h5Group.get(itemName, getlink=True)
 
-                treeNode = parentItem.createChild(None)
+                treeNode = parentItem.createChild(list())
 
                 if isinstance(h5Item, h5py.HardLink):
                     itemType = 'Hard Link'
@@ -91,19 +93,30 @@ class H5DataFileTreeBuilder:
 
 class H5DataFile(DataFile):
 
-    def __init__(self, filePath: Path, contentsTree: SimpleTreeNode,
+    def __init__(self, metadata: DataFileMetadata, contentsTree: SimpleTreeNode,
                  datasetList: list[DiffractionDataset]) -> None:
-        self._filePath = filePath
+        self._metadata = metadata
         self._contentsTree = contentsTree
         self._datasetList = datasetList
 
-    def getFilePath(self) -> Path:
-        return self._filePath
+    @property
+    def metadata(self) -> DataFileMetadata:
+        return self._metadata
 
     def getContentsTree(self) -> SimpleTreeNode:
         return self._contentsTree
 
+    @overload
     def __getitem__(self, index: int) -> DiffractionDataset:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[DiffractionDataset]:
+        ...
+
+    def __getitem__(
+            self, index: Union[int,
+                               slice]) -> Union[DiffractionDataset, Sequence[DiffractionDataset]]:
         return self._datasetList[index]
 
     def __len__(self) -> int:
@@ -124,6 +137,7 @@ class H5DataFileReader(DataFileReader):
         return 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)'
 
     def read(self, filePath: Path) -> DataFile:
+        metadata = DataFileMetadata(filePath, 0, 0, 0)
         contentsTree = self._treeBuilder.createRootNode()
         datasetList: list[DiffractionDataset] = list()
 
@@ -131,7 +145,7 @@ class H5DataFileReader(DataFileReader):
             with h5py.File(filePath, 'r') as h5File:
                 contentsTree = self._treeBuilder.build(h5File)
 
-        return H5DataFile(filePath, contentsTree, datasetList)
+        return H5DataFile(metadata, contentsTree, datasetList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

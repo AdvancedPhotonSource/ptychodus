@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..model import Observer, Observable, Object, ObjectPresenter
+from ..model import ImagePresenter, Observer, Observable, Object, ObjectPresenter
 from ..view import ImageView, ObjectInitializerView, ObjectParametersView
 from .data import FileDialogFactory
 from .image import ImageController

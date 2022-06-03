@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod, abstractproperty
 from collections.abc import Sequence
+from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 
@@ -33,10 +34,18 @@ class DiffractionDataset(Sequence[DataArrayType], Observable):
         pass
 
 
+@dataclass(frozen=True)
+class DataFileMetadata:
+    filePath: Path
+    imageWidth: int
+    imageHeight: int
+    totalNumberOfImages: int
+
+
 class DataFile(Sequence[DiffractionDataset], Observable):
 
-    @abstractmethod
-    def getFilePath(self) -> Path:
+    @abstractproperty
+    def metadata(self) -> DataFileMetadata:
         pass
 
     @abstractmethod

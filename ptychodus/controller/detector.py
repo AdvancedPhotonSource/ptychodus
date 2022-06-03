@@ -6,8 +6,9 @@ from PyQt5.QtGui import QFont
 
 from ..api.data import DatasetState
 from ..api.observer import Observable, Observer
-from ..model import DetectorPresenter
-from ..view import DetectorView
+from ..model import CropPresenter, DataFilePresenter, DetectorPresenter, \
+        DiffractionDatasetPresenter, ImagePresenter
+from ..view import CropView, DatasetView, DetectorView, ImageView
 from .data import FileDialogFactory
 from .image import ImageController
 
@@ -60,7 +61,7 @@ class DetectorController(Observer):
 
 class DatasetListModel(QAbstractListModel):
 
-    def __init__(self, presenter: VelociprobePresenter, parent: QObject = None) -> None:
+    def __init__(self, presenter: DataFilePresenter, parent: QObject = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
 
@@ -98,22 +99,22 @@ class DatasetListModel(QAbstractListModel):
 
 class DatasetParametersController(Observer):
 
-    def __init__(self, velociprobePresenter: VelociprobePresenter,
+    def __init__(self, dataFilePresenter: DataFilePresenter,
                  datasetPresenter: DiffractionDatasetPresenter, view: DatasetView) -> None:
         super().__init__()
-        self._velociprobePresenter = velociprobePresenter
+        self._dataFilePresenter = dataFilePresenter
         self._datasetPresenter = datasetPresenter
-        self._listModel = DatasetListModel(velociprobePresenter)
+        self._listModel = DatasetListModel(dataFilePresenter)
         self._view = view
 
     @classmethod
-    def createInstance(cls, velociprobePresenter: VelociprobePresenter,
+    def createInstance(cls, dataFilePresenter: DataFilePresenter,
                        datasetPresenter: DiffractionDatasetPresenter,
                        view: DatasetView) -> DatasetParametersController:
-        controller = cls(velociprobePresenter, datasetPresenter, view)
+        controller = cls(dataFilePresenter, datasetPresenter, view)
 
         view.dataFileListView.setModel(controller._listModel)
-        velociprobePresenter.addObserver(controller)
+        dataFilePresenter.addObserver(controller)
         datasetPresenter.addObserver(controller)
 
         view.dataFileListView.selectionModel().currentChanged.connect(
@@ -130,7 +131,7 @@ class DatasetParametersController(Observer):
         self._view.dataFileListView.setCurrentIndex(index)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._velociprobePresenter:
+        if observable is self._dataFilePresenter:
             self._listModel.beginResetModel()
             self._listModel.endResetModel()
         elif observable is self._datasetPresenter:

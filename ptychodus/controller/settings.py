@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject, QVariant
@@ -54,7 +55,7 @@ class SettingsEntryTableModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
         result = None
 
-        if index.isValid() and role == Qt.DisplayRole:
+        if self._settingsGroup is not None and index.isValid() and role == Qt.DisplayRole:
             settingsEntry = self._settingsGroup[index.row()]
 
             if index.column() == 0:
@@ -84,7 +85,8 @@ class SettingsController(Observer):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry, groupListView: QListView,
-                       entryTableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
+                       entryTableView: QTableView,
+                       fileDialogFactory: FileDialogFactory) -> SettingsController:
         controller = cls(settingsRegistry, groupListView, entryTableView, fileDialogFactory)
         settingsRegistry.addObserver(controller)
 
@@ -156,8 +158,7 @@ class ImportSettingsController(Observer):
             self._velociprobePresenter.syncDetectorPixelSize()
 
         if self._dialog.valuesGroupBox.detectorDistanceCheckBox.isChecked():
-            override = self._dialog.optionsGroupBox.fixDetectorDistanceUnitsCheckBox.isChecked()
-            self._velociprobePresenter.syncDetectorDistance(override)
+            self._velociprobePresenter.syncDetectorDistance()
 
         self._velociprobePresenter.syncImageCrop(
             syncCenter=self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked(),
