@@ -158,8 +158,7 @@ class ImportSettingsController(Observer):
             self._velociprobePresenter.syncDetectorPixelSize()
 
         if self._dialog.valuesGroupBox.detectorDistanceCheckBox.isChecked():
-            override = self._dialog.optionsGroupBox.fixDetectorDistanceUnitsCheckBox.isChecked()
-            self._velociprobePresenter.syncDetectorDistance(override)
+            self._velociprobePresenter.syncDetectorDistance()
 
         self._velociprobePresenter.syncImageCrop(
             syncCenter=self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked(),

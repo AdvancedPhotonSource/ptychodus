@@ -142,6 +142,25 @@ class ModelCore:
         self._dataDirectoryWatcher.join()
 
     def batchModeReconstruct(self) -> int:
+        outputFilePath = self._reconstructorSettings.outputFilePath.value
+
+        if outputFilePath.exists():
+            logger.error('Output file path already exists!')
+            return -1
+
         result = self.reconstructorPresenter.reconstruct()
-        # FIXME write npz output: scan, probe, object, obj plane pixel size
+
+        pixelSizeXInMeters = float(self._objectSizer.getPixelSizeXInMeters())
+        pixelSizeYInMeters = float(self._objectSizer.getPixelSizeYInMeters())
+
+        scanXInMeters = [float(point.x) for point in self._scan]
+        scanYInMeters = [float(point.y) for point in self._scan]
+
+        dataDump = dict()
+        dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
+        dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
+        dataDump['probe'] = self._probe.getArray()
+        dataDump['object'] = self._object.getArray()
+        numpy.savez(outputFilePath, **dataDump)
+
         return result

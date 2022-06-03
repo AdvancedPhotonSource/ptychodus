@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 
 from ..api.observer import Observable, Observer
 from ..api.reconstructor import Reconstructor
@@ -12,6 +13,9 @@ class ReconstructorSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.algorithm = settingsGroup.createStringEntry('Algorithm', 'rPIE')
+        self.outputFileType = settingsGroup.createStringEntry('OutputFileType', 'NPZ')
+        self.outputFilePath = settingsGroup.createPathEntry('OutputFilePath',
+                                                            Path('ptychodus.npz'))
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ReconstructorSettings:

@@ -545,7 +545,7 @@ class TikeReconstructor:
                                          num_gpu=self._settings.numGpus.value,
                                          use_mpi=self._settings.useMpi.value)
 
-        # FIXME self._scan.setScanPoints(...)
+        # TODO self._scan.setScanPoints(...)
         self._probe.setArray(result.probe[0, 0])
         self._object.setArray(result.psi)
         self._reconstructorPlotPresenter.setEnumeratedYValues(result.algorithm_options.costs)
