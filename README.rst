@@ -15,7 +15,7 @@ Installation
 .. code-block:: shell
 
     $ git clone https://github.com/AdvancedPhotonSource/ptychodus.git
-    $ conda create -c conda-forge -n ptychodus --file ptychodus/requirements.txt
+    $ conda create -c conda-forge -n ptychodus --file ptychodus/requirements-dev.txt
     $ conda activate ptychodus
     $ pip install -e ./ptychodus
 
