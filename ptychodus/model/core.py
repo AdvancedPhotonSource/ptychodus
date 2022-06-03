@@ -140,3 +140,8 @@ class ModelCore:
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataDirectoryWatcher.stop()
         self._dataDirectoryWatcher.join()
+
+    def batchModeReconstruct(self) -> int:
+        result = self.reconstructorPresenter.reconstruct()
+        # FIXME write npz output: scan, probe, object, obj plane pixel size
+        return result

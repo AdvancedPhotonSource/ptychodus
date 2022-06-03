@@ -212,6 +212,8 @@ class ImagePresenter(Observable, Observer):
         isCyclic = self._complexToRealStrategyChooser.getCurrentStrategy().isCyclic
         nextColormapChooser = self._cyclicColormapChooser if isCyclic else self._acyclicColormapChooser
 
+        print(f'{self._colormapChooser} -> {nextColormapChooser}') # FIXME remove
+
         if self._colormapChooser is not nextColormapChooser:
             self._colormapChooser = nextColormapChooser
             self.notifyObservers()

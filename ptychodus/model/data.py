@@ -56,7 +56,7 @@ class DataSettings(Observable, Observer):
         self.fileType = settingsGroup.createStringEntry('FileType', 'HDF5')
         self.filePath = settingsGroup.createPathEntry('FilePath', Path('/path/to/data.h5'))
         self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory',
-                                                              Path(tempfile.gettempdir()))
+                                                              Path('/dev/null'))
         self.numberOfDataThreads = settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)
 
     @classmethod
@@ -416,12 +416,18 @@ class ActiveDataFile(DataFile):
         self._datasetList.clear()
         self._dataArray = numpy.empty((0, 0, 0), dtype=int)
 
-        npyTempFile = tempfile.NamedTemporaryFile(dir=self._settings.scratchDirectory.value,
-                                                  suffix='.npy')
-        datasetShape = (dataFile.metadata.totalNumberOfImages, dataFile.metadata.imageHeight,
-                        dataFile.metadata.imageWidth)
-        logger.debug(f'Scratch data file {npyTempFile.name} is {datasetShape}')
-        self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=datasetShape)
+        scratchDirectory = self._settings.scratchDirectory.value
+        shape = (dataFile.metadata.totalNumberOfImages, dataFile.metadata.imageHeight,
+                 dataFile.metadata.imageWidth)
+
+        if scratchDirectory.is_dir():
+            npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
+            logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
+            self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=shape)
+        else:
+            logger.debug(f'Scratch memory is {shape}')
+            self._dataArray = numpy.zeros(shape)
+
         maxWorkers = self._settings.numberOfDataThreads.value
         stride = int(dataFile.metadata.totalNumberOfImages) // len(dataFile)
 

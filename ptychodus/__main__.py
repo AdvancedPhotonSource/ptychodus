@@ -70,7 +70,7 @@ def main() -> int:
 
         if parsedArgs.batch:
             verifyAllArgumentsParsed(parser, unparsedArgs)
-            result = model.reconstructorPresenter.reconstruct()
+            result = model.batchModeReconstruct()
         elif PyQt5:
             # QApplication expects the first argument to be the program name
             qtArgs = sys.argv[:1] + unparsedArgs

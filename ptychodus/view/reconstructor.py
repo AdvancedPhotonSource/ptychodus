@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import QComboBox, QFormLayout, QGroupBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QComboBox, QFormLayout, QGroupBox, QPushButton, QScrollArea, \
+        QStackedWidget, QVBoxLayout, QWidget
 
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvas
@@ -34,6 +35,7 @@ class ReconstructorParametersView(QWidget):
         super().__init__(parent)
         self.reconstructorView = ReconstructorView.createInstance()
         self.reconstructorStackedWidget = QStackedWidget()
+        self.scrollArea = QScrollArea()
 
     @property
     def algorithmComboBox(self) -> QComboBox:
@@ -47,11 +49,14 @@ class ReconstructorParametersView(QWidget):
     def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorParametersView:
         view = cls(parent)
 
+        view.scrollArea.setWidgetResizable(True)
+        view.scrollArea.setWidget(view.reconstructorStackedWidget)
+
         view.reconstructorStackedWidget.layout().setContentsMargins(0, 0, 0, 0)
 
         layout = QVBoxLayout()
         layout.addWidget(view.reconstructorView)
-        layout.addWidget(view.reconstructorStackedWidget)
+        layout.addWidget(view.scrollArea)
         view.setLayout(layout)
 
         return view

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject, QVariant
@@ -54,7 +55,7 @@ class SettingsEntryTableModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
         result = None
 
-        if index.isValid() and role == Qt.DisplayRole:
+        if self._settingsGroup is not None and index.isValid() and role == Qt.DisplayRole:
             settingsEntry = self._settingsGroup[index.row()]
 
             if index.column() == 0:
@@ -84,7 +85,8 @@ class SettingsController(Observer):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry, groupListView: QListView,
-                       entryTableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
+                       entryTableView: QTableView,
+                       fileDialogFactory: FileDialogFactory) -> SettingsController:
         controller = cls(settingsRegistry, groupListView, entryTableView, fileDialogFactory)
         settingsRegistry.addObserver(controller)
 

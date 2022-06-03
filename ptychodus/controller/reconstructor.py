@@ -98,13 +98,13 @@ class ReconstructorParametersController(Observer):
 
 class ReconstructorPlotController(Observer):
 
-    def __init__(self, presenter: ReconstructorPresenter, view: ReconstructorPlotView) -> None:
+    def __init__(self, presenter: ReconstructorPlotPresenter, view: ReconstructorPlotView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ReconstructorPresenter, view: ReconstructorPlotView):
+    def createInstance(cls, presenter: ReconstructorPlotPresenter, view: ReconstructorPlotView):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
         controller._syncModelToView()
