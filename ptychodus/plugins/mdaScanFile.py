@@ -3,9 +3,53 @@ from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
 from typing import Generic, TypeVar
+import sys
 import xdrlib
 
 T = TypeVar('T')
+
+
+class EpicsType(IntEnum):
+    DBR_STRING = 0
+    DBR_SHORT = 1
+    DBR_FLOAT = 2
+    DBR_ENUM = 3
+    DBR_CHAR = 4
+    DBR_LONG = 5
+    DBR_DOUBLE = 6
+    DBR_STS_STRING = 7
+    DBR_STS_SHORT = 8
+    DBR_STS_FLOAT = 9
+    DBR_STS_ENUM = 10
+    DBR_STS_CHAR = 11
+    DBR_STS_LONG = 12
+    DBR_STS_DOUBLE = 13
+    DBR_TIME_STRING = 14
+    DBR_TIME_SHORT = 15
+    DBR_TIME_FLOAT = 16
+    DBR_TIME_ENUM = 17
+    DBR_TIME_CHAR = 18
+    DBR_TIME_LONG = 19
+    DBR_TIME_DOUBLE = 20
+    DBR_GR_STRING = 21
+    DBR_GR_SHORT = 22
+    DBR_GR_FLOAT = 23
+    DBR_GR_ENUM = 24
+    DBR_GR_CHAR = 25
+    DBR_GR_LONG = 26
+    DBR_GR_DOUBLE = 27
+    DBR_CTRL_STRING = 28
+    DBR_CTRL_SHORT = 29
+    DBR_CTRL_FLOAT = 30
+    DBR_CTRL_ENUM = 31
+    DBR_CTRL_CHAR = 32
+    DBR_CTRL_LONG = 33
+    DBR_CTRL_DOUBLE = 34
+
+
+def read_counted_string(unpacker: xdrlib.Unpacker) -> str:
+    length = unpacker.unpack_int()
+    return unpacker.unpack_string().decode() if length else str()
 
 
 @dataclass(frozen=True)
@@ -42,24 +86,20 @@ class MDAHeaderSection:
 @dataclass(frozen=True)
 class MDAScanSection:
     # contains the scan data
-    pass # FIXME
+    pass  # FIXME
 
-
-class MDAExtraPVType(IntEnum):
-    DBR_STRING = 0
-    DBR_CTRL_SHORT = 29
-    DBR_CTRL_FLOAT = 30
-    DBR_CTRL_CHAR = 32
-    DBR_CTRL_LONG = 33
-    DBR_CTRL_DOUBLE = 34
+    @classmethod
+    def read(cls, fp: typing.BinaryIO) -> MDAScanSection:
+        return None  # FIXME
 
 
 @dataclass(frozen=True)
 class MDAProcessVariable(Generic[T]):
     name: str
     description: str
+    epicsType: EpicsType
     unit: str
-    values: list[T]
+    value: T
 
 
 @dataclass(frozen=True)
@@ -69,50 +109,36 @@ class MDAFile:
     extra_pvs: list[MDAProcessVariable]
 
     @staticmethod
-    def _read_counted_string(unpacker: xdrlib.Unpacker) -> str:
-        length = unpacker.unpack_int()
-        return unpacker.unpack_string().decode() if length else str()
-
-    @staticmethod
     def _read_pv(unpacker: xdrlib.Unpacker) -> MDAProcessVariable[Any]:
-        pvName = MDAFile._read_counted_string(unpacker)
-        pvDesc = MDAFile._read_counted_string(unpacker)
-        pvType = MDAExtraPVType(unpacker.unpack_int())
+        pvName = read_counted_string(unpacker)
+        pvDesc = read_counted_string(unpacker)
+        pvType = EpicsType(unpacker.unpack_int())
 
-# FIXME BEGIN
-        unit = ''
-        value = ''
-        count = 0
-        if type != 0:   # not DBR_STRING
-            count = u.unpack_int()  #
-            n = u.unpack_int()      # length of unit string
-            if n: unit = u.unpack_string().decode()
+        if pvType == EpicsType.DBR_STRING:
+            valueStr = read_counted_string(unpacker)
+            return MDAProcessVariable[str](pvName, pvDesc, pvType, str(), valueStr)
 
-        if type == 0: # DBR_STRING
-            n = u.unpack_int()      # length of value string
-            if n: value = u.unpack_string().decode()
-        elif type == 32: # DBR_CTRL_CHAR
-            #value = u.unpack_fstring(count)
-            v = u.unpack_farray(count, u.unpack_int)
-            value = ""
-            for i in range(len(v)):
-                # treat the byte array as a null-terminated string
-                if v[i] == 0: break
-                value = value + chr(v[i])
+        count = unpacker.unpack_int()
+        pvUnit = read_counted_string(unpacker)
 
-        elif type == 29: # DBR_CTRL_SHORT
-            value = u.unpack_farray(count, u.unpack_int)
-        elif type == 33: # DBR_CTRL_LONG
-            value = u.unpack_farray(count, u.unpack_int)
-        elif type == 30: # DBR_CTRL_FLOAT
-            value = u.unpack_farray(count, u.unpack_float)
-        elif type == 34: # DBR_CTRL_DOUBLE
-            value = u.unpack_farray(count, u.unpack_double)
+        if pvType == EpicsType.DBR_CTRL_CHAR:
+            valueChar = unpacker.unpack_fstring(count).decode()
+            valueChar = valueChar.split('\x00', 1)[0]  # treat as null-terminated string
+            return MDAProcessVariable[str](pvName, pvDesc, pvType, pvUnit, valueChar)
+        elif pvType == EpicsType.DBR_CTRL_SHORT:
+            valueShort = unpacker.unpack_farray(count, unpacker.unpack_int)
+            return MDAProcessVariable[list[int]](pvName, pvDesc, pvType, pvUnit, valueShort)
+        elif pvType == EpicsType.DBR_CTRL_LONG:
+            valueLong = unpacker.unpack_farray(count, unpacker.unpack_int)
+            return MDAProcessVariable[list[int]](pvName, pvDesc, pvType, pvUnit, valueLong)
+        elif pvType == EpicsType.DBR_CTRL_FLOAT:
+            valueFloat = unpacker.unpack_farray(count, unpacker.unpack_float)
+            return MDAProcessVariable[list[float]](pvName, pvDesc, pvType, pvUnit, valueFloat)
+        elif pvType == EpicsType.DBR_CTRL_DOUBLE:
+            valueDouble = unpacker.unpack_farray(count, unpacker.unpack_double)
+            return MDAProcessVariable[list[float]](pvName, pvDesc, pvType, pvUnit, valueDouble)
 
-        dict[name] = (desc, unit, value)
-# FIXME END
-
-        # FIXME return MDAProcessVariable[X]()
+        return MDAProcessVariable[str](pvName, pvDesc, pvType, pvUnit, str())
 
     @classmethod
     def read(cls, filePath: Path) -> MDAFile:
@@ -129,10 +155,15 @@ class MDAFile:
                     number_pvs = unpacker.unpack_int()
 
                     for pvidx in range(number_pvs):
-                        pv = MDAFile._read_pv(unpacker)
+                        pv = cls._read_pv(unpacker)
                         extra_pvs.append(pv)
         except OSError as exc:
             logger.exception(exc)
 
         return cls(header, scan, extra_pvs)
 
+
+if __name__ == '__main__':
+    filePath = Path(sys.argv[1])
+    mda = MDAFile.read(filePath)
+    print(mda)
