@@ -1,12 +1,17 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
 from typing import Generic, TypeVar
 import sys
+import typing
 import xdrlib
 
+
 T = TypeVar('T')
+
+logger = logging.getLogger(__name__)
 
 
 class EpicsType(IntEnum):
@@ -47,13 +52,34 @@ class EpicsType(IntEnum):
     DBR_CTRL_DOUBLE = 34
 
 
+def read_int_from_buffer(fp: typing.BinaryIO) -> int:
+    unpacker = xdrlib.Unpacker(fp.read(4))
+    return unpacker.unpack_int()
+
+
+def read_float_from_buffer(fp: typing.BinaryIO) -> float:
+    unpacker = xdrlib.Unpacker(fp.read(4))
+    return unpacker.unpack_float()
+
+
 def read_counted_string(unpacker: xdrlib.Unpacker) -> str:
     length = unpacker.unpack_int()
     return unpacker.unpack_string().decode() if length else str()
 
 
+def read_counted_string_from_buffer(fp: typing.BinaryIO) -> str:
+    length = read_int_from_buffer(fp)
+
+    if length:
+        sz = (length + 3)//4*4 + 4
+        unpacker = xdrlib.Unpacker(fp.read(sz))
+        return unpacker.unpack_string().decode()
+
+    return str()
+
+
 @dataclass(frozen=True)
-class MDAHeaderSection:
+class MDAHeader:
     version: float
     scan_number: int
     dimensions: list[int]
@@ -61,13 +87,13 @@ class MDAHeaderSection:
     extra_pvs_offset: int
 
     @classmethod
-    def read(cls, fp: typing.BinaryIO) -> MDAHeaderSection:
+    def read(cls, fp: typing.BinaryIO) -> MDAHeader:
         unpacker = xdrlib.Unpacker(fp.read(12))
         version = unpacker.unpack_float()
         scan_number = unpacker.unpack_int()
         data_rank = unpacker.unpack_int()
 
-        unpacker = xdrlib.Unpacker(fp.read(4 * data_rank + 8))
+        unpacker.reset(fp.read(4 * data_rank + 8))
         dimensions = unpacker.unpack_farray(data_rank, unpacker.unpack_int)
         is_regular = unpacker.unpack_bool()
         extra_pvs_offset = unpacker.unpack_int()
@@ -84,13 +110,138 @@ class MDAHeaderSection:
 
 
 @dataclass(frozen=True)
-class MDAScanSection:
-    # contains the scan data
-    pass  # FIXME
+class MDAScanHeader:
+    rank: int
+    current_point: int
+    lower_scan_offsets: list[int]
 
     @classmethod
-    def read(cls, fp: typing.BinaryIO) -> MDAScanSection:
-        return None  # FIXME
+    def read(cls, fp: typing.BinaryIO) -> MDAScanHeader:
+        unpacker = xdrlib.Unpacker(fp.read(12))
+        rank = unpacker.unpack_int()
+        npts = unpacker.unpack_int()
+        cpt = unpacker.unpack_int()
+        lower_scan_offsets: list[int] = list()
+
+        if rank > 1:
+            unpacker.reset(fp.read(4 * npts))
+            lower_scan_offsets = unpacker.unpack_farray(npts, unpacker.unpack_int)
+
+        return cls(rank, cpt, lower_scan_offsets)
+
+    @property
+    def number_of_requested_points(self) -> int:
+        return len(self.lower_scan_offsets)
+
+
+@dataclass(frozen=True)
+class MDAScanPositioner:
+    number: int
+    name: str
+    description: str
+    step_mode: str
+    unit: str
+    readback_name: str
+    readback_description: str
+    readback_unit: str
+
+    @classmethod
+    def read(cls, fp: typing.BinaryIO) -> MDAScanPositioner:
+        number = read_int_from_buffer(fp)
+        name = read_counted_string_from_buffer(fp)
+        description = read_counted_string_from_buffer(fp)
+        step_mode = read_counted_string_from_buffer(fp)
+        unit = read_counted_string_from_buffer(fp)
+        readback_name = read_counted_string_from_buffer(fp)
+        readback_description = read_counted_string_from_buffer(fp)
+        readback_unit = read_counted_string_from_buffer(fp)
+
+        return cls(number, name, description, step_mode, unit, readback_name,
+                readback_description, readback_unit)
+
+
+@dataclass(frozen=True)
+class MDAScanDetector:
+    number: int
+    name: str
+    description: str
+    unit: str
+
+    @classmethod
+    def read(cls, fp: typing.BinaryIO) -> MDAScanDetector:
+        number = read_int_from_buffer(fp)
+        name = read_counted_string_from_buffer(fp)
+        description = read_counted_string_from_buffer(fp)
+        unit = read_counted_string_from_buffer(fp)
+        return cls(number, name, description, unit)
+
+
+@dataclass(frozen=True)
+class MDAScanTrigger:
+    number: int
+    name: str
+    command: float
+
+    @classmethod
+    def read(cls, fp: typing.BinaryIO) -> MDAScanTrigger:
+        number = read_int_from_buffer(fp)
+        name = read_counted_string_from_buffer(fp)
+        command = read_float_from_buffer(fp)
+        return cls(number, name, command)
+
+
+@dataclass(frozen=True)
+class MDAScanInfo:
+    scan_name: str
+    time_stamp: str
+    positioners: list[MDAScanPositioner]
+    detectors: list[MDAScanDetector]
+    triggers: list[MDAScanTrigger]
+
+    @classmethod
+    def read(cls, fp: typing.BinaryIO) -> MDAScanInfo:
+        scan_name = read_counted_string_from_buffer(fp)
+        time_stamp = read_counted_string_from_buffer(fp)
+
+        unpacker = xdrlib.Unpacker(fp.read(12))
+        np = unpacker.unpack_int()
+        nd = unpacker.unpack_int()
+        nt = unpacker.unpack_int()
+
+        positioners = [MDAScanPositioner.read(fp) for p in range(np)]
+        detectors = [MDAScanDetector.read(fp) for d in range(nd)]
+        triggers = [MDAScanTrigger.read(fp) for t in range(nt)]
+
+        return cls(scan_name, time_stamp, positioners, detectors, triggers)
+
+
+@dataclass(frozen=True)
+class MDAScanData:
+    @classmethod
+    def read(cls, fp: typing.BinaryIO) -> MDAScanData:
+        return cls() # TODO
+
+
+@dataclass(frozen=True)
+class MDAScan:
+    header: MDAScanHeader
+    info: MDAScanInfo
+    data: MDAScanData
+    lower_scans: list[MDAScan]
+
+    @classmethod
+    def read(cls, fp: typing.BinaryIO) -> MDAScan:
+        header = MDAScanHeader.read(fp)
+        info = MDAScanInfo.read(fp)
+        data = MDAScanData.read(fp)
+        lower_scans: list[MDAScan] = list()
+
+        for offset in header.lower_scan_offsets:
+            fp.seek(offset)
+            scan = MDAScan.read(fp)
+            lower_scans.append(scan)
+
+        return cls(header, info, data, lower_scans)
 
 
 @dataclass(frozen=True)
@@ -104,12 +255,12 @@ class MDAProcessVariable(Generic[T]):
 
 @dataclass(frozen=True)
 class MDAFile:
-    header: MDAHeaderSection
-    scan: MDAScanSection
+    header: MDAHeader
+    scan: MDAScan
     extra_pvs: list[MDAProcessVariable]
 
     @staticmethod
-    def _read_pv(unpacker: xdrlib.Unpacker) -> MDAProcessVariable[Any]:
+    def _read_pv(unpacker: xdrlib.Unpacker) -> MDAProcessVariable[typing.Any]:
         pvName = read_counted_string(unpacker)
         pvDesc = read_counted_string(unpacker)
         pvType = EpicsType(unpacker.unpack_int())
@@ -146,8 +297,8 @@ class MDAFile:
 
         try:
             with filePath.open(mode='rb') as fp:
-                header = MDAHeaderSection.read(fp)
-                scan = MDAScanSection.read(fp)
+                header = MDAHeader.read(fp)
+                scan = MDAScan.read(fp)
 
                 if header.has_extra_pvs:
                     fp.seek(header.extra_pvs_offset)
