@@ -1,12 +1,14 @@
 from __future__ import annotations
-import logging
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
 from typing import Generic, TypeVar
+import logging
 import sys
 import typing
 import xdrlib
+
+import numpy
 
 
 T = TypeVar('T')
@@ -71,7 +73,7 @@ def read_counted_string_from_buffer(fp: typing.BinaryIO) -> str:
     length = read_int_from_buffer(fp)
 
     if length:
-        sz = (length + 3)//4*4 + 4
+        sz = (length + 3) // 4 * 4 + 4
         unpacker = xdrlib.Unpacker(fp.read(sz))
         return unpacker.unpack_string().decode()
 
@@ -112,6 +114,7 @@ class MDAHeader:
 @dataclass(frozen=True)
 class MDAScanHeader:
     rank: int
+    num_requested_points: int
     current_point: int
     lower_scan_offsets: list[int]
 
@@ -127,15 +130,11 @@ class MDAScanHeader:
             unpacker.reset(fp.read(4 * npts))
             lower_scan_offsets = unpacker.unpack_farray(npts, unpacker.unpack_int)
 
-        return cls(rank, cpt, lower_scan_offsets)
-
-    @property
-    def number_of_requested_points(self) -> int:
-        return len(self.lower_scan_offsets)
+        return cls(rank, npts, cpt, lower_scan_offsets)
 
 
 @dataclass(frozen=True)
-class MDAScanPositioner:
+class MDAScanPositionerInfo:
     number: int
     name: str
     description: str
@@ -146,7 +145,7 @@ class MDAScanPositioner:
     readback_unit: str
 
     @classmethod
-    def read(cls, fp: typing.BinaryIO) -> MDAScanPositioner:
+    def read(cls, fp: typing.BinaryIO) -> MDAScanPositionerInfo:
         number = read_int_from_buffer(fp)
         name = read_counted_string_from_buffer(fp)
         description = read_counted_string_from_buffer(fp)
@@ -156,19 +155,19 @@ class MDAScanPositioner:
         readback_description = read_counted_string_from_buffer(fp)
         readback_unit = read_counted_string_from_buffer(fp)
 
-        return cls(number, name, description, step_mode, unit, readback_name,
-                readback_description, readback_unit)
+        return cls(number, name, description, step_mode, unit, readback_name, readback_description,
+                   readback_unit)
 
 
 @dataclass(frozen=True)
-class MDAScanDetector:
+class MDAScanDetectorInfo:
     number: int
     name: str
     description: str
     unit: str
 
     @classmethod
-    def read(cls, fp: typing.BinaryIO) -> MDAScanDetector:
+    def read(cls, fp: typing.BinaryIO) -> MDAScanDetectorInfo:
         number = read_int_from_buffer(fp)
         name = read_counted_string_from_buffer(fp)
         description = read_counted_string_from_buffer(fp)
@@ -177,13 +176,13 @@ class MDAScanDetector:
 
 
 @dataclass(frozen=True)
-class MDAScanTrigger:
+class MDAScanTriggerInfo:
     number: int
     name: str
     command: float
 
     @classmethod
-    def read(cls, fp: typing.BinaryIO) -> MDAScanTrigger:
+    def read(cls, fp: typing.BinaryIO) -> MDAScanTriggerInfo:
         number = read_int_from_buffer(fp)
         name = read_counted_string_from_buffer(fp)
         command = read_float_from_buffer(fp)
@@ -194,9 +193,9 @@ class MDAScanTrigger:
 class MDAScanInfo:
     scan_name: str
     time_stamp: str
-    positioners: list[MDAScanPositioner]
-    detectors: list[MDAScanDetector]
-    triggers: list[MDAScanTrigger]
+    positioner: list[MDAScanPositionerInfo]
+    detector: list[MDAScanDetectorInfo]
+    trigger: list[MDAScanTriggerInfo]
 
     @classmethod
     def read(cls, fp: typing.BinaryIO) -> MDAScanInfo:
@@ -208,18 +207,45 @@ class MDAScanInfo:
         nd = unpacker.unpack_int()
         nt = unpacker.unpack_int()
 
-        positioners = [MDAScanPositioner.read(fp) for p in range(np)]
-        detectors = [MDAScanDetector.read(fp) for d in range(nd)]
-        triggers = [MDAScanTrigger.read(fp) for t in range(nt)]
+        positioner = [MDAScanPositionerInfo.read(fp) for p in range(np)]
+        detector = [MDAScanDetectorInfo.read(fp) for d in range(nd)]
+        trigger = [MDAScanTriggerInfo.read(fp) for t in range(nt)]
 
-        return cls(scan_name, time_stamp, positioners, detectors, triggers)
+        return cls(scan_name, time_stamp, positioner, detector, trigger)
+
+    @property
+    def num_positioners(self) -> int:
+        return len(self.positioner)
+
+    @property
+    def num_detectors(self) -> int:
+        return len(self.detector)
+
+    @property
+    def num_triggers(self) -> int:
+        return len(self.trigger)
 
 
 @dataclass(frozen=True)
 class MDAScanData:
+    readback_array: numpy.array # double, shape: np x npts
+    detector_array: numpy.array # float, shape: nd x npts
+
     @classmethod
-    def read(cls, fp: typing.BinaryIO) -> MDAScanData:
-        return cls() # TODO
+    def read(cls, fp: typing.BinaryIO, scanHeader: MdaScanHeader, scanInfo: MdaScanInfo) -> MDAScanData:
+        npts = scanHeader.num_requested_points
+        np = scanInfo.num_positioners
+        nd = scanInfo.num_detectors
+
+        unpacker = xdrlib.Unpacker(fp.read(8 * np * npts))
+        readback_lol = [unpacker.unpack_farray(npts, unpacker.unpack_double) for p in range(np)]
+        readback_array = numpy.array(readback_lol)
+
+        unpacker.reset(fp.read(4 * nd * npts))
+        detector_lol = [unpacker.unpack_farray(npts, unpacker.unpack_float) for d in range(nd)]
+        detector_array = numpy.array(detector_lol)
+
+        return cls(readback_array, detector_array)
 
 
 @dataclass(frozen=True)
@@ -233,7 +259,7 @@ class MDAScan:
     def read(cls, fp: typing.BinaryIO) -> MDAScan:
         header = MDAScanHeader.read(fp)
         info = MDAScanInfo.read(fp)
-        data = MDAScanData.read(fp)
+        data = MDAScanData.read(fp, header, info)
         lower_scans: list[MDAScan] = list()
 
         for offset in header.lower_scan_offsets:
