@@ -18,7 +18,7 @@ try:
     from PyQt5.QtWidgets import QApplication
     from PyQt5.Qt import PYQT_VERSION_STR
     from PyQt5.QtCore import QT_VERSION_STR
-except ImportError:
+except ModuleNotFoundError:
     PyQt5 = None
 
 

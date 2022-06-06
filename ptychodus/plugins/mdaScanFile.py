@@ -357,6 +357,7 @@ class MDAScanFileReader(ScanFileReader):
     def read(self, filePath: Path) -> Iterable[ScanPoint]:
         scanPointList = list()
 
+        micronsToMeters = Decimal('1e-6')
         mdaFile = MDAFile.read(filePath)
 
         xidx = next(pos.number for pos in mdaFile.scan.info.positioner
@@ -368,8 +369,8 @@ class MDAScanFileReader(ScanFileReader):
         yarray = mdaFile.scan.data.readback_array[yidx, :]
 
         for xf, yf in zip(xarray, yarray):
-            x = Decimal(repr(xf))
-            y = Decimal(repr(yf))
+            x = Decimal(repr(xf)) * micronsToMeters
+            y = Decimal(repr(yf)) * micronsToMeters
             point = ScanPoint(x, y)
 
             scanPointList.append(point)

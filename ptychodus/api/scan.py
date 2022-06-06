@@ -9,6 +9,7 @@ from typing import Iterable
 
 @dataclass(frozen=True)
 class ScanPoint:
+    '''ScanPoint coordinates are conventionally in meters'''
     x: Decimal
     y: Decimal
 

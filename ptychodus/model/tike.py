@@ -7,7 +7,7 @@ import numpy
 
 try:
     import tike.ptycho
-except ImportError:
+except ModuleNotFoundError:
 
     class tike:
         ptycho = None

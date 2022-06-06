@@ -2,6 +2,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import overload, Union
 import logging
+import re
+import sys
 
 from tifffile import TiffFile
 import numpy
@@ -115,21 +117,34 @@ class TiffDataFileReader(DataFileReader):
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         datasetList: list[DiffractionDataset] = list()
 
-        if filePath.is_file():
-            # TODO filePath.parent.glob
-            dataset = TiffDiffractionDataset(filePath)
-            array = dataset.getArray()
+        if filePath:
+            digits = re.findall(r'\d+', filePath.stem)
+            longest_digits = max(digits, key=len)
+            pattern = filePath.name.replace(longest_digits, f'\\d{{{len(longest_digits)}}}')
+            filePathList = [ path for path in filePath.parent.iterdir() \
+                        if re.search(pattern, path.name) ]
 
-            itemName = dataset.datasetName
-            itemType = 'TIFF'
-            itemDetails = str(array.shape)
+            for fp in filePathList:
+                dataset = TiffDiffractionDataset(fp)
+                array = dataset.getArray()
 
-            metadata = DataFileMetadata(filePath, array.shape[2], array.shape[1], array.shape[0])
-            contentsTree.createChild([itemName, itemType, itemDetails])
-            datasetList.append(dataset)
+                itemName = dataset.datasetName
+                itemType = 'TIFF'
+                itemDetails = str(array.shape)
+
+                metadata = DataFileMetadata(fp, array.shape[2], array.shape[1], array.shape[0])
+                contentsTree.createChild([itemName, itemType, itemDetails])
+                datasetList.append(dataset)
 
         return TiffDataFile(metadata, contentsTree, datasetList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.registerPlugin(TiffDataFileReader())
+
+
+if __name__ == '__main__':
+    filePath = Path(sys.argv[1])
+    reader = TiffDataFileReader()
+    tiffFile = reader.read(filePath)
+    print(tiffFile)

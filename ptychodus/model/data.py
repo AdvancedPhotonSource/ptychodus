@@ -486,31 +486,36 @@ class DataFilePresenter(Observable, Observer):
     def getNumberOfDatasets(self) -> int:
         return len(self._activeDataFile)
 
-    def openDataset(self, dataPath: str) -> Any:  # FIXME hdf5-only
+    def openDataset(self, dataPath: str) -> Any:
         filePath = self._activeDataFile.metadata.filePath
         data = None
 
-        if filePath and dataPath:
-            with h5py.File(filePath, 'r') as h5File:
-                if dataPath in h5File:
-                    item = h5File.get(dataPath)
+        print(dataPath)  # FIXME support TIFF
 
-                    if isinstance(item, h5py.Dataset):
-                        data = item[()]  # TODO decode strings as needed
-                else:
-                    parentPath, attrName = dataPath.rsplit('/', 1)
+        if filePath and h5py.is_hdf5(filePath) and dataPath:
+            try:
+                with h5py.File(filePath, 'r') as h5File:
+                    if dataPath in h5File:
+                        item = h5File.get(dataPath)
 
-                    if parentPath in h5File:
-                        item = h5File.get(parentPath)
+                        if isinstance(item, h5py.Dataset):
+                            data = item[()]  # TODO decode strings as needed
+                    else:
+                        parentPath, attrName = dataPath.rsplit('/', 1)
 
-                        if attrName in item.attrs:
-                            attr = item.attrs[attrName]
-                            stringInfo = h5py.check_string_dtype(attr.dtype)
+                        if parentPath in h5File:
+                            item = h5File.get(parentPath)
 
-                            if stringInfo:
-                                data = attr.decode(stringInfo.encoding)
-                            else:
-                                data = attr
+                            if attrName in item.attrs:
+                                attr = item.attrs[attrName]
+                                stringInfo = h5py.check_string_dtype(attr.dtype)
+
+                                if stringInfo:
+                                    data = attr.decode(stringInfo.encoding)
+                                else:
+                                    data = attr
+            except OSError:
+                logger.exception('Failed to open dataset!')
 
         return data
 
