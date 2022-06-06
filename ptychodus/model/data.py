@@ -486,7 +486,7 @@ class DataFilePresenter(Observable, Observer):
     def getNumberOfDatasets(self) -> int:
         return len(self._activeDataFile)
 
-    def openDataset(self, dataPath: str) -> Any:  # TODO hdf5-only
+    def openDataset(self, dataPath: str) -> Any:  # FIXME hdf5-only
         filePath = self._activeDataFile.metadata.filePath
         data = None
 
