@@ -1,8 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Generic, Iterable, TypeVar
 import logging
 import sys
 import typing
@@ -10,6 +11,8 @@ import xdrlib
 
 import numpy
 
+from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.scan import ScanFileReader, ScanPoint
 
 T = TypeVar('T')
 
@@ -228,11 +231,12 @@ class MDAScanInfo:
 
 @dataclass(frozen=True)
 class MDAScanData:
-    readback_array: numpy.array # double, shape: np x npts
-    detector_array: numpy.array # float, shape: nd x npts
+    readback_array: numpy.typing.NDArray[numpy.floating]  # double, shape: np x npts
+    detector_array: numpy.typing.NDArray[numpy.floating]  # float, shape: nd x npts
 
     @classmethod
-    def read(cls, fp: typing.BinaryIO, scanHeader: MdaScanHeader, scanInfo: MdaScanInfo) -> MDAScanData:
+    def read(cls, fp: typing.BinaryIO, scanHeader: MDAScanHeader,
+             scanInfo: MDAScanInfo) -> MDAScanData:
         npts = scanHeader.num_requested_points
         np = scanInfo.num_positioners
         nd = scanInfo.num_detectors
@@ -340,7 +344,44 @@ class MDAFile:
         return cls(header, scan, extra_pvs)
 
 
+class MDAScanFileReader(ScanFileReader):
+
+    @property
+    def simpleName(self) -> str:
+        return 'MDA'
+
+    @property
+    def fileFilter(self) -> str:
+        return 'EPICS MDA Files (*.mda)'
+
+    def read(self, filePath: Path) -> Iterable[ScanPoint]:
+        scanPointList = list()
+
+        mdaFile = MDAFile.read(filePath)
+
+        xidx = next(pos.number for pos in mdaFile.scan.info.positioner
+                    if 'X_HYBRID_SP' in pos.name)
+        xarray = mdaFile.scan.data.readback_array[xidx, :]
+
+        yidx = next(pos.number for pos in mdaFile.scan.info.positioner
+                    if 'Y_HYBRID_SP' in pos.name)
+        yarray = mdaFile.scan.data.readback_array[yidx, :]
+
+        for xf, yf in zip(xarray, yarray):
+            x = Decimal(repr(xf))
+            y = Decimal(repr(yf))
+            point = ScanPoint(x, y)
+
+            scanPointList.append(point)
+
+        return scanPointList
+
+
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(MDAScanFileReader())
+
+
 if __name__ == '__main__':
     filePath = Path(sys.argv[1])
-    mda = MDAFile.read(filePath)
-    print(mda)
+    mdaFile = MDAFile.read(filePath)
+    print(mdaFile)
