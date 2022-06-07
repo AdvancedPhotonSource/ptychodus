@@ -96,9 +96,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
             logger.exception('Invalid Dataset Index')
             return
 
-        if self._dataset is not None:
-            self._dataset.removeObserver(self)
-
+        self._dataset.removeObserver(self)
         self._dataset = dataset
         self._dataset.addObserver(self)
         self._datasetIndex = index
@@ -116,9 +114,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._dataFile:
-            if self._dataset is not None:
-                self._dataset.removeObserver(self)
-
+            self._dataset.removeObserver(self)
             self._dataset = NullDiffractionDataset()
             self._datasetIndex = 0
             self.notifyObservers()

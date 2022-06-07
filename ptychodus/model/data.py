@@ -490,8 +490,6 @@ class DataFilePresenter(Observable, Observer):
         filePath = self._activeDataFile.metadata.filePath
         data = None
 
-        print(dataPath)  # FIXME support TIFF
-
         if filePath and h5py.is_hdf5(filePath) and dataPath:
             try:
                 with h5py.File(filePath, 'r') as h5File:

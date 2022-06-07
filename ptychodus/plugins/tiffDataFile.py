@@ -121,20 +121,28 @@ class TiffDataFileReader(DataFileReader):
             digits = re.findall(r'\d+', filePath.stem)
             longest_digits = max(digits, key=len)
             pattern = filePath.name.replace(longest_digits, f'\\d{{{len(longest_digits)}}}')
-            filePathList = [ path for path in filePath.parent.iterdir() \
-                        if re.search(pattern, path.name) ]
+            totalNumberOfImages = 0
 
-            for fp in filePathList:
-                dataset = TiffDiffractionDataset(fp)
-                array = dataset.getArray()
+            for fp in filePath.parent.iterdir():
+                if re.search(pattern, fp.name):
+                    with TiffFile(fp) as tiff:
+                        totalNumberOfImages += len(tiff.pages)
 
-                itemName = dataset.datasetName
-                itemType = 'TIFF'
-                itemDetails = str(array.shape)
+                        itemName = fp.stem
+                        itemType = 'TIFF'
+                        itemDetails = str(tiff.epics_metadata)
+                        contentsTree.createChild([itemName, itemType, itemDetails])
 
-                metadata = DataFileMetadata(fp, array.shape[2], array.shape[1], array.shape[0])
-                contentsTree.createChild([itemName, itemType, itemDetails])
-                datasetList.append(dataset)
+                    dataset = TiffDiffractionDataset(fp)
+                    datasetList.append(dataset)
+
+            with TiffFile(filePath) as tiff:
+                array = tiff.asarray()
+                imageWidth = array.shape[-1]
+                imageHeight = array.shape[-2]
+
+            metadata = DataFileMetadata(filePath.parent / pattern, imageWidth, imageHeight,
+                                        totalNumberOfImages)
 
         return TiffDataFile(metadata, contentsTree, datasetList)
 
