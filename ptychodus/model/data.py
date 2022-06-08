@@ -416,34 +416,35 @@ class ActiveDataFile(DataFile):
         self._datasetList.clear()
         self._dataArray = numpy.empty((0, 0, 0), dtype=int)
 
-        scratchDirectory = self._settings.scratchDirectory.value
-        shape = (dataFile.metadata.totalNumberOfImages, dataFile.metadata.imageHeight,
-                 dataFile.metadata.imageWidth)
+        if len(dataFile) > 0:
+            maxWorkers = self._settings.numberOfDataThreads.value
+            scratchDirectory = self._settings.scratchDirectory.value
+            shape = (dataFile.metadata.totalNumberOfImages, dataFile.metadata.imageHeight,
+                     dataFile.metadata.imageWidth)
+            stride = int(dataFile.metadata.totalNumberOfImages) // len(dataFile)
 
-        if scratchDirectory.is_dir():
-            npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
-            logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
-            self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=shape)
-        else:
-            logger.debug(f'Scratch memory is {shape}')
-            self._dataArray = numpy.zeros(shape)
+            if scratchDirectory.is_dir():
+                npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
+                logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
+                self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=shape)
+            else:
+                logger.debug(f'Scratch memory is {shape}')
+                self._dataArray = numpy.zeros(shape)
 
-        maxWorkers = self._settings.numberOfDataThreads.value
-        stride = int(dataFile.metadata.totalNumberOfImages) // len(dataFile)
+            with concurrent.futures.ThreadPoolExecutor(maxWorkers) as executor:
+                futureList = list()
 
-        with concurrent.futures.ThreadPoolExecutor(maxWorkers) as executor:
-            futureList = list()
+                for index, dataset in enumerate(dataFile):
+                    datasetLoader = functools.partial(self._loadDataset, index, stride, dataset)
+                    future = executor.submit(datasetLoader)
+                    futureList.append(future)
 
-            for index, dataset in enumerate(dataFile):
-                datasetLoader = functools.partial(self._loadDataset, index, stride, dataset)
-                future = executor.submit(datasetLoader)
-                futureList.append(future)
+                for future in concurrent.futures.as_completed(futureList):
+                    dataset = future.result()
+                    self._datasetList.append(dataset)
 
-            for future in concurrent.futures.as_completed(futureList):
-                dataset = future.result()
-                self._datasetList.append(dataset)
+            self._datasetList.sort(key=lambda x: x.datasetName)
 
-        self._datasetList.sort(key=lambda x: x.datasetName)
         self.notifyObservers()
 
 
