@@ -7,23 +7,17 @@ from PyQt5.QtGui import QDoubleValidator, QPixmap, QWheelEvent
 from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, \
         QFormLayout, QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
         QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout, \
-        QLabel, QLineEdit, QPushButton, QSizePolicy, QSpinBox, QStyle, QVBoxLayout, QWidget
-from .widgets import BottomTitledGroupBox, DecimalSlider
+        QLabel, QPushButton, QSizePolicy, QSpinBox, QStyle, QVBoxLayout, QWidget
+from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
 class ImageDisplayRangeDialog(QDialog):
 
-    @staticmethod
-    def createRealLineEdit() -> QLineEdit:
-        lineEdit = QLineEdit()
-        lineEdit.setValidator(QDoubleValidator())
-        return lineEdit
-
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.buttonBox = QDialogButtonBox()
-        self.minValueWidget = ImageDisplayRangeDialog.createRealLineEdit()
-        self.maxValueWidget = ImageDisplayRangeDialog.createRealLineEdit()
+        self.minValueWidget = DecimalLineEdit()
+        self.maxValueWidget = DecimalLineEdit()
 
     def setMinAndMaxValues(self, minValue: Decimal, maxValue: Decimal) -> None:
         self.minValueWidget.setText(str(minValue))

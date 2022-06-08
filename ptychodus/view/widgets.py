@@ -23,6 +23,13 @@ class BottomTitledGroupBox(QGroupBox):
             }""")
 
 
+class DecimalLineEdit(QLineEdit):  # TODO
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setValidator(QDoubleValidator())
+
+
 class DecimalSlider(QWidget):
     valueChanged = pyqtSignal(Decimal)
 

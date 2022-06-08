@@ -363,12 +363,12 @@ class MDAScanFileReader(ScanFileReader):
         xidx = next(pos.number for pos in mdaFile.scan.info.positioner
                     if 'X_HYBRID_SP' in pos.name)
         xarray = mdaFile.scan.data.readback_array[xidx, :]
-        xarray -= xarray.mean()
+        xarray -= xarray.mean()  # TODO move to tike backend
 
         yidx = next(pos.number for pos in mdaFile.scan.info.positioner
                     if 'Y_HYBRID_SP' in pos.name)
         yarray = mdaFile.scan.data.readback_array[yidx, :]
-        yarray -= yarray.mean()
+        yarray -= yarray.mean()  # TODO move to tike backend
 
         for xf, yf in zip(xarray, yarray):
             x = Decimal(repr(xf)) * micronsToMeters
