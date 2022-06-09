@@ -16,18 +16,18 @@ class ImageDisplayRangeDialog(QDialog):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.buttonBox = QDialogButtonBox()
-        self.minValueWidget = DecimalLineEdit()
-        self.maxValueWidget = DecimalLineEdit()
+        self.minValueLineEdit = DecimalLineEdit.createInstance()
+        self.maxValueLineEdit = DecimalLineEdit.createInstance()
 
     def setMinAndMaxValues(self, minValue: Decimal, maxValue: Decimal) -> None:
-        self.minValueWidget.setText(str(minValue))
-        self.maxValueWidget.setText(str(maxValue))
+        self.minValueLineEdit.setValue(minValue)
+        self.maxValueLineEdit.setValue(maxValue)
 
     def minValue(self) -> Decimal:
-        return Decimal(self.minValueWidget.text())
+        return self._minValueLineEdit.getValue()
 
     def maxValue(self) -> Decimal:
-        return Decimal(self.maxValueWidget.text())
+        return self._maxValueLineEdit.getValue()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDisplayRangeDialog:
@@ -39,8 +39,8 @@ class ImageDisplayRangeDialog(QDialog):
         dialog.buttonBox.rejected.connect(dialog.reject)
 
         layout = QFormLayout()
-        layout.addRow('Minimum Displayed Value:', dialog.minValueWidget)
-        layout.addRow('Maximum Displayed Value:', dialog.maxValueWidget)
+        layout.addRow('Minimum Displayed Value:', dialog.minValueLineEdit)
+        layout.addRow('Maximum Displayed Value:', dialog.maxValueLineEdit)
         layout.addRow(dialog.buttonBox)
         dialog.setLayout(layout)
 

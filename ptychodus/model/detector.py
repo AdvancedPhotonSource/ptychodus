@@ -7,10 +7,10 @@ import logging
 import numpy
 
 from ..api.data import DataArrayType, DatasetState, DiffractionDataset
+from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
 from .data import ActiveDataFile, DetectorSettings, NullDiffractionDataset
-from .geometry import Interval
 
 logger = logging.getLogger(__name__)
 

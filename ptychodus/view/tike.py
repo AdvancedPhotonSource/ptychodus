@@ -71,7 +71,7 @@ class TikeBasicParametersView(QGroupBox):
 class TikeAdaptiveMomentView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(' Use Adaptive Moment', parent)
+        super().__init__('Use Adaptive Moment', parent)
         self.mdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.vdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
 
@@ -117,25 +117,23 @@ class TikePositionCorrectionView(QGroupBox):
 class TikeProbeSupportView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(' Finite Probe Support', parent)
-        self.weightWidget = DecimalLineEdit()
+        super().__init__('Finite Probe Support', parent)
+        self.weightLineEdit = DecimalLineEdit.createInstance()
         self.radiusSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.degreeWidget = DecimalLineEdit()
+        self.degreeLineEdit = DecimalLineEdit.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikeProbeSupportView:
         view = cls(parent)
 
-        view.weightWidget.setToolTip('Weight of the finite probe constraint.')
-        view.radiusSlider.setToolTip('Radius of finite probe support as fraction of probe grid.')
-        view.degreeWidget.setToolTip('Degree of the supergaussian defining the probe support.')
-
-        view.setCheckable(True)  # TODO to controller
+        view.weightLineEdit.setToolTip('Weight of the finite probe constraint.')
+        view.radiusSlider.setToolTip('Radius of probe support as fraction of probe grid.')
+        view.degreeLineEdit.setToolTip('Degree of the supergaussian defining the probe support.')
 
         layout = QFormLayout()
-        layout.addRow('Weight:', view.weightWidget)
+        layout.addRow('Weight:', view.weightLineEdit)
         layout.addRow('Radius:', view.radiusSlider)
-        layout.addRow('Degree:', view.degreeWidget)
+        layout.addRow('Degree:', view.degreeLineEdit)
         view.setLayout(layout)
 
         return view

@@ -8,10 +8,10 @@ import matplotlib.pyplot
 import numpy
 import numpy.typing
 
+from ..api.geometry import Interval
 from ..api.image import ScalarTransformation, ComplexToRealStrategy
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
-from .geometry import Interval
 
 logger = logging.getLogger(__name__)
 

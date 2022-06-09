@@ -16,11 +16,11 @@ import watchdog.events
 import watchdog.observers
 
 from ..api.data import DatasetState, DataArrayType, DataFile, DataFileReader, DataFileMetadata, DiffractionDataset
+from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser
 from ..api.settings import SettingsRegistry, SettingsGroup
 from ..api.tree import SimpleTreeNode
-from .geometry import Interval
 
 logger = logging.getLogger(__name__)
 

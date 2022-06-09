@@ -7,13 +7,13 @@ import logging
 import numpy
 import numpy.typing
 
+from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
 from ..api.probe import *
 from ..api.settings import SettingsRegistry, SettingsGroup
 from .data import CropSizer, Detector
 from .fzp import single_probe
-from .geometry import Interval
 from .image import ImageExtent
 
 logger = logging.getLogger(__name__)

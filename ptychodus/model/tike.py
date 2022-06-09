@@ -97,6 +97,8 @@ class TikeProbeCorrectionSettings(TikeAdaptiveMomentSettings):
         self.centeredIntensityConstraint = settingsGroup.createBooleanEntry(
             'CenteredIntensityConstraint', False)
         self.sparsityConstraint = settingsGroup.createRealEntry('SparsityConstraint', '1')
+        self.useFiniteProbeSupport = settingsGroup.createBooleanEntry(
+            'UseFiniteProbeSupport', True)
         self.probeSupportWeight = settingsGroup.createRealEntry('ProbeSupportWeight', '10')
         self.probeSupportRadius = settingsGroup.createRealEntry('ProbeSupportRadius', '0.3')
         self.probeSupportDegree = settingsGroup.createRealEntry('ProbeSupportDegree', '5')
@@ -147,6 +149,12 @@ class TikeProbeCorrectionPresenter(TikeAdaptiveMomentPresenter):
     def setSparsityConstraint(self, value: Decimal) -> None:
         self._settings.sparsityConstraint.value = value
 
+    def isFiniteProbeSupportEnabled(self) -> bool:
+        return self._settings.useFiniteProbeSupport.value
+
+    def setFiniteProbeSupportEnabled(self, enabled: bool) -> None:
+        self._settings.useFiniteProbeSupport.value = enabled
+
     def getMinProbeSupportWeight(self) -> Decimal:
         return Decimal()
 
@@ -170,6 +178,9 @@ class TikeProbeCorrectionPresenter(TikeAdaptiveMomentPresenter):
 
     def setProbeSupportRadius(self, value: Decimal) -> None:
         self._settings.probeSupportRadius.value = value
+
+    def getMinProbeSupportDegree(self) -> Decimal:
+        return Decimal()
 
     def getProbeSupportDegree(self) -> Decimal:
         return self._settings.probeSupportDegree.value
@@ -532,6 +543,9 @@ class TikeReconstructor:
         options = None
 
         if settings.useProbeCorrection.value:
+            probeSupport = float(settings.probeSupportWeight.value) \
+                    if settings.useFiniteProbeSupport.value else 0.
+
             options = tike.ptycho.ProbeOptions(
                 orthogonality_constraint=settings.orthogonalityConstraint.value,
                 centered_intensity_constraint=settings.centeredIntensityConstraint.value,
@@ -539,7 +553,7 @@ class TikeReconstructor:
                 use_adaptive_moment=settings.useAdaptiveMoment.value,
                 vdecay=float(settings.vdecay.value),
                 mdecay=float(settings.mdecay.value),
-                probe_support=float(settings.probeSupportWeight.value),
+                probe_support=probeSupport,
                 probe_support_radius=float(settings.probeSupportRadius.value),
                 probe_support_degree=float(settings.probeSupportDegree.value),
             )
