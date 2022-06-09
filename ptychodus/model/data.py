@@ -367,8 +367,8 @@ class ActiveDataFile(DataFile):
     def getContentsTree(self) -> SimpleTreeNode:
         return self._dataFile.getContentsTree()
 
-    def getDiffractionData(self) -> DataArrayType:
-        if self._cropSizer.isCropEnabled():
+    def getDiffractionData(self, cropped: bool = True) -> DataArrayType:
+        if cropped and self._cropSizer.isCropEnabled():
             sliceX = self._cropSizer.getSliceX()
             sliceY = self._cropSizer.getSliceY()
             return self._dataArray[:, sliceY, sliceX]
@@ -451,16 +451,19 @@ class ActiveDataFile(DataFile):
 class DataFilePresenter(Observable, Observer):
 
     def __init__(self, settings: DataSettings, activeDataFile: ActiveDataFile,
-                 fileReaderChooser: PluginChooser[DataFileReader]) -> None:
+                 fileReaderChooser: PluginChooser[DataFileReader],
+                 fileWriterChooser: PluginChooser[DataFileWriter]) -> None:
         super().__init__()
         self._settings = settings
         self._activeDataFile = activeDataFile
         self._fileReaderChooser = fileReaderChooser
+        self._fileWriterChooser = fileWriterChooser
 
     @classmethod
     def createInstance(cls, settings: DataSettings, activeDataFile: ActiveDataFile,
-                       fileReaderChooser: PluginChooser[DataFileReader]) -> DataFilePresenter:
-        presenter = cls(settings, activeDataFile, fileReaderChooser)
+                       fileReaderChooser: PluginChooser[DataFileReader],
+                       fileWriterChooser: PluginChooser[DataFileWriter]) -> DataFilePresenter:
+        presenter = cls(settings, activeDataFile, fileReaderChooser, fileWriterChooser)
         settings.fileType.addObserver(presenter)
         fileReaderChooser.addObserver(presenter)
         presenter._syncFileReaderFromSettings()
@@ -547,6 +550,18 @@ class DataFilePresenter(Observable, Observer):
 
     def _openDataFileFromSettings(self) -> None:
         self._openDataFile(self._settings.filePath.value)
+
+    def getSaveFileFilterList(self) -> list[str]:
+        return self._fileWriterChooser.getDisplayNameList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._fileWriterChooser.getCurrentDisplayName()
+
+    def saveDataFile(self, filePath: Path, fileFilter: str) -> None:
+        logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
+        self._fileWriterChooser.setFromDisplayName(fileFilter)
+        writer = self._fileWriterChooser.getCurrentStrategy()
+        writer.write(filePath, self._activeDataFile.getDiffractionData(cropped=False))
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.fileType:

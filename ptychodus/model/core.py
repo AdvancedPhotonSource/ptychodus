@@ -101,7 +101,8 @@ class ModelCore:
 
         self.dataFilePresenter = DataFilePresenter.createInstance(
             self._dataSettings, self._activeDataFile,
-            self._pluginRegistry.buildDataFileReaderChooser())
+            self._pluginRegistry.buildDataFileReaderChooser(),
+            self._pluginRegistry.buildDataFileWriterChooser())
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
