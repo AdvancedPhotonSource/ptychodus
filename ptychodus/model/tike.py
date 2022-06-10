@@ -91,7 +91,7 @@ class TikeProbeCorrectionSettings(TikeAdaptiveMomentSettings):
 
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
-        self.useProbeCorrection = settingsGroup.createBooleanEntry('UseProbeCorrection', False)
+        self.useProbeCorrection = settingsGroup.createBooleanEntry('UseProbeCorrection', True)
         self.orthogonalityConstraint = settingsGroup.createBooleanEntry(
             'OrthogonalityConstraint', True)
         self.centeredIntensityConstraint = settingsGroup.createBooleanEntry(
@@ -193,7 +193,7 @@ class TikeObjectCorrectionSettings(TikeAdaptiveMomentSettings):
 
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
-        self.useObjectCorrection = settingsGroup.createBooleanEntry('UseObjectCorrection', False)
+        self.useObjectCorrection = settingsGroup.createBooleanEntry('UseObjectCorrection', True)
         self.positivityConstraint = settingsGroup.createRealEntry('PositivityConstraint', '0')
         self.smoothnessConstraint = settingsGroup.createRealEntry('SmoothnessConstraint', '0')
 
