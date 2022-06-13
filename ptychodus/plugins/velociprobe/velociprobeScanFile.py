@@ -61,7 +61,7 @@ class VelociprobeScanFileReader(ScanFileReader):
         return f'Velociprobe Scan Files - {yPositionSourceText} (*.txt)'
 
     def read(self, filePath: Path) -> Iterable[ScanPoint]:
-        scanPointDict: dict[int, VelociprobeScanPointList] = defaultdict(VelociprobeScanPointList)
+        pointDict: dict[int, VelociprobeScanPointList] = defaultdict(VelociprobeScanPointList)
 
         with open(filePath, newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
@@ -80,22 +80,20 @@ class VelociprobeScanFileReader(ScanFileReader):
                 if self._yPositionSource == VelociprobeScanYPositionSource.ENCODER:
                     y_nm = -y_nm
 
-                scanPointDict[trigger].append(x_nm, y_nm)
+                pointDict[trigger].append(x_nm, y_nm)
 
-        scanPointList = [
-            scanPointList.mean() for _, scanPointList in sorted(scanPointDict.items())
-        ]
-        xMeanInMeters = Decimal(sum(point.x for point in scanPointList)) / len(scanPointList)
-        yMeanInMeters = Decimal(sum(point.y for point in scanPointList)) / len(scanPointList)
+        pointList = [pointList.mean() for _, pointList in sorted(pointDict.items())]
+        xMeanInMeters = Decimal(sum(point.x for point in pointList)) / len(pointList)
+        yMeanInMeters = Decimal(sum(point.y for point in pointList)) / len(pointList)
 
-        for idx, scanPoint in enumerate(scanPointList):
-            chi_rad = 0.
+        for idx, point in enumerate(pointList):
+            stageRotationInRadians = 0.
 
             if self._dataFileReader.entry:
-                chi_rad = self._dataFileReader.entry.sample.goniometer.chi_rad
+                stageRotationInRadians = self._dataFileReader.entry.sample.goniometer.chi_rad
 
-            x_m = (scanPoint.x - xMeanInMeters) * Decimal(numpy.cos(chi_rad))
-            y_m = (scanPoint.y - yMeanInMeters)
-            scanPointList[idx] = ScanPoint(x_m, y_m)
+            xInMeters = (point.x - xMeanInMeters) * Decimal(numpy.cos(stageRotationInRadians))
+            yInMeters = (point.y - yMeanInMeters)
+            pointList[idx] = ScanPoint(xInMeters, yInMeters)
 
-        return scanPointList
+        return pointList

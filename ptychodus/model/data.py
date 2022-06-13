@@ -242,7 +242,7 @@ class NullDiffractionDataset(DiffractionDataset):
         return DatasetState.NOT_FOUND
 
     def getArray(self) -> DataArrayType:
-        return numpy.empty((0, 0, 0), dtype=int)
+        return numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
     @overload
     def __getitem__(self, index: int) -> DataArrayType:
@@ -258,7 +258,7 @@ class NullDiffractionDataset(DiffractionDataset):
         if isinstance(index, slice):
             return list()
         else:
-            return numpy.empty((0, 0), dtype=int)
+            return numpy.empty((0, 0), dtype=numpy.uint16)
 
     def __len__(self) -> int:
         return 0
@@ -298,7 +298,7 @@ class CachedDiffractionDataset(DiffractionDataset, Observer):
         return self._array
 
     def __getitem__(self, index: int) -> DataArrayType:
-        array = numpy.empty((0, 0), dtype=int)
+        array = numpy.empty((0, 0), dtype=numpy.uint16)
 
         if self._cropSizer.isCropEnabled():
             sliceX = self._cropSizer.getSliceX()
@@ -358,7 +358,7 @@ class ActiveDataFile(DataFile):
         self._cropSizer = cropSizer
         self._dataFile: DataFile = NullDataFile()
         self._datasetList: list[DiffractionDataset] = list()
-        self._dataArray = numpy.empty((0, 0, 0), dtype=int)
+        self._dataArray = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
     @property
     def metadata(self) -> DataFileMetadata:
@@ -414,7 +414,7 @@ class ActiveDataFile(DataFile):
     def setActive(self, dataFile: DataFile) -> None:
         self._dataFile = dataFile
         self._datasetList.clear()
-        self._dataArray = numpy.empty((0, 0, 0), dtype=int)
+        self._dataArray = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
         if len(dataFile) > 0:
             maxWorkers = self._settings.numberOfDataThreads.value
@@ -426,10 +426,10 @@ class ActiveDataFile(DataFile):
             if scratchDirectory.is_dir():
                 npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
                 logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
-                self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=shape)
+                self._dataArray = numpy.memmap(npyTempFile, dtype=numpy.uint16, shape=shape)
             else:
                 logger.debug(f'Scratch memory is {shape}')
-                self._dataArray = numpy.zeros(shape)
+                self._dataArray = numpy.zeros(shape, dtype=numpy.uint16)
 
             with concurrent.futures.ThreadPoolExecutor(maxWorkers) as executor:
                 futureList = list()

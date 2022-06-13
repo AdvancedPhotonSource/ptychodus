@@ -24,10 +24,10 @@ class ImageDisplayRangeDialog(QDialog):
         self.maxValueLineEdit.setValue(maxValue)
 
     def minValue(self) -> Decimal:
-        return self._minValueLineEdit.getValue()
+        return self.minValueLineEdit.getValue()
 
     def maxValue(self) -> Decimal:
-        return self._maxValueLineEdit.getValue()
+        return self.maxValueLineEdit.getValue()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDisplayRangeDialog:
