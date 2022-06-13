@@ -49,7 +49,7 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
         return array.shape[0]
 
     def getArray(self) -> DataArrayType:
-        array = numpy.empty((0, 0, 0), dtype=int)
+        array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
         if self._filePath.is_file():
             self._state = DatasetState.EXISTS

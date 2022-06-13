@@ -16,11 +16,11 @@ import watchdog.events
 import watchdog.observers
 
 from ..api.data import DatasetState, DataArrayType, DataFile, DataFileReader, DataFileMetadata, DiffractionDataset
+from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser
 from ..api.settings import SettingsRegistry, SettingsGroup
 from ..api.tree import SimpleTreeNode
-from .geometry import Interval
 
 logger = logging.getLogger(__name__)
 
@@ -242,7 +242,7 @@ class NullDiffractionDataset(DiffractionDataset):
         return DatasetState.NOT_FOUND
 
     def getArray(self) -> DataArrayType:
-        return numpy.empty((0, 0, 0), dtype=int)
+        return numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
     @overload
     def __getitem__(self, index: int) -> DataArrayType:
@@ -258,7 +258,7 @@ class NullDiffractionDataset(DiffractionDataset):
         if isinstance(index, slice):
             return list()
         else:
-            return numpy.empty((0, 0), dtype=int)
+            return numpy.empty((0, 0), dtype=numpy.uint16)
 
     def __len__(self) -> int:
         return 0
@@ -298,7 +298,7 @@ class CachedDiffractionDataset(DiffractionDataset, Observer):
         return self._array
 
     def __getitem__(self, index: int) -> DataArrayType:
-        array = numpy.empty((0, 0), dtype=int)
+        array = numpy.empty((0, 0), dtype=numpy.uint16)
 
         if self._cropSizer.isCropEnabled():
             sliceX = self._cropSizer.getSliceX()
@@ -358,7 +358,7 @@ class ActiveDataFile(DataFile):
         self._cropSizer = cropSizer
         self._dataFile: DataFile = NullDataFile()
         self._datasetList: list[DiffractionDataset] = list()
-        self._dataArray = numpy.empty((0, 0, 0), dtype=int)
+        self._dataArray = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
     @property
     def metadata(self) -> DataFileMetadata:
@@ -367,8 +367,8 @@ class ActiveDataFile(DataFile):
     def getContentsTree(self) -> SimpleTreeNode:
         return self._dataFile.getContentsTree()
 
-    def getDiffractionData(self) -> DataArrayType:
-        if self._cropSizer.isCropEnabled():
+    def getDiffractionData(self, cropped: bool = True) -> DataArrayType:
+        if cropped and self._cropSizer.isCropEnabled():
             sliceX = self._cropSizer.getSliceX()
             sliceY = self._cropSizer.getSliceY()
             return self._dataArray[:, sliceY, sliceX]
@@ -414,7 +414,7 @@ class ActiveDataFile(DataFile):
     def setActive(self, dataFile: DataFile) -> None:
         self._dataFile = dataFile
         self._datasetList.clear()
-        self._dataArray = numpy.empty((0, 0, 0), dtype=int)
+        self._dataArray = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
         if len(dataFile) > 0:
             maxWorkers = self._settings.numberOfDataThreads.value
@@ -426,10 +426,10 @@ class ActiveDataFile(DataFile):
             if scratchDirectory.is_dir():
                 npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
                 logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
-                self._dataArray = numpy.memmap(npyTempFile, dtype=int, shape=shape)
+                self._dataArray = numpy.memmap(npyTempFile, dtype=numpy.uint16, shape=shape)
             else:
                 logger.debug(f'Scratch memory is {shape}')
-                self._dataArray = numpy.zeros(shape)
+                self._dataArray = numpy.zeros(shape, dtype=numpy.uint16)
 
             with concurrent.futures.ThreadPoolExecutor(maxWorkers) as executor:
                 futureList = list()
@@ -451,16 +451,19 @@ class ActiveDataFile(DataFile):
 class DataFilePresenter(Observable, Observer):
 
     def __init__(self, settings: DataSettings, activeDataFile: ActiveDataFile,
-                 fileReaderChooser: PluginChooser[DataFileReader]) -> None:
+                 fileReaderChooser: PluginChooser[DataFileReader],
+                 fileWriterChooser: PluginChooser[DataFileWriter]) -> None:
         super().__init__()
         self._settings = settings
         self._activeDataFile = activeDataFile
         self._fileReaderChooser = fileReaderChooser
+        self._fileWriterChooser = fileWriterChooser
 
     @classmethod
     def createInstance(cls, settings: DataSettings, activeDataFile: ActiveDataFile,
-                       fileReaderChooser: PluginChooser[DataFileReader]) -> DataFilePresenter:
-        presenter = cls(settings, activeDataFile, fileReaderChooser)
+                       fileReaderChooser: PluginChooser[DataFileReader],
+                       fileWriterChooser: PluginChooser[DataFileWriter]) -> DataFilePresenter:
+        presenter = cls(settings, activeDataFile, fileReaderChooser, fileWriterChooser)
         settings.fileType.addObserver(presenter)
         fileReaderChooser.addObserver(presenter)
         presenter._syncFileReaderFromSettings()
@@ -487,31 +490,34 @@ class DataFilePresenter(Observable, Observer):
     def getNumberOfDatasets(self) -> int:
         return len(self._activeDataFile)
 
-    def openDataset(self, dataPath: str) -> Any:  # TODO hdf5-only
+    def openDataset(self, dataPath: str) -> Any:
         filePath = self._activeDataFile.metadata.filePath
         data = None
 
-        if filePath and dataPath:
-            with h5py.File(filePath, 'r') as h5File:
-                if dataPath in h5File:
-                    item = h5File.get(dataPath)
+        if filePath and h5py.is_hdf5(filePath) and dataPath:
+            try:
+                with h5py.File(filePath, 'r') as h5File:
+                    if dataPath in h5File:
+                        item = h5File.get(dataPath)
 
-                    if isinstance(item, h5py.Dataset):
-                        data = item[()]  # TODO decode strings as needed
-                else:
-                    parentPath, attrName = dataPath.rsplit('/', 1)
+                        if isinstance(item, h5py.Dataset):
+                            data = item[()]  # TODO decode strings as needed
+                    else:
+                        parentPath, attrName = dataPath.rsplit('/', 1)
 
-                    if parentPath in h5File:
-                        item = h5File.get(parentPath)
+                        if parentPath in h5File:
+                            item = h5File.get(parentPath)
 
-                        if attrName in item.attrs:
-                            attr = item.attrs[attrName]
-                            stringInfo = h5py.check_string_dtype(attr.dtype)
+                            if attrName in item.attrs:
+                                attr = item.attrs[attrName]
+                                stringInfo = h5py.check_string_dtype(attr.dtype)
 
-                            if stringInfo:
-                                data = attr.decode(stringInfo.encoding)
-                            else:
-                                data = attr
+                                if stringInfo:
+                                    data = attr.decode(stringInfo.encoding)
+                                else:
+                                    data = attr
+            except OSError:
+                logger.exception('Failed to open dataset!')
 
         return data
 
@@ -544,6 +550,18 @@ class DataFilePresenter(Observable, Observer):
 
     def _openDataFileFromSettings(self) -> None:
         self._openDataFile(self._settings.filePath.value)
+
+    def getSaveFileFilterList(self) -> list[str]:
+        return self._fileWriterChooser.getDisplayNameList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._fileWriterChooser.getCurrentDisplayName()
+
+    def saveDataFile(self, filePath: Path, fileFilter: str) -> None:
+        logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
+        self._fileWriterChooser.setFromDisplayName(fileFilter)
+        writer = self._fileWriterChooser.getCurrentStrategy()
+        writer.write(filePath, self._activeDataFile.getDiffractionData(cropped=False))
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.fileType:

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy
 import scipy.io
 
 from ptychodus.api.plugins import PluginRegistry
@@ -18,7 +19,8 @@ class MATProbeFileReader(ProbeFileReader):
 
     def read(self, filePath: Path) -> ProbeArrayType:
         matDict = scipy.io.loadmat(filePath)
-        return matDict['probe']
+        probes = numpy.moveaxis(matDict['probe'], -1, 0)
+        return probes
 
 
 class MATProbeFileWriter(ProbeFileWriter):
@@ -32,6 +34,7 @@ class MATProbeFileWriter(ProbeFileWriter):
         return 'MAT Files (*.mat)'
 
     def write(self, filePath: Path, array: ProbeArrayType) -> None:
+        probes = numpy.moveaxis(array, 0, -1)
         matDict = {'probe': array}
         scipy.io.savemat(filePath, matDict)
 

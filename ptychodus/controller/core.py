@@ -83,6 +83,8 @@ class ControllerCore:
             lambda checked: controller._settingsController.saveSettings())
         view.openDataFileAction.triggered.connect(
             lambda checked: controller._dataFileController.openDataFile())
+        view.saveDataFileAction.triggered.connect(
+            lambda checked: controller._dataFileController.saveDataFile())
         view.chooseScratchDirectoryAction.triggered.connect(
             lambda checked: controller._dataFileController.chooseScratchDirectory())
         view.openScanAction.triggered.connect(

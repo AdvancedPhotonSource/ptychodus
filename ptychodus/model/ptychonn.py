@@ -3,7 +3,7 @@ import logging
 
 try:
     import torch
-except ImportError:
+except ModuleNotFoundError:
     torch = None
 
 from ..api.observer import Observable, Observer

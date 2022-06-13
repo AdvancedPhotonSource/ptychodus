@@ -5,21 +5,12 @@ import argparse
 import logging
 import sys
 
-import ptychodus.controller
-import ptychodus.model
-import ptychodus.view
+from ptychodus.model import ModelCore
+import ptychodus
 
 import h5py
 import matplotlib
 import numpy
-
-try:
-    import PyQt5
-    from PyQt5.QtWidgets import QApplication
-    from PyQt5.Qt import PYQT_VERSION_STR
-    from PyQt5.QtCore import QT_VERSION_STR
-except ImportError:
-    PyQt5 = None
 
 
 def versionString() -> str:
@@ -59,33 +50,43 @@ def main() -> int:
     logger.info(f'\tMatplotlib {matplotlib.__version__}')
     logger.info(f'\tHDF5 {h5py.version.hdf5_version}')
     logger.info(f'\tH5Py {h5py.__version__}')
-    logger.info('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
-    logger.info('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
 
     result = 0
 
-    with ptychodus.model.ModelCore(isDeveloperModeEnabled=parsedArgs.dev) as model:
+    with ModelCore(isDeveloperModeEnabled=parsedArgs.dev) as model:
         if parsedArgs.settings:
             model.settingsRegistry.openSettings(parsedArgs.settings.name)
 
         if parsedArgs.batch:
             verifyAllArgumentsParsed(parser, unparsedArgs)
-            result = model.batchModeReconstruct()
-        elif PyQt5:
+            return model.batchModeReconstruct()
+
+        try:
+            import PyQt5
+            from PyQt5.QtWidgets import QApplication
+            from PyQt5.Qt import PYQT_VERSION_STR
+            from PyQt5.QtCore import QT_VERSION_STR
+        except ModuleNotFoundError:
+            logger.error('\tPyQt ' + NOT_FOUND_STR)
+            return -1
+        else:
+            logger.info('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
+            logger.info('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
+
             # QApplication expects the first argument to be the program name
             qtArgs = sys.argv[:1] + unparsedArgs
             app = QApplication(qtArgs)
             verifyAllArgumentsParsed(parser, app.arguments()[1:])
 
-            view = ptychodus.view.ViewCore.createInstance()
-            controller = ptychodus.controller.ControllerCore.createInstance(model, view)
+            from ptychodus.view import ViewCore
+            view = ViewCore.createInstance()
+
+            from ptychodus.controller import ControllerCore
+            controller = ControllerCore.createInstance(model, view)
 
             view.setWindowTitle(versionString())
             view.show()
             result = app.exec_()
-        else:
-            logger.error('PyQt5 ' + NOT_FOUND_STR)
-            result = -1
 
     return result
 

@@ -7,33 +7,27 @@ from PyQt5.QtGui import QDoubleValidator, QPixmap, QWheelEvent
 from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, \
         QFormLayout, QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
         QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout, \
-        QLabel, QLineEdit, QPushButton, QSizePolicy, QSpinBox, QStyle, QVBoxLayout, QWidget
-from .widgets import BottomTitledGroupBox, DecimalSlider
+        QLabel, QPushButton, QSizePolicy, QSpinBox, QStyle, QVBoxLayout, QWidget
+from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
 class ImageDisplayRangeDialog(QDialog):
 
-    @staticmethod
-    def createRealLineEdit() -> QLineEdit:
-        lineEdit = QLineEdit()
-        lineEdit.setValidator(QDoubleValidator())
-        return lineEdit
-
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.buttonBox = QDialogButtonBox()
-        self.minValueWidget = ImageDisplayRangeDialog.createRealLineEdit()
-        self.maxValueWidget = ImageDisplayRangeDialog.createRealLineEdit()
+        self.minValueLineEdit = DecimalLineEdit.createInstance()
+        self.maxValueLineEdit = DecimalLineEdit.createInstance()
 
     def setMinAndMaxValues(self, minValue: Decimal, maxValue: Decimal) -> None:
-        self.minValueWidget.setText(str(minValue))
-        self.maxValueWidget.setText(str(maxValue))
+        self.minValueLineEdit.setValue(minValue)
+        self.maxValueLineEdit.setValue(maxValue)
 
     def minValue(self) -> Decimal:
-        return Decimal(self.minValueWidget.text())
+        return self.minValueLineEdit.getValue()
 
     def maxValue(self) -> Decimal:
-        return Decimal(self.maxValueWidget.text())
+        return self.maxValueLineEdit.getValue()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDisplayRangeDialog:
@@ -45,8 +39,8 @@ class ImageDisplayRangeDialog(QDialog):
         dialog.buttonBox.rejected.connect(dialog.reject)
 
         layout = QFormLayout()
-        layout.addRow('Minimum Displayed Value:', dialog.minValueWidget)
-        layout.addRow('Maximum Displayed Value:', dialog.maxValueWidget)
+        layout.addRow('Minimum Displayed Value:', dialog.minValueLineEdit)
+        layout.addRow('Maximum Displayed Value:', dialog.maxValueLineEdit)
         layout.addRow(dialog.buttonBox)
         dialog.setLayout(layout)
 

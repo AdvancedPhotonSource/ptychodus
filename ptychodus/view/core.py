@@ -40,6 +40,7 @@ class ViewCore(QMainWindow):
         self.dataFileAction = self.navigationToolBar.addAction(fileIcon, 'Data')
         self.dataFileMenu = QMenu()
         self.openDataFileAction = self.dataFileMenu.addAction('Open Data...')
+        self.saveDataFileAction = self.dataFileMenu.addAction('Save Data...')
         self.chooseScratchDirectoryAction = self.dataFileMenu.addAction(
             'Choose Scratch Directory...')
         self.dataFileTreeView = QTreeView()

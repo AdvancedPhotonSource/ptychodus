@@ -94,7 +94,6 @@ class VelociprobePresenter(Observable, Observer):
         filePathMaster = self._activeDataFile.metadata.filePath
         fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
         filePath = filePathMaster.parents[2] / 'positions' / fileName
-        print(filePath.resolve())
         fileFilter = 'Comma-Separated Values Files (*.csv)'  # TODO refactor; get from somewhere
         self._scanInitializer.openScan(filePath, fileFilter)
 

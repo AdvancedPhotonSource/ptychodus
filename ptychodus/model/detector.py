@@ -7,10 +7,10 @@ import logging
 import numpy
 
 from ..api.data import DataArrayType, DatasetState, DiffractionDataset
+from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
 from .data import ActiveDataFile, DetectorSettings, NullDiffractionDataset
-from .geometry import Interval
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +96,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
             logger.exception('Invalid Dataset Index')
             return
 
-        if self._dataset is not None:
-            self._dataset.removeObserver(self)
-
+        self._dataset.removeObserver(self)
         self._dataset = dataset
         self._dataset.addObserver(self)
         self._datasetIndex = index
@@ -116,9 +114,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._dataFile:
-            if self._dataset is not None:
-                self._dataset.removeObserver(self)
-
+            self._dataset.removeObserver(self)
             self._dataset = NullDiffractionDataset()
             self._datasetIndex = 0
             self.notifyObservers()

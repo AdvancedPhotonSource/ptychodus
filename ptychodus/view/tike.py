@@ -4,7 +4,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGroupBox, QSpinBox, QVBoxLayout, QWidget
 
-from .widgets import DecimalSlider
+from .widgets import DecimalLineEdit, DecimalSlider
 
 
 class TikeBasicParametersView(QGroupBox):
@@ -71,7 +71,7 @@ class TikeBasicParametersView(QGroupBox):
 class TikeAdaptiveMomentView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(' Use Adaptive Moment', parent)
+        super().__init__('Use Adaptive Moment', parent)
         self.mdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.vdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
 
@@ -114,6 +114,31 @@ class TikePositionCorrectionView(QGroupBox):
         return view
 
 
+class TikeProbeSupportView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Finite Probe Support', parent)
+        self.weightLineEdit = DecimalLineEdit.createInstance()
+        self.radiusSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.degreeLineEdit = DecimalLineEdit.createInstance()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeProbeSupportView:
+        view = cls(parent)
+
+        view.weightLineEdit.setToolTip('Weight of the finite probe constraint.')
+        view.radiusSlider.setToolTip('Radius of probe support as fraction of probe grid.')
+        view.degreeLineEdit.setToolTip('Degree of the supergaussian defining the probe support.')
+
+        layout = QFormLayout()
+        layout.addRow('Weight:', view.weightLineEdit)
+        layout.addRow('Radius:', view.radiusSlider)
+        layout.addRow('Degree:', view.degreeLineEdit)
+        view.setLayout(layout)
+
+        return view
+
+
 class TikeProbeCorrectionView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
@@ -121,6 +146,7 @@ class TikeProbeCorrectionView(QGroupBox):
         self.sparsityConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.orthogonalityConstraintCheckBox = QCheckBox('Orthogonality Constraint')
         self.centeredIntensityConstraintCheckBox = QCheckBox('Centered Intensity Constraint')
+        self.probeSupportView = TikeProbeSupportView.createInstance()
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
 
     @classmethod
@@ -138,6 +164,7 @@ class TikeProbeCorrectionView(QGroupBox):
         layout.addRow('Sparsity Constraint:', view.sparsityConstraintSlider)
         layout.addRow(view.orthogonalityConstraintCheckBox)
         layout.addRow(view.centeredIntensityConstraintCheckBox)
+        layout.addRow(view.probeSupportView)
         layout.addRow(view.adaptiveMomentView)
         view.setLayout(layout)
 

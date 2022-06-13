@@ -161,6 +161,16 @@ class DataFileController(Observer):
         if filePath:
             self._presenter.openDataFile(filePath, nameFilter)
 
+    def saveDataFile(self) -> None:
+        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+            self._treeView,
+            'Save Data File',
+            nameFilters=self._presenter.getSaveFileFilterList(),
+            selectedNameFilter=self._presenter.getSaveFileFilter())
+
+        if filePath:
+            self._presenter.saveDataFile(filePath, nameFilter)
+
     def chooseScratchDirectory(self) -> None:
         scratchDir = QFileDialog.getExistingDirectory(self._treeView, 'Choose Scratch Directory',
                                                       str(self._presenter.getScratchDirectory()))

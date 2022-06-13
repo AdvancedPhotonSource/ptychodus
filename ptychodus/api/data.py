@@ -66,3 +66,19 @@ class DataFileReader(ABC):
     @abstractmethod
     def read(self, filePath: Path) -> DataFile:
         pass
+
+
+class DataFileWriter(ABC):
+
+    @abstractproperty
+    def simpleName(self) -> str:
+        pass
+
+    @abstractproperty
+    def fileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def write(self, filePath: Path, array: DataArrayType) -> None:
+        # TODO this interface should use a DataFile rather than DataArray
+        pass

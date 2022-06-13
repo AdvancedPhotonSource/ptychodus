@@ -6,12 +6,12 @@ import logging
 
 import numpy
 
+from ..api.geometry import Box, Interval
 from ..api.object import *
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
 from ..api.settings import SettingsRegistry, SettingsGroup
 from .data import CropSizer, Detector
-from .geometry import Box, Interval
 from .image import ImageExtent
 from .probe import ProbeSizer
 from .scan import Scan

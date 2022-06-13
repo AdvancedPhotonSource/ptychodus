@@ -9,11 +9,11 @@ import logging
 
 import numpy
 
+from ..api.geometry import Interval, Box
 from ..api.observer import Observable, Observer
+from ..api.plugins import PluginChooser, PluginEntry
 from ..api.scan import ScanPoint, ScanPointSequence, ScanPointTransform, ScanFileReader, ScanFileWriter
 from ..api.settings import SettingsRegistry, SettingsGroup
-from ..api.plugins import PluginChooser, PluginEntry
-from .geometry import Interval, Box
 
 logger = logging.getLogger(__name__)
 

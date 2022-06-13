@@ -4,7 +4,7 @@ import logging
 
 try:
     import ptychopy
-except ImportError:
+except ModuleNotFoundError:
     ptychopy = None
 
 from ..api.observer import Observable, Observer
