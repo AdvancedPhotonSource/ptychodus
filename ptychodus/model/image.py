@@ -190,7 +190,7 @@ class ImagePresenter(Observable, Observer):
             if numpy.iscomplexobj(self._array):
                 self._image = complexToRealStrategy(self._array, scalarTransform)
             else:
-                self._image = scalarTransform(self._array)
+                self._image = scalarTransform(self._array.astype(numpy.float32))
 
         if self._image is None or numpy.size(self._image) <= 0:
             self._dataRange = Interval[Decimal](Decimal(0), Decimal(1))

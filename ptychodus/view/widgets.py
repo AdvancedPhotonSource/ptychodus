@@ -28,6 +28,7 @@ class DecimalLineEdit(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
+        self._validator = QDoubleValidator()
         self._lineEdit = QLineEdit()
         self._value = Decimal()
         self._minimum: Optional[Decimal] = None
@@ -37,7 +38,9 @@ class DecimalLineEdit(QWidget):
     def createInstance(cls, parent: Optional[QWidget] = None) -> DecimalLineEdit:
         widget = cls(parent)
 
+        widget._lineEdit.setValidator(widget._validator)
         widget._lineEdit.editingFinished.connect(widget._setValueFromLineEdit)
+        widget._setValueToLineEditAndEmitValueChanged()
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -94,7 +97,7 @@ class DecimalLineEdit(QWidget):
 
     def _setValueToLineEditAndEmitValueChanged(self) -> None:
         self._lineEdit.blockSignals(True)
-        self._lineEdit.setText(str(self._value))
+        self._lineEdit.setText(str(self.getValue()))
         self._lineEdit.blockSignals(False)
         self._emitValueChanged()
 
