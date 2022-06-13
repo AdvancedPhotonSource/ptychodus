@@ -80,4 +80,5 @@ class DataFileWriter(ABC):
 
     @abstractmethod
     def write(self, filePath: Path, array: DataArrayType) -> None:
+        # TODO this interface should use a DataFile rather than DataArray
         pass
