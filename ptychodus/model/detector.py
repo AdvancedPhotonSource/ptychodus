@@ -93,7 +93,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
         try:
             dataset = self._dataFile[index]
         except IndexError:
-            logger.exception('Invalid Dataset Index')
+            logger.exception('Invalid dataset index!')
             return
 
         self._dataset.removeObserver(self)

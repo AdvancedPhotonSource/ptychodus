@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 import logging
+import threading
 
 import numpy
 import numpy.typing
@@ -234,6 +235,7 @@ class Probe(Observable):
         self._settings = settings
         self._sizer = sizer
         self._array = numpy.zeros((1, *sizer.getProbeExtent().shape), dtype=complex)
+        self._arrayLock = threading.Lock()
 
     def getNumberOfProbeModes(self) -> int:
         return self._array.shape[0]
@@ -249,9 +251,11 @@ class Probe(Observable):
             raise TypeError('Probe must be a complex-valued ndarray')
 
         if array.ndim == 2:
-            self._array = array[numpy.newaxis, ...]
+            with self._arrayLock:
+                self._array = array[numpy.newaxis, ...]
         elif array.ndim == 3:
-            self._array = array
+            with self._arrayLock:
+                self._array = array
         else:
             raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
 

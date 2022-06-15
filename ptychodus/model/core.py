@@ -18,6 +18,7 @@ from .reconstructor import *
 from .scan import *
 from .tike import TikeBackend
 from .velociprobe import *
+from .watcher import DataDirectoryWatcher
 
 import ptychodus.plugins
 
@@ -50,7 +51,7 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
-        self._dataDirectoryWatcher = DataDirectoryWatcher()
+        self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
 
@@ -140,7 +141,6 @@ class ModelCore:
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataDirectoryWatcher.stop()
-        self._dataDirectoryWatcher.join()
 
     def batchModeReconstruct(self) -> int:
         outputFilePath = self._reconstructorSettings.outputFilePath.value

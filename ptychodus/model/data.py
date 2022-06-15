@@ -8,12 +8,9 @@ import concurrent.futures
 import functools
 import logging
 import tempfile
-import threading
 
 import h5py
 import numpy
-import watchdog.events
-import watchdog.observers
 
 from ..api.data import DatasetState, DataArrayType, DataFile, DataFileReader, DataFileMetadata, DiffractionDataset
 from ..api.geometry import Interval
@@ -188,47 +185,6 @@ class CropSizer(Observer, Observable):
             self.notifyObservers()
         elif observable is self._detector:
             self.notifyObservers()
-
-
-class H5FileEventHandler(watchdog.events.PatternMatchingEventHandler):
-
-    def __init__(self) -> None:
-        super().__init__(patterns=['*.h5', '*.hdf5'],
-                         ignore_directories=True,
-                         case_sensitive=False)
-
-    def on_any_event(self, event) -> None:
-        print(f'{event.event_type}: {event.src_path}')
-
-
-class DataDirectoryWatcher(threading.Thread):
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._directoryPath: Path = Path.home()
-        self._observer = watchdog.observers.Observer()
-        self._eventHandler = H5FileEventHandler()
-        self._waitTimeInSeconds = 1.
-        self._stopEvent = threading.Event()
-        self._watch = None
-
-    def run(self) -> None:
-        self._observer.schedule(self._eventHandler, self._directoryPath, recursive=False)
-        self._observer.start()
-
-        try:
-            while not self._stopEvent.wait(self._waitTimeInSeconds):
-                pass
-
-        except Exception:
-            logger.exception('Watchdog Thread Exception!')
-            self._observer.stop()
-
-        self._observer.join()
-
-    def stop(self) -> None:
-        self._observer.stop()
-        self._stopEvent.set()
 
 
 class NullDiffractionDataset(DiffractionDataset):

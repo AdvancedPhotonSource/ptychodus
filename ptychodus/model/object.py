@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from decimal import Decimal, ROUND_CEILING
 from pathlib import Path
 import logging
+import threading
 
 import numpy
 
@@ -194,6 +195,7 @@ class Object(Observable):
         self._settings = settings
         self._sizer = sizer
         self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
+        self._arrayLock = threading.Lock()
 
     def getArray(self) -> ObjectArrayType:
         return self._array
@@ -202,7 +204,9 @@ class Object(Observable):
         if not numpy.iscomplexobj(array):
             raise TypeError('Object must be a complex-valued ndarray')
 
-        self._array = array
+        with self._arrayLock:
+            self._array = array
+
         self.notifyObservers()
 
 
