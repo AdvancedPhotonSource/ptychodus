@@ -338,8 +338,8 @@ class MDAFile:
                     for pvidx in range(number_pvs):
                         pv = cls._read_pv(unpacker)
                         extra_pvs.append(pv)
-        except OSError as exc:
-            logger.exception(exc)
+        except OSError as err:
+            logger.exception(err)
 
         return cls(header, scan, extra_pvs)
 
