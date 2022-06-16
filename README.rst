@@ -7,10 +7,57 @@ Ptychodus
 * `ptychopy`_ is under development
 * `PtychoNN`_ is under development
 
-Installation
-------------
+Standard Installation
+---------------------
 
-* To install `ptychodus`, install `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_ then:
+Install `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_.
+
+* To install `ptychodus` with the GUI and no optional packages:
+
+.. code-block:: shell
+
+    $ conda create -c conda-forge -n ptychodus ptychodus
+
+* To install `ptychodus` with the GUI and all optional packages:
+
+.. code-block:: shell
+
+    $ conda create -c conda-forge -n ptychodus ptychodus-all
+
+
+* To install `ptychodus` without the GUI or optional packages:
+
+.. code-block:: shell
+
+    $ conda create -c conda-forge -n ptychodus ptychodus-core
+
+Activate the `ptychodus` conda environment to run ptychodus.
+
+.. code-block:: shell
+
+    $ conda activate ptychodus
+    $ ptychodus -h
+    usage: ptychodus [-h] [-b] [-d] [-f PREFIX] [-p PORT] [-s SETTINGS] [-v]
+
+    ptychodus is a ptychography analysis front-end
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -b, --batch           run reconstruction non-interactively
+      -d, --dev             run in developer mode
+      -f PREFIX, --file-prefix PREFIX
+                            replace file path prefix
+      -p PORT, --port PORT  remote process communication port number
+      -s SETTINGS, --settings SETTINGS
+                            use settings from file
+      -v, --version         show program's version number and exit
+    $ ptychodus
+
+
+Developer Installation
+----------------------
+
+* For a developer installation:
 
 .. code-block:: shell
 

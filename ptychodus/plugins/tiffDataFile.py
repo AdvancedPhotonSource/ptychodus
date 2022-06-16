@@ -18,10 +18,12 @@ logger = logging.getLogger(__name__)
 
 class TiffDiffractionDataset(DiffractionDataset):
 
-    def __init__(self, filePath: Path) -> None:
+    def __init__(self, filePath: Path, flipLR: bool, flipUD: bool) -> None:
         super().__init__()
         self._filePath = filePath
         self._state = DatasetState.NOT_FOUND
+        self._flipLR = flipLR
+        self._flipUD = flipUD
 
     @property
     def datasetName(self) -> str:
@@ -60,6 +62,13 @@ class TiffDiffractionDataset(DiffractionDataset):
 
                     if array.ndim == 2:
                         array = array[numpy.newaxis, :, :]
+
+                    if self._flipLR:
+                        array = numpy.fliplr(array)
+
+                    if self._flipUD:
+                        array = numpy.flipud(array)
+
             except OSError as err:
                 logger.exception(err)
             else:
@@ -104,13 +113,37 @@ class TiffDataFile(DataFile):
 
 class TiffDataFileReader(DataFileReader):
 
+    def __init__(self, flipLR: bool = False, flipUD: bool = False) -> None:
+        self._flipLR = flipLR
+        self._flipUD = flipUD
+
     @property
     def simpleName(self) -> str:
-        return 'TIFF'
+        sb = ['TIFF']
+
+        if self._flipLR and self._flipUD:
+            sb.append('FLIPBOTH')
+        elif self._flipLR:
+            sb.append('FLIPLR')
+        elif self._flipUD:
+            sb.append('FLIPUD')
+
+        return '-'.join(sb)
 
     @property
     def fileFilter(self) -> str:
-        return 'Tagged Image File Format Files (*.tif *.tiff)'
+        sb = ['Tagged Image File Format Files']
+
+        if self._flipLR and self._flipUD:
+            sb.append('[Flip Both]')
+        elif self._flipLR:
+            sb.append('[Flip Left-Right]')
+        elif self._flipUD:
+            sb.append('[Flip Up-Down]')
+
+        sb.append('(*.tif *.tiff)')
+
+        return ' '.join(sb)
 
     def read(self, filePath: Path) -> DataFile:
         metadata = DataFileMetadata(filePath, 0, 0, 0)
@@ -133,7 +166,7 @@ class TiffDataFileReader(DataFileReader):
                         itemDetails = str(tiff.epics_metadata)
                         contentsTree.createChild([itemName, itemType, itemDetails])
 
-                    dataset = TiffDiffractionDataset(fp)
+                    dataset = TiffDiffractionDataset(fp, self._flipLR, self._flipUD)
                     datasetList.append(dataset)
 
             with TiffFile(filePath) as tiff:
@@ -148,7 +181,10 @@ class TiffDataFileReader(DataFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(TiffDataFileReader())
+    registry.registerPlugin(TiffDataFileReader(flipLR=False, flipUD=False))
+    registry.registerPlugin(TiffDataFileReader(flipLR=False, flipUD=True))
+    registry.registerPlugin(TiffDataFileReader(flipLR=True, flipUD=False))
+    registry.registerPlugin(TiffDataFileReader(flipLR=True, flipUD=True))
 
 
 if __name__ == '__main__':

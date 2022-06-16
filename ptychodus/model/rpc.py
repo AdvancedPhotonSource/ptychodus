@@ -57,22 +57,24 @@ class RPC_TCPServer(socketserver.TCPServer):
         self._messageQueue = messageQueue
 
     def processMessage(self, message: str) -> str:
-        response = 'UNKNOWN'
-
         try:
             messageDict = json.loads(message)
             logger.debug(messageDict)
         except json.JSONDecodeError:
-            logger.debug(f'Failed to decode \"{message}\"!')
-            response = 'FAILURE'
-        else:
-            # FIXME generalize and handle conversion errors
-            messageObject = LoadResultsMessage.fromDict(messageDict)
-            logger.debug(messageObject)
-            self._messageQueue.put(messageObject)
-            response = 'SUCCESS'
+            logger.debug(f'Failed to decode JSON: \"{message}\"!')
+            return 'FAILURE'
 
-        return response
+        try:
+            messageType = messageDict['messageType']
+        except KeyError:
+            logger.debug(f'Missing messageType: \"{message}\"!')
+            return 'FAILURE'
+
+        # FIXME generalize and handle conversion errors
+        messageObject = LoadResultsMessage.fromDict(messageDict)
+        self._messageQueue.put(messageObject)
+
+        return 'SUCCESS'
 
 
 class RemoteProcessCommunicationServer:
