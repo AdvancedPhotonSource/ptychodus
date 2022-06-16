@@ -10,48 +10,49 @@ Ptychodus
 Standard Installation
 ---------------------
 
-Install `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_.
+1. Install `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_.
 
-* To install `ptychodus` with the GUI and no optional packages:
+2. Install ptychodus
 
-.. code-block:: shell
+   * To install `ptychodus` with the GUI and no optional packages:
 
-    $ conda create -c conda-forge -n ptychodus ptychodus
+     .. code-block:: shell
 
-* To install `ptychodus` with the GUI and all optional packages:
+           $ conda create -c conda-forge -n ptychodus ptychodus
 
-.. code-block:: shell
+   * To install `ptychodus` with the GUI and all optional packages:
 
-    $ conda create -c conda-forge -n ptychodus ptychodus-all
+     .. code-block:: shell
 
+           $ conda create -c conda-forge -n ptychodus ptychodus-all
 
-* To install `ptychodus` without the GUI or optional packages:
+   * To install `ptychodus` without the GUI or optional packages:
 
-.. code-block:: shell
+     .. code-block:: shell
 
-    $ conda create -c conda-forge -n ptychodus ptychodus-core
+           $ conda create -c conda-forge -n ptychodus ptychodus-core
 
-Activate the `ptychodus` conda environment to run ptychodus.
+3. Activate the `ptychodus` conda environment to run ptychodus.
 
-.. code-block:: shell
+   .. code-block:: shell
 
-    $ conda activate ptychodus
-    $ ptychodus -h
-    usage: ptychodus [-h] [-b] [-d] [-f PREFIX] [-p PORT] [-s SETTINGS] [-v]
+       $ conda activate ptychodus
+       $ ptychodus -h
+       usage: ptychodus [-h] [-b] [-d] [-f PREFIX] [-p PORT] [-s SETTINGS] [-v]
 
-    ptychodus is a ptychography analysis front-end
+       ptychodus is a ptychography analysis front-end
 
-    optional arguments:
-      -h, --help            show this help message and exit
-      -b, --batch           run reconstruction non-interactively
-      -d, --dev             run in developer mode
-      -f PREFIX, --file-prefix PREFIX
-                            replace file path prefix
-      -p PORT, --port PORT  remote process communication port number
-      -s SETTINGS, --settings SETTINGS
-                            use settings from file
-      -v, --version         show program's version number and exit
-    $ ptychodus
+       optional arguments:
+         -h, --help            show this help message and exit
+         -b, --batch           run reconstruction non-interactively
+         -d, --dev             run in developer mode
+         -f PREFIX, --file-prefix PREFIX
+                               replace file path prefix
+         -p PORT, --port PORT  remote process communication port number
+         -s SETTINGS, --settings SETTINGS
+                               use settings from file
+         -v, --version         show program's version number and exit
+       $ ptychodus
 
 
 Developer Installation
@@ -61,28 +62,28 @@ Developer Installation
 
 .. code-block:: shell
 
-    $ git clone https://github.com/AdvancedPhotonSource/ptychodus.git
-    $ conda create -c conda-forge -n ptychodus --file ptychodus/requirements-dev.txt
-    $ conda activate ptychodus
-    $ pip install -e ./ptychodus
+   $ git clone https://github.com/AdvancedPhotonSource/ptychodus.git
+   $ conda create -c conda-forge -n ptychodus --file ptychodus/requirements-dev.txt
+   $ conda activate ptychodus
+   $ pip install -e ./ptychodus
 
 * To install the `tike` backend:
 
 .. code-block:: shell
 
-    $ conda install -n ptychodus -c conda-forge tike
+   $ conda install -n ptychodus -c conda-forge tike
 
 * To install the `PtychoNN` backend:
 
 .. code-block:: shell
 
-    $ conda install -n ptychodus -c conda-forge pytorch
+   $ conda install -n ptychodus -c conda-forge pytorch
 
 * To launch the `ptychodus` GUI (with the "ptychodus" conda environment activated):
 
 .. code-block:: shell
 
-    $ ptychodus
+   $ ptychodus
 
 Tips
 ----
@@ -90,14 +91,14 @@ Tips
 * This project is experimenting with `type hints <https://docs.python.org/3/library/typing.html>`_ which can be checked using `mypy <http://mypy-lang.org>`_.
 
 .. code-block:: shell
-
-    $ mypy ptychodus
+  
+  $ mypy ptychodus
 
 * Stubs to support PyQt5 type hinting can be installed within the conda environment.
 
 .. code-block:: shell
 
-    $ pip install PyQt5-stubs
+   $ pip install PyQt5-stubs
 
 Reporting bugs
 --------------
@@ -108,4 +109,3 @@ Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
 .. _`tike`: https://github.com/tomography/tike
 .. _`ptychopy`: https://github.com/AdvancedPhotonSource/ptychopy
 .. _`PtychoNN`: https://github.com/mcherukara/PtychoNN
-
