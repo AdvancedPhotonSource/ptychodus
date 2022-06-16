@@ -10,12 +10,12 @@ import socketserver
 import sys
 import threading
 
-from ..api.ipc import IPCMessage
+from ..api.rpc import RPCMessage
 
 logger = logging.getLogger(__name__)
 
 
-class LoadResultsMessage(IPCMessage):
+class LoadResultsMessage(RPCMessage):
 
     def __init__(self, filePath: Path) -> None:
         self._filePath = filePath
@@ -23,7 +23,7 @@ class LoadResultsMessage(IPCMessage):
     @classmethod
     @property
     def messageType(self) -> int:
-        return 100  # any unique integer would work
+        return 100
 
     @property
     def filePath(self) -> Path:
@@ -40,7 +40,7 @@ class LoadResultsMessage(IPCMessage):
         return result
 
 
-class IPC_StreamRequestHandler(socketserver.StreamRequestHandler):
+class RPC_StreamRequestHandler(socketserver.StreamRequestHandler):
 
     def handle(self):
         message = self.rfile.readline().decode('utf-8').strip()
@@ -50,10 +50,10 @@ class IPC_StreamRequestHandler(socketserver.StreamRequestHandler):
         self.wfile.write(response.encode('utf-8'))
 
 
-class IPC_TCPServer(socketserver.TCPServer):
+class RPC_TCPServer(socketserver.TCPServer):
 
     def __init__(self, portNumber: int, messageQueue: queue.Queue) -> None:
-        super().__init__(('127.0.0.1', portNumber), IPC_StreamRequestHandler)
+        super().__init__(('127.0.0.1', portNumber), RPC_StreamRequestHandler)
         self._messageQueue = messageQueue
 
     def processMessage(self, message: str) -> str:
@@ -75,28 +75,28 @@ class IPC_TCPServer(socketserver.TCPServer):
         return response
 
 
-class InterProcessCommunicationServer:
+class RemoteProcessCommunicationServer:
 
     def __init__(self, portNumber: int) -> None:
         self._messageQueue = queue.Queue()
-        self._ipcServer = IPC_TCPServer(portNumber, self._messageQueue)
-        self._thread = threading.Thread(target=self._ipcServer.serve_forever)
+        self._rpcServer = RPC_TCPServer(portNumber, self._messageQueue)
+        self._thread = threading.Thread(target=self._rpcServer.serve_forever)
 
     def start(self) -> None:
         if self._thread.is_alive():
             logger.debug('Server thread is already alive!')
         else:
             self._thread.start()
-            logger.debug(f'Server thread is communicating on {self._ipcServer.server_address}')
+            logger.debug(f'Server thread is communicating on {self._rpcServer.server_address}')
 
     def stop(self) -> None:
-        self._ipcServer.shutdown()
-        self._ipcServer.server_close()
+        self._rpcServer.shutdown()
+        self._rpcServer.server_close()
         # FIXME self._messageQueue.join()
         logger.debug('Server stopped.')
 
 
-class InterProcessCommunicationClient:
+class RemoteProcessCommunicationClient:
 
     def __init__(self, portNumber: int) -> None:
         self._serverAddress = ('127.0.0.1', portNumber)
@@ -116,15 +116,15 @@ class InterProcessCommunicationClient:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog='ptychodus-ipc',
-        description='ptychodus-ipc communicates with an active ptychodus process')
+        prog='ptychodus-rpc',
+        description='ptychodus-rpc communicates with an active ptychodus process')
     parser.add_argument('-m', '--message', action='store', required=True, \
             help='message to send')
     parser.add_argument('-p', '--port', action='store', type=int, default=9999, \
-            help='inter-process communication port number')
+            help='remote process communication port number')
     args = parser.parse_args()
 
-    client = InterProcessCommunicationClient(args.port)
+    client = RemoteProcessCommunicationClient(args.port)
     response = client.send(args.message)
 
     print(response)

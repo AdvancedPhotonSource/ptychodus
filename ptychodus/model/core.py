@@ -10,12 +10,12 @@ from ..api.settings import SettingsRegistry
 from .data import *
 from .detector import *
 from .image import *
-from .ipc import InterProcessCommunicationServer
 from .object import *
 from .probe import *
 from .ptychonn import PtychoNNBackend
 from .ptychopy import PtychoPyBackend
 from .reconstructor import *
+from .rpc import RemoteProcessCommunicationServer
 from .scan import *
 from .tike import TikeBackend
 from .velociprobe import *
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class ModelCore:
 
-    def __init__(self, ipcPort: int, isDeveloperModeEnabled: bool = False) -> None:
+    def __init__(self, rpcPort: int, isDeveloperModeEnabled: bool = False) -> None:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
         self._colormapChooserFactory = ColormapChooserFactory()
@@ -52,7 +52,7 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
-        self._ipcServer = InterProcessCommunicationServer(ipcPort)
+        self._rpcServer = RemoteProcessCommunicationServer(rpcPort)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
 
         self._detector = Detector.createInstance(self._detectorSettings)
@@ -129,7 +129,7 @@ class ModelCore:
             self._reconstructorSettings, self._selectableReconstructor)
 
     def __enter__(self) -> ModelCore:
-        self._ipcServer.start()
+        self._rpcServer.start()
         self._dataDirectoryWatcher.start()
         return self
 
@@ -145,7 +145,7 @@ class ModelCore:
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataDirectoryWatcher.stop()
-        self._ipcServer.stop()
+        self._rpcServer.stop()
 
     def batchModeReconstruct(self) -> int:
         outputFilePath = self._reconstructorSettings.outputFilePath.value

@@ -34,7 +34,7 @@ def main() -> int:
     parser.add_argument('-f', '--file-prefix', action='store', dest='PREFIX', \
             help='replace file path prefix')
     parser.add_argument('-p', '--port', action='store', type=int, default=9999, \
-            help='inter-process communication port number')
+            help='remote process communication port number')
     parser.add_argument('-s', '--settings', action='store', type=argparse.FileType('r'), \
             help='use settings from file')
     parser.add_argument('-v', '--version', action='version', version=versionString())
@@ -52,7 +52,7 @@ def main() -> int:
 
     result = 0
 
-    with ModelCore(ipcPort=parsedArgs.port, isDeveloperModeEnabled=parsedArgs.dev) as model:
+    with ModelCore(rpcPort=parsedArgs.port, isDeveloperModeEnabled=parsedArgs.dev) as model:
         if parsedArgs.settings:
             model.settingsRegistry.openSettings(parsedArgs.settings.name)
 
