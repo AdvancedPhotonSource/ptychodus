@@ -16,7 +16,7 @@ class DataFileEventHandler(watchdog.events.PatternMatchingEventHandler):
         super().__init__(patterns=patterns, ignore_directories=True, case_sensitive=False)
 
     def on_any_event(self, event) -> None:
-        logger.info(f'{event.event_type}: {event.src_path}')
+        logger.debug(f'{event.event_type}: {event.src_path}')
 
 
 class DataDirectoryWatcher(Observer):
@@ -36,7 +36,7 @@ class DataDirectoryWatcher(Observer):
         filePath = self._settings.filePath.value
 
         if self._observer.is_alive():
-            logger.info('Watchdog thread is already alive!')
+            logger.debug('Watchdog thread is already alive!')
             return
 
         if filePath.is_file():
@@ -47,13 +47,13 @@ class DataDirectoryWatcher(Observer):
             self._observer = watchdog.observers.Observer()
             self._observer.schedule(eventHandler, directory, recursive=False)
             self._observer.start()
-            logger.info(f'Watchdog thread is watching \"{directory}\" for {patterns}.')
+            logger.debug(f'Watchdog thread is watching \"{directory}\" for {patterns}.')
 
     def stop(self) -> None:
         if self._observer.is_alive():
             self._observer.stop()
             self._observer.join()
-            logger.info('Watchdog thread stopped.')
+            logger.debug('Watchdog thread stopped.')
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.filePath:

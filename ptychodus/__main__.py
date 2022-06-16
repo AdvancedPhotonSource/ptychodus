@@ -27,17 +27,16 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(
         prog=ptychodus.__name__.lower(),
-        description=f'{ptychodus.__name__} is a ptychographic reconstruction user interface')
-    parser.add_argument('-b',
-                        '--batch',
-                        action='store_true',
-                        help='run reconstruction non-interactively')
+        description=f'{ptychodus.__name__} is a ptychography analysis front-end')
+    parser.add_argument('-b', '--batch', action='store_true', \
+            help='run reconstruction non-interactively')
     parser.add_argument('-d', '--dev', action='store_true', help='run in developer mode')
-    parser.add_argument('-s',
-                        '--settings',
-                        action='store',
-                        type=argparse.FileType('r'),
-                        help='use settings from file')
+    parser.add_argument('-f', '--file-prefix', action='store', dest='PREFIX', \
+            help='replace file path prefix')
+    parser.add_argument('-p', '--port', action='store', type=int, default=9999, \
+            help='inter-process communication port number')
+    parser.add_argument('-s', '--settings', action='store', type=argparse.FileType('r'), \
+            help='use settings from file')
     parser.add_argument('-v', '--version', action='version', version=versionString())
     parsedArgs, unparsedArgs = parser.parse_known_args()
 
@@ -53,7 +52,7 @@ def main() -> int:
 
     result = 0
 
-    with ModelCore(isDeveloperModeEnabled=parsedArgs.dev) as model:
+    with ModelCore(ipcPort=parsedArgs.port, isDeveloperModeEnabled=parsedArgs.dev) as model:
         if parsedArgs.settings:
             model.settingsRegistry.openSettings(parsedArgs.settings.name)
 

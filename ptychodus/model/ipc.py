@@ -1,44 +1,60 @@
+from __future__ import annotations
+import logging
+import socket
 import socketserver
+import sys
+import threading
+
+logger = logging.getLogger(__name__)
 
 
-class MyTCPHandler(socketserver.StreamRequestHandler):
+class InterProcessCommunicationHandler(socketserver.StreamRequestHandler):
 
     def handle(self):
-        # self.rfile is a file-like object created by the handler;
-        # we can now use e.g. readline() instead of raw recv() calls
-        self.data = self.rfile.readline().strip()
-        print('{} wrote:'.format(self.client_address[0]))
-        print(self.data)
-        # Likewise, self.wfile is a file-like object used to write back
-        # to the client
-        self.wfile.write(self.data.upper())
+        message = self.rfile.readline().decode('utf-8').strip()
+        logger.debug(f'{self.client_address[0]} wrote: \"{message}\"')
+        self.wfile.write(message.upper().encode('utf-8'))
+
+
+class InterProcessCommunicationServer:
+
+    def __init__(self, portNumber: int) -> None:
+        self._serverAddress = ('127.0.0.1', portNumber)
+        self._ipcServer = socketserver.TCPServer(self._serverAddress,
+                                                 InterProcessCommunicationHandler)
+        self._thread = threading.Thread(target=self._ipcServer.serve_forever)
+
+    def start(self) -> None:
+        if self._thread.is_alive():
+            logger.debug('Server thread is already alive!')
+        else:
+            self._thread.start()
+            logger.debug(f'Server thread is communicating on {self._ipcServer.server_address}')
+
+    def stop(self) -> None:
+        self._ipcServer.shutdown()
+        logger.debug('Server stopped.')
+
+
+class InterProcessCommunicationClient:
+
+    def __init__(self, portNumber: int) -> None:
+        self._serverAddress = ('127.0.0.1', portNumber)
+
+    def send(self, message: str) -> None:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect(self._serverAddress)
+
+            sock.sendall((message + '\n').encode('utf-8'))
+            logger.debug(f'SEND: \"{message}\"')
+
+            response = sock.recv(1024).decode('utf-8')
+            logger.debug(f'RECV: \"{response}\"')
 
 
 if __name__ == '__main__':
-    HOST, PORT = 'localhost', 9999
+    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
-    # Create the server, binding to localhost on port 9999
-    with socketserver.TCPServer((HOST, PORT), MyTCPHandler) as server:
-        # Activate the server; this will keep running until you
-        # interrupt the program with Ctrl-C
-        server.serve_forever()
-
-### client ###
-
-import socket
-import sys
-
-HOST, PORT = 'localhost', 9999
-data = ' '.join(sys.argv[1:])
-
-# Create a socket (SOCK_STREAM means a TCP socket)
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-    # Connect to server and send data
-    sock.connect((HOST, PORT))
-    sock.sendall(bytes(data + '\n', 'utf-8'))
-
-    # Receive data from the server and shut down
-    received = str(sock.recv(1024), 'utf-8')
-
-print('Sent:     {}'.format(data))
-print('Received: {}'.format(received))
+    portNumber = int(sys.argv[1])
+    client = InterProcessCommunicationClient(portNumber)
+    client.send(' '.join(sys.argv[2:]))
