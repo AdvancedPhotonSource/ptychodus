@@ -12,7 +12,7 @@ Standard Installation
 
 1. Install `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_.
 
-2. Install ptychodus
+2. Install ptychodus.
 
    * To install `ptychodus` with the GUI and no optional packages:
 
