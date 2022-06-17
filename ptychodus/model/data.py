@@ -12,7 +12,8 @@ import tempfile
 import h5py
 import numpy
 
-from ..api.data import DatasetState, DataArrayType, DataFile, DataFileReader, DataFileMetadata, DiffractionDataset
+from ..api.data import DatasetState, DataArrayType, DataFile, DataFileReader, DataFileMetadata, \
+        DataFileWriter, DiffractionDataset
 from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser

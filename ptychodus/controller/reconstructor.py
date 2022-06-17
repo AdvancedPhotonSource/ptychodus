@@ -7,7 +7,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
-from ..model import Observable, Observer, Reconstructor, ReconstructorPresenter
+from ..model import Observable, Observer, Reconstructor, \
+        ReconstructorPlotPresenter, ReconstructorPresenter
 from ..view import ReconstructorParametersView, ReconstructorPlotView
 
 logger = logging.getLogger(__name__)

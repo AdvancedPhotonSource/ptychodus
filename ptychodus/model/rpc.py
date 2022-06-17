@@ -9,6 +9,7 @@ import socket
 import socketserver
 import sys
 import threading
+import typing
 
 from ..api.rpc import RPCMessage
 
@@ -80,7 +81,7 @@ class RPC_TCPServer(socketserver.TCPServer):
 class RemoteProcessCommunicationServer:
 
     def __init__(self, portNumber: int) -> None:
-        self._messageQueue = queue.Queue()
+        self._messageQueue: queue.Queue[RPCMessage] = queue.Queue()
         self._rpcServer = RPC_TCPServer(portNumber, self._messageQueue)
         self._thread = threading.Thread(target=self._rpcServer.serve_forever)
 

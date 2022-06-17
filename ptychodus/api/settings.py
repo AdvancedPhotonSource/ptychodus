@@ -1,7 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
-from typing import Callable, Generic, Iterator, TypeVar
+from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
 import configparser
 
 from .observer import Observable, Observer
@@ -42,7 +42,7 @@ class SettingsGroup(Observable, Observer):
     def __init__(self, name: str) -> None:
         super().__init__()
         self._name = name
-        self._entryList: list[SettingsEntry] = list()
+        self._entryList: list[SettingsEntry[Any]] = list()
 
     @staticmethod
     def convertFloatToDecimal(value: float) -> Decimal:
@@ -78,7 +78,8 @@ class SettingsGroup(Observable, Observer):
                                                 lambda valueString: Decimal(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 
-    def _registerEntryIfNonexistent(self, candidateEntry):
+    def _registerEntryIfNonexistent(self,
+                                    candidateEntry: SettingsEntry[Any]) -> SettingsEntry[Any]:
         for existingEntry in self._entryList:
             if existingEntry.name.casefold() == candidateEntry.name.casefold():
                 if type(existingEntry.value) != type(candidateEntry.value):
@@ -92,10 +93,10 @@ class SettingsGroup(Observable, Observer):
 
         return candidateEntry
 
-    def __iter__(self) -> Iterator[SettingsEntry]:
+    def __iter__(self) -> Iterator[SettingsEntry[Any]]:
         return iter(self._entryList)
 
-    def __getitem__(self, index: int) -> SettingsEntry:
+    def __getitem__(self, index: int) -> SettingsEntry[Any]:
         return self._entryList[index]
 
     def __len__(self) -> int:
@@ -108,8 +109,9 @@ class SettingsGroup(Observable, Observer):
 
 class SettingsRegistry(Observable):
 
-    def __init__(self) -> None:
+    def __init__(self, replacementPathPrefix: Optional[str]) -> None:
         super().__init__()
+        self._replacementPathPrefix = replacementPathPrefix
         self._groupList: list[SettingsGroup] = list()
         self._fileFilterList: list[str] = ['Initialization Files (*.ini)']
 
@@ -138,6 +140,7 @@ class SettingsRegistry(Observable):
         return self._fileFilterList[0]
 
     def openSettings(self, filePath: Path) -> None:
+        prefixPlaceholder = 'PREFIX'
         config = configparser.ConfigParser(interpolation=None)
         config.read(filePath)
 
@@ -146,11 +149,16 @@ class SettingsRegistry(Observable):
                 continue
 
             for settingsEntry in settingsGroup:
-                if not config.has_option(settingsGroup.name, settingsEntry.name):
-                    continue
+                if config.has_option(settingsGroup.name, settingsEntry.name):
+                    optionValueString = config.get(settingsGroup.name, settingsEntry.name)
 
-                optionValueString = config.get(settingsGroup.name, settingsEntry.name)
-                settingsEntry.setValueFromString(optionValueString)
+                    if self._replacementPathPrefix is not None \
+                            and isinstance(settingsEntry.value, Path):
+                        if optionValueString.startswith(prefixPlaceholder):
+                            optionValueString = self._replacementPathPrefix \
+                                    + optionValueString[len(prefixPlaceholder):]
+
+                    settingsEntry.setValueFromString(optionValueString)
 
         self.notifyObservers()
 

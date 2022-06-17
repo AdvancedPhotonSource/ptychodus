@@ -5,7 +5,7 @@ import argparse
 import logging
 import sys
 
-from ptychodus.model import ModelCore
+from ptychodus.model import ModelArgs, ModelCore
 import ptychodus
 
 import h5py
@@ -31,7 +31,7 @@ def main() -> int:
     parser.add_argument('-b', '--batch', action='store_true', \
             help='run reconstruction non-interactively')
     parser.add_argument('-d', '--dev', action='store_true', help='run in developer mode')
-    parser.add_argument('-f', '--file-prefix', action='store', dest='PREFIX', \
+    parser.add_argument('-f', '--file-prefix', action='store', dest='prefix', \
             help='replace file path prefix')
     parser.add_argument('-p', '--port', action='store', type=int, default=9999, \
             help='remote process communication port number')
@@ -50,9 +50,13 @@ def main() -> int:
     logger.info(f'\tHDF5 {h5py.version.hdf5_version}')
     logger.info(f'\tH5Py {h5py.__version__}')
 
-    result = 0
+    print(parsedArgs.prefix)
 
-    with ModelCore(rpcPort=parsedArgs.port, isDeveloperModeEnabled=parsedArgs.dev) as model:
+    modelArgs = ModelArgs(rpcPort=parsedArgs.port,
+                          replacementPathPrefix=parsedArgs.prefix,
+                          isDeveloperModeEnabled=parsedArgs.dev)
+
+    with ModelCore(modelArgs) as model:
         if parsedArgs.settings:
             model.settingsRegistry.openSettings(parsedArgs.settings.name)
 
@@ -68,26 +72,24 @@ def main() -> int:
         except ModuleNotFoundError:
             logger.error('\tPyQt ' + NOT_FOUND_STR)
             return -1
-        else:
-            logger.info('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
-            logger.info('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
 
-            # QApplication expects the first argument to be the program name
-            qtArgs = sys.argv[:1] + unparsedArgs
-            app = QApplication(qtArgs)
-            verifyAllArgumentsParsed(parser, app.arguments()[1:])
+        logger.info('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
+        logger.info('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
 
-            from ptychodus.view import ViewCore
-            view = ViewCore.createInstance()
+        # QApplication expects the first argument to be the program name
+        qtArgs = sys.argv[:1] + unparsedArgs
+        app = QApplication(qtArgs)
+        verifyAllArgumentsParsed(parser, app.arguments()[1:])
 
-            from ptychodus.controller import ControllerCore
-            controller = ControllerCore.createInstance(model, view)
+        from ptychodus.view import ViewCore
+        view = ViewCore.createInstance()
 
-            view.setWindowTitle(versionString())
-            view.show()
-            result = app.exec_()
+        from ptychodus.controller import ControllerCore
+        controller = ControllerCore.createInstance(model, view)
 
-    return result
+        view.setWindowTitle(versionString())
+        view.show()
+        return app.exec_()
 
 
 sys.exit(main())

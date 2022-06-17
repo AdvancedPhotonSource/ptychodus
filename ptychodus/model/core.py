@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from types import TracebackType
 from typing import overload
 import logging
@@ -26,9 +27,16 @@ import ptychodus.plugins
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class ModelArgs:
+    rpcPort: int
+    replacementPathPrefix: Optional[str]
+    isDeveloperModeEnabled: bool = False
+
+
 class ModelCore:
 
-    def __init__(self, rpcPort: int, isDeveloperModeEnabled: bool = False) -> None:
+    def __init__(self, modelArgs: ModelArgs) -> None:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
         self._colormapChooserFactory = ColormapChooserFactory()
@@ -43,7 +51,7 @@ class ModelCore:
             self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
             self._pluginRegistry.buildComplexToRealStrategyChooser())
 
-        self.settingsRegistry = SettingsRegistry()
+        self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
@@ -52,7 +60,7 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
-        self._rpcServer = RemoteProcessCommunicationServer(rpcPort)
+        self._rpcServer = RemoteProcessCommunicationServer(modelArgs.rpcPort)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
 
         self._detector = Detector.createInstance(self._detectorSettings)
@@ -91,14 +99,14 @@ class ModelCore:
         self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
-                                                              isDeveloperModeEnabled)
+                                                              modelArgs.isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._activeDataFile,
                                                       self._scan, self._probeSizer, self._probe,
                                                       self._objectSizer, self._object,
                                                       self.reconstructorPlotPresenter,
-                                                      isDeveloperModeEnabled)
+                                                      modelArgs.isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
-                                                              isDeveloperModeEnabled)
+                                                              modelArgs.isDeveloperModeEnabled)
         self._selectableReconstructor = SelectableReconstructor.createInstance(
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)

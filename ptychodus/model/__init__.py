@@ -1,4 +1,4 @@
-from .core import ModelCore
+from .core import ModelArgs, ModelCore
 from .data import *
 from .detector import *
 from .image import *
