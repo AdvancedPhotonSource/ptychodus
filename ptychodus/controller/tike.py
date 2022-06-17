@@ -1,6 +1,8 @@
 from __future__ import annotations
 from decimal import Decimal
 
+from PyQt5.QtCore import QRegExp
+from PyQt5.QtGui import QRegExpValidator
 from PyQt5.QtWidgets import QWidget
 
 from ..model import Observable, Observer  # TODO, TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter
@@ -242,7 +244,10 @@ class TikeBasicParametersController(Observer):
 
         view.useMpiCheckBox.setVisible(False)  # TODO make visible when supported
         view.useMpiCheckBox.toggled.connect(presenter.setMpiEnabled)
-        view.numGpusSpinBox.valueChanged.connect(presenter.setNumGpus)
+
+        view.numGpusLineEdit.editingFinished.connect(controller._syncNumGpusToModel)
+        view.numGpusLineEdit.setValidator(QRegExpValidator(QRegExp('[\\d,]+')))
+
         view.noiseModelComboBox.currentTextChanged.connect(presenter.setNoiseModel)
 
         view.numProbeModesSpinBox.valueChanged.connect(presenter.setNumProbeModes)
@@ -257,15 +262,12 @@ class TikeBasicParametersController(Observer):
 
         return controller
 
+    def _syncNumGpusToModel(self) -> None:
+        self._presenter.setNumGpus(self._view.numGpusLineEdit.text())
+
     def _syncModelToView(self) -> None:
         self._view.useMpiCheckBox.setChecked(self._presenter.isMpiEnabled())
-
-        self._view.numGpusSpinBox.blockSignals(True)
-        self._view.numGpusSpinBox.setRange(self._presenter.getMinNumGpus(),
-                                           self._presenter.getMaxNumGpus())
-        self._view.numGpusSpinBox.setValue(self._presenter.getNumGpus())
-        self._view.numGpusSpinBox.blockSignals(False)
-
+        self._view.numGpusLineEdit.setText(self._presenter.getNumGpus())
         self._view.noiseModelComboBox.setCurrentText(self._presenter.getNoiseModel())
 
         self._view.numProbeModesSpinBox.blockSignals(True)

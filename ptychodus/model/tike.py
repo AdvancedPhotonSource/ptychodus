@@ -1,6 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
-from typing import Any
+from typing import Any, Union
 import logging
 
 import numpy
@@ -290,7 +290,7 @@ class TikeSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.useMpi = settingsGroup.createBooleanEntry('UseMpi', False)
-        self.numGpus = settingsGroup.createIntegerEntry('NumGpus', 1)
+        self.numGpus = settingsGroup.createStringEntry('NumGpus', '1')
         self.noiseModel = settingsGroup.createStringEntry('NoiseModel', 'gaussian')
         self.numProbeModes = settingsGroup.createIntegerEntry('NumProbeModes', 1)
         self.numBatch = settingsGroup.createIntegerEntry('NumBatch', 10)
@@ -329,17 +329,10 @@ class TikePresenter(Observable, Observer):
     def setMpiEnabled(self, enabled: bool) -> None:
         self._settings.useMpi.value = enabled
 
-    def getMinNumGpus(self) -> int:
-        return 1
+    def getNumGpus(self) -> str:
+        return self._settings.numGpus.value
 
-    def getMaxNumGpus(self) -> int:
-        return self.MAX_INT
-
-    def getNumGpus(self) -> int:
-        return self._clamp(self._settings.numGpus.value, self.getMinNumGpus(),
-                           self.getMaxNumGpus())
-
-    def setNumGpus(self, value: int) -> None:
+    def setNumGpus(self, value: str) -> None:
         self._settings.numGpus.value = value
 
     def getNoiseModelList(self) -> list[str]:
@@ -560,11 +553,25 @@ class TikeReconstructor:
 
         return options
 
+    def getNumGpus(self) -> Union[int,tuple[int,...]]: # FIXME test
+        numGpus = self._settings.numGpus.value
+        onlyDigitsAndCommas = all(c.isdigit() or c == ',' for c in numGpus)
+        hasDigit = any(c.isdigit() for c in numGpus)
+
+        if onlyDigitsAndCommas and hasDigit:
+            if ',' in numGpus:
+                return tuple(int(n) for n in numGpus.split(','))
+            else:
+                return int(numGpus)
+
+        return 1
+
     def __call__(self, algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> int:
         data = self.getDiffractionData()
         scan = self.getScan()
         probe = self.getProbe()
         psi = self.getInitialObject()
+        numGpus = self.getNumGpus(),
 
         if len(data) != len(scan):
             numFrame = min(len(data), len(scan))
@@ -578,6 +585,7 @@ class TikeReconstructor:
         logger.debug(f'scan shape={scan.shape}')
         logger.debug(f'probe shape={probe.shape}')
         logger.debug(f'object shape={psi.shape}')
+        logger.debug(f'num_gpu={numGpus}')
 
         parameters = tike.ptycho.solvers.PtychoParameters(
             probe=probe,
@@ -591,7 +599,7 @@ class TikeReconstructor:
         result = tike.ptycho.reconstruct(data=data,
                                          parameters=parameters,
                                          model=self._settings.noiseModel.value,
-                                         num_gpu=self._settings.numGpus.value,
+                                         num_gpu=numGpus,
                                          use_mpi=self._settings.useMpi.value)
 
         # TODO self._scan.setScanPoints(...)

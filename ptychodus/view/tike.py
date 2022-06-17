@@ -2,7 +2,8 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGroupBox, QSpinBox, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGroupBox, QLineEdit, QSpinBox, \
+        QVBoxLayout, QWidget
 
 from .widgets import DecimalLineEdit, DecimalSlider
 
@@ -12,7 +13,7 @@ class TikeBasicParametersView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Basic Parameters', parent)
         self.useMpiCheckBox = QCheckBox('Use MPI')
-        self.numGpusSpinBox = QSpinBox()
+        self.numGpusLineEdit = QLineEdit()
         self.noiseModelComboBox = QComboBox()
         self.numProbeModesSpinBox = QSpinBox()
         self.numBatchSpinBox = QSpinBox()
@@ -30,7 +31,7 @@ class TikeBasicParametersView(QGroupBox):
         view = cls(parent)
 
         view.useMpiCheckBox.setToolTip('Whether to use MPI or not.')
-        view.numGpusSpinBox.setToolTip(
+        view.numGpusLineEdit.setToolTip(
             'The number of GPUs to use. If the number of GPUs is less than the requested number, only workers for the available GPUs are allocated.'
         )
         view.noiseModelComboBox.setToolTip('The noise model to use for the cost function.')
@@ -48,7 +49,7 @@ class TikeBasicParametersView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow(view.useMpiCheckBox)
-        layout.addRow('Number of GPUs:', view.numGpusSpinBox)
+        layout.addRow('Number of GPUs:', view.numGpusLineEdit)
         layout.addRow('Noise Model:', view.noiseModelComboBox)
         layout.addRow('Number of Probe Modes:', view.numProbeModesSpinBox)
         layout.addRow('Number of Batches:', view.numBatchSpinBox)
