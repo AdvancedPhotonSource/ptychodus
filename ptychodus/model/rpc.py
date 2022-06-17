@@ -9,7 +9,7 @@ import socketserver
 import threading
 import typing
 
-from ..api.rpc import RPCMessage
+from ..api.rpc import RPCMessage, RPCMessageHandler
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class LoadResultsMessage(RPCMessage):
         return self._filePath
 
 
-class RPC_StreamRequestHandler(socketserver.StreamRequestHandler):
+class RPCStreamRequestHandler(socketserver.StreamRequestHandler):
 
     def handle(self):
         message = self.rfile.readline().decode('utf-8').strip()
@@ -49,16 +49,15 @@ class RPC_StreamRequestHandler(socketserver.StreamRequestHandler):
         self.wfile.write(response.encode('utf-8'))
 
 
-class RPC_TCPServer(socketserver.TCPServer):
+class RPCSocketServer(socketserver.TCPServer):
 
     def __init__(self, portNumber: int, messageQueue: queue.Queue) -> None:
-        super().__init__(('127.0.0.1', portNumber), RPC_StreamRequestHandler)
+        super().__init__(('127.0.0.1', portNumber), RPCStreamRequestHandler)
         self._messageQueue = messageQueue
 
     def processMessage(self, message: str) -> str:
         try:
             messageDict = json.loads(message)
-            logger.debug(messageDict)
         except json.JSONDecodeError:
             logger.debug(f'Failed to decode JSON: \"{message}\"!')
             return 'FAILURE'
@@ -66,7 +65,7 @@ class RPC_TCPServer(socketserver.TCPServer):
         try:
             messageType = messageDict['messageType']
         except KeyError:
-            logger.debug(f'Missing messageType: \"{message}\"!')
+            logger.debug(f'Missing messageType information: \"{message}\"!')
             return 'FAILURE'
 
         try:
@@ -81,28 +80,63 @@ class RPC_TCPServer(socketserver.TCPServer):
         return 'SUCCESS'
 
 
-class RemoteProcessCommunicationServer:
+class RPCMessageService:
 
     def __init__(self, portNumber: int) -> None:
         self._messageQueue: queue.Queue[RPCMessage] = queue.Queue()
-        self._rpcServer = RPC_TCPServer(portNumber, self._messageQueue)
-        self._thread = threading.Thread(target=self._rpcServer.serve_forever)
+        self._tcpServer = RPCSocketServer(portNumber, self._messageQueue)
+        self._producerThread = threading.Thread(target=self._tcpServer.serve_forever)
+        self._consumerThread = threading.Thread(target=self._processMessages)
+        self._consumerStopEvent = threading.Event()
+        self._messageHandlers: dict[int, RPCMessageHandler] = dict()
+
+    def registerMessageHandler(self, messageType: int, handler: RPCMessageHandler) -> None:
+        self._messageHandlers[messageType] = handler
 
     def start(self) -> None:
-        if self._thread.is_alive():
-            logger.debug('Server thread is already alive!')
+        logger.debug('Starting message service...')
+
+        if self._producerThread.is_alive():
+            logger.debug('Producer thread is already alive!')
         else:
-            self._thread.start()
-            logger.debug(f'Server thread is communicating on {self._rpcServer.server_address}')
+            self._producerThread.start()
+            logger.debug('Producer thread has started.')
+
+        if self._consumerThread.is_alive():
+            logger.debug('Consumer thread is already alive!')
+        else:
+            self._consumerThread.start()
+            logger.debug('Consumer thread has started.')
+
+        logger.debug(f'Message service is started on {self._tcpServer.server_address}.')
+
+    def _processMessages(self) -> None:
+        while not self._consumerStopEvent.is_set():
+            try:
+                message = self._messageQueue.get(block=True, timeout=1)
+            except queue.Empty:
+                pass
+            else:
+                handler = self._messageHandlers.get(message.messageType)
+
+                if handler is None:
+                    logger.debug(f'No handler for message type {message.messageType}')
+                else:
+                    logger.debug(f'Processing message type {message.messageType}')
+                    handler.handleMessage(message)
+
+                self._messageQueue.task_done()
 
     def stop(self) -> None:
-        self._rpcServer.shutdown()
-        self._rpcServer.server_close()
-        # FIXME self._messageQueue.join()
-        logger.debug('Server stopped.')
+        logger.debug('Stopping message service...')
+        self._tcpServer.shutdown()
+        self._tcpServer.server_close()
+        self._consumerStopEvent.set()
+        self._consumerThread.join()
+        logger.debug('Message service stopped.')
 
 
-class RemoteProcessCommunicationClient:
+class RPCMessageClient:
 
     def __init__(self, portNumber: int) -> None:
         self._serverAddress = ('127.0.0.1', portNumber)
@@ -132,7 +166,7 @@ def main() -> int:
             help='remote process communication port number')
     args = parser.parse_args()
 
-    client = RemoteProcessCommunicationClient(args.port)
+    client = RPCMessageClient(args.port)
     response = client.send(args.message)
 
     print(response)

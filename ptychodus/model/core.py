@@ -16,7 +16,7 @@ from .probe import *
 from .ptychonn import PtychoNNBackend
 from .ptychopy import PtychoPyBackend
 from .reconstructor import *
-from .rpc import RemoteProcessCommunicationServer
+from .rpc import RPCMessageService
 from .scan import *
 from .tike import TikeBackend
 from .velociprobe import *
@@ -60,7 +60,7 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
-        self._rpcServer = RemoteProcessCommunicationServer(modelArgs.rpcPort)
+        self._rpcMessageService = RPCMessageService(modelArgs.rpcPort)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
 
         self._detector = Detector.createInstance(self._detectorSettings)
@@ -137,7 +137,7 @@ class ModelCore:
             self._reconstructorSettings, self._selectableReconstructor)
 
     def __enter__(self) -> ModelCore:
-        self._rpcServer.start()
+        self._rpcMessageService.start()
         self._dataDirectoryWatcher.start()
         return self
 
@@ -153,7 +153,7 @@ class ModelCore:
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataDirectoryWatcher.stop()
-        self._rpcServer.stop()
+        self._rpcMessageService.stop()
 
     def batchModeReconstruct(self) -> int:
         outputFilePath = self._reconstructorSettings.outputFilePath.value
