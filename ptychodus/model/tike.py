@@ -571,7 +571,7 @@ class TikeReconstructor:
         scan = self.getScan()
         probe = self.getProbe()
         psi = self.getInitialObject()
-        numGpus = self.getNumGpus(),
+        numGpus = self.getNumGpus()
 
         if len(data) != len(scan):
             numFrame = min(len(data), len(scan))
