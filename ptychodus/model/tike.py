@@ -553,7 +553,7 @@ class TikeReconstructor:
 
         return options
 
-    def getNumGpus(self) -> Union[int,tuple[int,...]]:
+    def getNumGpus(self) -> Union[int, tuple[int, ...]]:
         numGpus = self._settings.numGpus.value
         onlyDigitsAndCommas = all(c.isdigit() or c == ',' for c in numGpus)
         hasDigit = any(c.isdigit() for c in numGpus)

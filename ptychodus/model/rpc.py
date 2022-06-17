@@ -23,22 +23,22 @@ class LoadResultsMessage(RPCMessage):
 
     @classmethod
     @property
-    def messageType(self) -> int:
+    def messageType(cls) -> int:
         return 100
 
-    @property
-    def filePath(self) -> Path:
-        return self._filePath
-
     @classmethod
-    def fromDict(self, values: dict[str, typing.Any]) -> LoadResultsMessage:
+    def fromDict(cls, values: dict[str, typing.Any]) -> LoadResultsMessage:
         filePath = Path(values['filePath'])
-        return LoadResultsMessage(filePath)
+        return cls(filePath)
 
     def toDict(self) -> dict[str, typing.Any]:
         result = super().toDict()
         result['filePath'] = str(self._filePath)
         return result
+
+    @property
+    def filePath(self) -> Path:
+        return self._filePath
 
 
 class RPC_StreamRequestHandler(socketserver.StreamRequestHandler):
@@ -71,8 +71,12 @@ class RPC_TCPServer(socketserver.TCPServer):
             logger.debug(f'Missing messageType: \"{message}\"!')
             return 'FAILURE'
 
-        # TODO generalize and handle possible errors
-        messageObject = LoadResultsMessage.fromDict(messageDict)
+        try:
+            # TODO generalize to support other message types
+            messageObject = LoadResultsMessage.fromDict(messageDict)
+        except:
+            logger.debug(f'Exception while creating message object: \"{message}\"!')
+            return 'FAILURE'
 
         self._messageQueue.put(messageObject)
 

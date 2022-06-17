@@ -7,13 +7,13 @@ class RPCMessage(ABC):
 
     @classmethod
     @abstractproperty
-    def messageType(self) -> int:
+    def messageType(cls) -> int:
         '''returns a unique integer'''
         pass
 
     @classmethod
     @abstractmethod
-    def fromDict(self, values: dict[str, typing.Any]) -> RPCMessage:
+    def fromDict(cls, values: dict[str, typing.Any]) -> RPCMessage:
         '''creates and populates a message class from a dictionary'''
         pass
 
