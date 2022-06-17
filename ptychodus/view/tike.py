@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QCheckBox, QComboBox, QFormLayout, QGroupBox, QLineEdit, QSpinBox, \
-        QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGroupBox, QLineEdit, QSpinBox,
+                             QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, DecimalSlider
 
