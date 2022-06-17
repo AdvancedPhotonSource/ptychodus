@@ -71,8 +71,9 @@ class RPC_TCPServer(socketserver.TCPServer):
             logger.debug(f'Missing messageType: \"{message}\"!')
             return 'FAILURE'
 
-        # FIXME generalize and handle conversion errors
+        # TODO generalize and handle possible errors
         messageObject = LoadResultsMessage.fromDict(messageDict)
+
         self._messageQueue.put(messageObject)
 
         return 'SUCCESS'
@@ -111,7 +112,9 @@ class RemoteProcessCommunicationClient:
             sock.sendall((message + '\n').encode('utf-8'))
             logger.debug(f'SEND: \"{message}\"')
 
-            response = sock.recv(1024).decode('utf-8')  # TODO buffer size
+            with sock.makefile(mode='r', encoding='utf-8') as fp:
+                response = fp.readline()
+
             logger.debug(f'RECV: \"{response}\"')
 
             return response

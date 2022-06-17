@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Optional, Tuple
 import logging
 
+import matplotlib.colors
 import matplotlib.pyplot
 import numpy
 import numpy.typing
