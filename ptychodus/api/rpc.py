@@ -7,8 +7,8 @@ class RPCMessage(ABC):
 
     @classmethod
     @abstractproperty
-    def messageType(cls) -> int:
-        '''returns a unique integer'''
+    def procedure(cls) -> str:
+        '''returns a unique name for the procedure'''
         pass
 
     @classmethod
@@ -19,12 +19,12 @@ class RPCMessage(ABC):
 
     def toDict(self) -> dict[str, Any]:
         '''creates and populates a dictionary from a message class'''
-        return {'messageType': self.messageType}
+        return {'procedure': self.procedure}
 
 
-class RPCMessageHandler(ABC):
+class RPCExecutor(ABC):
 
     @abstractmethod
-    def handleMessage(self, message: RPCMessage) -> None:
+    def submit(self, message: RPCMessage) -> None:
         '''performs action using information in message'''
         pass
