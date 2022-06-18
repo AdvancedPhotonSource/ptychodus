@@ -63,7 +63,7 @@ class DecimalLineEdit(QWidget):
             self._value = value
             self._setValueToLineEditAndEmitValueChanged()
 
-    def getMinimum(self) -> Decimal:
+    def getMinimum(self) -> Optional[Decimal]:
         return self._minimum
 
     def setMinimum(self, value: Decimal) -> None:
@@ -74,7 +74,7 @@ class DecimalLineEdit(QWidget):
         if valueBefore != valueAfter:
             self._setValueToLineEditAndEmitValueChanged()
 
-    def getMaximum(self) -> Decimal:
+    def getMaximum(self) -> Optional[Decimal]:
         return self._maximum
 
     def setMaximum(self, value: Decimal) -> None:

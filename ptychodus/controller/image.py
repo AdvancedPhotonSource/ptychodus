@@ -11,21 +11,23 @@ from ..api.image import ScalarTransformation, ComplexToRealStrategy
 from ..api.observer import Observable, Observer
 from ..model import ImagePresenter
 from ..view import ImageDisplayRangeDialog, ImageColormapGroupBox, \
-        ImageDataRangeGroupBox, ImageFileGroupBox, ImageView
+        ImageDataRangeGroupBox, ImageFileGroupBox, ImageView, ImageWidget
 from .data import FileDialogFactory
 
 
 class ImageFileController:
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
-    def __init__(self, view: ImageFileGroupBox, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, view: ImageFileGroupBox, imageWidget: ImageWidget,
+                 fileDialogFactory: FileDialogFactory) -> None:
         self._view = view
+        self._imageWidget = imageWidget
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, view: ImageFileGroupBox,
+    def createInstance(cls, view: ImageFileGroupBox, imageWidget: ImageWidget,
                        fileDialogFactory: FileDialogFactory) -> ImageFileController:
-        controller = cls(view, fileDialogFactory)
+        controller = cls(view, imageWidget, fileDialogFactory)
         view.saveButton.clicked.connect(controller._saveImage)
         return controller
 
@@ -34,7 +36,7 @@ class ImageFileController:
             self._view, 'Save Image', mimeTypeFilters=ImageFileController.MIME_TYPES)
 
         if filePath:
-            pixmap = self._view.imageWidget.getPixmap()
+            pixmap = self._imageWidget.getPixmap()
             pixmap.save(str(filePath))
 
 
@@ -146,7 +148,7 @@ class ImageController(Observer):
         self._presenter = presenter
         self._view = view
         self._fileController = ImageFileController.createInstance(
-            view.imageRibbon.imageFileGroupBox, fileDialogFactory)
+            view.imageRibbon.imageFileGroupBox, view.imageWidget, fileDialogFactory)
         self._colormapController = ImageColormapController.createInstance(
             presenter, view.imageRibbon.colormapGroupBox)
         self._dataRangeController = ImageDataRangeController.createInstance(

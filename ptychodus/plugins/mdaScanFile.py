@@ -338,8 +338,8 @@ class MDAFile:
                     for pvidx in range(number_pvs):
                         pv = cls._read_pv(unpacker)
                         extra_pvs.append(pv)
-        except OSError as exc:
-            logger.exception(exc)
+        except OSError as err:
+            logger.exception(err)
 
         return cls(header, scan, extra_pvs)
 
@@ -360,13 +360,8 @@ class MDAScanFileReader(ScanFileReader):
         micronsToMeters = Decimal('1e-6')
         mdaFile = MDAFile.read(filePath)
 
-        xidx = next(pos.number for pos in mdaFile.scan.info.positioner
-                    if 'X_HYBRID_SP' in pos.name)
-        xarray = mdaFile.scan.data.readback_array[xidx, :]
-
-        yidx = next(pos.number for pos in mdaFile.scan.info.positioner
-                    if 'Y_HYBRID_SP' in pos.name)
-        yarray = mdaFile.scan.data.readback_array[yidx, :]
+        xarray = mdaFile.scan.data.readback_array[0, :]
+        yarray = mdaFile.scan.data.readback_array[1, :]
 
         for xf, yf in zip(xarray, yarray):
             x = Decimal(repr(xf)) * micronsToMeters

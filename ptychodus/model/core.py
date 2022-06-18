@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from types import TracebackType
 from typing import overload
 import logging
@@ -15,18 +16,29 @@ from .probe import *
 from .ptychonn import PtychoNNBackend
 from .ptychopy import PtychoPyBackend
 from .reconstructor import *
+from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
+from .rpc import RPCMessageService
 from .scan import *
 from .tike import TikeBackend
 from .velociprobe import *
+from .watcher import DataDirectoryWatcher
 
 import ptychodus.plugins
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class ModelArgs:
+    rpcPort: int
+    autoExecuteRPCs: bool
+    replacementPathPrefix: Optional[str]
+    isDeveloperModeEnabled: bool = False
+
+
 class ModelCore:
 
-    def __init__(self, isDeveloperModeEnabled: bool = False) -> None:
+    def __init__(self, modelArgs: ModelArgs) -> None:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
         self._colormapChooserFactory = ColormapChooserFactory()
@@ -41,7 +53,7 @@ class ModelCore:
             self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
             self._pluginRegistry.buildComplexToRealStrategyChooser())
 
-        self.settingsRegistry = SettingsRegistry()
+        self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
@@ -50,7 +62,8 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
-        self._dataDirectoryWatcher = DataDirectoryWatcher()
+        self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
+
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
 
@@ -87,14 +100,14 @@ class ModelCore:
         self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
-                                                              isDeveloperModeEnabled)
+                                                              modelArgs.isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._activeDataFile,
                                                       self._scan, self._probeSizer, self._probe,
                                                       self._objectSizer, self._object,
                                                       self.reconstructorPlotPresenter,
-                                                      isDeveloperModeEnabled)
+                                                      modelArgs.isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
-                                                              isDeveloperModeEnabled)
+                                                              modelArgs.isDeveloperModeEnabled)
         self._selectableReconstructor = SelectableReconstructor.createInstance(
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
@@ -124,7 +137,14 @@ class ModelCore:
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 
+        self._loadResultsExecutor = LoadResultsExecutor(self._probe, self._object)
+        self.rpcMessageService = RPCMessageService(modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
+        self.rpcMessageService.registerMessageClass(LoadResultsMessage)
+        self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
+                                                 self._loadResultsExecutor)
+
     def __enter__(self) -> ModelCore:
+        self.rpcMessageService.start()
         self._dataDirectoryWatcher.start()
         return self
 
@@ -140,7 +160,7 @@ class ModelCore:
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataDirectoryWatcher.stop()
-        self._dataDirectoryWatcher.join()
+        self.rpcMessageService.stop()
 
     def batchModeReconstruct(self) -> int:
         outputFilePath = self._reconstructorSettings.outputFilePath.value
