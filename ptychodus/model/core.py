@@ -16,6 +16,7 @@ from .probe import *
 from .ptychonn import PtychoNNBackend
 from .ptychopy import PtychoPyBackend
 from .reconstructor import *
+from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .rpc import RPCMessageService
 from .scan import *
 from .tike import TikeBackend
@@ -60,7 +61,6 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
-        self._rpcMessageService = RPCMessageService(modelArgs.rpcPort)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
 
         self._detector = Detector.createInstance(self._detectorSettings)
@@ -135,6 +135,12 @@ class ModelCore:
                                                               self._objectInitializer)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
+
+        self._loadResultsExecutor = LoadResultsExecutor(self._probe, self._object)
+        self._rpcMessageService = RPCMessageService(modelArgs.rpcPort)
+        self._rpcMessageService.registerMessageClass(LoadResultsMessage)
+        self._rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
+                                                 self._loadResultsExecutor)
 
     def __enter__(self) -> ModelCore:
         self._rpcMessageService.start()

@@ -7,36 +7,10 @@ import queue
 import socket
 import socketserver
 import threading
-import typing
 
 from ..api.rpc import RPCMessage, RPCExecutor
 
 logger = logging.getLogger(__name__)
-
-
-class LoadResultsMessage(RPCMessage):
-
-    def __init__(self, filePath: Path) -> None:
-        self._filePath = filePath
-
-    @classmethod
-    @property
-    def procedure(cls) -> str:
-        return 'LoadResults'
-
-    @classmethod
-    def fromDict(cls, values: dict[str, typing.Any]) -> LoadResultsMessage:
-        filePath = Path(values['filePath'])
-        return cls(filePath)
-
-    def toDict(self) -> dict[str, typing.Any]:
-        result = super().toDict()
-        result['filePath'] = str(self._filePath)
-        return result
-
-    @property
-    def filePath(self) -> Path:
-        return self._filePath
 
 
 class RPCStreamRequestHandler(socketserver.StreamRequestHandler):
@@ -98,8 +72,6 @@ class RPCMessageService:
         self._consumerThread = threading.Thread(target=self._processMessages)
         self._consumerStopEvent = threading.Event()
         self._executors: dict[str, RPCExecutor] = dict()
-
-        self.registerMessageClass(LoadResultsMessage) # FIXME MOVE
 
     def registerMessageClass(self, messageClass: type[RPCMessage]) -> None:
         self._socketServer.registerMessageClass(messageClass)

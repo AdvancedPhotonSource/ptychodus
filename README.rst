@@ -91,7 +91,7 @@ Tips
 * This project is experimenting with `type hints <https://docs.python.org/3/library/typing.html>`_ which can be checked using `mypy <http://mypy-lang.org>`_.
 
 .. code-block:: shell
-  
+
   $ mypy ptychodus
 
 * Stubs to support PyQt5 type hinting can be installed within the conda environment.
