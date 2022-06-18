@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ModelArgs:
     rpcPort: int
+    autoExecuteRPCs: bool
     replacementPathPrefix: Optional[str]
     isDeveloperModeEnabled: bool = False
 
@@ -137,13 +138,13 @@ class ModelCore:
             self._reconstructorSettings, self._selectableReconstructor)
 
         self._loadResultsExecutor = LoadResultsExecutor(self._probe, self._object)
-        self._rpcMessageService = RPCMessageService(modelArgs.rpcPort)
-        self._rpcMessageService.registerMessageClass(LoadResultsMessage)
-        self._rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
+        self.rpcMessageService = RPCMessageService(modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
+        self.rpcMessageService.registerMessageClass(LoadResultsMessage)
+        self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
                                                  self._loadResultsExecutor)
 
     def __enter__(self) -> ModelCore:
-        self._rpcMessageService.start()
+        self.rpcMessageService.start()
         self._dataDirectoryWatcher.start()
         return self
 
@@ -159,7 +160,7 @@ class ModelCore:
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataDirectoryWatcher.stop()
-        self._rpcMessageService.stop()
+        self.rpcMessageService.stop()
 
     def batchModeReconstruct(self) -> int:
         outputFilePath = self._reconstructorSettings.outputFilePath.value

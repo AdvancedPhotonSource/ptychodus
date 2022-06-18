@@ -1,3 +1,4 @@
+from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication, QAction
 
 from ..model import ModelCore
@@ -70,6 +71,7 @@ class ControllerCore:
         self._monitorObjectController = ObjectImageController.createInstance(
             model.objectPresenter, model.objectImagePresenter, view.monitorObjectView.imageView,
             self._fileDialogFactory)
+        self._processMessagesTimer = QTimer()
 
     @classmethod
     def createInstance(cls, model: ModelCore, view: ViewCore):
@@ -101,6 +103,10 @@ class ControllerCore:
             lambda checked: controller._objectParametersController.saveObject())
         #view.exitAction.triggered.connect(
         #        lambda checked: QApplication.quit())
+
+        controller._processMessagesTimer.timeout.connect(
+                model.rpcMessageService.processMessages)
+        controller._processMessagesTimer.start(1000) # TODO make configurable
 
         return controller
 

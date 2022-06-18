@@ -50,9 +50,11 @@ def main() -> int:
     logger.info(f'\tHDF5 {h5py.version.hdf5_version}')
     logger.info(f'\tH5Py {h5py.__version__}')
 
-    modelArgs = ModelArgs(rpcPort=parsedArgs.port,
-                          replacementPathPrefix=parsedArgs.prefix,
-                          isDeveloperModeEnabled=parsedArgs.dev)
+    modelArgs = ModelArgs(
+        rpcPort=parsedArgs.port,
+        autoExecuteRPCs=False,  # TODO False if using GUI else True
+        replacementPathPrefix=parsedArgs.prefix,
+        isDeveloperModeEnabled=parsedArgs.dev)
 
     with ModelCore(modelArgs) as model:
         if parsedArgs.settings:

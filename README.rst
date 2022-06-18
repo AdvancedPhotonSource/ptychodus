@@ -100,6 +100,24 @@ Tips
 
    $ pip install PyQt5-stubs
 
+Basic RPC Demonstration
+-----------------------
+
+* Generate a batch mode reconstruction result file (named `results.npz` in this example)
+
+.. code-block:: shell
+   $ ptychodus -b -s /path/to/settings.ini
+
+* Launch the GUI in one terminal and navigate to the "Monitor" view
+
+.. code-block:: shell
+   $ ptychodus -p 9999
+
+* Send a RPC message (JSON format) to instruct the GUI to display the reconstruction result
+
+.. code-block:: shell
+   $ ptychodus-rpc -p 9999 -m '{"procedure": "LoadResults", "filePath": "/path/to/results.npz"}'
+
 Reporting bugs
 --------------
 
