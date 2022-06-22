@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -79,9 +80,9 @@ class SimpleScanDictionary(ScanDictionary):
         self._sequences = sequences
 
     @classmethod
-    def fromUnnamedSequence(cls, sequence: ScanPointSequence) -> SimpleScanDictionary:
+    def createFromUnnamedSequence(cls, sequence: ScanPointSequence) -> SimpleScanDictionary:
         '''creates a dictionary containing one unnamed scan sequence'''
-        return cls({cls.DEFAULT_SEQUENCE_NAME, sequence})
+        return cls({cls.DEFAULT_SEQUENCE_NAME: sequence})
 
     def __getitem__(self, key: str) -> ScanPointSequence:
         '''retrieves a scan point sequence from the dictionary'''

@@ -1,17 +1,17 @@
 from decimal import Decimal
 from pathlib import Path
-from typing import Iterable
 import csv
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import ScanFileReader, ScanFileWriter, ScanPoint, ScanPointParseError
+from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
+                                ScanPointParseError, SimpleScanDictionary)
 
 
 class CSVScanFileReader(ScanFileReader):
 
-    def __init__(self) -> None:
-        self._xcol = 1
-        self._ycol = 0
+    def __init__(self, xcol: int = 1, ycol: int = 0) -> None:
+        self._xcol = xcol
+        self._ycol = ycol
 
     @property
     def simpleName(self) -> str:
@@ -21,7 +21,7 @@ class CSVScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'Comma-Separated Values Files (*.csv)'
 
-    def read(self, filePath: Path) -> Iterable[ScanPoint]:
+    def read(self, filePath: Path) -> ScanDictionary:
         scanPointList = list()
         minimumColumnCount = max(self._xcol, self._ycol) + 1
 
@@ -41,7 +41,7 @@ class CSVScanFileReader(ScanFileReader):
 
                 scanPointList.append(point)
 
-        return scanPointList
+        return SimpleScanDictionary.createFromUnnamedSequence(scanPointList)
 
 
 class CSVScanFileWriter(ScanFileWriter):
@@ -54,10 +54,15 @@ class CSVScanFileWriter(ScanFileWriter):
     def fileFilter(self) -> str:
         return 'Comma-Separated Values Files (*.csv)'
 
-    def write(self, filePath: Path, scanPoints: Iterable[ScanPoint]) -> None:
+    def write(self, filePath: Path, scanDict: ScanDictionary) -> None:
+        if len(scanDict) != 1:
+            className = type(self).__name__
+            raise ValueError(f'{className} only supports single sequence scan files!')
+
         with open(filePath, 'wt') as csvFile:
-            for point in scanPoints:
-                csvFile.write(f'{point.y},{point.x}\n')
+            for sequence in scanDict.values():
+                for point in sequence:
+                    csvFile.write(f'{point.y},{point.x}\n')
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

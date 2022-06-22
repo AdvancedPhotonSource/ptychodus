@@ -270,14 +270,14 @@ class LengthWidget(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.lengthInMeters = Decimal()
-        self.magnitudeLineEdit = DecimalLineEdit()
+        self.magnitudeLineEdit = DecimalLineEdit.createInstance()
         self.unitsComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> LengthWidget:
         widget = cls(parent)
 
-        widget.setMinimum(Decimal())
+        widget.magnitudeLineEdit.setMinimum(Decimal())
         widget.magnitudeLineEdit.valueChanged.connect(widget._setLengthInMetersFromWidgets)
 
         widget.unitsComboBox.addItem('m', 0)
@@ -331,14 +331,14 @@ class EnergyWidget(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.energyInElectronVolts = Decimal()
-        self.magnitudeLineEdit = DecimalLineEdit()
+        self.magnitudeLineEdit = DecimalLineEdit.createInstance()
         self.unitsComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> EnergyWidget:
         widget = cls(parent)
 
-        widget.setMinimum(Decimal())
+        widget.magnitudeLineEdit.setMinimum(Decimal())
         widget.magnitudeLineEdit.valueChanged.connect(widget._setEnergyInElectronVoltsFromWidgets)
 
         widget.unitsComboBox.addItem('eV', 0)

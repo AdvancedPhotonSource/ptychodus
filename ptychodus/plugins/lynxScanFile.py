@@ -1,11 +1,12 @@
 from collections import defaultdict
 from decimal import Decimal
 from pathlib import Path
-from typing import Iterable
+from typing import Final
 import csv
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import ScanFileReader, ScanPoint, ScanPointParseError
+from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanPoint, ScanPointParseError,
+                                SimpleScanDictionary)
 
 
 class LynxScanPointList:
@@ -26,19 +27,21 @@ class LynxScanPointList:
 
 
 class LynxScanFileReader(ScanFileReader):
-    X_COLUMN = 1
-    Y_COLUMN = 2
-    DETECTOR_COUNT_COLUMN = 4
+    X_COLUMN: Final[int] = 1
+    Y_COLUMN: Final[int] = 2
+    DETECTOR_COUNT_COLUMN: Final[int] = 4
+    EXPECTED_HEADER: Final[list[str]] = [ 'DataPoint', 'x_st_fzp', 'y_st_fzp', \
+            'ckUser_Clk_Count', 'Detector_Count' ]
 
     @property
     def simpleName(self) -> str:
-        return f'Lynx'
+        return 'Lynx'
 
     @property
     def fileFilter(self) -> str:
-        return f'Lynx Scan Files (*.dat)'
+        return 'Lynx Scan Files (*.dat)'
 
-    def read(self, filePath: Path) -> Iterable[ScanPoint]:
+    def read(self, filePath: Path) -> ScanDictionary:
         scanPointDict: dict[int, LynxScanPointList] = defaultdict(LynxScanPointList)
 
         with open(filePath, newline='') as csvFile:
@@ -48,18 +51,13 @@ class LynxScanFileReader(ScanFileReader):
             metadataRow = next(csvIterator)
             headerRow = next(csvIterator)
 
-            assert len(headerRow) == 5
-            assert headerRow[0] == 'DataPoint'
-            assert headerRow[1] == 'x_st_fzp'
-            assert headerRow[2] == 'y_st_fzp'
-            assert headerRow[3] == 'ckUser_Clk_Count'
-            assert headerRow[4] == 'Detector_Count'
+            assert headerRow == LynxScanFileReader.EXPECTED_HEADER
 
             for row in csvIterator:
                 if row[0].startswith('#'):
                     continue
 
-                if len(row) != 5:
+                if len(row) != len(LynxScanFileReader.EXPECTED_HEADER):
                     raise ScanPointParseError()
 
                 detectorCount = int(row[LynxScanFileReader.DETECTOR_COUNT_COLUMN])
@@ -68,18 +66,9 @@ class LynxScanFileReader(ScanFileReader):
 
                 scanPointDict[detectorCount].append(x_um, y_um)
 
-        scanPointList = [
-            scanPointList.mean() for _, scanPointList in sorted(scanPointDict.items())
-        ]
-        xMeanInMeters = Decimal(sum(point.x for point in scanPointList)) / len(scanPointList)
-        yMeanInMeters = Decimal(sum(point.y for point in scanPointList)) / len(scanPointList)
+        scanPointList = [points.mean() for _, points in sorted(scanPointDict.items())]
 
-        for idx, scanPoint in enumerate(scanPointList):
-            x_m = scanPoint.x - xMeanInMeters
-            y_m = scanPoint.y - yMeanInMeters
-            scanPointList[idx] = ScanPoint(x_m, y_m)
-
-        return scanPointList
+        return SimpleScanDictionary.createFromUnnamedSequence(scanPointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

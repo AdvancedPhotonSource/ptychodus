@@ -1,67 +1,66 @@
 from collections import defaultdict
+from dataclasses import dataclass
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
-from typing import Iterable
+from statistics import median
+from typing import Final
 import csv
-
-import numpy
+import math
 
 from .velociprobeDataFile import VelociprobeDataFileReader
-from ptychodus.api.scan import ScanFileReader, ScanPoint, ScanPointParseError
+from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
+                                ScanPointParseError, ScanPointSequence, SimpleScanDictionary)
 
 
-class VelociprobeScanYPositionSource(IntEnum):
-    LASER_INTERFEROMETER = 2
-    ENCODER = 5
+class VelociprobeScanFileColumn:
+    X = 1
+    LASER_INTERFEROMETER_Y = 2
+    ENCODER_Y = 5
+    TRIGGER = 7
 
 
-class VelociprobeScanPointList:
-
-    def __init__(self) -> None:
-        self.xInNanometers: list[int] = list()
-        self.yInNanometers: list[int] = list()
-
-    def append(self, x_nm: int, y_nm: int) -> None:
-        self.xInNanometers.append(x_nm)
-        self.yInNanometers.append(y_nm)
-
-    def mean(self) -> ScanPoint:
-        nanometersToMeters = Decimal('1e-9')
-        x_nm = Decimal(sum(self.xInNanometers)) / Decimal(len(self.xInNanometers))
-        y_nm = Decimal(sum(self.yInNanometers)) / Decimal(len(self.yInNanometers))
-        return ScanPoint(x_nm * nanometersToMeters, y_nm * nanometersToMeters)
+@dataclass(frozen=True)
+class VelociprobeScanPoint:
+    x_nm: int
+    y_li_nm: int
+    y_en_nm: int
 
 
 class VelociprobeScanFileReader(ScanFileReader):
-    X_COLUMN = 1
-    TRIGGER_COLUMN = 7
+    EXPECTED_NUMBER_OF_COLUMNS: Final[int] = 8
 
-    def __init__(self, dataFileReader: VelociprobeDataFileReader,
-                 yPositionSource: VelociprobeScanYPositionSource) -> None:
+    def __init__(self, dataFileReader: VelociprobeDataFileReader) -> None:
         self._dataFileReader = dataFileReader
-        self._yPositionSource = yPositionSource
 
     @property
     def simpleName(self) -> str:
-        yPositionSourceText = 'EncoderY'
-
-        if self._yPositionSource == VelociprobeScanYPositionSource.LASER_INTERFEROMETER:
-            yPositionSourceText = 'LaserInterferometerY'
-
-        return f'VelociprobeWith{yPositionSourceText}'
+        return 'Velociprobe'
 
     @property
     def fileFilter(self) -> str:
-        yPositionSourceText = 'Encoder Y'
+        return 'Velociprobe Scan Files (*.txt)'
 
-        if self._yPositionSource == VelociprobeScanYPositionSource.LASER_INTERFEROMETER:
-            yPositionSourceText = 'Laser Interferometer Y'
+    def _applyTransform(self, pointList: list[ScanPoint]) -> None:
+        zero = Decimal()
+        numberOfPoints = Decimal(len(pointList))
 
-        return f'Velociprobe Scan Files - {yPositionSourceText} (*.txt)'
+        xMean = sum([point.x for point in pointList], start=zero) / numberOfPoints
+        yMean = sum([point.y for point in pointList], start=zero) / numberOfPoints
 
-    def read(self, filePath: Path) -> Iterable[ScanPoint]:
-        pointDict: dict[int, VelociprobeScanPointList] = defaultdict(VelociprobeScanPointList)
+        stageRotationInRadians = self._dataFileReader.entry.sample.goniometer.chi_rad \
+                if self._dataFileReader.entry else 0.
+        stageRotationCosine = Decimal(math.cos(stageRotationInRadians))
+
+        for idx, point in enumerate(pointList):
+            x = (point.x - xMean) * stageRotationCosine
+            y = (point.y - yMean)
+            pointList[idx] = ScanPoint(x, y)
+
+    def read(self, filePath: Path) -> ScanDictionary:
+        pointDict: dict[int, list[VelociprobeScanPoint]] = defaultdict(list[VelociprobeScanPoint])
+        liPoints: list[ScanPoint] = list()
+        enPoints: list[ScanPoint] = list()
 
         with open(filePath, newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
@@ -70,30 +69,34 @@ class VelociprobeScanFileReader(ScanFileReader):
                 if row[0].startswith('#'):
                     continue
 
-                if len(row) != 8:
-                    raise ScanPointParseError()
+                if len(row) != VelociprobeScanFileReader.EXPECTED_NUMBER_OF_COLUMNS:
+                    raise ScanPointParseError('Bad number of columns!')
 
-                trigger = int(row[VelociprobeScanFileReader.TRIGGER_COLUMN])
-                x_nm = int(row[VelociprobeScanFileReader.X_COLUMN])
-                y_nm = int(row[self._yPositionSource.value])
+                x_nm = int(row[VelociprobeScanFileColumn.X])
+                y_li_nm = int(row[VelociprobeScanFileColumn.LASER_INTERFEROMETER_Y])
+                y_en_nm = int(row[VelociprobeScanFileColumn.ENCODER_Y])
+                trigger = int(row[VelociprobeScanFileColumn.TRIGGER])
 
-                if self._yPositionSource == VelociprobeScanYPositionSource.ENCODER:
-                    y_nm = -y_nm
+                point = VelociprobeScanPoint(x_nm, y_li_nm, -y_en_nm)
+                pointDict[trigger].append(point)
 
-                pointDict[trigger].append(x_nm, y_nm)
+        for trigger, pointList in pointDict.items():
+            xf_nm = median([p.x_nm for p in pointList])
+            yf_li_nm = median([p.y_li_nm for p in pointList])
+            yf_en_nm = median([p.y_en_nm for p in pointList])
 
-        pointList = [pointList.mean() for _, pointList in sorted(pointDict.items())]
-        xMeanInMeters = Decimal(sum(point.x for point in pointList)) / len(pointList)
-        yMeanInMeters = Decimal(sum(point.y for point in pointList)) / len(pointList)
+            nm_to_m = Decimal('1e-9')
+            x_m = Decimal(xf_nm) * nm_to_m
+            y_li_m = Decimal(yf_li_nm) * nm_to_m
+            y_en_m = Decimal(yf_en_nm) * nm_to_m
 
-        for idx, point in enumerate(pointList):
-            stageRotationInRadians = 0.
+            liPoints.append(ScanPoint(x_m, y_li_m))
+            enPoints.append(ScanPoint(x_m, y_en_m))
 
-            if self._dataFileReader.entry:
-                stageRotationInRadians = self._dataFileReader.entry.sample.goniometer.chi_rad
+        self._applyTransform(liPoints)
+        self._applyTransform(enPoints)
 
-            xInMeters = (point.x - xMeanInMeters) * Decimal(numpy.cos(stageRotationInRadians))
-            yInMeters = (point.y - yMeanInMeters)
-            pointList[idx] = ScanPoint(xInMeters, yInMeters)
-
-        return pointList
+        scanDict: dict[str, ScanPointSequence] = dict()
+        scanDict['LaserInterferometerY'] = liPoints
+        scanDict['EncoderY'] = enPoints
+        return SimpleScanDictionary(scanDict)
