@@ -328,7 +328,7 @@ class ActiveDataFile(DataFile):
         if cropped and self._cropSizer.isCropEnabled():
             sliceX = self._cropSizer.getSliceX()
             sliceY = self._cropSizer.getSliceY()
-            return self._dataArray[:, sliceY, sliceX]
+            return self._dataArray[:, sliceY, sliceX]  # FIXME only save populated frames
 
         return self._dataArray
 

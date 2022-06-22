@@ -269,17 +269,15 @@ class LengthWidget(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.lengthInMeters = Decimal()
-        self.magnitudeValidator = QDoubleValidator()
-        self.magnitudeLineEdit = QLineEdit()  # TODO DecimalLineEdit
+        self.magnitudeLineEdit = DecimalLineEdit()
         self.unitsComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> LengthWidget:
         widget = cls(parent)
 
-        widget.magnitudeValidator.setBottom(0.)
-        widget.magnitudeLineEdit.setValidator(widget.magnitudeValidator)
-        widget.magnitudeLineEdit.editingFinished.connect(widget._setLengthInMetersFromWidgets)
+        widget.setMinimum(Decimal())
+        widget.magnitudeLineEdit.valueChanged.connect(widget._setLengthInMetersFromWidgets)
 
         widget.unitsComboBox.addItem('m', 0)
         widget.unitsComboBox.addItem('mm', -3)
@@ -301,7 +299,7 @@ class LengthWidget(QWidget):
     def setLengthInMeters(self, lengthInMeters: Decimal) -> None:
         self.lengthInMeters = lengthInMeters
 
-        if lengthInMeters > 0:
+        if lengthInMeters > Decimal():
             exponent = 3 * int(
                 (lengthInMeters.log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
             index = self.unitsComboBox.findData(exponent)
@@ -317,20 +315,13 @@ class LengthWidget(QWidget):
         exponent = self.unitsComboBox.currentData()
         return Decimal(f'1e{exponent:+d}')
 
-    def _setLengthInMetersFromWidgets(self) -> None:
-        decimalText = self.magnitudeLineEdit.text()
-
-        try:
-            magnitude = Decimal(decimalText)
-        except ValueError:
-            logger.error(f'Failed to parse length magnitude "{decimalText}"')
-        else:
-            self.lengthInMeters = magnitude * self._scaleToMeters
-            self.lengthChanged.emit(self.lengthInMeters)
+    def _setLengthInMetersFromWidgets(self, magnitude: Decimal) -> None:
+        self.lengthInMeters = magnitude * self._scaleToMeters
+        self.lengthChanged.emit(self.lengthInMeters)
 
     def _updateDisplay(self) -> None:
         lengthInDisplayUnits = self.lengthInMeters / self._scaleToMeters
-        self.magnitudeLineEdit.setText(str(lengthInDisplayUnits))
+        self.magnitudeLineEdit.setValue(lengthInDisplayUnits)
 
 
 class EnergyWidget(QWidget):
@@ -339,18 +330,15 @@ class EnergyWidget(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.energyInElectronVolts = Decimal()
-        self.magnitudeValidator = QDoubleValidator()
-        self.magnitudeLineEdit = QLineEdit()  # TODO DecimalLineEdit
+        self.magnitudeLineEdit = DecimalLineEdit()
         self.unitsComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> EnergyWidget:
         widget = cls(parent)
 
-        widget.magnitudeValidator.setBottom(0.)
-        widget.magnitudeLineEdit.setValidator(widget.magnitudeValidator)
-        widget.magnitudeLineEdit.editingFinished.connect(
-            widget._setEnergyInElectronVoltsFromWidgets)
+        widget.setMinimum(Decimal())
+        widget.magnitudeLineEdit.valueChanged.connect(widget._setEnergyInElectronVoltsFromWidgets)
 
         widget.unitsComboBox.addItem('eV', 0)
         widget.unitsComboBox.addItem('keV', 3)
@@ -371,7 +359,7 @@ class EnergyWidget(QWidget):
     def setEnergyInElectronVolts(self, energyInElectronVolts: Decimal) -> None:
         self.energyInElectronVolts = energyInElectronVolts
 
-        if energyInElectronVolts > 0:
+        if energyInElectronVolts > Decimal():
             exponent = 3 * int(
                 (energyInElectronVolts.log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
             index = self.unitsComboBox.findData(exponent)
@@ -387,17 +375,10 @@ class EnergyWidget(QWidget):
         exponent = self.unitsComboBox.currentData()
         return Decimal(f'1e{exponent:+d}')
 
-    def _setEnergyInElectronVoltsFromWidgets(self) -> None:
-        decimalText = self.magnitudeLineEdit.text()
-
-        try:
-            magnitude = Decimal(decimalText)
-        except ValueError:
-            logger.error(f'Failed to parse energy magnitude "{decimalText}"')
-        else:
-            self.energyInElectronVolts = magnitude * self._scaleToElectronVolts
-            self.energyChanged.emit(self.energyInElectronVolts)
+    def _setEnergyInElectronVoltsFromWidgets(self, magnitude: Decimal) -> None:
+        self.energyInElectronVolts = magnitude * self._scaleToElectronVolts
+        self.energyChanged.emit(self.energyInElectronVolts)
 
     def _updateDisplay(self) -> None:
         energyInDisplayUnits = self.energyInElectronVolts / self._scaleToElectronVolts
-        self.magnitudeLineEdit.setText(str(energyInDisplayUnits))
+        self.magnitudeLineEdit.setValue(energyInDisplayUnits)

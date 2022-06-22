@@ -18,7 +18,7 @@ class CSVProbeFileReader(ProbeFileReader):
 
     def read(self, filePath: Path) -> ProbeArrayType:
         probe = numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
-        # TODO add size checks
+        # FIXME add size checks
         numberOfProbeModes = probe.shape[0] // probe.shape[1]
 
         if numberOfProbeModes > 1:

@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod, abstractproperty
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -12,10 +11,6 @@ class ScanPoint:
     '''ScanPoint coordinates are conventionally in meters'''
     x: Decimal
     y: Decimal
-
-
-class ScanPointSequence(Sequence[ScanPoint]):
-    pass
 
 
 class ScanPointTransform(Enum):
@@ -58,6 +53,14 @@ class ScanPointTransform(Enum):
         return ScanPoint(yp, xp) if self.swapXY else ScanPoint(xp, yp)
 
 
+class ScanPointSequence(Sequence[ScanPoint]):
+    pass
+
+
+class ScanFile(Mapping[str, ScanPointSequence]):
+    pass
+
+
 class ScanFileReader(ABC):
 
     @abstractproperty
@@ -69,7 +72,7 @@ class ScanFileReader(ABC):
         pass
 
     @abstractmethod
-    def read(self, filePath: Path) -> Iterable[ScanPoint]:
+    def read(self, filePath: Path) -> ScanFile:
         pass
 
 
@@ -88,5 +91,5 @@ class ScanFileWriter(ABC):
         pass
 
     @abstractmethod
-    def write(self, filePath: Path, scanPoints: Iterable[ScanPoint]) -> None:
+    def write(self, filePath: Path, scanFile: ScanFile) -> None:
         pass

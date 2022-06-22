@@ -141,7 +141,7 @@ class ModelCore:
         self.rpcMessageService = RPCMessageService(modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
         self.rpcMessageService.registerMessageClass(LoadResultsMessage)
         self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
-                                                 self._loadResultsExecutor)
+                                                self._loadResultsExecutor)
 
     def __enter__(self) -> ModelCore:
         self.rpcMessageService.start()
