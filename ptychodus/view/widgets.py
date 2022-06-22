@@ -7,7 +7,8 @@ import numpy
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator
-from PyQt5.QtWidgets import QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QSizePolicy, QSlider, QSpinBox, QWidget
+from PyQt5.QtWidgets import (QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+                             QSizePolicy, QSlider, QSpinBox, QWidget)
 
 logger = logging.getLogger(__name__)
 

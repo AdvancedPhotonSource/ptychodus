@@ -3,7 +3,8 @@ from pathlib import Path
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtWidgets import QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu, QSplitter, QStyle, QTableView, QToolBar, QToolButton, QTreeView
+from PyQt5.QtWidgets import (QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu,
+                             QSplitter, QStyle, QTableView, QToolBar, QToolButton, QTreeView)
 
 from .detector import *
 from .monitor import *

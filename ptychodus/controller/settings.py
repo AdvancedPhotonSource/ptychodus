@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtCore import Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import (Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject,
+                          QVariant)
 from PyQt5.QtWidgets import QDialog, QListView, QTableView
 
 from ..api.observer import Observable, Observer

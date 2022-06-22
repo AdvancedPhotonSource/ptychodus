@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import QComboBox, QFormLayout, QGroupBox, QPushButton, QSpinBox, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QPushButton, QSpinBox, QVBoxLayout,
+                             QWidget)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar

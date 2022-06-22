@@ -12,7 +12,8 @@ import numpy
 from ..api.geometry import Interval, Box
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
-from ..api.scan import ScanPoint, ScanPointSequence, ScanPointTransform, ScanFileReader, ScanFileWriter
+from ..api.scan import (ScanFileReader, ScanFileWriter, ScanPoint, ScanPointSequence,
+                        ScanPointTransform)
 from ..api.settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
@@ -186,7 +187,7 @@ class FileScanInitializer(ScanPointSequence, Observer):
         if filePath is not None and filePath.is_file():
             logger.debug(f'Reading {filePath}')
             fileReader = self._fileReaderChooser.getCurrentStrategy()
-            pointIterable = fileReader.read(filePath)
+            pointIterable = fileReader.read(filePath)  # FIXME
             self._pointList = [point for point in pointIterable]
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
@@ -376,7 +377,7 @@ class ScanInitializer(Observable, Observer):
         logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
         self._fileWriterChooser.setFromDisplayName(fileFilter)
         writer = self._fileWriterChooser.getCurrentStrategy()
-        writer.write(filePath, self._scan)
+        writer.write(filePath, self._scan)  # FIXME
 
     def _syncInitializerFromSettings(self) -> None:
         self._initializerChooser.setFromSimpleName(self._settings.initializer.value)

@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QGroupBox,
+                             QHBoxLayout, QLabel, QVBoxLayout, QWidget)
 
 
 class ImportSettingsValuesGroupBox(QGroupBox):
