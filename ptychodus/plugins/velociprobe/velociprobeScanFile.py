@@ -13,7 +13,7 @@ from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, 
                                 ScanPointParseError, ScanPointSequence, SimpleScanDictionary)
 
 
-class VelociprobeScanFileColumn:
+class VelociprobeScanFileColumn(IntEnum):
     X = 1
     LASER_INTERFEROMETER_Y = 2
     ENCODER_Y = 5
@@ -59,8 +59,8 @@ class VelociprobeScanFileReader(ScanFileReader):
 
     def read(self, filePath: Path) -> ScanDictionary:
         pointDict: dict[int, list[VelociprobeScanPoint]] = defaultdict(list[VelociprobeScanPoint])
-        liPoints: list[ScanPoint] = list()
-        enPoints: list[ScanPoint] = list()
+        liPointList: list[ScanPoint] = list()
+        enPointList: list[ScanPoint] = list()
 
         with open(filePath, newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
@@ -90,13 +90,13 @@ class VelociprobeScanFileReader(ScanFileReader):
             y_li_m = Decimal(yf_li_nm) * nm_to_m
             y_en_m = Decimal(yf_en_nm) * nm_to_m
 
-            liPoints.append(ScanPoint(x_m, y_li_m))
-            enPoints.append(ScanPoint(x_m, y_en_m))
+            liPointList.append(ScanPoint(x_m, y_li_m))
+            enPointList.append(ScanPoint(x_m, y_en_m))
 
-        self._applyTransform(liPoints)
-        self._applyTransform(enPoints)
+        self._applyTransform(liPointList)
+        self._applyTransform(enPointList)
 
         scanDict: dict[str, ScanPointSequence] = dict()
-        scanDict['LaserInterferometerY'] = liPoints
-        scanDict['EncoderY'] = enPoints
+        scanDict['LaserInterferometerY'] = liPointList
+        scanDict['EncoderY'] = enPointList
         return SimpleScanDictionary(scanDict)

@@ -1,6 +1,9 @@
 from collections import defaultdict
+from dataclasses import dataclass
 from decimal import Decimal
+from enum import IntEnum
 from pathlib import Path
+from statistics import median
 from typing import Final
 import csv
 
@@ -8,28 +11,19 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanPoint, ScanPointParseError,
                                 SimpleScanDictionary)
 
+class LynxScanFileColumn(IntEnum):
+    X = 1
+    Y = 2
+    DETECTOR_COUNT = 4
 
-class LynxScanPointList:
 
-    def __init__(self) -> None:
-        self.xInMicrons: list[Decimal] = list()
-        self.yInMicrons: list[Decimal] = list()
-
-    def append(self, x_um: Decimal, y_um: Decimal) -> None:
-        self.xInMicrons.append(x_um)
-        self.yInMicrons.append(y_um)
-
-    def mean(self) -> ScanPoint:
-        micronsToMeters = Decimal('1e-6')
-        x_um = Decimal(sum(self.xInMicrons)) / Decimal(len(self.xInMicrons))
-        y_um = Decimal(sum(self.yInMicrons)) / Decimal(len(self.yInMicrons))
-        return ScanPoint(x_um * micronsToMeters, y_um * micronsToMeters)
+@dataclass(frozen=True)
+class LynxScanPoint:
+    x_um: Decimal
+    y_um: Decimal
 
 
 class LynxScanFileReader(ScanFileReader):
-    X_COLUMN: Final[int] = 1
-    Y_COLUMN: Final[int] = 2
-    DETECTOR_COUNT_COLUMN: Final[int] = 4
     EXPECTED_HEADER: Final[list[str]] = [ 'DataPoint', 'x_st_fzp', 'y_st_fzp', \
             'ckUser_Clk_Count', 'Detector_Count' ]
 
@@ -42,7 +36,8 @@ class LynxScanFileReader(ScanFileReader):
         return 'Lynx Scan Files (*.dat)'
 
     def read(self, filePath: Path) -> ScanDictionary:
-        scanPointDict: dict[int, LynxScanPointList] = defaultdict(LynxScanPointList)
+        pointDict: dict[int, list[LynxScanPoint]] = defaultdict(list[LynxScanPoint])
+        pointList: list[ScanPoint] = list()
 
         with open(filePath, newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=' ')
@@ -51,24 +46,34 @@ class LynxScanFileReader(ScanFileReader):
             metadataRow = next(csvIterator)
             headerRow = next(csvIterator)
 
-            assert headerRow == LynxScanFileReader.EXPECTED_HEADER
+            if headerRow != LynxScanFileReader.EXPECTED_HEADER:
+                raise ScanPointParseError('Bad header!')
 
             for row in csvIterator:
                 if row[0].startswith('#'):
                     continue
 
                 if len(row) != len(LynxScanFileReader.EXPECTED_HEADER):
-                    raise ScanPointParseError()
+                    raise ScanPointParseError('Bad number of columns!')
 
-                detectorCount = int(row[LynxScanFileReader.DETECTOR_COUNT_COLUMN])
-                x_um = Decimal(row[LynxScanFileReader.X_COLUMN])
-                y_um = Decimal(row[LynxScanFileReader.Y_COLUMN])
+                x_um = Decimal(row[LynxScanFileColumn.X])
+                y_um = Decimal(row[LynxScanFileColumn.Y])
+                detector_count = int(row[LynxScanFileColumn.DETECTOR_COUNT])
 
-                scanPointDict[detectorCount].append(x_um, y_um)
+                point = LynxScanPoint(x_um, y_um)
+                pointDict[detector_count].append(point)
 
-        scanPointList = [points.mean() for _, points in sorted(scanPointDict.items())]
+        for detector_count, pointList in pointDict.items():
+            xf_um = median([p.x_um for p in pointList])
+            yf_um = median([p.y_um for p in pointList])
 
-        return SimpleScanDictionary.createFromUnnamedSequence(scanPointList)
+            um_to_m = Decimal('1e-6')
+            x_m = Decimal(xf_um) * um_to_m
+            y_m = Decimal(yf_um) * um_to_m
+
+            pointList.append(ScanPoint(x_m, y_m))
+
+        return SimpleScanDictionary.createFromUnnamedSequence(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
