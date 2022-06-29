@@ -77,20 +77,26 @@ class ObjectSizer(Observable, Observer):
         return self._lambdaZ_m2 / extentYInMeters
 
     def getScanExtent(self) -> ImageExtent:
-        scanBox_m = self._scan.getBoundingBoxInMeters()
-        scanWidth_px = 0
-        scanHeight_px = 0
+        scanExtent = ImageExtent(0, 0)
+        xint_m = None
+        yint_m = None
 
-        if scanBox_m:
-            assert len(scanBox_m) == 2
+        for point in self._scan:
+            if xint_m and yint_m:
+                xint_m.hull(scanPoint.x)
+                yint_m.hull(scanPoint.y)
+            else:
+                xint_m = Interval[Decimal](scanPoint.x, scanPoint.x)
+                yint_m = Interval[Decimal](scanPoint.y, scanPoint.y)
 
-            scanWidthf_px = scanBox_m[0].length / self.getPixelSizeXInMeters()
-            scanWidth_px = int(scanWidthf_px.to_integral_exact(rounding=ROUND_CEILING))
+        if xint_m and yint_m:
+            xint_px = xint_m.length / self.getPixelSizeXInMeters()
+            yint_px = yint_m.length / self.getPixelSizeYInMeters()
 
-            scanHeightf_px = scanBox_m[1].length / self.getPixelSizeYInMeters()
-            scanHeight_px = int(scanHeightf_px.to_integral_exact(rounding=ROUND_CEILING))
+            scanExtent = ImageExtent(width=int(xint_px.to_integral_exact(rounding=ROUND_CEILING)),
+                                     height=int(yint_px.to_integral_exact(rounding=ROUND_CEILING)))
 
-        return ImageExtent(width=scanWidth_px, height=scanHeight_px)
+        return scanExtent
 
     def getPaddingExtent(self) -> ImageExtent:
         return 2 * (self._probeSizer.getProbeExtent() // 2)

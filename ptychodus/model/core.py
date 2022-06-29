@@ -68,11 +68,13 @@ class ModelCore:
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
 
         self._scan = Scan.createInstance(self._scanSettings)
+        # FIXME BEGIN
         self._fileScanInitializer = FileScanInitializer.createInstance(
             self._scanSettings, self._pluginRegistry.buildScanFileReaderChooser())
         self._scanInitializer = ScanInitializer.createInstance(
             self.rng, self._scanSettings, self._scan, self._fileScanInitializer,
             self._pluginRegistry.buildScanFileWriterChooser(), self.settingsRegistry)
+        # FIXME END
 
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings, self._probeSizer)

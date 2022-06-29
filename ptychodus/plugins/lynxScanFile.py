@@ -11,6 +11,7 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanPoint, ScanPointParseError,
                                 SimpleScanDictionary)
 
+
 class LynxScanFileColumn(IntEnum):
     X = 1
     Y = 2

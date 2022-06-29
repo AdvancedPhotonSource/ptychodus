@@ -2,20 +2,20 @@ from __future__ import annotations
 from decimal import Decimal
 
 from ..model import Observer, Observable, Scan, ScanPresenter
-from ..view import (ScanInitializerView, ScanParametersView, ScanPlotView, ScanScanView,
+from ..view import (ScanInitializerView, ScanParametersView, ScanPlotView, ScanEditorView,
                     ScanTransformView)
 from .data import FileDialogFactory
 
 
 class ScanScanController(Observer):
 
-    def __init__(self, presenter: ScanPresenter, view: ScanScanView) -> None:
+    def __init__(self, presenter: ScanPresenter, view: ScanEditorView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanScanView) -> ScanScanController:
+    def createInstance(cls, presenter: ScanPresenter, view: ScanEditorView) -> ScanScanController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -25,7 +25,6 @@ class ScanScanController(Observer):
 
         view.stepSizeXWidget.lengthChanged.connect(presenter.setStepSizeXInMeters)
         view.stepSizeYWidget.lengthChanged.connect(presenter.setStepSizeYInMeters)
-        view.jitterRadiusWidget.lengthChanged.connect(presenter.setJitterRadiusInMeters)
 
         controller._syncModelToView()
 
@@ -53,7 +52,6 @@ class ScanScanController(Observer):
 
         self._view.stepSizeXWidget.setLengthInMeters(self._presenter.getStepSizeXInMeters())
         self._view.stepSizeYWidget.setLengthInMeters(self._presenter.getStepSizeYInMeters())
-        self._view.jitterRadiusWidget.setLengthInMeters(self._presenter.getJitterRadiusInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -108,6 +106,7 @@ class ScanTransformController(Observer):
             view.transformComboBox.addItem(transform)
 
         view.transformComboBox.currentTextChanged.connect(presenter.setTransform)
+        view.jitterRadiusWidget.lengthChanged.connect(presenter.setJitterRadiusInMeters)
 
         controller._syncModelToView()
 
@@ -115,6 +114,7 @@ class ScanTransformController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.transformComboBox.setCurrentText(self._presenter.getTransform())
+        self._view.jitterRadiusWidget.setLengthInMeters(self._presenter.getJitterRadiusInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

@@ -72,11 +72,26 @@ class ScanDictionary(Mapping[str, ScanPointSequence]):
     pass
 
 
+class ScanInitializer(ScanDictionary):
+    '''interface for plugins that can initialize scan sequences'''
+
+    @abstractproperty
+    def simpleName(self) -> str:
+        '''returns a unique name that is appropriate for a settings file'''
+        pass
+
+    @abstractproperty
+    def displayName(self) -> str:
+        '''returns a unique name that is prettified for visual display'''
+        pass
+
+
 class SimpleScanDictionary(ScanDictionary):
     '''a dictionary-based scan file implementation'''
     DEFAULT_SEQUENCE_NAME: Final[str] = 'Default'
 
     def __init__(self, sequences: Mapping[str, ScanPointSequence]) -> None:
+        super().__init__()
         self._sequences = sequences
 
     @classmethod
