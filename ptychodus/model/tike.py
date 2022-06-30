@@ -717,6 +717,31 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
         return self._tikeReconstructor(self._algorithmOptions)
 
 
+class DifferenceMapReconstructor(Reconstructor):
+
+    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
+        super().__init__()
+        self._algorithmOptions = tike.ptycho.solvers.DmOptions()
+        self._tikeReconstructor = tikeReconstructor
+
+    @property
+    def name(self) -> str:
+        return self._algorithmOptions.name
+
+    @property
+    def backendName(self) -> str:
+        return self._tikeReconstructor.backendName
+
+    @property
+    def _settings(self) -> TikeSettings:
+        return self._tikeReconstructor._settings
+
+    def reconstruct(self) -> int:
+        self._algorithmOptions.num_batch = self._settings.numBatch.value
+        self._algorithmOptions.num_iter = self._settings.numIter.value
+        return self._tikeReconstructor(self._algorithmOptions)
+
+
 class TikeBackend:
 
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
@@ -764,6 +789,7 @@ class TikeBackend:
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))
             core.reconstructorList.append(ConjugateGradientReconstructor(tikeReconstructor))
             core.reconstructorList.append(IterativeLeastSquaresReconstructor(tikeReconstructor))
+            core.reconstructorList.append(DifferenceMapReconstructor(tikeReconstructor))
         else:
             logger.info('tike not found.')
 
@@ -772,5 +798,6 @@ class TikeBackend:
                 core.reconstructorList.append(NullReconstructor('adam_grad', 'Tike'))
                 core.reconstructorList.append(NullReconstructor('cgrad', 'Tike'))
                 core.reconstructorList.append(NullReconstructor('lstsq_grad', 'Tike'))
+                core.reconstructorList.append(NullReconstructor('dm', 'Tike'))
 
         return core
