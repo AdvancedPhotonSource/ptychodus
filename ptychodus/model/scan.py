@@ -8,7 +8,8 @@ import numpy
 from ..api.geometry import Interval, Box
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
-from ..api.scan import ScanFileReader, ScanFileWriter, ScanPoint, ScanPointSequence
+from ..api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanInitializer, ScanPoint,
+                        ScanPointSequence)
 from ..api.settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
@@ -41,13 +42,114 @@ class ScanSettings(Observable, Observer):
             self.notifyObservers()
 
 
+class CartesianScanInitializer(ScanInitializer):
+
+    def __init__(self, rng: numpy.random.Generator, stepSizeInMeters: tuple[Decimal, Decimal],
+                 extent: tuple[int, int], snake: bool) -> None:
+        super().__init__(rng)
+        self._stepSizeInMeters = stepSizeInMeters
+        self._extent = extent
+        self._snake = snake
+
+    @property
+    def name(self) -> str:
+        return 'Snake' if self._snake else 'Raster'
+
+    def _getPoint(self, index: int) -> ScanPoint:
+        if index >= len(self):
+            raise IndexError(f'Index {index} is out of range')
+
+        y, x = divmod(index, self._nx)
+
+        if self._snake and y & 1:
+            x = self._extent[0] - 1 - x
+
+        xf = x * self._stepSizeInMeters[0]
+        yf = y * self._stepSizeInMeters[1]
+
+        return ScanPoint(xf, yf)
+
+    def __len__(self) -> int:
+        return numpy.prod(self._extent)
+
+
+class SpiralScanInitializer(ScanInitializer):
+
+    def __init__(self, rng: numpy.random.Generator, stepSizeInMeters: tuple[Decimal, Decimal],
+                 numberOfPoints: int) -> None:
+        super().__init__(rng)
+        self._stepSizeInMeters = stepSizeInMeters
+        self._numberOfPoints = numberOfPoints
+
+    @property
+    def name(self) -> str:
+        return 'Spiral'
+
+    def _getPoint(self, index: int) -> ScanPoint:
+        if index >= len(self):
+            raise IndexError(f'Index {index} is out of range')
+
+        # theta = omega * t
+        # r = a + b * theta
+        # x = r * math.cos(theta)
+        # y = r * math.sin(theta)
+
+        sqrtIndex = Decimal(index).sqrt()
+
+        # TODO generalize parameters and redo without casting to float
+        theta = float(4 * sqrtIndex)
+        cosTheta = Decimal(math.cos(theta))
+        sinTheta = Decimal(math.sin(theta))
+
+        x = sqrtIndex * cosTheta * self._stepSizeInMeters[0]
+        y = sqrtIndex * sinTheta * self._stepSizeInMeters[1]
+
+        return ScanPoint(x, y)
+
+    def __len__(self) -> int:
+        return self._numberOfPoints
+
+# vvv FIXME vvv
+# FIXME ScanInitializers need to be able to read/write from settings
+# FIXME keep them in a main dictionary
+# FIXME - create from settings at initialization
+# FIXME - write the active scan to settings
+# FIXME - display file scan dicts as tree?
+
+class FileScanInitializer(ScanInitializer):
+
+    def __init__(self, rng: numpy.random.Generator, points: ScanPointSequence, filePath: Path,
+                 fileType: str, fileKey: str) -> None:
+        super().__init__()
+        self._points = points
+        self._filePath = filePath
+        self._fileType = fileType
+        self._fileKey = fileKey
+
+    @property
+    def name(self) -> str:
+        return 'FromFile'
+
+    def _getPoint(self, index: int) -> ScanPoint:
+        return self._points[index]
+
+    def __len__(self) -> int:
+        return len(self._points)
+
+
 class ScanInitializerRepository(Observable, Observer):
 
     @staticmethod
-    def _createPluginEntry(initializer: ScanInitializer) -> PluginEntry[ScanInitializer]:
+    def _createInitializerEntry(initializer: ScanInitializer) -> PluginEntry[ScanInitializer]:
         return PluginEntry[ScanInitializer](simpleName=initializer.simpleName,
                                             displayName=initializer.displayName,
                                             strategy=initializer)
+
+    @staticmethod
+    def _createTransformEntry(xform: ScanPointTransform) -> PluginEntry[ScanPointTransform]:
+        return PluginEntry[ScanPointTransform](simpleName=xform.simpleName,
+                                               displayName=xform.displayName,
+                                               strategy=xform)
 
     def __init__(self, settings: ScanSettings, fileReaderChooser: PluginChooser[ScanFileReader],
                  reinitObservable: Observable) -> None:
@@ -57,7 +159,9 @@ class ScanInitializerRepository(Observable, Observer):
         self._reinitObservable = reinitObservable
         self._fileInitializer = FileScanInitializer.createInstance(settings, fileReaderChooser)
         self._initializerChooser = PluginChooser[ScanInitializer](
-            AvailableScanDictionary._createPluginEntry(self._fileInitializer))
+            AvailableScanDictionary._createInitializerEntry(self._fileInitializer))
+        self._transformChooser = PluginChooser[ScanPointTransform].createFromList(
+            [Scan._createTransformEntry(xform) for xform in ScanPointTransform])
 
     @classmethod
     def createInstance(cls, settings: ScanSettings,
@@ -66,33 +170,20 @@ class ScanInitializerRepository(Observable, Observer):
         initializer = cls(settings, fileReaderChooser, reinitObservable)
 
         initializer._initializerChooser.addStrategy(
-            AvailableScanDictionary._createPluginEntry(CartesianScanInitializer(settings))
+            AvailableScanDictionary._createInitializerEntry(CartesianScanInitializer(settings)))
         initializer._initializerChooser.addStrategy(
-            AvailableScanDictionary._createPluginEntry(SpiralScanInitializer(settings))
+            AvailableScanDictionary._createInitializerEntry(SpiralScanInitializer(settings)))
 
         settings.initializer.addObserver(initializer)
         initializer._initializerChooser.addObserver(initializer)
         initializer._syncInitializerFromSettings()
         reinitObservable.addObserver(initializer)
 
+        settings.transform.addObserver(scan)
+        scan._transformChooser.addObserver(scan)
+        scan._syncTransformFromSettings()
+
         return initializer
-
-# FIXME BEGIN update to support category/initializer format
-    def getInitializerList(self) -> list[str]: # FIXME dict[str,list[str]]
-        return self._initializerChooser.getDisplayNameList()
-
-    def getInitializer(self) -> str: # FIXME category/initializer format
-        return self._initializerChooser.getCurrentDisplayName()
-
-    def setInitializer(self, name: str) -> None: # FIXME category/initializer format
-        self._initializerChooser.setFromDisplayName(name)
-
-    def initializeScan(self) -> None:
-        initializer = self._initializerChooser.getCurrentStrategy()
-        simpleName = self._initializerChooser.getCurrentSimpleName()
-        logger.debug(f'Initializing {simpleName} Scan')
-        self._scan.setScanPoints(initializer)  # FIXME
-# FIXME END
 
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileInitializer.getOpenFileFilterList()
@@ -105,20 +196,56 @@ class ScanInitializerRepository(Observable, Observer):
         self._initializerChooser.setToDefault()
         self.initializeScan()
 
+    def getInitializerList(self) -> list[str]:
+        return self._initializerChooser.getDisplayNameList()
+
+    def getInitializer(self) -> str:
+        return self._initializerChooser.getCurrentDisplayName()
+
+    def setInitializer(self, name: str) -> None:
+        self._initializerChooser.setFromDisplayName(name)
+
+    def initializeScan(self) -> None:  # FIXME
+        initializer = self._initializerChooser.getCurrentStrategy()
+        simpleName = self._initializerChooser.getCurrentSimpleName()
+        logger.debug(f'Initializing {simpleName} Scan')
+        self._scan.setScanPoints(initializer)
+
     def _syncInitializerFromSettings(self) -> None:
-        self._initializerChooser.setFromSimpleName(self._settings.initializer.value) # FIXME category/initializer format
+        self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
 
     def _syncInitializerToSettings(self) -> None:
-        self._settings.initializer.value = self._initializerChooser.getCurrentSimpleName() # FIXME category/initializer format
+        self._settings.initializer.value = self._initializerChooser.getCurrentSimpleName()
+        self.notifyObservers()
+
+    def getTransformList(self) -> list[str]:
+        return self._transformChooser.getDisplayNameList()
+
+    def getTransform(self) -> str:
+        return self._transformChooser.getCurrentDisplayName()
+
+    def setTransform(self, name: str) -> None:
+        self._transformChooser.setFromDisplayName(name)
+
+    def _syncTransformFromSettings(self) -> None:
+        self._transformChooser.setFromSimpleName(self._settings.transform.value)
+
+    def _syncTransformToSettings(self) -> None:
+        self._updateBoundingBox()
+        self._settings.transform.value = self._transformChooser.getCurrentSimpleName()
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.initializer:
+        if observable is self._reinitObservable:
+            self.initializeScan()
+        elif observable is self._settings.initializer:
             self._syncInitializerFromSettings()
         elif observable is self._initializerChooser:
             self._syncInitializerToSettings()
-        elif observable is self._reinitObservable:
-            self.initializeScan()
+        elif observable is self._settings.transform:
+            self._syncTransformFromSettings()
+        elif observable is self._transformChooser:
+            self._syncTransformToSettings()
 
 
 class ActiveScanPointSequence(ScanPointSequence, Observable):

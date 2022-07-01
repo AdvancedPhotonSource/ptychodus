@@ -7,6 +7,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Final, Iterator
 
+import numpy
+
+from .observer import Observable
+
 
 @dataclass(frozen=True)
 class ScanPoint:
@@ -67,23 +71,63 @@ class ScanPointSequence(Sequence[ScanPoint]):
     pass
 
 
-class ScanDictionary(Mapping[str, ScanPointSequence]):
-    '''a collection of named scan point sequences'''
-    pass
-
-
-class ScanInitializer(ScanDictionary):
+class ScanInitializer(ScanPointSequence, Observable):
     '''interface for plugins that can initialize scan sequences'''
 
     @abstractproperty
-    def simpleName(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
+    def name(self) -> str:
+        '''returns a unique name'''
         pass
 
-    @abstractproperty
-    def displayName(self) -> str:
-        '''returns a unique name that is prettified for visual display'''
+    @abstractmethod
+    def _getPoint(self, index: int) -> ScanPoint:
+        '''returns the scan point'''
         pass
+
+    def __init__(self, rng: numpy.random.Generator) -> None:
+        super().__init__()
+        self._rng = rng
+        self._transform = ScanPointTransform.PXPY
+        self._jitterRadiusInMeters = Decimal()
+
+    def getTransform(self) -> ScanPointTransform:
+        '''gets the scan point transform'''
+        return self._transform
+
+    def setTransform(self, transform: ScanPointTransform) -> None:
+        '''sets the scan point transform'''
+        if self._transform != transform:
+            self._transform = transform
+            self.notifyObservers()
+
+    def getJitterRadiusInMeters(self) -> Decimal:
+        '''gets the jitter radius'''
+        return self._jitterRadiusInMeters
+
+    def setJitterRadiusInMeters(self, jitterRadiusInMeters: Decimal) -> None:
+        '''sets the jitter radius'''
+        if self._jitterRadiusInMeters != jitterRadiusInMeters:
+            self._jitterRadiusInMeters = jitterRadiusInMeters
+            self.notifyObservers()
+
+    def __getitem__(self, index: int) -> ScanPoint:
+        '''returns the jittered and transformed scan point'''
+        point = self._getPoint(index)
+
+        if self._jitterRadiusInMeters > Decimal():
+            rad = Decimal(self._rng.uniform())
+            dirX = Decimal(self._rng.normal())
+            dirY = Decimal(self._rng.normal())
+
+            scalar = self._jitterRadiusInMeters * (rad / (dirX**2 + dirY**2)).sqrt()
+            point = ScanPoint(point.x + scalar * dirX, point.y + scalar * dirY)
+
+        return self._transform(point)
+
+
+class ScanDictionary(Mapping[str, ScanPointSequence]):
+    '''a collection of named scan point sequences'''
+    pass
 
 
 class SimpleScanDictionary(ScanDictionary):
