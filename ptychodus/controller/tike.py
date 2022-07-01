@@ -359,6 +359,10 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
             view = TikeParametersView.createInstance(showCgIter=False,
                                                      showAlpha=False,
                                                      showStepLength=False)
+        elif reconstructorName == 'dm':
+            view = TikeParametersView.createInstance(showCgIter=False,
+                                                     showAlpha=False,
+                                                     showStepLength=False)
         else:
             view = TikeParametersView.createInstance(showCgIter=True,
                                                      showAlpha=True,
