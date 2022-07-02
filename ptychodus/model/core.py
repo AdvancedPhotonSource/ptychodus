@@ -18,7 +18,7 @@ from .ptychopy import PtychoPyBackend
 from .reconstructor import *
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .rpc import RPCMessageService
-from .scan import *
+from .scan import ScanCore
 from .tike import TikeBackend
 from .velociprobe import *
 from .watcher import DataDirectoryWatcher
@@ -57,7 +57,6 @@ class ModelCore:
         self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
-        self._scanSettings = ScanSettings.createInstance(self.settingsRegistry)
         self._probeSettings = ProbeSettings.createInstance(self.settingsRegistry)
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
@@ -66,15 +65,6 @@ class ModelCore:
 
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
-
-        self._scan = Scan.createInstance(self._scanSettings)
-        # FIXME BEGIN
-        self._fileScanInitializer = FileScanInitializer.createInstance(
-            self._scanSettings, self._pluginRegistry.buildScanFileReaderChooser())
-        self._scanInitializer = ScanInitializer.createInstance(
-            self.rng, self._scanSettings, self._scan, self._fileScanInitializer,
-            self._pluginRegistry.buildScanFileWriterChooser(), self.settingsRegistry)
-        # FIXME END
 
         self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
         self._probe = Probe(self._probeSettings, self._probeSizer)
@@ -86,8 +76,12 @@ class ModelCore:
             self._probe, self._fileProbeInitializer,
             self._pluginRegistry.buildProbeFileWriterChooser(), self.settingsRegistry)
 
-        self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
-                                                       self._probeSizer)
+        self._scanCore = ScanCore(self.rng, self.settingsRegistry,
+                                  self._pluginRegistry.buildScanFileReaderChooser(),
+                                  self._pluginRegistry.buildScanFileWriterChooser())
+
+        self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer,
+                                                       self._scanCore.scan, self._probeSizer)
         self._object = Object(self._objectSettings, self._objectSizer)
         self._fileObjectInitializer = FileObjectInitializer.createInstance(
             self._objectSettings, self._objectSizer,
@@ -104,8 +98,8 @@ class ModelCore:
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._activeDataFile,
-                                                      self._scan, self._probeSizer, self._probe,
-                                                      self._objectSizer, self._object,
+                                                      self._scanCore.scan, self._probeSizer,
+                                                      self._probe, self._objectSizer, self._object,
                                                       self.reconstructorPlotPresenter,
                                                       modelArgs.isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
@@ -128,11 +122,9 @@ class ModelCore:
                                        'VelociprobeDataFileReader')  # TODO remove when able
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
-            self._probeSettings, self._activeDataFile, self._scanInitializer)
+            self._probeSettings, self._activeDataFile, self._scanCore.scanInitializer)
         self.probePresenter = ProbePresenter.createInstance(self._probeSettings, self._probeSizer,
                                                             self._probe, self._probeInitializer)
-        self.scanPresenter = ScanPresenter.createInstance(self._scanSettings, self._scan,
-                                                          self._scanInitializer)
         self.objectPresenter = ObjectPresenter.createInstance(self._objectSettings,
                                                               self._objectSizer, self._object,
                                                               self._objectInitializer)
@@ -176,8 +168,8 @@ class ModelCore:
         pixelSizeXInMeters = float(self._objectSizer.getPixelSizeXInMeters())
         pixelSizeYInMeters = float(self._objectSizer.getPixelSizeYInMeters())
 
-        scanXInMeters = [float(point.x) for point in self._scan]
-        scanYInMeters = [float(point.y) for point in self._scan]
+        scanXInMeters = [float(point.x) for point in self._scanCore.scan]
+        scanYInMeters = [float(point.y) for point in self._scanCore.scan]
 
         dataDump = dict()
         dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
