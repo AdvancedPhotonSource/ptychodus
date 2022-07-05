@@ -1,7 +1,8 @@
+from __future__ import annotations
 from pathlib import Path
 
-from ..api.observer import Observable, Observer
-from ..api.settings import SettingsRegistry, SettingsGroup
+from ...api.observer import Observable, Observer
+from ...api.settings import SettingsRegistry, SettingsGroup
 
 
 class ScanSettings(Observable, Observer):

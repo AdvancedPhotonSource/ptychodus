@@ -29,29 +29,20 @@ class ScanFileInfo:
 
 
 class TabularScanInitializer(ScanInitializer):
-    # TODO must be saved to disk to make active; can be made active iff fileInfo not None
+    # FIXME createFromSettings // load scan if initializer is FromFile
+    # TODO display file scan dicts as tree
 
-    def __init__(self,
-                 parameters: ScanInitializerParameters,
-                 pointList: list[ScanPoint],
-                 name: str,
-                 fileInfo: Optional[ScanFileInfo] = None) -> None:
+    def __init__(self, parameters: ScanInitializerParameters, name: str, \\
+            pointList: list[ScanPoint], fileInfo: Optional[ScanFileInfo] = None) -> None:
         super().__init__(parameters)
-        self._pointList = pointList
         self._name = name
+        self._pointList = pointList
         self._fileInfo = fileInfo
-
-    @classmethod
-    def createFromSettings(cls, rng: numpy.random.Generator, settings: ScanSettings,
-                           name: str) -> TabularScanInitializer:
-        parameters = ScanInitializerParameters.createFromSettings(rng, settings)
-        pointList: list[ScanPoint] = list()  # FIXME
-        fileInfo = ScanFileInfo.createFromSettings(settings)
-        return cls(parameters, pointList, name, fileInfo)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         if self._fileInfo is None:
-            return
+            # TODO must be saved to disk to make active; can be made active iff fileInfo not None
+            raise ValueError('Missing file info.')
 
         settings.initializer.value = 'FromFile'
         self._fileInfo.syncToSettings(settings)
@@ -63,6 +54,7 @@ class TabularScanInitializer(ScanInitializer):
 
     @property
     def name(self) -> str:
+        # FIXME Tabular initializer needs to be 'FromFile', but name does not
         return self._name
 
     def _getPoint(self, index: int) -> ScanPoint:

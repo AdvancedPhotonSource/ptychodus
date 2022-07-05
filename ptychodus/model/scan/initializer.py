@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from decimal import Decimal
@@ -12,8 +13,8 @@ from .settings import ScanSettings
 @dataclass
 class ScanInitializerParameters:
     rng: numpy.random.Generator
-    transform: ScanPointTransform
-    jitterRadiusInMeters: Decimal
+    transform: ScanPointTransform = ScanPointTransform.PXPY
+    jitterRadiusInMeters: Decimal = Decimal()
 
     @classmethod
     def createFromSettings(cls, rng: numpy.random.Generator,
