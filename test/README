@@ -1,0 +1,5 @@
+Data files for the tests require the git lfs extension. Without git-lfs, these
+files will appear as broken symbolic links because the actual file contents has
+not been downloaded.
+
+https://git-lfs.github.com/
