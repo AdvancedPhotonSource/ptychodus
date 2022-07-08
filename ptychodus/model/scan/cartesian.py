@@ -1,7 +1,5 @@
 from decimal import Decimal
 
-import numpy
-
 from ...api.scan import ScanPoint
 from .initializer import ScanInitializer, ScanInitializerParameters
 from .settings import ScanSettings
@@ -19,9 +17,8 @@ class CartesianScanInitializer(ScanInitializer):
         self._snake = snake
 
     @classmethod
-    def createFromSettings(cls, rng: numpy.random.Generator, settings: ScanSettings,
+    def createFromSettings(cls, parameters: ScanInitializerParameters, settings: ScanSettings,
                            snake: bool) -> CartesianScanInitializer:
-        parameters = ScanInitializerParameters.createFromSettings(rng, settings)
         stepSizeXInMeters = settings.stepSizeXInMeters.value
         stepSizeYInMeters = settings.stepSizeYInMeters.value
         extentX = settings.extentX.value
@@ -36,10 +33,12 @@ class CartesianScanInitializer(ScanInitializer):
         settings.extentY.value = self._extentY
         super().syncToSettings(settings)
 
+    @classmethod
     @property
     def category(self) -> str:
         return 'Cartesian'
 
+    @classmethod
     @property
     def name(self) -> str:
         return 'Snake' if self._snake else 'Raster'

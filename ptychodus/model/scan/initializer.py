@@ -31,11 +31,13 @@ class ScanInitializerParameters:
 class ScanInitializer(ScanPointSequence, Observable):
     '''ABC for plugins that can initialize scan sequences'''
 
+    @classmethod
     @abstractproperty
     def category(self) -> str:
         '''returns a unique category for organizing scan positions'''
         pass
 
+    @classmethod
     @abstractproperty
     def name(self) -> str:
         '''returns a unique name'''

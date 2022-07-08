@@ -7,7 +7,7 @@ from .initializer import ScanInitializer, ScanInitializerParameters
 from .settings import ScanSettings
 
 
-class ArchimedeanSpiralScanInitializer(ScanInitializer):
+class SpiralScanInitializer(ScanInitializer):
 
     def __init__(self, parameters: ScanInitializerParameters, stepSizeXInMeters: Decimal,
                  stepSizeYInMeters: Decimal, numberOfPoints: int) -> None:
@@ -17,9 +17,8 @@ class ArchimedeanSpiralScanInitializer(ScanInitializer):
         self._numberOfPoints = numberOfPoints
 
     @classmethod
-    def createFromSettings(cls, rng: numpy.random.Generator,
-                           settings: ScanSettings) -> ArchimedeanSpiralScanInitializer:
-        parameters = ScanInitializerParameters.createFromSettings(rng, settings)
+    def createFromSettings(cls, parameters: ScanInitializerParameters,
+                           settings: ScanSettings) -> SpiralScanInitializer:
         stepSizeXInMeters = settings.stepSizeXInMeters.value
         stepSizeYInMeters = settings.stepSizeYInMeters.value
         numberOfPoints = settings.extentX.value * settings.extentY.value
@@ -33,10 +32,12 @@ class ArchimedeanSpiralScanInitializer(ScanInitializer):
         settings.extentY.value = 1
         super().syncToSettings(settings)
 
+    @classmethod
     @property
     def category(self) -> str:
         return 'Spiral'
 
+    @classmethod
     @property
     def name(self) -> str:
         return 'Archimedean'
