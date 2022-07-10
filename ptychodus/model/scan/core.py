@@ -46,62 +46,63 @@ class ScanInitializerFactory:
         return ScanInitializerParameters.createFromSettings(self._rng, self._settings)
 
 
-class ScanInitializerRepository(Mapping[str, Mapping[str, ScanInitializer]], Observable):
+class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Observer):
 
     def __init__(self, initializerFactory: ScanInitializerFactory,
                  fileReaderChooser: PluginChooser[ScanFileReader],
-                 fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
+                 fileWriterChooser: PluginChooser[ScanFileWriter],
+                 reinitObservable: Observable) -> None:
         super().__init__()
         self._initializerFactory = initializerFactory
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
-        self._initializers: dict[str, dict[str, ScanInitializer]] = dict()
+        self._reinitObservable = reinitObservable
+        self._initializers: dict[str, ScanInitializer] = dict()
 
     @classmethod
-    def createInstance(
-            self, initializerFactory: ScanInitializerFactory,
-            fileReaderChooser: PluginChooser[ScanFileReader],
-            fileWriterChooser: PluginChooser[ScanFileWriter]) -> ScanInitializerRepository:
-        repository = cls(initializerFactory, fileReaderChooser, fileWriterChooser)
+    def createInstance(self, initializerFactory: ScanInitializerFactory,
+                       fileReaderChooser: PluginChooser[ScanFileReader],
+                       fileWriterChooser: PluginChooser[ScanFileWriter],
+                       reinitObservable: Observable) -> ScanInitializerRepository:
+        repository = cls(initializerFactory, fileReaderChooser, fileWriterChooser,
+                         reinitObservable)
         repository._syncFromSettings()
+        reinitObservable.addObserver(repository)
         return repository
+
+    def getDefaultInitializer(self) -> ScanInitializer:
+        return list(self._initializers.values())[0] if len(self._initializers) > 0 \
+                else self._initializerFactory.createTabularInitializer([], None)
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._initializers)
 
-    def __getitem__(self, category: str) -> Mapping[str, ScanInitializer]:
-        return self._initializers[category]
+    def __getitem__(self, name: str) -> ScanInitializer:
+        return self._initializers[name]
 
     def __len__(self) -> int:
         return len(self._initializers)
 
     def insert(self, initializer: ScanInitializer, name: Optional[str] = None) -> None:
-        if initializer.category not in self._initializers:
-            self._initializers[initializer.category] = dict()
+        if name is None:
+            name = initializer.name
 
-        initializerCategory = self._initializers[initializer.category]
-        initializerName = initializer.name if name is None else name
+        initializerName = name
         index = 0
 
-        while initializerName in initializerCategory:
+        while initializerName in self._initializers:
             index += 1
             initializerName = f'{name}-{index}'
 
-        initializerCategory[initializerName] = initializer
+        self._initializers[initializerName] = initializer
         self.notifyObservers()
 
-    def remove(self, category: str, name: str) -> None:
-        # FIXME prevent removing last element; can never be empty
-        if category in self._initializers:
-            initializerCategory = self._initializers[category]
-
+    def remove(self, name: str) -> None:
+        if len(self._initializers) > 1:
             try:
-                initializerCategory.pop(name)
+                self._initializers.pop(name)
             except KeyError:
                 pass
-
-            if not initializerCategory:
-                self._initializers.pop(category)
 
         self.notifyObservers()
 
@@ -111,9 +112,7 @@ class ScanInitializerRepository(Mapping[str, Mapping[str, ScanInitializer]], Obs
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.getCurrentDisplayName()
 
-    def openScan(self, filePath: Path, fileFilter: str) -> None:
-        logger.debug(f'Reading \"{filePath}\" as \"{fileFilter}\"')
-        self._fileReaderChooser.setFromDisplayName(fileFilter)
+    def _loadScan(self, filePath: Path) -> None:
         fileType = self._fileReaderChooser.getCurrentSimpleName()
         reader = self._fileReaderChooser.getCurrentStrategy()
         scanDict = reader.read(filePath)
@@ -124,17 +123,28 @@ class ScanInitializerRepository(Mapping[str, Mapping[str, ScanInitializer]], Obs
             initializer = self._initializerFactory.createTabularInitializer(pointList, fileInfo)
             self.insert(initializer, name)
 
+    def openScan(self, filePath: Path, fileFilter: str) -> None:
+        logger.debug(f'Reading \"{filePath}\" as \"{fileFilter}\"')
+        self._fileReaderChooser.setFromDisplayName(fileFilter)
+        self._loadScan(filePath)
+
+    def _openScanFromSettings(self) -> None:
+        fileInfo = ScanFileInfo.createFromSettings(self._settings)
+        logger.debug(f'Reading \"{fileInfo.filePath}\" as \"{fileInfo.fileType}\"')
+        self._fileReaderChooser.setFromSimpleName(fileInfo.fileType)
+        self._loadScan(fileInfo.filePath)
+
     def getSaveFileFilterList(self) -> list[str]:
         return self._fileWriterChooser.getDisplayNameList()
 
     def getSaveFileFilter(self) -> str:
         return self._fileWriterChooser.getCurrentDisplayName()
 
-    def saveScan(self, filePath: Path, fileFilter: str, category: str, initializer: str) -> None:
+    def saveScan(self, filePath: Path, fileFilter: str, name: str) -> None:
         try:
-            initializer = self._initializers[category][initializer]
+            initializer = self._initializers[name]
         except KeyError:
-            logger.error(f'Unable to locate \"{category}/{initializer}\"!')
+            logger.error(f'Unable to locate \"{name}\"!')
             return
 
         logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
@@ -143,10 +153,28 @@ class ScanInitializerRepository(Mapping[str, Mapping[str, ScanInitializer]], Obs
         writer.write(filePath, SimpleScanDictionary.createFromUnnamedSequence(initializer))
 
     def _syncFromSettings(self) -> None:
-        # FIXME do not allow self._initializers to be empty!
-        # FIXME createFromSettings // load scan if initializer is FromFile
+        # FIXME this method needs to do the right thing when rerun
         # TODO display file scan dicts as tree
-        pass
+        initializerName = self._settings.initializer.value
+        name = initializerName.casefold()
+
+        if name == 'fromfile':
+            self._openScanFromSettings()
+        elif name == 'raster':
+            raster = self._initializerFactory.createRasterInitializer()
+            self.insert(raster)
+        elif name == 'snake':
+            snake = self._initializerFactory.createSnakeInitializer()
+            self.insert(snake)
+        elif name == 'spiral':
+            spiral = self._initializerFactory.createSpiralInitializer()
+            self.insert(spiral)
+        else:
+            logger.error(f'Unknown scan initializer \"{initializerName}\"!')
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._reinitObservable:
+            self._syncFromSettings()
 
 
 class Scan(ScanPointSequence, Observable, Observer):
@@ -157,8 +185,7 @@ class Scan(ScanPointSequence, Observable, Observer):
         self._settings = settings
         self._initializerRepository = initializerRepository
         self._reinitObservable = reinitObservable
-        self._initializer = next(next(iter(initializerRepository)))
-        # FIXME need first value, not key
+        self._initializer = initializerRepository.getDefaultInitializer()
 
     @classmethod
     def createInstance(cls, settings: ScanSettings,
@@ -169,19 +196,22 @@ class Scan(ScanPointSequence, Observable, Observer):
         reinitObservable.addObserver(scan)
         return scan
 
-    def setActive(self, category: str, initializer: str) -> None:
+    def setActive(self, name: str) -> None:
         try:
-            self._initializer = self._initializerRepository[category][initializer]
+            initializer = self._initializerRepository[name]
         except KeyError:
-            logger.error(f'Failed to activate \"{category}/{initializer}\"!')
+            logger.error(f'Failed to activate \"{name}\"!')
             return
+
+        self._initializer.removeObserver(self)
+        self._initializer = initializer
+        self._initializer.addObserver(self)
 
         self._syncToSettings()
         self.notifyObservers()
 
     def _syncFromSettings(self) -> None:
-        # FIXME select from initializerRepository (should already be populated); notifyObservers when initializer or initializer parameters change
-        pass
+        self.setActive(self._settings.initializer.value)
 
     def _syncToSettings(self) -> None:
         self._initializer.syncToSettings(self._settings)
@@ -193,13 +223,16 @@ class Scan(ScanPointSequence, Observable, Observer):
         return len(self._initializer)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._reinitObservable:
+        if observable is self._initializer:
+            self.notifyObservers()
+        elif observable is self._reinitObservable:
             self._syncFromSettings()
 
 
 class ScanPresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
+# FIXME BEGIN
     def __init__(self, settings: ScanSettings, scan: Scan, initializer: ScanInitializer) -> None:
         super().__init__()
         self._settings = settings
@@ -291,6 +324,7 @@ class ScanPresenter(Observable, Observer):
             self.notifyObservers()
         elif observable is self._initializer:
             self.notifyObservers()
+# FIXME END
 
 
 class ScanCore:
@@ -302,16 +336,12 @@ class ScanCore:
         self._initializerFactory = ScanInitializerFactory(rng, self._settings)
         self._initializerRepository = ScanInitializerRepository(self._initializerFactory,
                                                                 fileReaderChooser,
-                                                                fileWriterChooser)
-        self.scan = Scan.createInstance(self._settings)
-        self._fileScanInitializer = FileScanInitializer.createInstance(
-            self._settings, fileReaderChooser)
-        self._scanInitializer = ScanInitializer.createInstance(self.rng, self._settings,
-                                                               self._scan,
-                                                               self._fileScanInitializer,
-                                                               fileWriterChooser, settingsRegistry)
+                                                                fileWriterChooser,
+                                                                settingsRegistry)
+        self.scan = Scan.createInstance(self._settings, self._initializerRepository,
+                                        settingsRegistry)
         self.scanPresenter = ScanPresenter.createInstance(self._settings, self._scan,
-                                                          self._scanInitializer)
+                                                          self._scanInitializer)  # FIXME
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self.scanPresenter.openScan(filePath, fileFilter)
