@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import defaultdict
 from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
@@ -13,8 +14,12 @@ from ...api.plugins import PluginChooser, PluginEntry
 from ...api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
                          ScanPointSequence, SimpleScanDictionary)
 from ...api.settings import SettingsRegistry
-from .initializer import ScanInitializer
+from ...api.tree import SimpleTreeNode
+from .cartesian import CartesianScanInitializer
+from .initializer import ScanInitializer, ScanInitializerParameters
 from .settings import ScanSettings
+from .spiral import SpiralScanInitializer
+from .tabular import TabularScanInitializer
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +45,7 @@ class ScanInitializerFactory:
     def createTabularInitializer(self, pointList: list[ScanPoint],
                                  fileInfo: Optional[ScanFileInfo]) -> TabularScanInitializer:
         parameters = self.createInitializerParameters()
-        return TabularScanInitializer(parameters, name, pointList, fileInfo)
+        return TabularScanInitializer(parameters, pointList, fileInfo)
 
     def createInitializerParameters(self) -> ScanInitializerParameters:
         return ScanInitializerParameters.createFromSettings(self._rng, self._settings)
@@ -154,7 +159,6 @@ class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Obser
 
     def _syncFromSettings(self) -> None:
         # FIXME this method needs to do the right thing when rerun
-        # TODO display file scan dicts as tree
         initializerName = self._settings.initializer.value
         name = initializerName.casefold()
 
@@ -191,7 +195,7 @@ class Scan(ScanPointSequence, Observable, Observer):
     def createInstance(cls, settings: ScanSettings,
                        initializerRepository: ScanInitializerRepository,
                        reinitObservable: Observable) -> Scan:
-        scan = cls(settings, initializerRepository, fileReaderChooser, reinitObservable)
+        scan = cls(settings, initializerRepository, reinitObservable)
         scan._syncFromSettings()
         reinitObservable.addObserver(scan)
         return scan
@@ -230,101 +234,45 @@ class Scan(ScanPointSequence, Observable, Observer):
 
 
 class ScanPresenter(Observable, Observer):
-    MAX_INT = 0x7FFFFFFF
 
-# FIXME BEGIN
-    def __init__(self, settings: ScanSettings, scan: Scan, initializer: ScanInitializer) -> None:
+    def __init__(self, initializerRepository: ScanInitializerRepository, scan: Scan) -> None:
         super().__init__()
-        self._settings = settings
+        self._initializerRepository = initializerRepository
         self._scan = scan
-        self._initializer = initializer
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings, scan: Scan,
-                       initializer: ScanInitializer) -> ScanPresenter:
-        presenter = cls(settings, scan, initializer)
-        settings.addObserver(presenter)
+    def createInstance(cls, initializerRepository: ScanInitializerRepository,
+                       scan: Scan) -> ScanPresenter:
+        presenter = cls(initializerRepository, scan)
+        initializerRepository.addObserver(presenter)
         scan.addObserver(presenter)
-        initializer.addObserver(presenter)
         return presenter
 
-    def getInitializerList(self) -> list[str]:
-        return self._initializer.getInitializerList()
+    def getInitializerTree(self) -> SimpleTreeNode:
+        return self._initializerTree
 
-    def getInitializer(self) -> str:
-        return self._initializer.getInitializer()
+    def _updateInitializerTree(self) -> None:
+        nameDict: defaultdict[str, list[str]] = defaultdict(list)
 
-    def setInitializer(self, name: str) -> None:
-        self._initializer.setInitializer(name)
+        for name, initializer in self._initializerRepository.items():
+            initializerDict[initializer.category].append(name)
 
-    def initializeScan(self) -> None:
-        self._initializer.initializeScan()
+        initializerTree = SimpleTreeNode.createRoot(['Name'])
 
-    def getTransformList(self) -> list[str]:
-        return self._scan.getTransformList()
+        for category, nameList in sorted(nameDict.items()):
+            categoryNode = initializerTree.createChild([category])
 
-    def getTransform(self) -> str:
-        return self._scan.getTransform()
+            for name in sorted(nameList):
+                categoryNode.createChild([name])
 
-    def setTransform(self, name: str) -> None:
-        self._scan.setTransform(name)
-
-    def getScanPointList(self) -> list[ScanPoint]:
-        return [scanPoint for scanPoint in self._scan]
-
-    def getNumberOfScanPointsLimits(self) -> Interval[int]:
-        return Interval[int](0, self.MAX_INT)
-
-    def getNumberOfScanPoints(self) -> int:
-        limits = self.getNumberOfScanPointsLimits()
-        return limits.clamp(len(self._scan))
-
-    def getExtentXLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getExtentX(self) -> int:
-        limits = self.getExtentXLimits()
-        return limits.clamp(self._settings.extentX.value)
-
-    def setExtentX(self, value: int) -> None:
-        self._settings.extentX.value = value
-
-    def getExtentYLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getExtentY(self) -> int:
-        limits = self.getExtentYLimits()
-        return limits.clamp(self._settings.extentY.value)
-
-    def setExtentY(self, value: int) -> None:
-        self._settings.extentY.value = value
-
-    def getStepSizeXInMeters(self) -> Decimal:
-        return self._settings.stepSizeXInMeters.value
-
-    def setStepSizeXInMeters(self, value: Decimal) -> None:
-        self._settings.stepSizeXInMeters.value = value
-
-    def getStepSizeYInMeters(self) -> Decimal:
-        return self._settings.stepSizeYInMeters.value
-
-    def setStepSizeYInMeters(self, value: Decimal) -> None:
-        self._settings.stepSizeYInMeters.value = value
-
-    def getJitterRadiusInMeters(self) -> Decimal:
-        return self._settings.jitterRadiusInMeters.value
-
-    def setJitterRadiusInMeters(self, value: Decimal) -> None:
-        self._settings.jitterRadiusInMeters.value = value
+        self._initializerTree = initializerTree
+        self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings:
-            self.notifyObservers()
+        if observable is self._initializerRepository:
+            self._updateInitializerTree()
         elif observable is self._scan:
             self.notifyObservers()
-        elif observable is self._initializer:
-            self.notifyObservers()
-# FIXME END
 
 
 class ScanCore:
@@ -340,8 +288,7 @@ class ScanCore:
                                                                 settingsRegistry)
         self.scan = Scan.createInstance(self._settings, self._initializerRepository,
                                         settingsRegistry)
-        self.scanPresenter = ScanPresenter.createInstance(self._settings, self._scan,
-                                                          self._scanInitializer)  # FIXME
+        self.scanPresenter = ScanPresenter.createInstance(self._initializerRepository, self.scan)
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self.scanPresenter.openScan(filePath, fileFilter)

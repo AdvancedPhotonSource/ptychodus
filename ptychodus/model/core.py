@@ -122,7 +122,7 @@ class ModelCore:
                                        'VelociprobeDataFileReader')  # TODO remove when able
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
-            self._probeSettings, self._activeDataFile, self._scanCore.scanInitializer)
+            self._probeSettings, self._activeDataFile, self._scanCore.scan)
         self.probePresenter = ProbePresenter.createInstance(self._probeSettings, self._probeSizer,
                                                             self._probe, self._probeInitializer)
         self.objectPresenter = ObjectPresenter.createInstance(self._objectSettings,
@@ -179,3 +179,7 @@ class ModelCore:
         numpy.savez(outputFilePath, **dataDump)
 
         return result
+
+    @property
+    def scanPresenter(self) -> ScanPresenter:
+        return self._scanCore.scanPresenter
