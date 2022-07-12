@@ -2,12 +2,11 @@ from __future__ import annotations
 from decimal import Decimal
 
 from ..model import Observer, Observable, Scan, ScanPresenter
-from ..view import (ScanInitializerView, ScanParametersView, ScanPlotView, ScanEditorView,
-                    ScanTransformView)
+from ..view import (ScanParametersView, ScanPlotView, ScanEditorView, ScanTransformView)
 from .data import FileDialogFactory
 
 
-class ScanScanController(Observer):
+class ScanEditorController(Observer):
 
     def __init__(self, presenter: ScanPresenter, view: ScanEditorView) -> None:
         super().__init__()
@@ -15,7 +14,7 @@ class ScanScanController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanEditorView) -> ScanScanController:
+    def createInstance(cls, presenter: ScanPresenter, view: ScanEditorView) -> ScanEditorController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -52,37 +51,6 @@ class ScanScanController(Observer):
 
         self._view.stepSizeXWidget.setLengthInMeters(self._presenter.getStepSizeXInMeters())
         self._view.stepSizeYWidget.setLengthInMeters(self._presenter.getStepSizeYInMeters())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
-
-
-class ScanInitializerController(Observer):
-
-    def __init__(self, presenter: ScanPresenter, view: ScanInitializerView) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-
-    @classmethod
-    def createInstance(cls, presenter: ScanPresenter,
-                       view: ScanInitializerView) -> ScanInitializerController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-
-        for initializer in presenter.getInitializerList():
-            view.initializerComboBox.addItem(initializer)
-
-        view.initializerComboBox.currentTextChanged.connect(presenter.setInitializer)
-        view.initializeButton.clicked.connect(presenter.initializeScan)
-
-        controller._syncModelToView()
-
-        return controller
-
-    def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(self._presenter.getInitializer())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -128,16 +96,16 @@ class ScanParametersController:
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
-        self._scanController = ScanScanController.createInstance(presenter, view.scanView)
-        self._initializerController = ScanInitializerController.createInstance(
-            presenter, view.initializerView)
-        self._transformController = ScanTransformController.createInstance(
-            presenter, view.transformView)
 
     @classmethod
     def createInstance(cls, presenter: ScanPresenter, view: ScanParametersView,
                        fileDialogFactory: FileDialogFactory) -> ScanParametersController:
         controller = cls(presenter, view, fileDialogFactory)
+        # TODO insertButton
+        # TODO editButton
+        # TODO saveButton
+        # TODO removeButton
+        # TODO treeview selection/toggling
         return controller
 
     def openScan(self) -> None:
@@ -148,7 +116,7 @@ class ScanParametersController:
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openScan(filePath, nameFilter)
+            self._presenter.openScan(filePath, nameFilter) # FIXME
 
     def saveScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
@@ -158,7 +126,7 @@ class ScanParametersController:
             selectedNameFilter=self._presenter.getSaveFileFilter())
 
         if filePath:
-            self._presenter.saveScan(filePath, nameFilter)
+            self._presenter.saveScan(filePath, nameFilter) # FIXME
 
 
 class ScanPlotController(Observer):
