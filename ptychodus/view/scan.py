@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QPushButton, QSpinBox,
-                             QTreeView, QVBoxLayout, QWidget)
+from PyQt5.QtCore import QEvent, QObject
+from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QMenu, QPushButton,
+                             QSpinBox, QTreeView, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -60,6 +61,7 @@ class ScanButtonBox(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
+        self.insertMenu = QMenu()
         self.insertButton = QPushButton('Insert')
         self.editButton = QPushButton('Edit')
         self.saveButton = QPushButton('Save')
@@ -68,6 +70,9 @@ class ScanButtonBox(QWidget):
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> None:
         view = cls(parent)
+
+        view.insertMenu.installEventFilter(view)
+        view.insertButton.setMenu(view.insertMenu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -79,11 +84,20 @@ class ScanButtonBox(QWidget):
 
         return view
 
+    def eventFilter(self, object_: QObject, event: QEvent) -> bool:
+        if object_ == self.insertMenu and event.type() == QEvent.Show:
+            pos = self.insertMenu.pos()
+            pos.setY(pos.y() - self.insertButton.height() - self.insertMenu.height())
+            self.insertMenu.move(pos)
+            return True
 
-class ScanParametersView(QGroupBox):
+        return False
+
+
+class ScanParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__('Position Data', parent)
+        super().__init__(parent)
         self.treeView = QTreeView()
         self.buttonBox = ScanButtonBox.createInstance()
 

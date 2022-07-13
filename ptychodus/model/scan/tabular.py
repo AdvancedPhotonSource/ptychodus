@@ -46,12 +46,10 @@ class TabularScanInitializer(ScanInitializer):
         self._fileInfo.syncToSettings(settings)
         super().syncToSettings(settings)
 
-    @classmethod
     @property
     def category(self) -> str:
         return 'Tabular'
 
-    @classmethod
     @property
     def name(self) -> str:
         return 'FromFile'

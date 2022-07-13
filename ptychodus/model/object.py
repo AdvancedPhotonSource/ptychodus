@@ -83,11 +83,11 @@ class ObjectSizer(Observable, Observer):
 
         for point in self._scan:
             if xint_m and yint_m:
-                xint_m.hull(scanPoint.x)
-                yint_m.hull(scanPoint.y)
+                xint_m.hull(point.x)
+                yint_m.hull(point.y)
             else:
-                xint_m = Interval[Decimal](scanPoint.x, scanPoint.x)
-                yint_m = Interval[Decimal](scanPoint.y, scanPoint.y)
+                xint_m = Interval[Decimal](point.x, point.x)
+                yint_m = Interval[Decimal](point.y, point.y)
 
         if xint_m and yint_m:
             xint_px = xint_m.length / self.getPixelSizeXInMeters()

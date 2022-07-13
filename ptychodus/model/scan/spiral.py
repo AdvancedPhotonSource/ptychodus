@@ -33,12 +33,10 @@ class SpiralScanInitializer(ScanInitializer):
         settings.extentY.value = 1
         super().syncToSettings(settings)
 
-    @classmethod
     @property
     def category(self) -> str:
         return 'Spiral'
 
-    @classmethod
     @property
     def name(self) -> str:
         return 'Archimedean'

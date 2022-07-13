@@ -34,12 +34,10 @@ class CartesianScanInitializer(ScanInitializer):
         settings.extentY.value = self._extentY
         super().syncToSettings(settings)
 
-    @classmethod
     @property
     def category(self) -> str:
         return 'Cartesian'
 
-    @classmethod
     @property
     def name(self) -> str:
         return 'Snake' if self._snake else 'Raster'
@@ -80,7 +78,7 @@ class CartesianScanInitializer(ScanInitializer):
         if index >= len(self):
             raise IndexError(f'Index {index} is out of range')
 
-        y, x = divmod(index, self._nx)
+        y, x = divmod(index, self._extentX)
 
         if self._snake and y & 1:
             x = self._extentX - 1 - x

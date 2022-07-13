@@ -4,6 +4,7 @@ from decimal import Decimal
 from ..model import Observer, Observable, Scan, ScanPresenter
 from ..view import (ScanParametersView, ScanPlotView, ScanEditorView, ScanTransformView)
 from .data import FileDialogFactory
+from .tree import SimpleTreeModel
 
 
 class ScanEditorController(Observer):
@@ -14,7 +15,8 @@ class ScanEditorController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanEditorView) -> ScanEditorController:
+    def createInstance(cls, presenter: ScanPresenter,
+                       view: ScanEditorView) -> ScanEditorController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -96,16 +98,26 @@ class ScanParametersController:
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
+        self._treeModel = SimpleTreeModel(presenter.getInitializerTree())
 
     @classmethod
     def createInstance(cls, presenter: ScanPresenter, view: ScanParametersView,
                        fileDialogFactory: FileDialogFactory) -> ScanParametersController:
         controller = cls(presenter, view, fileDialogFactory)
+
+        view.treeView.setModel(controller._treeModel)
+
+        for entry in ['A', 'B', 'C']:
+            view.buttonBox.insertMenu.addAction(entry)
+
         # TODO insertButton
         # TODO editButton
         # TODO saveButton
         # TODO removeButton
         # TODO treeview selection/toggling
+
+        controller._syncModelToView()
+
         return controller
 
     def openScan(self) -> None:
@@ -116,7 +128,7 @@ class ScanParametersController:
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openScan(filePath, nameFilter) # FIXME
+            self._presenter.openScan(filePath, nameFilter)  # FIXME
 
     def saveScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
@@ -126,7 +138,11 @@ class ScanParametersController:
             selectedNameFilter=self._presenter.getSaveFileFilter())
 
         if filePath:
-            self._presenter.saveScan(filePath, nameFilter) # FIXME
+            self._presenter.saveScan(filePath, nameFilter)  # FIXME
+
+    def _syncModelToView(self) -> None:
+        # TODO self._treeModel.setRootNode(self._presenter.getInitializerTree())
+        pass
 
 
 class ScanPlotController(Observer):

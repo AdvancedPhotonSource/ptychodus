@@ -53,11 +53,12 @@ class ScanInitializerFactory:
 
 class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Observer):
 
-    def __init__(self, initializerFactory: ScanInitializerFactory,
+    def __init__(self, settings: ScanSettings, initializerFactory: ScanInitializerFactory,
                  fileReaderChooser: PluginChooser[ScanFileReader],
                  fileWriterChooser: PluginChooser[ScanFileWriter],
                  reinitObservable: Observable) -> None:
         super().__init__()
+        self._settings = settings
         self._initializerFactory = initializerFactory
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
@@ -65,11 +66,11 @@ class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Obser
         self._initializers: dict[str, ScanInitializer] = dict()
 
     @classmethod
-    def createInstance(self, initializerFactory: ScanInitializerFactory,
+    def createInstance(cls, settings: ScanSettings, initializerFactory: ScanInitializerFactory,
                        fileReaderChooser: PluginChooser[ScanFileReader],
                        fileWriterChooser: PluginChooser[ScanFileWriter],
                        reinitObservable: Observable) -> ScanInitializerRepository:
-        repository = cls(initializerFactory, fileReaderChooser, fileWriterChooser,
+        repository = cls(settings, initializerFactory, fileReaderChooser, fileWriterChooser,
                          reinitObservable)
         repository._syncFromSettings()
         reinitObservable.addObserver(repository)
@@ -235,15 +236,21 @@ class Scan(ScanPointSequence, Observable, Observer):
 
 class ScanPresenter(Observable, Observer):
 
+    @staticmethod
+    def createRoot() -> SimpleTreeNode:
+        return SimpleTreeNode.createRoot(['Position Data', 'Points'])
+
     def __init__(self, initializerRepository: ScanInitializerRepository, scan: Scan) -> None:
         super().__init__()
         self._initializerRepository = initializerRepository
         self._scan = scan
+        self._initializerTree = ScanPresenter.createRoot()
 
     @classmethod
     def createInstance(cls, initializerRepository: ScanInitializerRepository,
                        scan: Scan) -> ScanPresenter:
         presenter = cls(initializerRepository, scan)
+        presenter._updateInitializerTree()
         initializerRepository.addObserver(presenter)
         scan.addObserver(presenter)
         return presenter
@@ -255,9 +262,9 @@ class ScanPresenter(Observable, Observer):
         nameDict: defaultdict[str, list[str]] = defaultdict(list)
 
         for name, initializer in self._initializerRepository.items():
-            initializerDict[initializer.category].append(name)
+            nameDict[initializer.category].append(name)
 
-        initializerTree = SimpleTreeNode.createRoot(['Name'])
+        initializerTree = ScanPresenter.createRoot()
 
         for category, nameList in sorted(nameDict.items()):
             categoryNode = initializerTree.createChild([category])
@@ -282,10 +289,9 @@ class ScanCore:
                  fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
         self._settings = ScanSettings.createInstance(settingsRegistry)
         self._initializerFactory = ScanInitializerFactory(rng, self._settings)
-        self._initializerRepository = ScanInitializerRepository(self._initializerFactory,
-                                                                fileReaderChooser,
-                                                                fileWriterChooser,
-                                                                settingsRegistry)
+        self._initializerRepository = ScanInitializerRepository.createInstance(
+            self._settings, self._initializerFactory, fileReaderChooser, fileWriterChooser,
+            settingsRegistry)
         self.scan = Scan.createInstance(self._settings, self._initializerRepository,
                                         settingsRegistry)
         self.scanPresenter = ScanPresenter.createInstance(self._initializerRepository, self.scan)
