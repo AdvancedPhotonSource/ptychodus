@@ -71,7 +71,6 @@ class ScanButtonBox(QWidget):
     def createInstance(cls, parent: Optional[QWidget] = None) -> None:
         view = cls(parent)
 
-        view.insertMenu.installEventFilter(view)
         view.insertButton.setMenu(view.insertMenu)
 
         layout = QHBoxLayout()
@@ -83,15 +82,6 @@ class ScanButtonBox(QWidget):
         view.setLayout(layout)
 
         return view
-
-    def eventFilter(self, object_: QObject, event: QEvent) -> bool:
-        if object_ == self.insertMenu and event.type() == QEvent.Show:
-            pos = self.insertMenu.pos()
-            pos.setY(pos.y() - self.insertButton.height() - self.insertMenu.height())
-            self.insertMenu.move(pos)
-            return True
-
-        return False
 
 
 class ScanParametersView(QWidget):

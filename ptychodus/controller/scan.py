@@ -4,7 +4,7 @@ from decimal import Decimal
 from ..model import Observer, Observable, Scan, ScanPresenter
 from ..view import (ScanParametersView, ScanPlotView, ScanEditorView, ScanTransformView)
 from .data import FileDialogFactory
-from .tree import SimpleTreeModel
+from .tree import CheckableTreeModel
 
 
 class ScanEditorController(Observer):
@@ -98,7 +98,7 @@ class ScanParametersController:
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
-        self._treeModel = SimpleTreeModel(presenter.getInitializerTree())
+        self._treeModel = CheckableTreeModel(presenter.getScanTree())
 
     @classmethod
     def createInstance(cls, presenter: ScanPresenter, view: ScanParametersView,
@@ -106,21 +106,19 @@ class ScanParametersController:
         controller = cls(presenter, view, fileDialogFactory)
 
         view.treeView.setModel(controller._treeModel)
+        view.treeView.selectionModel().currentChanged.connect(controller._setActiveScan)
 
-        for entry in ['A', 'B', 'C']:
-            view.buttonBox.insertMenu.addAction(entry)
+        view.buttonBox.editButton.clicked.connect(controller._editSelectedScan)
+        view.buttonBox.saveButton.clicked.connect(controller._saveSelectedScan)
+        view.buttonBox.removeButton.clicked.connect(controller._removeSelectedScan)
 
-        # TODO insertButton
-        # TODO editButton
-        # TODO saveButton
-        # TODO removeButton
-        # TODO treeview selection/toggling
+        # TODO treeview selected/checked
 
         controller._syncModelToView()
 
         return controller
 
-    def openScan(self) -> None:
+    def _openScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Scan',
@@ -128,9 +126,15 @@ class ScanParametersController:
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openScan(filePath, nameFilter)  # FIXME
+            self._presenter.openScan(filePath, nameFilter)
 
-    def saveScan(self) -> None:
+    def _getSelectedScan(self) -> str:
+        # TODO handle case of no selection
+        current = self._view.treeView.selectionModel().currentIndex()
+        nodeItem = current.internalPointer()
+        return nodeItem.data(0)
+
+    def _saveSelectedScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Scan',
@@ -138,11 +142,41 @@ class ScanParametersController:
             selectedNameFilter=self._presenter.getSaveFileFilter())
 
         if filePath:
-            self._presenter.saveScan(filePath, nameFilter)  # FIXME
+            name = self._getSelectedScan()
+            self._presenter.saveScan(filePath, nameFilter, name)
+
+    def _editSelectedScan(self) -> None:
+        name = self._getSelectedScan()
+        print(f'editScan({name})')  # TODO
+
+    def _removeSelectedScan(self) -> None:
+        name = self._getSelectedScan()
+        self._presenter.removeScan(name)
+
+    def _setButtonsEnabled(self) -> None:
+        hasSelection = self._view.treeView.selectionModel().hasSelection()
+        self._view.buttonBox.insertButton.setEnabled(True)
+        self._view.buttonBox.editButton.setEnabled(hasSelection)
+        self._view.buttonBox.saveButton.setEnabled(hasSelection)
+        self._view.buttonBox.removeButton.setEnabled(hasSelection)  # TODO and count > 1
+
+    def _setActiveScan(self, current: QModelIndex, previous: QModelIndex) -> None:
+        nodeItem = current.internalPointer()
+        name = nodeItem.data(0)
+        self._presenter.setActiveScan(name)
+        self._setButtonsEnabled()
 
     def _syncModelToView(self) -> None:
-        # TODO self._treeModel.setRootNode(self._presenter.getInitializerTree())
-        pass
+        self._view.buttonBox.insertMenu.clear()
+
+        for entry in self._presenter.getAvailableInitializerList():
+            self._view.buttonBox.insertMenu.addAction(entry)
+
+        self._setButtonsEnabled()
+
+        # TODO presenter.getActiveScan() to update treeview selection
+        # TODO do something with treeview checkboxes
+        self._treeModel.setRootNode(self._presenter.getScanTree())
 
 
 class ScanPlotController(Observer):
@@ -160,7 +194,7 @@ class ScanPlotController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        scanPath = self._presenter.getScanPointList()
+        scanPath = self._presenter.getActiveScanPointList()
 
         x = [point.x for point in scanPath]
         y = [point.y for point in scanPath]

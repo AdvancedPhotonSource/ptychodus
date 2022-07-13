@@ -51,7 +51,7 @@ class ScanInitializerFactory:
         return ScanInitializerParameters.createFromSettings(self._rng, self._settings)
 
 
-class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Observer):
+class ScanRepository(Mapping[str, ScanInitializer], Observable, Observer):
 
     def __init__(self, settings: ScanSettings, initializerFactory: ScanInitializerFactory,
                  fileReaderChooser: PluginChooser[ScanFileReader],
@@ -69,16 +69,15 @@ class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Obser
     def createInstance(cls, settings: ScanSettings, initializerFactory: ScanInitializerFactory,
                        fileReaderChooser: PluginChooser[ScanFileReader],
                        fileWriterChooser: PluginChooser[ScanFileWriter],
-                       reinitObservable: Observable) -> ScanInitializerRepository:
+                       reinitObservable: Observable) -> ScanRepository:
         repository = cls(settings, initializerFactory, fileReaderChooser, fileWriterChooser,
                          reinitObservable)
         repository._syncFromSettings()
         reinitObservable.addObserver(repository)
         return repository
 
-    def getDefaultInitializer(self) -> ScanInitializer:
-        return list(self._initializers.values())[0] if len(self._initializers) > 0 \
-                else self._initializerFactory.createTabularInitializer([], None)
+    def getDefaultInitializer(self) -> Tuple[str, ScanInitializer]:
+        return next(iter(self._initializers.items()))
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._initializers)
@@ -89,7 +88,7 @@ class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Obser
     def __len__(self) -> int:
         return len(self._initializers)
 
-    def insert(self, initializer: ScanInitializer, name: Optional[str] = None) -> None:
+    def insertScan(self, initializer: ScanInitializer, name: Optional[str] = None) -> None:
         if name is None:
             name = initializer.name
 
@@ -103,7 +102,7 @@ class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Obser
         self._initializers[initializerName] = initializer
         self.notifyObservers()
 
-    def remove(self, name: str) -> None:
+    def removeScan(self, name: str) -> None:
         if len(self._initializers) > 1:
             try:
                 self._initializers.pop(name)
@@ -127,7 +126,7 @@ class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Obser
             pointList = [point for point in pointSequence]
             fileInfo = ScanFileInfo(fileType, filePath, name)
             initializer = self._initializerFactory.createTabularInitializer(pointList, fileInfo)
-            self.insert(initializer, name)
+            self.insertScan(initializer, name)
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         logger.debug(f'Reading \"{filePath}\" as \"{fileFilter}\"')
@@ -167,13 +166,13 @@ class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Obser
             self._openScanFromSettings()
         elif name == 'raster':
             raster = self._initializerFactory.createRasterInitializer()
-            self.insert(raster)
+            self.insertScan(raster)
         elif name == 'snake':
             snake = self._initializerFactory.createSnakeInitializer()
-            self.insert(snake)
+            self.insertScan(snake)
         elif name == 'spiral':
             spiral = self._initializerFactory.createSpiralInitializer()
-            self.insert(spiral)
+            self.insertScan(spiral)
         else:
             logger.error(f'Unknown scan initializer \"{initializerName}\"!')
 
@@ -184,32 +183,36 @@ class ScanInitializerRepository(Mapping[str, ScanInitializer], Observable, Obser
 
 class Scan(ScanPointSequence, Observable, Observer):
 
-    def __init__(self, settings: ScanSettings, initializerRepository: ScanInitializerRepository,
+    def __init__(self, settings: ScanSettings, repository: ScanRepository,
                  reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
-        self._initializerRepository = initializerRepository
+        self._repository = repository
         self._reinitObservable = reinitObservable
-        self._initializer = initializerRepository.getDefaultInitializer()
+        self._name, self._initializer = repository.getDefaultInitializer()
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings,
-                       initializerRepository: ScanInitializerRepository,
+    def createInstance(cls, settings: ScanSettings, repository: ScanRepository,
                        reinitObservable: Observable) -> Scan:
-        scan = cls(settings, initializerRepository, reinitObservable)
+        scan = cls(settings, repository, reinitObservable)
         scan._syncFromSettings()
         reinitObservable.addObserver(scan)
         return scan
 
+    @property
+    def name(self) -> str:
+        return self._name
+
     def setActive(self, name: str) -> None:
         try:
-            initializer = self._initializerRepository[name]
+            initializer = self._repository[name]
         except KeyError:
             logger.error(f'Failed to activate \"{name}\"!')
             return
 
         self._initializer.removeObserver(self)
         self._initializer = initializer
+        self._name = name
         self._initializer.addObserver(self)
 
         self._syncToSettings()
@@ -240,44 +243,76 @@ class ScanPresenter(Observable, Observer):
     def createRoot() -> SimpleTreeNode:
         return SimpleTreeNode.createRoot(['Position Data', 'Points'])
 
-    def __init__(self, initializerRepository: ScanInitializerRepository, scan: Scan) -> None:
+    def __init__(self, repository: ScanRepository, scan: Scan) -> None:
         super().__init__()
-        self._initializerRepository = initializerRepository
+        self._repository = repository
         self._scan = scan
-        self._initializerTree = ScanPresenter.createRoot()
+        self._scanTree = ScanPresenter.createRoot()
 
     @classmethod
-    def createInstance(cls, initializerRepository: ScanInitializerRepository,
-                       scan: Scan) -> ScanPresenter:
-        presenter = cls(initializerRepository, scan)
-        presenter._updateInitializerTree()
-        initializerRepository.addObserver(presenter)
+    def createInstance(cls, repository: ScanRepository, scan: Scan) -> ScanPresenter:
+        presenter = cls(repository, scan)
+        presenter._updateScanTree()
+        repository.addObserver(presenter)
         scan.addObserver(presenter)
         return presenter
 
-    def getInitializerTree(self) -> SimpleTreeNode:
-        return self._initializerTree
+    def getAvailableInitializerList(self) -> list[str]:
+        return ['Open File...', 'Raster', 'Snake', 'Spiral']
 
-    def _updateInitializerTree(self) -> None:
+    def getScanTree(self) -> SimpleTreeNode:
+        return self._scanTree
+
+    def _updateScanTree(self) -> None:
         nameDict: defaultdict[str, list[str]] = defaultdict(list)
 
-        for name, initializer in self._initializerRepository.items():
+        for name, initializer in self._repository.items():
             nameDict[initializer.category].append(name)
 
-        initializerTree = ScanPresenter.createRoot()
+        scanTree = ScanPresenter.createRoot()
 
         for category, nameList in sorted(nameDict.items()):
-            categoryNode = initializerTree.createChild([category])
+            categoryNode = scanTree.createChild([category])
 
             for name in sorted(nameList):
                 categoryNode.createChild([name])
 
-        self._initializerTree = initializerTree
+        self._scanTree = scanTree
         self.notifyObservers()
 
+    def getActiveScan(self) -> str:
+        return self._scan.name
+
+    def getActiveScanPointList(self) -> list[ScanPoint]:
+        return [point for point in self._scan]
+
+    def setActiveScan(self, name: str) -> None:
+        self._scan.setActive(name)
+
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._repository.getOpenFileFilterList()
+
+    def getOpenFileFilter(self) -> str:
+        return self._repository.getOpenFileFilter()
+
+    def openScan(self, filePath: Path, fileFilter: str) -> None:
+        self._repository.openScan(filePath, fileFilter)
+
+    def getSaveFileFilterList(self) -> list[str]:
+        return self._repository.getSaveFileFilterList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._repository.getSaveFileFilter()
+
+    def saveScan(self, filePath: Path, fileFilter: str, name: str) -> None:
+        self._repository.saveScan(filePath, fileFilter, name)
+
+    def removeScan(self, name: str) -> None:
+        self._repository.removeScan(name)
+
     def update(self, observable: Observable) -> None:
-        if observable is self._initializerRepository:
-            self._updateInitializerTree()
+        if observable is self._repository:
+            self._updateScanTree()
         elif observable is self._scan:
             self.notifyObservers()
 
@@ -289,12 +324,11 @@ class ScanCore:
                  fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
         self._settings = ScanSettings.createInstance(settingsRegistry)
         self._initializerFactory = ScanInitializerFactory(rng, self._settings)
-        self._initializerRepository = ScanInitializerRepository.createInstance(
-            self._settings, self._initializerFactory, fileReaderChooser, fileWriterChooser,
-            settingsRegistry)
-        self.scan = Scan.createInstance(self._settings, self._initializerRepository,
-                                        settingsRegistry)
-        self.scanPresenter = ScanPresenter.createInstance(self._initializerRepository, self.scan)
+        self._repository = ScanRepository.createInstance(self._settings, self._initializerFactory,
+                                                         fileReaderChooser, fileWriterChooser,
+                                                         settingsRegistry)
+        self.scan = Scan.createInstance(self._settings, self._repository, settingsRegistry)
+        self.scanPresenter = ScanPresenter.createInstance(self._repository, self.scan)
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self.scanPresenter.openScan(filePath, fileFilter)

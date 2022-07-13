@@ -49,7 +49,8 @@ class ControllerCore:
             self._fileDialogFactory)
         self._scanParametersController = ScanParametersController.createInstance(
             model.scanPresenter, view.scanParametersView, self._fileDialogFactory)
-        # FIXME self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter, view.scanPlotView)
+        self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter,
+                                                                     view.scanPlotView)
         self._objectParametersController = ObjectParametersController.createInstance(
             model.objectPresenter, view.objectParametersView, self._fileDialogFactory)
         self._objectImageController = ObjectImageController.createInstance(
