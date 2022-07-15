@@ -91,10 +91,11 @@ class ScanTransformController(Observer):
             self._syncModelToView()
 
 
-class ScanParametersController:
+class ScanParametersController(Observer):
 
     def __init__(self, presenter: ScanPresenter, view: ScanParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
@@ -104,9 +105,23 @@ class ScanParametersController:
     def createInstance(cls, presenter: ScanPresenter, view: ScanParametersView,
                        fileDialogFactory: FileDialogFactory) -> ScanParametersController:
         controller = cls(presenter, view, fileDialogFactory)
+        presenter.addObserver(controller)
 
         view.treeView.setModel(controller._treeModel)
         view.treeView.selectionModel().currentChanged.connect(controller._setActiveScan)
+        view.treeView.selectionModel().selectionChanged.connect(controller._setButtonsEnabled)
+
+        openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
+        openFileAction.triggered.connect(lambda checked: controller._openScan())
+
+        insertRasterAction = view.buttonBox.insertMenu.addAction('Raster')
+        insertRasterAction.triggered.connect(lambda checked: presenter.insertRasterScan())
+
+        insertSnakeAction = view.buttonBox.insertMenu.addAction('Snake')
+        insertSnakeAction.triggered.connect(lambda checked: presenter.insertSnakeScan())
+
+        insertSpiralAction = view.buttonBox.insertMenu.addAction('Spiral')
+        insertSpiralAction.triggered.connect(lambda checked: presenter.insertSpiralScan())
 
         view.buttonBox.editButton.clicked.connect(controller._editSelectedScan)
         view.buttonBox.saveButton.clicked.connect(controller._saveSelectedScan)
@@ -154,29 +169,28 @@ class ScanParametersController:
         self._presenter.removeScan(name)
 
     def _setButtonsEnabled(self) -> None:
-        hasSelection = self._view.treeView.selectionModel().hasSelection()
+        current = self._view.treeView.selectionModel().currentIndex()
+        nodeItem = current.internalPointer()
+        isLeaf = nodeItem.isLeaf if nodeItem else False
+
         self._view.buttonBox.insertButton.setEnabled(True)
-        self._view.buttonBox.editButton.setEnabled(hasSelection)
-        self._view.buttonBox.saveButton.setEnabled(hasSelection)
-        self._view.buttonBox.removeButton.setEnabled(hasSelection)  # TODO and count > 1
+        self._view.buttonBox.editButton.setEnabled(isLeaf)
+        self._view.buttonBox.saveButton.setEnabled(isLeaf)
+        self._view.buttonBox.removeButton.setEnabled(isLeaf)  # TODO and count > 1
 
     def _setActiveScan(self, current: QModelIndex, previous: QModelIndex) -> None:
         nodeItem = current.internalPointer()
         name = nodeItem.data(0)
-        self._presenter.setActiveScan(name)
-        self._setButtonsEnabled()
+        # FIXME self._presenter.setActiveScan(name)
 
     def _syncModelToView(self) -> None:
-        self._view.buttonBox.insertMenu.clear()
-
-        for entry in self._presenter.getAvailableInitializerList():
-            self._view.buttonBox.insertMenu.addAction(entry)
-
         self._setButtonsEnabled()
-
         # TODO presenter.getActiveScan() to update treeview selection
-        # TODO do something with treeview checkboxes
         self._treeModel.setRootNode(self._presenter.getScanTree())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
 
 
 class ScanPlotController(Observer):

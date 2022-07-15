@@ -61,6 +61,7 @@ class ModelCore:
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
+        # TODO DataDirectoryWatcher should be optional
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
 
         self._detector = Detector.createInstance(self._detectorSettings)
@@ -131,15 +132,22 @@ class ModelCore:
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 
-        self._loadResultsExecutor = LoadResultsExecutor(self._probe, self._object)
-        self.rpcMessageService = RPCMessageService(modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
-        self.rpcMessageService.registerMessageClass(LoadResultsMessage)
-        self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
-                                                self._loadResultsExecutor)
+        if modelArgs.rpcPort >= 0:
+            self._loadResultsExecutor = LoadResultsExecutor(self._probe, self._object)
+            self.rpcMessageService = RPCMessageService(modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
+            self.rpcMessageService.registerMessageClass(LoadResultsMessage)
+            self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
+                                                    self._loadResultsExecutor)
+        else:
+            self.rpcMessageService = None
 
     def __enter__(self) -> ModelCore:
-        self.rpcMessageService.start()
-        self._dataDirectoryWatcher.start()
+        if self.rpcMessageService:
+            self.rpcMessageService.start()
+
+        if self._dataDirectoryWatcher:
+            self._dataDirectoryWatcher.start()
+
         return self
 
     @overload
@@ -153,16 +161,13 @@ class ModelCore:
 
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
-        self._dataDirectoryWatcher.stop()
-        self.rpcMessageService.stop()
+        if self._dataDirectoryWatcher:
+            self._dataDirectoryWatcher.stop()
+
+        if self.rpcMessageService:
+            self.rpcMessageService.stop()
 
     def batchModeReconstruct(self) -> int:
-        outputFilePath = self._reconstructorSettings.outputFilePath.value
-
-        if outputFilePath.exists():
-            logger.error('Output file path already exists!')
-            return -1
-
         result = self.reconstructorPresenter.reconstruct()
 
         pixelSizeXInMeters = float(self._objectSizer.getPixelSizeXInMeters())
@@ -171,12 +176,13 @@ class ModelCore:
         scanXInMeters = [float(point.x) for point in self._scanCore.scan]
         scanYInMeters = [float(point.y) for point in self._scanCore.scan]
 
+        # TODO document output file format; include cost function values
         dataDump = dict()
         dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
         dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
         dataDump['probe'] = self._probe.getArray()
         dataDump['object'] = self._object.getArray()
-        numpy.savez(outputFilePath, **dataDump)
+        numpy.savez(self._reconstructorSettings.outputFilePath.value, **dataDump)
 
         return result
 

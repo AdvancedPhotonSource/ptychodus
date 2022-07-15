@@ -35,15 +35,15 @@ class TabularScanInitializer(ScanInitializer):
                  fileInfo: Optional[ScanFileInfo]) -> None:
         super().__init__(parameters)
         self._pointList = pointList
-        self._fileInfo = fileInfo
+        self.fileInfo = fileInfo
 
     def syncToSettings(self, settings: ScanSettings) -> None:
-        if self._fileInfo is None:
+        if self.fileInfo is None:
             # TODO must be saved to disk to make active; can be made active iff fileInfo not None
             raise ValueError('Missing file info.')
 
         settings.initializer.value = self.name
-        self._fileInfo.syncToSettings(settings)
+        self.fileInfo.syncToSettings(settings)
         super().syncToSettings(settings)
 
     @property
