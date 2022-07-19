@@ -45,13 +45,13 @@ class ModelCore:
 
         self.detectorImagePresenter = ImagePresenter.createInstance(
             self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
-            self._pluginRegistry.buildComplexToRealStrategyChooser())
+            self._pluginRegistry.buildColorizerChooser())
         self.probeImagePresenter = ImagePresenter.createInstance(
             self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
-            self._pluginRegistry.buildComplexToRealStrategyChooser())
+            self._pluginRegistry.buildColorizerChooser())
         self.objectImagePresenter = ImagePresenter.createInstance(
             self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
-            self._pluginRegistry.buildComplexToRealStrategyChooser())
+            self._pluginRegistry.buildColorizerChooser())
 
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._dataSettings = DataSettings.createInstance(self.settingsRegistry)

@@ -77,7 +77,7 @@ class ImageColormapGroupBox(BottomTitledGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Color Map', parent)
-        self.complexToRealStrategyComboBox = QComboBox()
+        self.colorizerComboBox = QComboBox()
         self.scalarTransformationComboBox = QComboBox()
         self.colormapComboBox = QComboBox()
 
@@ -85,13 +85,13 @@ class ImageColormapGroupBox(BottomTitledGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColormapGroupBox:
         view = cls(parent)
 
-        view.complexToRealStrategyComboBox.setToolTip('Complex to Real Strategy')
+        view.colorizerComboBox.setToolTip('Colorizer')
         view.scalarTransformationComboBox.setToolTip('Scalar Transformation')
         view.colormapComboBox.setToolTip('Colormap')
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 35)
-        layout.addWidget(view.complexToRealStrategyComboBox)
+        layout.addWidget(view.colorizerComboBox)
         layout.addWidget(view.scalarTransformationComboBox)
         layout.addWidget(view.colormapComboBox)
         view.setLayout(layout)

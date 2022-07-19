@@ -11,6 +11,8 @@ import numpy
 
 from .observer import Observable
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class ScanPoint:

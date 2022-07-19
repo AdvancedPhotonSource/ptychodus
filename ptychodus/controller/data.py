@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy
 from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QVariant
@@ -21,7 +21,7 @@ class FileDialogFactory:
                         caption: str,
                         nameFilters: Optional[list[str]] = None,
                         mimeTypeFilters: Optional[list[str]] = None,
-                        selectedNameFilter: Optional[str] = None) -> Tuple[Optional[Path], str]:
+                        selectedNameFilter: Optional[str] = None) -> tuple[Optional[Path], str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._openWorkingDirectory))
@@ -52,7 +52,7 @@ class FileDialogFactory:
                         caption: str,
                         nameFilters: Optional[list[str]] = None,
                         mimeTypeFilters: Optional[list[str]] = None,
-                        selectedNameFilter: Optional[str] = None) -> Tuple[Optional[Path], str]:
+                        selectedNameFilter: Optional[str] = None) -> tuple[Optional[Path], str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._saveWorkingDirectory))

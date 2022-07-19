@@ -7,7 +7,7 @@ from PyQt5.QtGui import QDoubleValidator, QImage, QPixmap, QStandardItem, QStand
 import matplotlib
 import numpy
 
-from ..api.image import ScalarTransformation, ComplexToRealStrategy
+from ..api.image import ScalarTransformation, Colorizer
 from ..api.observer import Observable, Observer
 from ..model import ImagePresenter
 from ..view import ImageDisplayRangeDialog, ImageColormapGroupBox, \
@@ -46,7 +46,7 @@ class ImageColormapController(Observer):
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._complexToRealStrategyModel = QStringListModel()
+        self._colorizerModel = QStringListModel()
         self._scalarTransformationModel = QStringListModel()
         self._colormapModel = QStringListModel()
 
@@ -55,15 +55,15 @@ class ImageColormapController(Observer):
                        view: ImageColormapGroupBox) -> ImageColormapController:
         controller = cls(presenter, view)
 
-        view.complexToRealStrategyComboBox.setModel(controller._complexToRealStrategyModel)
+        view.colorizerComboBox.setModel(controller._colorizerModel)
         view.scalarTransformationComboBox.setModel(controller._scalarTransformationModel)
         view.colormapComboBox.setModel(controller._colormapModel)
 
         controller._syncModelToView()
         presenter.addObserver(controller)
 
-        view.complexToRealStrategyComboBox.currentTextChanged.connect(
-            presenter.setComplexToRealStrategy)
+        view.colorizerComboBox.currentTextChanged.connect(
+            presenter.setColorizer)
         view.scalarTransformationComboBox.currentTextChanged.connect(
             presenter.setScalarTransformation)
         view.colormapComboBox.currentTextChanged.connect(presenter.setColormap)
@@ -71,13 +71,13 @@ class ImageColormapController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.complexToRealStrategyComboBox.blockSignals(True)
-        self._complexToRealStrategyModel.setStringList(
-            self._presenter.getComplexToRealStrategyList())
-        self._view.complexToRealStrategyComboBox.setCurrentText(
-            self._presenter.getComplexToRealStrategy())
-        self._view.complexToRealStrategyComboBox.blockSignals(False)
-        self._view.complexToRealStrategyComboBox.setVisible(self._presenter.isComplexValued())
+        self._view.colorizerComboBox.blockSignals(True)
+        self._colorizerModel.setStringList(
+            self._presenter.getColorizerList())
+        self._view.colorizerComboBox.setCurrentText(
+            self._presenter.getColorizer())
+        self._view.colorizerComboBox.blockSignals(False)
+        self._view.colorizerComboBox.setVisible(self._presenter.isComplexValued())
 
         self._view.scalarTransformationComboBox.blockSignals(True)
         self._scalarTransformationModel.setStringList(
