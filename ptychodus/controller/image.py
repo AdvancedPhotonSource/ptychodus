@@ -62,8 +62,7 @@ class ImageColormapController(Observer):
         controller._syncModelToView()
         presenter.addObserver(controller)
 
-        view.colorizerComboBox.currentTextChanged.connect(
-            presenter.setColorizer)
+        view.colorizerComboBox.currentTextChanged.connect(presenter.setColorizer)
         view.scalarTransformationComboBox.currentTextChanged.connect(
             presenter.setScalarTransformation)
         view.colormapComboBox.currentTextChanged.connect(presenter.setColormap)
@@ -72,10 +71,8 @@ class ImageColormapController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.colorizerComboBox.blockSignals(True)
-        self._colorizerModel.setStringList(
-            self._presenter.getColorizerList())
-        self._view.colorizerComboBox.setCurrentText(
-            self._presenter.getColorizer())
+        self._colorizerModel.setStringList(self._presenter.getColorizerList())
+        self._view.colorizerComboBox.setCurrentText(self._presenter.getColorizer())
         self._view.colorizerComboBox.blockSignals(False)
         self._view.colorizerComboBox.setVisible(self._presenter.isComplexValued())
 

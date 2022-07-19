@@ -218,7 +218,8 @@ class ScanPresenter(Observable, Observer):
         self._scanTree = ScanPresenter.createRoot()
 
     @classmethod
-    def createInstance(cls, initializerFactory: ScanInitializerFactory, repository: ScanRepository, scan: Scan,
+    def createInstance(cls, initializerFactory: ScanInitializerFactory, repository: ScanRepository,
+                       scan: Scan,
                        fileWriterChooser: PluginChooser[ScanFileWriter]) -> ScanPresenter:
         presenter = cls(initializerFactory, repository, scan, fileWriterChooser)
         presenter._updateScanTree()

@@ -134,7 +134,8 @@ class ModelCore:
 
         if modelArgs.rpcPort >= 0:
             self._loadResultsExecutor = LoadResultsExecutor(self._probe, self._object)
-            self.rpcMessageService = RPCMessageService(modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
+            self.rpcMessageService = RPCMessageService(modelArgs.rpcPort,
+                                                       modelArgs.autoExecuteRPCs)
             self.rpcMessageService.registerMessageClass(LoadResultsMessage)
             self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
                                                     self._loadResultsExecutor)

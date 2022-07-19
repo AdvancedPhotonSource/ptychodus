@@ -14,10 +14,10 @@ from .probe import ProbeFileReader, ProbeFileWriter, ProbeInitializerType
 from .reconstructor import Reconstructor
 from .scan import ScanFileReader, ScanFileWriter, ScanPointTransform
 
-T = TypeVar('T', DataFileReader, DataFileWriter, ObjectFileReader,
-            ObjectFileWriter, ObjectInitializerType, ProbeFileReader, ProbeFileWriter,
-            ProbeInitializerType, Reconstructor, ScalarTransformation, ScanFileReader,
-            ScanFileWriter, ScanPointTransform)
+T = TypeVar('T', DataFileReader, DataFileWriter, ObjectFileReader, ObjectFileWriter,
+            ObjectInitializerType, ProbeFileReader, ProbeFileWriter, ProbeInitializerType,
+            Reconstructor, ScalarTransformation, ScanFileReader, ScanFileWriter,
+            ScanPointTransform)
 
 logger = logging.getLogger(__name__)
 

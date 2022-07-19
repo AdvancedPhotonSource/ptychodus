@@ -16,7 +16,6 @@ except ModuleNotFoundError:
 from ..api.data import DataArrayType, DataFile, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .image import ImageExtent
 from .object import Object, ObjectSizer
 from .probe import Probe, ProbeSizer
 from .reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter

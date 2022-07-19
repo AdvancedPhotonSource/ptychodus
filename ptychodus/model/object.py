@@ -8,12 +8,12 @@ import threading
 import numpy
 
 from ..api.geometry import Box, Interval
+from ..api.image import ImageExtent
 from ..api.object import *
 from ..api.observer import Observable, Observer
 from ..api.plugins import PluginChooser, PluginEntry
 from ..api.settings import SettingsRegistry, SettingsGroup
 from .data import CropSizer, Detector
-from .image import ImageExtent
 from .probe import ProbeSizer
 from .scan import Scan
 

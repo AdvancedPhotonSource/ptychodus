@@ -101,7 +101,8 @@ class ControllerCore:
         #        lambda checked: QApplication.quit())
 
         if model.rpcMessageService:
-            controller._processMessagesTimer.timeout.connect(model.rpcMessageService.processMessages)
+            controller._processMessagesTimer.timeout.connect(
+                model.rpcMessageService.processMessages)
             controller._processMessagesTimer.start(1000)  # TODO make configurable
 
         return controller
