@@ -1,6 +1,5 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
-from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy
@@ -52,8 +51,12 @@ class ImageExtent:
         return f'{type(self).__name__}({self.width}, {self.height})'
 
 
-class ScalarTransformation(Callable[[RealArrayType], RealArrayType]):
+class ScalarTransformation(ABC):
 
     @abstractproperty
     def name(self) -> str:
+        pass
+
+    @abstractmethod
+    def __call__(self, array: RealArrayType) -> RealArrayType:
         pass

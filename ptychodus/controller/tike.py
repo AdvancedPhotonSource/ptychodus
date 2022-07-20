@@ -242,7 +242,6 @@ class TikeBasicParametersController(Observer):
         for model in presenter.getNoiseModelList():
             view.noiseModelComboBox.addItem(model)
 
-        view.useMpiCheckBox.setVisible(False)  # TODO make visible when supported
         view.useMpiCheckBox.toggled.connect(presenter.setMpiEnabled)
 
         view.numGpusLineEdit.editingFinished.connect(controller._syncNumGpusToModel)
