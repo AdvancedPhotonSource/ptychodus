@@ -76,7 +76,7 @@ class ImageFileGroupBox(BottomTitledGroupBox):
 class ImageColormapGroupBox(BottomTitledGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Color Map', parent)
+        super().__init__('Colorize', parent)
         self.colorizerComboBox = QComboBox()
         self.scalarTransformationComboBox = QComboBox()
         self.colormapComboBox = QComboBox()

@@ -41,17 +41,10 @@ class ModelCore:
     def __init__(self, modelArgs: ModelArgs) -> None:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
-        self._colormapChooserFactory = ColormapChooserFactory()
 
-        self.detectorImagePresenter = ImagePresenter.createInstance(
-            self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
-            self._pluginRegistry.buildColorizerChooser())
-        self.probeImagePresenter = ImagePresenter.createInstance(
-            self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
-            self._pluginRegistry.buildColorizerChooser())
-        self.objectImagePresenter = ImagePresenter.createInstance(
-            self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
-            self._pluginRegistry.buildColorizerChooser())
+        self._detectorImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
+        self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
+        self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
 
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
@@ -186,6 +179,18 @@ class ModelCore:
         numpy.savez(self._reconstructorSettings.outputFilePath.value, **dataDump)
 
         return result
+
+    @property
+    def detectorImagePresenter(self) -> ImagePresenter:
+        return self._detectorImageCore.presenter
+
+    @property
+    def probeImagePresenter(self) -> ImagePresenter:
+        return self._probeImageCore.presenter
+
+    @property
+    def objectImagePresenter(self) -> ImagePresenter:
+        return self._objectImageCore.presenter
 
     @property
     def scanPresenter(self) -> ScanPresenter:

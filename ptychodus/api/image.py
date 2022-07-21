@@ -10,11 +10,13 @@ RealArrayType = numpy.typing.NDArray[numpy.floating]
 
 @dataclass(frozen=True)
 class ImageExtent:
+    '''image extent in pixels'''
     width: int
     height: int
 
     @property
     def shape(self) -> tuple[int, int]:
+        '''returns the shape (height, width) tuple'''
         return self.height, self.width
 
     def __add__(self, other: ImageExtent) -> ImageExtent:
@@ -52,11 +54,14 @@ class ImageExtent:
 
 
 class ScalarTransformation(ABC):
+    '''interface for real-valued transformations of a real array'''
 
     @abstractproperty
     def name(self) -> str:
+        '''returns a unique name'''
         pass
 
     @abstractmethod
     def __call__(self, array: RealArrayType) -> RealArrayType:
+        '''returns the transformed input array'''
         pass

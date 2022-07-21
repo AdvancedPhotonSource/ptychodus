@@ -7,7 +7,7 @@ from PyQt5.QtGui import QDoubleValidator, QImage, QPixmap, QStandardItem, QStand
 import matplotlib
 import numpy
 
-from ..api.image import ScalarTransformation, Colorizer
+from ..api.image import ScalarTransformation
 from ..api.observer import Observable, Observer
 from ..model import ImagePresenter
 from ..view import ImageDisplayRangeDialog, ImageColormapGroupBox, \
@@ -74,7 +74,6 @@ class ImageColormapController(Observer):
         self._colorizerModel.setStringList(self._presenter.getColorizerList())
         self._view.colorizerComboBox.setCurrentText(self._presenter.getColorizer())
         self._view.colorizerComboBox.blockSignals(False)
-        self._view.colorizerComboBox.setVisible(self._presenter.isComplexValued())
 
         self._view.scalarTransformationComboBox.blockSignals(True)
         self._scalarTransformationModel.setStringList(

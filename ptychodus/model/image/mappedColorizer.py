@@ -11,22 +11,23 @@ from ...api.image import RealArrayType
 from ...api.observer import Observable
 from ...api.plugins import PluginChooser, PluginEntry
 from .colorizer import Colorizer
+from .displayRange import DisplayRange
 from .visarray import VisualizationArrayComponent
 
 
 class MappedColorizer(Colorizer):
 
     def __init__(self, componentChooser: PluginChooser[VisualizationArrayComponent],
-                 cyclicColormapChooser: PluginChooser[Colormap],
+                 displayRange: DisplayRange, cyclicColormapChooser: PluginChooser[Colormap],
                  acyclicColormapChooser: PluginChooser[Colormap]) -> None:
         super().__init__('Colormap', componentChooser)
+        self._displayRange = displayRange
         self._cyclicColormapChooser = cyclicColormapChooser
         self._acyclicColormapChooser = acyclicColormapChooser
-        self._displayRange = Interval[Decimal](Decimal(0), Decimal(1))  # FIXME update
 
     @classmethod
-    def createInstance(
-            cls, componentChooser: PluginChooser[VisualizationArrayComponent]) -> MappedColorizer:
+    def createInstance(cls, componentChooser: PluginChooser[VisualizationArrayComponent],
+                       displayRange: DisplayRange) -> MappedColorizer:
         cyclicColormapEntries: list[PluginEntry[Colormap]] = list()
         acyclicColormapEntries: list[PluginEntry[Colormap]] = list()
 
@@ -47,7 +48,8 @@ class MappedColorizer(Colorizer):
         acyclicColormapChooser = PluginChooser[Colormap].createFromList(acyclicColormapEntries)
         acyclicColormapChooser.setFromSimpleName('viridis')
 
-        colorizer = cls(componentChooser, cyclicColormapChooser, acyclicColormapChooser)
+        colorizer = cls(componentChooser, displayRange, cyclicColormapChooser,
+                        acyclicColormapChooser)
         cyclicColormapChooser.addObserver(colorizer)
         acyclicColormapChooser.addObserver(colorizer)
         return colorizer
@@ -67,7 +69,9 @@ class MappedColorizer(Colorizer):
         self._colormapChooser.setFromDisplayName(name)
 
     def __call__(self) -> RealArrayType:
-        norm = Normalize(vmin=self._displayRange.lower, vmax=self._displayRange.upper, clip=False)
+        norm = Normalize(vmin=self._displayRange.getLower(),
+                         vmax=self._displayRange.getUpper(),
+                         clip=False)
         cmap = self._colormapChooser.getCurrentStrategy()
         scalarMappable = ScalarMappable(norm, cmap)
         return scalarMappable.to_rgba(self._component())

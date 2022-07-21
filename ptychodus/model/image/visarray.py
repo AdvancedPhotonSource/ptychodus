@@ -25,9 +25,9 @@ class VisualizationArray(Observable):
         return self._array
 
     def setArray(self, array: NumericArrayType) -> None:
-        if array.dtype == numpy.inexact:
+        if numpy.issubdtype(array.dtype, numpy.inexact):
             self._array = array
-        elif array.dtype == numpy.integer:
+        elif numpy.issubdtype(array.dtype, numpy.integer):
             self._array = array.astype(numpy.float64)
         else:
             logger.error(f'Refusing to assign array with non-numeric dtype \"{array.dtype}\"!')
@@ -66,13 +66,16 @@ class VisualizationArrayComponent(Observable, Observer):
     def setScalarTransformation(self, name: str) -> None:
         self._transformChooser.setFromDisplayName(name)
 
+    def getArray(self) -> InexactArrayType:
+        return self._array()
+
     @abstractmethod
-    def _getComponent(self) -> RealArrayType:
+    def getComponent(self) -> RealArrayType:
         pass
 
     def __call__(self) -> RealArrayType:
         transform = self._transformChooser.getCurrentStrategy()
-        return transform(self._getComponent())
+        return transform(self.getComponent())
 
     def update(self, observable: Observable) -> None:
         if observable is self._array:
@@ -87,8 +90,8 @@ class AmplitudeArrayComponent(VisualizationArrayComponent):
                  transformChooser: PluginChooser[ScalarTransformation]):
         super().__init__('Amplitude', False, array, transformChooser)
 
-    def _getComponent(self) -> RealArrayType:
-        return numpy.absolute(self._array())
+    def getComponent(self) -> RealArrayType:
+        return numpy.absolute(self.getArray())
 
 
 class PhaseArrayComponent(VisualizationArrayComponent):
@@ -97,8 +100,8 @@ class PhaseArrayComponent(VisualizationArrayComponent):
                  transformChooser: PluginChooser[ScalarTransformation]):
         super().__init__('Phase', True, array, transformChooser)
 
-    def _getComponent(self) -> RealArrayType:
-        return numpy.angle(self._array)
+    def getComponent(self) -> RealArrayType:
+        return numpy.angle(self.getArray())
 
 
 class RealArrayComponent(VisualizationArrayComponent):
@@ -107,8 +110,8 @@ class RealArrayComponent(VisualizationArrayComponent):
                  transformChooser: PluginChooser[ScalarTransformation]):
         super().__init__('Real', False, array, transformChooser)
 
-    def _getComponent(self) -> RealArrayType:
-        return numpy.real(self._array())
+    def getComponent(self) -> RealArrayType:
+        return numpy.real(self.getArray())
 
 
 class ImaginaryArrayComponent(VisualizationArrayComponent):
@@ -117,5 +120,5 @@ class ImaginaryArrayComponent(VisualizationArrayComponent):
                  transformChooser: PluginChooser[ScalarTransformation]):
         super().__init__('Imaginary', False, array, transformChooser)
 
-    def _getComponent(self) -> RealArrayType:
-        return numpy.imag(self._array())
+    def getComponent(self) -> RealArrayType:
+        return numpy.imag(self.getArray())
