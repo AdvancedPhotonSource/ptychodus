@@ -13,6 +13,7 @@ from .probe import *
 from .reconstructor import *
 from .scan import *
 from .settings import *
+from .workflow import *
 
 
 class ViewCore(QMainWindow):
@@ -73,6 +74,11 @@ class ViewCore(QMainWindow):
         self.reconstructorParametersView = ReconstructorParametersView.createInstance()
         self.reconstructorPlotView = ReconstructorPlotView.createInstance()
 
+        # FIXME show in developer mode only
+        self.workflowAction = self.navigationToolBar.addAction(fileIcon, 'Workflow')
+        self.workflowParametersView = WorkflowParametersView.createInstance()
+        self.workflowPlotView = WorkflowPlotView.createInstance()
+
         self.monitorAction = self.navigationToolBar.addAction(fileIcon, 'Monitor')
         self.monitorProbeView = MonitorProbeView.createInstance()
         self.monitorObjectView = MonitorObjectView.createInstance()
@@ -119,6 +125,7 @@ class ViewCore(QMainWindow):
         view.parametersWidget.addWidget(view.probeParametersView)
         view.parametersWidget.addWidget(view.objectParametersView)
         view.parametersWidget.addWidget(view.reconstructorParametersView)
+        view.parametersWidget.addWidget(view.workflowParametersView)
         view.parametersWidget.addWidget(view.monitorProbeView)
         view.parametersWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.parametersWidget)
@@ -131,6 +138,7 @@ class ViewCore(QMainWindow):
         view.contentsWidget.addWidget(view.probeImageView)
         view.contentsWidget.addWidget(view.objectImageView)
         view.contentsWidget.addWidget(view.reconstructorPlotView)
+        view.contentsWidget.addWidget(view.workflowPlotView)
         view.contentsWidget.addWidget(view.monitorObjectView)
         view.contentsWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.contentsWidget)
