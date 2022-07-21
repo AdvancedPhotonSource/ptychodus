@@ -171,7 +171,7 @@ class Scan(ScanPointSequence, Observable, Observer):
         initializerName = self._settings.initializer.value
         name = initializerName.casefold()
 
-        # TODO confirm that this method does the right thing when rerun
+        # FIXME confirm that this method does the right thing when rerun
         if name == 'fromfile':
             tabularList = self._initializerFactory.openScanFromSettings()
 

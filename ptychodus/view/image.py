@@ -73,25 +73,28 @@ class ImageFileGroupBox(BottomTitledGroupBox):
         return view
 
 
-class ImageColormapGroupBox(BottomTitledGroupBox):
+class ImageColorizerGroupBox(BottomTitledGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Colorize', parent)
         self.colorizerComboBox = QComboBox()
+        self.componentComboBox = QComboBox()
         self.scalarTransformationComboBox = QComboBox()
         self.colormapComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColormapGroupBox:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColorizerGroupBox:
         view = cls(parent)
 
         view.colorizerComboBox.setToolTip('Colorizer')
+        view.componentComboBox.setToolTip('Component')
         view.scalarTransformationComboBox.setToolTip('Scalar Transformation')
         view.colormapComboBox.setToolTip('Colormap')
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 35)
         layout.addWidget(view.colorizerComboBox)
+        layout.addWidget(view.componentComboBox)
         layout.addWidget(view.scalarTransformationComboBox)
         layout.addWidget(view.colormapComboBox)
         view.setLayout(layout)
@@ -164,7 +167,7 @@ class ImageRibbon(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.imageFileGroupBox = ImageFileGroupBox.createInstance()
-        self.colormapGroupBox = ImageColormapGroupBox.createInstance()
+        self.colormapGroupBox = ImageColorizerGroupBox.createInstance()
         self.dataRangeGroupBox = ImageDataRangeGroupBox.createInstance()
         self.indexGroupBox = IndexGroupBox.createInstance()
 

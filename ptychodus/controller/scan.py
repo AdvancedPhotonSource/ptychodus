@@ -127,7 +127,7 @@ class ScanParametersController(Observer):
         view.buttonBox.saveButton.clicked.connect(controller._saveSelectedScan)
         view.buttonBox.removeButton.clicked.connect(controller._removeSelectedScan)
 
-        # TODO treeview selected/checked
+        # FIXME treeview selected/checked
 
         controller._syncModelToView()
 
@@ -144,7 +144,7 @@ class ScanParametersController(Observer):
             self._presenter.openScan(filePath, nameFilter)
 
     def _getSelectedScan(self) -> str:
-        # TODO handle case of no selection
+        # FIXME handle case of no selection
         current = self._view.treeView.selectionModel().currentIndex()
         nodeItem = current.internalPointer()
         return nodeItem.data(0)
@@ -162,7 +162,7 @@ class ScanParametersController(Observer):
 
     def _editSelectedScan(self) -> None:
         name = self._getSelectedScan()
-        print(f'editScan({name})')  # TODO
+        print(f'editScan({name})')  # FIXME
 
     def _removeSelectedScan(self) -> None:
         name = self._getSelectedScan()
@@ -176,7 +176,7 @@ class ScanParametersController(Observer):
         self._view.buttonBox.insertButton.setEnabled(True)
         self._view.buttonBox.editButton.setEnabled(isLeaf)
         self._view.buttonBox.saveButton.setEnabled(isLeaf)
-        self._view.buttonBox.removeButton.setEnabled(isLeaf)  # TODO and count > 1
+        self._view.buttonBox.removeButton.setEnabled(isLeaf)  # FIXME and count > 1
 
     def _setActiveScan(self, current: QModelIndex, previous: QModelIndex) -> None:
         nodeItem = current.internalPointer()
@@ -185,7 +185,7 @@ class ScanParametersController(Observer):
 
     def _syncModelToView(self) -> None:
         self._setButtonsEnabled()
-        # TODO presenter.getActiveScan() to update treeview selection
+        # FIXME presenter.getActiveScan() to update treeview selection
         self._treeModel.setRootNode(self._presenter.getScanTree())
 
     def update(self, observable: Observable) -> None:

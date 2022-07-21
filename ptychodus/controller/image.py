@@ -10,7 +10,7 @@ import numpy
 from ..api.image import ScalarTransformation
 from ..api.observer import Observable, Observer
 from ..model import ImagePresenter
-from ..view import ImageDisplayRangeDialog, ImageColormapGroupBox, \
+from ..view import ImageDisplayRangeDialog, ImageColorizerGroupBox, \
         ImageDataRangeGroupBox, ImageFileGroupBox, ImageView, ImageWidget
 from .data import FileDialogFactory
 
@@ -40,22 +40,24 @@ class ImageFileController:
             pixmap.save(str(filePath))
 
 
-class ImageColormapController(Observer):
+class ImageColorizerController(Observer):
 
-    def __init__(self, presenter: ImagePresenter, view: ImageColormapGroupBox) -> None:
+    def __init__(self, presenter: ImagePresenter, view: ImageColorizerGroupBox) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._colorizerModel = QStringListModel()
+        self._componentModel = QStringListModel()
         self._scalarTransformationModel = QStringListModel()
         self._colormapModel = QStringListModel()
 
     @classmethod
     def createInstance(cls, presenter: ImagePresenter,
-                       view: ImageColormapGroupBox) -> ImageColormapController:
+                       view: ImageColorizerGroupBox) -> ImageColorizerController:
         controller = cls(presenter, view)
 
         view.colorizerComboBox.setModel(controller._colorizerModel)
+        view.componentComboBox.setModel(controller._componentModel)
         view.scalarTransformationComboBox.setModel(controller._scalarTransformationModel)
         view.colormapComboBox.setModel(controller._colormapModel)
 
@@ -63,6 +65,7 @@ class ImageColormapController(Observer):
         presenter.addObserver(controller)
 
         view.colorizerComboBox.currentTextChanged.connect(presenter.setColorizer)
+        view.componentComboBox.currentTextChanged.connect(presenter.setArrayComponent)
         view.scalarTransformationComboBox.currentTextChanged.connect(
             presenter.setScalarTransformation)
         view.colormapComboBox.currentTextChanged.connect(presenter.setColormap)
@@ -74,6 +77,11 @@ class ImageColormapController(Observer):
         self._colorizerModel.setStringList(self._presenter.getColorizerList())
         self._view.colorizerComboBox.setCurrentText(self._presenter.getColorizer())
         self._view.colorizerComboBox.blockSignals(False)
+
+        self._view.componentComboBox.blockSignals(True)
+        self._componentModel.setStringList(self._presenter.getArrayComponentList())
+        self._view.componentComboBox.setCurrentText(self._presenter.getArrayComponent())
+        self._view.componentComboBox.blockSignals(False)
 
         self._view.scalarTransformationComboBox.blockSignals(True)
         self._scalarTransformationModel.setStringList(
@@ -145,7 +153,7 @@ class ImageController(Observer):
         self._view = view
         self._fileController = ImageFileController.createInstance(
             view.imageRibbon.imageFileGroupBox, view.imageWidget, fileDialogFactory)
-        self._colormapController = ImageColormapController.createInstance(
+        self._colorizerController = ImageColorizerController.createInstance(
             presenter, view.imageRibbon.colormapGroupBox)
         self._dataRangeController = ImageDataRangeController.createInstance(
             presenter, view.imageRibbon.dataRangeGroupBox)
@@ -162,7 +170,7 @@ class ImageController(Observer):
         realImage = self._presenter.getImage()
         qpixmap = QPixmap()
 
-        if realImage is not None:
+        if realImage is not None and numpy.size(realImage) > 0:
             integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8)
 
             qimage = QImage(integerImage.data, integerImage.shape[1], integerImage.shape[0],

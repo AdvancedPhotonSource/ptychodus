@@ -18,8 +18,7 @@ class CylindricalColorModelColorizer(Colorizer):
     def __init__(self, componentChooser: PluginChooser[VisualizationArrayComponent],
                  displayRange: DisplayRange, name: str, model: CylindricalColorModel,
                  variant: bool) -> None:
-        super().__init__(name, componentChooser)
-        self._displayRange = displayRange  # TODO apply this
+        super().__init__(name, componentChooser, displayRange)
         self._model = numpy.vectorize(model)
         self._variant = variant
 
@@ -34,6 +33,7 @@ class CylindricalColorModelColorizer(Colorizer):
         ]
 
     def __call__(self) -> RealArrayType:
+        # TODO apply displayRange
         phaseInRadians = numpy.angle(self._component.getArray())
         h = (phaseInRadians + numpy.pi) / (2 * numpy.pi)
         x = self._component()

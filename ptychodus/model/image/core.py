@@ -31,6 +31,7 @@ class ImagePresenter(Observable, Observer):
         presenter = cls(array, displayRange, colorizerChooser)
         displayRange.addObserver(presenter)
         colorizerChooser.addObserver(presenter)
+        colorizerChooser.getCurrentStrategy().addObserver(presenter)
         return presenter
 
     # TODO do this via dependency injection
@@ -44,11 +45,22 @@ class ImagePresenter(Observable, Observer):
         return self._colorizerChooser.getCurrentDisplayName()
 
     def setColorizer(self, name: str) -> None:
+        self._colorizer.removeObserver(self)
         self._colorizerChooser.setFromDisplayName(name)
+        self._colorizer.addObserver(self)
 
     @property
     def _colorizer(self) -> Colorizer:
         return self._colorizerChooser.getCurrentStrategy()
+
+    def getArrayComponentList(self) -> list[str]:
+        return self._colorizer.getArrayComponentList()
+
+    def getArrayComponent(self) -> str:
+        return self._colorizer.getArrayComponent()
+
+    def setArrayComponent(self, name: str) -> None:
+        self._colorizer.setArrayComponent(name)
 
     def getScalarTransformationList(self) -> list[str]:
         return self._colorizer.getScalarTransformationList()
@@ -75,18 +87,16 @@ class ImagePresenter(Observable, Observer):
         self._displayRange.setUpper(value)
 
     def setDisplayRangeToDataRange(self) -> None:
-        dataRange = DisplayRange.createUnitInterval()
+        dataRange = self._colorizer.getDataRange()
 
-        if self._image is not None and numpy.size(self._image) > 0:
-            lower = Decimal(repr(self._image.min()))
-            upper = Decimal(repr(self._image.max()))
-
-            if lower == upper:
-                half = Decimal('0.5')
-                lower -= half
-                upper += half
-
-            dataRange = Interval[Decimal](lower, upper)
+        if dataRange.lower.is_nan() or dataRange.upper.is_nan():
+            logger.debug('Visualization array component includes one or more NaNs.')
+            dataRange = Interval[Decimal](Decimal(0), Decimal(1))
+        elif dataRange.lower == dataRange.upper:
+            logger.debug('Visualization array component values are uniform.')
+            half = Decimal('0.5')
+            dataRange.lower -= half
+            dataRange.upper += half
 
         self._displayRange.setRangeAndLimits(dataRange)
 
@@ -121,10 +131,16 @@ class ImagePresenter(Observable, Observer):
     def getImage(self) -> RealArrayType:
         return self._image
 
+    def _updateImage(self) -> None:
+        colorizer = self._colorizerChooser.getCurrentStrategy()
+        self._image = colorizer()
+        self.notifyObservers()
+
     def update(self, observable: Observable) -> None:
         if observable is self._colorizerChooser:
-            colorizer = self._colorizerChooser.getCurrentStrategy()
-            self._image = colorizer()
+            self._updateImage()
+        elif observable is self._colorizer:
+            self._updateImage()
 
 
 class ImageCore:

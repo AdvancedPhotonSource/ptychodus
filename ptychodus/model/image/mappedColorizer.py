@@ -20,8 +20,7 @@ class MappedColorizer(Colorizer):
     def __init__(self, componentChooser: PluginChooser[VisualizationArrayComponent],
                  displayRange: DisplayRange, cyclicColormapChooser: PluginChooser[Colormap],
                  acyclicColormapChooser: PluginChooser[Colormap]) -> None:
-        super().__init__('Colormap', componentChooser)
-        self._displayRange = displayRange
+        super().__init__('Colormap', componentChooser, displayRange)
         self._cyclicColormapChooser = cyclicColormapChooser
         self._acyclicColormapChooser = acyclicColormapChooser
 
@@ -69,8 +68,8 @@ class MappedColorizer(Colorizer):
         self._colormapChooser.setFromDisplayName(name)
 
     def __call__(self) -> RealArrayType:
-        norm = Normalize(vmin=self._displayRange.getLower(),
-                         vmax=self._displayRange.getUpper(),
+        norm = Normalize(vmin=float(self._displayRange.getLower()),
+                         vmax=float(self._displayRange.getUpper()),
                          clip=False)
         cmap = self._colormapChooser.getCurrentStrategy()
         scalarMappable = ScalarMappable(norm, cmap)

@@ -19,19 +19,28 @@ class VisualizationArray(Observable):
 
     def __init__(self) -> None:
         super().__init__()
-        self._array: InexactArrayType = numpy.empty((0, 0))
+        self._array: InexactArrayType = numpy.zeros((1, 1))
+
+    def _reset(self) -> None:
+        self._array = numpy.zeros((1, 1))
 
     def __call__(self) -> InexactArrayType:
         return self._array
 
     def setArray(self, array: NumericArrayType) -> None:
-        if numpy.issubdtype(array.dtype, numpy.inexact):
+        if array is None:
+            logger.error('Refusing to assign null array!')
+            self._reset()
+        elif numpy.size(array) < 1:
+            logger.error('Refusing to assign empty array!')
+            self._reset()
+        elif numpy.issubdtype(array.dtype, numpy.inexact):
             self._array = array
         elif numpy.issubdtype(array.dtype, numpy.integer):
             self._array = array.astype(numpy.float64)
         else:
             logger.error(f'Refusing to assign array with non-numeric dtype \"{array.dtype}\"!')
-            self._array = numpy.empty((0, 0))
+            self._reset()
 
         self.notifyObservers()
 
