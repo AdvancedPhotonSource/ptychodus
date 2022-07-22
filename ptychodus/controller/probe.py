@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 from ..model import Observer, Observable, ImagePresenter, Probe, ProbePresenter
-from ..view import (ImageView, ProbeInitializerView, ProbeParametersView, ProbeProbeView,
-                    ProbeZonePlateView)
+from ..view import (ImageView, ProbeView, ProbeInitializerView, ProbeParametersView,
+                    ProbeSuperGaussianView, ProbeZonePlateView)
 from .data import FileDialogFactory
 from .image import ImageController
 
 
-class ProbeProbeController(Observer):
+class ProbeController(Observer):
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeProbeView) -> None:
+    def __init__(self, presenter: ProbePresenter, view: ProbeView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter,
-                       view: ProbeProbeView) -> ProbeProbeController:
+    def createInstance(cls, presenter: ProbePresenter, view: ProbeView) -> ProbeController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -24,7 +23,6 @@ class ProbeProbeController(Observer):
         view.sizeSpinBox.autoToggled.connect(presenter.setAutomaticProbeSizeEnabled)
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setEnabled(False)
-        view.diameterWidget.lengthChanged.connect(presenter.setProbeDiameterInMeters)
 
         controller._syncModelToView()
 
@@ -38,7 +36,40 @@ class ProbeProbeController(Observer):
         self._view.energyWidget.setEnergyInElectronVolts(
             self._presenter.getProbeEnergyInElectronVolts())
         self._view.wavelengthWidget.setLengthInMeters(self._presenter.getProbeWavelengthInMeters())
-        self._view.diameterWidget.setLengthInMeters(self._presenter.getProbeDiameterInMeters())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
+class ProbeSuperGaussianController(Observer):
+
+    def __init__(self, presenter: ProbePresenter, view: ProbeSuperGaussianView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: ProbePresenter,
+                       view: ProbeSuperGaussianView) -> ProbeSuperGaussianController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.annularRadiusWidget.lengthChanged.connect(
+            presenter.setSuperGaussianAnnularRadiusInMeters)
+        view.probeWidthWidget.lengthChanged.connect(presenter.setSuperGaussianProbeWidthInMeters)
+        view.orderParameterWidget.valueChanged.connect(presenter.setSuperGaussianOrderParameter)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _syncModelToView(self) -> None:
+        self._view.annularRadiusWidget.setLengthInMeters(
+            self._presenter.getSuperGaussianAnnularRadiusInMeters())
+        self._view.probeWidthWidget.setLengthInMeters(
+            self._presenter.getSuperGaussianProbeWidthInMeters())
+        self._view.orderParameterWidget.setValue(self._presenter.getSuperGaussianOrderParameter())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -83,54 +114,36 @@ class ProbeZonePlateController(Observer):
             self._syncModelToView()
 
 
-class ProbeInitializerController(Observer):
-
-    def __init__(self, presenter: ProbePresenter, view: ProbeInitializerView) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-
-    @classmethod
-    def createInstance(cls, presenter: ProbePresenter,
-                       view: ProbeInitializerView) -> ProbeInitializerController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-
-        for initializer in presenter.getInitializerList():
-            view.initializerComboBox.addItem(initializer)
-
-        view.initializerComboBox.currentTextChanged.connect(presenter.setInitializer)
-        view.initializeButton.clicked.connect(presenter.initializeProbe)
-
-        controller._syncModelToView()
-
-        return controller
-
-    def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(self._presenter.getInitializer())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
-
-
-class ProbeParametersController:
+class ProbeParametersController(Observer):
 
     def __init__(self, presenter: ProbePresenter, view: ProbeParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
-        self._probeController = ProbeProbeController.createInstance(presenter, view.probeView)
+        self._probeController = ProbeController.createInstance(presenter, view.probeView)
+        self._superGaussianController = ProbeSuperGaussianController.createInstance(
+            presenter, view.superGaussianView)
         self._zonePlateController = ProbeZonePlateController.createInstance(
             presenter, view.zonePlateView)
-        self._initializerController = ProbeInitializerController.createInstance(
-            presenter, view.initializerView)
+        self._initializerGroupBoxes = [view.superGaussianView, view.zonePlateView]
 
     @classmethod
     def createInstance(cls, presenter: ProbePresenter, view: ProbeParametersView,
                        fileDialogFactory: FileDialogFactory) -> ProbeParametersController:
         controller = cls(presenter, view, fileDialogFactory)
+        presenter.addObserver(controller)
+
+        for initializer in presenter.getInitializerList():
+            view.initializerView.initializerComboBox.addItem(initializer)
+
+        view.initializerView.initializerComboBox.currentTextChanged.connect(
+            presenter.setInitializer)
+        view.initializerView.initializeButton.clicked.connect(presenter.initializeProbe)
+
+        controller._syncModelToView()
+
         return controller
 
     def openProbe(self) -> None:
@@ -152,6 +165,18 @@ class ProbeParametersController:
 
         if filePath:
             self._presenter.saveProbe(filePath, nameFilter)
+
+    def _syncModelToView(self) -> None:
+        initializer = self._presenter.getInitializer()
+
+        self._view.initializerView.initializerComboBox.setCurrentText(initializer)
+
+        for groupBox in self._initializerGroupBoxes:
+            groupBox.setVisible(groupBox.title() == initializer)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
 
 
 class ProbeImageController(Observer):

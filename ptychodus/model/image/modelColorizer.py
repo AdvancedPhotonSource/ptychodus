@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Callable
 import colorsys
 
+from matplotlib.colors import Normalize
 import numpy
 
 from ...api.image import RealArrayType
@@ -33,10 +34,13 @@ class CylindricalColorModelColorizer(Colorizer):
         ]
 
     def __call__(self) -> RealArrayType:
-        # TODO apply displayRange
+        norm = Normalize(vmin=float(self._displayRange.getLower()),
+                         vmax=float(self._displayRange.getUpper()),
+                         clip=False)
+
         phaseInRadians = numpy.angle(self._component.getArray())
         h = (phaseInRadians + numpy.pi) / (2 * numpy.pi)
-        x = self._component()
+        x = norm(self._component())
         y = numpy.zeros_like(h)
 
         if self._variant:

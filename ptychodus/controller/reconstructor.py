@@ -4,7 +4,6 @@ import logging
 import traceback
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
 from ..model import (Observable, Observer, ReconstructorPlotPresenter, ReconstructorPresenter)
@@ -31,7 +30,6 @@ class ReconstructorParametersController(Observer):
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._algorithmComboBoxModel = QStandardItemModel()
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = \
                 { vcf.backendName: vcf for vcf in viewControllerFactoryList }
 
@@ -42,14 +40,11 @@ class ReconstructorParametersController(Observer):
         controller = cls(presenter, view, viewControllerFactoryList)
         presenter.addObserver(controller)
 
-        view.algorithmComboBox.setModel(controller._algorithmComboBoxModel)
-
         for reconstructorName, backendName in presenter.getAlgorithmDict().items():
             controller._addReconstructor(reconstructorName, backendName)
 
         view.algorithmComboBox.currentTextChanged.connect(presenter.setAlgorithm)
-        view.algorithmComboBox.currentIndexChanged.connect(
-            view.reconstructorStackedWidget.setCurrentIndex)
+        view.algorithmComboBox.currentIndexChanged.connect(view.stackedWidget.setCurrentIndex)
         view.reconstructButton.clicked.connect(controller._reconstruct)
 
         controller._syncModelToView()
@@ -57,9 +52,8 @@ class ReconstructorParametersController(Observer):
         return controller
 
     def _addReconstructor(self, reconstructorName: str, backendName: str) -> None:
-        row = QStandardItem(reconstructorName)
-        row.setData(self._algorithmComboBoxModel.rowCount())
-        self._algorithmComboBoxModel.appendRow(row)
+        self._view.algorithmComboBox.addItem(reconstructorName,
+                                             self._view.algorithmComboBox.count())
 
         if backendName in self._viewControllerFactoryDict:
             viewControllerFactory = self._viewControllerFactoryDict[backendName]
@@ -68,7 +62,7 @@ class ReconstructorParametersController(Observer):
             widget = QLabel(f'{backendName} not found!')
             widget.setAlignment(Qt.AlignCenter)
 
-        self._view.reconstructorStackedWidget.addWidget(widget)
+        self._view.stackedWidget.addWidget(widget)
 
     def _reconstruct(self) -> None:
         result = -1

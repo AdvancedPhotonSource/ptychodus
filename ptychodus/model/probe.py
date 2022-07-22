@@ -25,7 +25,7 @@ class ProbeSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.initializer = settingsGroup.createStringEntry('Initializer', 'GaussianBeam')
+        self.initializer = settingsGroup.createStringEntry('Initializer', 'SuperGaussian')
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/probe.npy'))
@@ -34,8 +34,13 @@ class ProbeSettings(Observable, Observer):
         self.probeSize = settingsGroup.createIntegerEntry('ProbeSize', 64)
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
             'ProbeEnergyInElectronVolts', '2000')
-        self.probeDiameterInMeters = settingsGroup.createRealEntry('ProbeDiameterInMeters',
-                                                                   '400e-6')
+
+        self.sgAnnularRadiusInMeters = settingsGroup.createRealEntry(
+            'SuperGaussianAnnularRadiusInMeters', '0')
+        self.sgProbeWidthInMeters = settingsGroup.createRealEntry(
+            'SuperGaussianProbeWidthInMeters', '400e-6')
+        self.sgOrderParameter = settingsGroup.createRealEntry('SuperGaussianOrderParameter', '1')
+
         self.zonePlateRadiusInMeters = settingsGroup.createRealEntry('ZonePlateRadiusInMeters',
                                                                      '90e-6')
         self.outermostZoneWidthInMeters = settingsGroup.createRealEntry(
@@ -108,30 +113,26 @@ class ProbeSizer(Observable, Observer):
             self._updateProbeSize()
 
 
-class GaussianBeamProbeInitializer:
+class SuperGaussianProbeInitializer:
 
-    def __init__(self, detector: Detector, probeSettings: ProbeSettings) -> None:
+    def __init__(self, detector: Detector, settings: ProbeSettings) -> None:
         self._detector = detector
-        self._probeSettings = probeSettings
+        self._settings = settings
 
-    def _createCircularMask(self) -> numpy.typing.NDArray[numpy.bool_]:
-        width_px = self._probeSettings.probeSize.value
+    def __call__(self) -> ProbeArrayType:
+        width_px = self._settings.probeSize.value
         height_px = width_px
 
         Y_px, X_px = numpy.ogrid[:height_px, :width_px]
         X_m = (X_px - width_px / 2) * float(self._detector.getPixelSizeXInMeters())
         Y_m = (Y_px - height_px / 2) * float(self._detector.getPixelSizeYInMeters())
-
-        probeRadius_m = self._probeSettings.probeDiameterInMeters.value / 2
         R_m = numpy.hypot(X_m, Y_m)
 
-        return (R_m <= probeRadius_m)
+        Z = (R_m - float(self._settings.sgAnnularRadiusInMeters.value)) \
+                / float(self._settings.sgProbeWidthInMeters.value)
+        ZP = numpy.power(Z, 2 * float(self._settings.sgOrderParameter.value))
 
-    def __call__(self) -> ProbeArrayType:
-        mask = self._createCircularMask()
-        ft = numpy.fft.fft2(mask)
-        ft = numpy.fft.fftshift(ft)
-        return ft
+        return numpy.exp(-ZP / 2) + 0j
 
 
 class FresnelZonePlateProbeInitializer:
@@ -293,9 +294,9 @@ class ProbeInitializer(Observable, Observer):
                                                         detector, probeSettings, sizer))
         initializer._initializerChooser.addStrategy(fzpInit)
 
-        gaussInit = PluginEntry[ProbeInitializerType](simpleName='GaussianBeam',
-                                                      displayName='Gaussian Beam',
-                                                      strategy=GaussianBeamProbeInitializer(
+        gaussInit = PluginEntry[ProbeInitializerType](simpleName='SuperGaussian',
+                                                      displayName='Super Gaussian',
+                                                      strategy=SuperGaussianProbeInitializer(
                                                           detector, probeSettings))
         initializer._initializerChooser.addStrategy(gaussInit)
 
@@ -437,11 +438,23 @@ class ProbePresenter(Observable, Observer):
     def getProbeWavelengthInMeters(self) -> Decimal:
         return self._sizer.getWavelengthInMeters()
 
-    def setProbeDiameterInMeters(self, value: Decimal) -> None:
-        self._settings.probeDiameterInMeters.value = value
+    def setSuperGaussianAnnularRadiusInMeters(self, value: Decimal) -> None:
+        self._settings.sgAnnularRadiusInMeters.value = value
 
-    def getProbeDiameterInMeters(self) -> Decimal:
-        return self._settings.probeDiameterInMeters.value
+    def getSuperGaussianAnnularRadiusInMeters(self) -> Decimal:
+        return self._settings.sgAnnularRadiusInMeters.value
+
+    def setSuperGaussianProbeWidthInMeters(self, value: Decimal) -> None:
+        self._settings.sgProbeWidthInMeters.value = value
+
+    def getSuperGaussianProbeWidthInMeters(self) -> Decimal:
+        return self._settings.sgProbeWidthInMeters.value
+
+    def setSuperGaussianOrderParameter(self, value: Decimal) -> None:
+        self._settings.sgOrderParameter.value = value
+
+    def getSuperGaussianOrderParameter(self) -> Decimal:
+        return max(self._settings.sgOrderParameter.value, Decimal(1))
 
     def setZonePlateRadiusInMeters(self, value: Decimal) -> None:
         self._settings.zonePlateRadiusInMeters.value = value

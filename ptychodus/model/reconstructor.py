@@ -12,6 +12,7 @@ class ReconstructorSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
+        # TODO make algorithm name unique: different backends may implement same algorithms
         self.algorithm = settingsGroup.createStringEntry('Algorithm', 'rPIE')
         self.outputFileType = settingsGroup.createStringEntry('OutputFileType', 'NPZ')
         self.outputFilePath = settingsGroup.createPathEntry('OutputFilePath',
