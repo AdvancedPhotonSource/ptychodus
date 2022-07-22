@@ -14,7 +14,7 @@ class WorkflowDataView(QGroupBox):
 
     def __init__(self, title: str, parent: Optional[QWidget] = None) -> None:
         super().__init__(title, parent)
-        self.uuidLineEdit = QLineEdit()
+        self.endpointUUIDLineEdit = QLineEdit()
         self.pathLineEdit = QLineEdit()
 
     @classmethod
@@ -22,7 +22,7 @@ class WorkflowDataView(QGroupBox):
         view = cls(title, parent)
 
         layout = QFormLayout()
-        layout.addRow('Endpoint UUID:', view.uuidLineEdit)
+        layout.addRow('Endpoint UUID:', view.endpointUUIDLineEdit)
         layout.addRow('Data Path:', view.pathLineEdit)
         view.setLayout(layout)
 
@@ -33,14 +33,14 @@ class WorkflowComputeView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Compute', parent)
-        self.uuidLineEdit = QLineEdit()
+        self.endpointUUIDLineEdit = QLineEdit()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowComputeView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Endpoint UUID:', view.uuidLineEdit)
+        layout.addRow('Endpoint UUID:', view.endpointUUIDLineEdit)
         view.setLayout(layout)
 
         return view
@@ -65,27 +65,6 @@ class WorkflowParametersView(QWidget):
         layout.addWidget(view.computeView)
         layout.addWidget(view.launchButton)
         layout.addStretch()
-        view.setLayout(layout)
-
-        return view
-
-
-class WorkflowPlotView(QWidget):
-
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self.figure = Figure()
-        self.figureCanvas = FigureCanvas(self.figure)
-        self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
-        self.axes = self.figure.add_subplot(111)
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowPlotView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.navigationToolbar)
-        layout.addWidget(view.figureCanvas)
         view.setLayout(layout)
 
         return view

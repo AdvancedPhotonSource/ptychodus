@@ -85,7 +85,7 @@ def main() -> int:
         verifyAllArgumentsParsed(parser, app.arguments()[1:])
 
         from ptychodus.view import ViewCore
-        view = ViewCore.createInstance()
+        view = ViewCore.createInstance(parsedArgs.dev)
 
         from ptychodus.controller import ControllerCore
         controller = ControllerCore.createInstance(model, view)

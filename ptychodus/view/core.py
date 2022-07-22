@@ -74,17 +74,18 @@ class ViewCore(QMainWindow):
         self.reconstructorParametersView = ReconstructorParametersView.createInstance()
         self.reconstructorPlotView = ReconstructorPlotView.createInstance()
 
-        # FIXME show in developer mode only
         self.workflowAction = self.navigationToolBar.addAction(fileIcon, 'Workflow')
         self.workflowParametersView = WorkflowParametersView.createInstance()
-        self.workflowPlotView = WorkflowPlotView.createInstance()
+        self.workflowRightView = QWidget()
 
         self.monitorAction = self.navigationToolBar.addAction(fileIcon, 'Monitor')
         self.monitorProbeView = MonitorProbeView.createInstance()
         self.monitorObjectView = MonitorObjectView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ViewCore:
+    def createInstance(cls,
+                       isDeveloperModeEnabled: bool,
+                       parent: Optional[QWidget] = None) -> ViewCore:
         view = cls(parent)
 
         view.navigationToolBar.setContextMenuPolicy(Qt.PreventContextMenu)
@@ -138,12 +139,15 @@ class ViewCore(QMainWindow):
         view.contentsWidget.addWidget(view.probeImageView)
         view.contentsWidget.addWidget(view.objectImageView)
         view.contentsWidget.addWidget(view.reconstructorPlotView)
-        view.contentsWidget.addWidget(view.workflowPlotView)
+        view.contentsWidget.addWidget(view.workflowRightView)
         view.contentsWidget.addWidget(view.monitorObjectView)
         view.contentsWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.contentsWidget)
 
         view.setCentralWidget(view.splitter)
+
+        # TODO make visible when complete
+        view.workflowAction.setVisible(isDeveloperModeEnabled)
 
         desktopSize = QApplication.desktop().availableGeometry().size()
         view.resize(desktopSize.width() * 2 // 3, desktopSize.height() * 2 // 3)

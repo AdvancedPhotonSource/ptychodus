@@ -16,12 +16,13 @@ from .probe import *
 from .ptychonn import PtychoNNBackend
 from .ptychopy import PtychoPyBackend
 from .reconstructor import *
-from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .rpc import RPCMessageService
-from .scan import ScanCore
+from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
+from .scan import ScanCore, ScanPresenter
 from .tike import TikeBackend
 from .velociprobe import *
 from .watcher import DataDirectoryWatcher
+from .workflow import WorkflowPresenter, WorkflowSettings
 
 import ptychodus.plugins
 
@@ -42,7 +43,8 @@ class ModelCore:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
-        self._detectorImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
+        self._detectorImageCore = ImageCore(
+            self._pluginRegistry.buildScalarTransformationChooser())
         self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
         self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
 
@@ -53,6 +55,7 @@ class ModelCore:
         self._probeSettings = ProbeSettings.createInstance(self.settingsRegistry)
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
+        self._workflowSettings = WorkflowSettings.createInstance(self.settingsRegistry)
 
         # TODO DataDirectoryWatcher should be optional
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
@@ -124,6 +127,7 @@ class ModelCore:
                                                               self._objectInitializer)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
+        self.workflowPresenter = WorkflowPresenter.createInstance(self._workflowSettings)
 
         if modelArgs.rpcPort >= 0:
             self._loadResultsExecutor = LoadResultsExecutor(self._probe, self._object)

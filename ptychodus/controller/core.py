@@ -12,6 +12,7 @@ from .reconstructor import *
 from .scan import ScanParametersController, ScanPlotController
 from .settings import *
 from .tike import TikeViewControllerFactory
+from .workflow import WorkflowParametersController
 
 
 class ControllerCore:
@@ -65,6 +66,8 @@ class ControllerCore:
             [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
             model.reconstructorPlotPresenter, view.reconstructorPlotView)
+        self._workflowParametersController = WorkflowParametersController.createInstance(
+            model.workflowPresenter, view.workflowParametersView)
         self._monitorProbeController = ProbeImageController.createInstance(
             model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
             self._fileDialogFactory)

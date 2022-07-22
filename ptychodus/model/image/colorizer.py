@@ -11,8 +11,7 @@ from .visarray import VisualizationArrayComponent
 
 class Colorizer(Observable, Observer):
 
-    def __init__(self, name: str,
-                 componentChooser: PluginChooser[VisualizationArrayComponent],
+    def __init__(self, name: str, componentChooser: PluginChooser[VisualizationArrayComponent],
                  displayRange: DisplayRange) -> None:
         super().__init__()
         self._name = name

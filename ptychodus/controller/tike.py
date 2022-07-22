@@ -1,8 +1,8 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from PyQt5.QtCore import QRegExp
-from PyQt5.QtGui import QRegExpValidator
+from PyQt5.QtCore import QRegularExpression
+from PyQt5.QtGui import QRegularExpressionValidator
 from PyQt5.QtWidgets import QWidget
 
 from ..model import Observable, Observer  # TODO, TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter
@@ -245,7 +245,8 @@ class TikeBasicParametersController(Observer):
         view.useMpiCheckBox.toggled.connect(presenter.setMpiEnabled)
 
         view.numGpusLineEdit.editingFinished.connect(controller._syncNumGpusToModel)
-        view.numGpusLineEdit.setValidator(QRegExpValidator(QRegExp('[\\d,]+')))
+        view.numGpusLineEdit.setValidator(
+            QRegularExpressionValidator(QRegularExpression('[\\d,]+')))
 
         view.noiseModelComboBox.currentTextChanged.connect(presenter.setNoiseModel)
 

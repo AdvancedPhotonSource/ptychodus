@@ -189,4 +189,4 @@ class ImageCore:
             self._colorizerChooser.addStrategy(ImageCore.createColorizerPlugin(colorizer))
 
         self.presenter = ImagePresenter.createInstance(self._array, self._displayRange,
-                                                            self._colorizerChooser)
+                                                       self._colorizerChooser)
