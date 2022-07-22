@@ -1,7 +1,9 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import overload, Union
 
 import numpy
 
@@ -31,13 +33,17 @@ class ScanInitializerParameters:
 class ScanInitializer(ScanPointSequence, Observable):
     '''ABC for plugins that can initialize scan sequences'''
 
+    def __init__(self, parameters: ScanInitializerParameters) -> None:
+        super().__init__()
+        self._parameters = parameters
+
     @abstractproperty
     def category(self) -> str:
         '''returns a unique category for organizing scan positions'''
         pass
 
     @abstractproperty
-    def name(self) -> str:
+    def variant(self) -> str:
         '''returns a unique name'''
         pass
 
@@ -46,9 +52,19 @@ class ScanInitializer(ScanPointSequence, Observable):
         '''returns the scan point'''
         pass
 
-    def __init__(self, parameters: ScanInitializerParameters) -> None:
-        super().__init__()
-        self._parameters = parameters
+    def _getJitteredAndTransformedPoint(self, index: int) -> ScanPoint:
+        '''returns the jittered and transformed scan point'''
+        point = self._getPoint(index)
+
+        if self._parameters.jitterRadiusInMeters > Decimal():
+            rad = Decimal(repr(self._parameters.rng.uniform()))
+            dirX = Decimal(repr(self._parameters.rng.normal()))
+            dirY = Decimal(repr(self._parameters.rng.normal()))
+
+            scalar = self._parameters.jitterRadiusInMeters * (rad / (dirX**2 + dirY**2)).sqrt()
+            point = ScanPoint(point.x + scalar * dirX, point.y + scalar * dirY)
+
+        return self._parameters.transform(point)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         '''synchronizes parameters to settings'''
@@ -74,16 +90,19 @@ class ScanInitializer(ScanPointSequence, Observable):
             self._parameters.jitterRadiusInMeters = jitterRadiusInMeters
             self.notifyObservers()
 
+    @overload
     def __getitem__(self, index: int) -> ScanPoint:
-        '''returns the jittered and transformed scan point'''
-        point = self._getPoint(index)
+        ...
 
-        if self._parameters.jitterRadiusInMeters > Decimal():
-            rad = Decimal(self._parameters.rng.uniform())
-            dirX = Decimal(self._parameters.rng.normal())
-            dirY = Decimal(self._parameters.rng.normal())
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[ScanPoint]:
+        ...
 
-            scalar = self._parameters.jitterRadiusInMeters * (rad / (dirX**2 + dirY**2)).sqrt()
-            point = ScanPoint(point.x + scalar * dirX, point.y + scalar * dirY)
-
-        return self._parameters.transform(point)
+    def __getitem__(self, index: Union[int, slice]) -> Union[ScanPoint, Sequence[ScanPoint]]:
+        if isinstance(index, slice):
+            return [
+                self._getJitteredAndTransformedPoint(idx)
+                for idx in range(index.start, index.stop, index.step)
+            ]
+        else:
+            return self._getJitteredAndTransformedPoint(index)

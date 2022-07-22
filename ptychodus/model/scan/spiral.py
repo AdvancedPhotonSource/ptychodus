@@ -26,7 +26,7 @@ class SpiralScanInitializer(ScanInitializer):
         return cls(parameters, stepSizeXInMeters, stepSizeYInMeters, numberOfPoints)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.initializer.value = self.name
+        settings.initializer.value = self.variant
         settings.stepSizeXInMeters.value = self._stepSizeXInMeters
         settings.stepSizeYInMeters.value = self._stepSizeYInMeters
         settings.extentX.value = self._numberOfPoints
@@ -38,7 +38,7 @@ class SpiralScanInitializer(ScanInitializer):
         return 'Spiral'
 
     @property
-    def name(self) -> str:
+    def variant(self) -> str:
         return 'Archimedean'
 
     def getStepSizeXInMeters(self) -> Decimal:

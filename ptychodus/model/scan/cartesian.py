@@ -27,7 +27,7 @@ class CartesianScanInitializer(ScanInitializer):
         return cls(parameters, stepSizeXInMeters, stepSizeYInMeters, extentX, extentY, snake)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.initializer.value = self.name
+        settings.initializer.value = self.variant
         settings.stepSizeXInMeters.value = self._stepSizeXInMeters
         settings.stepSizeYInMeters.value = self._stepSizeYInMeters
         settings.extentX.value = self._extentX
@@ -39,7 +39,7 @@ class CartesianScanInitializer(ScanInitializer):
         return 'Cartesian'
 
     @property
-    def name(self) -> str:
+    def variant(self) -> str:
         return 'Snake' if self._snake else 'Raster'
 
     def getStepSizeXInMeters(self) -> Decimal:

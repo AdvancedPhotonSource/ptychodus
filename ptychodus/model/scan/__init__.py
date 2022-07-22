@@ -1,1 +1,1 @@
-from .core import Scan, ScanCore, ScanPresenter
+from .core import Scan, ScanCore, ScanPresenter, ScanRepositoryEntry

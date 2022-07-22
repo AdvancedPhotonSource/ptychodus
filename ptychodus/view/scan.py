@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import QEvent, QObject
-from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QMenu, QPushButton,
-                             QSpinBox, QTreeView, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHeaderView, QHBoxLayout, QMenu,
+                             QPushButton, QSpinBox, QTableView, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -68,7 +68,7 @@ class ScanButtonBox(QWidget):
         self.removeButton = QPushButton('Remove')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> None:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanButtonBox:
         view = cls(parent)
 
         view.insertButton.setMenu(view.insertMenu)
@@ -84,19 +84,22 @@ class ScanButtonBox(QWidget):
         return view
 
 
-class ScanParametersView(QWidget):
+class ScanParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self.treeView = QTreeView()
+        super().__init__('Position Data', parent)
+        self.tableView = QTableView()
         self.buttonBox = ScanButtonBox.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ScanParametersView:
         view = cls(parent)
 
+        view.tableView.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch)
+
         layout = QVBoxLayout()
-        layout.addWidget(view.treeView)
+        layout.addWidget(view.tableView)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 

@@ -115,7 +115,7 @@ class ViewCore(QMainWindow):
         objectToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 
         view.settingsEntryView.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeToContents)
+            QHeaderView.Stretch)
         view.dataFileTreeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         # maintain same order as navigationToolBar buttons

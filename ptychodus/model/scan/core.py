@@ -1,20 +1,17 @@
 from __future__ import annotations
-from collections import defaultdict
-from collections.abc import Mapping
-from decimal import Decimal
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import overload, Iterator, Optional, Union
 import logging
 
 import numpy
 
-from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
-from ...api.plugins import PluginChooser, PluginEntry
-from ...api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
-                         ScanPointSequence, SimpleScanDictionary)
+from ...api.plugins import PluginChooser
+from ...api.scan import (ScanFileReader, ScanFileWriter, ScanPoint, ScanPointSequence,
+                         SimpleScanDictionary)
 from ...api.settings import SettingsRegistry
-from ...api.tree import SimpleTreeNode
 from .cartesian import CartesianScanInitializer
 from .initializer import ScanInitializer, ScanInitializerParameters
 from .settings import ScanSettings
@@ -100,7 +97,7 @@ class ScanRepository(Mapping[str, ScanInitializer], Observable):
 
     def insertScan(self, initializer: ScanInitializer, name: Optional[str] = None) -> None:
         if name is None:
-            name = initializer.name
+            name = initializer.variant
 
         initializerName = name
         index = 0
@@ -161,7 +158,15 @@ class Scan(ScanPointSequence, Observable, Observer):
         self._syncToSettings()
         self.notifyObservers()
 
+    @overload
     def __getitem__(self, index: int) -> ScanPoint:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[ScanPoint]:
+        ...
+
+    def __getitem__(self, index: Union[int, slice]) -> Union[ScanPoint, Sequence[ScanPoint]]:
         return self._initializer[index]
 
     def __len__(self) -> int:
@@ -202,11 +207,15 @@ class Scan(ScanPointSequence, Observable, Observer):
             self._syncFromSettings()
 
 
-class ScanPresenter(Observable, Observer):
+@dataclass(frozen=True)
+class ScanRepositoryEntry:
+    name: str
+    category: str
+    variant: str
+    pointSequence: ScanPointSequence
 
-    @staticmethod
-    def createRoot() -> SimpleTreeNode:
-        return SimpleTreeNode.createRoot(['Position Data'])
+
+class ScanPresenter(Observable, Observer):
 
     def __init__(self, initializerFactory: ScanInitializerFactory, repository: ScanRepository,
                  scan: Scan, fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
@@ -215,37 +224,19 @@ class ScanPresenter(Observable, Observer):
         self._repository = repository
         self._scan = scan
         self._fileWriterChooser = fileWriterChooser
-        self._scanTree = ScanPresenter.createRoot()
 
     @classmethod
     def createInstance(cls, initializerFactory: ScanInitializerFactory, repository: ScanRepository,
                        scan: Scan,
                        fileWriterChooser: PluginChooser[ScanFileWriter]) -> ScanPresenter:
         presenter = cls(initializerFactory, repository, scan, fileWriterChooser)
-        presenter._updateScanTree()
         repository.addObserver(presenter)
         scan.addObserver(presenter)
         return presenter
 
-    def getScanTree(self) -> SimpleTreeNode:
-        return self._scanTree
-
-    def _updateScanTree(self) -> None:
-        nameDict: defaultdict[str, list[str]] = defaultdict(list)
-
-        for name, initializer in self._repository.items():
-            nameDict[initializer.category].append(name)
-
-        scanTree = ScanPresenter.createRoot()
-
-        for category, nameList in sorted(nameDict.items()):
-            categoryNode = scanTree.createChild([category])
-
-            for name in sorted(nameList):
-                categoryNode.createChild([name])
-
-        self._scanTree = scanTree
-        self.notifyObservers()
+    def getScanRepositoryContents(self) -> list[ScanRepositoryEntry]:
+        return [ScanRepositoryEntry(name, ini.category, ini.variant, ini)
+                for name, ini in self._repository.items()]
 
     def getActiveScanPointList(self) -> list[ScanPoint]:
         return [point for point in self._scan]
@@ -282,7 +273,7 @@ class ScanPresenter(Observable, Observer):
 
         for initializer in initializerList:
             fileInfo = initializer.fileInfo
-            name = fileInfo.fileSeriesKey if fileInfo else initializer.name
+            name = fileInfo.fileSeriesKey if fileInfo else initializer.variant
             self._repository.insertScan(initializer, name)
 
     def removeScan(self, name: str) -> None:
@@ -309,7 +300,7 @@ class ScanPresenter(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._repository:
-            self._updateScanTree()
+            self.notifyObservers()
         elif observable is self._scan:
             self.notifyObservers()
 

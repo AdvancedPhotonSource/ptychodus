@@ -64,9 +64,9 @@ class LynxScanFileReader(ScanFileReader):
                 point = LynxScanPoint(x_um, y_um)
                 pointDict[detector_count].append(point)
 
-        for detector_count, pointList in pointDict.items():
-            xf_um = median([p.x_um for p in pointList])
-            yf_um = median([p.y_um for p in pointList])
+        for _, lynxPointList in pointDict.items():
+            xf_um = median([p.x_um for p in lynxPointList])
+            yf_um = median([p.y_um for p in lynxPointList])
 
             um_to_m = Decimal('1e-6')
             x_m = Decimal(xf_um) * um_to_m

@@ -22,6 +22,10 @@ class ScanPoint:
     y: Decimal
 
 
+ScanPointSequence = Sequence[ScanPoint]
+ScanDictionary = Mapping[str, ScanPointSequence]
+
+
 class ScanPointTransform(Enum):
     '''transformations to negate or swap scan point coordinates'''
     PXPY = 0x0
@@ -79,16 +83,6 @@ class ScanPointTransform(Enum):
         xp = -point.x if self.negateX else point.x
         yp = -point.y if self.negateY else point.y
         return ScanPoint(yp, xp) if self.swapXY else ScanPoint(xp, yp)
-
-
-class ScanPointSequence(Sequence[ScanPoint]):
-    '''a sequence of scan points'''
-    pass
-
-
-class ScanDictionary(Mapping[str, ScanPointSequence]):
-    '''a collection of named scan point sequences'''
-    pass
 
 
 class SimpleScanDictionary(ScanDictionary):
