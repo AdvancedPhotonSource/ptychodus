@@ -95,8 +95,7 @@ class ScanParametersView(QGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> ScanParametersView:
         view = cls(parent)
 
-        view.tableView.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch)
+        view.tableView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         layout = QVBoxLayout()
         layout.addWidget(view.tableView)

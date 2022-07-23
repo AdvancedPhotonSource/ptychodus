@@ -67,17 +67,25 @@ class ScanInitializerFactory:
         self._fileReaderChooser.setFromSimpleName(fileInfo.fileType)
         return self._readScan(fileInfo.filePath)
 
-    def createRasterInitializer(self) -> CartesianScanInitializer:
-        parameters = self.createInitializerParameters()
-        return CartesianScanInitializer.createFromSettings(parameters, self._settings, snake=False)
+    def getInitializerNameList(self) -> list[str]:
+        return ['Raster', 'Snake', 'Spiral']
 
-    def createSnakeInitializer(self) -> CartesianScanInitializer:
+    def createInitializer(self, name: str) -> Optional[ScanInitializer]:
+        nameLower = name.casefold()
         parameters = self.createInitializerParameters()
-        return CartesianScanInitializer.createFromSettings(parameters, self._settings, snake=True)
 
-    def createSpiralInitializer(self) -> SpiralScanInitializer:
-        parameters = self.createInitializerParameters()
-        return SpiralScanInitializer.createFromSettings(parameters, self._settings)
+        if nameLower == 'raster':
+            return CartesianScanInitializer.createFromSettings(parameters,
+                                                               self._settings,
+                                                               snake=False)
+        elif nameLower == 'snake':
+            return CartesianScanInitializer.createFromSettings(parameters,
+                                                               self._settings,
+                                                               snake=True)
+        elif nameLower == 'spiral':
+            return SpiralScanInitializer.createFromSettings(parameters, self._settings)
+
+        return None
 
 
 class ScanRepository(Mapping[str, ScanInitializer], Observable):
@@ -144,6 +152,9 @@ class Scan(ScanPointSequence, Observable, Observer):
         return self._name
 
     def setActive(self, name: str) -> None:
+        if self._name == name:
+            return
+
         try:
             initializer = self._repository[name]
         except KeyError:
@@ -182,18 +193,13 @@ class Scan(ScanPointSequence, Observable, Observer):
 
             for tabular in tabularList:
                 self._repository.insertScan(tabular)
-
-        elif name == 'raster':
-            raster = self._initializerFactory.createRasterInitializer()
-            self._repository.insertScan(raster)
-        elif name == 'snake':
-            snake = self._initializerFactory.createSnakeInitializer()
-            self._repository.insertScan(snake)
-        elif name == 'spiral':
-            spiral = self._initializerFactory.createSpiralInitializer()
-            self._repository.insertScan(spiral)
         else:
-            logger.error(f'Unknown scan initializer \"{initializerName}\"!')
+            initializer = self._initializerFactory.createInitializer(name)
+
+            if initializer is None:
+                logger.error(f'Unknown scan initializer \"{initializerName}\"!')
+            else:
+                self._repository.insertScan(initializer)
 
         self.setActive(initializerName)
 
@@ -235,8 +241,10 @@ class ScanPresenter(Observable, Observer):
         return presenter
 
     def getScanRepositoryContents(self) -> list[ScanRepositoryEntry]:
-        return [ScanRepositoryEntry(name, ini.category, ini.variant, ini)
-                for name, ini in self._repository.items()]
+        return [
+            ScanRepositoryEntry(name, ini.category, ini.variant, ini)
+            for name, ini in self._repository.items()
+        ]
 
     def getActiveScanPointList(self) -> list[ScanPoint]:
         return [point for point in self._scan]
@@ -247,20 +255,16 @@ class ScanPresenter(Observable, Observer):
     def setActiveScan(self, name: str) -> None:
         self._scan.setActive(name)
 
-    def insertRasterScan(self) -> CartesianScanInitializer:
-        initializer = self._initializerFactory.createRasterInitializer()
-        self._repository.insertScan(initializer)
-        return initializer
+    def getInitializerNameList(self) -> list[str]:
+        return self._initializerFactory.getInitializerNameList()
 
-    def insertSnakeScan(self) -> CartesianScanInitializer:
-        initializer = self._initializerFactory.createSnakeInitializer()
-        self._repository.insertScan(initializer)
-        return initializer
+    def initializeScan(self, name: str) -> None:
+        initializer = self._initializerFactory.createInitializer(name)
 
-    def insertSpiralScan(self) -> SpiralScanInitializer:
-        initializer = self._initializerFactory.createSpiralInitializer()
-        self._repository.insertScan(initializer)
-        return initializer
+        if initializer is None:
+            logger.error(f'Unknown scan initializer \"{name}\"!')
+        else:
+            self._repository.insertScan(initializer)
 
     def getOpenFileFilterList(self) -> list[str]:
         return self._initializerFactory.getOpenFileFilterList()

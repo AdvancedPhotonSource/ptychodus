@@ -1,7 +1,9 @@
 from __future__ import annotations
 from decimal import Decimal
+from typing import Callable
 
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import (Qt, QAbstractTableModel, QItemSelectionModel, QModelIndex, QObject,
+                          QVariant)
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ..api.observer import Observer, Observable
@@ -106,11 +108,17 @@ class ScanTableModel(QAbstractTableModel):
         return self._scanList[index.row()].name
 
     def refresh(self) -> None:
-        # TODO emit dataChanged appropriately
-        self.beginResetModel()
-        self._scanList = self._presenter.getScanRepositoryContents()
-        self._scanList.sort(key=lambda entry: entry.name)
-        self.endResetModel()
+        scanList = self._presenter.getScanRepositoryContents()
+
+        if len(self._scanList) == len(scanList):
+            topLeft = self.index(0, 0)
+            bottomRight = self.index(len(self._scanList), self.columnCount())
+            self.dataChanged.emit(topLeft, bottomRight)
+        else:
+            self.beginResetModel()
+            self._scanList = scanList
+            self._scanList.sort(key=lambda entry: entry.name)
+            self.endResetModel()
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -126,18 +134,21 @@ class ScanTableModel(QAbstractTableModel):
 
         return value
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int) -> QVariant:
+    def headerData(self,
+                   section: int,
+                   orientation: Qt.Orientation,
+                   role: int = Qt.DisplayRole) -> QVariant:
         result = QVariant()
 
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             if section == 0:
-                result = 'Name'
+                result = QVariant('Name')
             elif section == 1:
-                result = 'Category'
+                result = QVariant('Category')
             elif section == 2:
-                result = 'Variant'
+                result = QVariant('Variant')
             elif section == 3:
-                result = 'Length'
+                result = QVariant('Length')
 
         return result
 
@@ -149,16 +160,17 @@ class ScanTableModel(QAbstractTableModel):
 
             if role == Qt.CheckStateRole:
                 if index.column() == 0:
-                    value = Qt.Checked if entry.name in self._checkedNames else Qt.Unchecked
+                    value = QVariant(Qt.Checked if entry.name in
+                                     self._checkedNames else Qt.Unchecked)
             elif role == Qt.DisplayRole:
                 if index.column() == 0:
-                    value = entry.name
+                    value = QVariant(entry.name)
                 elif index.column() == 1:
-                    value = entry.category
+                    value = QVariant(entry.category)
                 elif index.column() == 2:
-                    value = entry.variant
+                    value = QVariant(entry.variant)
                 elif index.column() == 3:
-                    value = len(entry.pointSequence)
+                    value = QVariant(len(entry.pointSequence))
 
         return value
 
@@ -192,7 +204,7 @@ class ScanParametersController(Observer):
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
-        self._tableModel = ScanTableModel(presenter) # TODO update when presenter changes
+        self._tableModel = ScanTableModel(presenter)
 
     @classmethod
     def createInstance(cls, presenter: ScanPresenter, view: ScanParametersView,
@@ -201,30 +213,28 @@ class ScanParametersController(Observer):
         presenter.addObserver(controller)
 
         view.tableView.setModel(controller._tableModel)
+        # TODO view.tableView.setSortingEnabled(True)
         view.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.tableView.selectionModel().currentChanged.connect(controller._setActiveScan)
 
         openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
         openFileAction.triggered.connect(lambda checked: controller._openScan())
 
-        insertRasterAction = view.buttonBox.insertMenu.addAction('Raster')
-        insertRasterAction.triggered.connect(lambda checked: presenter.insertRasterScan())
-
-        insertSnakeAction = view.buttonBox.insertMenu.addAction('Snake')
-        insertSnakeAction.triggered.connect(lambda checked: presenter.insertSnakeScan())
-
-        insertSpiralAction = view.buttonBox.insertMenu.addAction('Spiral')
-        insertSpiralAction.triggered.connect(lambda checked: presenter.insertSpiralScan())
+        for name in presenter.getInitializerNameList():
+            insertAction = view.buttonBox.insertMenu.addAction(name)
+            insertAction.triggered.connect(controller._createInitLambda(name))
 
         view.buttonBox.editButton.clicked.connect(controller._editSelectedScan)
         view.buttonBox.saveButton.clicked.connect(controller._saveSelectedScan)
         view.buttonBox.removeButton.clicked.connect(controller._removeSelectedScan)
 
-        # FIXME tableView selected/checked
-
         controller._syncModelToView()
 
         return controller
+
+    def _createInitLambda(self, name: str) -> Callable[[bool], None]:
+        # NOTE additional defining scope for lambda forces a new instance for each use
+        return lambda checked: self._presenter.initializeScan(name)
 
     def _openScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
@@ -254,7 +264,7 @@ class ScanParametersController(Observer):
 
     def _editSelectedScan(self) -> None:
         name = self._getSelectedScan()
-        print(f'editScan({name})')  # FIXME
+        print(f'editScan({name})')  # FIXME implement
 
     def _removeSelectedScan(self) -> None:
         name = self._getSelectedScan()
@@ -266,7 +276,16 @@ class ScanParametersController(Observer):
 
     def _syncModelToView(self) -> None:
         self._tableModel.refresh()
-        # FIXME presenter.getActiveScan() to update tableView selection
+
+        for row in range(self._tableModel.rowCount()):
+            index = self._tableModel.index(row, 0)
+            name = self._tableModel.data(index)
+
+            if name == self._presenter.getActiveScan():
+                self._view.tableView.selectRow(row)
+                return
+
+        self._view.tableView.clearSelection()
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
