@@ -22,7 +22,7 @@ class ProbeController(Observer):
         view.sizeSpinBox.valueChanged.connect(presenter.setProbeSize)
         view.sizeSpinBox.autoToggled.connect(presenter.setAutomaticProbeSizeEnabled)
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
-        view.wavelengthWidget.setEnabled(False)
+        view.wavelengthWidget.setReadOnly(True)
 
         controller._syncModelToView()
 

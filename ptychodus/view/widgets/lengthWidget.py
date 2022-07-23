@@ -38,6 +38,13 @@ class LengthWidget(QWidget):
 
         return widget
 
+    def isReadOnly(self) -> bool:
+        return self.magnitudeLineEdit.isReadOnly()
+
+    def setReadOnly(self, enable: bool) -> None:
+        self.magnitudeLineEdit.setReadOnly(enable)
+        self.unitsComboBox.setEnabled(not enable)
+
     def getLengthInMeters(self) -> Decimal:
         return self.lengthInMeters
 

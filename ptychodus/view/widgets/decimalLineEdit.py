@@ -42,6 +42,12 @@ class DecimalLineEdit(QWidget):
         widget._validator.setBottom(0.)
         return widget
 
+    def isReadOnly(self) -> bool:
+        return self._lineEdit.isReadOnly()
+
+    def setReadOnly(self, enable: bool) -> None:
+        self._lineEdit.setReadOnly(enable)
+
     def getValue(self) -> Decimal:
         if self._minimum is not None and self._value < self._minimum:
             return self._minimum

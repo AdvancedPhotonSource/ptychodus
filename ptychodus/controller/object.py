@@ -37,6 +37,35 @@ class ObjectInitializerController(Observer):
             self._syncModelToView()
 
 
+class ObjectController(Observer):
+
+    def __init__(self, presenter: ObjectPresenter, view: ObjectView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: ObjectPresenter, view: ObjectView) -> ObjectController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.pixelSizeXWidget.setReadOnly(True)
+        view.pixelSizeYWidget.setReadOnly(True)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _syncModelToView(self) -> None:
+
+        self._view.pixelSizeXWidget.setLengthInMeters(self._presenter.getPixelSizeXInMeters())
+        self._view.pixelSizeYWidget.setLengthInMeters(self._presenter.getPixelSizeYInMeters())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
 class ObjectParametersController:
 
     def __init__(self, presenter: ObjectPresenter, view: ObjectParametersView,
@@ -46,6 +75,7 @@ class ObjectParametersController:
         self._fileDialogFactory = fileDialogFactory
         self._initializerController = ObjectInitializerController.createInstance(
             presenter, view.initializerView)
+        self._objectController = ObjectController.createInstance(presenter, view.objectView)
 
     @classmethod
     def createInstance(cls, presenter: ObjectPresenter, view: ObjectParametersView,

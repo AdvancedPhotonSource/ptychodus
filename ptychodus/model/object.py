@@ -310,21 +310,21 @@ class ObjectInitializer(Observable, Observer):
 
 class ObjectPresenter(Observable, Observer):
 
-    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, obj: Object,
+    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, object_: Object,
                  initializer: ObjectInitializer) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
-        self._object = obj
+        self._object = object_
         self._initializer = initializer
 
     @classmethod
-    def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer, obj: Object,
+    def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer, object_: Object,
                        initializer: ObjectInitializer) -> ObjectPresenter:
-        presenter = cls(settings, sizer, obj, initializer)
+        presenter = cls(settings, sizer, object_, initializer)
         settings.addObserver(presenter)
         sizer.addObserver(presenter)
-        obj.addObserver(presenter)
+        object_.addObserver(presenter)
         initializer.addObserver(presenter)
         return presenter
 
@@ -357,6 +357,12 @@ class ObjectPresenter(Observable, Observer):
 
     def initializeObject(self) -> None:
         self._initializer.initializeObject()
+
+    def getPixelSizeXInMeters(self) -> Decimal:
+        return self._sizer.getPixelSizeXInMeters()
+
+    def getPixelSizeYInMeters(self) -> Decimal:
+        return self._sizer.getPixelSizeYInMeters()
 
     def getObject(self) -> ObjectArrayType:
         return self._object.getArray()
