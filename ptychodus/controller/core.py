@@ -9,7 +9,7 @@ from .object import *
 from .probe import *
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import *
-from .scan import ScanParametersController, ScanPlotController
+from .scan import ScanPositionDataController, ScanPlotController
 from .settings import *
 from .tike import TikeViewControllerFactory
 from .workflow import WorkflowParametersController
@@ -48,8 +48,8 @@ class ControllerCore:
         self._probeImageController = ProbeImageController.createInstance(
             model.probePresenter, model.probeImagePresenter, view.probeImageView,
             self._fileDialogFactory)
-        self._scanParametersController = ScanParametersController.createInstance(
-            model.scanPresenter, view.scanParametersView, self._fileDialogFactory)
+        self._scanPositionDataController = ScanPositionDataController.createInstance(
+            model.scanPresenter, view.scanParametersView.positionDataView, self._fileDialogFactory)
         self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter,
                                                                      view.scanPlotView)
         self._objectParametersController = ObjectParametersController.createInstance(
@@ -92,10 +92,6 @@ class ControllerCore:
             lambda checked: controller._dataFileController.saveDataFile())
         view.chooseScratchDirectoryAction.triggered.connect(
             lambda checked: controller._dataFileController.chooseScratchDirectory())
-        view.openProbeAction.triggered.connect(
-            lambda checked: controller._probeParametersController.openProbe())
-        view.saveProbeAction.triggered.connect(
-            lambda checked: controller._probeParametersController.saveProbe())
         view.openObjectAction.triggered.connect(
             lambda checked: controller._objectParametersController.openObject())
         view.saveObjectAction.triggered.connect(

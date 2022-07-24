@@ -2,13 +2,13 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Callable
 
-from PyQt5.QtCore import (Qt, QAbstractTableModel, QItemSelectionModel, QModelIndex, QObject,
+from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel,
                           QVariant)
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ..api.observer import Observer, Observable
 from ..model import Scan, ScanPresenter, ScanRepositoryEntry
-from ..view import ScanParametersView, ScanPlotView, ScanEditorView, ScanTransformView
+from ..view import ScanPositionDataView, ScanPlotView, ScanEditorView, ScanTransformView
 from .data import FileDialogFactory
 
 
@@ -196,24 +196,27 @@ class ScanTableModel(QAbstractTableModel):
         return 4
 
 
-class ScanParametersController(Observer):
+class ScanPositionDataController(Observer):
 
-    def __init__(self, presenter: ScanPresenter, view: ScanParametersView,
+    def __init__(self, presenter: ScanPresenter, view: ScanPositionDataView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
         self._tableModel = ScanTableModel(presenter)
+        self._proxyModel = QSortFilterProxyModel()
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanParametersView,
-                       fileDialogFactory: FileDialogFactory) -> ScanParametersController:
+    def createInstance(cls, presenter: ScanPresenter, view: ScanPositionDataView,
+                       fileDialogFactory: FileDialogFactory) -> ScanPositionDataController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
-        view.tableView.setModel(controller._tableModel)
-        # TODO view.tableView.setSortingEnabled(True)
+        controller._proxyModel.setSourceModel(controller._tableModel)
+
+        view.tableView.setModel(controller._proxyModel)
+        view.tableView.setSortingEnabled(True)
         view.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.tableView.selectionModel().currentChanged.connect(controller._setActiveScan)
 

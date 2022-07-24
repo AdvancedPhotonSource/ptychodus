@@ -302,6 +302,9 @@ class ScanPresenter(Observable, Observer):
         writer = self._fileWriterChooser.getCurrentStrategy()
         writer.write(filePath, SimpleScanDictionary.createFromUnnamedSequence(initializer))
 
+        # FIXME if strategy is Tabular and no fileInfo, add fileInfo to
+        #       strategy and make sure that strategy calls notifyObservers
+
     def update(self, observable: Observable) -> None:
         if observable is self._repository:
             self.notifyObservers()

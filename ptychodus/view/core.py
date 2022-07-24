@@ -57,9 +57,6 @@ class ViewCore(QMainWindow):
         self.scanPlotView = ScanPlotView.createInstance()
 
         self.probeAction = self.navigationToolBar.addAction(fileIcon, 'Probe')
-        self.probeMenu = QMenu()
-        self.openProbeAction = self.probeMenu.addAction('Open Probe...')
-        self.saveProbeAction = self.probeMenu.addAction('Save Probe...')
         self.probeParametersView = ProbeParametersView.createInstance()
         self.probeImageView = ImageView.createInstance()
 
@@ -105,10 +102,6 @@ class ViewCore(QMainWindow):
         dataFileToolButton = view.navigationToolBar.widgetForAction(view.dataFileAction)
         dataFileToolButton.setMenu(view.dataFileMenu)
         dataFileToolButton.setPopupMode(QToolButton.MenuButtonPopup)
-
-        probeToolButton = view.navigationToolBar.widgetForAction(view.probeAction)
-        probeToolButton.setMenu(view.probeMenu)
-        probeToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 
         objectToolButton = view.navigationToolBar.widgetForAction(view.objectAction)
         objectToolButton.setMenu(view.objectMenu)

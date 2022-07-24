@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
+from PyQt5.QtWidgets import QAbstractItemView, QWidget
+
 from ..model import Observer, Observable, ImagePresenter, Probe, ProbePresenter
-from ..view import (ImageView, ProbeView, ProbeInitializerView, ProbeParametersView,
-                    ProbeSuperGaussianView, ProbeZonePlateView)
+from ..view import (ImageView, ProbeView, ProbeParametersView, ProbeSuperGaussianView,
+                    ProbeZonePlateView, ProgressBarItemDelegate)
 from .data import FileDialogFactory
 from .image import ImageController
 
@@ -114,6 +117,48 @@ class ProbeZonePlateController(Observer):
             self._syncModelToView()
 
 
+class ProbeModesTableModel(QAbstractTableModel):
+
+    def __init__(self, presenter: ProbePresenter, parent: QObject = None) -> None:
+        super().__init__(parent)
+        self._presenter = presenter
+
+    def refresh(self) -> None:
+        self.beginResetModel()
+        self.endResetModel()
+
+    def headerData(self,
+                   section: int,
+                   orientation: Qt.Orientation,
+                   role: int = Qt.DisplayRole) -> QVariant:
+        value = QVariant()
+
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            if section == 0:
+                value = QVariant('Mode')
+            elif section == 1:
+                value = QVariant('Relative Power')
+
+        return value
+
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+        value = QVariant()
+
+        if index.isValid():
+            if role == Qt.DisplayRole and index.column() == 0:
+                value = QVariant(index.row())
+            if role == Qt.UserRole and index.column() == 1:
+                value = QVariant(self._presenter.getProbeModeRelativePower(index.row()))
+
+        return value
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return self._presenter.getNumberOfProbeModes()
+
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return 2
+
+
 class ProbeParametersController(Observer):
 
     def __init__(self, presenter: ProbePresenter, view: ProbeParametersView,
@@ -124,10 +169,10 @@ class ProbeParametersController(Observer):
         self._fileDialogFactory = fileDialogFactory
         self._probeController = ProbeController.createInstance(presenter, view.probeView)
         self._superGaussianController = ProbeSuperGaussianController.createInstance(
-            presenter, view.superGaussianView)
+            presenter, view.initializerView.superGaussianView)
         self._zonePlateController = ProbeZonePlateController.createInstance(
-            presenter, view.zonePlateView)
-        self._initializerGroupBoxes = [view.superGaussianView, view.zonePlateView]
+            presenter, view.initializerView.zonePlateView)
+        self._modesTableModel = ProbeModesTableModel(presenter)
 
     @classmethod
     def createInstance(cls, presenter: ProbePresenter, view: ProbeParametersView,
@@ -135,18 +180,43 @@ class ProbeParametersController(Observer):
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
-        for initializer in presenter.getInitializerList():
-            view.initializerView.initializerComboBox.addItem(initializer)
+        delegate = ProgressBarItemDelegate(view.modesView.tableView)
+        view.modesView.tableView.setItemDelegateForColumn(1, delegate)
+        view.modesView.tableView.setModel(controller._modesTableModel)
+        view.modesView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.modesView.tableView.selectionModel().currentChanged.connect(
+            controller._displayProbeMode)
 
-        view.initializerView.initializerComboBox.currentTextChanged.connect(
-            presenter.setInitializer)
-        view.initializerView.initializeButton.clicked.connect(presenter.initializeProbe)
+        # FIXME hide image ribbon groupbox
+
+        openFileAction = view.modesView.buttonBox.initializeMenu.addAction('Open File...')
+        openFileAction.triggered.connect(lambda checked: controller._openProbe())
+
+        for name in presenter.getInitializerNameList():
+            initAction = view.modesView.buttonBox.initializeMenu.addAction(name)
+            initAction.triggered.connect(controller._createInitLambda(name)) # FIXME
+
+        view.modesView.buttonBox.saveButton.clicked.connect(controller._saveProbe)
+        view.modesView.buttonBox.pushModeButton.clicked.connect(presenter.pushProbeMode)
+        view.modesView.buttonBox.popModeButton.clicked.connect(presenter.popProbeMode)
 
         controller._syncModelToView()
 
         return controller
 
-    def openProbe(self) -> None:
+    def _createInitLambda(self, name: str) -> Callable[[bool], None]:
+        # NOTE additional defining scope for lambda forces a new instance for each use
+        return lambda checked: self._presenter.initializeProbe(name)
+
+    def _renderImageData(self, index: int) -> None:
+        array = self._presenter.getProbeMode(index)
+        self._imagePresenter.setArray(array)
+
+    def _displayProbeMode(self, current: QModelIndex, previous: QModelIndex) -> None:
+        # FIXME self._renderImageData(current.row())
+        print(f'Display Probe Mode {current.row()}')
+
+    def _openProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Probe',
@@ -156,7 +226,7 @@ class ProbeParametersController(Observer):
         if filePath:
             self._presenter.openProbe(filePath, nameFilter)
 
-    def saveProbe(self) -> None:
+    def _saveProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Probe',
@@ -167,12 +237,8 @@ class ProbeParametersController(Observer):
             self._presenter.saveProbe(filePath, nameFilter)
 
     def _syncModelToView(self) -> None:
-        initializer = self._presenter.getInitializer()
-
-        self._view.initializerView.initializerComboBox.setCurrentText(initializer)
-
-        for groupBox in self._initializerGroupBoxes:
-            groupBox.setVisible(groupBox.title() == initializer)
+        self._modesTableModel.refresh()
+        # FIXME renderImageData
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

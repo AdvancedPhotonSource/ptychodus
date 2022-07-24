@@ -63,8 +63,8 @@ class ScanButtonBox(QWidget):
         super().__init__(parent)
         self.insertMenu = QMenu()
         self.insertButton = QPushButton('Insert')
-        self.editButton = QPushButton('Edit')
         self.saveButton = QPushButton('Save')
+        self.editButton = QPushButton('Edit')
         self.removeButton = QPushButton('Remove')
 
     @classmethod
@@ -76,15 +76,15 @@ class ScanButtonBox(QWidget):
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.insertButton)
-        layout.addWidget(view.editButton)
         layout.addWidget(view.saveButton)
+        layout.addWidget(view.editButton)
         layout.addWidget(view.removeButton)
         view.setLayout(layout)
 
         return view
 
 
-class ScanParametersView(QGroupBox):
+class ScanPositionDataView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Position Data', parent)
@@ -92,7 +92,7 @@ class ScanParametersView(QGroupBox):
         self.buttonBox = ScanButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanPositionDataView:
         view = cls(parent)
 
         view.tableView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -100,6 +100,23 @@ class ScanParametersView(QGroupBox):
         layout = QVBoxLayout()
         layout.addWidget(view.tableView)
         layout.addWidget(view.buttonBox)
+        view.setLayout(layout)
+
+        return view
+
+
+class ScanParametersView(QWidget):
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.positionDataView = ScanPositionDataView.createInstance()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanParametersView:
+        view = cls(parent)
+
+        layout = QVBoxLayout()
+        layout.addWidget(view.positionDataView)
         view.setLayout(layout)
 
         return view

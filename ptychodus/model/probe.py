@@ -33,7 +33,7 @@ class ProbeSettings(Observable, Observer):
             'AutomaticProbeSizeEnabled', True)
         self.probeSize = settingsGroup.createIntegerEntry('ProbeSize', 64)
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
-            'ProbeEnergyInElectronVolts', '2000')
+            'ProbeEnergyInElectronVolts', '10000')
 
         self.sgAnnularRadiusInMeters = settingsGroup.createRealEntry(
             'SuperGaussianAnnularRadiusInMeters', '0')
@@ -275,6 +275,8 @@ class ProbeInitializer(Observable, Observer):
         self._fileWriterChooser = fileWriterChooser
         self._reinitObservable = reinitObservable
         self._fileInitializer = fileInitializer
+
+        # FIXME need to update so that FromFile does not show in GUI
         self._initializerChooser = PluginChooser[ProbeInitializerType](
             PluginEntry[ProbeInitializerType](simpleName='FromFile',
                                               displayName='From File',
@@ -307,7 +309,7 @@ class ProbeInitializer(Observable, Observer):
 
         return initializer
 
-    def getInitializerList(self) -> list[str]:
+    def getInitializerNameList(self) -> list[str]:
         return self._initializerChooser.getDisplayNameList()
 
     def getInitializer(self) -> str:
@@ -381,8 +383,8 @@ class ProbePresenter(Observable, Observer):
         initializer.addObserver(presenter)
         return presenter
 
-    def getInitializerList(self) -> list[str]:
-        return self._initializer.getInitializerList()
+    def getInitializerNameList(self) -> list[str]:
+        return self._initializer.getInitializerNameList()
 
     def getInitializer(self) -> str:
         return self._initializer.getInitializer()
@@ -407,6 +409,12 @@ class ProbePresenter(Observable, Observer):
 
     def saveProbe(self, filePath: Path, fileFilter: str) -> None:
         self._initializer.saveProbe(filePath, fileFilter)
+
+    def pushProbeMode(self) -> None:
+        logger.debug('Push probe mode')  # FIXME
+
+    def popProbeMode(self) -> None:
+        logger.debug('Pop probe mode')  # FIXME
 
     def initializeProbe(self) -> None:
         self._initializer.initializeProbe()
@@ -483,6 +491,9 @@ class ProbePresenter(Observable, Observer):
     def getNumberOfProbeModes(self) -> int:
         return self._probe.getNumberOfProbeModes()
 
+    def getProbeModeRelativePower(self, index: int) -> Decimal:
+        return Decimal(10 * (index + 1))  # FIXME
+
     def getProbeMode(self, index: int) -> ProbeArrayType:
         return self._probe.getProbeMode(index)
 
@@ -495,3 +506,29 @@ class ProbePresenter(Observable, Observer):
             self.notifyObservers()
         elif observable is self._initializer:
             self.notifyObservers()
+
+# FIXME BEGIN
+def plot_probe_power(probe):
+    """Draw a bar chart of relative power of each probe to the current axes.
+
+    The power of the probe is computed as the sum of absolute squares over all
+    pixels in the probe.
+
+    Parameters
+    ----------
+    probe : (..., 1, 1, SHARED, WIDE, HIGH) complex64
+        The probes to be analyzed.
+    """
+    power = np.square(tike.linalg.norm(
+        probe,
+        axis=(-2, -1),
+        keepdims=False,
+    )).flatten()
+    axes = plt.gca()
+    axes.bar(
+        range(len(power)),
+        height=power / np.sum(power),
+    )
+    axes.set_xlabel('Probe index')
+    axes.set_ylabel('Relative probe power')
+# FIXME END
