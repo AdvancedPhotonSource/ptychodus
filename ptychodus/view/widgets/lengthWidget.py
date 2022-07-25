@@ -28,6 +28,7 @@ class LengthWidget(QWidget):
         widget.unitsComboBox.addItem('mm', -3)
         widget.unitsComboBox.addItem('\u00B5m', -6)
         widget.unitsComboBox.addItem('nm', -9)
+        widget.unitsComboBox.addItem('pm', -12)
         widget.unitsComboBox.activated.connect(widget._updateDisplay)
 
         layout = QHBoxLayout()

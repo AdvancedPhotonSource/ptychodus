@@ -1,6 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
 from typing import Callable
+import logging
 
 from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel,
                           QVariant)
@@ -10,6 +11,8 @@ from ..api.observer import Observer, Observable
 from ..model import Scan, ScanPresenter, ScanRepositoryEntry
 from ..view import ScanPositionDataView, ScanPlotView, ScanEditorView, ScanTransformView
 from .data import FileDialogFactory
+
+logger = logging.getLogger(__name__)
 
 
 class ScanEditorController(Observer):

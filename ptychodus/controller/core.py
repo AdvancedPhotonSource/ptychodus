@@ -44,10 +44,8 @@ class ControllerCore:
             model.diffractionDatasetPresenter, model.detectorImagePresenter,
             view.detectorImageView, self._fileDialogFactory)
         self._probeParametersController = ProbeParametersController.createInstance(
-            model.probePresenter, view.probeParametersView, self._fileDialogFactory)
-        self._probeImageController = ProbeImageController.createInstance(
-            model.probePresenter, model.probeImagePresenter, view.probeImageView,
-            self._fileDialogFactory)
+            model.probePresenter, view.probeParametersView, model.probeImagePresenter,
+            view.probeImageView, self._fileDialogFactory)
         self._scanPositionDataController = ScanPositionDataController.createInstance(
             model.scanPresenter, view.scanParametersView.positionDataView, self._fileDialogFactory)
         self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter,
@@ -88,10 +86,6 @@ class ControllerCore:
             lambda checked: controller._dataFileController.saveDataFile())
         view.chooseScratchDirectoryAction.triggered.connect(
             lambda checked: controller._dataFileController.chooseScratchDirectory())
-        view.openObjectAction.triggered.connect(
-            lambda checked: controller._objectParametersController.openObject())
-        view.saveObjectAction.triggered.connect(
-            lambda checked: controller._objectParametersController.saveObject())
         #view.exitAction.triggered.connect(
         #        lambda checked: QApplication.quit())
 

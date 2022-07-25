@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Callable
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QAbstractItemView, QWidget
@@ -162,22 +163,28 @@ class ProbeModesTableModel(QAbstractTableModel):
 class ProbeParametersController(Observer):
 
     def __init__(self, presenter: ProbePresenter, view: ProbeParametersView,
+                 imagePresenter: ImagePresenter, imageView: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
+        self._imagePresenter = imagePresenter
+        self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
         self._probeController = ProbeController.createInstance(presenter, view.probeView)
         self._superGaussianController = ProbeSuperGaussianController.createInstance(
             presenter, view.initializerView.superGaussianView)
         self._zonePlateController = ProbeZonePlateController.createInstance(
             presenter, view.initializerView.zonePlateView)
+        self._imageController = ImageController.createInstance(imagePresenter, imageView,
+                                                               fileDialogFactory)
         self._modesTableModel = ProbeModesTableModel(presenter)
 
     @classmethod
     def createInstance(cls, presenter: ProbePresenter, view: ProbeParametersView,
+                       imagePresenter: ImagePresenter, imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ProbeParametersController:
-        controller = cls(presenter, view, fileDialogFactory)
+        controller = cls(presenter, view, imagePresenter, imageView, fileDialogFactory)
         presenter.addObserver(controller)
 
         delegate = ProgressBarItemDelegate(view.modesView.tableView)
@@ -187,7 +194,7 @@ class ProbeParametersController(Observer):
         view.modesView.tableView.selectionModel().currentChanged.connect(
             controller._displayProbeMode)
 
-        # FIXME hide image ribbon groupbox
+        imageView.imageRibbon.indexGroupBox.setVisible(False)
 
         openFileAction = view.modesView.buttonBox.initializeMenu.addAction('Open File...')
         openFileAction.triggered.connect(lambda checked: controller._openProbe())
@@ -213,8 +220,7 @@ class ProbeParametersController(Observer):
         self._imagePresenter.setArray(array)
 
     def _displayProbeMode(self, current: QModelIndex, previous: QModelIndex) -> None:
-        # FIXME self._renderImageData(current.row())
-        print(f'Display Probe Mode {current.row()}')
+        self._renderImageData(current.row())
 
     def _openProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
@@ -238,7 +244,9 @@ class ProbeParametersController(Observer):
 
     def _syncModelToView(self) -> None:
         self._modesTableModel.refresh()
-        # FIXME renderImageData
+
+        current = self._view.modesView.tableView.currentIndex()
+        self._renderImageData(current.row())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

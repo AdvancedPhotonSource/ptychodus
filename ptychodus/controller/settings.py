@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QDialog, QListView, QTableView
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup, SettingsRegistry
 from ..model import ObjectPresenter, ProbePresenter, ScanPresenter, VelociprobePresenter
-from ..view import ImportSettingsDialog
+from ..view import ImportSettingsDialog, SettingsParametersView
 from .data import FileDialogFactory
 
 
@@ -59,7 +59,7 @@ class SettingsEntryTableModel(QAbstractTableModel):
 
         return value
 
-    def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
         value = QVariant()
 
         if self._settingsGroup is None:

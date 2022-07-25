@@ -58,9 +58,6 @@ class ViewCore(QMainWindow):
         self.probeImageView = ImageView.createInstance()
 
         self.objectAction = self.navigationToolBar.addAction(fileIcon, 'Object')
-        self.objectMenu = QMenu()
-        self.openObjectAction = self.objectMenu.addAction('Open Object...')
-        self.saveObjectAction = self.objectMenu.addAction('Save Object...')
         self.objectParametersView = ObjectParametersView.createInstance()
         self.objectImageView = ImageView.createInstance()
 
@@ -96,10 +93,6 @@ class ViewCore(QMainWindow):
         dataFileToolButton = view.navigationToolBar.widgetForAction(view.dataFileAction)
         dataFileToolButton.setMenu(view.dataFileMenu)
         dataFileToolButton.setPopupMode(QToolButton.MenuButtonPopup)
-
-        objectToolButton = view.navigationToolBar.widgetForAction(view.objectAction)
-        objectToolButton.setMenu(view.objectMenu)
-        objectToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 
         view.settingsEntryView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         view.dataFileTreeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)

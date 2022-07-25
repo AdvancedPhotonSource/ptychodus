@@ -254,7 +254,7 @@ class ObjectInitializer(Observable, Observer):
 
         return initializer
 
-    def getInitializerList(self) -> list[str]:
+    def getInitializerNameList(self) -> list[str]:
         return self._initializerChooser.getDisplayNameList()
 
     def getInitializer(self) -> str:
@@ -328,8 +328,8 @@ class ObjectPresenter(Observable, Observer):
         initializer.addObserver(presenter)
         return presenter
 
-    def getInitializerList(self) -> list[str]:
-        return self._initializer.getInitializerList()
+    def getInitializerNameList(self) -> list[str]:
+        return self._initializer.getInitializerNameList()
 
     def getInitializer(self) -> str:
         return self._initializer.getInitializer()
