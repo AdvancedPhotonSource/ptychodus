@@ -507,6 +507,7 @@ class ProbePresenter(Observable, Observer):
         elif observable is self._initializer:
             self.notifyObservers()
 
+
 # FIXME BEGIN
 def plot_probe_power(probe):
     """Draw a bar chart of relative power of each probe to the current axes.
@@ -531,4 +532,6 @@ def plot_probe_power(probe):
     )
     axes.set_xlabel('Probe index')
     axes.set_ylabel('Relative probe power')
+
+
 # FIXME END

@@ -33,10 +33,7 @@ class ViewCore(QMainWindow):
         self.importSettingsDialog = ImportSettingsDialog.createInstance(self)
 
         self.settingsAction = self.navigationToolBar.addAction(fileIcon, 'Settings')
-        self.settingsMenu = QMenu()
-        self.openSettingsAction = self.settingsMenu.addAction('Open Settings...')
-        self.saveSettingsAction = self.settingsMenu.addAction('Save Settings...')
-        self.settingsGroupView = QListView()
+        self.settingsParametersView = SettingsParametersView.createInstance()
         self.settingsEntryView = QTableView()
 
         self.dataFileAction = self.navigationToolBar.addAction(fileIcon, 'Data')
@@ -95,9 +92,6 @@ class ViewCore(QMainWindow):
             view.navigationActionGroup.addAction(action)
 
         view.settingsAction.setChecked(True)
-        settingsToolButton = view.navigationToolBar.widgetForAction(view.settingsAction)
-        settingsToolButton.setMenu(view.settingsMenu)
-        settingsToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 
         dataFileToolButton = view.navigationToolBar.widgetForAction(view.dataFileAction)
         dataFileToolButton.setMenu(view.dataFileMenu)
@@ -111,7 +105,7 @@ class ViewCore(QMainWindow):
         view.dataFileTreeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         # maintain same order as navigationToolBar buttons
-        view.parametersWidget.addWidget(view.settingsGroupView)
+        view.parametersWidget.addWidget(view.settingsParametersView)
         view.parametersWidget.addWidget(view.dataFileTreeView)
         view.parametersWidget.addWidget(view.detectorParametersView)
         view.parametersWidget.addWidget(view.scanParametersView)

@@ -30,7 +30,7 @@ class ControllerCore:
             model.probePresenter, model.objectPresenter, model.velociprobePresenter,
             view.importSettingsDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
-                                                                     view.settingsGroupView,
+                                                                     view.settingsParametersView,
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
@@ -82,10 +82,6 @@ class ControllerCore:
 
         view.navigationActionGroup.triggered.connect(
             lambda action: controller.swapCentralWidgets(action))
-        view.openSettingsAction.triggered.connect(
-            lambda checked: controller._settingsController.openSettings())
-        view.saveSettingsAction.triggered.connect(
-            lambda checked: controller._settingsController.saveSettings())
         view.openDataFileAction.triggered.connect(
             lambda checked: controller._dataFileController.openDataFile())
         view.saveDataFileAction.triggered.connect(

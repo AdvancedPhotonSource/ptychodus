@@ -194,7 +194,7 @@ class ProbeParametersController(Observer):
 
         for name in presenter.getInitializerNameList():
             initAction = view.modesView.buttonBox.initializeMenu.addAction(name)
-            initAction.triggered.connect(controller._createInitLambda(name)) # FIXME
+            initAction.triggered.connect(controller._createInitLambda(name))  # FIXME
 
         view.modesView.buttonBox.saveButton.clicked.connect(controller._saveProbe)
         view.modesView.buttonBox.pushModeButton.clicked.connect(presenter.pushProbeMode)

@@ -249,12 +249,13 @@ class ScanPositionDataController(Observer):
         if filePath:
             self._presenter.openScan(filePath, nameFilter)
 
-    def _getSelectedScan(self) -> str:
-        # FIXME handle case of no selection
-        current = self._view.tableView.selectionModel().currentIndex()
-        return self._tableModel.getName(current)
-
     def _saveSelectedScan(self) -> None:
+        current = self._view.tableView.selectionModel().currentIndex()
+
+        if not current.isValid():
+            logger.error('No scans are selected!')
+            return
+
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Scan',
@@ -262,16 +263,26 @@ class ScanPositionDataController(Observer):
             selectedNameFilter=self._presenter.getSaveFileFilter())
 
         if filePath:
-            name = self._getSelectedScan()
+            name = self._tableModel.getName(current)
             self._presenter.saveScan(filePath, nameFilter, name)
 
     def _editSelectedScan(self) -> None:
-        name = self._getSelectedScan()
-        print(f'editScan({name})')  # FIXME implement
+        current = self._view.tableView.selectionModel().currentIndex()
+
+        if current.isValid():
+            name = self._tableModel.getName(current)
+            logger.debug(f'editScan({name})')  # FIXME implement
+        else:
+            logger.error('No scans are selected!')
 
     def _removeSelectedScan(self) -> None:
-        name = self._getSelectedScan()
-        self._presenter.removeScan(name)
+        current = self._view.tableView.selectionModel().currentIndex()
+
+        if current.isValid():
+            name = self._tableModel.getName(current)
+            self._presenter.removeScan(name)
+        else:
+            logger.error('No scans are selected!')
 
     def _setActiveScan(self, current: QModelIndex, previous: QModelIndex) -> None:
         name = self._tableModel.getName(current)

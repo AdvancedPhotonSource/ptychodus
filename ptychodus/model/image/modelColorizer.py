@@ -14,7 +14,7 @@ from .visarray import VisualizationArrayComponent
 CylindricalColorModel = Callable[[float, float, float], tuple[float, float, float]]
 
 
-class CylindricalColorModelColorizer(Colorizer):
+class CylindricalColorModelColorizer(Colorizer):  # FIXME broken
 
     def __init__(self, componentChooser: PluginChooser[VisualizationArrayComponent],
                  displayRange: DisplayRange, name: str, model: CylindricalColorModel,
