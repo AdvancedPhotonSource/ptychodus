@@ -322,9 +322,8 @@ class ScanCore:
         self._initializerFactory = ScanInitializerFactory(rng, self._settings, fileReaderChooser)
         self.scan = Scan.createInstance(self._settings, self._initializerFactory, self._repository,
                                         settingsRegistry)
-        self.scanPresenter = ScanPresenter.createInstance(self._initializerFactory,
-                                                          self._repository, self.scan,
-                                                          fileWriterChooser)
+        self.presenter = ScanPresenter.createInstance(self._initializerFactory, self._repository,
+                                                      self.scan, fileWriterChooser)
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
-        self.scanPresenter.openScan(filePath, fileFilter)
+        self.presenter.openScan(filePath, fileFilter)

@@ -12,7 +12,7 @@ from .data import *
 from .detector import *
 from .image import *
 from .object import *
-from .probe import *
+from .probe import ProbeCore, ProbePresenter
 from .ptychonn import PtychoNNBackend
 from .ptychopy import PtychoPyBackend
 from .reconstructor import *
@@ -23,8 +23,6 @@ from .tike import TikeBackend
 from .velociprobe import *
 from .watcher import DataDirectoryWatcher
 from .workflow import WorkflowPresenter, WorkflowSettings
-
-import ptychodus.plugins
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +50,6 @@ class ModelCore:
         self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
-        self._probeSettings = ProbeSettings.createInstance(self.settingsRegistry)
         self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
         self._workflowSettings = WorkflowSettings.createInstance(self.settingsRegistry)
@@ -60,25 +57,19 @@ class ModelCore:
         # TODO DataDirectoryWatcher should be optional
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
 
-        self._detector = Detector.createInstance(self._detectorSettings)
-        self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
-
-        self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
-        self._probe = Probe(self._probeSettings, self._probeSizer)
-        self._fileProbeInitializer = FileProbeInitializer.createInstance(
-            self._probeSettings, self._probeSizer,
-            self._pluginRegistry.buildProbeFileReaderChooser())
-        self._probeInitializer = ProbeInitializer.createInstance(
-            self._detector, self._probeSettings, self._probeSizer,
-            self._probe, self._fileProbeInitializer,
-            self._pluginRegistry.buildProbeFileWriterChooser(), self.settingsRegistry)
-
         self._scanCore = ScanCore(self.rng, self.settingsRegistry,
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())
 
+        self._detector = Detector.createInstance(self._detectorSettings)
+        self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
+
+        self._probeCore = ProbeCore(self.settingsRegistry, self._detector, self._cropSizer,
+                                    self._pluginRegistry.buildProbeFileReaderChooser(),
+                                    self._pluginRegistry.buildProbeFileWriterChooser())
+
         self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer,
-                                                       self._scanCore.scan, self._probeSizer)
+                                                       self._scanCore.scan, self._probeCore.sizer)
         self._object = Object(self._objectSettings, self._objectSizer)
         self._fileObjectInitializer = FileObjectInitializer.createInstance(
             self._objectSettings, self._objectSizer,
@@ -95,8 +86,9 @@ class ModelCore:
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._activeDataFile,
-                                                      self._scanCore.scan, self._probeSizer,
-                                                      self._probe, self._objectSizer, self._object,
+                                                      self._scanCore.scan, self._probeCore.sizer,
+                                                      self._probeCore.probe, self._objectSizer,
+                                                      self._object,
                                                       self.reconstructorPlotPresenter,
                                                       modelArgs.isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
@@ -119,9 +111,7 @@ class ModelCore:
                                        'VelociprobeDataFileReader')  # TODO remove when able
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
-            self._probeSettings, self._activeDataFile, self._scanCore.scan)
-        self.probePresenter = ProbePresenter.createInstance(self._probeSettings, self._probeSizer,
-                                                            self._probe, self._probeInitializer)
+            self._probeCore.settings, self._activeDataFile, self._scanCore)
         self.objectPresenter = ObjectPresenter.createInstance(self._objectSettings,
                                                               self._objectSizer, self._object,
                                                               self._objectInitializer)
@@ -130,9 +120,9 @@ class ModelCore:
         self.workflowPresenter = WorkflowPresenter.createInstance(self._workflowSettings)
 
         if modelArgs.rpcPort >= 0:
-            self._loadResultsExecutor = LoadResultsExecutor(self._probe, self._object)
-            self.rpcMessageService = RPCMessageService(modelArgs.rpcPort,
-                                                       modelArgs.autoExecuteRPCs)
+            self._loadResultsExecutor = LoadResultsExecutor(self._probeCore.probe, self._object)
+            self.rpcMessageService: Optional[RPCMessageService] = RPCMessageService(
+                modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
             self.rpcMessageService.registerMessageClass(LoadResultsMessage)
             self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
                                                     self._loadResultsExecutor)
@@ -178,7 +168,7 @@ class ModelCore:
         dataDump = dict()
         dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
         dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
-        dataDump['probe'] = self._probe.getArray()
+        dataDump['probe'] = self._probeCore.probe.getArray()
         dataDump['object'] = self._object.getArray()
         numpy.savez(self._reconstructorSettings.outputFilePath.value, **dataDump)
 
@@ -189,13 +179,17 @@ class ModelCore:
         return self._detectorImageCore.presenter
 
     @property
+    def scanPresenter(self) -> ScanPresenter:
+        return self._scanCore.presenter
+
+    @property
+    def probePresenter(self) -> ProbePresenter:
+        return self._probeCore.presenter
+
+    @property
     def probeImagePresenter(self) -> ImagePresenter:
         return self._probeImageCore.presenter
 
     @property
     def objectImagePresenter(self) -> ImagePresenter:
         return self._objectImageCore.presenter
-
-    @property
-    def scanPresenter(self) -> ScanPresenter:
-        return self._scanCore.scanPresenter

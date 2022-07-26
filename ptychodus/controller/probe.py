@@ -149,7 +149,9 @@ class ProbeModesTableModel(QAbstractTableModel):
             if role == Qt.DisplayRole and index.column() == 0:
                 value = QVariant(index.row())
             if role == Qt.UserRole and index.column() == 1:
-                value = QVariant(self._presenter.getProbeModeRelativePower(index.row()))
+                power = self._presenter.getProbeModeRelativePower(index.row())
+                powerPct = (100 * power).to_integral_value()
+                value = QVariant(powerPct)
 
         return value
 
@@ -281,6 +283,7 @@ class ProbeImageController(Observer):
         self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
+        # FIXME need to keep probe mode widgets in sync across views
         numberOfProbeModes = self._presenter.getNumberOfProbeModes()
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setEnabled(numberOfProbeModes > 0)
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setRange(0, numberOfProbeModes - 1)
