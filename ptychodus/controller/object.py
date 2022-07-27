@@ -29,7 +29,7 @@ class ObjectParametersController(Observer):
 
         for name in presenter.getInitializerNameList():
             initAction = view.initializerView.buttonBox.initializeMenu.addAction(name)
-            initAction.triggered.connect(controller._createInitLambda(name))  # FIXME
+            initAction.triggered.connect(controller._createInitLambda(name))
 
         view.initializerView.buttonBox.saveButton.clicked.connect(controller._saveObject)
 
@@ -37,9 +37,13 @@ class ObjectParametersController(Observer):
 
         return controller
 
+    def _initializeObject(self, name: str) -> None:
+        self._presenter.setInitializer(name)
+        self._presenter.initializeObject()
+
     def _createInitLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
-        return lambda checked: self._presenter.initializeObject(name)
+        return lambda checked: self._initializeObject(name)
 
     def _openObject(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(

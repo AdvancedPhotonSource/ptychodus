@@ -150,7 +150,7 @@ class ProbeModesTableModel(QAbstractTableModel):
                 value = QVariant(index.row())
             if role == Qt.UserRole and index.column() == 1:
                 power = self._presenter.getProbeModeRelativePower(index.row())
-                powerPct = (100 * power).to_integral_value()
+                powerPct = int((100 * power).to_integral_value())
                 value = QVariant(powerPct)
 
         return value
@@ -203,7 +203,7 @@ class ProbeParametersController(Observer):
 
         for name in presenter.getInitializerNameList():
             initAction = view.modesView.buttonBox.initializeMenu.addAction(name)
-            initAction.triggered.connect(controller._createInitLambda(name))  # FIXME
+            initAction.triggered.connect(controller._createInitLambda(name))
 
         view.modesView.buttonBox.saveButton.clicked.connect(controller._saveProbe)
         view.modesView.buttonBox.pushModeButton.clicked.connect(presenter.pushProbeMode)
@@ -213,9 +213,13 @@ class ProbeParametersController(Observer):
 
         return controller
 
+    def _initializeProbe(self, name: str) -> None:
+        self._presenter.setInitializer(name)
+        self._presenter.initializeProbe()
+
     def _createInitLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
-        return lambda checked: self._presenter.initializeProbe(name)
+        return lambda checked: self._initializeProbe(name)
 
     def _renderImageData(self, index: int) -> None:
         array = self._presenter.getProbeMode(index)

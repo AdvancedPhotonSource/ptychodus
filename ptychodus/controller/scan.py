@@ -107,9 +107,6 @@ class ScanTableModel(QAbstractTableModel):
         self._scanList: list[ScanRepositoryEntry] = list()
         self._checkedNames: set[str] = set()
 
-    def getName(self, index: QModelIndex) -> str:
-        return self._scanList[index.row()].name
-
     def refresh(self) -> None:
         scanList = self._presenter.getScanRepositoryContents()
 
@@ -266,14 +263,14 @@ class ScanPositionDataController(Observer):
             selectedNameFilter=self._presenter.getSaveFileFilter())
 
         if filePath:
-            name = self._tableModel.getName(current)
+            name = current.sibling(current.row(), 0).data()
             self._presenter.saveScan(filePath, nameFilter, name)
 
     def _editSelectedScan(self) -> None:
         current = self._view.tableView.selectionModel().currentIndex()
 
         if current.isValid():
-            name = self._tableModel.getName(current)
+            name = current.sibling(current.row(), 0).data()
             logger.debug(f'editScan({name})')  # FIXME implement
         else:
             logger.error('No scans are selected!')
@@ -282,21 +279,21 @@ class ScanPositionDataController(Observer):
         current = self._view.tableView.selectionModel().currentIndex()
 
         if current.isValid():
-            name = self._tableModel.getName(current)
+            name = current.sibling(current.row(), 0).data()
             self._presenter.removeScan(name)
         else:
             logger.error('No scans are selected!')
 
     def _setActiveScan(self, current: QModelIndex, previous: QModelIndex) -> None:
-        name = self._tableModel.getName(current)
+        name = current.sibling(current.row(), 0).data()
         self._presenter.setActiveScan(name)
 
     def _syncModelToView(self) -> None:
         self._tableModel.refresh()
 
-        for row in range(self._tableModel.rowCount()):
-            index = self._tableModel.index(row, 0)
-            name = self._tableModel.data(index)
+        for row in range(self._proxyModel.rowCount()):
+            index = self._proxyModel.index(row, 0)
+            name = index.data()
 
             if name == self._presenter.getActiveScan():
                 self._view.tableView.selectRow(row)
