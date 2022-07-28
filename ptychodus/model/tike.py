@@ -291,7 +291,6 @@ class TikeSettings(Observable, Observer):
         self.useMpi = settingsGroup.createBooleanEntry('UseMpi', False)
         self.numGpus = settingsGroup.createStringEntry('NumGpus', '1')
         self.noiseModel = settingsGroup.createStringEntry('NoiseModel', 'gaussian')
-        self.numProbeModes = settingsGroup.createIntegerEntry('NumProbeModes', 1)
         self.numBatch = settingsGroup.createIntegerEntry('NumBatch', 10)
         self.numIter = settingsGroup.createIntegerEntry('NumIter', 1)
         self.cgIter = settingsGroup.createIntegerEntry('CgIter', 2)
@@ -342,19 +341,6 @@ class TikePresenter(Observable, Observer):
 
     def setNoiseModel(self, name: str) -> None:
         self._settings.noiseModel.value = name
-
-    def getMinNumProbeModes(self) -> int:
-        return 1
-
-    def getMaxNumProbeModes(self) -> int:
-        return self.MAX_INT
-
-    def getNumProbeModes(self) -> int:
-        return self._clamp(self._settings.numProbeModes.value, self.getMinNumProbeModes(),
-                           self.getMaxNumProbeModes())
-
-    def setNumProbeModes(self, value: int) -> None:
-        self._settings.numProbeModes.value = value
 
     def getMinNumBatch(self) -> int:
         return 1
@@ -460,11 +446,6 @@ class TikeReconstructor:
     def getProbe(self) -> numpy.ndarray:
         probe = self._probe.getArray()
         probe = probe[numpy.newaxis, numpy.newaxis, :, :].astype('complex64')
-
-        if self._settings.numProbeModes.value > 0:
-            probe = tike.ptycho.probe.add_modes_random_phase(probe,
-                                                             self._settings.numProbeModes.value)
-
         return probe
 
     def getInitialObject(self) -> numpy.ndarray:
