@@ -2,12 +2,21 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import UUID
 
+from PyQt5.QtCore import QRegularExpression
+from PyQt5.QtGui import QRegularExpressionValidator
+
 from ..api.observer import Observable, Observer
 from ..model import WorkflowPresenter
 from ..view import WorkflowParametersView
 
 
 class WorkflowParametersController(Observer):
+
+    @staticmethod
+    def createUUIDValidator() -> QRegularExpressionValidator:
+        hexre = '[0-9A-Fa-f]'
+        uuidre = f'{hexre}{{8}}-{hexre}{{4}}-{hexre}{{4}}-{hexre}{{4}}-{hexre}{{12}}'
+        return QRegularExpressionValidator(QRegularExpression(uuidre))
 
     def __init__(self, presenter: WorkflowPresenter, view: WorkflowParametersView) -> None:
         super().__init__()
@@ -20,17 +29,22 @@ class WorkflowParametersController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        view.dataSourceView.endpointUUIDLineEdit.setValidator(
+            WorkflowParametersController.createUUIDValidator())
         view.dataSourceView.endpointUUIDLineEdit.editingFinished.connect(
             controller._syncDataSourceEndpointUUIDToModel)
         view.dataSourceView.pathLineEdit.editingFinished.connect(
             controller._syncDataSourcePathToModel)
 
+        view.dataDestinationView.endpointUUIDLineEdit.setValidator(
+            WorkflowParametersController.createUUIDValidator())
         view.dataDestinationView.endpointUUIDLineEdit.editingFinished.connect(
             controller._syncDataDestinationEndpointUUIDToModel)
         view.dataDestinationView.pathLineEdit.editingFinished.connect(
             controller._syncDataDestinationPathToModel)
 
-        # TODO UUID QRegularExpressionValidator
+        view.computeView.endpointUUIDLineEdit.setValidator(
+            WorkflowParametersController.createUUIDValidator())
         view.computeView.endpointUUIDLineEdit.editingFinished.connect(
             controller._syncComputeEndpointUUIDToModel)
 
