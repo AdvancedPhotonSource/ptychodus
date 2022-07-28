@@ -44,17 +44,21 @@ class ScanInitializerFactory:
         return self._fileReaderChooser.getCurrentDisplayName()
 
     def _readScan(self, filePath: Path) -> list[TabularScanInitializer]:
-        fileType = self._fileReaderChooser.getCurrentSimpleName()
-        logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
-        reader = self._fileReaderChooser.getCurrentStrategy()
-        namedSequenceDict = reader.read(filePath)
         initializerList: list[TabularScanInitializer] = list()
 
-        for name, pointSequence in namedSequenceDict.items():
-            pointList = [point for point in pointSequence]
-            fileInfo = ScanFileInfo(fileType, filePath, name)
-            initializer = self.createTabularInitializer(pointList, fileInfo)
-            initializerList.append(initializer)
+        if filePath is not None and filePath.is_file():
+            fileType = self._fileReaderChooser.getCurrentSimpleName()
+            logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
+            reader = self._fileReaderChooser.getCurrentStrategy()
+            namedSequenceDict = reader.read(filePath)
+
+            for name, pointSequence in namedSequenceDict.items():
+                pointList = [point for point in pointSequence]
+                fileInfo = ScanFileInfo(fileType, filePath, name)
+                initializer = self.createTabularInitializer(pointList, fileInfo)
+                initializerList.append(initializer)
+        else:
+            logger.debug(f'Refusing to read invalid file path {filePath}')
 
         return initializerList
 

@@ -496,6 +496,8 @@ class DataFilePresenter(Observable, Observer):
             fileReader = self._fileReaderChooser.getCurrentStrategy()
             dataFile = fileReader.read(filePath)
             self._activeDataFile.setActive(dataFile)
+        else:
+            logger.debug(f'Refusing to read invalid file path {filePath}')
 
     def openDataFile(self, filePath: Path, fileFilter: str) -> None:
         self._fileReaderChooser.setFromDisplayName(fileFilter)

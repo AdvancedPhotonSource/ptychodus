@@ -57,6 +57,8 @@ class FileProbeInitializer(Observer):
             logger.debug(f'Reading {filePath}')
             fileReader = self._fileReaderChooser.getCurrentStrategy()
             self._array = fileReader.read(filePath)
+        else:
+            logger.debug(f'Refusing to read invalid file path {filePath}')
 
     def openProbe(self, filePath: Path, fileFilter: str) -> None:
         self._fileReaderChooser.setFromDisplayName(fileFilter)
