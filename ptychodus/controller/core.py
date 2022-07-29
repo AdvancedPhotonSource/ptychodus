@@ -9,7 +9,7 @@ from .object import *
 from .probe import *
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import *
-from .scan import ScanPositionDataController, ScanPlotController
+from .scan import ScanController
 from .settings import *
 from .tike import TikeViewControllerFactory
 from .workflow import WorkflowParametersController
@@ -46,10 +46,9 @@ class ControllerCore:
         self._probeParametersController = ProbeParametersController.createInstance(
             model.probePresenter, view.probeParametersView, model.probeImagePresenter,
             view.probeImageView, self._fileDialogFactory)
-        self._scanPositionDataController = ScanPositionDataController.createInstance(
-            model.scanPresenter, view.scanParametersView.positionDataView, self._fileDialogFactory)
-        self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter,
-                                                                     view.scanPlotView)
+        self._scanController = ScanController.createInstance(
+            model.scanPresenter, view.scanParametersView.positionDataView, view.scanPlotView,
+            self._fileDialogFactory)
         self._objectParametersController = ObjectParametersController.createInstance(
             model.objectPresenter, view.objectParametersView, self._fileDialogFactory)
         self._objectImageController = ObjectImageController.createInstance(

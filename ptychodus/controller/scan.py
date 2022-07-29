@@ -117,7 +117,6 @@ class ScanTableModel(QAbstractTableModel):
         else:
             self.beginResetModel()
             self._scanList = scanList
-            self._scanList.sort(key=lambda entry: entry.name)
             self.endResetModel()
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
@@ -196,41 +195,48 @@ class ScanTableModel(QAbstractTableModel):
         return 4
 
 
-class ScanPositionDataController(Observer):
+class ScanController(Observer):
 
-    def __init__(self, presenter: ScanPresenter, view: ScanPositionDataView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, presenter: ScanPresenter, positionDataView: ScanPositionDataView,
+                 plotView: ScanPlotView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
-        self._view = view
+        self._positionDataView = positionDataView
+        self._plotView = plotView
         self._fileDialogFactory = fileDialogFactory
         self._tableModel = ScanTableModel(presenter)
         self._proxyModel = QSortFilterProxyModel()
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanPositionDataView,
-                       fileDialogFactory: FileDialogFactory) -> ScanPositionDataController:
-        controller = cls(presenter, view, fileDialogFactory)
+    def createInstance(cls, presenter: ScanPresenter, positionDataView: ScanPositionDataView,
+                       plotView: ScanPlotView,
+                       fileDialogFactory: FileDialogFactory) -> ScanController:
+        controller = cls(presenter, positionDataView, plotView, fileDialogFactory)
         presenter.addObserver(controller)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
 
-        view.tableView.setModel(controller._proxyModel)
-        view.tableView.setSortingEnabled(True)
-        view.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        view.tableView.selectionModel().currentChanged.connect(controller._setActiveScan)
+        positionDataView.tableView.setModel(controller._proxyModel)
+        positionDataView.tableView.setSortingEnabled(True)
+        positionDataView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        positionDataView.tableView.selectionModel().currentChanged.connect(
+            controller._setActiveScan)
+        positionDataView.tableView.horizontalHeader().sectionClicked.connect(
+            lambda logicalIndex: controller._redrawPlot())
 
-        openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
+        openFileAction = positionDataView.buttonBox.insertMenu.addAction('Open File...')
         openFileAction.triggered.connect(lambda checked: controller._openScan())
 
         for name in presenter.getInitializerNameList():
-            insertAction = view.buttonBox.insertMenu.addAction(name)
+            insertAction = positionDataView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createInitLambda(name))
 
-        view.buttonBox.editButton.clicked.connect(controller._editSelectedScan)
-        view.buttonBox.saveButton.clicked.connect(controller._saveSelectedScan)
-        view.buttonBox.removeButton.clicked.connect(controller._removeSelectedScan)
+        positionDataView.buttonBox.editButton.clicked.connect(controller._editSelectedScan)
+        positionDataView.buttonBox.saveButton.clicked.connect(controller._saveSelectedScan)
+        positionDataView.buttonBox.removeButton.clicked.connect(controller._removeSelectedScan)
 
+        controller._proxyModel.dataChanged.connect(
+            lambda topLeft, bottomRight, roles: controller._redrawPlot())
         controller._syncModelToView()
 
         return controller
@@ -241,7 +247,7 @@ class ScanPositionDataController(Observer):
 
     def _openScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
+            self._positionDataView,
             'Open Scan',
             nameFilters=self._presenter.getOpenFileFilterList(),
             selectedNameFilter=self._presenter.getOpenFileFilter())
@@ -250,14 +256,14 @@ class ScanPositionDataController(Observer):
             self._presenter.openScan(filePath, nameFilter)
 
     def _saveSelectedScan(self) -> None:
-        current = self._view.tableView.selectionModel().currentIndex()
+        current = self._positionDataView.tableView.selectionModel().currentIndex()
 
         if not current.isValid():
             logger.error('No scans are selected!')
             return
 
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._view,
+            self._positionDataView,
             'Save Scan',
             nameFilters=self._presenter.getSaveFileFilterList(),
             selectedNameFilter=self._presenter.getSaveFileFilter())
@@ -267,7 +273,7 @@ class ScanPositionDataController(Observer):
             self._presenter.saveScan(filePath, nameFilter, name)
 
     def _editSelectedScan(self) -> None:
-        current = self._view.tableView.selectionModel().currentIndex()
+        current = self._positionDataView.tableView.selectionModel().currentIndex()
 
         if current.isValid():
             name = current.sibling(current.row(), 0).data()
@@ -276,7 +282,7 @@ class ScanPositionDataController(Observer):
             logger.error('No scans are selected!')
 
     def _removeSelectedScan(self) -> None:
-        current = self._view.tableView.selectionModel().currentIndex()
+        current = self._positionDataView.tableView.selectionModel().currentIndex()
 
         if current.isValid():
             name = current.sibling(current.row(), 0).data()
@@ -288,6 +294,31 @@ class ScanPositionDataController(Observer):
         name = current.sibling(current.row(), 0).data()
         self._presenter.setActiveScan(name)
 
+    def _redrawPlot(self) -> None:
+        scanMap = {entry.name: entry for entry in self._presenter.getScanRepositoryContents()}
+        self._plotView.axes.clear()
+
+        for row in range(self._proxyModel.rowCount()):
+            index = self._proxyModel.index(row, 0)
+
+            if index.data(Qt.CheckStateRole) != Qt.Checked:
+                continue
+
+            name = index.data()
+            scanPath = scanMap[name].pointSequence
+            x = [point.x for point in scanPath]
+            y = [point.y for point in scanPath]
+
+            self._plotView.axes.plot(x, y, '.-', label=name, linewidth=1.5)
+
+        self._plotView.axes.invert_yaxis()
+        self._plotView.axes.axis('equal')
+        self._plotView.axes.grid(True)
+        self._plotView.axes.set_xlabel('X [m]')
+        self._plotView.axes.set_ylabel('Y [m]')
+        self._plotView.axes.legend(loc='best')
+        self._plotView.figureCanvas.draw()
+
     def _syncModelToView(self) -> None:
         self._tableModel.refresh()
 
@@ -296,44 +327,11 @@ class ScanPositionDataController(Observer):
             name = index.data()
 
             if name == self._presenter.getActiveScan():
-                self._view.tableView.selectRow(row)
+                self._positionDataView.tableView.selectRow(row)
+                self._redrawPlot()
                 return
 
-        self._view.tableView.clearSelection()
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
-
-
-class ScanPlotController(Observer):
-
-    def __init__(self, presenter: ScanPresenter, view: ScanPlotView) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-
-    @classmethod
-    def createInstance(cls, presenter: ScanPresenter, view: ScanPlotView) -> ScanPlotController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-        controller._syncModelToView()
-        return controller
-
-    def _syncModelToView(self) -> None:
-        scanPath = self._presenter.getActiveScanPointList()
-
-        x = [point.x for point in scanPath]
-        y = [point.y for point in scanPath]
-
-        self._view.axes.clear()
-        self._view.axes.plot(x, y, '.-', linewidth=1.5)
-        self._view.axes.invert_yaxis()
-        self._view.axes.axis('equal')
-        self._view.axes.grid(True)
-        self._view.axes.set_xlabel('X [m]')
-        self._view.axes.set_ylabel('Y [m]')
-        self._view.figureCanvas.draw()
+        self._positionDataView.tableView.clearSelection()
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
