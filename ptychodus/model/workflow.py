@@ -24,6 +24,7 @@ class WorkflowSettings(Observable, Observer):
                                                                  Path('/~/path/to/data'))
         self.computeEndpointUUID = settingsGroup.createUUIDEntry('ComputeEndpointUUID',
                                                                  UUID(int=0))
+        self.flowUUID = settingsGroup.createUUIDEntry('FlowUUID', UUID(int=0))
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> WorkflowSettings:
@@ -77,6 +78,12 @@ class WorkflowPresenter(Observer, Observable):
 
     def getComputeEndpointUUID(self) -> UUID:
         return self._settings.computeEndpointUUID.value
+
+    def setFlowUUID(self, endpointUUID: UUID) -> None:
+        self._settings.flowUUID.value = endpointUUID
+
+    def getFlowUUID(self) -> UUID:
+        return self._settings.flowUUID.value
 
     def launchWorkflow(self) -> None:
         logger.info('Launch workflow!')

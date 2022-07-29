@@ -47,6 +47,9 @@ class WorkflowParametersController(Observer):
             WorkflowParametersController.createUUIDValidator())
         view.computeView.endpointUUIDLineEdit.editingFinished.connect(
             controller._syncComputeEndpointUUIDToModel)
+        view.computeView.flowUUIDLineEdit.setValidator(
+            WorkflowParametersController.createUUIDValidator())
+        view.computeView.flowUUIDLineEdit.editingFinished.connect(controller._syncFlowUUIDToModel)
 
         view.launchButton.clicked.connect(presenter.launchWorkflow)
 
@@ -74,6 +77,10 @@ class WorkflowParametersController(Observer):
         endpointUUID = UUID(self._view.computeView.endpointUUIDLineEdit.text())
         self._presenter.setComputeEndpointUUID(endpointUUID)
 
+    def _syncFlowUUIDToModel(self) -> None:
+        flowUUID = UUID(self._view.computeView.flowUUIDLineEdit.text())
+        self._presenter.setFlowUUID(flowUUID)
+
     def _syncModelToView(self) -> None:
         self._view.dataSourceView.endpointUUIDLineEdit.setText(
             str(self._presenter.getDataSourceEndpointUUID()))
@@ -84,6 +91,7 @@ class WorkflowParametersController(Observer):
             str(self._presenter.getDataDestinationPath()))
         self._view.computeView.endpointUUIDLineEdit.setText(
             str(self._presenter.getComputeEndpointUUID()))
+        self._view.computeView.flowUUIDLineEdit.setText(str(self._presenter.getFlowUUID()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
