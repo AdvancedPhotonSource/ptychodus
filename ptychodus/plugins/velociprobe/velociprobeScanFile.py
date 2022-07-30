@@ -97,6 +97,6 @@ class VelociprobeScanFileReader(ScanFileReader):
         self._applyTransform(enPointList)
 
         scanDict: dict[str, ScanPointSequence] = dict()
-        scanDict['LaserInterferometerY'] = liPointList
-        scanDict['EncoderY'] = enPointList
+        scanDict[f'{self.simpleName}LaserInterferometerY'] = liPointList
+        scanDict[f'{self.simpleName}EncoderY'] = enPointList
         return SimpleScanDictionary(scanDict)

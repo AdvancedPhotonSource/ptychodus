@@ -4,24 +4,24 @@ import logging
 
 import numpy
 
+from ...api.object import ObjectArrayType, ObjectFileReader
 from ...api.plugins import PluginChooser
-from ...api.probe import ProbeArrayType, ProbeFileReader
-from .settings import ProbeSettings
-from .sizer import ProbeSizer
+from .settings import ObjectSettings
+from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
 
 
-class FileProbeInitializer:
+class FileObjectInitializer:
 
-    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer,
-                 fileReaderChooser: PluginChooser[ProbeFileReader]) -> None:
+    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer,
+                 fileReaderChooser: PluginChooser[ObjectFileReader]) -> None:
         self._settings = settings
         self._sizer = sizer
         self._fileReaderChooser = fileReaderChooser
 
-    def __call__(self) -> ProbeArrayType:
-        array = numpy.zeros(self._sizer.getProbeExtent().shape, dtype=complex)
+    def __call__(self) -> ObjectArrayType:
+        array = numpy.zeros(self._sizer.getObjectExtent().shape, dtype=complex)
 
         self._fileReaderChooser.setFromSimpleName(self._settings.inputFileType.value)
         fileReader = self._fileReaderChooser.getCurrentStrategy()

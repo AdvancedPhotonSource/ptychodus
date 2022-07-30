@@ -74,7 +74,7 @@ class LynxScanFileReader(ScanFileReader):
 
             pointList.append(ScanPoint(x_m, y_m))
 
-        return SimpleScanDictionary.createFromUnnamedSequence(pointList)
+        return SimpleScanDictionary({self.simpleName: pointList})
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

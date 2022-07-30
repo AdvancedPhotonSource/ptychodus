@@ -8,6 +8,7 @@ from .settings import ProbeSettings
 class SuperGaussianProbeInitializer:
 
     def __init__(self, detector: Detector, settings: ProbeSettings) -> None:
+        # TODO VERIFY perhaps this should use pixel size at object plane?
         self._detector = detector
         self._settings = settings
 

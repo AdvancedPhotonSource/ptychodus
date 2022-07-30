@@ -22,7 +22,7 @@ class CSVScanFileReader(ScanFileReader):
         return 'Comma-Separated Values Files (*.csv)'
 
     def read(self, filePath: Path) -> ScanDictionary:
-        scanPointList = list()
+        pointList = list()
         minimumColumnCount = max(self._xcol, self._ycol) + 1
 
         with open(filePath, newline='') as csvFile:
@@ -39,9 +39,9 @@ class CSVScanFileReader(ScanFileReader):
                 y = Decimal(row[self._ycol])
                 point = ScanPoint(x, y)
 
-                scanPointList.append(point)
+                pointList.append(point)
 
-        return SimpleScanDictionary.createFromUnnamedSequence(scanPointList)
+        return SimpleScanDictionary({self.simpleName: pointList})
 
 
 class CSVScanFileWriter(ScanFileWriter):

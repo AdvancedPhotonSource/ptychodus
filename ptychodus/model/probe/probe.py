@@ -3,8 +3,8 @@ import logging
 
 import numpy
 
-from ...api.probe import ProbeArrayType
 from ...api.observer import Observable
+from ...api.probe import ProbeArrayType
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
 

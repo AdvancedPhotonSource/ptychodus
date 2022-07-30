@@ -11,6 +11,7 @@ class ObjectParametersController(Observer):
 
     def __init__(self, presenter: ObjectPresenter, view: ObjectParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
@@ -24,12 +25,9 @@ class ObjectParametersController(Observer):
         view.objectView.pixelSizeXWidget.setReadOnly(True)
         view.objectView.pixelSizeYWidget.setReadOnly(True)
 
-        openFileAction = view.initializerView.buttonBox.initializeMenu.addAction('Open File...')
-        openFileAction.triggered.connect(lambda checked: controller._openObject())
-
         for name in presenter.getInitializerNameList():
             initAction = view.initializerView.buttonBox.initializeMenu.addAction(name)
-            initAction.triggered.connect(controller._createInitLambda(name))
+            initAction.triggered.connect(controller._createInitializerLambda(name))
 
         view.initializerView.buttonBox.saveButton.clicked.connect(controller._saveObject)
 
@@ -38,10 +36,13 @@ class ObjectParametersController(Observer):
         return controller
 
     def _initializeObject(self, name: str) -> None:
+        if name == 'Open File...':
+            self._openObject()
+
         self._presenter.setInitializer(name)
         self._presenter.initializeObject()
 
-    def _createInitLambda(self, name: str) -> Callable[[bool], None]:
+    def _createInitializerLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
         return lambda checked: self._initializeObject(name)
 
@@ -53,7 +54,8 @@ class ObjectParametersController(Observer):
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openObject(filePath, nameFilter)
+            self._presenter.setOpenFilePath(filePath)
+            self._presenter.setOpenFileFilter(nameFilter)
 
     def _saveObject(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
@@ -83,6 +85,7 @@ class ObjectImageController(Observer):
         super().__init__()
         self._presenter = presenter
         self._imagePresenter = imagePresenter
+        self._view = view
         self._imageController = ImageController.createInstance(imagePresenter, view,
                                                                fileDialogFactory)
 

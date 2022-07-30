@@ -355,7 +355,7 @@ class MDAScanFileReader(ScanFileReader):
         return 'EPICS MDA Files (*.mda)'
 
     def read(self, filePath: Path) -> ScanDictionary:
-        scanPointList = list()
+        pointList = list()
 
         micronsToMeters = Decimal('1e-6')
         mdaFile = MDAFile.read(filePath)
@@ -368,9 +368,9 @@ class MDAScanFileReader(ScanFileReader):
             y = Decimal(repr(yf)) * micronsToMeters
             point = ScanPoint(x, y)
 
-            scanPointList.append(point)
+            pointList.append(point)
 
-        return SimpleScanDictionary.createFromUnnamedSequence(scanPointList)
+        return SimpleScanDictionary({self.simpleName: pointList})
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

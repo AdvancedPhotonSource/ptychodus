@@ -2,8 +2,9 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import QEvent, QObject
-from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHeaderView, QHBoxLayout, QMenu,
-                             QPushButton, QSpinBox, QTableView, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
+                             QHeaderView, QHBoxLayout, QMenu, QPushButton, QSpinBox, QTableView,
+                             QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -16,7 +17,7 @@ from .widgets import LengthWidget
 class ScanEditorView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__('Editor', parent)
+        super().__init__('Parameters', parent)
         self.numberOfScanPointsSpinBox = QSpinBox()
         self.extentXSpinBox = QSpinBox()
         self.extentYSpinBox = QSpinBox()
@@ -55,6 +56,43 @@ class ScanTransformView(QGroupBox):
         view.setLayout(layout)
 
         return view
+
+
+class ScanEditorDialog(QDialog):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.editorView = ScanEditorView.createInstance()
+        self.transformView = ScanTransformView.createInstance()
+        self.centerWidget = QWidget()
+        self.buttonBox = QDialogButtonBox()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanEditorDialog:
+        view = cls(parent)
+
+        view.setWindowTitle('Edit Scan')
+
+        centerLayout = QVBoxLayout()
+        centerLayout.addWidget(view.editorView)
+        centerLayout.addWidget(view.transformView)
+        view.centerWidget.setLayout(centerLayout)
+
+        view.buttonBox.addButton(QDialogButtonBox.Ok)
+        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+
+        layout = QVBoxLayout()
+        layout.addWidget(view.centerWidget)
+        layout.addWidget(view.buttonBox)
+        view.setLayout(layout)
+
+        return view
+
+    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ApplyRole:
+            self.accept()
+        else:
+            self.reject()
 
 
 class ScanButtonBox(QWidget):
@@ -110,6 +148,7 @@ class ScanParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.positionDataView = ScanPositionDataView.createInstance()
+        self.editorDialog = ScanEditorDialog.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ScanParametersView:

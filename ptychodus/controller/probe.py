@@ -198,12 +198,9 @@ class ProbeParametersController(Observer):
 
         imageView.imageRibbon.indexGroupBox.setVisible(False)
 
-        openFileAction = view.modesView.buttonBox.initializeMenu.addAction('Open File...')
-        openFileAction.triggered.connect(lambda checked: controller._openProbe())
-
         for name in presenter.getInitializerNameList():
             initAction = view.modesView.buttonBox.initializeMenu.addAction(name)
-            initAction.triggered.connect(controller._createInitLambda(name))
+            initAction.triggered.connect(controller._createInitializerLambda(name))
 
         view.modesView.buttonBox.saveButton.clicked.connect(controller._saveProbe)
         view.modesView.buttonBox.pushModeButton.clicked.connect(presenter.pushProbeMode)
@@ -214,10 +211,13 @@ class ProbeParametersController(Observer):
         return controller
 
     def _initializeProbe(self, name: str) -> None:
+        if name == 'Open File...':
+            self._openProbe()
+
         self._presenter.setInitializer(name)
         self._presenter.initializeProbe()
 
-    def _createInitLambda(self, name: str) -> Callable[[bool], None]:
+    def _createInitializerLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
         return lambda checked: self._initializeProbe(name)
 
@@ -236,7 +236,8 @@ class ProbeParametersController(Observer):
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openProbe(filePath, nameFilter)
+            self._presenter.setOpenFilePath(filePath)
+            self._presenter.setOpenFileFilter(nameFilter)
 
     def _saveProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
