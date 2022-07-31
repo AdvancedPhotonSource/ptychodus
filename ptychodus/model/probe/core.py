@@ -12,8 +12,9 @@ from .file import FileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
 from .probe import Probe
 from .settings import ProbeSettings
-from .sg import SuperGaussianProbeInitializer
 from .sizer import ProbeSizer
+from .superGaussian import SuperGaussianProbeInitializer
+from .testPattern import TestPatternProbeInitializer
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +223,7 @@ class ProbeCore:
             displayName='Open File...',
             strategy=FileProbeInitializer(self.settings, self.sizer, fileReaderChooser),
         )
-        self._sgPlugin = PluginEntry[ProbeInitializerType](
+        self._superGaussianPlugin = PluginEntry[ProbeInitializerType](
             simpleName='SuperGaussian',
             displayName='Super Gaussian',
             strategy=SuperGaussianProbeInitializer(detector, self.settings),
@@ -232,8 +233,14 @@ class ProbeCore:
             displayName='Fresnel Zone Plate',
             strategy=FresnelZonePlateProbeInitializer(detector, self.settings, self.sizer),
         )
-        self._initializerChooser = PluginChooser[ProbeInitializerType].createFromList(
-            [self._filePlugin, self._sgPlugin, self._fzpPlugin])
+        self._testPatternPlugin = PluginEntry[ProbeInitializerType](
+            simpleName='TestPattern',
+            displayName='Test Pattern',
+            strategy=TestPatternProbeInitializer(self.settings),
+        )
+        self._initializerChooser = PluginChooser[ProbeInitializerType].createFromList([
+            self._filePlugin, self._superGaussianPlugin, self._fzpPlugin, self._testPatternPlugin
+        ])
 
         self.presenter = ProbePresenter.createInstance(self.settings, self.sizer, self.probe,
                                                        self._initializerChooser, fileReaderChooser,

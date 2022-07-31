@@ -14,7 +14,7 @@ from .visarray import VisualizationArrayComponent
 CylindricalColorModel = Callable[[float, float, float], tuple[float, float, float]]
 
 
-class CylindricalColorModelColorizer(Colorizer):  # FIXME broken
+class CylindricalColorModelColorizer(Colorizer):
 
     def __init__(self, componentChooser: PluginChooser[VisualizationArrayComponent],
                  displayRange: DisplayRange, name: str, model: CylindricalColorModel,
@@ -41,9 +41,12 @@ class CylindricalColorModelColorizer(Colorizer):  # FIXME broken
         phaseInRadians = numpy.angle(self._component.getArray())
         h = (phaseInRadians + numpy.pi) / (2 * numpy.pi)
         x = norm(self._component())
-        y = numpy.zeros_like(h)
+        y = numpy.ones_like(h)
+        a = numpy.ones_like(h)
 
         if self._variant:
             y, x = x, y
 
-        return numpy.stack(self._model(h, x, y), axis=-1)
+        r, g, b = self._model(h, x, y)
+
+        return numpy.stack((r, g, b, a), axis=-1)

@@ -8,17 +8,16 @@ from .settings import ProbeSettings
 class SuperGaussianProbeInitializer:
 
     def __init__(self, detector: Detector, settings: ProbeSettings) -> None:
-        # TODO VERIFY perhaps this should use pixel size at object plane?
+        # FIXME VERIFY perhaps this should use pixel size at object plane?
         self._detector = detector
         self._settings = settings
 
     def __call__(self) -> ProbeArrayType:
-        width_px = self._settings.probeSize.value
-        height_px = width_px
+        hsize_px = self._settings.probeSize.value / 2
 
-        Y_px, X_px = numpy.ogrid[:height_px, :width_px]
-        X_m = (X_px - width_px / 2) * float(self._detector.getPixelSizeXInMeters())
-        Y_m = (Y_px - height_px / 2) * float(self._detector.getPixelSizeYInMeters())
+        Y_px, X_px = numpy.mgrid[-hsize_px:hsize_px, -hsize_px:hsize_px] + 0.5
+        X_m = X_px * float(self._detector.getPixelSizeXInMeters())
+        Y_m = Y_px * float(self._detector.getPixelSizeYInMeters())
         R_m = numpy.hypot(X_m, Y_m)
 
         Z = (R_m - float(self._settings.sgAnnularRadiusInMeters.value)) \
