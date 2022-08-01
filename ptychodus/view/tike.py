@@ -45,11 +45,11 @@ class TikeBasicParametersView(QGroupBox):
             'Scales the inital search directions before the line search.')
 
         layout = QFormLayout()
-        layout.addRow(view.useMpiCheckBox)
         layout.addRow('Number of GPUs:', view.numGpusLineEdit)
         layout.addRow('Noise Model:', view.noiseModelComboBox)
         layout.addRow('Number of Batches:', view.numBatchSpinBox)
         layout.addRow('Number of Iterations:', view.numIterSpinBox)
+        layout.addRow(view.useMpiCheckBox)
 
         if showCgIter:
             layout.addRow('CG Search Directions:', view.cgIterSpinBox)

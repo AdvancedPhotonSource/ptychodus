@@ -61,6 +61,9 @@ class ProbePresenter(Observable, Observer):
         logger.debug(f'Initializing {simpleName} Probe')
         self._probe.setArray(initializer())
 
+        while self._probe.getNumberOfProbeModes() < self._settings.numberOfProbeModes.value:
+            self._probe.pushProbeMode()
+
     def getInitializerNameList(self) -> list[str]:
         return self._initializerChooser.getDisplayNameList()
 
@@ -177,11 +180,16 @@ class ProbePresenter(Observable, Observer):
     def getProbeMode(self, index: int) -> ProbeArrayType:
         return self._probe.getProbeMode(index)
 
+    def _syncNumberOfProbeModesToSettings(self) -> None:
+        self._settings.numberOfProbeModes.value = self._probe.getNumberOfProbeModes()
+
     def pushProbeMode(self) -> None:
         self._probe.pushProbeMode()
+        self._syncNumberOfProbeModesToSettings()
 
     def popProbeMode(self) -> None:
         self._probe.popProbeMode()
+        self._syncNumberOfProbeModesToSettings()
 
     def _syncFromSettings(self) -> None:
         self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
@@ -216,7 +224,7 @@ class ProbeCore:
                  fileWriterChooser: PluginChooser[ProbeFileWriter]) -> None:
         self.settings = ProbeSettings.createInstance(settingsRegistry)
         self.sizer = ProbeSizer.createInstance(self.settings, cropSizer)
-        self.probe = Probe(self.settings, self.sizer)
+        self.probe = Probe(self.sizer)
 
         self._filePlugin = PluginEntry[ProbeInitializerType](
             simpleName='FromFile',

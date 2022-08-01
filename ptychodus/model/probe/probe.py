@@ -5,7 +5,6 @@ import numpy
 
 from ...api.observer import Observable
 from ...api.probe import ProbeArrayType
-from .settings import ProbeSettings
 from .sizer import ProbeSizer
 
 logger = logging.getLogger(__name__)
@@ -13,10 +12,8 @@ logger = logging.getLogger(__name__)
 
 class Probe(Observable):
 
-    def __init__(self, settings: ProbeSettings, sizer: ProbeSizer) -> None:
+    def __init__(self, sizer: ProbeSizer) -> None:
         super().__init__()
-        self._settings = settings
-        self._sizer = sizer
         self._array = numpy.zeros((1, *sizer.getProbeExtent().shape), dtype=complex)
 
     def getNumberOfProbeModes(self) -> int:
@@ -53,9 +50,15 @@ class Probe(Observable):
 
     def pushProbeMode(self) -> None:
         # randomly shift the first mode
-        variate = 0.  # FIXME
+        pw = self._array.shape[-1]
+
+        variate1 = numpy.random.rand(2, 1) - 0.5  # FIXME rng
+        variate2 = (numpy.arange(0, pw) + 0.5) / pw - 0.5
+        variate = variate1 * variate2
+
         phaseShift = numpy.exp(-2j * numpy.pi * variate)
-        mode = self._array[:1, :, :] * phaseShift
+        mode = self._array[:1, :, :] * phaseShift[0][numpy.newaxis] * phaseShift[1][:,
+                                                                                    numpy.newaxis]
         self._array = numpy.concatenate((self._array, mode))
         self.notifyObservers()
 

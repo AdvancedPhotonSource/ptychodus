@@ -145,7 +145,7 @@ class ObjectCore:
                  fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
         self.settings = ObjectSettings.createInstance(settingsRegistry)
         self.sizer = ObjectSizer.createInstance(detector, cropSizer, scan, probeSizer)
-        self.object = Object(self.settings, self.sizer)
+        self.object = Object(self.sizer)
 
         self._filePlugin = PluginEntry[ObjectInitializerType](
             simpleName='FromFile',

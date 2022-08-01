@@ -19,6 +19,7 @@ class ProbeSettings(Observable, Observer):
         self.probeSize = settingsGroup.createIntegerEntry('ProbeSize', 64)
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
             'ProbeEnergyInElectronVolts', '10000')
+        self.numberOfProbeModes = settingsGroup.createIntegerEntry('NumberOfProbeModes', 1)
 
         self.sgAnnularRadiusInMeters = settingsGroup.createRealEntry(
             'SuperGaussianAnnularRadiusInMeters', '0')

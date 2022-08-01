@@ -2,16 +2,13 @@ import numpy
 
 from ...api.object import ObjectArrayType
 from ...api.observer import Observable
-from .settings import ObjectSettings
 from .sizer import ObjectSizer
 
 
 class Object(Observable):
 
-    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer) -> None:
+    def __init__(self, sizer: ObjectSizer) -> None:
         super().__init__()
-        self._settings = settings
-        self._sizer = sizer
         self._array = numpy.zeros(sizer.getObjectExtent().shape, dtype=complex)
 
     def getArray(self) -> ObjectArrayType:
