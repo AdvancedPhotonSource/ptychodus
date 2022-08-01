@@ -22,7 +22,7 @@ from .scan import ScanCore, ScanPresenter
 from .tike import TikeBackend
 from .velociprobe import *
 from .watcher import DataDirectoryWatcher
-from .workflow import WorkflowPresenter, WorkflowSettings
+from .workflow import WorkflowCore, WorkflowPresenter
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,6 @@ class ModelCore:
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
-        self._workflowSettings = WorkflowSettings.createInstance(self.settingsRegistry)
 
         # TODO DataDirectoryWatcher should be optional
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
@@ -104,7 +103,8 @@ class ModelCore:
             self._probeCore.settings, self._activeDataFile, self._scanCore)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
-        self.workflowPresenter = WorkflowPresenter.createInstance(self._workflowSettings)
+
+        self._workflowCore = WorkflowCore(self.settingsRegistry)
 
         if modelArgs.rpcPort >= 0:
             self._loadResultsExecutor = LoadResultsExecutor(self._probeCore.probe,
@@ -185,3 +185,7 @@ class ModelCore:
     @property
     def objectImagePresenter(self) -> ImagePresenter:
         return self._objectImageCore.presenter
+
+    @property
+    def workflowPresenter(self) -> WorkflowPresenter:
+        return self._workflowCore.presenter

@@ -13,9 +13,11 @@ class SuperGaussianProbeInitializer:
         self._settings = settings
 
     def __call__(self) -> ProbeArrayType:
-        hsize_px = self._settings.probeSize.value / 2
+        probeSize_px = self._settings.probeSize.value
+        gridCenter_px = probeSize_px / 2
+        cellCenters_px = numpy.arange(probeSize_px) + 0.5 - gridCenter_px
 
-        Y_px, X_px = numpy.mgrid[-hsize_px:hsize_px, -hsize_px:hsize_px] + 0.5
+        Y_px, X_px = numpy.meshgrid(cellCenters_px, cellCenters_px)
         X_m = X_px * float(self._detector.getPixelSizeXInMeters())
         Y_m = Y_px * float(self._detector.getPixelSizeYInMeters())
         R_m = numpy.hypot(X_m, Y_m)

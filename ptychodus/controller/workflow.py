@@ -29,27 +29,27 @@ class WorkflowParametersController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        view.dataSourceView.endpointUUIDLineEdit.setValidator(
+        view.dataSourceView.endpointIDLineEdit.setValidator(
             WorkflowParametersController.createUUIDValidator())
-        view.dataSourceView.endpointUUIDLineEdit.editingFinished.connect(
-            controller._syncDataSourceEndpointUUIDToModel)
+        view.dataSourceView.endpointIDLineEdit.editingFinished.connect(
+            controller._syncDataSourceEndpointIDToModel)
         view.dataSourceView.pathLineEdit.editingFinished.connect(
             controller._syncDataSourcePathToModel)
 
-        view.dataDestinationView.endpointUUIDLineEdit.setValidator(
+        view.dataDestinationView.endpointIDLineEdit.setValidator(
             WorkflowParametersController.createUUIDValidator())
-        view.dataDestinationView.endpointUUIDLineEdit.editingFinished.connect(
-            controller._syncDataDestinationEndpointUUIDToModel)
+        view.dataDestinationView.endpointIDLineEdit.editingFinished.connect(
+            controller._syncDataDestinationEndpointIDToModel)
         view.dataDestinationView.pathLineEdit.editingFinished.connect(
             controller._syncDataDestinationPathToModel)
 
-        view.computeView.endpointUUIDLineEdit.setValidator(
+        view.computeView.endpointIDLineEdit.setValidator(
             WorkflowParametersController.createUUIDValidator())
-        view.computeView.endpointUUIDLineEdit.editingFinished.connect(
-            controller._syncComputeEndpointUUIDToModel)
-        view.computeView.flowUUIDLineEdit.setValidator(
+        view.computeView.endpointIDLineEdit.editingFinished.connect(
+            controller._syncComputeEndpointIDToModel)
+        view.computeView.flowIDLineEdit.setValidator(
             WorkflowParametersController.createUUIDValidator())
-        view.computeView.flowUUIDLineEdit.editingFinished.connect(controller._syncFlowUUIDToModel)
+        view.computeView.flowIDLineEdit.editingFinished.connect(controller._syncFlowIDToModel)
 
         view.launchButton.clicked.connect(presenter.launchWorkflow)
 
@@ -57,41 +57,41 @@ class WorkflowParametersController(Observer):
 
         return controller
 
-    def _syncDataSourceEndpointUUIDToModel(self) -> None:
-        endpointUUID = UUID(self._view.dataSourceView.endpointUUIDLineEdit.text())
-        self._presenter.setDataSourceEndpointUUID(endpointUUID)
+    def _syncDataSourceEndpointIDToModel(self) -> None:
+        endpointID = UUID(self._view.dataSourceView.endpointIDLineEdit.text())
+        self._presenter.setDataSourceEndpointID(endpointID)
 
     def _syncDataSourcePathToModel(self) -> None:
         dataSourcePath = Path(self._view.dataSourceView.pathLineEdit.text())
         self._presenter.setDataSourcePath(dataSourcePath)
 
-    def _syncDataDestinationEndpointUUIDToModel(self) -> None:
-        endpointUUID = UUID(self._view.dataDestinationView.endpointUUIDLineEdit.text())
-        self._presenter.setDataDestinationEndpointUUID(endpointUUID)
+    def _syncDataDestinationEndpointIDToModel(self) -> None:
+        endpointID = UUID(self._view.dataDestinationView.endpointIDLineEdit.text())
+        self._presenter.setDataDestinationEndpointID(endpointID)
 
     def _syncDataDestinationPathToModel(self) -> None:
         dataDestinationPath = Path(self._view.dataDestinationView.pathLineEdit.text())
         self._presenter.setDataDestinationPath(dataDestinationPath)
 
-    def _syncComputeEndpointUUIDToModel(self) -> None:
-        endpointUUID = UUID(self._view.computeView.endpointUUIDLineEdit.text())
-        self._presenter.setComputeEndpointUUID(endpointUUID)
+    def _syncComputeEndpointIDToModel(self) -> None:
+        endpointID = UUID(self._view.computeView.endpointIDLineEdit.text())
+        self._presenter.setComputeEndpointID(endpointID)
 
-    def _syncFlowUUIDToModel(self) -> None:
-        flowUUID = UUID(self._view.computeView.flowUUIDLineEdit.text())
-        self._presenter.setFlowUUID(flowUUID)
+    def _syncFlowIDToModel(self) -> None:
+        flowID = UUID(self._view.computeView.flowIDLineEdit.text())
+        self._presenter.setFlowID(flowID)
 
     def _syncModelToView(self) -> None:
-        self._view.dataSourceView.endpointUUIDLineEdit.setText(
-            str(self._presenter.getDataSourceEndpointUUID()))
+        self._view.dataSourceView.endpointIDLineEdit.setText(
+            str(self._presenter.getDataSourceEndpointID()))
         self._view.dataSourceView.pathLineEdit.setText(str(self._presenter.getDataSourcePath()))
-        self._view.dataDestinationView.endpointUUIDLineEdit.setText(
-            str(self._presenter.getDataDestinationEndpointUUID()))
+        self._view.dataDestinationView.endpointIDLineEdit.setText(
+            str(self._presenter.getDataDestinationEndpointID()))
         self._view.dataDestinationView.pathLineEdit.setText(
             str(self._presenter.getDataDestinationPath()))
-        self._view.computeView.endpointUUIDLineEdit.setText(
-            str(self._presenter.getComputeEndpointUUID()))
-        self._view.computeView.flowUUIDLineEdit.setText(str(self._presenter.getFlowUUID()))
+        self._view.computeView.endpointIDLineEdit.setText(
+            str(self._presenter.getComputeEndpointID()))
+        self._view.computeView.flowIDLineEdit.setText(str(self._presenter.getFlowID()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

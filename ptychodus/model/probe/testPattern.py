@@ -10,9 +10,11 @@ class TestPatternProbeInitializer:
         self._settings = settings
 
     def __call__(self) -> ProbeArrayType:
-        hsize_px = self._settings.probeSize.value / 2
+        probeSize_px = self._settings.probeSize.value
+        gridCenter_px = probeSize_px / 2
+        cellCenters = (numpy.arange(probeSize_px) + 0.5 - gridCenter_px) / gridCenter_px
 
-        Y, X = (numpy.mgrid[-hsize_px:hsize_px, -hsize_px:hsize_px] + 0.5) / hsize_px
+        Y, X = numpy.meshgrid(cellCenters, cellCenters)
         NIL = (numpy.hypot(X, Y) > 1)
         X[NIL] = 0
         Y[NIL] = 0

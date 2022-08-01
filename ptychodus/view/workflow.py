@@ -14,7 +14,7 @@ class WorkflowDataView(QGroupBox):
 
     def __init__(self, title: str, parent: Optional[QWidget] = None) -> None:
         super().__init__(title, parent)
-        self.endpointUUIDLineEdit = QLineEdit()
+        self.endpointIDLineEdit = QLineEdit()
         self.pathLineEdit = QLineEdit()
 
     @classmethod
@@ -22,7 +22,7 @@ class WorkflowDataView(QGroupBox):
         view = cls(title, parent)
 
         layout = QFormLayout()
-        layout.addRow('Endpoint UUID:', view.endpointUUIDLineEdit)
+        layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
         layout.addRow('Data Path:', view.pathLineEdit)
         view.setLayout(layout)
 
@@ -33,16 +33,16 @@ class WorkflowComputeView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__('Compute', parent)
-        self.endpointUUIDLineEdit = QLineEdit()
-        self.flowUUIDLineEdit = QLineEdit()
+        self.endpointIDLineEdit = QLineEdit()
+        self.flowIDLineEdit = QLineEdit()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowComputeView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Endpoint UUID:', view.endpointUUIDLineEdit)
-        layout.addRow('Flow UUID:', view.flowUUIDLineEdit)
+        layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
+        layout.addRow('Flow ID:', view.flowIDLineEdit)
         view.setLayout(layout)
 
         return view
