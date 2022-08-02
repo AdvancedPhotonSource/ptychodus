@@ -41,7 +41,10 @@ def main() -> int:
     parsedArgs, unparsedArgs = parser.parse_known_args()
 
     logger = logging.getLogger(ptychodus.__name__)
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+    logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+                        stream=sys.stdout,
+                        encoding='utf-8',
+                        level=logging.DEBUG)
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
     logger.info(versionString())
@@ -82,7 +85,7 @@ def main() -> int:
         verifyAllArgumentsParsed(parser, app.arguments()[1:])
 
         from ptychodus.view import ViewCore
-        view = ViewCore.createInstance()
+        view = ViewCore.createInstance(parsedArgs.dev)
 
         from ptychodus.controller import ControllerCore
         controller = ControllerCore.createInstance(model, view)

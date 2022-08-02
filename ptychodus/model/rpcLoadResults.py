@@ -6,6 +6,8 @@ import logging
 import numpy
 
 from ..api.rpc import RPCMessage, RPCExecutor
+from .object import Object
+from .probe import Probe
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +44,11 @@ class LoadResultsExecutor(RPCExecutor):
         self._object = object_
 
     def submit(self, message: RPCMessage) -> None:
-        if message.filePath.is_file():
-            logger.debug(f'Loading results from {message.filePath}')
-            results = numpy.load(message.filePath)
-            self._probe.setArray(results['probe'])
-            self._object.setArray(results['object'])
-        else:
-            logger.debug(f'{message.filePath} is not a file.')
+        if isinstance(message, LoadResultsMessage):
+            if message.filePath.is_file():
+                logger.debug(f'Loading results from {message.filePath}')
+                results = numpy.load(message.filePath)
+                self._probe.setArray(results['probe'])
+                self._object.setArray(results['object'])
+            else:
+                logger.debug(f'{message.filePath} is not a file.')

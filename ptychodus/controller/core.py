@@ -9,9 +9,10 @@ from .object import *
 from .probe import *
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import *
-from .scan import *
+from .scan import ScanController
 from .settings import *
 from .tike import TikeViewControllerFactory
+from .workflow import WorkflowParametersController
 
 
 class ControllerCore:
@@ -29,7 +30,7 @@ class ControllerCore:
             model.probePresenter, model.objectPresenter, model.velociprobePresenter,
             view.importSettingsDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
-                                                                     view.settingsGroupView,
+                                                                     view.settingsParametersView,
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
@@ -43,14 +44,12 @@ class ControllerCore:
             model.diffractionDatasetPresenter, model.detectorImagePresenter,
             view.detectorImageView, self._fileDialogFactory)
         self._probeParametersController = ProbeParametersController.createInstance(
-            model.probePresenter, view.probeParametersView, self._fileDialogFactory)
-        self._probeImageController = ProbeImageController.createInstance(
-            model.probePresenter, model.probeImagePresenter, view.probeImageView,
-            self._fileDialogFactory)
-        self._scanParametersController = ScanParametersController.createInstance(
-            model.scanPresenter, view.scanParametersView, self._fileDialogFactory)
-        self._scanPlotController = ScanPlotController.createInstance(model.scanPresenter,
-                                                                     view.scanPlotView)
+            model.probePresenter, view.probeParametersView, model.probeImagePresenter,
+            view.probeImageView, self._fileDialogFactory)
+        self._scanController = ScanController.createInstance(model.scanPresenter,
+                                                             view.scanParametersView,
+                                                             view.scanPlotView,
+                                                             self._fileDialogFactory)
         self._objectParametersController = ObjectParametersController.createInstance(
             model.objectPresenter, view.objectParametersView, self._fileDialogFactory)
         self._objectImageController = ObjectImageController.createInstance(
@@ -65,6 +64,8 @@ class ControllerCore:
             [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
             model.reconstructorPlotPresenter, view.reconstructorPlotView)
+        self._workflowParametersController = WorkflowParametersController.createInstance(
+            model.workflowPresenter, view.workflowParametersView)
         self._monitorProbeController = ProbeImageController.createInstance(
             model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
             self._fileDialogFactory)
@@ -79,34 +80,19 @@ class ControllerCore:
 
         view.navigationActionGroup.triggered.connect(
             lambda action: controller.swapCentralWidgets(action))
-        view.openSettingsAction.triggered.connect(
-            lambda checked: controller._settingsController.openSettings())
-        view.saveSettingsAction.triggered.connect(
-            lambda checked: controller._settingsController.saveSettings())
         view.openDataFileAction.triggered.connect(
             lambda checked: controller._dataFileController.openDataFile())
         view.saveDataFileAction.triggered.connect(
             lambda checked: controller._dataFileController.saveDataFile())
         view.chooseScratchDirectoryAction.triggered.connect(
             lambda checked: controller._dataFileController.chooseScratchDirectory())
-        view.openScanAction.triggered.connect(
-            lambda checked: controller._scanParametersController.openScan())
-        view.saveScanAction.triggered.connect(
-            lambda checked: controller._scanParametersController.saveScan())
-        view.openProbeAction.triggered.connect(
-            lambda checked: controller._probeParametersController.openProbe())
-        view.saveProbeAction.triggered.connect(
-            lambda checked: controller._probeParametersController.saveProbe())
-        view.openObjectAction.triggered.connect(
-            lambda checked: controller._objectParametersController.openObject())
-        view.saveObjectAction.triggered.connect(
-            lambda checked: controller._objectParametersController.saveObject())
         #view.exitAction.triggered.connect(
         #        lambda checked: QApplication.quit())
 
-        controller._processMessagesTimer.timeout.connect(
+        if model.rpcMessageService:
+            controller._processMessagesTimer.timeout.connect(
                 model.rpcMessageService.processMessages)
-        controller._processMessagesTimer.start(1000) # TODO make configurable
+            controller._processMessagesTimer.start(1000)  # TODO make configurable
 
         return controller
 

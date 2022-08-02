@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import QFormLayout, QGroupBox, QListView, QSizePolicy, QSpinBox, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QListView, QSizePolicy, QSpinBox, QVBoxLayout,
+                             QWidget)
 
 from .image import ImageView
 from .widgets import LengthWidget

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
-from typing import Generic, Iterable, TypeVar
+from typing import Generic, TypeVar
 import logging
 import sys
 import typing
@@ -12,7 +12,7 @@ import xdrlib
 import numpy
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import ScanFileReader, ScanPoint
+from ptychodus.api.scan import ScanDictionary, ScanFileReader, ScanPoint, SimpleScanDictionary
 
 T = TypeVar('T')
 
@@ -354,8 +354,8 @@ class MDAScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'EPICS MDA Files (*.mda)'
 
-    def read(self, filePath: Path) -> Iterable[ScanPoint]:
-        scanPointList = list()
+    def read(self, filePath: Path) -> ScanDictionary:
+        pointList = list()
 
         micronsToMeters = Decimal('1e-6')
         mdaFile = MDAFile.read(filePath)
@@ -368,9 +368,9 @@ class MDAScanFileReader(ScanFileReader):
             y = Decimal(repr(yf)) * micronsToMeters
             point = ScanPoint(x, y)
 
-            scanPointList.append(point)
+            pointList.append(point)
 
-        return scanPointList
+        return SimpleScanDictionary({self.simpleName: pointList})
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

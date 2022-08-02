@@ -1,29 +1,32 @@
 from __future__ import annotations
+from typing import Callable
+
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
+from PyQt5.QtWidgets import QAbstractItemView, QWidget
 
 from ..model import Observer, Observable, ImagePresenter, Probe, ProbePresenter
-from ..view import ImageView, ProbeProbeView, ProbeInitializerView, ProbeZonePlateView, ProbeParametersView
+from ..view import (ImageView, ProbeView, ProbeParametersView, ProbeSuperGaussianView,
+                    ProbeZonePlateView, ProgressBarItemDelegate)
 from .data import FileDialogFactory
 from .image import ImageController
 
 
-class ProbeProbeController(Observer):
+class ProbeController(Observer):
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeProbeView) -> None:
+    def __init__(self, presenter: ProbePresenter, view: ProbeView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter,
-                       view: ProbeProbeView) -> ProbeProbeController:
+    def createInstance(cls, presenter: ProbePresenter, view: ProbeView) -> ProbeController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
         view.sizeSpinBox.valueChanged.connect(presenter.setProbeSize)
         view.sizeSpinBox.autoToggled.connect(presenter.setAutomaticProbeSizeEnabled)
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
-        view.wavelengthWidget.setEnabled(False)
-        view.diameterWidget.lengthChanged.connect(presenter.setProbeDiameterInMeters)
+        view.wavelengthWidget.setReadOnly(True)
 
         controller._syncModelToView()
 
@@ -37,7 +40,40 @@ class ProbeProbeController(Observer):
         self._view.energyWidget.setEnergyInElectronVolts(
             self._presenter.getProbeEnergyInElectronVolts())
         self._view.wavelengthWidget.setLengthInMeters(self._presenter.getProbeWavelengthInMeters())
-        self._view.diameterWidget.setLengthInMeters(self._presenter.getProbeDiameterInMeters())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
+class ProbeSuperGaussianController(Observer):
+
+    def __init__(self, presenter: ProbePresenter, view: ProbeSuperGaussianView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: ProbePresenter,
+                       view: ProbeSuperGaussianView) -> ProbeSuperGaussianController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.annularRadiusWidget.lengthChanged.connect(
+            presenter.setSuperGaussianAnnularRadiusInMeters)
+        view.probeWidthWidget.lengthChanged.connect(presenter.setSuperGaussianProbeWidthInMeters)
+        view.orderParameterWidget.valueChanged.connect(presenter.setSuperGaussianOrderParameter)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _syncModelToView(self) -> None:
+        self._view.annularRadiusWidget.setLengthInMeters(
+            self._presenter.getSuperGaussianAnnularRadiusInMeters())
+        self._view.probeWidthWidget.setLengthInMeters(
+            self._presenter.getSuperGaussianProbeWidthInMeters())
+        self._view.orderParameterWidget.setValue(self._presenter.getSuperGaussianOrderParameter())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -82,57 +118,117 @@ class ProbeZonePlateController(Observer):
             self._syncModelToView()
 
 
-class ProbeInitializerController(Observer):
+class ProbeModesTableModel(QAbstractTableModel):
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeInitializerView) -> None:
+    def __init__(self, presenter: ProbePresenter, parent: QObject = None) -> None:
+        super().__init__(parent)
+        self._presenter = presenter
+
+    def refresh(self) -> None:
+        self.beginResetModel()
+        self.endResetModel()
+
+    def headerData(self,
+                   section: int,
+                   orientation: Qt.Orientation,
+                   role: int = Qt.DisplayRole) -> QVariant:
+        value = QVariant()
+
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            if section == 0:
+                value = QVariant('Mode')
+            elif section == 1:
+                value = QVariant('Relative Power')
+
+        return value
+
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+        value = QVariant()
+
+        if index.isValid():
+            if role == Qt.DisplayRole and index.column() == 0:
+                value = QVariant(index.row())
+            if role == Qt.UserRole and index.column() == 1:
+                power = self._presenter.getProbeModeRelativePower(index.row())
+                powerPct = int((100 * power).to_integral_value())
+                value = QVariant(powerPct)
+
+        return value
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return self._presenter.getNumberOfProbeModes()
+
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return 2
+
+
+class ProbeParametersController(Observer):
+
+    def __init__(self, presenter: ProbePresenter, view: ProbeParametersView,
+                 imagePresenter: ImagePresenter, imageView: ImageView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
+        self._imagePresenter = imagePresenter
+        self._imageView = imageView
+        self._fileDialogFactory = fileDialogFactory
+        self._probeController = ProbeController.createInstance(presenter, view.probeView)
+        self._superGaussianController = ProbeSuperGaussianController.createInstance(
+            presenter, view.initializerView.superGaussianView)
+        self._zonePlateController = ProbeZonePlateController.createInstance(
+            presenter, view.initializerView.zonePlateView)
+        self._imageController = ImageController.createInstance(imagePresenter, imageView,
+                                                               fileDialogFactory)
+        self._modesTableModel = ProbeModesTableModel(presenter)
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter,
-                       view: ProbeInitializerView) -> ProbeInitializerController:
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: ProbePresenter, view: ProbeParametersView,
+                       imagePresenter: ImagePresenter, imageView: ImageView,
+                       fileDialogFactory: FileDialogFactory) -> ProbeParametersController:
+        controller = cls(presenter, view, imagePresenter, imageView, fileDialogFactory)
         presenter.addObserver(controller)
 
-        for initializer in presenter.getInitializerList():
-            view.initializerComboBox.addItem(initializer)
+        delegate = ProgressBarItemDelegate(view.modesView.tableView)
+        view.modesView.tableView.setItemDelegateForColumn(1, delegate)
+        view.modesView.tableView.setModel(controller._modesTableModel)
+        view.modesView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.modesView.tableView.selectionModel().currentChanged.connect(
+            controller._displayProbeMode)
 
-        view.initializerComboBox.currentTextChanged.connect(presenter.setInitializer)
-        view.initializeButton.clicked.connect(presenter.initializeProbe)
+        imageView.imageRibbon.indexGroupBox.setVisible(False)
+
+        for name in presenter.getInitializerNameList():
+            initAction = view.modesView.buttonBox.initializeMenu.addAction(name)
+            initAction.triggered.connect(controller._createInitializerLambda(name))
+
+        view.modesView.buttonBox.saveButton.clicked.connect(controller._saveProbe)
+        view.modesView.buttonBox.pushModeButton.clicked.connect(presenter.pushProbeMode)
+        view.modesView.buttonBox.popModeButton.clicked.connect(presenter.popProbeMode)
 
         controller._syncModelToView()
 
         return controller
 
-    def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(self._presenter.getInitializer())
+    def _initializeProbe(self, name: str) -> None:
+        if name == 'Open File...':
+            self._openProbe()
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
+        self._presenter.setInitializer(name)
+        self._presenter.initializeProbe()
 
+    def _createInitializerLambda(self, name: str) -> Callable[[bool], None]:
+        # NOTE additional defining scope for lambda forces a new instance for each use
+        return lambda checked: self._initializeProbe(name)
 
-class ProbeParametersController:
+    def _renderImageData(self, index: int) -> None:
+        array = self._presenter.getProbeMode(index)
+        self._imagePresenter.setArray(array)
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeParametersView,
-                 fileDialogFactory: FileDialogFactory) -> None:
-        self._presenter = presenter
-        self._view = view
-        self._fileDialogFactory = fileDialogFactory
-        self._probeController = ProbeProbeController.createInstance(presenter, view.probeView)
-        self._zonePlateController = ProbeZonePlateController.createInstance(
-            presenter, view.zonePlateView)
-        self._initializerController = ProbeInitializerController.createInstance(
-            presenter, view.initializerView)
+    def _displayProbeMode(self, current: QModelIndex, previous: QModelIndex) -> None:
+        self._renderImageData(current.row())
 
-    @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ProbeParametersView,
-                       fileDialogFactory: FileDialogFactory) -> ProbeParametersController:
-        controller = cls(presenter, view, fileDialogFactory)
-        return controller
-
-    def openProbe(self) -> None:
+    def _openProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Probe',
@@ -140,9 +236,10 @@ class ProbeParametersController:
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openProbe(filePath, nameFilter)
+            self._presenter.setOpenFilePath(filePath)
+            self._presenter.setOpenFileFilter(nameFilter)
 
-    def saveProbe(self) -> None:
+    def _saveProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Probe',
@@ -151,6 +248,16 @@ class ProbeParametersController:
 
         if filePath:
             self._presenter.saveProbe(filePath, nameFilter)
+
+    def _syncModelToView(self) -> None:
+        self._modesTableModel.refresh()
+
+        current = self._view.modesView.tableView.currentIndex()
+        self._renderImageData(current.row())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
 
 
 class ProbeImageController(Observer):
@@ -181,6 +288,7 @@ class ProbeImageController(Observer):
         self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
+        # FIXME need ProbeModeController to keep probe mode widgets in sync across views
         numberOfProbeModes = self._presenter.getNumberOfProbeModes()
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setEnabled(numberOfProbeModes > 0)
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setRange(0, numberOfProbeModes - 1)

@@ -2,6 +2,7 @@ from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
+from uuid import UUID
 import configparser
 
 from .observer import Observable, Observer
@@ -60,6 +61,11 @@ class SettingsGroup(Observable, Observer):
     def createPathEntry(self, name: str, defaultValue: Path) -> SettingsEntry[Path]:
         candidateEntry = SettingsEntry[Path](name, defaultValue,
                                              lambda valueString: Path(valueString))
+        return self._registerEntryIfNonexistent(candidateEntry)
+
+    def createUUIDEntry(self, name: str, defaultValue: UUID) -> SettingsEntry[UUID]:
+        candidateEntry = SettingsEntry[UUID](name, defaultValue,
+                                             lambda valueString: UUID(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createBooleanEntry(self, name: str, defaultValue: bool) -> SettingsEntry[bool]:
@@ -122,6 +128,7 @@ class SettingsRegistry(Observable):
 
         group = SettingsGroup(name)
         self._groupList.append(group)
+        self._groupList.sort(key=lambda group: group.name)
         return group
 
     def __iter__(self) -> Iterator[SettingsGroup]:

@@ -78,7 +78,7 @@ class DatasetListModel(QAbstractListModel):
 
         return value
 
-    def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
         value = QVariant()
 
         if index.isValid():

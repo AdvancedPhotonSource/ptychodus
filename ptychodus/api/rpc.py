@@ -4,6 +4,7 @@ from typing import Any
 
 
 class RPCMessage(ABC):
+    '''interface for remote procedure call messages'''
 
     @classmethod
     @abstractproperty
@@ -23,6 +24,7 @@ class RPCMessage(ABC):
 
 
 class RPCExecutor(ABC):
+    '''interface for remote procedure call executors'''
 
     @abstractmethod
     def submit(self, message: RPCMessage) -> None:

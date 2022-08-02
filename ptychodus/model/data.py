@@ -328,7 +328,7 @@ class ActiveDataFile(DataFile):
         if cropped and self._cropSizer.isCropEnabled():
             sliceX = self._cropSizer.getSliceX()
             sliceY = self._cropSizer.getSliceY()
-            return self._dataArray[:, sliceY, sliceX]
+            return self._dataArray[:, sliceY, sliceX]  # TODO only save populated frames
 
         return self._dataArray
 
@@ -496,6 +496,8 @@ class DataFilePresenter(Observable, Observer):
             fileReader = self._fileReaderChooser.getCurrentStrategy()
             dataFile = fileReader.read(filePath)
             self._activeDataFile.setActive(dataFile)
+        else:
+            logger.debug(f'Refusing to read invalid file path {filePath}')
 
     def openDataFile(self, filePath: Path, fileFilter: str) -> None:
         self._fileReaderChooser.setFromDisplayName(fileFilter)

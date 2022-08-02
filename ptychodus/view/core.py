@@ -3,7 +3,8 @@ from pathlib import Path
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtWidgets import QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu, QSplitter, QStyle, QTableView, QToolBar, QToolButton, QTreeView
+from PyQt5.QtWidgets import (QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu,
+                             QSplitter, QStyle, QTableView, QToolBar, QToolButton, QTreeView)
 
 from .detector import *
 from .monitor import *
@@ -12,11 +13,12 @@ from .probe import *
 from .reconstructor import *
 from .scan import *
 from .settings import *
+from .workflow import *
 
 
 class ViewCore(QMainWindow):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
 
         pixmapi = getattr(QStyle, 'SP_FileIcon')
@@ -31,10 +33,7 @@ class ViewCore(QMainWindow):
         self.importSettingsDialog = ImportSettingsDialog.createInstance(self)
 
         self.settingsAction = self.navigationToolBar.addAction(fileIcon, 'Settings')
-        self.settingsMenu = QMenu()
-        self.openSettingsAction = self.settingsMenu.addAction('Open Settings...')
-        self.saveSettingsAction = self.settingsMenu.addAction('Save Settings...')
-        self.settingsGroupView = QListView()
+        self.settingsParametersView = SettingsParametersView.createInstance()
         self.settingsEntryView = QTableView()
 
         self.dataFileAction = self.navigationToolBar.addAction(fileIcon, 'Data')
@@ -51,23 +50,14 @@ class ViewCore(QMainWindow):
         self.detectorImageView = ImageView.createInstance()
 
         self.scanAction = self.navigationToolBar.addAction(fileIcon, 'Scan')
-        self.scanMenu = QMenu()
-        self.openScanAction = self.scanMenu.addAction('Open Scan...')
-        self.saveScanAction = self.scanMenu.addAction('Save Scan...')
         self.scanParametersView = ScanParametersView.createInstance()
         self.scanPlotView = ScanPlotView.createInstance()
 
         self.probeAction = self.navigationToolBar.addAction(fileIcon, 'Probe')
-        self.probeMenu = QMenu()
-        self.openProbeAction = self.probeMenu.addAction('Open Probe...')
-        self.saveProbeAction = self.probeMenu.addAction('Save Probe...')
         self.probeParametersView = ProbeParametersView.createInstance()
         self.probeImageView = ImageView.createInstance()
 
         self.objectAction = self.navigationToolBar.addAction(fileIcon, 'Object')
-        self.objectMenu = QMenu()
-        self.openObjectAction = self.objectMenu.addAction('Open Object...')
-        self.saveObjectAction = self.objectMenu.addAction('Save Object...')
         self.objectParametersView = ObjectParametersView.createInstance()
         self.objectImageView = ImageView.createInstance()
 
@@ -75,12 +65,18 @@ class ViewCore(QMainWindow):
         self.reconstructorParametersView = ReconstructorParametersView.createInstance()
         self.reconstructorPlotView = ReconstructorPlotView.createInstance()
 
+        self.workflowAction = self.navigationToolBar.addAction(fileIcon, 'Workflow')
+        self.workflowParametersView = WorkflowParametersView.createInstance()
+        self.workflowRightView = QWidget()
+
         self.monitorAction = self.navigationToolBar.addAction(fileIcon, 'Monitor')
         self.monitorProbeView = MonitorProbeView.createInstance()
         self.monitorObjectView = MonitorObjectView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ViewCore:
+    def createInstance(cls,
+                       isDeveloperModeEnabled: bool,
+                       parent: Optional[QWidget] = None) -> ViewCore:
         view = cls(parent)
 
         view.navigationToolBar.setContextMenuPolicy(Qt.PreventContextMenu)
@@ -93,38 +89,23 @@ class ViewCore(QMainWindow):
             view.navigationActionGroup.addAction(action)
 
         view.settingsAction.setChecked(True)
-        settingsToolButton = view.navigationToolBar.widgetForAction(view.settingsAction)
-        settingsToolButton.setMenu(view.settingsMenu)
-        settingsToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 
         dataFileToolButton = view.navigationToolBar.widgetForAction(view.dataFileAction)
         dataFileToolButton.setMenu(view.dataFileMenu)
         dataFileToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 
-        scanToolButton = view.navigationToolBar.widgetForAction(view.scanAction)
-        scanToolButton.setMenu(view.scanMenu)
-        scanToolButton.setPopupMode(QToolButton.MenuButtonPopup)
-
-        probeToolButton = view.navigationToolBar.widgetForAction(view.probeAction)
-        probeToolButton.setMenu(view.probeMenu)
-        probeToolButton.setPopupMode(QToolButton.MenuButtonPopup)
-
-        objectToolButton = view.navigationToolBar.widgetForAction(view.objectAction)
-        objectToolButton.setMenu(view.objectMenu)
-        objectToolButton.setPopupMode(QToolButton.MenuButtonPopup)
-
-        view.settingsEntryView.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeToContents)
+        view.settingsEntryView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         view.dataFileTreeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         # maintain same order as navigationToolBar buttons
-        view.parametersWidget.addWidget(view.settingsGroupView)
+        view.parametersWidget.addWidget(view.settingsParametersView)
         view.parametersWidget.addWidget(view.dataFileTreeView)
         view.parametersWidget.addWidget(view.detectorParametersView)
         view.parametersWidget.addWidget(view.scanParametersView)
         view.parametersWidget.addWidget(view.probeParametersView)
         view.parametersWidget.addWidget(view.objectParametersView)
         view.parametersWidget.addWidget(view.reconstructorParametersView)
+        view.parametersWidget.addWidget(view.workflowParametersView)
         view.parametersWidget.addWidget(view.monitorProbeView)
         view.parametersWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.parametersWidget)
@@ -137,11 +118,15 @@ class ViewCore(QMainWindow):
         view.contentsWidget.addWidget(view.probeImageView)
         view.contentsWidget.addWidget(view.objectImageView)
         view.contentsWidget.addWidget(view.reconstructorPlotView)
+        view.contentsWidget.addWidget(view.workflowRightView)
         view.contentsWidget.addWidget(view.monitorObjectView)
         view.contentsWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.contentsWidget)
 
         view.setCentralWidget(view.splitter)
+
+        # TODO make visible when complete
+        view.workflowAction.setVisible(isDeveloperModeEnabled)
 
         desktopSize = QApplication.desktop().availableGeometry().size()
         view.resize(desktopSize.width() * 2 // 3, desktopSize.height() * 2 // 3)

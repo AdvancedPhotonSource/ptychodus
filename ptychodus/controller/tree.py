@@ -18,13 +18,13 @@ class SimpleTreeModel(QAbstractItemModel):
         value = QVariant()
 
         if index.isValid() and role == Qt.DisplayRole:
-            item = index.internalPointer()
-            value = item.data(index.column())
+            node = index.internalPointer()
+            value = node.data(index.column())
 
         return value
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = Qt.NoItemFlags
+        value = Qt.ItemFlags()
 
         if index.isValid():
             value = super().flags(index)
@@ -54,11 +54,11 @@ class SimpleTreeModel(QAbstractItemModel):
 
         return value
 
-    def parent(self, index: QModelIndex) -> QModelIndex:
+    def parent(self, child: QModelIndex) -> QModelIndex:
         value = QModelIndex()
 
-        if index.isValid():
-            childItem = index.internalPointer()
+        if child.isValid():
+            childItem = child.internalPointer()
             parentItem = childItem.parentItem
 
             if parentItem is self._rootNode:
