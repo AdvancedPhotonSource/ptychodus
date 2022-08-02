@@ -12,7 +12,7 @@ from matplotlib.figure import Figure
 
 class ReconstructorView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Reconstructor', parent)
         self.reconstructorComboBox = QComboBox()
         self.reconstructButton = QPushButton('Reconstruct')
@@ -31,7 +31,7 @@ class ReconstructorView(QGroupBox):
 
 class ReconstructorParametersView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.reconstructorView = ReconstructorView.createInstance()
         self.stackedWidget = QStackedWidget()
@@ -64,7 +64,7 @@ class ReconstructorParametersView(QWidget):
 
 class ReconstructorPlotView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.figure = Figure()
         self.figureCanvas = FigureCanvas(self.figure)

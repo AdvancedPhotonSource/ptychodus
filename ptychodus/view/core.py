@@ -18,7 +18,7 @@ from .workflow import *
 
 class ViewCore(QMainWindow):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
 
         pixmapi = getattr(QStyle, 'SP_FileIcon')

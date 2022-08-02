@@ -288,7 +288,7 @@ class ProbeImageController(Observer):
         self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
-        # FIXME need to keep probe mode widgets in sync across views
+        # FIXME need ProbeModeController to keep probe mode widgets in sync across views
         numberOfProbeModes = self._presenter.getNumberOfProbeModes()
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setEnabled(numberOfProbeModes > 0)
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setRange(0, numberOfProbeModes - 1)

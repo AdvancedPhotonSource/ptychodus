@@ -9,7 +9,7 @@ from .widgets import LengthWidget
 
 class ObjectView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
@@ -28,7 +28,7 @@ class ObjectView(QGroupBox):
 
 class ObjectButtonBox(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.initializeMenu = QMenu()
         self.initializeButton = QPushButton('Initialize')
@@ -51,7 +51,7 @@ class ObjectButtonBox(QWidget):
 
 class ObjectInitializerView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Initializer', parent)
         self.buttonBox = ObjectButtonBox.createInstance()
 
@@ -68,7 +68,7 @@ class ObjectInitializerView(QGroupBox):
 
 class ObjectParametersView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.objectView = ObjectView.createInstance()
         self.initializerView = ObjectInitializerView.createInstance()

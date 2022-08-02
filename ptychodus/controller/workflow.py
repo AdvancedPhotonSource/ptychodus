@@ -4,6 +4,7 @@ from uuid import UUID
 
 from PyQt5.QtCore import QRegularExpression
 from PyQt5.QtGui import QRegularExpressionValidator
+from PyQt5.QtWidgets import QDialog
 
 from ..api.observer import Observable, Observer
 from ..model import WorkflowPresenter
@@ -51,7 +52,9 @@ class WorkflowParametersController(Observer):
             WorkflowParametersController.createUUIDValidator())
         view.computeView.flowIDLineEdit.editingFinished.connect(controller._syncFlowIDToModel)
 
-        view.launchButton.clicked.connect(presenter.launchWorkflow)
+        view.buttonBox.authorizeButton.clicked.connect(controller._startAuthorization)
+        view.buttonBox.launchButton.clicked.connect(presenter.launchWorkflow)
+        view.authorizeDialog.finished.connect(controller._finishAuthorization)
 
         controller._syncModelToView()
 
@@ -81,6 +84,18 @@ class WorkflowParametersController(Observer):
         flowID = UUID(self._view.computeView.flowIDLineEdit.text())
         self._presenter.setFlowID(flowID)
 
+    def _startAuthorization(self) -> None:
+        authorizeUrl = self._presenter.getAuthorizeUrl()
+        self._view.authorizeDialog.authorizeView.resetView(authorizeUrl)
+        self._view.authorizeDialog.open()
+
+    def _finishAuthorization(self, result: int) -> None:
+        if result != QDialog.Accepted:
+            return
+
+        authCode = self._view.authorizeDialog.authorizeView.authorizationCodeLineEdit.text()
+        self._presenter.setAuthorizationCode(authCode)
+
     def _syncModelToView(self) -> None:
         self._view.dataSourceView.endpointIDLineEdit.setText(
             str(self._presenter.getDataSourceEndpointID()))
@@ -92,6 +107,10 @@ class WorkflowParametersController(Observer):
         self._view.computeView.endpointIDLineEdit.setText(
             str(self._presenter.getComputeEndpointID()))
         self._view.computeView.flowIDLineEdit.setText(str(self._presenter.getFlowID()))
+
+        isAuthorized = self._presenter.isAuthorized()
+        self._view.buttonBox.authorizeButton.setEnabled(not isAuthorized)
+        self._view.buttonBox.launchButton.setEnabled(isAuthorized)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

@@ -2,9 +2,9 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import QEvent, QObject
-from PyQt5.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
-                             QHeaderView, QHBoxLayout, QMenu, QPushButton, QSpinBox, QTableView,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGroupBox, QHeaderView, QHBoxLayout, QMenu, QPushButton, QSpinBox,
+                             QTableView, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -16,7 +16,7 @@ from .widgets import LengthWidget
 
 class ScanEditorView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
         self.numberOfScanPointsSpinBox = QSpinBox()
         self.extentXSpinBox = QSpinBox()
@@ -41,7 +41,7 @@ class ScanEditorView(QGroupBox):
 
 class ScanTransformView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Transform', parent)
         self.transformComboBox = QComboBox()
         self.jitterRadiusWidget = LengthWidget.createInstance()
@@ -89,7 +89,7 @@ class ScanEditorDialog(QDialog):
         return view
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ApplyRole:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
             self.accept()
         else:
             self.reject()
@@ -97,7 +97,7 @@ class ScanEditorDialog(QDialog):
 
 class ScanButtonBox(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.insertMenu = QMenu()
         self.insertButton = QPushButton('Insert')
@@ -124,7 +124,7 @@ class ScanButtonBox(QWidget):
 
 class ScanPositionDataView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Position Data', parent)
         self.tableView = QTableView()
         self.buttonBox = ScanButtonBox.createInstance()
@@ -145,7 +145,7 @@ class ScanPositionDataView(QGroupBox):
 
 class ScanParametersView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.positionDataView = ScanPositionDataView.createInstance()
         self.editorDialog = ScanEditorDialog.createInstance()
@@ -163,7 +163,7 @@ class ScanParametersView(QWidget):
 
 class ScanPlotView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.figure = Figure()
         self.figureCanvas = FigureCanvas(self.figure)

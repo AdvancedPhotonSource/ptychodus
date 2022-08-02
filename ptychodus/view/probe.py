@@ -10,7 +10,7 @@ from .widgets import DecimalLineEdit, EnergyWidget, LengthWidget, SemiautomaticS
 
 class ProbeView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
         self.sizeSpinBox = SemiautomaticSpinBox.createInstance()
         self.energyWidget = EnergyWidget.createInstance()
@@ -31,7 +31,7 @@ class ProbeView(QGroupBox):
 
 class ProbeSuperGaussianView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.annularRadiusWidget = LengthWidget.createInstance()
         self.probeWidthWidget = LengthWidget.createInstance()
@@ -52,7 +52,7 @@ class ProbeSuperGaussianView(QWidget):
 
 class ProbeZonePlateView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.zonePlateRadiusWidget = LengthWidget.createInstance()
         self.outermostZoneWidthWidget = LengthWidget.createInstance()
@@ -75,7 +75,7 @@ class ProbeZonePlateView(QWidget):
 
 class ProbeInitializerView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Initializer', parent)
         self.superGaussianView = ProbeSuperGaussianView.createInstance()
         self.zonePlateView = ProbeZonePlateView.createInstance()
@@ -94,7 +94,7 @@ class ProbeInitializerView(QGroupBox):
 
 class ProbeModesButtonBox(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.initializeMenu = QMenu()
         self.initializeButton = QPushButton('Initialize')
@@ -121,7 +121,7 @@ class ProbeModesButtonBox(QWidget):
 
 class ProbeModesView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Modes', parent)
         self.tableView = QTableView()
         self.buttonBox = ProbeModesButtonBox.createInstance()
@@ -142,7 +142,7 @@ class ProbeModesView(QGroupBox):
 
 class ProbeParametersView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.probeView = ProbeView.createInstance()
         self.initializerView = ProbeInitializerView.createInstance()

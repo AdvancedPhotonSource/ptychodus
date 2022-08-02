@@ -28,7 +28,7 @@ class WorkflowPresenter(Observer, Observable):
         return presenter
 
     def isAuthorized(self) -> bool:
-        return (self._client is not None)
+        return not (self._client is None)
 
     def setAuthorizationCode(self, authCode: str) -> None:
         self._client = self._clientBuilder.build(authCode)
@@ -80,7 +80,7 @@ class WorkflowPresenter(Observer, Observable):
 
     def launchWorkflow(self) -> None:
         if self._client:
-            self._client.run()
+            self._client.runFlow()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
