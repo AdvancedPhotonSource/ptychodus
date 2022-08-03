@@ -3,7 +3,7 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QHBoxLayout, QLineEdit, QPushButton, QScrollArea,
+                             QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea,
                              QStackedWidget, QVBoxLayout, QWidget)
 
 import matplotlib
@@ -12,41 +12,12 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 
 
-class WorkflowAuthorizeView(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.authorizeUrlLineEdit = QLineEdit()
-        self.authorizationCodeLineEdit = QLineEdit()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowAuthorizeView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Authorize URL:', view.authorizeUrlLineEdit)
-        layout.addRow('Authorization Code:', view.authorizationCodeLineEdit)
-        view.setLayout(layout)
-
-        return view
-
-    def resetView(self, authorizeUrl: str) -> None:
-        authLabel = self.layout().labelForField(self.authorizeUrlLineEdit)
-        authLabel.setText(f'<a href="{authorizeUrl}">Authorize URL</a>:')
-        authLabel.setTextFormat(Qt.RichText)
-        authLabel.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        authLabel.setOpenExternalLinks(True)
-
-        self.authorizeUrlLineEdit.setReadOnly(True)
-        self.authorizeUrlLineEdit.setText(authorizeUrl)
-        self.authorizationCodeLineEdit.clear()
-
-
 class WorkflowAuthorizeDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.authorizeView = WorkflowAuthorizeView.createInstance()
+        self.label = QLabel()
+        self.lineEdit = QLineEdit()
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
@@ -54,13 +25,17 @@ class WorkflowAuthorizeDialog(QDialog):
         view = cls(parent)
 
         view.setWindowTitle('Authorize Workflow')
+        view.label.setTextFormat(Qt.RichText)
+        view.label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        view.label.setOpenExternalLinks(True)
 
         view.buttonBox.addButton(QDialogButtonBox.Ok)
         view.buttonBox.addButton(QDialogButtonBox.Cancel)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.authorizeView)
+        layout.addWidget(view.label)
+        layout.addWidget(view.lineEdit)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
@@ -116,7 +91,9 @@ class WorkflowButtonBox(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.authorizeButton = QPushButton('Authorize')
-        self.launchButton = QPushButton('Launch')
+        self.listFlowsButton = QPushButton('List Flows')
+        self.deployFlowButton = QPushButton('Deploy Flow')
+        self.runFlowButton = QPushButton('Run Flow')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowButtonBox:
@@ -125,7 +102,9 @@ class WorkflowButtonBox(QWidget):
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.authorizeButton)
-        layout.addWidget(view.launchButton)
+        layout.addWidget(view.listFlowsButton)
+        layout.addWidget(view.deployFlowButton)
+        layout.addWidget(view.runFlowButton)
         view.setLayout(layout)
 
         return view

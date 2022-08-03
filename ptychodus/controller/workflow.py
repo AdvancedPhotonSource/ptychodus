@@ -53,7 +53,9 @@ class WorkflowParametersController(Observer):
         view.computeView.flowIDLineEdit.editingFinished.connect(controller._syncFlowIDToModel)
 
         view.buttonBox.authorizeButton.clicked.connect(controller._startAuthorization)
-        view.buttonBox.launchButton.clicked.connect(presenter.launchWorkflow)
+        view.buttonBox.listFlowsButton.clicked.connect(presenter.printFlows)
+        view.buttonBox.deployFlowButton.clicked.connect(presenter.deployFlow)
+        view.buttonBox.runFlowButton.clicked.connect(presenter.runFlow)
         view.authorizeDialog.finished.connect(controller._finishAuthorization)
 
         controller._syncModelToView()
@@ -85,15 +87,18 @@ class WorkflowParametersController(Observer):
         self._presenter.setFlowID(flowID)
 
     def _startAuthorization(self) -> None:
-        authorizeUrl = self._presenter.getAuthorizeUrl()
-        self._view.authorizeDialog.authorizeView.resetView(authorizeUrl)
+        authorizeURL = self._presenter.getAuthorizeURL()
+        text = f'Input the Globus authorization code from <a href="{authorizeURL}">this link</a>:'
+
+        self._view.authorizeDialog.label.setText(text)
+        self._view.authorizeDialog.lineEdit.clear()
         self._view.authorizeDialog.open()
 
     def _finishAuthorization(self, result: int) -> None:
         if result != QDialog.Accepted:
             return
 
-        authCode = self._view.authorizeDialog.authorizeView.authorizationCodeLineEdit.text()
+        authCode = self._view.authorizeDialog.lineEdit.text()
         self._presenter.setAuthorizationCode(authCode)
 
     def _syncModelToView(self) -> None:
@@ -110,7 +115,9 @@ class WorkflowParametersController(Observer):
 
         isAuthorized = self._presenter.isAuthorized()
         self._view.buttonBox.authorizeButton.setEnabled(not isAuthorized)
-        self._view.buttonBox.launchButton.setEnabled(isAuthorized)
+        self._view.buttonBox.listFlowsButton.setEnabled(isAuthorized)
+        self._view.buttonBox.deployFlowButton.setEnabled(isAuthorized)
+        self._view.buttonBox.runFlowButton.setEnabled(isAuthorized)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

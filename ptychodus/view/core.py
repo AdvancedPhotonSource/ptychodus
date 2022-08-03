@@ -67,7 +67,7 @@ class ViewCore(QMainWindow):
 
         self.workflowAction = self.navigationToolBar.addAction(fileIcon, 'Workflow')
         self.workflowParametersView = WorkflowParametersView.createInstance()
-        self.workflowRightView = QWidget()
+        self.workflowTableView = QTableView()
 
         self.monitorAction = self.navigationToolBar.addAction(fileIcon, 'Monitor')
         self.monitorProbeView = MonitorProbeView.createInstance()
@@ -118,7 +118,7 @@ class ViewCore(QMainWindow):
         view.contentsWidget.addWidget(view.probeImageView)
         view.contentsWidget.addWidget(view.objectImageView)
         view.contentsWidget.addWidget(view.reconstructorPlotView)
-        view.contentsWidget.addWidget(view.workflowRightView)
+        view.contentsWidget.addWidget(view.workflowTableView)
         view.contentsWidget.addWidget(view.monitorObjectView)
         view.contentsWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.contentsWidget)

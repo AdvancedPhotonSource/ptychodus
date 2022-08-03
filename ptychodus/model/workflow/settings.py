@@ -22,7 +22,7 @@ class WorkflowSettings(Observable, Observer):
         self.computeEndpointID = settingsGroup.createUUIDEntry(
             'ComputeEndpointID', UUID('b35e121c-5ed6-4980-a32e-9aee09089c36'))
         self.flowID = settingsGroup.createUUIDEntry('FlowID',
-                                                    UUID('1e6b4406-ee3d-4bc5-9198-74128e108111'))
+                                                    UUID('8465696e-6bd6-4c9b-b5f2-7d4a6b19c5c1'))
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> WorkflowSettings:

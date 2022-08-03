@@ -1,5 +1,4 @@
 from __future__ import annotations
-from importlib.metadata import version
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
@@ -34,8 +33,8 @@ class WorkflowPresenter(Observer, Observable):
         self._client = self._clientBuilder.build(authCode)
         self.notifyObservers()
 
-    def getAuthorizeUrl(self) -> str:
-        return self._clientBuilder.getAuthorizeUrl()
+    def getAuthorizeURL(self) -> str:
+        return self._clientBuilder.getAuthorizeURL()
 
     def setDataSourceEndpointID(self, endpointID: UUID) -> None:
         self._settings.dataSourceEndpointID.value = endpointID
@@ -78,7 +77,11 @@ class WorkflowPresenter(Observer, Observable):
         if self._client:
             self._client.printFlows()
 
-    def launchWorkflow(self) -> None:
+    def deployFlow(self) -> None:
+        if self._client:
+            self._client.deployFlow()
+
+    def runFlow(self) -> None:
         if self._client:
             self._client.runFlow()
 
@@ -90,8 +93,5 @@ class WorkflowPresenter(Observer, Observable):
 class WorkflowCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
-        gacVersion = version('globus-automate-client')
-        logger.debug(f'\tGlobus Automate Client {gacVersion}')
-
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
         self.presenter = WorkflowPresenter.createInstance(self._settings)

@@ -1,0 +1,23 @@
+{
+    "additionalProperties": false,
+    "required": [
+        "input"
+    ],
+    "properties": {
+        "input": {
+            "type": "object",
+            "required": [
+                "echo_string"
+            ],
+            "properties": {
+                "echo_string": {
+                    "type": "string"
+                },
+                "sleep_time": {
+                    "type": "integer"
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}
