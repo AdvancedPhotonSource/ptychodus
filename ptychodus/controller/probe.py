@@ -203,8 +203,8 @@ class ProbeParametersController(Observer):
             initAction.triggered.connect(controller._createInitializerLambda(name))
 
         view.modesView.buttonBox.saveButton.clicked.connect(controller._saveProbe)
-        view.modesView.buttonBox.pushModeButton.clicked.connect(presenter.pushProbeMode)
-        view.modesView.buttonBox.popModeButton.clicked.connect(presenter.popProbeMode)
+        view.modesView.buttonBox.addAModeButton.clicked.connect(presenter.addAMode)
+        view.modesView.buttonBox.removeAModeButton.clicked.connect(presenter.removeAMode)
 
         controller._syncModelToView()
 

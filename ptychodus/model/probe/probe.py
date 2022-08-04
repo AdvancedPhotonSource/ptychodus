@@ -48,7 +48,7 @@ class Probe(Observable):
 
         self.notifyObservers()
 
-    def pushProbeMode(self) -> None:
+    def addAMode(self) -> None:
         # randomly shift the first mode
         pw = self._array.shape[-1]
 
@@ -62,7 +62,7 @@ class Probe(Observable):
         self._array = numpy.concatenate((self._array, mode))
         self.notifyObservers()
 
-    def popProbeMode(self) -> None:
+    def removeAMode(self) -> None:
         if self._array.shape[0] > 1:
             self._array = self._array[:-1, :, :]
             self.notifyObservers()

@@ -99,8 +99,8 @@ class ProbeModesButtonBox(QWidget):
         self.initializeMenu = QMenu()
         self.initializeButton = QPushButton('Initialize')
         self.saveButton = QPushButton('Save')
-        self.pushModeButton = QPushButton('Push Mode')
-        self.popModeButton = QPushButton('Pop Mode')
+        self.addAModeButton = QPushButton('Add A Mode')
+        self.removeAModeButton = QPushButton('Remove A Mode')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeModesButtonBox:
@@ -112,8 +112,8 @@ class ProbeModesButtonBox(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.initializeButton)
         layout.addWidget(view.saveButton)
-        layout.addWidget(view.pushModeButton)
-        layout.addWidget(view.popModeButton)
+        layout.addWidget(view.addAModeButton)
+        layout.addWidget(view.removeAModeButton)
         view.setLayout(layout)
 
         return view
@@ -145,7 +145,7 @@ class ProbeParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.probeView = ProbeView.createInstance()
-        self.initializerView = ProbeInitializerView.createInstance()
+        self.initializerView = ProbeInitializerView.createInstance() # FIXME
         self.modesView = ProbeModesView.createInstance()
 
     @classmethod

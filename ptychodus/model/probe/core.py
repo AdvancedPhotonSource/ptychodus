@@ -62,7 +62,7 @@ class ProbePresenter(Observable, Observer):
         self._probe.setArray(initializer())
 
         while self._probe.getNumberOfProbeModes() < self._settings.numberOfProbeModes.value:
-            self._probe.pushProbeMode()
+            self._probe.addAMode()
 
     def getInitializerNameList(self) -> list[str]:
         return self._initializerChooser.getDisplayNameList()
@@ -183,12 +183,12 @@ class ProbePresenter(Observable, Observer):
     def _syncNumberOfProbeModesToSettings(self) -> None:
         self._settings.numberOfProbeModes.value = self._probe.getNumberOfProbeModes()
 
-    def pushProbeMode(self) -> None:
-        self._probe.pushProbeMode()
+    def addAMode(self) -> None:
+        self._probe.addAMode()
         self._syncNumberOfProbeModesToSettings()
 
-    def popProbeMode(self) -> None:
-        self._probe.popProbeMode()
+    def removeAMode(self) -> None:
+        self._probe.removeAMode()
         self._syncNumberOfProbeModesToSettings()
 
     def _syncFromSettings(self) -> None:
