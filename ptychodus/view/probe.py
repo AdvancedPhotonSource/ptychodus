@@ -145,7 +145,7 @@ class ProbeParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.probeView = ProbeView.createInstance()
-        self.initializerView = ProbeInitializerView.createInstance() # FIXME
+        self.initializerView = ProbeInitializerView.createInstance()  # FIXME
         self.modesView = ProbeModesView.createInstance()
 
     @classmethod

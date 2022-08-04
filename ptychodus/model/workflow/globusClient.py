@@ -1,24 +1,27 @@
 from collections.abc import Mapping
-from typing import Any
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any
 import json
 import logging
 
 from globus_automate_client import FlowsClient
-from globus_automate_client.flows_client import FLOWS_CLIENT_ID
+from globus_automate_client.flows_client import (MANAGE_FLOWS_SCOPE, RUN_FLOWS_SCOPE,
+                                                 VIEW_FLOWS_SCOPE)
 from globus_sdk import NativeAppAuthClient, OAuthTokenResponse, RefreshTokenAuthorizer
 
+from .client import WorkflowClient, WorkflowClientBuilder
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowClient:
+class GlobusWorkflowClient(WorkflowClient):
     CLIENT_ID: str = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
     def __init__(self, settings: WorkflowSettings, authClient: NativeAppAuthClient,
                  tokenResponse: OAuthTokenResponse) -> None:
+        super().__init__()
         self._settings = settings
         self._tokenResponse = tokenResponse
         self._authorizerMapping = {
@@ -26,7 +29,7 @@ class WorkflowClient:
             for resourceServer, tokenData in tokenResponse.by_resource_server.items()
         }
         self._client = FlowsClient.new_client(
-            client_id=WorkflowClient.CLIENT_ID,
+            client_id=GlobusWorkflowClient.CLIENT_ID,
             authorizer=self._authorizerMapping['flows.globus.org'],
             authorizer_callback=self._authorizerRetriever)
 
@@ -82,38 +85,51 @@ class WorkflowClient:
         flowScope = None
         flowInput = {'input': {'echo_string': 'From Ptychodus', 'sleep_time': 10}}
 
-        runResult = self._client.run_flow(flowID, flowScope, flowInput)
-        logger.info(f'Flow Run Result: {json.dumps(runResult.data, indent=4)}')
+        runResult = self._client.run_flow(flowID, flowScope, flowInput, label='Run Label')
+        logger.info(f'Run Flow Result: {json.dumps(runResult.data, indent=4)}')
+
+        # TODO delete_flow
+        # TODO enumerate_actions
+        # TODO enumerate_runs
+        # TODO flow_action_cancel
+        # TODO flow_action_log
+        # TODO flow_action_release
+        # TODO flow_action_resume
+        # TODO flow_action_status
+        # TODO flow_action_update
+        # TODO get_flow
+        # TODO list_flow_actions
+        # TODO list_flow_runs
+        # TODO scope_for_flow
+        # TODO update_flow
+        # TODO update_runs
 
 
-class WorkflowClientBuilder:
+class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
 
     def __init__(self, settings: WorkflowSettings) -> None:
+        super().__init__(settings)
+
         gacVersion = version('globus-automate-client')
         logger.info(f'\tGlobus Automate Client {gacVersion}')
 
-        self._settings = settings
-        self._authClient = NativeAppAuthClient(WorkflowClient.CLIENT_ID)
+        self._authClient = NativeAppAuthClient(GlobusWorkflowClient.CLIENT_ID)
 
     def getAuthorizeURL(self) -> str:
-        CLIENT_ID = FLOWS_CLIENT_ID
-        # FIXME CLIENT_ID = WorkflowClient.CLIENT_ID
-
         FLOW_ID = str(self._settings.flowID.value)
         FLOW_ID_ = FLOW_ID.replace('-', '_')
 
         requestedScopes = [
-            f'https://auth.globus.org/scopes/{CLIENT_ID}/view_flows',
-            f'https://auth.globus.org/scopes/{CLIENT_ID}/manage_flows',
-            f'https://auth.globus.org/scopes/{CLIENT_ID}/run',
+            MANAGE_FLOWS_SCOPE,
+            VIEW_FLOWS_SCOPE,
+            RUN_FLOWS_SCOPE,
             f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
         ]
 
-        logger.debug(f'Requested Scopes: {requestedScopes}')
         self._authClient.oauth2_start_flow(requested_scopes=requestedScopes, refresh_tokens=True)
         return self._authClient.oauth2_get_authorize_url()
 
-    def build(self, authCode: str) -> WorkflowClient:
+    def build(self, authCode: str) -> GlobusWorkflowClient:
         tokenResponse = self._authClient.oauth2_exchange_code_for_tokens(authCode.strip())
         logger.debug(tokenResponse)
-        return WorkflowClient(self._settings, self._authClient, tokenResponse)
+        return GlobusWorkflowClient(self._settings, self._authClient, tokenResponse)

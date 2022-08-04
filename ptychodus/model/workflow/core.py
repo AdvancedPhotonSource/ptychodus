@@ -6,8 +6,14 @@ import logging
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
-from .client import WorkflowClient, WorkflowClientBuilder
 from .settings import WorkflowSettings
+
+try:
+    from .globusClient import GlobusWorkflowClient as WorkflowClient
+    from .globusClient import GlobusWorkflowClientBuilder as WorkflowClientBuilder
+except ModuleNotFoundError:
+    from .client import WorkflowClient
+    from .client import WorkflowClientBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +79,6 @@ class WorkflowPresenter(Observer, Observable):
         return self._settings.flowID.value
 
     def printFlows(self) -> None:
-        # TODO table model
         if self._client:
             self._client.printFlows()
 
