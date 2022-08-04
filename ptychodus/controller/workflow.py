@@ -53,7 +53,8 @@ class WorkflowParametersController(Observer):
         view.computeView.flowIDLineEdit.editingFinished.connect(controller._syncFlowIDToModel)
 
         view.buttonBox.authorizeButton.clicked.connect(controller._startAuthorization)
-        view.buttonBox.listFlowsButton.clicked.connect(presenter.printFlows)
+        view.buttonBox.listFlowsButton.clicked.connect(presenter.listFlows)
+        view.buttonBox.listFlowRunsButton.clicked.connect(presenter.listFlowRuns)
         view.buttonBox.deployFlowButton.clicked.connect(presenter.deployFlow)
         view.buttonBox.runFlowButton.clicked.connect(presenter.runFlow)
         view.authorizeDialog.finished.connect(controller._finishAuthorization)
@@ -116,6 +117,7 @@ class WorkflowParametersController(Observer):
         isAuthorized = self._presenter.isAuthorized()
         self._view.buttonBox.authorizeButton.setEnabled(not isAuthorized)
         self._view.buttonBox.listFlowsButton.setEnabled(isAuthorized)
+        self._view.buttonBox.listFlowRunsButton.setEnabled(isAuthorized)
         self._view.buttonBox.deployFlowButton.setEnabled(isAuthorized)
         self._view.buttonBox.runFlowButton.setEnabled(isAuthorized)
 

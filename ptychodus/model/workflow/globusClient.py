@@ -7,7 +7,7 @@ import logging
 
 from globus_automate_client import FlowsClient
 from globus_automate_client.flows_client import (MANAGE_FLOWS_SCOPE, RUN_FLOWS_SCOPE,
-                                                 VIEW_FLOWS_SCOPE)
+                                                 RUN_STATUS_SCOPE, VIEW_FLOWS_SCOPE)
 from globus_sdk import NativeAppAuthClient, OAuthTokenResponse, RefreshTokenAuthorizer
 
 from .client import WorkflowClient, WorkflowClientBuilder
@@ -42,10 +42,16 @@ class GlobusWorkflowClient(WorkflowClient):
         logger.debug(f'Resource Server is {resourceServer}')
         return self._authorizerMapping[resourceServer]
 
-    def printFlows(self) -> None:
+    def listFlows(self) -> None:
         myFlows = self._client.list_flows()
         # NOTE type(myFlows) is globus_sdk.response.GlobusHTTPResponse
         logger.info(f'Flow List: {myFlows}')
+
+    def listFlowRuns(self) -> None:
+        flowID = str(self._settings.flowID.value)
+        myFlowRuns = self._client.list_flow_runs(flow_id=flowID)
+        # NOTE type(myFlowRuns) is globus_sdk.response.GlobusHTTPResponse
+        logger.info(f'Flow Run List: {myFlowRuns}')
 
     def _loadFlowDefinition(self) -> dict[str, Any]:
         flowDefinitionPath = Path(__file__).parents[0] / 'flowDefinition.json'
@@ -89,7 +95,6 @@ class GlobusWorkflowClient(WorkflowClient):
         logger.info(f'Run Flow Result: {json.dumps(runResult.data, indent=4)}')
 
         # TODO delete_flow
-        # TODO enumerate_actions
         # TODO enumerate_runs
         # TODO flow_action_cancel
         # TODO flow_action_log
@@ -98,8 +103,6 @@ class GlobusWorkflowClient(WorkflowClient):
         # TODO flow_action_status
         # TODO flow_action_update
         # TODO get_flow
-        # TODO list_flow_actions
-        # TODO list_flow_runs
         # TODO scope_for_flow
         # TODO update_flow
         # TODO update_runs
@@ -121,8 +124,9 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
 
         requestedScopes = [
             MANAGE_FLOWS_SCOPE,
-            VIEW_FLOWS_SCOPE,
             RUN_FLOWS_SCOPE,
+            RUN_STATUS_SCOPE,
+            VIEW_FLOWS_SCOPE,
             f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
         ]
 

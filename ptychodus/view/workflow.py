@@ -92,6 +92,7 @@ class WorkflowButtonBox(QWidget):
         super().__init__(parent)
         self.authorizeButton = QPushButton('Authorize')
         self.listFlowsButton = QPushButton('List Flows')
+        self.listFlowRunsButton = QPushButton('List Flow Runs')
         self.deployFlowButton = QPushButton('Deploy Flow')
         self.runFlowButton = QPushButton('Run Flow')
 
@@ -103,6 +104,7 @@ class WorkflowButtonBox(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.authorizeButton)
         layout.addWidget(view.listFlowsButton)
+        layout.addWidget(view.listFlowRunsButton)
         layout.addWidget(view.deployFlowButton)
         layout.addWidget(view.runFlowButton)
         view.setLayout(layout)

@@ -3,7 +3,10 @@ from .settings import WorkflowSettings
 
 class WorkflowClient:
 
-    def printFlows(self) -> None:
+    def listFlows(self) -> None:
+        pass
+
+    def listFlowRuns(self) -> None:
         pass
 
     def deployFlow(self) -> None:

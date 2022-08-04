@@ -78,9 +78,13 @@ class WorkflowPresenter(Observer, Observable):
     def getFlowID(self) -> UUID:
         return self._settings.flowID.value
 
-    def printFlows(self) -> None:
+    def listFlows(self) -> None:
         if self._client:
-            self._client.printFlows()
+            self._client.listFlows()
+
+    def listFlowRuns(self) -> None:
+        if self._client:
+            self._client.listFlowRuns()
 
     def deployFlow(self) -> None:
         if self._client:
