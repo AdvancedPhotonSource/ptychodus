@@ -121,8 +121,11 @@ class ScanRepository(Mapping[str, ScanInitializer], Observable):
         self._initializers[initializerName] = initializer
         self.notifyObservers()
 
+    def canRemoveScan(self, name: str) -> bool:
+        return len(self._initializers) > 1
+
     def removeScan(self, name: str) -> None:
-        if len(self._initializers) > 1:
+        if self.canRemoveScan(name):
             try:
                 self._initializers.pop(name)
             except KeyError:
@@ -284,8 +287,12 @@ class ScanPresenter(Observable, Observer):
             name = fileInfo.fileSeriesKey if fileInfo else initializer.variant
             self._repository.insertScan(initializer, name)
 
+    def canRemoveScan(self, name: str) -> bool:
+        return self._repository.canRemoveScan(name) and name != self._scan.name
+
     def removeScan(self, name: str) -> None:
-        self._repository.removeScan(name)
+        if self.canRemoveScan(name):
+            self._repository.removeScan(name)
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._fileWriterChooser.getDisplayNameList()

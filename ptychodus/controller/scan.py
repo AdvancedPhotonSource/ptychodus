@@ -5,6 +5,7 @@ import logging
 
 from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel,
                           QVariant)
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ..api.observer import Observer, Observable
@@ -109,16 +110,9 @@ class ScanTableModel(QAbstractTableModel):
         self._checkedNames: set[str] = set()
 
     def refresh(self) -> None:
-        scanList = self._presenter.getScanRepositoryContents()
-
-        if len(self._scanList) == len(scanList):
-            topLeft = self.index(0, 0)
-            bottomRight = self.index(len(self._scanList), self.columnCount())
-            self.dataChanged.emit(topLeft, bottomRight)
-        else:
-            self.beginResetModel()
-            self._scanList = scanList
-            self.endResetModel()
+        self.beginResetModel()
+        self._scanList = self._presenter.getScanRepositoryContents()
+        self.endResetModel()
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -171,6 +165,10 @@ class ScanTableModel(QAbstractTableModel):
                     value = QVariant(entry.variant)
                 elif index.column() == 3:
                     value = QVariant(len(entry.pointSequence))
+            elif role == Qt.FontRole:
+                font = QFont()
+                font.setBold(entry.name == self._presenter.getActiveScan())
+                value = QVariant(font)
 
         return value
 
@@ -226,8 +224,11 @@ class ScanController(Observer):
         parametersView.positionDataView.tableView.setSortingEnabled(True)
         parametersView.positionDataView.tableView.setSelectionBehavior(
             QAbstractItemView.SelectRows)
-        parametersView.positionDataView.tableView.selectionModel().currentChanged.connect(
-            controller._setActiveScan)
+        parametersView.positionDataView.tableView.setSelectionMode(
+            QAbstractItemView.SingleSelection)
+        parametersView.positionDataView.tableView.activated.connect(controller._setActiveScan)
+        parametersView.positionDataView.tableView.selectionModel().selectionChanged.connect(
+            lambda selected, deselected: controller._setButtonsEnabled())
         parametersView.positionDataView.tableView.horizontalHeader().sectionClicked.connect(
             lambda logicalIndex: controller._redrawPlot())
 
@@ -302,8 +303,23 @@ class ScanController(Observer):
         else:
             logger.error('No scans are selected!')
 
-    def _setActiveScan(self, current: QModelIndex, previous: QModelIndex) -> None:
-        name = current.sibling(current.row(), 0).data()
+    def _setButtonsEnabled(self) -> None:
+        selectionModel = self._parametersView.positionDataView.tableView.selectionModel()
+        enable = False
+        enableRemove = False
+
+        for index in selectionModel.selectedIndexes():
+            if index.isValid():
+                enable = True
+                name = index.sibling(index.row(), 0).data()
+                enableRemove |= self._presenter.canRemoveScan(name)
+
+        self._parametersView.positionDataView.buttonBox.saveButton.setEnabled(enable)
+        self._parametersView.positionDataView.buttonBox.editButton.setEnabled(enable)
+        self._parametersView.positionDataView.buttonBox.removeButton.setEnabled(enableRemove)
+
+    def _setActiveScan(self, index: QModelIndex) -> None:
+        name = index.sibling(index.row(), 0).data()
         self._presenter.setActiveScan(name)
 
     def _redrawPlot(self) -> None:
@@ -336,17 +352,8 @@ class ScanController(Observer):
 
     def _syncModelToView(self) -> None:
         self._tableModel.refresh()
-
-        for row in range(self._proxyModel.rowCount()):
-            index = self._proxyModel.index(row, 0)
-            name = index.data()
-
-            if name == self._presenter.getActiveScan():
-                self._parametersView.positionDataView.tableView.selectRow(row)
-                self._redrawPlot()
-                return
-
-        self._parametersView.positionDataView.tableView.clearSelection()
+        self._setButtonsEnabled()
+        self._redrawPlot()
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
