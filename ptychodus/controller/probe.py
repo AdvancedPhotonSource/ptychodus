@@ -4,7 +4,7 @@ from typing import Callable
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QAbstractItemView, QWidget
 
-from ..model import Observer, Observable, ImagePresenter, Probe, ProbePresenter
+from ..model import Observable, Observer, ImagePresenter, Probe, ProbePresenter
 from ..view import (ImageView, ProbeView, ProbeParametersView, ProbeSuperGaussianView,
                     ProbeZonePlateView, ProgressBarItemDelegate)
 from .data import FileDialogFactory
@@ -288,7 +288,6 @@ class ProbeImageController(Observer):
         self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
-        # FIXME need ProbeModeController to keep probe mode widgets in sync across views
         numberOfProbeModes = self._presenter.getNumberOfProbeModes()
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setEnabled(numberOfProbeModes > 0)
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setRange(0, numberOfProbeModes - 1)

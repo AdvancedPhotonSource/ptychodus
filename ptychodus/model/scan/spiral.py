@@ -22,15 +22,15 @@ class SpiralScanInitializer(ScanInitializer):
                            settings: ScanSettings) -> SpiralScanInitializer:
         stepSizeXInMeters = settings.stepSizeXInMeters.value
         stepSizeYInMeters = settings.stepSizeYInMeters.value
-        numberOfPoints = settings.extentX.value * settings.extentY.value
+        numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value
         return cls(parameters, stepSizeXInMeters, stepSizeYInMeters, numberOfPoints)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         settings.initializer.value = self.variant
         settings.stepSizeXInMeters.value = self._stepSizeXInMeters
         settings.stepSizeYInMeters.value = self._stepSizeYInMeters
-        settings.extentX.value = self._numberOfPoints
-        settings.extentY.value = 1
+        settings.numberOfPointsX.value = self._numberOfPoints
+        settings.numberOfPointsY.value = 1
         super().syncToSettings(settings)
 
     @property

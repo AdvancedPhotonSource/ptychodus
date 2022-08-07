@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 import json
 import logging
 
@@ -112,13 +112,14 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
 
     def __init__(self, settings: WorkflowSettings) -> None:
         super().__init__(settings)
-
-        gacVersion = version('globus-automate-client')
-        logger.info(f'\tGlobus Automate Client {gacVersion}')
-
-        self._authClient = NativeAppAuthClient(GlobusWorkflowClient.CLIENT_ID)
+        self._authClient: Optional[NativeAppAuthClient] = None
 
     def getAuthorizeURL(self) -> str:
+        if self._authClient is None:
+            gacVersion = version('globus-automate-client')
+            logger.info(f'\tGlobus Automate Client {gacVersion}')
+            self._authClient = NativeAppAuthClient(GlobusWorkflowClient.CLIENT_ID)
+
         FLOW_ID = str(self._settings.flowID.value)
         FLOW_ID_ = FLOW_ID.replace('-', '_')
 
@@ -130,10 +131,15 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
             f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
         ]
 
+        logger.debug(f'Requested scopes: {requestedScopes}')
+
         self._authClient.oauth2_start_flow(requested_scopes=requestedScopes, refresh_tokens=True)
         return self._authClient.oauth2_get_authorize_url()
 
     def build(self, authCode: str) -> GlobusWorkflowClient:
+        if self._authClient is None:
+            raise RuntimeError('Missing AuthClient!')
+
         tokenResponse = self._authClient.oauth2_exchange_code_for_tokens(authCode.strip())
-        logger.debug(tokenResponse)
+        logger.debug(f'Token response: {tokenResponse}')
         return GlobusWorkflowClient(self._settings, self._authClient, tokenResponse)

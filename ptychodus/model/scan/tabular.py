@@ -35,15 +35,15 @@ class TabularScanInitializer(ScanInitializer):
                  fileInfo: Optional[ScanFileInfo]) -> None:
         super().__init__(parameters)
         self._pointList = pointList
-        self.fileInfo = fileInfo
+        self._fileInfo = fileInfo
 
     def syncToSettings(self, settings: ScanSettings) -> None:
-        if self.fileInfo is None:
+        if self._fileInfo is None:
             # FIXME must be saved to disk to make active; can be made active iff fileInfo not None
             raise ValueError('Missing file info.')
 
         settings.initializer.value = self.variant
-        self.fileInfo.syncToSettings(settings)
+        self._fileInfo.syncToSettings(settings)
         super().syncToSettings(settings)
 
     @property
@@ -52,7 +52,14 @@ class TabularScanInitializer(ScanInitializer):
 
     @property
     def variant(self) -> str:
-        return 'FromMemory' if self.fileInfo is None else 'FromFile'
+        return 'FromMemory' if self._fileInfo is None else 'FromFile'
+
+    def getFileInfo(self) -> Optional[ScanFileInfo]:
+        return self._fileInfo
+
+    def setFileInfo(self, fileInfo: ScanFileInfo) -> None:
+        self._fileInfo = fileInfo
+        self.notifyObservers()
 
     def _getPoint(self, index: int) -> ScanPoint:
         return self._pointList[index]

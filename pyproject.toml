@@ -8,3 +8,13 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
+
+[[tool.mypy.overrides]]
+module = [
+    "h5py",
+    "matplotlib.*",
+    "scipy.*",
+    "tifffile",
+    "watchdog.*",
+]
+ignore_missing_imports = true

@@ -18,20 +18,29 @@ class ScanEditorView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
-        self.numberOfScanPointsSpinBox = QSpinBox()
-        self.extentXSpinBox = QSpinBox()
-        self.extentYSpinBox = QSpinBox()
+        self.numberOfPointsSpinBox = QSpinBox()
+        self.numberOfPointsXSpinBox = QSpinBox()
+        self.numberOfPointsYSpinBox = QSpinBox()
         self.stepSizeXWidget = LengthWidget.createInstance()
         self.stepSizeYWidget = LengthWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanEditorView:
+    def createInstance(cls, isCartesian: bool, parent: Optional[QWidget] = None) -> ScanEditorView:
         view = cls(parent)
 
+        MAX_INT = 0x7FFFFFFF
+        view.numberOfPointsSpinBox.setRange(0, MAX_INT)
+        view.numberOfPointsXSpinBox.setRange(0, MAX_INT)
+        view.numberOfPointsYSpinBox.setRange(0, MAX_INT)
+
         layout = QFormLayout()
-        layout.addRow('Number of Points:', view.numberOfScanPointsSpinBox)
-        layout.addRow('Extent X:', view.extentXSpinBox)
-        layout.addRow('Extent Y:', view.extentYSpinBox)
+
+        if isCartesian:
+            layout.addRow('Number Of Points X:', view.numberOfPointsXSpinBox)
+            layout.addRow('Number Of Points Y:', view.numberOfPointsYSpinBox)
+        else:
+            layout.addRow('Number Of Points:', view.numberOfPointsSpinBox)
+
         layout.addRow('Step Size X:', view.stepSizeXWidget)
         layout.addRow('Step Size Y:', view.stepSizeYWidget)
         view.setLayout(layout)
@@ -60,18 +69,18 @@ class ScanTransformView(QGroupBox):
 
 class ScanEditorDialog(QDialog):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, isCartesian: bool, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.editorView = ScanEditorView.createInstance()
+        self.editorView = ScanEditorView.createInstance(isCartesian)
         self.transformView = ScanTransformView.createInstance()
         self.centerWidget = QWidget()
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanEditorDialog:
-        view = cls(parent)
-
-        view.setWindowTitle('Edit Scan')
+    def createInstance(cls,
+                       isCartesian: bool,
+                       parent: Optional[QWidget] = None) -> ScanEditorDialog:
+        view = cls(isCartesian, parent)
 
         centerLayout = QVBoxLayout()
         centerLayout.addWidget(view.editorView)
@@ -148,7 +157,6 @@ class ScanParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.positionDataView = ScanPositionDataView.createInstance()
-        self.editorDialog = ScanEditorDialog.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ScanParametersView:

@@ -18,7 +18,7 @@ except ModuleNotFoundError:
 logger = logging.getLogger(__name__)
 
 
-class WorkflowPresenter(Observer, Observable):
+class WorkflowPresenter(Observable, Observer):
 
     def __init__(self, settings: WorkflowSettings) -> None:
         super().__init__()

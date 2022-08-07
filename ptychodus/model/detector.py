@@ -15,7 +15,7 @@ from .data import ActiveDataFile, DetectorSettings, NullDiffractionDataset
 logger = logging.getLogger(__name__)
 
 
-class DetectorPresenter(Observer, Observable):
+class DetectorPresenter(Observable, Observer):
     MAX_INT = 0x7FFFFFFF
 
     def __init__(self, settings: DetectorSettings) -> None:

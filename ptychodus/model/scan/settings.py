@@ -15,8 +15,8 @@ class ScanSettings(Observable, Observer):
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/scan.csv'))
         self.inputFileSeriesKey = settingsGroup.createStringEntry('InputFileSeriesKey', 'Default')
-        self.extentX = settingsGroup.createIntegerEntry('ExtentX', 10)
-        self.extentY = settingsGroup.createIntegerEntry('ExtentY', 10)
+        self.numberOfPointsX = settingsGroup.createIntegerEntry('NumberOfPointsX', 10)
+        self.numberOfPointsY = settingsGroup.createIntegerEntry('NumberOfPointsY', 10)
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')
         self.stepSizeYInMeters = settingsGroup.createRealEntry('StepSizeYInMeters', '1e-6')
         self.jitterRadiusInMeters = settingsGroup.createRealEntry('JitterRadiusInMeters', '0')

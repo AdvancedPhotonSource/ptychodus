@@ -9,12 +9,13 @@ from .settings import ScanSettings
 class CartesianScanInitializer(ScanInitializer):
 
     def __init__(self, parameters: ScanInitializerParameters, stepSizeXInMeters: Decimal,
-                 stepSizeYInMeters: Decimal, extentX: int, extentY: int, snake: bool) -> None:
+                 stepSizeYInMeters: Decimal, numberOfPointsX: int, numberOfPointsY: int,
+                 snake: bool) -> None:
         super().__init__(parameters)
         self._stepSizeXInMeters = stepSizeXInMeters
         self._stepSizeYInMeters = stepSizeYInMeters
-        self._extentX = extentX
-        self._extentY = extentY
+        self._numberOfPointsX = numberOfPointsX
+        self._numberOfPointsY = numberOfPointsY
         self._snake = snake
 
     @classmethod
@@ -22,16 +23,17 @@ class CartesianScanInitializer(ScanInitializer):
                            snake: bool) -> CartesianScanInitializer:
         stepSizeXInMeters = settings.stepSizeXInMeters.value
         stepSizeYInMeters = settings.stepSizeYInMeters.value
-        extentX = settings.extentX.value
-        extentY = settings.extentY.value
-        return cls(parameters, stepSizeXInMeters, stepSizeYInMeters, extentX, extentY, snake)
+        numberOfPointsX = settings.numberOfPointsX.value
+        numberOfPointsY = settings.numberOfPointsY.value
+        return cls(parameters, stepSizeXInMeters, stepSizeYInMeters, numberOfPointsX,
+                   numberOfPointsY, snake)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         settings.initializer.value = self.variant
         settings.stepSizeXInMeters.value = self._stepSizeXInMeters
         settings.stepSizeYInMeters.value = self._stepSizeYInMeters
-        settings.extentX.value = self._extentX
-        settings.extentY.value = self._extentY
+        settings.numberOfPointsX.value = self._numberOfPointsX
+        settings.numberOfPointsY.value = self._numberOfPointsY
         super().syncToSettings(settings)
 
     @property
@@ -58,30 +60,30 @@ class CartesianScanInitializer(ScanInitializer):
             self._stepSizeYInMeters = stepSizeYInMeters
             self.notifyObservers()
 
-    def getExtentX(self) -> int:
-        return self._extentX
+    def getNumberOfPointsX(self) -> int:
+        return self._numberOfPointsX
 
-    def setExtentX(self, extentX: int) -> None:
-        if self._extentX != extentX:
-            self._extentX = extentX
+    def setNumberOfPointsX(self, numberOfPointsX: int) -> None:
+        if self._numberOfPointsX != numberOfPointsX:
+            self._numberOfPointsX = numberOfPointsX
             self.notifyObservers()
 
-    def getExtentY(self) -> int:
-        return self._extentY
+    def getNumberOfPointsY(self) -> int:
+        return self._numberOfPointsY
 
-    def setExtentY(self, extentY: int) -> None:
-        if self._extentY != extentY:
-            self._extentY = extentY
+    def setNumberOfPointsY(self, numberOfPointsY: int) -> None:
+        if self._numberOfPointsY != numberOfPointsY:
+            self._numberOfPointsY = numberOfPointsY
             self.notifyObservers()
 
     def _getPoint(self, index: int) -> ScanPoint:
         if index >= len(self):
             raise IndexError(f'Index {index} is out of range')
 
-        y, x = divmod(index, self._extentX)
+        y, x = divmod(index, self._numberOfPointsX)
 
         if self._snake and y & 1:
-            x = self._extentX - 1 - x
+            x = self._numberOfPointsX - 1 - x
 
         xf = x * self._stepSizeXInMeters
         yf = y * self._stepSizeYInMeters
@@ -89,4 +91,4 @@ class CartesianScanInitializer(ScanInitializer):
         return ScanPoint(xf, yf)
 
     def __len__(self) -> int:
-        return self._extentX * self._extentY
+        return self._numberOfPointsX * self._numberOfPointsY

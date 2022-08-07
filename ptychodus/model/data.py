@@ -122,7 +122,7 @@ class Detector(Observable, Observer):
             self.notifyObservers()
 
 
-class CropSizer(Observer, Observable):
+class CropSizer(Observable, Observer):
 
     def __init__(self, settings: CropSettings, detector: Detector) -> None:
         super().__init__()
@@ -533,7 +533,7 @@ class DataFilePresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class CropPresenter(Observer, Observable):
+class CropPresenter(Observable, Observer):
 
     def __init__(self, settings: CropSettings, sizer: CropSizer) -> None:
         super().__init__()

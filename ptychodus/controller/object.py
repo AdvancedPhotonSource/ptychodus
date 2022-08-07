@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Callable
 
-from ..model import ImagePresenter, Observer, Observable, Object, ObjectPresenter
+from ..model import ImagePresenter, Observable, Observer, Object, ObjectPresenter
 from ..view import ImageView, ObjectParametersView
 from .data import FileDialogFactory
 from .image import ImageController

@@ -70,6 +70,22 @@ class ScanInitializer(ScanPointSequence, Observable):
         '''synchronizes parameters to settings'''
         self._parameters.syncToSettings(settings)
 
+    def getTransformNameList(self) -> list[str]:
+        return [transform.displayName for transform in ScanPointTransform]
+
+    def getTransformName(self) -> str:
+        return self._parameters.transform.displayName
+
+    def setTransformByName(self, name: str) -> None:
+        nameLower = name.casefold()
+
+        for transform in ScanPointTransform:
+            if nameLower == transform.displayName.casefold():
+                self.setTransform(transform)
+                return
+
+        logger.error(f'Unknown scan point transform \"{name}\"!')
+
     def getTransform(self) -> ScanPointTransform:
         '''gets the scan point transform'''
         return self._parameters.transform
