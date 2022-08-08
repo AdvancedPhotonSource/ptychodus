@@ -30,7 +30,6 @@ class ViewCore(QMainWindow):
         self.splitter = QSplitter(Qt.Horizontal)
         self.parametersWidget = QStackedWidget()
         self.contentsWidget = QStackedWidget()
-        self.importSettingsDialog = ImportSettingsDialog.createInstance(self)
 
         self.settingsAction = self.navigationToolBar.addAction(fileIcon, 'Settings')
         self.settingsParametersView = SettingsParametersView.createInstance()

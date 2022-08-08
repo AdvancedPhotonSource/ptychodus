@@ -112,7 +112,7 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.autoButton = QPushButton('Auto')
         self.setButton = QPushButton('Set')
-        self.displayRangeDialog = ImageDisplayRangeDialog.createInstance()
+        self.displayRangeDialog = ImageDisplayRangeDialog.createInstance(self)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDataRangeGroupBox:

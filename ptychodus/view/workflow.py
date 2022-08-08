@@ -120,7 +120,7 @@ class WorkflowParametersView(QWidget):
         self.dataDestinationView = WorkflowDataView.createInstance('Data Destination')
         self.computeView = WorkflowComputeView.createInstance()
         self.buttonBox = WorkflowButtonBox.createInstance()
-        self.authorizeDialog = WorkflowAuthorizeDialog.createInstance()
+        self.authorizeDialog = WorkflowAuthorizeDialog.createInstance(self)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowParametersView:

@@ -135,7 +135,7 @@ class ScanController(Observer):
             transformController = ScanTransformController.createInstance(
                 initializer, dialog.transformView)
 
-            dialog.open()
+            dialog.open()  # FIXME does this modify anything correctly?
         else:
             logger.error('No scans are selected!')
 

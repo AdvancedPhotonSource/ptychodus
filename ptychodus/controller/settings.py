@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QDialog, QListView, QTableView
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup, SettingsRegistry
 from ..model import ObjectPresenter, ProbePresenter, ScanPresenter, VelociprobePresenter
-from ..view import ImportSettingsDialog, SettingsParametersView
+from ..view import SettingsImportDialog, SettingsParametersView
 from .data import FileDialogFactory
 
 
@@ -146,10 +146,10 @@ class SettingsController(Observer):
             self._syncModelToView()
 
 
-class ImportSettingsController(Observer):
+class SettingsImportController(Observer):
 
     def __init__(self, probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
-                 velociprobePresenter: VelociprobePresenter, dialog: ImportSettingsDialog) -> None:
+                 velociprobePresenter: VelociprobePresenter, dialog: SettingsImportDialog) -> None:
         super().__init__()
         self._probePresenter = probePresenter
         self._objectPresenter = objectPresenter
@@ -158,7 +158,7 @@ class ImportSettingsController(Observer):
 
     @classmethod
     def createInstance(cls, probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
-                       velociprobePresenter: VelociprobePresenter, dialog: ImportSettingsDialog):
+                       velociprobePresenter: VelociprobePresenter, dialog: SettingsImportDialog):
         controller = cls(probePresenter, objectPresenter, velociprobePresenter, dialog)
         velociprobePresenter.addObserver(controller)
         dialog.finished.connect(controller._importSettings)

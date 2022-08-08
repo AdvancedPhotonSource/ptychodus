@@ -26,9 +26,9 @@ class ControllerCore:
         self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(model.ptychopyBackend)
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeBackend)
 
-        self._importSettingsController = ImportSettingsController.createInstance(
+        self._settingsImportController = SettingsImportController.createInstance(
             model.probePresenter, model.objectPresenter, model.velociprobePresenter,
-            view.importSettingsDialog)
+            view.settingsParametersView.importDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
                                                                      view.settingsParametersView,
                                                                      view.settingsEntryView,

@@ -5,8 +5,8 @@ from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QAbstractItemView, QWidget
 
 from ..model import Observable, Observer, ImagePresenter, Probe, ProbePresenter
-from ..view import (ImageView, ProbeView, ProbeParametersView, ProbeSuperGaussianView,
-                    ProbeZonePlateView, ProgressBarItemDelegate)
+from ..view import (ImageView, ProbeView, ProbeEditorDialog, ProbeParametersView,
+                    ProbeSuperGaussianView, ProbeZonePlateView, ProgressBarItemDelegate)
 from .data import FileDialogFactory
 from .image import ImageController
 
@@ -175,9 +175,9 @@ class ProbeParametersController(Observer):
         self._fileDialogFactory = fileDialogFactory
         self._probeController = ProbeController.createInstance(presenter, view.probeView)
         self._superGaussianController = ProbeSuperGaussianController.createInstance(
-            presenter, view.initializerView.superGaussianView)
+            self._presenter, self._view.editorDialog.superGaussianView)
         self._zonePlateController = ProbeZonePlateController.createInstance(
-            presenter, view.initializerView.zonePlateView)
+            self._presenter, self._view.editorDialog.zonePlateView)
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
         self._modesTableModel = ProbeModesTableModel(presenter)
@@ -203,19 +203,30 @@ class ProbeParametersController(Observer):
             initAction.triggered.connect(controller._createInitializerLambda(name))
 
         view.modesView.buttonBox.saveButton.clicked.connect(controller._saveProbe)
-        view.modesView.buttonBox.addAModeButton.clicked.connect(presenter.addAMode)
-        view.modesView.buttonBox.removeAModeButton.clicked.connect(presenter.removeAMode)
+        view.modesView.buttonBox.editButton.clicked.connect(controller._editProbe)
+
+        addAModeAction = view.modesView.buttonBox.modesMenu.addAction('Append A Mode')
+        addAModeAction.triggered.connect(presenter.addAMode)
+
+        removeAModeAction = view.modesView.buttonBox.modesMenu.addAction('Remove Last Mode')
+        removeAModeAction.triggered.connect(presenter.removeAMode)
 
         controller._syncModelToView()
 
         return controller
 
+    def _editProbe(self) -> None:
+        self._view.editorDialog.setWindowTitle('name')  # FIXME
+        self._view.editorDialog.open()
+
     def _initializeProbe(self, name: str) -> None:
         if name == 'Open File...':
-            self._openProbe()
+            if not self._openProbe():
+                return
 
         self._presenter.setInitializer(name)
         self._presenter.initializeProbe()
+        self._editProbe()
 
     def _createInitializerLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
@@ -228,16 +239,20 @@ class ProbeParametersController(Observer):
     def _displayProbeMode(self, current: QModelIndex, previous: QModelIndex) -> None:
         self._renderImageData(current.row())
 
-    def _openProbe(self) -> None:
+    def _openProbe(self) -> bool:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Probe',
             nameFilters=self._presenter.getOpenFileFilterList(),
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
-        if filePath:
+        accepted = bool(filePath)
+
+        if accepted:
             self._presenter.setOpenFilePath(filePath)
             self._presenter.setOpenFileFilter(nameFilter)
+
+        return accepted
 
     def _saveProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(

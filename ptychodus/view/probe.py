@@ -1,9 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHeaderView, QHBoxLayout, QMenu,
-                             QPushButton, QSizePolicy, QStackedWidget, QTableView, QVBoxLayout,
-                             QWidget)
+from PyQt5.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
+                             QHeaderView, QHBoxLayout, QMenu, QPushButton, QSizePolicy,
+                             QStackedWidget, QTableView, QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, EnergyWidget, LengthWidget, SemiautomaticSpinBox
 
@@ -73,23 +73,34 @@ class ProbeZonePlateView(QWidget):
         return view
 
 
-class ProbeInitializerView(QGroupBox):
+class ProbeEditorDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Initializer', parent)
+        super().__init__(parent)
         self.superGaussianView = ProbeSuperGaussianView.createInstance()
         self.zonePlateView = ProbeZonePlateView.createInstance()
+        self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeInitializerView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeEditorDialog:
         view = cls(parent)
+
+        view.buttonBox.addButton(QDialogButtonBox.Ok)
+        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
         layout.addWidget(view.superGaussianView)
         layout.addWidget(view.zonePlateView)
+        layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view
+
+    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
+            self.accept()
+        else:
+            self.reject()
 
 
 class ProbeModesButtonBox(QWidget):
@@ -99,21 +110,23 @@ class ProbeModesButtonBox(QWidget):
         self.initializeMenu = QMenu()
         self.initializeButton = QPushButton('Initialize')
         self.saveButton = QPushButton('Save')
-        self.addAModeButton = QPushButton('Add A Mode')
-        self.removeAModeButton = QPushButton('Remove A Mode')
+        self.editButton = QPushButton('Edit')
+        self.modesMenu = QMenu()
+        self.modesButton = QPushButton('Modes')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeModesButtonBox:
         view = cls(parent)
 
         view.initializeButton.setMenu(view.initializeMenu)
+        view.modesButton.setMenu(view.modesMenu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.initializeButton)
         layout.addWidget(view.saveButton)
-        layout.addWidget(view.addAModeButton)
-        layout.addWidget(view.removeAModeButton)
+        layout.addWidget(view.editButton)
+        layout.addWidget(view.modesButton)
         view.setLayout(layout)
 
         return view
@@ -145,8 +158,8 @@ class ProbeParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.probeView = ProbeView.createInstance()
-        self.initializerView = ProbeInitializerView.createInstance()  # FIXME
         self.modesView = ProbeModesView.createInstance()
+        self.editorDialog = ProbeEditorDialog.createInstance(self)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeParametersView:
