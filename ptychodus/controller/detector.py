@@ -86,10 +86,9 @@ class DatasetListModel(QAbstractListModel):
                 value = self._presenter.getDatasetName(index.row())
             elif role == Qt.FontRole:
                 state = self._presenter.getDatasetState(index.row())
-                value = QFont()
-
-                if state == DatasetState.EXISTS:
-                    value.setItalic(True)
+                font = QFont()
+                font.setItalic(state == DatasetState.EXISTS)
+                value = QVariant(font)
 
         return value
 

@@ -95,6 +95,7 @@ class ViewCore(QMainWindow):
 
         view.settingsEntryView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         view.dataFileTreeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)
+        view.workflowTableView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsParametersView)

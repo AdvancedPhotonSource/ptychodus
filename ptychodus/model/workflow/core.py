@@ -7,6 +7,7 @@ import logging
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from .settings import WorkflowSettings
+from .client import WorkflowRun
 
 try:
     from .globusClient import GlobusWorkflowClient as WorkflowClient
@@ -82,9 +83,13 @@ class WorkflowPresenter(Observable, Observer):
         if self._client:
             self._client.listFlows()
 
-    def listFlowRuns(self) -> None:
+    def listFlowRuns(self) -> list[WorkflowRun]:
+        flowRuns: list[WorkflowRun] = list()
+
         if self._client:
-            self._client.listFlowRuns()
+            flowRuns.extend(self._client.listFlowRuns())
+
+        return flowRuns
 
     def deployFlow(self) -> None:
         if self._client:

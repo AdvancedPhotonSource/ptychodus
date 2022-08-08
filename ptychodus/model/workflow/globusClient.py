@@ -10,7 +10,7 @@ from globus_automate_client.flows_client import (MANAGE_FLOWS_SCOPE, RUN_FLOWS_S
                                                  RUN_STATUS_SCOPE, VIEW_FLOWS_SCOPE)
 from globus_sdk import NativeAppAuthClient, OAuthTokenResponse, RefreshTokenAuthorizer
 
-from .client import WorkflowClient, WorkflowClientBuilder
+from .client import WorkflowClient, WorkflowClientBuilder, WorkflowRun
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
@@ -43,15 +43,38 @@ class GlobusWorkflowClient(WorkflowClient):
         return self._authorizerMapping[resourceServer]
 
     def listFlows(self) -> None:
-        myFlows = self._client.list_flows()
-        # NOTE type(myFlows) is globus_sdk.response.GlobusHTTPResponse
-        logger.info(f'Flow List: {myFlows}')
+        response = self._client.list_flows()
+        logger.info(f'Flow List: {response}')
 
-    def listFlowRuns(self) -> None:
+    def listFlowRuns(self) -> list[WorkflowRun]:
+        runList: list[WorkflowRun] = list()
         flowID = str(self._settings.flowID.value)
-        myFlowRuns = self._client.list_flow_runs(flow_id=flowID)
-        # NOTE type(myFlowRuns) is globus_sdk.response.GlobusHTTPResponse
-        logger.info(f'Flow Run List: {myFlowRuns}')
+        orderings = {'start_time': 'desc'}  # ordering by start_time (descending)
+        response = self._client.list_flow_runs(flow_id=flowID, orderings=orderings)
+        logger.debug(f'Flow Run List: {response}')
+
+        for runDict in response['runs']:
+            run = WorkflowRun(label=runDict.get('label', ''),
+                              startTime=runDict.get('start_time', ''),
+                              completionTime=runDict.get('completion_time', ''),
+                              status=runDict.get('status', ''),
+                              displayStatus=runDict.get('display_status', ''),
+                              runId=runDict.get('run_id', ''))
+            runList.append(run)
+
+        #flow_action_id = response.data['actions'][0]['action_id']
+        #flow_action = flows_client.flow_action_status(flow_id, flow_scope,
+        #                                              flow_action_id)
+        #try:
+        #    flow_step = flow_action['details']['action_statuses'][0]['state_name']
+        #except:
+        #    flow_step = 'None'
+
+        #flow_status = flow_action['status']
+        #scanid = re.search(r'^\d+', flow_action['label'])[0]
+        #info = f"{scanid} {flow_step} {flow_status}"
+
+        return runList
 
     def _loadFlowDefinition(self) -> dict[str, Any]:
         flowDefinitionPath = Path(__file__).parents[0] / 'flowDefinition.json'
@@ -80,7 +103,6 @@ class GlobusWorkflowClient(WorkflowClient):
             visible_to=['public'],
             runnable_by=['all_authenticated_users'],
         )
-        # NOTE type(deployResult) is globus_sdk.response.GlobusHTTPResponse
 
         flowID = deployResult.data['id']
         logger.info(f'Deployed Flow ID: {flowID}')

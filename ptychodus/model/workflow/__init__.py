@@ -1,1 +1,1 @@
-from .core import WorkflowCore, WorkflowPresenter
+from .core import WorkflowCore, WorkflowPresenter, WorkflowRun
