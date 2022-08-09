@@ -168,17 +168,14 @@ class ImageCore:
         self._array = VisualizationArray()
         self._displayRange = DisplayRange()
 
-        self._amplitudeChooser = ImageCore.createComponentChooser([
-            AmplitudeArrayComponent(self._array, transformChooser),
-        ])
-
+        # FIXME BEGIN
         self._componentChooser = ImageCore.createComponentChooser([
-            AmplitudeArrayComponent(self._array, transformChooser),
-            PhaseArrayComponent(self._array, transformChooser),
-            RealArrayComponent(self._array, transformChooser),
-            ImaginaryArrayComponent(self._array, transformChooser),
+            ComplexArrayComponent(self._array),
+            AmplitudeArrayComponent(self._array),
+            PhaseArrayComponent(self._array),
+            RealArrayComponent(self._array),
+            ImaginaryArrayComponent(self._array),
         ])
-
         self._mappedColorizer = MappedColorizer.createInstance(self._componentChooser,
                                                                self._displayRange)
         self._colorizerChooser = PluginChooser[Colorizer](ImageCore.createColorizerPlugin(
@@ -187,6 +184,7 @@ class ImageCore:
         for colorizer in CylindricalColorModelColorizer.createVariants(
                 self._amplitudeChooser, self._displayRange):
             self._colorizerChooser.addStrategy(ImageCore.createColorizerPlugin(colorizer))
+        # FIXME END
 
         self.presenter = ImagePresenter.createInstance(self._array, self._displayRange,
                                                        self._colorizerChooser)

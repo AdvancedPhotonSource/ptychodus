@@ -16,9 +16,8 @@ CylindricalColorModel = Callable[[float, float, float], tuple[float, float, floa
 
 class CylindricalColorModelColorizer(Colorizer):
 
-    def __init__(self, componentChooser: PluginChooser[VisualizationArrayComponent],
-                 displayRange: DisplayRange, name: str, model: CylindricalColorModel,
-                 variant: bool) -> None:
+    def __init__(self, name: str, componentChooser: PluginChooser[VisualizationArrayComponent],
+                 displayRange: DisplayRange, model: CylindricalColorModel, variant: bool) -> None:
         super().__init__(name, componentChooser, displayRange)
         self._model = numpy.vectorize(model)
         self._variant = variant
@@ -27,11 +26,23 @@ class CylindricalColorModelColorizer(Colorizer):
     def createVariants(cls, componentChooser: PluginChooser[VisualizationArrayComponent],
                        displayRange: DisplayRange) -> list[Colorizer]:
         return [
-            cls(componentChooser, displayRange, 'HSV Saturation', colorsys.hsv_to_rgb, False),
-            cls(componentChooser, displayRange, 'HSV Value', colorsys.hsv_to_rgb, True),
-            cls(componentChooser, displayRange, 'HLS Lightness', colorsys.hls_to_rgb, False),
-            cls(componentChooser, displayRange, 'HLS Saturation', colorsys.hls_to_rgb, True)
+            cls('HSV Saturation', componentChooser, displayRange, colorsys.hsv_to_rgb, False),
+            cls('HSV Value', componentChooser, displayRange, colorsys.hsv_to_rgb, True),
+            cls('HLS Lightness', componentChooser, displayRange, colorsys.hls_to_rgb, False),
+            cls('HLS Saturation', componentChooser, displayRange, colorsys.hls_to_rgb, True)
         ]
+
+    def getVariantList(self) -> list[str]:
+        return list() # FIXME
+
+    def getVariant(self) -> str:
+        return str() # FIXME
+
+    def setVariant(self, name: str) -> None:
+        pass # FIXME
+
+    def getDataRange(self) -> Interval[Decimal]:
+        pass # FIXME
 
     def __call__(self) -> RealArrayType:
         norm = Normalize(vmin=float(self._displayRange.getLower()),

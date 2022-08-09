@@ -67,10 +67,10 @@ class ProbePresenter(Observable, Observer):
     def getInitializerNameList(self) -> list[str]:
         return self._initializerChooser.getDisplayNameList()
 
-    def getInitializer(self) -> str:
+    def getInitializerName(self) -> str:
         return self._initializerChooser.getCurrentDisplayName()
 
-    def setInitializer(self, name: str) -> None:
+    def setInitializerByName(self, name: str) -> None:
         self._initializerChooser.setFromDisplayName(name)
 
     def getOpenFilePath(self) -> Path:

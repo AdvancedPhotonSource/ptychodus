@@ -2,69 +2,63 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 
 from ...api.geometry import Interval
-from ...api.image import RealArrayType
+from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from .displayRange import DisplayRange
 from .visarray import VisualizationArrayComponent
 
 
-class Colorizer(Observable, Observer):
+class Colorizer(Observable, Observer, ABC):
 
-    def __init__(self, name: str, componentChooser: PluginChooser[VisualizationArrayComponent],
+    def __init__(self, arrayComponent: VisualizationArrayComponent,
+                 transformChooser: PluginChooser[ScalarTransformation],
                  displayRange: DisplayRange) -> None:
         super().__init__()
-        self._name = name
-        self._componentChooser = componentChooser
+        self._arrayComponent = arrayComponent
+        self._arrayComponent.addObserver(self)
+        self._transformChooser = transformChooser
+        self._transformChooser.addObserver(self)
         self._displayRange = displayRange
-
-        componentChooser.addObserver(self)
-        componentChooser.getCurrentStrategy().addObserver(self)
-        displayRange.addObserver(self)
+        self._displayRange.addObserver(self)
 
     @property
     def name(self) -> str:
-        return self._name
-
-    @property
-    def _component(self) -> VisualizationArrayComponent:
-        return self._componentChooser.getCurrentStrategy()
-
-    def getArrayComponentList(self) -> list[str]:
-        return self._componentChooser.getDisplayNameList()
-
-    def getArrayComponent(self) -> str:
-        return self._componentChooser.getCurrentDisplayName()
-
-    def setArrayComponent(self, name: str) -> None:
-        self._component.removeObserver(self)
-        self._componentChooser.setFromDisplayName(name)
-        self._component.addObserver(self)
-
-    def getDataRange(self) -> Interval[Decimal]:
-        component = self._componentChooser.getCurrentStrategy()
-        values = component()
-        lower = Decimal(repr(values.min()))
-        upper = Decimal(repr(values.max()))
-        return Interval[Decimal](lower, upper)
+        return self._arrayComponent.name
 
     def getScalarTransformationList(self) -> list[str]:
-        return self._component.getScalarTransformationList()
+        return self._transformChooser.getDisplayNameList()
 
     def getScalarTransformation(self) -> str:
-        return self._component.getScalarTransformation()
+        return self._transformChooser.getCurrentDisplayName()
 
     def setScalarTransformation(self, name: str) -> None:
-        self._component.setScalarTransformation(name)
+        self._transformChooser.setFromDisplayName(name)
+
+    @abstractmethod
+    def getVariantList(self) -> list[str]:
+        pass
+
+    @abstractmethod
+    def getVariant(self) -> str:
+        pass
+
+    @abstractmethod
+    def setVariant(self, name: str) -> None:
+        pass
+
+    @abstractmethod
+    def getDataRange(self) -> Interval[Decimal]:
+        pass
 
     @abstractmethod
     def __call__(self) -> RealArrayType:
         pass
 
     def update(self, observable: Observable) -> None:
-        if observable is self._componentChooser:
+        if observable is self._arrayComponent:
             self.notifyObservers()
-        elif observable is self._component:
+        elif observable is self._transformChooser:
             self.notifyObservers()
         elif observable is self._displayRange:
             self.notifyObservers()

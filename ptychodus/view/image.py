@@ -4,10 +4,11 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QDoubleValidator, QPixmap, QWheelEvent
-from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, \
-        QFormLayout, QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
-        QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout, \
-        QLabel, QPushButton, QSizePolicy, QSpinBox, QStyle, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFormLayout, QGraphicsPixmapItem, QGraphicsScene,
+                             QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
+                             QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
+                             QSpinBox, QStyle, QVBoxLayout, QWidget)
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
@@ -77,26 +78,23 @@ class ImageColorizerGroupBox(BottomTitledGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Colorize', parent)
-        self.colorizerComboBox = QComboBox()
         self.componentComboBox = QComboBox()
-        self.scalarTransformationComboBox = QComboBox()
-        self.colormapComboBox = QComboBox()
+        self.transformerComboBox = QComboBox()
+        self.colorizerComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColorizerGroupBox:
         view = cls(parent)
 
-        view.colorizerComboBox.setToolTip('Colorizer')
         view.componentComboBox.setToolTip('Component')
-        view.scalarTransformationComboBox.setToolTip('Scalar Transformation')
-        view.colormapComboBox.setToolTip('Colormap')
+        view.transformerComboBox.setToolTip('Transformer')
+        view.colorizerComboBox.setToolTip('Colorizer')
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 35)
-        layout.addWidget(view.colorizerComboBox)
         layout.addWidget(view.componentComboBox)
-        layout.addWidget(view.scalarTransformationComboBox)
-        layout.addWidget(view.colormapComboBox)
+        layout.addWidget(view.transformerComboBox)
+        layout.addWidget(view.colorizerComboBox)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)

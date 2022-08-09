@@ -216,7 +216,9 @@ class ProbeParametersController(Observer):
         return controller
 
     def _editProbe(self) -> None:
-        self._view.editorDialog.setWindowTitle('name')  # FIXME
+        initializerName = self._presenter.getInitializerName()
+        self._view.editorDialog.setWindowTitle(initializerName)
+        # FIXME setup dialog and update view while editing
         self._view.editorDialog.open()
 
     def _initializeProbe(self, name: str) -> None:
@@ -224,7 +226,7 @@ class ProbeParametersController(Observer):
             if not self._openProbe():
                 return
 
-        self._presenter.setInitializer(name)
+        self._presenter.setInitializerByName(name)
         self._presenter.initializeProbe()
         self._editProbe()
 

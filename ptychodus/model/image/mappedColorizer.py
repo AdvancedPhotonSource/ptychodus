@@ -53,19 +53,28 @@ class MappedColorizer(Colorizer):
         acyclicColormapChooser.addObserver(colorizer)
         return colorizer
 
+    def getDataRange(self) -> Interval[Decimal]:
+        values = self._arrayComponent()
+        lower = Decimal(repr(values.min()))
+        upper = Decimal(repr(values.max()))
+        return Interval[Decimal](lower, upper)
+
     @property
     def _colormapChooser(self) -> PluginChooser[Colormap]:
-        return self._cyclicColormapChooser if self._component.isCyclic \
+        return self._cyclicColormapChooser if self._arrayComponent.isCyclic \
                 else self._acyclicColormapChooser
 
-    def getColormapList(self) -> list[str]:
+    def getVariantList(self) -> list[str]:
         return self._colormapChooser.getDisplayNameList()
 
-    def getColormap(self) -> str:
+    def getVariant(self) -> str:
         return self._colormapChooser.getCurrentDisplayName()
 
-    def setColormap(self, name: str) -> None:
+    def setVariant(self, name: str) -> None:
         self._colormapChooser.setFromDisplayName(name)
+
+    def getDataRange(self) -> Interval[Decimal]:
+        pass # FIXME
 
     def __call__(self) -> RealArrayType:
         norm = Normalize(vmin=float(self._displayRange.getLower()),
@@ -73,7 +82,7 @@ class MappedColorizer(Colorizer):
                          clip=False)
         cmap = self._colormapChooser.getCurrentStrategy()
         scalarMappable = ScalarMappable(norm, cmap)
-        return scalarMappable.to_rgba(self._component())
+        return scalarMappable.to_rgba(self._arrayComponent())
 
     def update(self, observable: Observable) -> None:
         if observable is self._cyclicColormapChooser:
