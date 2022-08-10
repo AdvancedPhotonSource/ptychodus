@@ -11,40 +11,39 @@ from .visarray import VisualizationArrayComponent
 
 class Colorizer(Observable, Observer, ABC):
 
-    def __init__(self, arrayComponent: VisualizationArrayComponent,
-                 transformChooser: PluginChooser[ScalarTransformation],
-                 displayRange: DisplayRange) -> None:
+    def __init__(self, arrayComponent: VisualizationArrayComponent, displayRange: DisplayRange,
+                 transformChooser: PluginChooser[ScalarTransformation]) -> None:
         super().__init__()
         self._arrayComponent = arrayComponent
         self._arrayComponent.addObserver(self)
-        self._transformChooser = transformChooser
-        self._transformChooser.addObserver(self)
         self._displayRange = displayRange
         self._displayRange.addObserver(self)
+        self._transformChooser = transformChooser
+        self._transformChooser.addObserver(self)
 
     @property
     def name(self) -> str:
         return self._arrayComponent.name
 
-    def getScalarTransformationList(self) -> list[str]:
+    def getScalarTransformationNameList(self) -> list[str]:
         return self._transformChooser.getDisplayNameList()
 
-    def getScalarTransformation(self) -> str:
+    def getScalarTransformationName(self) -> str:
         return self._transformChooser.getCurrentDisplayName()
 
-    def setScalarTransformation(self, name: str) -> None:
+    def setScalarTransformationByName(self, name: str) -> None:
         self._transformChooser.setFromDisplayName(name)
 
     @abstractmethod
-    def getVariantList(self) -> list[str]:
+    def getVariantNameList(self) -> list[str]:
         pass
 
     @abstractmethod
-    def getVariant(self) -> str:
+    def getVariantName(self) -> str:
         pass
 
     @abstractmethod
-    def setVariant(self, name: str) -> None:
+    def setVariantByName(self, name: str) -> None:
         pass
 
     @abstractmethod
@@ -58,7 +57,7 @@ class Colorizer(Observable, Observer, ABC):
     def update(self, observable: Observable) -> None:
         if observable is self._arrayComponent:
             self.notifyObservers()
-        elif observable is self._transformChooser:
-            self.notifyObservers()
         elif observable is self._displayRange:
+            self.notifyObservers()
+        elif observable is self._transformChooser:
             self.notifyObservers()

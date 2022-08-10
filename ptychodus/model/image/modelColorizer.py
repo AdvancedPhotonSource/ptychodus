@@ -1,44 +1,105 @@
-from __future__ import annotations
-from typing import Callable
+from abc import ABC, abstractmethod, abstractproperty
+from decimal import Decimal
 import colorsys
 
 from matplotlib.colors import Normalize
 import numpy
 
-from ...api.image import RealArrayType
-from ...api.plugins import PluginChooser
+from ...api.geometry import Interval
+from ...api.image import RealArrayType, ScalarTransformation
+from ...api.observer import Observable
+from ...api.plugins import PluginChooser, PluginEntry
 from .colorizer import Colorizer
 from .displayRange import DisplayRange
-from .visarray import VisualizationArrayComponent
+from .visarray import ComplexArrayComponent, VisualizationArray
 
-CylindricalColorModel = Callable[[float, float, float], tuple[float, float, float]]
+
+class CylindricalColorModel(ABC):
+
+    @abstractproperty
+    def name(self) -> str:
+        pass
+
+    @abstractmethod
+    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
+        pass
+
+
+class HSVSaturationColorModel(CylindricalColorModel):
+
+    @property
+    def name(self) -> str:
+        return 'HSV Saturation'
+
+    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
+        return colorsys.hsv_to_rgb(h, x, y)
+
+
+class HSVValueColorModel(CylindricalColorModel):
+
+    @property
+    def name(self) -> str:
+        return 'HSV Value'
+
+    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
+        return colorsys.hsv_to_rgb(h, y, x)
+
+
+class HLSLightnessColorModel(CylindricalColorModel):
+
+    @property
+    def name(self) -> str:
+        return 'HLS Lightness'
+
+    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
+        return colorsys.hls_to_rgb(h, x, y)
+
+
+class HLSSaturationColorModel(CylindricalColorModel):
+
+    @property
+    def name(self) -> str:
+        return 'HLS Saturation'
+
+    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
+        return colorsys.hls_to_rgb(h, y, x)
 
 
 class CylindricalColorModelColorizer(Colorizer):
 
-    def __init__(self, name: str, componentChooser: PluginChooser[VisualizationArrayComponent],
-                 displayRange: DisplayRange, model: CylindricalColorModel, variant: bool) -> None:
-        super().__init__(name, componentChooser, displayRange)
-        self._model = numpy.vectorize(model)
+    def __init__(self, arrayComponent: ComplexArrayComponent, displayRange: DisplayRange,
+                 transformChooser: PluginChooser[ScalarTransformation],
+                 variantChooser: PluginChooser[CylindricalColorModel]) -> None:
+        super().__init__(arrayComponent, displayRange, transformChooser)
         self._variantChooser = variantChooser
+        self._variantChooser.addObserver(self)
 
     @classmethod
-    def createVariants(cls, componentChooser: PluginChooser[VisualizationArrayComponent],
-                       displayRange: DisplayRange) -> list[Colorizer]:
-        return [
-            cls('HSV Saturation', componentChooser, displayRange, colorsys.hsv_to_rgb, False),
-            cls('HSV Value', componentChooser, displayRange, colorsys.hsv_to_rgb, True),
-            cls('HLS Lightness', componentChooser, displayRange, colorsys.hls_to_rgb, False),
-            cls('HLS Saturation', componentChooser, displayRange, colorsys.hls_to_rgb, True)
+    def createColorizerList(
+            cls, array: VisualizationArray, displayRange: DisplayRange,
+            transformChooser: PluginChooser[ScalarTransformation]) -> list[Colorizer]:
+        arrayComponent = ComplexArrayComponent(array)
+        modelList = [
+            HSVSaturationColorModel(),
+            HSVValueColorModel(),
+            HLSLightnessColorModel(),
+            HLSSaturationColorModel()
         ]
+        variantList = [
+            PluginEntry[CylindricalColorModel](simpleName=model.name,
+                                               displayName=model.name,
+                                               strategy=model) for model in modelList
+        ]
+        variantChooser = PluginChooser[CylindricalColorModel].createFromList(variantList)
+        return [cls(arrayComponent, displayRange, transformChooser, variantChooser)]
 
-    def getVariantList(self) -> list[str]:
+    def getVariantNameList(self) -> list[str]:
         return self._variantChooser.getDisplayNameList()
 
-    def getVariant(self) -> str:
+    def getVariantName(self) -> str:
         return self._variantChooser.getCurrentDisplayName()
 
-    def setVariant(self, name: str) -> None:
+    def setVariantByName(self, name: str) -> None:
         self._variantChooser.setFromDisplayName(name)
 
     def getDataRange(self) -> Interval[Decimal]:
@@ -48,20 +109,28 @@ class CylindricalColorModelColorizer(Colorizer):
         return Interval[Decimal](lower, upper)
 
     def __call__(self) -> RealArrayType:
-        # FIXME crash when display range reversed
+        if self._displayRange.getUpper() <= self._displayRange.getLower():
+            shape = self._arrayComponent().shape
+            return numpy.zeros((*shape, 4))
+
+        amplitude = numpy.absolute(self._arrayComponent())
+        phaseInRadians = numpy.angle(self._arrayComponent())
         norm = Normalize(vmin=float(self._displayRange.getLower()),
                          vmax=float(self._displayRange.getUpper()),
                          clip=False)
 
-        phaseInRadians = numpy.angle(self._arrayComponent())
         h = (phaseInRadians + numpy.pi) / (2 * numpy.pi)
-        x = norm(self._component())
+        x = norm(amplitude)
         y = numpy.ones_like(h)
         a = numpy.ones_like(h)
 
-        if self._variant:
-            y, x = x, y
-
-        r, g, b = self._model(h, x, y)
+        model = numpy.vectorize(self._variantChooser.getCurrentStrategy())
+        r, g, b = model(h, x, y)
 
         return numpy.stack((r, g, b, a), axis=-1)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._variantChooser:
+            self.notifyObservers()
+        else:
+            super().update(observable)

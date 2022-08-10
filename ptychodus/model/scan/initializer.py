@@ -4,12 +4,15 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import overload, Union
+import logging
 
 import numpy
 
 from ...api.observer import Observable, Observer
 from ...api.scan import ScanPoint, ScanPointSequence, ScanPointTransform
 from .settings import ScanSettings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

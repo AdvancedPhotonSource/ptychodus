@@ -78,23 +78,23 @@ class ImageColorizerGroupBox(BottomTitledGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Colorize', parent)
-        self.componentComboBox = QComboBox()
-        self.transformerComboBox = QComboBox()
         self.colorizerComboBox = QComboBox()
+        self.scalarTransformComboBox = QComboBox()
+        self.variantComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColorizerGroupBox:
         view = cls(parent)
 
-        view.componentComboBox.setToolTip('Component')
-        view.transformerComboBox.setToolTip('Transformer')
-        view.colorizerComboBox.setToolTip('Colorizer')
+        view.colorizerComboBox.setToolTip('Array Component')
+        view.scalarTransformComboBox.setToolTip('Scalar Transform')
+        view.variantComboBox.setToolTip('Colorizer')
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 35)
-        layout.addWidget(view.componentComboBox)
-        layout.addWidget(view.transformerComboBox)
         layout.addWidget(view.colorizerComboBox)
+        layout.addWidget(view.scalarTransformComboBox)
+        layout.addWidget(view.variantComboBox)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)

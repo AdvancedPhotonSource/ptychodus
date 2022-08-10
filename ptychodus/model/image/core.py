@@ -3,7 +3,7 @@ from decimal import Decimal
 import logging
 
 from ...api.geometry import Interval
-from ...api.image import RealArrayType
+from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from .colorizer import Colorizer
@@ -38,38 +38,29 @@ class ImagePresenter(Observable, Observer):
     def setArray(self, array: NumericArrayType) -> None:
         self._array.setArray(array)
 
-    def getColorizerList(self) -> list[str]:
-        return self._colorizerChooser.getDisplayNameList()
-
-    def getColorizer(self) -> str:
-        return self._colorizerChooser.getCurrentDisplayName()
-
-    def setColorizer(self, name: str) -> None:
-        self._colorizer.removeObserver(self)
-        self._colorizerChooser.setFromDisplayName(name)
-        self._colorizer.addObserver(self)
-
     @property
     def _colorizer(self) -> Colorizer:
         return self._colorizerChooser.getCurrentStrategy()
 
-    def getArrayComponentList(self) -> list[str]:
-        return self._colorizer.getArrayComponentList()
+    def getColorizerNameList(self) -> list[str]:
+        return self._colorizerChooser.getDisplayNameList()
 
-    def getArrayComponent(self) -> str:
-        return self._colorizer.getArrayComponent()
+    def getColorizerName(self) -> str:
+        return self._colorizerChooser.getCurrentDisplayName()
 
-    def setArrayComponent(self, name: str) -> None:
-        self._colorizer.setArrayComponent(name)
+    def setColorizerByName(self, name: str) -> None:
+        self._colorizer.removeObserver(self)
+        self._colorizerChooser.setFromDisplayName(name)
+        self._colorizer.addObserver(self)
 
-    def getScalarTransformationList(self) -> list[str]:
-        return self._colorizer.getScalarTransformationList()
+    def getScalarTransformationNameList(self) -> list[str]:
+        return self._colorizer.getScalarTransformationNameList()
 
-    def getScalarTransformation(self) -> str:
-        return self._colorizer.getScalarTransformation()
+    def getScalarTransformationName(self) -> str:
+        return self._colorizer.getScalarTransformationName()
 
-    def setScalarTransformation(self, name: str) -> None:
-        self._colorizer.setScalarTransformation(name)
+    def setScalarTransformationByName(self, name: str) -> None:
+        self._colorizer.setScalarTransformationByName(name)
 
     def getDisplayRangeLimits(self) -> Interval[Decimal]:
         return self._displayRange.getLimits()
@@ -103,37 +94,20 @@ class ImagePresenter(Observable, Observer):
     def setCustomDisplayRange(self, minValue: Decimal, maxValue) -> None:
         self._displayRange.setLimits(minValue, maxValue)
 
-    def isColormapEnabled(self) -> bool:
-        return isinstance(self._colorizer, MappedColorizer)
+    def getVariantNameList(self) -> list[str]:
+        return self._colorizer.getVariantNameList()
 
-    def getColormapList(self) -> list[str]:
-        colormapList: list[str] = list()
+    def getVariantName(self) -> str:
+        return self._colorizer.getVariantName()
 
-        if isinstance(self._colorizer, MappedColorizer):
-            colormapList.extend(self._colorizer.getColormapList())
-
-        return colormapList
-
-    def getColormap(self) -> str:
-        colormap = str()
-
-        if isinstance(self._colorizer, MappedColorizer):
-            colormap = self._colorizer.getColormap()
-
-        return colormap
-
-    def setColormap(self, name: str) -> None:
-        if isinstance(self._colorizer, MappedColorizer):
-            self._colorizer.setColormap(name)
-        else:
-            logger.error('Colorizer does not accept a colormap.')
+    def setVariantByName(self, name: str) -> None:
+        self._colorizer.setVariantByName(name)
 
     def getImage(self) -> RealArrayType:
         return self._image
 
     def _updateImage(self) -> None:
-        colorizer = self._colorizerChooser.getCurrentStrategy()
-        self._image = colorizer()
+        self._image = self._colorizer()
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
@@ -146,20 +120,7 @@ class ImagePresenter(Observable, Observer):
 class ImageCore:
 
     @staticmethod
-    def createComponentChooser(componentList: list[VisualizationArrayComponent]) -> \
-            PluginChooser[VisualizationArrayComponent]:
-        entryList: list[PluginEntry[VisualizationArrayComponent]] = list()
-
-        for component in componentList:
-            entry = PluginEntry[VisualizationArrayComponent](simpleName=component.name,
-                                                             displayName=component.name,
-                                                             strategy=component)
-            entryList.append(entry)
-
-        return PluginChooser[VisualizationArrayComponent].createFromList(entryList)
-
-    @staticmethod
-    def createColorizerPlugin(colorizer: Colorizer) -> PluginEntry[Colorizer]:
+    def _createColorizerPlugin(colorizer: Colorizer) -> PluginEntry[Colorizer]:
         return PluginEntry[Colorizer](simpleName=colorizer.name,
                                       displayName=colorizer.name,
                                       strategy=colorizer)
@@ -168,23 +129,10 @@ class ImageCore:
         self._array = VisualizationArray()
         self._displayRange = DisplayRange()
 
-        # FIXME BEGIN
-        self._componentChooser = ImageCore.createComponentChooser([
-            ComplexArrayComponent(self._array),
-            AmplitudeArrayComponent(self._array),
-            PhaseArrayComponent(self._array),
-            RealArrayComponent(self._array),
-            ImaginaryArrayComponent(self._array),
-        ])
-        self._mappedColorizer = MappedColorizer.createInstance(self._componentChooser,
-                                                               self._displayRange)
-        self._colorizerChooser = PluginChooser[Colorizer](ImageCore.createColorizerPlugin(
-            self._mappedColorizer))
-
-        for colorizer in CylindricalColorModelColorizer.createVariants(
-                self._amplitudeChooser, self._displayRange):
-            self._colorizerChooser.addStrategy(ImageCore.createColorizerPlugin(colorizer))
-        # FIXME END
-
+        colorizerArgs = (self._array, self._displayRange, transformChooser)
+        colorizerList = MappedColorizer.createColorizerList(*colorizerArgs) \
+                + CylindricalColorModelColorizer.createColorizerList(*colorizerArgs)
+        self._colorizerChooser = PluginChooser[Colorizer].createFromList(
+            [ImageCore._createColorizerPlugin(colorizer) for colorizer in colorizerList])
         self.presenter = ImagePresenter.createInstance(self._array, self._displayRange,
                                                        self._colorizerChooser)

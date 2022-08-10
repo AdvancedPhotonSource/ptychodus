@@ -5,28 +5,30 @@ from decimal import Decimal
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Colormap, Normalize
 import matplotlib
+import numpy
 
 from ...api.geometry import Interval
-from ...api.image import RealArrayType
+from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable
 from ...api.plugins import PluginChooser, PluginEntry
 from .colorizer import Colorizer
 from .displayRange import DisplayRange
-from .visarray import VisualizationArrayComponent
+from .visarray import *
 
 
 class MappedColorizer(Colorizer):
 
-    def __init__(self, componentChooser: PluginChooser[VisualizationArrayComponent],
-                 displayRange: DisplayRange, cyclicColormapChooser: PluginChooser[Colormap],
-                 acyclicColormapChooser: PluginChooser[Colormap]) -> None:
-        super().__init__('Colormap', componentChooser, displayRange)
-        self._cyclicColormapChooser = cyclicColormapChooser
-        self._acyclicColormapChooser = acyclicColormapChooser
+    def __init__(self, arrayComponent: VisualizationArrayComponent, displayRange: DisplayRange,
+                 transformChooser: PluginChooser[ScalarTransformation],
+                 variantChooser: PluginChooser[Colormap]) -> None:
+        super().__init__(arrayComponent, displayRange, transformChooser)
+        self._variantChooser = variantChooser
+        self._variantChooser.addObserver(self)
 
     @classmethod
-    def createInstance(cls, componentChooser: PluginChooser[VisualizationArrayComponent],
-                       displayRange: DisplayRange) -> MappedColorizer:
+    def createColorizerList(
+            cls, array: VisualizationArray, displayRange: DisplayRange,
+            transformChooser: PluginChooser[ScalarTransformation]) -> list[Colorizer]:
         cyclicColormapEntries: list[PluginEntry[Colormap]] = list()
         acyclicColormapEntries: list[PluginEntry[Colormap]] = list()
 
@@ -47,20 +49,25 @@ class MappedColorizer(Colorizer):
         acyclicColormapChooser = PluginChooser[Colormap].createFromList(acyclicColormapEntries)
         acyclicColormapChooser.setFromSimpleName('viridis')
 
-        colorizer = cls(componentChooser, displayRange, cyclicColormapChooser,
+        amplitude = cls(AmplitudeArrayComponent(array), displayRange, transformChooser,
                         acyclicColormapChooser)
-        cyclicColormapChooser.addObserver(colorizer)
-        acyclicColormapChooser.addObserver(colorizer)
-        return colorizer
+        phase = cls(PhaseArrayComponent(array), displayRange, transformChooser,
+                    cyclicColormapChooser)
+        real = cls(RealArrayComponent(array), displayRange, transformChooser,
+                   acyclicColormapChooser)
+        imag = cls(ImaginaryArrayComponent(array), displayRange, transformChooser,
+                   acyclicColormapChooser)
 
-    def getVariantList(self) -> list[str]:
-        return self._colormapChooser.getDisplayNameList()
+        return [amplitude, phase, real, imag]
 
-    def getVariant(self) -> str:
-        return self._colormapChooser.getCurrentDisplayName()
+    def getVariantNameList(self) -> list[str]:
+        return self._variantChooser.getDisplayNameList()
 
-    def setVariant(self, name: str) -> None:
-        self._colormapChooser.setFromDisplayName(name)
+    def getVariantName(self) -> str:
+        return self._variantChooser.getCurrentDisplayName()
+
+    def setVariantByName(self, name: str) -> None:
+        self._variantChooser.setFromDisplayName(name)
 
     def getDataRange(self) -> Interval[Decimal]:
         values = self._arrayComponent()
@@ -69,18 +76,19 @@ class MappedColorizer(Colorizer):
         return Interval[Decimal](lower, upper)
 
     def __call__(self) -> RealArrayType:
-        # FIXME crash when display range reversed
+        if self._displayRange.getUpper() <= self._displayRange.getLower():
+            shape = self._arrayComponent().shape
+            return numpy.zeros((*shape, 4))
+
         norm = Normalize(vmin=float(self._displayRange.getLower()),
                          vmax=float(self._displayRange.getUpper()),
                          clip=False)
-        cmap = self._colormapChooser.getCurrentStrategy()
+        cmap = self._variantChooser.getCurrentStrategy()
         scalarMappable = ScalarMappable(norm, cmap)
         return scalarMappable.to_rgba(self._arrayComponent())
 
     def update(self, observable: Observable) -> None:
-        if observable is self._cyclicColormapChooser:
-            self.notifyObservers()
-        elif observable is self._acyclicColormapChooser:
+        if observable is self._variantChooser:
             self.notifyObservers()
         else:
             super().update(observable)
