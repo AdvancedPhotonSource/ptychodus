@@ -20,7 +20,7 @@ class CylindricalColorModelColorizer(Colorizer):
                  displayRange: DisplayRange, model: CylindricalColorModel, variant: bool) -> None:
         super().__init__(name, componentChooser, displayRange)
         self._model = numpy.vectorize(model)
-        self._variant = variant
+        self._variantChooser = variantChooser
 
     @classmethod
     def createVariants(cls, componentChooser: PluginChooser[VisualizationArrayComponent],
@@ -33,23 +33,27 @@ class CylindricalColorModelColorizer(Colorizer):
         ]
 
     def getVariantList(self) -> list[str]:
-        return list() # FIXME
+        return self._variantChooser.getDisplayNameList()
 
     def getVariant(self) -> str:
-        return str() # FIXME
+        return self._variantChooser.getCurrentDisplayName()
 
     def setVariant(self, name: str) -> None:
-        pass # FIXME
+        self._variantChooser.setFromDisplayName(name)
 
     def getDataRange(self) -> Interval[Decimal]:
-        pass # FIXME
+        values = numpy.absolute(self._arrayComponent())
+        lower = Decimal(repr(values.min()))
+        upper = Decimal(repr(values.max()))
+        return Interval[Decimal](lower, upper)
 
     def __call__(self) -> RealArrayType:
+        # FIXME crash when display range reversed
         norm = Normalize(vmin=float(self._displayRange.getLower()),
                          vmax=float(self._displayRange.getUpper()),
                          clip=False)
 
-        phaseInRadians = numpy.angle(self._component.getArray())
+        phaseInRadians = numpy.angle(self._arrayComponent())
         h = (phaseInRadians + numpy.pi) / (2 * numpy.pi)
         x = norm(self._component())
         y = numpy.ones_like(h)

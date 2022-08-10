@@ -53,17 +53,6 @@ class MappedColorizer(Colorizer):
         acyclicColormapChooser.addObserver(colorizer)
         return colorizer
 
-    def getDataRange(self) -> Interval[Decimal]:
-        values = self._arrayComponent()
-        lower = Decimal(repr(values.min()))
-        upper = Decimal(repr(values.max()))
-        return Interval[Decimal](lower, upper)
-
-    @property
-    def _colormapChooser(self) -> PluginChooser[Colormap]:
-        return self._cyclicColormapChooser if self._arrayComponent.isCyclic \
-                else self._acyclicColormapChooser
-
     def getVariantList(self) -> list[str]:
         return self._colormapChooser.getDisplayNameList()
 
@@ -74,9 +63,13 @@ class MappedColorizer(Colorizer):
         self._colormapChooser.setFromDisplayName(name)
 
     def getDataRange(self) -> Interval[Decimal]:
-        pass # FIXME
+        values = self._arrayComponent()
+        lower = Decimal(repr(values.min()))
+        upper = Decimal(repr(values.max()))
+        return Interval[Decimal](lower, upper)
 
     def __call__(self) -> RealArrayType:
+        # FIXME crash when display range reversed
         norm = Normalize(vmin=float(self._displayRange.getLower()),
                          vmax=float(self._displayRange.getUpper()),
                          clip=False)
