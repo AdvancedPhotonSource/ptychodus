@@ -23,7 +23,7 @@ class WorkflowClient:
         return flowRuns
 
     def deployFlow(self) -> UUID:
-        return UUID()
+        return UUID(int=0)
 
     def updateFlow(self, flowID: UUID) -> None:
         pass

@@ -127,7 +127,7 @@ class GlobusWorkflowClient(WorkflowClient):
         logger.info(f'Flow List: {response}')
 
     def deleteFlow(self, flowID: UUID) -> None:
-        response = self._client.deplete_flow(flowID)
+        response = self._client.delete_flow(flowID)
         logger.info(f'Delete Flow Response: {response}')
 
     def runFlow(self) -> None:

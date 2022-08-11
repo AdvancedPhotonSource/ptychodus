@@ -10,7 +10,8 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QTableView, QWidget
 
 from ..api.observer import Observable, Observer
 from ..model import WorkflowPresenter, WorkflowRun
-from ..view import WorkflowComputeView, WorkflowDataView, WorkflowParametersView
+from ..view import (WorkflowComputeView, WorkflowDataView, WorkflowDeveloperView,
+                    WorkflowParametersView)
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,64 @@ class WorkflowComputeController(Observer):
             self._syncModelToView()
 
 
+class WorkflowDeveloperController(Observer):
+
+    def __init__(self, presenter: WorkflowPresenter, view: WorkflowDeveloperView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: WorkflowPresenter,
+                       view: WorkflowDeveloperView) -> WorkflowDeveloperController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.flowIDLineEdit.editingFinished.connect(controller._setButtonsEnabled)
+        view.buttonBox.deployFlowButton.clicked.connect(presenter.deployFlow)
+        view.buttonBox.listFlowsButton.clicked.connect(presenter.listFlows)
+        view.buttonBox.updateFlowButton.clicked.connect(controller._updateFlow)
+        view.buttonBox.deleteFlowButton.clicked.connect(controller._deleteFlow)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _updateFlow(self) -> None:
+        try:
+            flowID = UUID(self._view.flowIDLineEdit.text())
+        except ValueError as err:
+            logger.exception(err)
+            return
+
+        self._presenter.updateFlow(flowID)
+
+    def _deleteFlow(self) -> None:
+        try:
+            flowID = UUID(self._view.flowIDLineEdit.text())
+        except ValueError as err:
+            logger.exception(err)
+            return
+
+        self._presenter.deleteFlow(flowID)
+
+    def _setButtonsEnabled(self) -> None:
+        isAuthorized = self._presenter.isAuthorized()
+        isAuthorizedWithFlowID = (len(self._view.flowIDLineEdit.text()) > 0)
+
+        self._view.buttonBox.deployFlowButton.setEnabled(isAuthorized)
+        self._view.buttonBox.listFlowsButton.setEnabled(isAuthorized)
+        self._view.buttonBox.updateFlowButton.setEnabled(isAuthorizedWithFlowID)
+        self._view.buttonBox.deleteFlowButton.setEnabled(isAuthorizedWithFlowID)
+
+    def _syncModelToView(self) -> None:
+        self._setButtonsEnabled()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
 class WorkflowTableModel(QAbstractTableModel):
 
     def __init__(self, presenter: WorkflowPresenter, parent: QObject = None) -> None:
@@ -209,6 +268,8 @@ class WorkflowController(Observer):
             presenter, parametersView.dataDestinationView)
         self._computeController = WorkflowComputeController.createInstance(
             presenter, parametersView.computeView)
+        self._developerController = WorkflowDeveloperController.createInstance(
+            presenter, parametersView.developerView)
         self._tableView = tableView
         self._tableModel = WorkflowTableModel(presenter)
         self._proxyModel = QSortFilterProxyModel()
@@ -226,9 +287,7 @@ class WorkflowController(Observer):
         tableView.clicked.connect(controller._handleTableViewClick)
 
         parametersView.buttonBox.authorizeButton.clicked.connect(controller._startAuthorization)
-        #parametersView.buttonBox.listFlowsButton.clicked.connect(presenter.listFlows)
         parametersView.buttonBox.listFlowRunsButton.clicked.connect(controller._tableModel.refresh)
-        #parametersView.buttonBox.deployFlowButton.clicked.connect(presenter.deployFlow)
         parametersView.buttonBox.executeButton.clicked.connect(controller._execute)
         parametersView.authorizeDialog.finished.connect(controller._finishAuthorization)
 

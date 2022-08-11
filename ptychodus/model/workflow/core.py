@@ -88,7 +88,7 @@ class WorkflowPresenter(Observable, Observer):
         return flowRuns
 
     def deployFlow(self) -> UUID:
-        flowID = UUID()
+        flowID = UUID(int=0)
 
         if self._client:
             flowID = self._client.deployFlow()
