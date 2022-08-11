@@ -1,15 +1,129 @@
 from __future__ import annotations
 from pathlib import Path
 from uuid import UUID
+import logging
 
 from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QRegularExpression,
-                          QSortFilterProxyModel, QVariant)
-from PyQt5.QtGui import QRegularExpressionValidator
+                          QSortFilterProxyModel, QUrl, QVariant)
+from PyQt5.QtGui import QColor, QDesktopServices, QFont, QRegularExpressionValidator
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QTableView, QWidget
 
 from ..api.observer import Observable, Observer
 from ..model import WorkflowPresenter, WorkflowRun
-from ..view import WorkflowParametersView
+from ..view import WorkflowComputeView, WorkflowDataView, WorkflowParametersView
+
+logger = logging.getLogger(__name__)
+
+
+class WorkflowDataSourceController(Observer):
+
+    def __init__(self, presenter: WorkflowPresenter, view: WorkflowDataView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: WorkflowPresenter,
+                       view: WorkflowDataView) -> WorkflowDataSourceController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
+        view.pathLineEdit.editingFinished.connect(controller._syncPathToModel)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _syncEndpointIDToModel(self) -> None:
+        endpointID = UUID(self._view.endpointIDLineEdit.text())
+        self._presenter.setDataSourceEndpointID(endpointID)
+
+    def _syncPathToModel(self) -> None:
+        dataPath = Path(self._view.pathLineEdit.text())
+        self._presenter.setDataSourcePath(dataPath)
+
+    def _syncModelToView(self) -> None:
+        self._view.endpointIDLineEdit.setText(str(self._presenter.getDataSourceEndpointID()))
+        self._view.pathLineEdit.setText(str(self._presenter.getDataSourcePath()))
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
+class WorkflowDataDestinationController(Observer):
+
+    def __init__(self, presenter: WorkflowPresenter, view: WorkflowDataView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: WorkflowPresenter,
+                       view: WorkflowDataView) -> WorkflowDataDestinationController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
+        view.pathLineEdit.editingFinished.connect(controller._syncPathToModel)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _syncEndpointIDToModel(self) -> None:
+        endpointID = UUID(self._view.endpointIDLineEdit.text())
+        self._presenter.setDataDestinationEndpointID(endpointID)
+
+    def _syncPathToModel(self) -> None:
+        dataPath = Path(self._view.pathLineEdit.text())
+        self._presenter.setDataDestinationPath(dataPath)
+
+    def _syncModelToView(self) -> None:
+        self._view.endpointIDLineEdit.setText(str(self._presenter.getDataDestinationEndpointID()))
+        self._view.pathLineEdit.setText(str(self._presenter.getDataDestinationPath()))
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
+class WorkflowComputeController(Observer):
+
+    def __init__(self, presenter: WorkflowPresenter, view: WorkflowComputeView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: WorkflowPresenter,
+                       view: WorkflowComputeView) -> WorkflowComputeController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
+        view.flowIDLineEdit.editingFinished.connect(controller._syncFlowIDToModel)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _syncEndpointIDToModel(self) -> None:
+        endpointID = UUID(self._view.endpointIDLineEdit.text())
+        self._presenter.setComputeEndpointID(endpointID)
+
+    def _syncFlowIDToModel(self) -> None:
+        flowID = UUID(self._view.flowIDLineEdit.text())
+        self._presenter.setFlowID(flowID)
+
+    def _syncModelToView(self) -> None:
+        self._view.endpointIDLineEdit.setText(str(self._presenter.getComputeEndpointID()))
+        self._view.flowIDLineEdit.setText(str(self._presenter.getFlowID()))
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
 
 
 class WorkflowTableModel(QAbstractTableModel):
@@ -33,29 +147,45 @@ class WorkflowTableModel(QAbstractTableModel):
                    role: int = Qt.DisplayRole) -> QVariant:
         value = QVariant()
 
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
-            value = QVariant(self._sectionHeaders[section])
+        if role == Qt.DisplayRole:
+            if orientation == Qt.Horizontal:
+                value = QVariant(self._sectionHeaders[section])
+            elif orientation == Qt.Vertical:
+                value = QVariant(section)
 
         return value
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
         value = QVariant()
 
-        if index.isValid() and role == Qt.DisplayRole:
+        if index.isValid():
             flowRun = self._flowRuns[index.row()]
 
-            if index.column() == 0:
-                value = QVariant(flowRun.label)
-            elif index.column() == 1:
-                value = QVariant(flowRun.startTime)
-            elif index.column() == 2:
-                value = QVariant(flowRun.completionTime)
-            elif index.column() == 3:
-                value = QVariant(flowRun.status)
-            elif index.column() == 4:
-                value = QVariant(flowRun.displayStatus)
+            if role == Qt.DisplayRole:
+                if index.column() == 0:
+                    value = QVariant(flowRun.label)
+                elif index.column() == 1:
+                    value = QVariant(flowRun.startTime)
+                elif index.column() == 2:
+                    value = QVariant(flowRun.completionTime)
+                elif index.column() == 3:
+                    value = QVariant(flowRun.status)
+                elif index.column() == 4:
+                    value = QVariant(flowRun.displayStatus)
+                elif index.column() == 5:
+                    value = QVariant(flowRun.runID)
             elif index.column() == 5:
-                value = QVariant(flowRun.runId)
+                if role == Qt.ToolTipRole:
+                    value = QVariant(flowRun.runURL)
+                elif role == Qt.FontRole:
+                    font = QFont()
+                    font.setUnderline(True)
+                    value = QVariant(font)
+                elif role == Qt.ForegroundRole:
+                    color = QColor(Qt.blue)
+                    value = QVariant(color)
+                elif role == Qt.UserRole:
+                    value = QVariant(QUrl(flowRun.runURL))
 
         return value
 
@@ -68,17 +198,17 @@ class WorkflowTableModel(QAbstractTableModel):
 
 class WorkflowController(Observer):
 
-    @staticmethod
-    def createUUIDValidator() -> QRegularExpressionValidator:
-        hexre = '[0-9A-Fa-f]'
-        uuidre = f'{hexre}{{8}}-{hexre}{{4}}-{hexre}{{4}}-{hexre}{{4}}-{hexre}{{12}}'
-        return QRegularExpressionValidator(QRegularExpression(uuidre))
-
     def __init__(self, presenter: WorkflowPresenter, parametersView: WorkflowParametersView,
                  tableView: QTableView) -> None:
         super().__init__()
         self._presenter = presenter
         self._parametersView = parametersView
+        self._dataSourceController = WorkflowDataSourceController.createInstance(
+            presenter, parametersView.dataSourceView)
+        self._dataDestinationController = WorkflowDataDestinationController.createInstance(
+            presenter, parametersView.dataDestinationView)
+        self._computeController = WorkflowComputeController.createInstance(
+            presenter, parametersView.computeView)
         self._tableView = tableView
         self._tableModel = WorkflowTableModel(presenter)
         self._proxyModel = QSortFilterProxyModel()
@@ -93,64 +223,32 @@ class WorkflowController(Observer):
         tableView.setModel(controller._proxyModel)
         tableView.setSortingEnabled(True)
         tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
-
-        parametersView.dataSourceView.endpointIDLineEdit.setValidator(
-            WorkflowController.createUUIDValidator())
-        parametersView.dataSourceView.endpointIDLineEdit.editingFinished.connect(
-            controller._syncDataSourceEndpointIDToModel)
-        parametersView.dataSourceView.pathLineEdit.editingFinished.connect(
-            controller._syncDataSourcePathToModel)
-
-        parametersView.dataDestinationView.endpointIDLineEdit.setValidator(
-            WorkflowController.createUUIDValidator())
-        parametersView.dataDestinationView.endpointIDLineEdit.editingFinished.connect(
-            controller._syncDataDestinationEndpointIDToModel)
-        parametersView.dataDestinationView.pathLineEdit.editingFinished.connect(
-            controller._syncDataDestinationPathToModel)
-
-        parametersView.computeView.endpointIDLineEdit.setValidator(
-            WorkflowController.createUUIDValidator())
-        parametersView.computeView.endpointIDLineEdit.editingFinished.connect(
-            controller._syncComputeEndpointIDToModel)
-        parametersView.computeView.flowIDLineEdit.setValidator(
-            WorkflowController.createUUIDValidator())
-        parametersView.computeView.flowIDLineEdit.editingFinished.connect(
-            controller._syncFlowIDToModel)
+        tableView.clicked.connect(controller._handleTableViewClick)
 
         parametersView.buttonBox.authorizeButton.clicked.connect(controller._startAuthorization)
-        parametersView.buttonBox.listFlowsButton.clicked.connect(presenter.listFlows)
+        #parametersView.buttonBox.listFlowsButton.clicked.connect(presenter.listFlows)
         parametersView.buttonBox.listFlowRunsButton.clicked.connect(controller._tableModel.refresh)
-        parametersView.buttonBox.deployFlowButton.clicked.connect(presenter.deployFlow)
-        parametersView.buttonBox.runFlowButton.clicked.connect(controller._runFlow)
+        #parametersView.buttonBox.deployFlowButton.clicked.connect(presenter.deployFlow)
+        parametersView.buttonBox.executeButton.clicked.connect(controller._execute)
         parametersView.authorizeDialog.finished.connect(controller._finishAuthorization)
+
+        parametersView.authorizeDialog.lineEdit.textChanged.connect(
+            controller._setAuthorizeDialogButtonsEnabled)
+        controller._setAuthorizeDialogButtonsEnabled()
 
         controller._syncModelToView()
 
         return controller
 
-    def _syncDataSourceEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._parametersView.dataSourceView.endpointIDLineEdit.text())
-        self._presenter.setDataSourceEndpointID(endpointID)
+    def _handleTableViewClick(self, index: QModelIndex) -> None:
+        if index.column() == 5:
+            url = index.data(Qt.UserRole)
+            logger.debug(f'Opening URL: \"{url.toString()}\"')
+            QDesktopServices.openUrl(url)
 
-    def _syncDataSourcePathToModel(self) -> None:
-        dataSourcePath = Path(self._parametersView.dataSourceView.pathLineEdit.text())
-        self._presenter.setDataSourcePath(dataSourcePath)
-
-    def _syncDataDestinationEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._parametersView.dataDestinationView.endpointIDLineEdit.text())
-        self._presenter.setDataDestinationEndpointID(endpointID)
-
-    def _syncDataDestinationPathToModel(self) -> None:
-        dataDestinationPath = Path(self._parametersView.dataDestinationView.pathLineEdit.text())
-        self._presenter.setDataDestinationPath(dataDestinationPath)
-
-    def _syncComputeEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._parametersView.computeView.endpointIDLineEdit.text())
-        self._presenter.setComputeEndpointID(endpointID)
-
-    def _syncFlowIDToModel(self) -> None:
-        flowID = UUID(self._parametersView.computeView.flowIDLineEdit.text())
-        self._presenter.setFlowID(flowID)
+    def _setAuthorizeDialogButtonsEnabled(self) -> None:
+        text = self._parametersView.authorizeDialog.lineEdit.text()
+        self._parametersView.authorizeDialog.okButton.setEnabled(len(text) > 0)
 
     def _startAuthorization(self) -> None:
         authorizeURL = self._presenter.getAuthorizeURL()
@@ -167,29 +265,17 @@ class WorkflowController(Observer):
         authCode = self._parametersView.authorizeDialog.lineEdit.text()
         self._presenter.setAuthorizationCode(authCode)
 
-    def _runFlow(self) -> None:
+    def _execute(self) -> None:
         self._presenter.runFlow()
         self._tableModel.refresh()
 
     def _syncModelToView(self) -> None:
-        self._parametersView.dataSourceView.endpointIDLineEdit.setText(
-            str(self._presenter.getDataSourceEndpointID()))
-        self._parametersView.dataSourceView.pathLineEdit.setText(
-            str(self._presenter.getDataSourcePath()))
-        self._parametersView.dataDestinationView.endpointIDLineEdit.setText(
-            str(self._presenter.getDataDestinationEndpointID()))
-        self._parametersView.dataDestinationView.pathLineEdit.setText(
-            str(self._presenter.getDataDestinationPath()))
-        self._parametersView.computeView.endpointIDLineEdit.setText(
-            str(self._presenter.getComputeEndpointID()))
-        self._parametersView.computeView.flowIDLineEdit.setText(str(self._presenter.getFlowID()))
-
         isAuthorized = self._presenter.isAuthorized()
         self._parametersView.buttonBox.authorizeButton.setEnabled(not isAuthorized)
-        self._parametersView.buttonBox.listFlowsButton.setEnabled(isAuthorized)
+        #self._parametersView.buttonBox.listFlowsButton.setEnabled(isAuthorized)
         self._parametersView.buttonBox.listFlowRunsButton.setEnabled(isAuthorized)
-        self._parametersView.buttonBox.deployFlowButton.setEnabled(isAuthorized)
-        self._parametersView.buttonBox.runFlowButton.setEnabled(isAuthorized)
+        #self._parametersView.buttonBox.deployFlowButton.setEnabled(isAuthorized)
+        self._parametersView.buttonBox.executeButton.setEnabled(isAuthorized)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

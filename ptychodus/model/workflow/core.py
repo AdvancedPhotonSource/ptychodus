@@ -79,10 +79,6 @@ class WorkflowPresenter(Observable, Observer):
     def getFlowID(self) -> UUID:
         return self._settings.flowID.value
 
-    def listFlows(self) -> None:
-        if self._client:
-            self._client.listFlows()
-
     def listFlowRuns(self) -> list[WorkflowRun]:
         flowRuns: list[WorkflowRun] = list()
 
@@ -91,9 +87,25 @@ class WorkflowPresenter(Observable, Observer):
 
         return flowRuns
 
-    def deployFlow(self) -> None:
+    def deployFlow(self) -> UUID:
+        flowID = UUID()
+
         if self._client:
-            self._client.deployFlow()
+            flowID = self._client.deployFlow()
+
+        return flowID
+
+    def updateFlow(self, flowID: UUID) -> None:
+        if self._client:
+            self._client.updateFlow(flowID)
+
+    def listFlows(self) -> None:
+        if self._client:
+            self._client.listFlows()
+
+    def deleteFlow(self, flowID: UUID) -> None:
+        if self._client:
+            self._client.deleteFlow(flowID)
 
     def runFlow(self) -> None:
         if self._client:

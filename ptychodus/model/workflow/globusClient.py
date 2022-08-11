@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Optional
+from uuid import UUID
 import json
 import logging
 
@@ -42,10 +43,6 @@ class GlobusWorkflowClient(WorkflowClient):
         logger.debug(f'Resource Server is {resourceServer}')
         return self._authorizerMapping[resourceServer]
 
-    def listFlows(self) -> None:
-        response = self._client.list_flows()
-        logger.info(f'Flow List: {response}')
-
     def listFlowRuns(self) -> list[WorkflowRun]:
         runList: list[WorkflowRun] = list()
         flowID = str(self._settings.flowID.value)
@@ -54,12 +51,15 @@ class GlobusWorkflowClient(WorkflowClient):
         logger.debug(f'Flow Run List: {response}')
 
         for runDict in response['runs']:
+            runID = runDict.get('run_id', '')
+            runURL = f'https://app.globus.org/runs/{runID}/logs'
             run = WorkflowRun(label=runDict.get('label', ''),
                               startTime=runDict.get('start_time', ''),
                               completionTime=runDict.get('completion_time', ''),
                               status=runDict.get('status', ''),
                               displayStatus=runDict.get('display_status', ''),
-                              runId=runDict.get('run_id', ''))
+                              runID=runID,
+                              runURL=runURL)
             runList.append(run)
 
         #flow_action_id = response.data['actions'][0]['action_id']
@@ -92,11 +92,11 @@ class GlobusWorkflowClient(WorkflowClient):
 
         return inputSchema
 
-    def deployFlow(self) -> None:
+    def deployFlow(self) -> UUID:
         flowDefinition = self._loadFlowDefinition()
         inputSchema = self._loadInputSchema()
 
-        deployResult = self._client.deploy_flow(
+        response = self._client.deploy_flow(
             flow_definition=flowDefinition,
             title='Ptychodus',
             input_schema=inputSchema,
@@ -104,19 +104,40 @@ class GlobusWorkflowClient(WorkflowClient):
             runnable_by=['all_authenticated_users'],
         )
 
-        flowID = deployResult.data['id']
-        logger.info(f'Deployed Flow ID: {flowID}')
-        self._settings.flowID.value = flowID
+        logger.debug(f'Deploy Flow Response: {response}')
+        return UUID(response.data['id'])
+
+    def updateFlow(self, flowID: UUID) -> None:
+        flowDefinition = self._loadFlowDefinition()
+        inputSchema = self._loadInputSchema()
+
+        response = self._client.update_flow(
+            flow_id=flowID,
+            flow_definition=flowDefinition,
+            title='Ptychodus',
+            input_schema=inputSchema,
+            visible_to=['public'],
+            runnable_by=['all_authenticated_users'],
+        )
+
+        logger.debug(f'Update Flow Response: {response}')
+
+    def listFlows(self) -> None:
+        response = self._client.list_flows()
+        logger.info(f'Flow List: {response}')
+
+    def deleteFlow(self, flowID: UUID) -> None:
+        response = self._client.deplete_flow(flowID)
+        logger.info(f'Delete Flow Response: {response}')
 
     def runFlow(self) -> None:
         flowID = str(self._settings.flowID.value)
         flowScope = None
         flowInput = {'input': {'echo_string': 'From Ptychodus', 'sleep_time': 10}}
 
-        runResult = self._client.run_flow(flowID, flowScope, flowInput, label='Run Label')
-        logger.info(f'Run Flow Result: {json.dumps(runResult.data, indent=4)}')
+        runResponse = self._client.run_flow(flowID, flowScope, flowInput, label='Run Label')
+        logger.info(f'Run Flow Response: {json.dumps(runResponse.data, indent=4)}')
 
-        # TODO delete_flow
         # TODO enumerate_runs
         # TODO flow_action_cancel
         # TODO flow_action_log
@@ -124,9 +145,6 @@ class GlobusWorkflowClient(WorkflowClient):
         # TODO flow_action_resume
         # TODO flow_action_status
         # TODO flow_action_update
-        # TODO get_flow
-        # TODO scope_for_flow
-        # TODO update_flow
         # TODO update_runs
 
 

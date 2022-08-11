@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from uuid import UUID
 
 from .settings import WorkflowSettings
 
@@ -11,19 +12,26 @@ class WorkflowRun:
     completionTime: str
     status: str
     displayStatus: str
-    runId: str
+    runID: str
+    runURL: str
 
 
 class WorkflowClient:
-
-    def listFlows(self) -> None:
-        pass
 
     def listFlowRuns(self) -> list[WorkflowRun]:
         flowRuns: list[WorkflowRun] = list()
         return flowRuns
 
-    def deployFlow(self) -> None:
+    def deployFlow(self) -> UUID:
+        return UUID()
+
+    def updateFlow(self, flowID: UUID) -> None:
+        pass
+
+    def listFlows(self) -> None:
+        pass
+
+    def deleteFlow(self, flowID: UUID) -> None:
         pass
 
     def runFlow(self) -> None:
