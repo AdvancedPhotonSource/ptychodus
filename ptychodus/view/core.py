@@ -36,11 +36,6 @@ class ViewCore(QMainWindow):
         self.settingsEntryView = QTableView()
 
         self.dataFileAction = self.navigationToolBar.addAction(fileIcon, 'Data')
-        self.dataFileMenu = QMenu()
-        self.openDataFileAction = self.dataFileMenu.addAction('Open Data...')
-        self.saveDataFileAction = self.dataFileMenu.addAction('Save Data...')
-        self.chooseScratchDirectoryAction = self.dataFileMenu.addAction(
-            'Choose Scratch Directory...')
         self.dataFileTreeView = QTreeView()
         self.dataFileTableView = QTableView()
 
@@ -88,10 +83,6 @@ class ViewCore(QMainWindow):
             view.navigationActionGroup.addAction(action)
 
         view.settingsAction.setChecked(True)
-
-        dataFileToolButton = view.navigationToolBar.widgetForAction(view.dataFileAction)
-        dataFileToolButton.setMenu(view.dataFileMenu)
-        dataFileToolButton.setPopupMode(QToolButton.MenuButtonPopup)
 
         view.settingsEntryView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         view.dataFileTreeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)

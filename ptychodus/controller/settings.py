@@ -100,6 +100,9 @@ class SettingsController(Observer):
         controller = cls(settingsRegistry, parametersView, entryTableView, fileDialogFactory)
         settingsRegistry.addObserver(controller)
 
+        parametersView.settingsView.replacementPathPrefixLineEdit.editingFinished.connect(
+            controller._syncReplacementPathPrefixToModel)
+
         groupListView = parametersView.groupView.listView
         groupListView.setModel(controller._groupListModel)
         groupListView.selectionModel().currentChanged.connect(controller._updateEntryTable)
@@ -110,6 +113,10 @@ class SettingsController(Observer):
         controller._syncModelToView()
 
         return controller
+
+    def _syncReplacementPathPrefixToModel(self) -> None:
+        self._settingsRegistry.setReplacementPathPrefix(
+            self._parametersView.settingsView.replacementPathPrefixLineEdit.text())
 
     def _openSettings(self) -> None:
         filePath, _ = self._fileDialogFactory.getOpenFilePath(
@@ -137,6 +144,9 @@ class SettingsController(Observer):
         self._entryTableView.setModel(entryTableModel)
 
     def _syncModelToView(self) -> None:
+        self._parametersView.settingsView.replacementPathPrefixLineEdit.setText(
+            self._settingsRegistry.getReplacementPathPrefix())
+
         self._groupListModel.refresh()
         current = self._parametersView.groupView.listView.currentIndex()
         self._updateEntryTable(current, QModelIndex())

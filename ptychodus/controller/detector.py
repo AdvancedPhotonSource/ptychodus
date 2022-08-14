@@ -1,13 +1,15 @@
 from __future__ import annotations
 from decimal import Decimal
+from pathlib import Path
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QFileDialog
 
 from ..api.data import DatasetState
 from ..api.observer import Observable, Observer
-from ..model import CropPresenter, DataFilePresenter, DetectorPresenter, \
-        DiffractionDatasetPresenter, ImagePresenter
+from ..model import (CropPresenter, DataFilePresenter, DetectorPresenter,
+                     DiffractionDatasetPresenter, ImagePresenter)
 from ..view import CropView, DatasetView, DetectorView, ImageView
 from .data import FileDialogFactory
 from .image import ImageController
@@ -65,6 +67,10 @@ class DatasetListModel(QAbstractListModel):
         super().__init__(parent)
         self._presenter = presenter
 
+    def refresh(self) -> None:
+        self.beginResetModel()
+        self.endResetModel()
+
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = Qt.NoItemFlags
 
@@ -99,27 +105,61 @@ class DatasetListModel(QAbstractListModel):
 class DatasetParametersController(Observer):
 
     def __init__(self, dataFilePresenter: DataFilePresenter,
-                 datasetPresenter: DiffractionDatasetPresenter, view: DatasetView) -> None:
+                 datasetPresenter: DiffractionDatasetPresenter, view: DatasetView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._dataFilePresenter = dataFilePresenter
         self._datasetPresenter = datasetPresenter
-        self._listModel = DatasetListModel(dataFilePresenter)
         self._view = view
+        self._fileDialogFactory = fileDialogFactory
+        self._listModel = DatasetListModel(dataFilePresenter)
 
     @classmethod
     def createInstance(cls, dataFilePresenter: DataFilePresenter,
-                       datasetPresenter: DiffractionDatasetPresenter,
-                       view: DatasetView) -> DatasetParametersController:
-        controller = cls(dataFilePresenter, datasetPresenter, view)
+                       datasetPresenter: DiffractionDatasetPresenter, view: DatasetView,
+                       fileDialogFactory: FileDialogFactory) -> DatasetParametersController:
+        controller = cls(dataFilePresenter, datasetPresenter, view, fileDialogFactory)
 
-        view.dataFileListView.setModel(controller._listModel)
+        view.listView.setModel(controller._listModel)
         dataFilePresenter.addObserver(controller)
         datasetPresenter.addObserver(controller)
 
-        view.dataFileListView.selectionModel().currentChanged.connect(
+        view.listView.selectionModel().currentChanged.connect(
             controller._updateCurrentDatasetIndex)
 
+        view.buttonBox.openButton.clicked.connect(controller._openDataFile)
+        view.buttonBox.saveButton.clicked.connect(controller._saveDataFile)
+
         return controller
+
+    def _openDataFile(self) -> None:
+        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+            self._view,
+            'Open Data File',
+            nameFilters=self._dataFilePresenter.getOpenFileFilterList(),
+            selectedNameFilter=self._dataFilePresenter.getOpenFileFilter())
+
+        if filePath:
+            self._dataFilePresenter.openDataFile(filePath, nameFilter)
+
+    def _saveDataFile(self) -> None:
+        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+            self._view,
+            'Save Data File',
+            nameFilters=self._dataFilePresenter.getSaveFileFilterList(),
+            selectedNameFilter=self._dataFilePresenter.getSaveFileFilter())
+
+        if filePath:
+            self._dataFilePresenter.saveDataFile(filePath, nameFilter)
+
+    def _chooseScratchDirectory(self) -> None:
+        # TODO unused
+        scratchDir = QFileDialog.getExistingDirectory(
+            self._view, 'Choose Scratch Directory',
+            str(self._dataFilePresenter.getScratchDirectory()))
+
+        if scratchDir:
+            self._dataFilePresenter.setScratchDirectory(Path(scratchDir))
 
     def _updateCurrentDatasetIndex(self, index: QModelIndex) -> None:
         self._datasetPresenter.setCurrentDatasetIndex(index.row())
@@ -127,12 +167,11 @@ class DatasetParametersController(Observer):
     def _updateSelection(self) -> None:
         row = self._datasetPresenter.getCurrentDatasetIndex()
         index = self._listModel.index(row, 0)
-        self._view.dataFileListView.setCurrentIndex(index)
+        self._view.listView.setCurrentIndex(index)
 
     def update(self, observable: Observable) -> None:
         if observable is self._dataFilePresenter:
-            self._listModel.beginResetModel()
-            self._listModel.endResetModel()
+            self._listModel.refresh()
         elif observable is self._datasetPresenter:
             self._updateSelection()
 

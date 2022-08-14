@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QListView, QSizePolicy, QSpinBox, QVBoxLayout,
-                             QWidget)
+from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QHBoxLayout, QListView, QPushButton,
+                             QSizePolicy, QSpinBox, QVBoxLayout, QWidget)
 
 from .image import ImageView
 from .widgets import LengthWidget
@@ -33,21 +33,40 @@ class DetectorView(QGroupBox):
         return view
 
 
+class DatasetButtonBox(QWidget):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.openButton = QPushButton('Open')
+        self.saveButton = QPushButton('Save')
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetButtonBox:
+        view = cls(parent)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.openButton)
+        layout.addWidget(view.saveButton)
+        view.setLayout(layout)
+
+        return view
+
+
 class DatasetView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Data', parent)
-        self.dataFileListView = QListView()
+        self.listView = QListView()
+        self.buttonBox = DatasetButtonBox.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetView:
         view = cls(parent)
 
-        view.dataFileListView.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
-
         layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.dataFileListView)
+        layout.addWidget(view.listView)
+        layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view
@@ -81,19 +100,17 @@ class DetectorParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.detectorView = DetectorView.createInstance()
-        self.datasetView = DatasetView.createInstance()
         self.imageCropView = CropView.createInstance()
+        self.datasetView = DatasetView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorParametersView:
         view = cls(parent)
 
-        view.datasetView.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
-
         layout = QVBoxLayout()
         layout.addWidget(view.detectorView)
-        layout.addWidget(view.datasetView)
         layout.addWidget(view.imageCropView)
+        layout.addWidget(view.datasetView)
         view.setLayout(layout)
 
         return view

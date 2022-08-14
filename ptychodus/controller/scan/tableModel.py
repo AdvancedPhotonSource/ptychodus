@@ -24,10 +24,10 @@ class ScanTableModel(QAbstractTableModel):
             entry = self._scanList[index.row()]
 
             if entry.variant == 'FromMemory':
-                value &= ~Qt.ItemIsSelectable
+                value = int(value) & ~Qt.ItemIsSelectable
 
             if index.column() == 0:
-                value |= Qt.ItemIsUserCheckable
+                value = int(value) | Qt.ItemIsUserCheckable
 
         return value
 

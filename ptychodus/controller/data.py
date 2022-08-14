@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import numpy
 from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QVariant
@@ -83,10 +83,12 @@ class DataArrayTableModel(QAbstractTableModel):
 
     def __init__(self, parent: QObject = None) -> None:
         super().__init__(parent)
-        self._array = None
+        self._array: Optional[numpy.ndarray] = None
 
-    def headerData(self, section: int, orientation: Qt.Orientation,
-                   role: Qt.ItemDataRole) -> QVariant:
+    def headerData(self,
+                   section: int,
+                   orientation: Qt.Orientation,
+                   role: int = Qt.DisplayRole) -> Any:
         result = None
 
         if role == Qt.DisplayRole:
@@ -94,7 +96,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
         return QVariant(result)
 
-    def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         result = None
 
         if index.isValid() and role == Qt.DisplayRole and self._array is not None:
@@ -118,7 +120,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
         return count
 
-    def setArray(self, data: numpy.ndarray) -> None:
+    def setArray(self, data: Optional[numpy.ndarray]) -> None:
         self.beginResetModel()
         self._array = None
 
@@ -131,52 +133,23 @@ class DataArrayTableModel(QAbstractTableModel):
 
 class DataFileController(Observer):
 
-    def __init__(self, presenter: DataFilePresenter, treeView: QTreeView, tableView: QTableView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, presenter: DataFilePresenter, treeView: QTreeView,
+                 tableView: QTableView) -> None:
         self._presenter = presenter
         self._treeModel = SimpleTreeModel(presenter.getContentsTree())
         self._treeView = treeView
         self._tableModel = DataArrayTableModel()
         self._tableView = tableView
-        self._fileDialogFactory = fileDialogFactory
 
     @classmethod
     def createInstance(cls, presenter: DataFilePresenter, treeView: QTreeView,
-                       tableView: QTableView,
-                       fileDialogFactory: FileDialogFactory) -> DataFileController:
-        controller = cls(presenter, treeView, tableView, fileDialogFactory)
+                       tableView: QTableView) -> DataFileController:
+        controller = cls(presenter, treeView, tableView)
         treeView.setModel(controller._treeModel)
         treeView.selectionModel().currentChanged.connect(controller.updateDataArrayInTableView)
         tableView.setModel(controller._tableModel)
         presenter.addObserver(controller)
         return controller
-
-    def openDataFile(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._treeView,
-            'Open Data File',
-            nameFilters=self._presenter.getOpenFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenFileFilter())
-
-        if filePath:
-            self._presenter.openDataFile(filePath, nameFilter)
-
-    def saveDataFile(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._treeView,
-            'Save Data File',
-            nameFilters=self._presenter.getSaveFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveFileFilter())
-
-        if filePath:
-            self._presenter.saveDataFile(filePath, nameFilter)
-
-    def chooseScratchDirectory(self) -> None:
-        scratchDir = QFileDialog.getExistingDirectory(self._treeView, 'Choose Scratch Directory',
-                                                      str(self._presenter.getScratchDirectory()))
-
-        if scratchDir:
-            self._presenter.setScratchDirectory(Path(scratchDir))
 
     def updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
         names = list()

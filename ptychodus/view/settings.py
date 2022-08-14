@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QGroupBox,
-                             QHBoxLayout, QLabel, QListView, QPushButton, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListView, QPushButton,
+                             QVBoxLayout, QWidget)
 
 
 class SettingsImportValuesGroupBox(QGroupBox):
@@ -99,6 +100,26 @@ class SettingsImportDialog(QDialog):
             self.reject()
 
 
+class SettingsView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Parameters', parent)
+        self.replacementPathPrefixLineEdit = QLineEdit()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsView:
+        view = cls(parent)
+
+        view.replacementPathPrefixLineEdit.setToolTip(
+            'Path prefix replacement text used when opening or saving settings files.')
+
+        layout = QFormLayout()
+        layout.addRow('Replacement Path Prefix:', view.replacementPathPrefixLineEdit)
+        view.setLayout(layout)
+
+        return view
+
+
 class SettingsButtonBox(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
@@ -142,6 +163,7 @@ class SettingsParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
+        self.settingsView = SettingsView.createInstance()
         self.groupView = SettingsGroupView.createInstance()
         self.importDialog = SettingsImportDialog.createInstance(self)
 
@@ -150,6 +172,7 @@ class SettingsParametersView(QWidget):
         view = cls(parent)
 
         layout = QVBoxLayout()
+        layout.addWidget(view.settingsView)
         layout.addWidget(view.groupView)
         view.setLayout(layout)
 

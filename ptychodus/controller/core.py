@@ -3,14 +3,15 @@ from PyQt5.QtWidgets import QApplication, QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
-from .data import *
-from .detector import *
-from .object import *
-from .probe import *
+from .data import DataFileController, FileDialogFactory
+from .detector import (CropController, DatasetImageController, DatasetParametersController,
+                       DetectorController)
+from .object import ObjectImageController, ObjectParametersController
+from .probe import ProbeImageController, ProbeParametersController
 from .ptychopy import PtychoPyViewControllerFactory
-from .reconstructor import *
+from .reconstructor import ReconstructorParametersController, ReconstructorPlotController
 from .scan import ScanController
-from .settings import *
+from .settings import SettingsController, SettingsImportController
 from .tike import TikeViewControllerFactory
 from .workflow import WorkflowController
 
@@ -37,7 +38,7 @@ class ControllerCore:
             model.detectorPresenter, view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
             model.dataFilePresenter, model.diffractionDatasetPresenter,
-            view.detectorParametersView.datasetView)
+            view.detectorParametersView.datasetView, self._fileDialogFactory)
         self._cropController = CropController.createInstance(
             model.cropPresenter, view.detectorParametersView.imageCropView)
         self._datasetImageController = DatasetImageController.createInstance(
@@ -57,8 +58,7 @@ class ControllerCore:
             self._fileDialogFactory)
         self._dataFileController = DataFileController.createInstance(model.dataFilePresenter,
                                                                      view.dataFileTreeView,
-                                                                     view.dataFileTableView,
-                                                                     self._fileDialogFactory)
+                                                                     view.dataFileTableView)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter, view.reconstructorParametersView,
             [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])
@@ -81,14 +81,6 @@ class ControllerCore:
 
         view.navigationActionGroup.triggered.connect(
             lambda action: controller.swapCentralWidgets(action))
-        view.openDataFileAction.triggered.connect(
-            lambda checked: controller._dataFileController.openDataFile())
-        view.saveDataFileAction.triggered.connect(
-            lambda checked: controller._dataFileController.saveDataFile())
-        view.chooseScratchDirectoryAction.triggered.connect(
-            lambda checked: controller._dataFileController.chooseScratchDirectory())
-        #view.exitAction.triggered.connect(
-        #        lambda checked: QApplication.quit())
 
         if model.rpcMessageService:
             controller._processMessagesTimer.timeout.connect(

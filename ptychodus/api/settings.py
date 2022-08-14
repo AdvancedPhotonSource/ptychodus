@@ -114,6 +114,7 @@ class SettingsGroup(Observable, Observer):
 
 
 class SettingsRegistry(Observable):
+    PREFIX_PLACEHOLDER_TEXT = 'PREFIX'
 
     def __init__(self, replacementPathPrefix: Optional[str]) -> None:
         super().__init__()
@@ -140,6 +141,12 @@ class SettingsRegistry(Observable):
     def __len__(self) -> int:
         return len(self._groupList)
 
+    def getReplacementPathPrefix(self) -> Optional[str]:
+        return self._replacementPathPrefix
+
+    def setReplacementPathPrefix(self, replacementPathPrefix: str) -> None:
+        self._replacementPathPrefix = replacementPathPrefix
+
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileFilterList
 
@@ -147,7 +154,6 @@ class SettingsRegistry(Observable):
         return self._fileFilterList[0]
 
     def openSettings(self, filePath: Path) -> None:
-        prefixPlaceholder = 'PREFIX'
         config = configparser.ConfigParser(interpolation=None)
         config.read(filePath)
 
@@ -157,15 +163,15 @@ class SettingsRegistry(Observable):
 
             for settingsEntry in settingsGroup:
                 if config.has_option(settingsGroup.name, settingsEntry.name):
-                    optionValueString = config.get(settingsGroup.name, settingsEntry.name)
+                    valueString = config.get(settingsGroup.name, settingsEntry.name)
 
                     if self._replacementPathPrefix is not None \
                             and isinstance(settingsEntry.value, Path):
-                        if optionValueString.startswith(prefixPlaceholder):
-                            optionValueString = self._replacementPathPrefix \
-                                    + optionValueString[len(prefixPlaceholder):]
+                        if valueString.startswith(SettingsRegistry.PREFIX_PLACEHOLDER_TEXT):
+                            valueString = self._replacementPathPrefix \
+                                    + valueString[len(SettingsRegistry.PREFIX_PLACEHOLDER_TEXT):]
 
-                    settingsEntry.setValueFromString(optionValueString)
+                    settingsEntry.setValueFromString(valueString)
 
         self.notifyObservers()
 
@@ -183,7 +189,14 @@ class SettingsRegistry(Observable):
             config.add_section(settingsGroup.name)
 
             for settingsEntry in settingsGroup:
-                config.set(settingsGroup.name, settingsEntry.name, str(settingsEntry.value))
+                valueString = str(settingsEntry.value)
+
+                if self._replacementPathPrefix is not None \
+                        and isinstance(settingsEntry.value, Path):
+                    if valueString.startswith(self._replacementPathPrefix):
+                        valueString = SettingsRegistry.PREFIX_PLACEHOLDER_TEXT \
+                                + valueString[len(self._replacementPathPrefix):]
+                config.set(settingsGroup.name, settingsEntry.name, valueString)
 
         with open(filePath, 'w') as configFile:
             config.write(configFile)
