@@ -31,8 +31,8 @@ class ProbeSettings(Observable, Observer):
                                                                      '90e-6')
         self.outermostZoneWidthInMeters = settingsGroup.createRealEntry(
             'OutermostZoneWidthInMeters', '50e-9')
-        self.beamstopDiameterInMeters = settingsGroup.createRealEntry(
-            'BeamstopDiameterInMeters', '60e-6')
+        self.centralBeamstopDiameterInMeters = settingsGroup.createRealEntry(
+            'CentralBeamstopDiameterInMeters', '60e-6')
         self.defocusDistanceInMeters = settingsGroup.createRealEntry('DefocusDistanceInMeters',
                                                                      '800e-6')
 

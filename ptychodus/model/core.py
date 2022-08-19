@@ -62,7 +62,8 @@ class ModelCore:
         self._scanCore = ScanCore(self.rng, self.settingsRegistry,
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())
-        self._probeCore = ProbeCore(self.settingsRegistry, self._detector, self._cropSizer,
+        self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
+                                    self._cropSizer,
                                     self._pluginRegistry.buildProbeFileReaderChooser(),
                                     self._pluginRegistry.buildProbeFileWriterChooser())
         self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._detector,

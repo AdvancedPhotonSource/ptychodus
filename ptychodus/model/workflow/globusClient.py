@@ -50,6 +50,8 @@ class GlobusWorkflowClient(WorkflowClient):
         response = self._client.list_flow_runs(flow_id=flowID, orderings=orderings)
         logger.debug(f'Flow Run List: {response}')
 
+        # FIXME display_status -> current action
+        # TODO 10 second polling
         for runDict in response['runs']:
             runID = runDict.get('run_id', '')
             runURL = f'https://app.globus.org/runs/{runID}/logs'
@@ -57,7 +59,7 @@ class GlobusWorkflowClient(WorkflowClient):
                               startTime=runDict.get('start_time', ''),
                               completionTime=runDict.get('completion_time', ''),
                               status=runDict.get('status', ''),
-                              displayStatus=runDict.get('display_status', ''),
+                              action=runDict.get('display_status', ''),
                               runID=runID,
                               runURL=runURL)
             runList.append(run)

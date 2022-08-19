@@ -11,7 +11,7 @@ class WorkflowRun:
     startTime: str
     completionTime: str
     status: str
-    displayStatus: str
+    action: str
     runID: str
     runURL: str
 

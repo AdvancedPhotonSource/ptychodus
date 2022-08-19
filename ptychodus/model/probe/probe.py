@@ -1,13 +1,10 @@
 from decimal import Decimal
-import logging
 
 import numpy
 
 from ...api.observer import Observable
 from ...api.probe import ProbeArrayType
 from .sizer import ProbeSizer
-
-logger = logging.getLogger(__name__)
 
 
 class Probe(Observable):
@@ -23,6 +20,7 @@ class Probe(Observable):
         return self._array[index, ...]
 
     def getProbeModeRelativePower(self, index: int) -> Decimal:
+        # FIXME handle NaN in array
         probe = self._array
         power = numpy.sum((probe * probe.conj()).real, axis=(-2, -1))
         powersum = power.sum()
@@ -47,24 +45,3 @@ class Probe(Observable):
             raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
 
         self.notifyObservers()
-
-    def addAMode(self) -> None:
-        # randomly shift the first mode
-        pw = self._array.shape[-1]
-
-        variate1 = numpy.random.rand(2, 1) - 0.5  # FIXME rng
-        variate2 = (numpy.arange(0, pw) + 0.5) / pw - 0.5
-        variate = variate1 * variate2
-
-        phaseShift = numpy.exp(-2j * numpy.pi * variate)
-        mode = self._array[:1, :, :] * phaseShift[0][numpy.newaxis] * phaseShift[1][:,
-                                                                                    numpy.newaxis]
-        self._array = numpy.concatenate((self._array, mode))
-        self.notifyObservers()
-
-    def removeAMode(self) -> None:
-        if self._array.shape[0] > 1:
-            self._array = self._array[:-1, :, :]
-            self.notifyObservers()
-        else:
-            logger.error('Refusing to remove last probe mode!')

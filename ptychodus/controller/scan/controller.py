@@ -135,7 +135,7 @@ class ScanController(Observer):
             transformController = ScanTransformController.createInstance(
                 initializer, dialog.transformView)
 
-            dialog.open()  # FIXME does this modify anything correctly?
+            dialog.open()
         else:
             logger.error('No scans are selected!')
 
@@ -168,6 +168,7 @@ class ScanController(Observer):
         self._presenter.setActiveScan(name)
 
     def _redrawPlot(self) -> None:
+        # FIXME redraw whenever a checked scan changes
         scanMap = {entry.name: entry for entry in self._presenter.getScanRepositoryContents()}
         self._plotView.axes.clear()
 

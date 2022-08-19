@@ -8,9 +8,9 @@ import pkgutil
 
 from .data import DataFileReader, DataFileWriter
 from .image import ScalarTransformation
-from .object import ObjectFileReader, ObjectFileWriter, ObjectInitializerType
+from .object import ObjectFileReader, ObjectFileWriter
 from .observer import Observable
-from .probe import ProbeFileReader, ProbeFileWriter, ProbeInitializerType
+from .probe import ProbeFileReader, ProbeFileWriter
 from .scan import ScanFileReader, ScanFileWriter
 
 T = TypeVar('T')

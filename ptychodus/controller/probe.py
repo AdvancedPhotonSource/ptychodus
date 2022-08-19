@@ -2,11 +2,13 @@ from __future__ import annotations
 from typing import Callable
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
-from PyQt5.QtWidgets import QAbstractItemView, QWidget
+from PyQt5.QtWidgets import QAbstractItemView, QDialog, QWidget
 
-from ..model import Observable, Observer, ImagePresenter, Probe, ProbePresenter
-from ..view import (ImageView, ProbeView, ProbeEditorDialog, ProbeParametersView,
-                    ProbeSuperGaussianView, ProbeZonePlateView, ProgressBarItemDelegate)
+from ..model import (FileProbeInitializer, FresnelZonePlateProbeInitializer, ImagePresenter,
+                     Observable, Observer, Probe, ProbePresenter, SuperGaussianProbeInitializer)
+from ..view import (FresnelZonePlateProbeDialog, FresnelZonePlateProbeView, ImageView,
+                    ProbeParametersView, ProbeView, ProgressBarItemDelegate,
+                    SuperGaussianProbeDialog, SuperGaussianProbeView)
 from .data import FileDialogFactory
 from .image import ImageController
 
@@ -46,23 +48,24 @@ class ProbeController(Observer):
             self._syncModelToView()
 
 
-class ProbeSuperGaussianController(Observer):
+class SuperGaussianProbeController(Observer):
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeSuperGaussianView) -> None:
+    def __init__(self, initializer: SuperGaussianProbeInitializer,
+                 view: SuperGaussianProbeView) -> None:
         super().__init__()
-        self._presenter = presenter
+        self._initializer = initializer
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter,
-                       view: ProbeSuperGaussianView) -> ProbeSuperGaussianController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
+    def createInstance(cls, initializer: SuperGaussianProbeInitializer,
+                       view: SuperGaussianProbeView) -> SuperGaussianProbeController:
+        controller = cls(initializer, view)
+        initializer.addObserver(controller)
 
-        view.annularRadiusWidget.lengthChanged.connect(
-            presenter.setSuperGaussianAnnularRadiusInMeters)
-        view.probeWidthWidget.lengthChanged.connect(presenter.setSuperGaussianProbeWidthInMeters)
-        view.orderParameterWidget.valueChanged.connect(presenter.setSuperGaussianOrderParameter)
+        view.annularRadiusWidget.lengthChanged.connect(initializer.setAnnularRadiusInMeters)
+        view.probeWidthWidget.lengthChanged.connect(initializer.setProbeWidthInMeters)
+        view.orderParameterWidget.valueChanged.connect(initializer.setOrderParameter)
+        view.numberOfModesSpinBox.valueChanged.connect(initializer.setNumberOfProbeModes)
 
         controller._syncModelToView()
 
@@ -70,34 +73,37 @@ class ProbeSuperGaussianController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.annularRadiusWidget.setLengthInMeters(
-            self._presenter.getSuperGaussianAnnularRadiusInMeters())
-        self._view.probeWidthWidget.setLengthInMeters(
-            self._presenter.getSuperGaussianProbeWidthInMeters())
-        self._view.orderParameterWidget.setValue(self._presenter.getSuperGaussianOrderParameter())
+            self._initializer.getAnnularRadiusInMeters())
+        self._view.probeWidthWidget.setLengthInMeters(self._initializer.getProbeWidthInMeters())
+        self._view.orderParameterWidget.setValue(self._initializer.getOrderParameter())
+        self._view.numberOfModesSpinBox.setValue(self._initializer.getNumberOfProbeModes())
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._initializer:
             self._syncModelToView()
 
 
-class ProbeZonePlateController(Observer):
+class FresnelZonePlateProbeController(Observer):
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeZonePlateView) -> None:
+    def __init__(self, initializer: FresnelZonePlateProbeInitializer,
+                 view: FresnelZonePlateProbeView) -> None:
         super().__init__()
-        self._presenter = presenter
+        self._initializer = initializer
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter,
-                       view: ProbeZonePlateView) -> ProbeZonePlateController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
+    def createInstance(cls, initializer: FresnelZonePlateProbeInitializer,
+                       view: FresnelZonePlateProbeView) -> FresnelZonePlateProbeController:
+        controller = cls(initializer, view)
+        initializer.addObserver(controller)
 
-        view.zonePlateRadiusWidget.lengthChanged.connect(presenter.setZonePlateRadiusInMeters)
+        view.zonePlateRadiusWidget.lengthChanged.connect(initializer.setZonePlateRadiusInMeters)
         view.outermostZoneWidthWidget.lengthChanged.connect(
-            presenter.setOutermostZoneWidthInMeters)
-        view.beamstopDiameterWidget.lengthChanged.connect(presenter.setBeamstopDiameterInMeters)
-        view.defocusDistanceWidget.lengthChanged.connect(presenter.setDefocusDistanceInMeters)
+            initializer.setOutermostZoneWidthInMeters)
+        view.beamstopDiameterWidget.lengthChanged.connect(
+            initializer.setCentralBeamstopDiameterInMeters)
+        view.defocusDistanceWidget.lengthChanged.connect(initializer.setDefocusDistanceInMeters)
+        view.numberOfModesSpinBox.valueChanged.connect(initializer.setNumberOfProbeModes)
 
         controller._syncModelToView()
 
@@ -105,16 +111,17 @@ class ProbeZonePlateController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.zonePlateRadiusWidget.setLengthInMeters(
-            self._presenter.getZonePlateRadiusInMeters())
+            self._initializer.getZonePlateRadiusInMeters())
         self._view.outermostZoneWidthWidget.setLengthInMeters(
-            self._presenter.getOutermostZoneWidthInMeters())
+            self._initializer.getOutermostZoneWidthInMeters())
         self._view.beamstopDiameterWidget.setLengthInMeters(
-            self._presenter.getBeamstopDiameterInMeters())
+            self._initializer.getCentralBeamstopDiameterInMeters())
         self._view.defocusDistanceWidget.setLengthInMeters(
-            self._presenter.getDefocusDistanceInMeters())
+            self._initializer.getDefocusDistanceInMeters())
+        self._view.numberOfModesSpinBox.setValue(self._initializer.getNumberOfProbeModes())
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._initializer:
             self._syncModelToView()
 
 
@@ -174,10 +181,6 @@ class ProbeParametersController(Observer):
         self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
         self._probeController = ProbeController.createInstance(presenter, view.probeView)
-        self._superGaussianController = ProbeSuperGaussianController.createInstance(
-            self._presenter, self._view.editorDialog.superGaussianView)
-        self._zonePlateController = ProbeZonePlateController.createInstance(
-            self._presenter, self._view.editorDialog.zonePlateView)
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
         self._modesTableModel = ProbeModesTableModel(presenter)
@@ -203,13 +206,6 @@ class ProbeParametersController(Observer):
             initAction.triggered.connect(controller._createInitializerLambda(name))
 
         view.modesView.buttonBox.saveButton.clicked.connect(controller._saveProbe)
-        view.modesView.buttonBox.editButton.clicked.connect(controller._editProbe)
-
-        addAModeAction = view.modesView.buttonBox.modesMenu.addAction('Append A Mode')
-        addAModeAction.triggered.connect(presenter.addAMode)
-
-        removeAModeAction = view.modesView.buttonBox.modesMenu.addAction('Remove Last Mode')
-        removeAModeAction.triggered.connect(presenter.removeAMode)
 
         controller._syncModelToView()
 
@@ -217,22 +213,48 @@ class ProbeParametersController(Observer):
 
     def _editProbe(self) -> None:
         initializerName = self._presenter.getInitializerName()
-        self._view.editorDialog.setWindowTitle(initializerName)
-        # FIXME setup dialog and update view while editing
-        self._view.editorDialog.open()
+        initializer = self._presenter.getInitializer()
 
-    def _initializeProbe(self, name: str) -> None:
-        if name == 'Open File...':
-            if not self._openProbe():
-                return
+        # FIXME update view while editing
+        if isinstance(initializer, FileProbeInitializer):
+            filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+                self._view,
+                'Open Probe',
+                nameFilters=initializer.getOpenFileFilterList(),
+                selectedNameFilter=initializer.getOpenFileFilter())
 
+            if filePath:
+                initializer.setOpenFilePath(filePath)
+                initializer.setOpenFileFilter(nameFilter)
+                self._presenter.initializeProbe()
+        elif isinstance(initializer, SuperGaussianProbeInitializer):
+            sgDialog = SuperGaussianProbeDialog.createInstance(self._view)
+            sgDialog.setWindowTitle(initializerName)
+            sgDialog.finished.connect(self._finishInitialization)
+            sgController = SuperGaussianProbeController.createInstance(
+                initializer, sgDialog.editorView)
+            sgDialog.open()
+        elif isinstance(initializer, FresnelZonePlateProbeInitializer):
+            fzpDialog = FresnelZonePlateProbeDialog.createInstance(self._view)
+            fzpDialog.setWindowTitle(initializerName)
+            fzpDialog.finished.connect(self._finishInitialization)
+            fzpController = FresnelZonePlateProbeController.createInstance(
+                initializer, fzpDialog.editorView)
+            fzpDialog.open()
+        else:
+            self._finishInitialization(QDialog.Accepted)
+
+    def _startInitialization(self, name: str) -> None:
         self._presenter.setInitializerByName(name)
-        self._presenter.initializeProbe()
         self._editProbe()
+
+    def _finishInitialization(self, result: int) -> None:
+        if result == QDialog.Accepted:
+            self._presenter.initializeProbe()
 
     def _createInitializerLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
-        return lambda checked: self._initializeProbe(name)
+        return lambda checked: self._startInitialization(name)
 
     def _renderImageData(self, index: int) -> None:
         array = self._presenter.getProbeMode(index)
@@ -240,21 +262,6 @@ class ProbeParametersController(Observer):
 
     def _displayProbeMode(self, current: QModelIndex, previous: QModelIndex) -> None:
         self._renderImageData(current.row())
-
-    def _openProbe(self) -> bool:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Probe',
-            nameFilters=self._presenter.getOpenFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenFileFilter())
-
-        accepted = bool(filePath)
-
-        if accepted:
-            self._presenter.setOpenFilePath(filePath)
-            self._presenter.setOpenFileFilter(nameFilter)
-
-        return accepted
 
     def _saveProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(

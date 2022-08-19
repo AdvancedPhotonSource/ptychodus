@@ -191,7 +191,7 @@ class WorkflowTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._presenter = presenter
         self._sectionHeaders = [
-            'Label', 'Start Time', 'Completion Time', 'Status', 'Display Status', 'Run ID'
+            'Label', 'Start Time', 'Completion Time', 'Flow Status', 'Current Action', 'Run ID'
         ]
         self._flowRuns: list[WorkflowRun] = list()
 
@@ -230,7 +230,7 @@ class WorkflowTableModel(QAbstractTableModel):
                 elif index.column() == 3:
                     value = QVariant(flowRun.status)
                 elif index.column() == 4:
-                    value = QVariant(flowRun.displayStatus)
+                    value = QVariant(flowRun.action)
                 elif index.column() == 5:
                     value = QVariant(flowRun.runID)
             elif index.column() == 5:

@@ -3,7 +3,7 @@ from typing import Optional
 
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
                              QGroupBox, QHeaderView, QHBoxLayout, QMenu, QPushButton, QSizePolicy,
-                             QStackedWidget, QTableView, QVBoxLayout, QWidget)
+                             QSpinBox, QStackedWidget, QTableView, QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, EnergyWidget, LengthWidget, SemiautomaticSpinBox
 
@@ -29,28 +29,30 @@ class ProbeView(QGroupBox):
         return view
 
 
-class ProbeSuperGaussianView(QWidget):
+class SuperGaussianProbeView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.annularRadiusWidget = LengthWidget.createInstance()
         self.probeWidthWidget = LengthWidget.createInstance()
         self.orderParameterWidget = DecimalLineEdit.createInstance()
+        self.numberOfModesSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeSuperGaussianView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SuperGaussianProbeView:
         view = cls(parent)
 
         layout = QFormLayout()
         layout.addRow('Annular Radius:', view.annularRadiusWidget)
         layout.addRow('Probe Width:', view.probeWidthWidget)
         layout.addRow('Order Parameter:', view.orderParameterWidget)
+        layout.addRow('Number of Modes:', view.numberOfModesSpinBox)
         view.setLayout(layout)
 
         return view
 
 
-class ProbeZonePlateView(QWidget):
+class FresnelZonePlateProbeView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
@@ -58,9 +60,10 @@ class ProbeZonePlateView(QWidget):
         self.outermostZoneWidthWidget = LengthWidget.createInstance()
         self.beamstopDiameterWidget = LengthWidget.createInstance()
         self.defocusDistanceWidget = LengthWidget.createInstance()
+        self.numberOfModesSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeZonePlateView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> FresnelZonePlateProbeView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -68,29 +71,58 @@ class ProbeZonePlateView(QWidget):
         layout.addRow('Outermost Zone Width:', view.outermostZoneWidthWidget)
         layout.addRow('Beamstop Diameter:', view.beamstopDiameterWidget)
         layout.addRow('Defocus Distance:', view.defocusDistanceWidget)
+        layout.addRow('Number of Modes:', view.numberOfModesSpinBox)
         view.setLayout(layout)
 
         return view
 
 
-class ProbeEditorDialog(QDialog):
+class SuperGaussianProbeDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.superGaussianView = ProbeSuperGaussianView.createInstance()
-        self.zonePlateView = ProbeZonePlateView.createInstance()
+        self.editorView = SuperGaussianProbeView.createInstance()
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeEditorDialog:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SuperGaussianProbeDialog:
         view = cls(parent)
 
         view.buttonBox.addButton(QDialogButtonBox.Ok)
+        view.buttonBox.addButton(QDialogButtonBox.Cancel)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.superGaussianView)
-        layout.addWidget(view.zonePlateView)
+        layout.addWidget(view.editorView)
+        layout.addWidget(view.buttonBox)
+        view.setLayout(layout)
+
+        return view
+
+    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
+            self.accept()
+        else:
+            self.reject()
+
+
+class FresnelZonePlateProbeDialog(QDialog):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.editorView = FresnelZonePlateProbeView.createInstance()
+        self.buttonBox = QDialogButtonBox()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> FresnelZonePlateProbeDialog:
+        view = cls(parent)
+
+        view.buttonBox.addButton(QDialogButtonBox.Ok)
+        view.buttonBox.addButton(QDialogButtonBox.Cancel)
+        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+
+        layout = QVBoxLayout()
+        layout.addWidget(view.editorView)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
@@ -110,23 +142,17 @@ class ProbeModesButtonBox(QWidget):
         self.initializeMenu = QMenu()
         self.initializeButton = QPushButton('Initialize')
         self.saveButton = QPushButton('Save')
-        self.editButton = QPushButton('Edit')
-        self.modesMenu = QMenu()
-        self.modesButton = QPushButton('Modes')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeModesButtonBox:
         view = cls(parent)
 
         view.initializeButton.setMenu(view.initializeMenu)
-        view.modesButton.setMenu(view.modesMenu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.initializeButton)
         layout.addWidget(view.saveButton)
-        layout.addWidget(view.editButton)
-        layout.addWidget(view.modesButton)
         view.setLayout(layout)
 
         return view
@@ -159,7 +185,6 @@ class ProbeParametersView(QWidget):
         super().__init__(parent)
         self.probeView = ProbeView.createInstance()
         self.modesView = ProbeModesView.createInstance()
-        self.editorDialog = ProbeEditorDialog.createInstance(self)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeParametersView:
