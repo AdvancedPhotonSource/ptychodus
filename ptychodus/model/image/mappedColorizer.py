@@ -53,12 +53,14 @@ class MappedColorizer(Colorizer):
                         acyclicColormapChooser)
         phase = cls(PhaseArrayComponent(array), displayRange, transformChooser,
                     cyclicColormapChooser)
+        phaseUnwrapped = cls(UnwrappedPhaseArrayComponent(array), displayRange,
+            transformChooser, acyclicColormapChooser)
         real = cls(RealArrayComponent(array), displayRange, transformChooser,
                    acyclicColormapChooser)
         imag = cls(ImaginaryArrayComponent(array), displayRange, transformChooser,
                    acyclicColormapChooser)
 
-        return [amplitude, phase, real, imag]
+        return [amplitude, phase, phaseUnwrapped, real, imag]
 
     def getVariantNameList(self) -> list[str]:
         return self._variantChooser.getDisplayNameList()

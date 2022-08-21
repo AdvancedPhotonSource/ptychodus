@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import logging
 
+from skimage.restoration import unwrap_phase
 import numpy
 import numpy.typing
 
@@ -88,6 +89,16 @@ class PhaseArrayComponent(VisualizationArrayComponent):
 
     def __call__(self) -> InexactArrayType:
         return numpy.angle(self._array())
+
+
+class UnwrappedPhaseArrayComponent(VisualizationArrayComponent):
+
+    def __init__(self, array: VisualizationArray) -> None:
+        super().__init__('Phase (Unwrapped)', array)
+
+    def __call__(self) -> InexactArrayType:
+        phase = numpy.angle(self._array())
+        return unwrap_phase(phase)
 
 
 class RealArrayComponent(VisualizationArrayComponent):

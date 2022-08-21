@@ -1,10 +1,13 @@
 from decimal import Decimal
+import logging
 
 import numpy
 
 from ...api.observer import Observable
 from ...api.probe import ProbeArrayType
 from .sizer import ProbeSizer
+
+logger = logging.getLogger(__name__)
 
 
 class Probe(Observable):
@@ -20,7 +23,10 @@ class Probe(Observable):
         return self._array[index, ...]
 
     def getProbeModeRelativePower(self, index: int) -> Decimal:
-        # FIXME handle NaN in array
+        if numpy.isnan(self._array).any():
+            logger.error('Probe contains NaN value(s)!')
+            return Decimal()
+
         probe = self._array
         power = numpy.sum((probe * probe.conj()).real, axis=(-2, -1))
         powersum = power.sum()
