@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import Final
 import logging
 
 try:
@@ -8,8 +9,8 @@ except ModuleNotFoundError:
     ptychopy = None
 
 from ..api.observer import Observable, Observer
-from .reconstructor import Reconstructor
 from ..api.settings import SettingsRegistry, SettingsGroup
+from .reconstructor import Reconstructor
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +217,7 @@ class CommandStringBuilder:
 
 
 class PtychoPyPresenter(Observable, Observer):
-    MAX_INT = 0x7FFFFFFF
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: PtychoPySettings) -> None:
         super().__init__()

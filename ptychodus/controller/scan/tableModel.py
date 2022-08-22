@@ -35,11 +35,9 @@ class ScanTableModel(QAbstractTableModel):
         value = super().flags(index)
 
         if index.isValid():
-            initializer = self._scanList[index.row()].initializer
+            entry = self._scanList[index.row()]
 
-            # FIXME must be saved to disk to make active; can be made active iff fileInfo not None
-            # FIXME logic belongs in presenter
-            if initializer.variant == 'FromMemory':
+            if not self._presenter.canActivateScan(entry.name):
                 value = int(value) & ~Qt.ItemIsSelectable
 
             if index.column() == 0:

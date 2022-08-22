@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import overload, Union
+from typing import overload, Final, Union
 import logging
 
 import numpy
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class DetectorPresenter(Observable, Observer):
-    MAX_INT = 0x7FFFFFFF
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: DetectorSettings) -> None:
         super().__init__()

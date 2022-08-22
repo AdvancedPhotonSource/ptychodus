@@ -16,6 +16,7 @@ from .initializerFactory import ScanInitializerFactory
 from .repository import ScanRepository
 from .scan import Scan
 from .settings import ScanSettings
+from .tabular import ScanFileInfo, TabularScanInitializer
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,15 @@ class ScanPresenter(Observable, Observer):
 
     def getActiveScan(self) -> str:
         return self._scan.name
+
+    def canActivateScan(self, name: str) -> bool:
+        canActivate = False
+        initializer = self._repository.get(name)
+
+        if isinstance(initializer, TabularScanInitializer):
+            canActivate = (initializer.getFileInfo() is not None)
+
+        return canActivate
 
     def setActiveScan(self, name: str) -> None:
         self._scan.setActive(name)
@@ -99,14 +109,19 @@ class ScanPresenter(Observable, Observer):
             logger.error(f'Unable to locate \"{name}\"!')
             return
 
+        scanDict = SimpleScanDictionary.createFromUnnamedSequence(initializer)
+
         self._fileWriterChooser.setFromDisplayName(fileFilter)
         fileType = self._fileWriterChooser.getCurrentSimpleName()
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.getCurrentStrategy()
-        writer.write(filePath, SimpleScanDictionary.createFromUnnamedSequence(initializer))
+        writer.write(filePath, scanDict)
 
-        # FIXME if strategy is Tabular and no fileInfo, add fileInfo to
-        #       strategy and make sure that strategy calls notifyObservers
+        if isinstance(initializer, TabularScanInitializer):
+            if initializer.getFileInfo() is None:
+                fileInfo = ScanFileInfo(fileType, filePath,
+                                        SimpleScanDictionary.DEFAULT_SEQUENCE_NAME)
+                initializer.setFileInfo(fileInfo)
 
     def update(self, observable: Observable) -> None:
         if observable is self._repository:

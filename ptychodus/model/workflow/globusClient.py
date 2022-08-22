@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Final, Optional
 from uuid import UUID
 import json
 import logging
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class GlobusWorkflowClient(WorkflowClient):
-    CLIENT_ID: str = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
+    CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
     def __init__(self, settings: WorkflowSettings, authClient: NativeAppAuthClient,
                  tokenResponse: OAuthTokenResponse) -> None:

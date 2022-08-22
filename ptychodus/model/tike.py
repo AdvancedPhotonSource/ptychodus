@@ -1,6 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
-from typing import Any, Union
+from typing import Any, Final, Union
 import logging
 
 import numpy
@@ -309,7 +309,7 @@ class TikeSettings(Observable, Observer):
 
 
 class TikePresenter(Observable, Observer):
-    MAX_INT = 0x7FFFFFFF
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: TikeSettings) -> None:
         super().__init__()

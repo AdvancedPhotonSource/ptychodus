@@ -1,7 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
+from typing import Any, Callable, Final, Generic, Iterator, Optional, TypeVar
 from uuid import UUID
 import configparser
 
@@ -114,7 +114,7 @@ class SettingsGroup(Observable, Observer):
 
 
 class SettingsRegistry(Observable):
-    PREFIX_PLACEHOLDER_TEXT = 'PREFIX'
+    PREFIX_PLACEHOLDER_TEXT: Final[str] = 'PREFIX'
 
     def __init__(self, replacementPathPrefix: Optional[str]) -> None:
         super().__init__()
