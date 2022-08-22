@@ -39,7 +39,6 @@ class TabularScanInitializer(ScanInitializer):
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         if self._fileInfo is None:
-            # FIXME must be saved to disk to make active; can be made active iff fileInfo not None
             raise ValueError('Missing file info.')
 
         settings.initializer.value = self.variant

@@ -215,7 +215,7 @@ class ProbeParametersController(Observer):
         initializerName = self._presenter.getInitializerName()
         initializer = self._presenter.getInitializer()
 
-        # FIXME update view while editing
+        # TODO show live update while editing
         if isinstance(initializer, FileProbeInitializer):
             filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
                 self._view,

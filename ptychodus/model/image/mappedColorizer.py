@@ -53,8 +53,8 @@ class MappedColorizer(Colorizer):
                         acyclicColormapChooser)
         phase = cls(PhaseArrayComponent(array), displayRange, transformChooser,
                     cyclicColormapChooser)
-        phaseUnwrapped = cls(UnwrappedPhaseArrayComponent(array), displayRange,
-            transformChooser, acyclicColormapChooser)
+        phaseUnwrapped = cls(UnwrappedPhaseArrayComponent(array), displayRange, transformChooser,
+                             acyclicColormapChooser)
         real = cls(RealArrayComponent(array), displayRange, transformChooser,
                    acyclicColormapChooser)
         imag = cls(ImaginaryArrayComponent(array), displayRange, transformChooser,

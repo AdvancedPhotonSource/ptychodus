@@ -1,8 +1,7 @@
 from __future__ import annotations
-from collections.abc import Mapping, Sequence
+from collections.abc import ItemsView
 from dataclasses import dataclass
 from pathlib import Path
-from typing import overload, Iterator, Optional, Union
 import logging
 
 import numpy
@@ -14,146 +13,11 @@ from ...api.scan import (ScanFileReader, ScanFileWriter, ScanPoint, ScanPointSeq
 from ...api.settings import SettingsRegistry
 from .initializer import ScanInitializer
 from .initializerFactory import ScanInitializerFactory
+from .repository import ScanRepository
+from .scan import Scan
 from .settings import ScanSettings
 
 logger = logging.getLogger(__name__)
-
-
-class ScanRepository(Mapping[str, ScanInitializer], Observable):
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._initializers: dict[str, ScanInitializer] = dict()
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._initializers)
-
-    def __getitem__(self, name: str) -> ScanInitializer:
-        return self._initializers[name]
-
-    def __len__(self) -> int:
-        return len(self._initializers)
-
-    def insertScan(self, initializer: ScanInitializer, name: Optional[str] = None) -> None:
-        if name is None:
-            name = initializer.variant
-
-        initializerName = name
-        index = 0
-
-        while initializerName in self._initializers:
-            index += 1
-            initializerName = f'{name}-{index}'
-
-        self._initializers[initializerName] = initializer
-        self.notifyObservers()
-
-    def canRemoveScan(self, name: str) -> bool:
-        return len(self._initializers) > 1
-
-    def removeScan(self, name: str) -> None:
-        if self.canRemoveScan(name):
-            try:
-                self._initializers.pop(name)
-            except KeyError:
-                pass
-
-        self.notifyObservers()
-
-
-class Scan(ScanPointSequence, Observable, Observer):
-
-    def __init__(self, settings: ScanSettings, initializerFactory: ScanInitializerFactory,
-                 repository: ScanRepository, reinitObservable: Observable) -> None:
-        super().__init__()
-        self._settings = settings
-        self._initializerFactory = initializerFactory
-        self._repository = repository
-        self._reinitObservable = reinitObservable
-        self._initializer: ScanInitializer = initializerFactory.createTabularInitializer([], None)
-        self._name = str()
-
-    @classmethod
-    def createInstance(cls, settings: ScanSettings, initializerFactory: ScanInitializerFactory,
-                       repository: ScanRepository, reinitObservable: Observable) -> Scan:
-        scan = cls(settings, initializerFactory, repository, reinitObservable)
-        scan._syncFromSettings()
-        reinitObservable.addObserver(scan)
-        return scan
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def setActive(self, name: str) -> None:
-        if self._name == name:
-            return
-
-        try:
-            initializer = self._repository[name]
-        except KeyError:
-            logger.error(f'Failed to activate \"{name}\"!')
-            return
-
-        self._initializer.removeObserver(self)
-        self._initializer = initializer
-        self._name = name
-        self._initializer.addObserver(self)
-
-        self._syncToSettings()
-        self.notifyObservers()
-
-    @overload
-    def __getitem__(self, index: int) -> ScanPoint:
-        ...
-
-    @overload
-    def __getitem__(self, index: slice) -> Sequence[ScanPoint]:
-        ...
-
-    def __getitem__(self, index: Union[int, slice]) -> Union[ScanPoint, Sequence[ScanPoint]]:
-        return self._initializer[index]
-
-    def __len__(self) -> int:
-        return len(self._initializer)
-
-    def _syncFromSettings(self) -> None:
-        initializerName = self._settings.initializer.value
-        name = initializerName.casefold()
-
-        # FIXME confirm that this method does the right thing when rerun
-        if name == 'fromfile':
-            tabularList = self._initializerFactory.openScanFromSettings()
-
-            for tabular in tabularList:
-                self._repository.insertScan(tabular)
-        else:
-            initializer = self._initializerFactory.createInitializer(name)
-
-            if initializer is None:
-                logger.error(f'Unknown scan initializer \"{initializerName}\"!')
-            else:
-                self._repository.insertScan(initializer)
-
-        self.setActive(initializerName)
-
-    def _syncToSettings(self) -> None:
-        self._initializer.syncToSettings(self._settings)
-        self.notifyObservers()
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._initializer:
-            self._syncToSettings()
-        elif observable is self._reinitObservable:
-            self._syncFromSettings()
-
-
-@dataclass(frozen=True)
-class ScanRepositoryEntry:
-    name: str
-    category: str
-    variant: str
-    pointSequence: ScanPointSequence
 
 
 class ScanPresenter(Observable, Observer):
@@ -175,11 +39,8 @@ class ScanPresenter(Observable, Observer):
         scan.addObserver(presenter)
         return presenter
 
-    def getScanRepositoryContents(self) -> list[ScanRepositoryEntry]:
-        return [
-            ScanRepositoryEntry(name, ini.category, ini.variant, ini)
-            for name, ini in self._repository.items()
-        ]
+    def getScanRepositoryContents(self) -> ItemsView[str, ScanInitializer]:
+        return self._repository.items()
 
     def getActiveScanPointList(self) -> list[ScanPoint]:
         return [point for point in self._scan]

@@ -54,7 +54,7 @@ class SuperGaussianProbeInitializer(UnimodalProbeInitializer):
         gridCenter_px = probeSize_px / 2
         cellCenters_px = numpy.arange(probeSize_px) + 0.5 - gridCenter_px
 
-        # FIXME this should use pixel size at object plane
+        # TODO verify pixel size
         Y_px, X_px = numpy.meshgrid(cellCenters_px, cellCenters_px)
         X_m = X_px * float(self._detector.getPixelSizeXInMeters())
         Y_m = Y_px * float(self._detector.getPixelSizeYInMeters())

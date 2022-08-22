@@ -1,7 +1,15 @@
+from dataclasses import dataclass
+
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ...model import ScanPresenter, ScanRepositoryEntry
+from ...model import ScanInitializer, ScanPresenter
+
+
+@dataclass(frozen=True)
+class ScanRepositoryEntry:
+    name: str
+    initializer: ScanInitializer
 
 
 class ScanTableModel(QAbstractTableModel):
@@ -14,16 +22,24 @@ class ScanTableModel(QAbstractTableModel):
 
     def refresh(self) -> None:
         self.beginResetModel()
-        self._scanList = self._presenter.getScanRepositoryContents()
+        self._scanList = [
+            ScanRepositoryEntry(name, initializer)
+            for name, initializer in self._presenter.getScanRepositoryContents()
+        ]
         self.endResetModel()
+
+    def isChecked(self, name: str) -> bool:
+        return (name in self._checkedNames)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
         if index.isValid():
-            entry = self._scanList[index.row()]
+            initializer = self._scanList[index.row()].initializer
 
-            if entry.variant == 'FromMemory':
+            # FIXME must be saved to disk to make active; can be made active iff fileInfo not None
+            # FIXME logic belongs in presenter
+            if initializer.variant == 'FromMemory':
                 value = int(value) & ~Qt.ItemIsSelectable
 
             if index.column() == 0:
@@ -63,11 +79,11 @@ class ScanTableModel(QAbstractTableModel):
                 if index.column() == 0:
                     value = QVariant(entry.name)
                 elif index.column() == 1:
-                    value = QVariant(entry.category)
+                    value = QVariant(entry.initializer.category)
                 elif index.column() == 2:
-                    value = QVariant(entry.variant)
+                    value = QVariant(entry.initializer.variant)
                 elif index.column() == 3:
-                    value = QVariant(len(entry.pointSequence))
+                    value = QVariant(len(entry.initializer))
             elif role == Qt.FontRole:
                 font = QFont()
                 font.setBold(entry.name == self._presenter.getActiveScan())

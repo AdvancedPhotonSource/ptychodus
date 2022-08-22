@@ -7,7 +7,8 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFi
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
-from ...model import Scan, ScanPresenter, ScanRepositoryEntry
+from ...model import (CartesianScanInitializer, Scan, ScanInitializer, ScanPresenter,
+                      SpiralScanInitializer)
 from ...view import (ScanEditorDialog, ScanParametersView, ScanPlotView, ScanPositionDataView,
                      ScanTransformView)
 from ..data import FileDialogFactory
@@ -119,14 +120,13 @@ class ScanController(Observer):
             initializer = self._presenter.getInitializer(name)
 
             isCartesian = (category.casefold() == 'cartesian')
-
             dialog = ScanEditorDialog.createInstance(isCartesian, self._parametersView)
             dialog.setWindowTitle(name)
 
-            if isCartesian:
+            if isinstance(initializer, CartesianScanInitializer):
                 cartesianController = CartesianScanController.createInstance(
                     initializer, dialog.editorView)
-            elif category.casefold() == 'spiral':
+            elif isinstance(initializer, SpiralScanInitializer):
                 spiralController = SpiralScanController.createInstance(
                     initializer, dialog.editorView)
             else:
@@ -168,8 +168,10 @@ class ScanController(Observer):
         self._presenter.setActiveScan(name)
 
     def _redrawPlot(self) -> None:
-        # FIXME redraw whenever a checked scan changes
-        scanMap = {entry.name: entry for entry in self._presenter.getScanRepositoryContents()}
+        initializerDict = {
+            name: initializer
+            for name, initializer in self._presenter.getScanRepositoryContents()
+        }
         self._plotView.axes.clear()
 
         for row in range(self._proxyModel.rowCount()):
@@ -179,9 +181,9 @@ class ScanController(Observer):
                 continue
 
             name = index.data()
-            scanPath = scanMap[name].pointSequence
-            x = [point.x for point in scanPath]
-            y = [point.y for point in scanPath]
+            initializer = initializerDict[name]
+            x = [point.x for point in initializer]
+            y = [point.y for point in initializer]
 
             self._plotView.axes.plot(x, y, '.-', label=name, linewidth=1.5)
 
@@ -197,6 +199,9 @@ class ScanController(Observer):
         self._plotView.figureCanvas.draw()
 
     def _syncModelToView(self) -> None:
+        for _, initializer in self._presenter.getScanRepositoryContents():
+            initializer.addObserver(self)
+
         self._tableModel.refresh()
         self._setButtonsEnabled()
         self._redrawPlot()
@@ -204,3 +209,8 @@ class ScanController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
+        else:
+            for name, initializer in self._presenter.getScanRepositoryContents():
+                if observable is initializer and self._tableModel.isChecked(name):
+                    self._redrawPlot()
+                    break
