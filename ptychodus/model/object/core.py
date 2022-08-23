@@ -17,6 +17,7 @@ from .file import FileObjectInitializer
 from .object import Object
 from .settings import ObjectSettings
 from .sizer import ObjectSizer
+from .uniform import UniformObjectInitializer
 from .urand import UniformRandomObjectInitializer
 
 logger = logging.getLogger(__name__)
@@ -152,13 +153,18 @@ class ObjectCore:
             displayName='Open File...',
             strategy=FileObjectInitializer(self.settings, self.sizer, fileReaderChooser),
         )
+        self._uniformPlugin = PluginEntry[ObjectInitializerType](
+            simpleName='Uniform',
+            displayName='Uniform',
+            strategy=UniformObjectInitializer(self.sizer),
+        )
         self._urandPlugin = PluginEntry[ObjectInitializerType](
             simpleName='Random',
             displayName='Random',
             strategy=UniformRandomObjectInitializer(rng, self.sizer),
         )
         self._initializerChooser = PluginChooser[ObjectInitializerType].createFromList(
-            [self._filePlugin, self._urandPlugin])
+            [self._filePlugin, self._uniformPlugin, self._urandPlugin])
 
         self.presenter = ObjectPresenter.createInstance(self.settings, self.sizer, self.object,
                                                         self._initializerChooser,
