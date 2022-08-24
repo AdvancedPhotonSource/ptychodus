@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QV
 from PyQt5.QtWidgets import QDialog, QFileDialog, QTableView, QTreeView, QWidget
 
 from ..model import DataFilePresenter, Observable, Observer
+from ..view import DataParametersView
 from .tree import SimpleTreeModel
 
 
@@ -131,27 +132,64 @@ class DataArrayTableModel(QAbstractTableModel):
         self.endResetModel()
 
 
-class DataFileController(Observer):
+class DataParametersController(Observer):
 
-    def __init__(self, presenter: DataFilePresenter, treeView: QTreeView,
-                 tableView: QTableView) -> None:
+    def __init__(self, presenter: DataFilePresenter, view: DataParametersView,
+                 tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
-        self._treeModel = SimpleTreeModel(presenter.getContentsTree())
-        self._treeView = treeView
-        self._tableModel = DataArrayTableModel()
+        self._view = view
         self._tableView = tableView
+        self._fileDialogFactory = fileDialogFactory
+        self._treeModel = SimpleTreeModel(presenter.getContentsTree())
+        self._tableModel = DataArrayTableModel()
 
     @classmethod
-    def createInstance(cls, presenter: DataFilePresenter, treeView: QTreeView,
-                       tableView: QTableView) -> DataFileController:
-        controller = cls(presenter, treeView, tableView)
-        treeView.setModel(controller._treeModel)
-        treeView.selectionModel().currentChanged.connect(controller.updateDataArrayInTableView)
-        tableView.setModel(controller._tableModel)
+    def createInstance(cls, presenter: DataFilePresenter, view: DataParametersView,
+                       tableView: QTableView,
+                       fileDialogFactory: FileDialogFactory) -> DataParametersController:
+        controller = cls(presenter, view, tableView, fileDialogFactory)
         presenter.addObserver(controller)
+
+        view.dataView.treeView.setModel(controller._treeModel)
+        view.dataView.treeView.selectionModel().currentChanged.connect(
+            controller._updateDataArrayInTableView)
+        tableView.setModel(controller._tableModel)
+
+        view.dataView.buttonBox.openButton.clicked.connect(controller._openDataFile)
+        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDataFile)
+
         return controller
 
-    def updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
+    def _openDataFile(self) -> None:
+        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+            self._view,
+            'Open Data File',
+            nameFilters=self._presenter.getOpenFileFilterList(),
+            selectedNameFilter=self._presenter.getOpenFileFilter())
+
+        if filePath:
+            self._presenter.openDataFile(filePath, nameFilter)
+            self._view.dataView.setTitle(f'Data File: {filePath}')
+
+    def _saveDataFile(self) -> None:
+        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+            self._view,
+            'Save Data File',
+            nameFilters=self._presenter.getSaveFileFilterList(),
+            selectedNameFilter=self._presenter.getSaveFileFilter())
+
+        if filePath:
+            self._presenter.saveDataFile(filePath, nameFilter)
+
+    def _chooseScratchDirectory(self) -> None:
+        # TODO unused
+        scratchDir = QFileDialog.getExistingDirectory(self._view, 'Choose Scratch Directory',
+                                                      str(self._presenter.getScratchDirectory()))
+
+        if scratchDir:
+            self._presenter.setScratchDirectory(Path(scratchDir))
+
+    def _updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
         names = list()
         nodeItem = current.internalPointer()
 

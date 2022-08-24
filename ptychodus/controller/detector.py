@@ -105,20 +105,18 @@ class DatasetListModel(QAbstractListModel):
 class DatasetParametersController(Observer):
 
     def __init__(self, dataFilePresenter: DataFilePresenter,
-                 datasetPresenter: DiffractionDatasetPresenter, view: DatasetView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+                 datasetPresenter: DiffractionDatasetPresenter, view: DatasetView) -> None:
         super().__init__()
         self._dataFilePresenter = dataFilePresenter
         self._datasetPresenter = datasetPresenter
         self._view = view
-        self._fileDialogFactory = fileDialogFactory
         self._listModel = DatasetListModel(dataFilePresenter)
 
     @classmethod
     def createInstance(cls, dataFilePresenter: DataFilePresenter,
-                       datasetPresenter: DiffractionDatasetPresenter, view: DatasetView,
-                       fileDialogFactory: FileDialogFactory) -> DatasetParametersController:
-        controller = cls(dataFilePresenter, datasetPresenter, view, fileDialogFactory)
+                       datasetPresenter: DiffractionDatasetPresenter,
+                       view: DatasetView) -> DatasetParametersController:
+        controller = cls(dataFilePresenter, datasetPresenter, view)
 
         view.listView.setModel(controller._listModel)
         dataFilePresenter.addObserver(controller)
@@ -127,39 +125,7 @@ class DatasetParametersController(Observer):
         view.listView.selectionModel().currentChanged.connect(
             controller._updateCurrentDatasetIndex)
 
-        view.buttonBox.openButton.clicked.connect(controller._openDataFile)
-        view.buttonBox.saveButton.clicked.connect(controller._saveDataFile)
-
         return controller
-
-    def _openDataFile(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Data File',
-            nameFilters=self._dataFilePresenter.getOpenFileFilterList(),
-            selectedNameFilter=self._dataFilePresenter.getOpenFileFilter())
-
-        if filePath:
-            self._dataFilePresenter.openDataFile(filePath, nameFilter)
-
-    def _saveDataFile(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._view,
-            'Save Data File',
-            nameFilters=self._dataFilePresenter.getSaveFileFilterList(),
-            selectedNameFilter=self._dataFilePresenter.getSaveFileFilter())
-
-        if filePath:
-            self._dataFilePresenter.saveDataFile(filePath, nameFilter)
-
-    def _chooseScratchDirectory(self) -> None:
-        # TODO unused
-        scratchDir = QFileDialog.getExistingDirectory(
-            self._view, 'Choose Scratch Directory',
-            str(self._dataFilePresenter.getScratchDirectory()))
-
-        if scratchDir:
-            self._dataFilePresenter.setScratchDirectory(Path(scratchDir))
 
     def _updateCurrentDatasetIndex(self, index: QModelIndex) -> None:
         self._datasetPresenter.setCurrentDatasetIndex(index.row())

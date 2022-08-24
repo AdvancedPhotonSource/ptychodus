@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QApplication, QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
-from .data import DataFileController, FileDialogFactory
+from .data import DataParametersController, FileDialogFactory
 from .detector import (CropController, DatasetImageController, DatasetParametersController,
                        DetectorController)
 from .object import ObjectImageController, ObjectParametersController
@@ -38,7 +38,7 @@ class ControllerCore:
             model.detectorPresenter, view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
             model.dataFilePresenter, model.diffractionDatasetPresenter,
-            view.detectorParametersView.datasetView, self._fileDialogFactory)
+            view.detectorParametersView.datasetView)
         self._cropController = CropController.createInstance(
             model.cropPresenter, view.detectorParametersView.imageCropView)
         self._datasetImageController = DatasetImageController.createInstance(
@@ -56,9 +56,9 @@ class ControllerCore:
         self._objectImageController = ObjectImageController.createInstance(
             model.objectPresenter, model.objectImagePresenter, view.objectImageView,
             self._fileDialogFactory)
-        self._dataFileController = DataFileController.createInstance(model.dataFilePresenter,
-                                                                     view.dataFileTreeView,
-                                                                     view.dataFileTableView)
+        self._dataParametersController = DataParametersController.createInstance(
+            model.dataFilePresenter, view.dataParametersView, view.dataTableView,
+            self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter, view.reconstructorParametersView,
             [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])

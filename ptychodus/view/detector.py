@@ -33,32 +33,11 @@ class DetectorView(QGroupBox):
         return view
 
 
-class DatasetButtonBox(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.openButton = QPushButton('Open')
-        self.saveButton = QPushButton('Save')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetButtonBox:
-        view = cls(parent)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.openButton)
-        layout.addWidget(view.saveButton)
-        view.setLayout(layout)
-
-        return view
-
-
 class DatasetView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Data', parent)
         self.listView = QListView()
-        self.buttonBox = DatasetButtonBox.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetView:
@@ -66,7 +45,6 @@ class DatasetView(QGroupBox):
 
         layout = QVBoxLayout()
         layout.addWidget(view.listView)
-        layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view
@@ -85,6 +63,7 @@ class CropView(QGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> CropView:
         view = cls(parent)
 
+        # FIXME GridLayout with FlipXY CheckBoxes
         layout = QFormLayout()
         layout.addRow('Center X [px]:', view.centerXSpinBox)
         layout.addRow('Center Y [px]:', view.centerYSpinBox)

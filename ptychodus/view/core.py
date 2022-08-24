@@ -6,6 +6,7 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWidgets import (QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu,
                              QSplitter, QStyle, QTableView, QToolBar, QToolButton, QTreeView)
 
+from .data import DataParametersView
 from .detector import *
 from .monitor import *
 from .object import *
@@ -35,9 +36,9 @@ class ViewCore(QMainWindow):
         self.settingsParametersView = SettingsParametersView.createInstance()
         self.settingsEntryView = QTableView()
 
-        self.dataFileAction = self.navigationToolBar.addAction(fileIcon, 'Data')
-        self.dataFileTreeView = QTreeView()
-        self.dataFileTableView = QTableView()
+        self.dataAction = self.navigationToolBar.addAction(fileIcon, 'Data')
+        self.dataParametersView = DataParametersView.createInstance()
+        self.dataTableView = QTableView()
 
         self.detectorAction = self.navigationToolBar.addAction(fileIcon, 'Detector')
         self.detectorParametersView = DetectorParametersView.createInstance()
@@ -85,13 +86,12 @@ class ViewCore(QMainWindow):
         view.settingsAction.setChecked(True)
 
         view.settingsEntryView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        view.dataFileTreeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)
         view.workflowTableView.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeToContents)
 
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsParametersView)
-        view.parametersWidget.addWidget(view.dataFileTreeView)
+        view.parametersWidget.addWidget(view.dataParametersView)
         view.parametersWidget.addWidget(view.detectorParametersView)
         view.parametersWidget.addWidget(view.scanParametersView)
         view.parametersWidget.addWidget(view.probeParametersView)
@@ -104,7 +104,7 @@ class ViewCore(QMainWindow):
 
         # maintain same order as navigationToolBar buttons
         view.contentsWidget.addWidget(view.settingsEntryView)
-        view.contentsWidget.addWidget(view.dataFileTableView)
+        view.contentsWidget.addWidget(view.dataTableView)
         view.contentsWidget.addWidget(view.detectorImageView)
         view.contentsWidget.addWidget(view.scanPlotView)
         view.contentsWidget.addWidget(view.probeImageView)

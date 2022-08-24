@@ -51,7 +51,8 @@ class GlobusWorkflowClient(WorkflowClient):
         logger.debug(f'Flow Run List: {response}')
 
         # FIXME display_status -> current action
-        # TODO 10 second polling
+        # FIXME source/compute/results endpoints
+        # FIXME 10 second polling
         for runDict in response['runs']:
             runID = runDict.get('run_id', '')
             runURL = f'https://app.globus.org/runs/{runID}/logs'
