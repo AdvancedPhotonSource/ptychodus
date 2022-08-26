@@ -4,7 +4,7 @@ from decimal import Decimal
 import numpy
 
 from ...api.probe import ProbeArrayType
-from ..data import Detector
+from .apparatus import Apparatus
 from .initializer import UnimodalProbeInitializer, UnimodalProbeInitializerParameters
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
@@ -13,10 +13,10 @@ from .sizer import ProbeSizer
 class SuperGaussianProbeInitializer(UnimodalProbeInitializer):
 
     def __init__(self, parameters: UnimodalProbeInitializerParameters, sizer: ProbeSizer,
-                 detector: Detector) -> None:
+                 apparatus: Apparatus) -> None:
         super().__init__(parameters)
         self._sizer = sizer
-        self._detector = detector
+        self._apparatus = apparatus
         self._annularRadiusInMeters = Decimal()
         self._probeWidthInMeters = Decimal()
         self._orderParameter = Decimal()
@@ -24,8 +24,8 @@ class SuperGaussianProbeInitializer(UnimodalProbeInitializer):
     @classmethod
     def createInstance(cls, parameters: UnimodalProbeInitializerParameters,
                        settings: ProbeSettings, sizer: ProbeSizer,
-                       detector: Detector) -> SuperGaussianProbeInitializer:
-        initializer = cls(parameters, sizer, detector)
+                       apparatus: Apparatus) -> SuperGaussianProbeInitializer:
+        initializer = cls(parameters, sizer, apparatus)
         initializer.syncFromSettings(settings)
         return initializer
 
@@ -54,10 +54,9 @@ class SuperGaussianProbeInitializer(UnimodalProbeInitializer):
         gridCenter_px = probeSize_px / 2
         cellCenters_px = numpy.arange(probeSize_px) + 0.5 - gridCenter_px
 
-        # TODO verify pixel size
         Y_px, X_px = numpy.meshgrid(cellCenters_px, cellCenters_px)
-        X_m = X_px * float(self._detector.getPixelSizeXInMeters())
-        Y_m = Y_px * float(self._detector.getPixelSizeYInMeters())
+        X_m = X_px * float(self._apparatus.getObjectPlanePixelSizeXInMeters())
+        Y_m = Y_px * float(self._apparatus.getObjectPlanePixelSizeYInMeters())
         R_m = numpy.hypot(X_m, Y_m)
 
         Z = (R_m - float(self._annularRadiusInMeters)) / float(self._probeWidthInMeters)

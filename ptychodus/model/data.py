@@ -156,6 +156,7 @@ class CropSizer(Observable, Observer):
         return limitsInPixels.clamp(self._settings.centerXInPixels.value)
 
     def getSliceX(self) -> slice:
+        # TODO add support for flipX
         centerInPixels = self.getCenterXInPixels()
         radiusInPixels = self.getExtentXInPixels() // 2
         return slice(centerInPixels - radiusInPixels, centerInPixels + radiusInPixels)
@@ -177,6 +178,7 @@ class CropSizer(Observable, Observer):
         return limitsInPixels.clamp(self._settings.centerYInPixels.value)
 
     def getSliceY(self) -> slice:
+        # TODO add support for flipY
         centerInPixels = self.getCenterYInPixels()
         radiusInPixels = self.getExtentYInPixels() // 2
         return slice(centerInPixels - radiusInPixels, centerInPixels + radiusInPixels)

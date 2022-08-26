@@ -5,7 +5,7 @@ from decimal import Decimal
 import numpy
 
 from ...api.probe import ProbeArrayType
-from ..data import Detector
+from .apparatus import Apparatus
 from .initializer import UnimodalProbeInitializer, UnimodalProbeInitializerParameters
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
@@ -102,18 +102,18 @@ def fresnel_propagation(input, dxy, z, wavelength):
 class FresnelZonePlateProbeInitializer(UnimodalProbeInitializer):
 
     def __init__(self, parameters: UnimodalProbeInitializerParameters, sizer: ProbeSizer,
-                 detector: Detector) -> None:
+                 apparatus: Apparatus) -> None:
         super().__init__(parameters)
         self._sizer = sizer
-        self._detector = detector
+        self._apparatus = apparatus
         self._zonePlate = FresnelZonePlate(Decimal(), Decimal(), Decimal())
         self._defocusDistanceInMeters = Decimal()  # from sample to the focal plane
 
     @classmethod
     def createInstance(cls, parameters: UnimodalProbeInitializerParameters,
                        settings: ProbeSettings, sizer: ProbeSizer,
-                       detector: Detector) -> FresnelZonePlateProbeInitializer:
-        initializer = cls(parameters, sizer, detector)
+                       apparatus: Apparatus) -> FresnelZonePlateProbeInitializer:
+        initializer = cls(parameters, sizer, apparatus)
         initializer.syncFromSettings(settings)
         return initializer
 
@@ -159,13 +159,10 @@ class FresnelZonePlateProbeInitializer(UnimodalProbeInitializer):
         probe = numpy.zeros((probeSize, probeSize), dtype=complex)
 
         # central wavelength
-        lambda0 = self._sizer.getWavelengthInMeters()
-
-        # sample to detector distance
-        dis_StoD = self._detector.getDetectorDistanceInMeters()
+        lambda0 = self._apparatus.getProbeWavelengthInMeters()
 
         # pixel size on sample plane (TODO non-square pixels are unsupported)
-        dx = lambda0 * dis_StoD / probeSize / self._detector.getPixelSizeXInMeters()
+        dx = self._apparatus.getObjectPlanePixelSizeXInMeters()
 
         T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters, probeSize, dx,
                                        self._zonePlate)

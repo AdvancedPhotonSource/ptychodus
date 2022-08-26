@@ -4,45 +4,26 @@ from decimal import Decimal, ROUND_CEILING
 from ...api.geometry import Interval
 from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
-from ..data import CropSizer, Detector
-from ..probe import ProbeSizer
+from ..probe import Apparatus, ProbeSizer
 from ..scan import Scan
 
 
 class ObjectSizer(Observable, Observer):
 
-    def __init__(self, detector: Detector, cropSizer: CropSizer, scan: Scan,
-                 probeSizer: ProbeSizer) -> None:
+    def __init__(self, apparatus: Apparatus, scan: Scan, probeSizer: ProbeSizer) -> None:
         super().__init__()
-        self._detector = detector
-        self._cropSizer = cropSizer
+        self._apparatus = apparatus
         self._scan = scan
         self._probeSizer = probeSizer
 
     @classmethod
-    def createInstance(cls, detector: Detector, cropSizer: CropSizer, scan: Scan,
+    def createInstance(cls, apparatus: Apparatus, scan: Scan,
                        probeSizer: ProbeSizer) -> ObjectSizer:
-        sizer = cls(detector, cropSizer, scan, probeSizer)
-        detector.addObserver(sizer)
-        cropSizer.addObserver(sizer)
+        sizer = cls(apparatus, scan, probeSizer)
+        apparatus.addObserver(sizer)
         scan.addObserver(sizer)
         probeSizer.addObserver(sizer)
         return sizer
-
-    @property
-    def _lambdaZ_m2(self) -> Decimal:
-        return self._probeSizer.getWavelengthInMeters() \
-                * self._detector.getDetectorDistanceInMeters()
-
-    def getPixelSizeXInMeters(self) -> Decimal:
-        extentXInMeters = self._cropSizer.getExtentXInPixels() \
-                * self._detector.getPixelSizeXInMeters()
-        return self._lambdaZ_m2 / extentXInMeters
-
-    def getPixelSizeYInMeters(self) -> Decimal:
-        extentYInMeters = self._cropSizer.getExtentYInPixels() \
-                * self._detector.getPixelSizeYInMeters()
-        return self._lambdaZ_m2 / extentYInMeters
 
     def getScanExtent(self) -> ImageExtent:
         scanExtent = ImageExtent(0, 0)
@@ -58,8 +39,8 @@ class ObjectSizer(Observable, Observer):
                 yint_m = Interval[Decimal](point.y, point.y)
 
         if xint_m and yint_m:
-            xint_px = xint_m.length / self.getPixelSizeXInMeters()
-            yint_px = yint_m.length / self.getPixelSizeYInMeters()
+            xint_px = xint_m.length / self._apparatus.getObjectPlanePixelSizeXInMeters()
+            yint_px = yint_m.length / self._apparatus.getObjectPlanePixelSizeYInMeters()
 
             scanExtent = ImageExtent(width=int(xint_px.to_integral_exact(rounding=ROUND_CEILING)),
                                      height=int(yint_px.to_integral_exact(rounding=ROUND_CEILING)))
@@ -73,9 +54,7 @@ class ObjectSizer(Observable, Observer):
         return self.getScanExtent() + self.getPaddingExtent()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._detector:
-            self.notifyObservers()
-        elif observable is self._cropSizer:
+        if observable is self._apparatus:
             self.notifyObservers()
         elif observable is self._scan:
             self.notifyObservers()

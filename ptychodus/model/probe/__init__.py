@@ -1,3 +1,4 @@
+from .apparatus import Apparatus
 from .core import ProbeCore, ProbePresenter
 from .file import FileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer

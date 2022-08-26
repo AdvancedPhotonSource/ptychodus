@@ -39,14 +39,6 @@ class ProbeSizer(Observable, Observer):
         size = self.getProbeSize()
         return ImageExtent(width=size, height=size)
 
-    def getWavelengthInMeters(self) -> Decimal:
-        # Source: https://physics.nist.gov/cuu/Constants/index.html
-        planck_constant_eV_per_Hz = Decimal('4.135667696e-15')
-        light_speed_m_per_s = Decimal(299792458)
-        hc_eVm = planck_constant_eV_per_Hz * light_speed_m_per_s
-        probe_wavelength_m = hc_eVm / self._settings.probeEnergyInElectronVolts.value
-        return probe_wavelength_m
-
     def _updateProbeSize(self) -> None:
         if self._settings.automaticProbeSizeEnabled.value:
             self._settings.probeSize.value = self._probeSizeMax

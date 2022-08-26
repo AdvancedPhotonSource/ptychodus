@@ -66,8 +66,8 @@ class ModelCore:
                                     self._cropSizer,
                                     self._pluginRegistry.buildProbeFileReaderChooser(),
                                     self._pluginRegistry.buildProbeFileWriterChooser())
-        self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._detector,
-                                      self._cropSizer, self._scanCore.scan, self._probeCore.sizer,
+        self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
+                                      self._scanCore.scan, self._probeCore.sizer,
                                       self._pluginRegistry.buildObjectFileReaderChooser(),
                                       self._pluginRegistry.buildObjectFileWriterChooser())
 
@@ -77,7 +77,7 @@ class ModelCore:
                                                               modelArgs.isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(
             self.settingsRegistry, self._activeDataFile, self._scanCore.scan,
-            self._probeCore.sizer, self._probeCore.probe, self._objectCore.sizer,
+            self._probeCore.sizer, self._probeCore.probe, self._probeCore.apparatus,
             self._objectCore.object, self.reconstructorPlotPresenter,
             modelArgs.isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
@@ -147,8 +147,8 @@ class ModelCore:
     def batchModeReconstruct(self) -> int:
         result = self.reconstructorPresenter.reconstruct()
 
-        pixelSizeXInMeters = float(self._objectCore.sizer.getPixelSizeXInMeters())
-        pixelSizeYInMeters = float(self._objectCore.sizer.getPixelSizeYInMeters())
+        pixelSizeXInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeXInMeters())
+        pixelSizeYInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeYInMeters())
 
         scanXInMeters = [float(point.x) for point in self._scanCore.scan]
         scanYInMeters = [float(point.y) for point in self._scanCore.scan]

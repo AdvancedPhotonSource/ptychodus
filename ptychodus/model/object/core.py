@@ -11,7 +11,7 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from ...api.settings import SettingsRegistry
 from ..data import CropSizer, Detector
-from ..probe import ProbeSizer
+from ..probe import Apparatus, ProbeSizer
 from ..scan import Scan
 from .file import FileObjectInitializer
 from .object import Object
@@ -25,14 +25,14 @@ logger = logging.getLogger(__name__)
 
 class ObjectPresenter(Observable, Observer):
 
-    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, object_: Object,
+    def __init__(self, settings: ObjectSettings, apparatus: Apparatus, object_: Object,
                  initializerChooser: PluginChooser[ObjectInitializerType],
                  fileReaderChooser: PluginChooser[ObjectFileReader],
                  fileWriterChooser: PluginChooser[ObjectFileWriter],
                  reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
-        self._sizer = sizer
+        self._apparatus = apparatus
         self._object = object_
         self._initializerChooser = initializerChooser
         self._fileReaderChooser = fileReaderChooser
@@ -40,16 +40,16 @@ class ObjectPresenter(Observable, Observer):
         self._reinitObservable = reinitObservable
 
     @classmethod
-    def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer, object_: Object,
+    def createInstance(cls, settings: ObjectSettings, apparatus: Apparatus, object_: Object,
                        initializerChooser: PluginChooser[ObjectInitializerType],
                        fileReaderChooser: PluginChooser[ObjectFileReader],
                        fileWriterChooser: PluginChooser[ObjectFileWriter],
                        reinitObservable: Observable) -> ObjectPresenter:
-        presenter = cls(settings, sizer, object_, initializerChooser, fileReaderChooser,
+        presenter = cls(settings, apparatus, object_, initializerChooser, fileReaderChooser,
                         fileWriterChooser, reinitObservable)
 
         settings.addObserver(presenter)
-        sizer.addObserver(presenter)
+        apparatus.addObserver(presenter)
         object_.addObserver(presenter)
         initializerChooser.addObserver(presenter)
         fileReaderChooser.addObserver(presenter)
@@ -104,10 +104,10 @@ class ObjectPresenter(Observable, Observer):
         writer.write(filePath, self._object.getArray())
 
     def getPixelSizeXInMeters(self) -> Decimal:
-        return self._sizer.getPixelSizeXInMeters()
+        return self._apparatus.getObjectPlanePixelSizeXInMeters()
 
     def getPixelSizeYInMeters(self) -> Decimal:
-        return self._sizer.getPixelSizeYInMeters()
+        return self._apparatus.getObjectPlanePixelSizeYInMeters()
 
     def getObject(self) -> ObjectArrayType:
         return self._object.getArray()
@@ -126,7 +126,7 @@ class ObjectPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self._syncFromSettings()
-        elif observable is self._sizer:
+        elif observable is self._apparatus:
             self.notifyObservers()
         elif observable is self._object:
             self.notifyObservers()
@@ -141,11 +141,11 @@ class ObjectPresenter(Observable, Observer):
 class ObjectCore:
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
-                 detector: Detector, cropSizer: CropSizer, scan: Scan, probeSizer: ProbeSizer,
+                 apparatus: Apparatus, scan: Scan, probeSizer: ProbeSizer,
                  fileReaderChooser: PluginChooser[ObjectFileReader],
                  fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
         self.settings = ObjectSettings.createInstance(settingsRegistry)
-        self.sizer = ObjectSizer.createInstance(detector, cropSizer, scan, probeSizer)
+        self.sizer = ObjectSizer.createInstance(apparatus, scan, probeSizer)
         self.object = Object(self.sizer)
 
         self._filePlugin = PluginEntry[ObjectInitializerType](
@@ -166,7 +166,7 @@ class ObjectCore:
         self._initializerChooser = PluginChooser[ObjectInitializerType].createFromList(
             [self._filePlugin, self._uniformPlugin, self._urandPlugin])
 
-        self.presenter = ObjectPresenter.createInstance(self.settings, self.sizer, self.object,
+        self.presenter = ObjectPresenter.createInstance(self.settings, apparatus, self.object,
                                                         self._initializerChooser,
                                                         fileReaderChooser, fileWriterChooser,
                                                         settingsRegistry)

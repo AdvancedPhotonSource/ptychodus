@@ -16,8 +16,8 @@ except ModuleNotFoundError:
 from ..api.data import DataArrayType, DataFile, DiffractionDataset
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .object import Object, ObjectSizer
-from .probe import Probe, ProbeSizer
+from .object import Object
+from .probe import Apparatus, Probe, ProbeSizer
 from .reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
 from .scan import Scan
 
@@ -421,7 +421,7 @@ class TikeReconstructor:
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings, dataFile: DataFile,
-                 scan: Scan, probeSizer: ProbeSizer, probe: Probe, objectSizer: ObjectSizer,
+                 scan: Scan, probeSizer: ProbeSizer, probe: Probe, apparatus: Apparatus,
                  object_: Object, reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
@@ -431,7 +431,7 @@ class TikeReconstructor:
         self._scan = scan
         self._probeSizer = probeSizer
         self._probe = probe
-        self._objectSizer = objectSizer
+        self._apparatus = apparatus
         self._object = object_
         self._reconstructorPlotPresenter = reconstructorPlotPresenter
 
@@ -462,8 +462,8 @@ class TikeReconstructor:
         xvalues = list()
         yvalues = list()
 
-        px_m = self._objectSizer.getPixelSizeXInMeters()
-        py_m = self._objectSizer.getPixelSizeYInMeters()
+        px_m = self._apparatus.getObjectPlanePixelSizeXInMeters()
+        py_m = self._apparatus.getObjectPlanePixelSizeYInMeters()
 
         logger.debug(f'object pixel size x = {px_m} m')
         logger.debug(f'object pixel size y = {py_m} m')
@@ -750,7 +750,7 @@ class TikeBackend:
                        scan: Scan,
                        probeSizer: ProbeSizer,
                        probe: Probe,
-                       objectSizer: ObjectSizer,
+                       apparatus: Apparatus,
                        object_: Object,
                        reconstructorPlotPresenter: ReconstructorPlotPresenter,
                        isDeveloperModeEnabled: bool = False) -> TikeBackend:
@@ -762,7 +762,7 @@ class TikeBackend:
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, dataFile, scan,
-                                                  probeSizer, probe, objectSizer, object_,
+                                                  probeSizer, probe, apparatus, object_,
                                                   reconstructorPlotPresenter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(

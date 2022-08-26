@@ -10,6 +10,7 @@ from ...api.plugins import PluginChooser, PluginEntry
 from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ..data import CropSizer, Detector
+from .apparatus import Apparatus
 from .file import FileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
 from .initializer import ProbeInitializer, UnimodalProbeInitializerParameters
@@ -25,28 +26,30 @@ logger = logging.getLogger(__name__)
 class ProbePresenter(Observable, Observer):
 
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
-                 initializerChooser: PluginChooser[ProbeInitializer],
+                 apparatus: Apparatus, initializerChooser: PluginChooser[ProbeInitializer],
                  fileWriterChooser: PluginChooser[ProbeFileWriter],
                  reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
         self._probe = probe
+        self._apparatus = apparatus
         self._initializerChooser = initializerChooser
         self._fileWriterChooser = fileWriterChooser
         self._reinitObservable = reinitObservable
 
     @classmethod
     def createInstance(cls, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
-                       initializerChooser: PluginChooser[ProbeInitializer],
+                       apparatus: Apparatus, initializerChooser: PluginChooser[ProbeInitializer],
                        fileWriterChooser: PluginChooser[ProbeFileWriter],
                        reinitObservable: Observable) -> ProbePresenter:
-        presenter = cls(settings, sizer, probe, initializerChooser, fileWriterChooser,
+        presenter = cls(settings, sizer, probe, apparatus, initializerChooser, fileWriterChooser,
                         reinitObservable)
 
         settings.addObserver(presenter)
         sizer.addObserver(presenter)
         probe.addObserver(presenter)
+        apparatus.addObserver(presenter)
         reinitObservable.addObserver(presenter)
 
         presenter._syncFromSettings()
@@ -111,7 +114,7 @@ class ProbePresenter(Observable, Observer):
         return self._settings.probeEnergyInElectronVolts.value
 
     def getProbeWavelengthInMeters(self) -> Decimal:
-        return self._sizer.getWavelengthInMeters()
+        return self._apparatus.getProbeWavelengthInMeters()
 
     def getNumberOfProbeModes(self) -> int:
         return self._probe.getNumberOfProbeModes()
@@ -135,6 +138,8 @@ class ProbePresenter(Observable, Observer):
             self.notifyObservers()
         elif observable is self._probe:
             self.notifyObservers()
+        elif observable is self._apparatus:
+            self.notifyObservers()
         elif observable is self._reinitObservable:
             self.initializeProbe()
 
@@ -144,15 +149,15 @@ class ProbeCore:
     @staticmethod
     def _createInitializerChooser(
             rng: numpy.random.Generator, settings: ProbeSettings, sizer: ProbeSizer,
-            detector: Detector,
+            apparatus: Apparatus,
             fileReaderChooser: PluginChooser[ProbeFileReader]) -> PluginChooser[ProbeInitializer]:
         sgParams = UnimodalProbeInitializerParameters(rng)
         fzpParams = UnimodalProbeInitializerParameters(rng)
 
         initializerList = [
             FileProbeInitializer.createInstance(settings, sizer, fileReaderChooser),
-            SuperGaussianProbeInitializer.createInstance(sgParams, settings, sizer, detector),
-            FresnelZonePlateProbeInitializer.createInstance(fzpParams, settings, sizer, detector),
+            SuperGaussianProbeInitializer.createInstance(sgParams, settings, sizer, apparatus),
+            FresnelZonePlateProbeInitializer.createInstance(fzpParams, settings, sizer, apparatus),
             TestPatternProbeInitializer.createInstance(sizer),
         ]
 
@@ -170,11 +175,12 @@ class ProbeCore:
                  fileWriterChooser: PluginChooser[ProbeFileWriter]) -> None:
         self.settings = ProbeSettings.createInstance(settingsRegistry)
         self.sizer = ProbeSizer.createInstance(self.settings, cropSizer)
+        self.apparatus = Apparatus.createInstance(detector, cropSizer, self.settings)
         self.probe = Probe(self.sizer)
 
         self._initializerChooser = ProbeCore._createInitializerChooser(
-            rng, self.settings, self.sizer, detector, fileReaderChooser)
+            rng, self.settings, self.sizer, self.apparatus, fileReaderChooser)
 
         self.presenter = ProbePresenter.createInstance(self.settings, self.sizer, self.probe,
-                                                       self._initializerChooser, fileWriterChooser,
-                                                       settingsRegistry)
+                                                       self.apparatus, self._initializerChooser,
+                                                       fileWriterChooser, settingsRegistry)

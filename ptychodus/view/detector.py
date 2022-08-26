@@ -63,7 +63,6 @@ class CropView(QGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> CropView:
         view = cls(parent)
 
-        # FIXME GridLayout with FlipXY CheckBoxes
         layout = QFormLayout()
         layout.addRow('Center X [px]:', view.centerXSpinBox)
         layout.addRow('Center Y [px]:', view.centerYSpinBox)
