@@ -7,40 +7,44 @@ import json
 import logging
 import pprint
 
+from funcx import FuncXClient
+from gladier import generate_flow_definition, GladierBaseClient
 from globus_automate_client import FlowsClient
-from globus_automate_client.flows_client import (MANAGE_FLOWS_SCOPE, RUN_FLOWS_SCOPE,
-                                                 RUN_STATUS_SCOPE, VIEW_FLOWS_SCOPE)
+from globus_automate_client.flows_client import ALL_FLOW_SCOPES
 from globus_sdk import NativeAppAuthClient, OAuthTokenResponse, RefreshTokenAuthorizer
-from globus_sdk.authorizers import GlobusAuthorizer
+from globus_sdk.scopes import AuthScopes, SearchScopes
 
 from .client import WorkflowClient, WorkflowClientBuilder, WorkflowRun
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
 
+CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
+
+
+@generate_flow_definition
+class GladierTestClient(GladierBaseClient):
+    client_id = CLIENT_ID
+    gladier_tools = [
+        "gladier_tools.posix.shell_cmd.ShellCmdTool",
+    ]
+
 
 class GlobusWorkflowClient(WorkflowClient):
-    CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
-    def __init__(self, settings: WorkflowSettings, authorizerDict: dict[str, Any],
-                 authorizer: Optional[GlobusAuthorizer]) -> None:
+    def __init__(self, settings: WorkflowSettings, authorizerDict: dict[str, Any]) -> None:
         super().__init__()
         self._settings = settings
-        self._authorizerDict = authorizerDict
-        self._client = FlowsClient.new_client(client_id=self.CLIENT_ID,
-                                              authorizer_callback=self._authorizerRetriever,
-                                              authorizer=authorizer)
-
-    def _authorizerRetriever(self, flow_url: str, flow_scope: str,
-                             client_id: str) -> RefreshTokenAuthorizer:
-        logger.debug(f'Searching for flow scope {flow_scope}')
-        return self._authorizerDict[flow_scope]
+        self._client = GladierTestClient(authorizers=authorizerDict,
+                                         auto_login=False,
+                                         auto_registration=True)
+        logger.debug(f'Client Scopes: {self._client.scopes}')
 
     def listFlowRuns(self) -> list[WorkflowRun]:
         runList: list[WorkflowRun] = list()
         flowID = str(self._settings.flowID.value)
         orderings = {'start_time': 'desc'}  # ordering by start_time (descending)
-        response = self._client.list_flow_runs(flow_id=flowID, orderings=orderings)
+        response = self._client.flows_client.list_flow_runs(flow_id=flowID, orderings=orderings)
         logger.debug(f'Flow Run List: {response}')
 
         # FIXME display_status -> current action
@@ -92,7 +96,7 @@ class GlobusWorkflowClient(WorkflowClient):
         flowDefinition = self._loadFlowDefinition()
         inputSchema = self._loadInputSchema()
 
-        response = self._client.deploy_flow(
+        response = self._client.flows_client.deploy_flow(
             flow_definition=flowDefinition,
             title='Ptychodus',
             input_schema=inputSchema,
@@ -107,7 +111,7 @@ class GlobusWorkflowClient(WorkflowClient):
         flowDefinition = self._loadFlowDefinition()
         inputSchema = self._loadInputSchema()
 
-        response = self._client.update_flow(
+        response = self._client.flows_client.update_flow(
             flow_id=flowID,
             flow_definition=flowDefinition,
             title='Ptychodus',
@@ -119,11 +123,11 @@ class GlobusWorkflowClient(WorkflowClient):
         logger.debug(f'Update Flow Response: {response}')
 
     def listFlows(self) -> None:
-        response = self._client.list_flows()
+        response = self._client.flows_client.list_flows()
         logger.info(f'Flow List: {response}')
 
     def deleteFlow(self, flowID: UUID) -> None:
-        response = self._client.delete_flow(flowID)
+        response = self._client.flows_client.delete_flow(flowID)
         logger.info(f'Delete Flow Response: {response}')
 
     def runFlow(self) -> None:
@@ -131,7 +135,7 @@ class GlobusWorkflowClient(WorkflowClient):
         flowScope = None
         flowInput = {'input': {'echo_string': 'From Ptychodus', 'sleep_time': 10}}
 
-        runResponse = self._client.run_flow(flowID, flowScope, flowInput, label='Run Label')
+        runResponse = self._client.run_flow(flowInput, label='Run Label')
         logger.info(f'Run Flow Response: {json.dumps(runResponse.data, indent=4)}')
 
 
@@ -143,19 +147,19 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
 
     def getAuthorizeURL(self) -> str:
         if self._authClient is None:
-            gacVersion = version('globus-automate-client')
-            logger.info(f'\tGlobus Automate Client {gacVersion}')
-            self._authClient = NativeAppAuthClient(GlobusWorkflowClient.CLIENT_ID)
+            self._authClient = NativeAppAuthClient(CLIENT_ID)
 
         FLOW_ID = str(self._settings.flowID.value)
         FLOW_ID_ = FLOW_ID.replace('-', '_')
 
         requestedScopes = [
+            # FuncX Scopes
+            FuncXClient.FUNCX_SCOPE,
+            AuthScopes.openid,
+            SearchScopes.all,
+
             # Automate scopes
-            MANAGE_FLOWS_SCOPE,
-            RUN_FLOWS_SCOPE,
-            RUN_STATUS_SCOPE,
-            VIEW_FLOWS_SCOPE,
+            *ALL_FLOW_SCOPES,
 
             # Flow scope
             f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
@@ -173,7 +177,6 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
         tokenResponse = self._authClient.oauth2_exchange_code_for_tokens(authCode.strip())
         logger.debug(f'Token response: {tokenResponse}')
         authorizerDict: dict[str, Any] = dict()
-        flowsAuthorizer: Optional[GlobusAuthorizer] = None
 
         for resourceServer, tokenData in tokenResponse.by_resource_server.items():
             authorizer = RefreshTokenAuthorizer(
@@ -186,9 +189,6 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
             for scope in tokenData['scope'].split():
                 authorizerDict[scope] = authorizer
 
-            if resourceServer == 'flows.globus.org':
-                flowsAuthorizer = authorizer
-
         logger.debug('Authorizers: {pprint.pformat(authorizerDict)}')
 
-        return GlobusWorkflowClient(self._settings, authorizerDict, flowsAuthorizer)
+        return GlobusWorkflowClient(self._settings, authorizerDict)
