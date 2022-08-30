@@ -47,9 +47,6 @@ class GlobusWorkflowClient(WorkflowClient):
         response = self._client.flows_client.list_flow_runs(flow_id=flowID, orderings=orderings)
         logger.debug(f'Flow Run List: {response}')
 
-        # FIXME display_status -> current action
-        # FIXME source/compute/results endpoints
-        # FIXME 10 second polling
         for runDict in response['runs']:
             runID = runDict.get('run_id', '')
             runURL = f'https://app.globus.org/runs/{runID}/logs'
@@ -62,6 +59,7 @@ class GlobusWorkflowClient(WorkflowClient):
                               runURL=runURL)
             runList.append(run)
 
+        # FIXME display_status -> current action
         #flow_action_id = response.data['actions'][0]['action_id']
         #flow_action = flows_client.flow_action_status(flow_id, flow_scope,
         #                                              flow_action_id)

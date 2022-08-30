@@ -4,7 +4,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
                              QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea,
-                             QStackedWidget, QVBoxLayout, QWidget)
+                             QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvas
@@ -74,6 +74,8 @@ class WorkflowComputeView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Compute', parent)
         self.endpointIDLineEdit = UUIDLineEdit()
+        self.dataEndpointIDLineEdit = UUIDLineEdit()
+        self.pathLineEdit = QLineEdit()
         self.flowIDLineEdit = UUIDLineEdit()
 
     @classmethod
@@ -82,7 +84,26 @@ class WorkflowComputeView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
+        layout.addRow('Data Endpoint ID:', view.dataEndpointIDLineEdit)
+        layout.addRow('Data Path:', view.pathLineEdit)
         layout.addRow('Flow ID:', view.flowIDLineEdit)
+        view.setLayout(layout)
+
+        return view
+
+
+class WorkflowStatusView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Status', parent)
+        self.refreshIntervalSpinBox = QSpinBox()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowStatusView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow('Refresh Interval [sec]:', view.refreshIntervalSpinBox)
         view.setLayout(layout)
 
         return view
@@ -93,7 +114,6 @@ class WorkflowButtonBox(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.authorizeButton = QPushButton('Authorize')
-        self.listFlowRunsButton = QPushButton('List Flow Runs')
         self.executeButton = QPushButton('Execute')
 
     @classmethod
@@ -103,7 +123,6 @@ class WorkflowButtonBox(QWidget):
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.authorizeButton)
-        layout.addWidget(view.listFlowRunsButton)
         layout.addWidget(view.executeButton)
         view.setLayout(layout)
 
@@ -157,11 +176,12 @@ class WorkflowParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.dataSourceView = WorkflowDataView.createInstance('Data Source')
-        self.dataDestinationView = WorkflowDataView.createInstance('Data Destination')
+        self.inputDataView = WorkflowDataView.createInstance('Input Data')
         self.computeView = WorkflowComputeView.createInstance()
-        self.developerView = WorkflowDeveloperView.createInstance()
+        self.outputDataView = WorkflowDataView.createInstance('Output Data')
+        self.statusView = WorkflowStatusView.createInstance()
         self.buttonBox = WorkflowButtonBox.createInstance()
+        self.developerView = WorkflowDeveloperView.createInstance()
         self.authorizeDialog = WorkflowAuthorizeDialog.createInstance(self)
 
     @classmethod
@@ -169,9 +189,10 @@ class WorkflowParametersView(QWidget):
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.dataSourceView)
-        layout.addWidget(view.dataDestinationView)
+        layout.addWidget(view.inputDataView)
         layout.addWidget(view.computeView)
+        layout.addWidget(view.outputDataView)
+        layout.addWidget(view.statusView)
         layout.addWidget(view.buttonBox)
         layout.addStretch()
         layout.addWidget(view.developerView)

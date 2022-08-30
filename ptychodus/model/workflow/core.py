@@ -43,29 +43,29 @@ class WorkflowPresenter(Observable, Observer):
     def getAuthorizeURL(self) -> str:
         return self._clientBuilder.getAuthorizeURL()
 
-    def setDataSourceEndpointID(self, endpointID: UUID) -> None:
-        self._settings.dataSourceEndpointID.value = endpointID
+    def setInputDataEndpointID(self, endpointID: UUID) -> None:
+        self._settings.inputDataEndpointID.value = endpointID
 
-    def getDataSourceEndpointID(self) -> UUID:
-        return self._settings.dataSourceEndpointID.value
+    def getInputDataEndpointID(self) -> UUID:
+        return self._settings.inputDataEndpointID.value
 
-    def setDataSourcePath(self, dataSourcePath: Path) -> None:
-        self._settings.dataSourcePath.value = dataSourcePath
+    def setInputDataPath(self, inputDataPath: Path) -> None:
+        self._settings.inputDataPath.value = inputDataPath
 
-    def getDataSourcePath(self) -> Path:
-        return self._settings.dataSourcePath.value
+    def getInputDataPath(self) -> Path:
+        return self._settings.inputDataPath.value
 
-    def setDataDestinationEndpointID(self, endpointID: UUID) -> None:
-        self._settings.dataDestinationEndpointID.value = endpointID
+    def setOutputDataEndpointID(self, endpointID: UUID) -> None:
+        self._settings.outputDataEndpointID.value = endpointID
 
-    def getDataDestinationEndpointID(self) -> UUID:
-        return self._settings.dataDestinationEndpointID.value
+    def getOutputDataEndpointID(self) -> UUID:
+        return self._settings.outputDataEndpointID.value
 
-    def setDataDestinationPath(self, dataDestinationPath: Path) -> None:
-        self._settings.dataDestinationPath.value = dataDestinationPath
+    def setOutputDataPath(self, outputDataPath: Path) -> None:
+        self._settings.outputDataPath.value = outputDataPath
 
-    def getDataDestinationPath(self) -> Path:
-        return self._settings.dataDestinationPath.value
+    def getOutputDataPath(self) -> Path:
+        return self._settings.outputDataPath.value
 
     def setComputeEndpointID(self, endpointID: UUID) -> None:
         self._settings.computeEndpointID.value = endpointID
@@ -78,6 +78,24 @@ class WorkflowPresenter(Observable, Observer):
 
     def getFlowID(self) -> UUID:
         return self._settings.flowID.value
+
+    def setComputeDataEndpointID(self, endpointID: UUID) -> None:
+        self._settings.computeDataEndpointID.value = endpointID
+
+    def getComputeDataEndpointID(self) -> UUID:
+        return self._settings.computeDataEndpointID.value
+
+    def setComputeDataPath(self, computeDataPath: Path) -> None:
+        self._settings.computeDataPath.value = computeDataPath
+
+    def getComputeDataPath(self) -> Path:
+        return self._settings.computeDataPath.value
+
+    def setStatusRefreshIntervalInSeconds(self, seconds: int) -> None:
+        self._settings.statusRefreshIntervalInSeconds.value = seconds
+
+    def getStatusRefreshIntervalInSeconds(self) -> int:
+        return self._settings.statusRefreshIntervalInSeconds.value
 
     def listFlowRuns(self) -> list[WorkflowRun]:
         flowRuns: list[WorkflowRun] = list()

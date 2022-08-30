@@ -5,9 +5,12 @@ from PyQt5.QtCore import QRegularExpression
 from PyQt5.QtGui import QRegularExpressionValidator
 from PyQt5.QtWidgets import QWidget
 
-from ..model import Observable, Observer  # TODO, TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter
-from ..view import TikeAdaptiveMomentView, TikeBasicParametersView, TikeObjectCorrectionView, \
-        TikeParametersView, TikePositionCorrectionView, TikeProbeCorrectionView
+from ..api.observer import Observable, Observer
+from ..model import (TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter,
+                     TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter)
+from ..view import (TikeAdaptiveMomentView, TikeBasicParametersView, TikeObjectCorrectionView,
+                    TikeParametersView, TikePositionCorrectionView, TikeProbeCorrectionView,
+                    TikeProbeSupportView)
 from .reconstructor import ReconstructorViewControllerFactory
 
 

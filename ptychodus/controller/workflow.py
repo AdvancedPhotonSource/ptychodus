@@ -4,7 +4,7 @@ from uuid import UUID
 import logging
 
 from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QRegularExpression,
-                          QSortFilterProxyModel, QUrl, QVariant)
+                          QSortFilterProxyModel, QTimer, QUrl, QVariant)
 from PyQt5.QtGui import QColor, QDesktopServices, QFont, QRegularExpressionValidator
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QTableView, QWidget
 
@@ -16,7 +16,7 @@ from ..view import (WorkflowComputeView, WorkflowDataView, WorkflowDeveloperView
 logger = logging.getLogger(__name__)
 
 
-class WorkflowDataSourceController(Observer):
+class WorkflowInputDataController(Observer):
 
     def __init__(self, presenter: WorkflowPresenter, view: WorkflowDataView) -> None:
         super().__init__()
@@ -25,7 +25,7 @@ class WorkflowDataSourceController(Observer):
 
     @classmethod
     def createInstance(cls, presenter: WorkflowPresenter,
-                       view: WorkflowDataView) -> WorkflowDataSourceController:
+                       view: WorkflowDataView) -> WorkflowInputDataController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -38,22 +38,22 @@ class WorkflowDataSourceController(Observer):
 
     def _syncEndpointIDToModel(self) -> None:
         endpointID = UUID(self._view.endpointIDLineEdit.text())
-        self._presenter.setDataSourceEndpointID(endpointID)
+        self._presenter.setInputDataEndpointID(endpointID)
 
     def _syncPathToModel(self) -> None:
         dataPath = Path(self._view.pathLineEdit.text())
-        self._presenter.setDataSourcePath(dataPath)
+        self._presenter.setInputDataPath(dataPath)
 
     def _syncModelToView(self) -> None:
-        self._view.endpointIDLineEdit.setText(str(self._presenter.getDataSourceEndpointID()))
-        self._view.pathLineEdit.setText(str(self._presenter.getDataSourcePath()))
+        self._view.endpointIDLineEdit.setText(str(self._presenter.getInputDataEndpointID()))
+        self._view.pathLineEdit.setText(str(self._presenter.getInputDataPath()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
 
 
-class WorkflowDataDestinationController(Observer):
+class WorkflowOutputDataController(Observer):
 
     def __init__(self, presenter: WorkflowPresenter, view: WorkflowDataView) -> None:
         super().__init__()
@@ -62,7 +62,7 @@ class WorkflowDataDestinationController(Observer):
 
     @classmethod
     def createInstance(cls, presenter: WorkflowPresenter,
-                       view: WorkflowDataView) -> WorkflowDataDestinationController:
+                       view: WorkflowDataView) -> WorkflowOutputDataController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -75,15 +75,15 @@ class WorkflowDataDestinationController(Observer):
 
     def _syncEndpointIDToModel(self) -> None:
         endpointID = UUID(self._view.endpointIDLineEdit.text())
-        self._presenter.setDataDestinationEndpointID(endpointID)
+        self._presenter.setOutputDataEndpointID(endpointID)
 
     def _syncPathToModel(self) -> None:
         dataPath = Path(self._view.pathLineEdit.text())
-        self._presenter.setDataDestinationPath(dataPath)
+        self._presenter.setOutputDataPath(dataPath)
 
     def _syncModelToView(self) -> None:
-        self._view.endpointIDLineEdit.setText(str(self._presenter.getDataDestinationEndpointID()))
-        self._view.pathLineEdit.setText(str(self._presenter.getDataDestinationPath()))
+        self._view.endpointIDLineEdit.setText(str(self._presenter.getOutputDataEndpointID()))
+        self._view.pathLineEdit.setText(str(self._presenter.getOutputDataPath()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -104,6 +104,8 @@ class WorkflowComputeController(Observer):
         presenter.addObserver(controller)
 
         view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
+        view.dataEndpointIDLineEdit.editingFinished.connect(controller._syncDataEndpointIDToModel)
+        view.pathLineEdit.editingFinished.connect(controller._syncPathToModel)
         view.flowIDLineEdit.editingFinished.connect(controller._syncFlowIDToModel)
 
         controller._syncModelToView()
@@ -114,12 +116,22 @@ class WorkflowComputeController(Observer):
         endpointID = UUID(self._view.endpointIDLineEdit.text())
         self._presenter.setComputeEndpointID(endpointID)
 
+    def _syncDataEndpointIDToModel(self) -> None:
+        endpointID = UUID(self._view.dataEndpointIDLineEdit.text())
+        self._presenter.setComputeDataEndpointID(endpointID)
+
+    def _syncPathToModel(self) -> None:
+        dataPath = Path(self._view.pathLineEdit.text())
+        self._presenter.setComputeDataPath(dataPath)
+
     def _syncFlowIDToModel(self) -> None:
         flowID = UUID(self._view.flowIDLineEdit.text())
         self._presenter.setFlowID(flowID)
 
     def _syncModelToView(self) -> None:
         self._view.endpointIDLineEdit.setText(str(self._presenter.getComputeEndpointID()))
+        self._view.dataEndpointIDLineEdit.setText(str(self._presenter.getComputeDataEndpointID()))
+        self._view.pathLineEdit.setText(str(self._presenter.getComputeDataPath()))
         self._view.flowIDLineEdit.setText(str(self._presenter.getFlowID()))
 
     def update(self, observable: Observable) -> None:
@@ -262,10 +274,10 @@ class WorkflowController(Observer):
         super().__init__()
         self._presenter = presenter
         self._parametersView = parametersView
-        self._dataSourceController = WorkflowDataSourceController.createInstance(
-            presenter, parametersView.dataSourceView)
-        self._dataDestinationController = WorkflowDataDestinationController.createInstance(
-            presenter, parametersView.dataDestinationView)
+        self._inputDataController = WorkflowInputDataController.createInstance(
+            presenter, parametersView.inputDataView)
+        self._outputDataController = WorkflowOutputDataController.createInstance(
+            presenter, parametersView.outputDataView)
         self._computeController = WorkflowComputeController.createInstance(
             presenter, parametersView.computeView)
         self._developerController = WorkflowDeveloperController.createInstance(
@@ -273,6 +285,7 @@ class WorkflowController(Observer):
         self._tableView = tableView
         self._tableModel = WorkflowTableModel(presenter)
         self._proxyModel = QSortFilterProxyModel()
+        self._statusRefreshTimer = QTimer()
 
     @classmethod
     def createInstance(cls, presenter: WorkflowPresenter, parametersView: WorkflowParametersView,
@@ -286,8 +299,10 @@ class WorkflowController(Observer):
         tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
         tableView.clicked.connect(controller._handleTableViewClick)
 
+        parametersView.statusView.refreshIntervalSpinBox.setRange(1, 600)
+        parametersView.statusView.refreshIntervalSpinBox.valueChanged.connect(
+            presenter.setStatusRefreshIntervalInSeconds)
         parametersView.buttonBox.authorizeButton.clicked.connect(controller._startAuthorization)
-        parametersView.buttonBox.listFlowRunsButton.clicked.connect(controller._tableModel.refresh)
         parametersView.buttonBox.executeButton.clicked.connect(controller._execute)
         parametersView.authorizeDialog.finished.connect(controller._finishAuthorization)
 
@@ -295,6 +310,8 @@ class WorkflowController(Observer):
             controller._setAuthorizeDialogButtonsEnabled)
         controller._setAuthorizeDialogButtonsEnabled()
 
+        controller._statusRefreshTimer.setSingleShot(True)
+        controller._statusRefreshTimer.timeout.connect(controller._refreshStatus)
         controller._syncModelToView()
 
         return controller
@@ -308,6 +325,15 @@ class WorkflowController(Observer):
     def _setAuthorizeDialogButtonsEnabled(self) -> None:
         text = self._parametersView.authorizeDialog.lineEdit.text()
         self._parametersView.authorizeDialog.okButton.setEnabled(len(text) > 0)
+
+    def _restartStatusRefreshTimer(self) -> None:
+        seconds = 1000 * self._presenter.getStatusRefreshIntervalInSeconds()
+
+        if seconds > 0:
+            self._statusRefreshTimer.start(seconds)
+        else:
+            # TODO can't restart
+            self._statusRefreshTimer.stop()
 
     def _startAuthorization(self) -> None:
         authorizeURL = self._presenter.getAuthorizeURL()
@@ -323,17 +349,21 @@ class WorkflowController(Observer):
 
         authCode = self._parametersView.authorizeDialog.lineEdit.text()
         self._presenter.setAuthorizationCode(authCode)
+        self._restartStatusRefreshTimer()
+
+    def _refreshStatus(self) -> None:
+        self._tableModel.refresh()
+        self._restartStatusRefreshTimer()
 
     def _execute(self) -> None:
         self._presenter.runFlow()
-        self._tableModel.refresh()
 
     def _syncModelToView(self) -> None:
+        self._parametersView.statusView.refreshIntervalSpinBox.setValue(
+            self._presenter.getStatusRefreshIntervalInSeconds())
+
         isAuthorized = self._presenter.isAuthorized()
         self._parametersView.buttonBox.authorizeButton.setEnabled(not isAuthorized)
-        #self._parametersView.buttonBox.listFlowsButton.setEnabled(isAuthorized)
-        self._parametersView.buttonBox.listFlowRunsButton.setEnabled(isAuthorized)
-        #self._parametersView.buttonBox.deployFlowButton.setEnabled(isAuthorized)
         self._parametersView.buttonBox.executeButton.setEnabled(isAuthorized)
 
     def update(self, observable: Observable) -> None:

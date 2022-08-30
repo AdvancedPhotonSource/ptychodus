@@ -11,7 +11,6 @@ from globus_automate_client import FlowsClient
 from globus_automate_client.flows_client import (MANAGE_FLOWS_SCOPE, RUN_FLOWS_SCOPE,
                                                  RUN_STATUS_SCOPE, VIEW_FLOWS_SCOPE)
 from globus_sdk import NativeAppAuthClient, OAuthTokenResponse, RefreshTokenAuthorizer
-from globus_sdk.authorizers import GlobusAuthorizer
 
 from .client import WorkflowClient, WorkflowClientBuilder, WorkflowRun
 from .settings import WorkflowSettings
@@ -22,14 +21,13 @@ logger = logging.getLogger(__name__)
 class GlobusWorkflowClient(WorkflowClient):
     CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
-    def __init__(self, settings: WorkflowSettings, authorizerDict: dict[str, Any],
-                 authorizer: Optional[GlobusAuthorizer]) -> None:
+    def __init__(self, settings: WorkflowSettings, authorizerDict: dict[str, Any]) -> None:
         super().__init__()
         self._settings = settings
         self._authorizerDict = authorizerDict
         self._client = FlowsClient.new_client(client_id=self.CLIENT_ID,
                                               authorizer_callback=self._authorizerRetriever,
-                                              authorizer=authorizer)
+                                              authorizer=authorizerDict.get(MANAGE_FLOWS_SCOPE))
 
     def _authorizerRetriever(self, flow_url: str, flow_scope: str,
                              client_id: str) -> RefreshTokenAuthorizer:
@@ -43,9 +41,6 @@ class GlobusWorkflowClient(WorkflowClient):
         response = self._client.list_flow_runs(flow_id=flowID, orderings=orderings)
         logger.debug(f'Flow Run List: {response}')
 
-        # FIXME display_status -> current action
-        # FIXME source/compute/results endpoints
-        # FIXME 10 second polling
         for runDict in response['runs']:
             runID = runDict.get('run_id', '')
             runURL = f'https://app.globus.org/runs/{runID}/logs'
@@ -58,6 +53,7 @@ class GlobusWorkflowClient(WorkflowClient):
                               runURL=runURL)
             runList.append(run)
 
+        # FIXME display_status -> current action
         #flow_action_id = response.data['actions'][0]['action_id']
         #flow_action = flows_client.flow_action_status(flow_id, flow_scope,
         #                                              flow_action_id)
@@ -173,7 +169,6 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
         tokenResponse = self._authClient.oauth2_exchange_code_for_tokens(authCode.strip())
         logger.debug(f'Token response: {tokenResponse}')
         authorizerDict: dict[str, Any] = dict()
-        flowsAuthorizer: Optional[GlobusAuthorizer] = None
 
         for resourceServer, tokenData in tokenResponse.by_resource_server.items():
             authorizer = RefreshTokenAuthorizer(
@@ -186,9 +181,6 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
             for scope in tokenData['scope'].split():
                 authorizerDict[scope] = authorizer
 
-            if resourceServer == 'flows.globus.org':
-                flowsAuthorizer = authorizer
-
         logger.debug('Authorizers: {pprint.pformat(authorizerDict)}')
 
-        return GlobusWorkflowClient(self._settings, authorizerDict, flowsAuthorizer)
+        return GlobusWorkflowClient(self._settings, authorizerDict)
