@@ -113,6 +113,7 @@ class CylindricalColorModelColorizer(Colorizer):
             shape = self._arrayComponent().shape
             return numpy.zeros((*shape, 4))
 
+        transform = self._transformChooser.getCurrentStrategy()
         amplitude = numpy.absolute(self._arrayComponent())
         phaseInRadians = numpy.angle(self._arrayComponent())
         norm = Normalize(vmin=float(self._displayRange.getLower()),
@@ -120,7 +121,7 @@ class CylindricalColorModelColorizer(Colorizer):
                          clip=False)
 
         h = (phaseInRadians + numpy.pi) / (2 * numpy.pi)
-        x = norm(amplitude)
+        x = norm(transform(amplitude))
         y = numpy.ones_like(h)
         a = numpy.ones_like(h)
 

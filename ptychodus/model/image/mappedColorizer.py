@@ -82,12 +82,16 @@ class MappedColorizer(Colorizer):
             shape = self._arrayComponent().shape
             return numpy.zeros((*shape, 4))
 
+        transform = self._transformChooser.getCurrentStrategy()
+        values = transform(self._arrayComponent())
+
         norm = Normalize(vmin=float(self._displayRange.getLower()),
                          vmax=float(self._displayRange.getUpper()),
                          clip=False)
         cmap = self._variantChooser.getCurrentStrategy()
         scalarMappable = ScalarMappable(norm, cmap)
-        return scalarMappable.to_rgba(self._arrayComponent())
+
+        return scalarMappable.to_rgba(values)
 
     def update(self, observable: Observable) -> None:
         if observable is self._variantChooser:
