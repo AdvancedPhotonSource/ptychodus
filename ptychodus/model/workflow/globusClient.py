@@ -68,60 +68,6 @@ class GlobusWorkflowClient(WorkflowClient):
 
         return runList
 
-    def _loadFlowDefinition(self) -> dict[str, Any]:
-        flowDefinitionPath = Path(__file__).parents[0] / 'flowDefinition.json'
-
-        with flowDefinitionPath.open(mode='r') as fp:
-            flowDefinition = json.load(fp)
-
-        return flowDefinition
-
-    def _loadInputSchema(self) -> dict[str, Any]:
-        inputSchemaPath = Path(__file__).parents[0] / 'inputSchema.json'
-
-        with inputSchemaPath.open(mode='r') as fp:
-            inputSchema = json.load(fp)
-
-        return inputSchema
-
-    def deployFlow(self) -> UUID:
-        flowDefinition = self._loadFlowDefinition()
-        inputSchema = self._loadInputSchema()
-
-        response = self._client.deploy_flow(
-            flow_definition=flowDefinition,
-            title='Ptychodus',
-            input_schema=inputSchema,
-            visible_to=['public'],
-            runnable_by=['all_authenticated_users'],
-        )
-
-        logger.debug(f'Deploy Flow Response: {response}')
-        return UUID(response.data['id'])
-
-    def updateFlow(self, flowID: UUID) -> None:
-        flowDefinition = self._loadFlowDefinition()
-        inputSchema = self._loadInputSchema()
-
-        response = self._client.update_flow(
-            flow_id=flowID,
-            flow_definition=flowDefinition,
-            title='Ptychodus',
-            input_schema=inputSchema,
-            visible_to=['public'],
-            runnable_by=['all_authenticated_users'],
-        )
-
-        logger.debug(f'Update Flow Response: {response}')
-
-    def listFlows(self) -> None:
-        response = self._client.list_flows()
-        logger.info(f'Flow List: {response}')
-
-    def deleteFlow(self, flowID: UUID) -> None:
-        response = self._client.delete_flow(flowID)
-        logger.info(f'Delete Flow Response: {response}')
-
     def runFlow(self) -> None:
         flowID = str(self._settings.flowID.value)
         flowScope = None

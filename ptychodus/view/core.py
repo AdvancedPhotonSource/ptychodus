@@ -1,8 +1,10 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
+import logging
 
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.Qt import PYQT_VERSION_STR
+from PyQt5.QtCore import QSize, QT_VERSION_STR, Qt
 from PyQt5.QtWidgets import (QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu,
                              QSplitter, QStyle, QTableView, QToolBar, QToolButton, QTreeView)
 
@@ -15,6 +17,8 @@ from .reconstructor import *
 from .scan import *
 from .settings import *
 from .workflow import *
+
+logger = logging.getLogger(__name__)
 
 
 class ViewCore(QMainWindow):
@@ -72,8 +76,10 @@ class ViewCore(QMainWindow):
     def createInstance(cls,
                        isDeveloperModeEnabled: bool,
                        parent: Optional[QWidget] = None) -> ViewCore:
-        view = cls(parent)
+        logger.info(f'PyQt {PYQT_VERSION_STR}')
+        logger.info(f'Qt {QT_VERSION_STR}')
 
+        view = cls(parent)
         view.navigationToolBar.setContextMenuPolicy(Qt.PreventContextMenu)
         view.addToolBar(Qt.LeftToolBarArea, view.navigationToolBar)
         view.navigationToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)

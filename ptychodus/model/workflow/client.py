@@ -22,18 +22,6 @@ class WorkflowClient:
         flowRuns: list[WorkflowRun] = list()
         return flowRuns
 
-    def deployFlow(self) -> UUID:
-        return UUID(int=0)
-
-    def updateFlow(self, flowID: UUID) -> None:
-        pass
-
-    def listFlows(self) -> None:
-        pass
-
-    def deleteFlow(self, flowID: UUID) -> None:
-        pass
-
     def runFlow(self) -> None:
         pass
 

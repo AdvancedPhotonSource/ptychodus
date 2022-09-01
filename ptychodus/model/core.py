@@ -1,9 +1,13 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from importlib.metadata import version
 from types import TracebackType
-from typing import overload
+from typing import overload, Optional
 import logging
+import sys
 
+import h5py
+import matplotlib
 import numpy
 
 from ..api.plugins import PluginRegistry
@@ -27,17 +31,34 @@ from .workflow import WorkflowCore, WorkflowPresenter
 logger = logging.getLogger(__name__)
 
 
+def configureLogger() -> None:
+    logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+                        stream=sys.stdout,
+                        encoding='utf-8',
+                        level=logging.DEBUG)
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
+
+    logger.info(f'Ptychodus {version("ptychodus")}')
+    logger.info(f'NumPy {version("numpy")}')
+    logger.info(f'Matplotlib {version("matplotlib")}')
+    logger.info(f'H5Py {version("h5py")}')
+    logger.info(f'HDF5 {h5py.version.hdf5_version}')
+
+
 @dataclass(frozen=True)
 class ModelArgs:
-    rpcPort: int
-    autoExecuteRPCs: bool
+    settingsFilePath: Optional[Path]
     replacementPathPrefix: Optional[str]
+    rpcPort: int = -1
+    autoExecuteRPCs: bool = False
     isDeveloperModeEnabled: bool = False
 
 
 class ModelCore:
 
     def __init__(self, modelArgs: ModelArgs) -> None:
+        configureLogger()
+        self._modelArgs = modelArgs
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
@@ -119,6 +140,9 @@ class ModelCore:
             self.rpcMessageService = None
 
     def __enter__(self) -> ModelCore:
+        if self._modelArgs.settingsFilePath:
+            self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
+
         if self.rpcMessageService:
             self.rpcMessageService.start()
 

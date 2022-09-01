@@ -17,6 +17,7 @@ module = [
     "h5py",
     "matplotlib.*",
     "scipy.*",
+    "skimage.*",
     "tifffile",
     "watchdog.*",
 ]

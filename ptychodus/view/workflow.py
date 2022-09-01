@@ -129,49 +129,6 @@ class WorkflowButtonBox(QWidget):
         return view
 
 
-class WorkflowDeveloperButtonBox(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.deployFlowButton = QPushButton('Deploy')
-        self.listFlowsButton = QPushButton('List')
-        self.updateFlowButton = QPushButton('Update')
-        self.deleteFlowButton = QPushButton('Delete')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowDeveloperButtonBox:
-        view = cls(parent)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.deployFlowButton)
-        layout.addWidget(view.listFlowsButton)
-        layout.addWidget(view.updateFlowButton)
-        layout.addWidget(view.deleteFlowButton)
-        view.setLayout(layout)
-
-        return view
-
-
-class WorkflowDeveloperView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Developer', parent)
-        self.flowIDLineEdit = UUIDLineEdit()
-        self.buttonBox = WorkflowDeveloperButtonBox.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowDeveloperView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.flowIDLineEdit)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-
 class WorkflowParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
@@ -181,7 +138,6 @@ class WorkflowParametersView(QWidget):
         self.outputDataView = WorkflowDataView.createInstance('Output Data')
         self.statusView = WorkflowStatusView.createInstance()
         self.buttonBox = WorkflowButtonBox.createInstance()
-        self.developerView = WorkflowDeveloperView.createInstance()
         self.authorizeDialog = WorkflowAuthorizeDialog.createInstance(self)
 
     @classmethod
@@ -195,7 +151,6 @@ class WorkflowParametersView(QWidget):
         layout.addWidget(view.statusView)
         layout.addWidget(view.buttonBox)
         layout.addStretch()
-        layout.addWidget(view.developerView)
         view.setLayout(layout)
 
         return view

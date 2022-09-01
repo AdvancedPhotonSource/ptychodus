@@ -22,7 +22,7 @@ class WorkflowSettings(Observable, Observer):
         self.computeDataPath = settingsGroup.createPathEntry('ComputeDataPath',
                                                              Path('/~/path/to/data'))
         self.flowID = settingsGroup.createUUIDEntry('FlowID',
-                                                    UUID('8465696e-6bd6-4c9b-b5f2-7d4a6b19c5c1'))
+                                                    UUID('9fb405f9-be63-4ce7-9605-faf62752bea2'))
         self.outputDataEndpointID = settingsGroup.createUUIDEntry(
             'OutputDataEndpointID', UUID('9c9cb97e-de86-11e6-9d15-22000a1e3b52'))
         self.outputDataPath = settingsGroup.createPathEntry('OutputDataPath',

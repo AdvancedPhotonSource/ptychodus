@@ -105,26 +105,6 @@ class WorkflowPresenter(Observable, Observer):
 
         return flowRuns
 
-    def deployFlow(self) -> UUID:
-        flowID = UUID(int=0)
-
-        if self._client:
-            flowID = self._client.deployFlow()
-
-        return flowID
-
-    def updateFlow(self, flowID: UUID) -> None:
-        if self._client:
-            self._client.updateFlow(flowID)
-
-    def listFlows(self) -> None:
-        if self._client:
-            self._client.listFlows()
-
-    def deleteFlow(self, flowID: UUID) -> None:
-        if self._client:
-            self._client.deleteFlow(flowID)
-
     def runFlow(self) -> None:
         if self._client:
             self._client.runFlow()
