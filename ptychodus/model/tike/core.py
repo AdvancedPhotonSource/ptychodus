@@ -11,6 +11,7 @@ from ...api.settings import SettingsRegistry
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
 from ..reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
+from .arrayConverter import TikeArrayConverter
 from ..scan import Scan
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionPresenter, TikePositionCorrectionSettings
@@ -153,7 +154,6 @@ class TikeBackend:
                        settingsRegistry: SettingsRegistry,
                        dataFile: DataFile,
                        scan: Scan,
-                       probeSizer: ProbeSizer,
                        probe: Probe,
                        apparatus: Apparatus,
                        object_: Object,
@@ -178,10 +178,10 @@ class TikeBackend:
                 core.reconstructorList.append(NullReconstructor('lstsq_grad', 'Tike'))
                 core.reconstructorList.append(NullReconstructor('dm', 'Tike'))
         else:
+            arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_, dataFile)
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
-                                                  core._probeCorrectionSettings, dataFile, scan,
-                                                  probeSizer, probe, apparatus, object_,
+                                                  core._probeCorrectionSettings, arrayConverter,
                                                   reconstructorPlotPresenter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
