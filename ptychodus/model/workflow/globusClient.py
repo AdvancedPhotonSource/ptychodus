@@ -6,7 +6,9 @@ from uuid import UUID
 import json
 import logging
 import pprint
+import sys
 
+from gladier import GladierBaseClient, GladierBaseTool, generate_flow_definition
 from globus_automate_client import FlowsClient
 from globus_automate_client.flows_client import (MANAGE_FLOWS_SCOPE, RUN_FLOWS_SCOPE,
                                                  RUN_STATUS_SCOPE, VIEW_FLOWS_SCOPE)
@@ -16,6 +18,39 @@ from .client import WorkflowClient, WorkflowClientBuilder, WorkflowRun
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
+
+
+def ptychodus_reconstruct(**data):
+    from pathlib import Path
+    from ptychodus.model import ModelArgs, ModelCore
+
+    modelArgs = ModelArgs(
+        settingsFilePath=Path(data['settings_file']),
+        replacementPathPrefix=data['replacement_path_prefix'],
+    )
+
+    with ModelCore(modelArgs) as model:
+        model.batchModeReconstruct()
+
+
+@generate_flow_definition
+class PtychodusReconstruct(GladierBaseTool):
+    required_input = [
+        'settings_file',
+        'replacement_path_prefix',
+    ]
+    funcx_functions = [ptychodus_reconstruct]
+
+
+@generate_flow_definition
+class PtychodusClient(GladierBaseClient):
+    # TODO client_id = GlobusWorkflowClient.CLIENT_ID
+    gladier_tools = [
+        'gladier_tools.globus.transfer.Transfer:InputData',
+        PtychodusReconstruct,
+        'gladier_tools.globus.transfer.Transfer:OutputData',
+        #'gladier_tools.publish.Publish',
+    ]
 
 
 class GlobusWorkflowClient(WorkflowClient):
@@ -71,9 +106,38 @@ class GlobusWorkflowClient(WorkflowClient):
     def runFlow(self) -> None:
         flowID = str(self._settings.flowID.value)
         flowScope = None
-        flowInput = {'input': {'echo_string': 'From Ptychodus', 'sleep_time': 10}}
 
-        runResponse = self._client.run_flow(flowID, flowScope, flowInput, label='Run Label')
+        flowInput = {
+            'input_data_transfer_source_endpoint_id':
+            str(self._settings.inputDataEndpointID.value),
+            'input_data_transfer_source_path':
+            str(self._settings.inputDataPath.value),
+            'input_data_transfer_destination_endpoint_id':
+            str(self._settings.computeDataEndpointID.value),
+            'input_data_transfer_destination_path':
+            str(self._settings.computeDataPath.value),
+            'input_data_transfer_recursive':
+            False,
+            'funcx_endpoint_compute':
+            str(self._settings.computeEndpointID.value),
+            'ptychodus_reconstruct_funcx_id':
+            '',  # FIXME
+            'output_data_transfer_source_endpoint_id':
+            str(self._settings.computeDataEndpointID.value),
+            'output_data_transfer_source_path':
+            str(self._settings.computeDataPath.value),
+            'output_data_transfer_destination_endpoint_id':
+            str(self._settings.outputDataEndpointID.value),
+            'output_data_transfer_destination_path':
+            str(self._settings.outputDataPath.value),
+            'output_data_transfer_recursive':
+            False,
+        }
+
+        flowInput = {'input': flowInput}
+        flowLabel = 'Run Label'
+
+        runResponse = self._client.run_flow(flowID, flowScope, flowInput, label=flowLabel)
         logger.info(f'Run Flow Response: {json.dumps(runResponse.data, indent=4)}')
 
 
@@ -130,3 +194,20 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
         logger.debug('Authorizers: {pprint.pformat(authorizerDict)}')
 
         return GlobusWorkflowClient(self._settings, authorizerDict)
+
+
+def main() -> int:
+    client = PtychodusClient()
+    flow_id = client.get_flow_id()
+    print(f'Flow ID: {flow_id}')
+    funcx_ids = client.get_funcx_function_ids()
+
+    print('FuncX IDs:')
+
+    for name, value in funcx_ids.items():
+        print(f'\t{name} -> {value}')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
