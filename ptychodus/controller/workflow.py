@@ -40,7 +40,7 @@ class WorkflowInputDataController(Observer):
         self._presenter.setInputDataEndpointID(endpointID)
 
     def _syncPathToModel(self) -> None:
-        dataPath = Path(self._view.pathLineEdit.text())
+        dataPath = self._view.pathLineEdit.text()
         self._presenter.setInputDataPath(dataPath)
 
     def _syncModelToView(self) -> None:
@@ -77,7 +77,7 @@ class WorkflowOutputDataController(Observer):
         self._presenter.setOutputDataEndpointID(endpointID)
 
     def _syncPathToModel(self) -> None:
-        dataPath = Path(self._view.pathLineEdit.text())
+        dataPath = self._view.pathLineEdit.text()
         self._presenter.setOutputDataPath(dataPath)
 
     def _syncModelToView(self) -> None:
@@ -120,7 +120,7 @@ class WorkflowComputeController(Observer):
         self._presenter.setComputeDataEndpointID(endpointID)
 
     def _syncPathToModel(self) -> None:
-        dataPath = Path(self._view.pathLineEdit.text())
+        dataPath = self._view.pathLineEdit.text()
         self._presenter.setComputeDataPath(dataPath)
 
     def _syncFlowIDToModel(self) -> None:

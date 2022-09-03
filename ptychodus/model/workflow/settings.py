@@ -13,22 +13,21 @@ class WorkflowSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.inputDataEndpointID = settingsGroup.createUUIDEntry(
             'InputDataEndpointID', UUID('9c9cb97e-de86-11e6-9d15-22000a1e3b52'))
-        self.inputDataPath = settingsGroup.createPathEntry('InputDataPath',
-                                                           Path('/~/path/to/data'))
+        self.inputDataPath = settingsGroup.createStringEntry('InputDataPath', '/~/path/to/data')
         self.computeEndpointID = settingsGroup.createUUIDEntry(
             'ComputeEndpointID', UUID('08925f04-569f-11e7-bef8-22000b9a448b'))
         self.computeDataEndpointID = settingsGroup.createUUIDEntry('ComputeDataEndpointID',
                                                                    UUID(int=0))
-        self.computeDataPath = settingsGroup.createPathEntry('ComputeDataPath',
-                                                             Path('/~/path/to/data'))
+        self.computeDataPath = settingsGroup.createStringEntry('ComputeDataPath',
+                                                               '/~/path/to/data')
         self.flowID = settingsGroup.createUUIDEntry('FlowID',
                                                     UUID('9fb405f9-be63-4ce7-9605-faf62752bea2'))
+        # FIXME need to create/wire a widget for the FuncX ID
         self.ptychodusReconstructFuncXID = settingsGroup.createUUIDEntry(
             'PtychodusReconstructFuncXID', UUID('0148eb97-eac0-4afa-be07-131d18cb5243'))
         self.outputDataEndpointID = settingsGroup.createUUIDEntry(
             'OutputDataEndpointID', UUID('9c9cb97e-de86-11e6-9d15-22000a1e3b52'))
-        self.outputDataPath = settingsGroup.createPathEntry('OutputDataPath',
-                                                            Path('/~/path/to/data'))
+        self.outputDataPath = settingsGroup.createStringEntry('OutputDataPath', '/~/path/to/data')
         self.statusRefreshIntervalInSeconds = settingsGroup.createIntegerEntry(
             'StatusRefreshIntervalInSeconds', 10)
 

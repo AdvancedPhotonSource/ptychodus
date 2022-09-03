@@ -49,10 +49,10 @@ class WorkflowPresenter(Observable, Observer):
     def getInputDataEndpointID(self) -> UUID:
         return self._settings.inputDataEndpointID.value
 
-    def setInputDataPath(self, inputDataPath: Path) -> None:
+    def setInputDataPath(self, inputDataPath: str) -> None:
         self._settings.inputDataPath.value = inputDataPath
 
-    def getInputDataPath(self) -> Path:
+    def getInputDataPath(self) -> str:
         return self._settings.inputDataPath.value
 
     def setOutputDataEndpointID(self, endpointID: UUID) -> None:
@@ -61,10 +61,10 @@ class WorkflowPresenter(Observable, Observer):
     def getOutputDataEndpointID(self) -> UUID:
         return self._settings.outputDataEndpointID.value
 
-    def setOutputDataPath(self, outputDataPath: Path) -> None:
+    def setOutputDataPath(self, outputDataPath: str) -> None:
         self._settings.outputDataPath.value = outputDataPath
 
-    def getOutputDataPath(self) -> Path:
+    def getOutputDataPath(self) -> str:
         return self._settings.outputDataPath.value
 
     def setComputeEndpointID(self, endpointID: UUID) -> None:
@@ -85,10 +85,10 @@ class WorkflowPresenter(Observable, Observer):
     def getComputeDataEndpointID(self) -> UUID:
         return self._settings.computeDataEndpointID.value
 
-    def setComputeDataPath(self, computeDataPath: Path) -> None:
+    def setComputeDataPath(self, computeDataPath: str) -> None:
         self._settings.computeDataPath.value = computeDataPath
 
-    def getComputeDataPath(self) -> Path:
+    def getComputeDataPath(self) -> str:
         return self._settings.computeDataPath.value
 
     def setStatusRefreshIntervalInSeconds(self, seconds: int) -> None:

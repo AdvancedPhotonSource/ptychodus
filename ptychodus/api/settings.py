@@ -191,8 +191,7 @@ class SettingsRegistry(Observable):
             for settingsEntry in settingsGroup:
                 valueString = str(settingsEntry.value)
 
-                if self._replacementPathPrefix is not None \
-                        and isinstance(settingsEntry.value, Path):
+                if self._replacementPathPrefix and isinstance(settingsEntry.value, Path):
                     if valueString.startswith(self._replacementPathPrefix):
                         valueString = SettingsRegistry.PREFIX_PLACEHOLDER_TEXT \
                                 + valueString[len(self._replacementPathPrefix):]

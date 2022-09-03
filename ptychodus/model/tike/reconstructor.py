@@ -111,6 +111,11 @@ class TikeReconstructor:
         psi = inputArrays.object_
         numGpus = self.getNumGpus()
 
+        if len(data) != len(scan):
+            numFrame = min(len(data), len(scan))
+            scan = scan[:numFrame, ...]
+            data = data[:numFrame, ...]
+
         logger.debug(f'data shape={data.shape}')
         logger.debug(f'scan shape={scan.shape}')
         logger.debug(f'probe shape={probe.shape}')

@@ -33,18 +33,11 @@ class TikeArrayConverter:
         self._object = object_
         self._dataFile = dataFile
 
-    @property
-    def numberOfFrames(self) -> int:
-        return min(len(self._scan), len(self._dataFile))
-
     def getDiffractionData(self) -> DataArrayType:
-        numFrames = self.numberOfFrames
         data = self._dataFile.getDiffractionData()
-        return numpy.fft.ifftshift(data[:numFrames, ...], axes=(-2, -1))
+        return numpy.fft.ifftshift(data, axes=(-2, -1))
 
     def exportToTike(self) -> TikeArrays:
-        numFrames = self.numberOfFrames
-
         pixelSizeXInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
         pixelSizeYInMeters = self._apparatus.getObjectPlanePixelSizeYInMeters()
 
@@ -55,9 +48,6 @@ class TikeArrayConverter:
             scanX.append(float(point.x / pixelSizeXInMeters))
             scanY.append(float(point.y / pixelSizeYInMeters))
 
-            if n > numFrames:
-                break
-
         probe = self._probe.getArray()
         padX = probe.shape[-1] // 2
         padY = probe.shape[-2] // 2
@@ -65,35 +55,41 @@ class TikeArrayConverter:
         shiftX = padX - min(scanX)
         shiftY = padY - min(scanY)
 
-        for n in range(numFrames):
+        for n in range(len(self._scan)):
             scanX[n] += shiftX
             scanY[n] += shiftY
+
+        logger.debug(f'Scan {min(scanX),min(scanY)} -> {max(scanX),max(scanY)}')
 
         spanX = max(scanX)
         spanY = max(scanY)
 
+        tikeObjectShapeX = probe.shape[-1] + int(spanX) + padX
+        tikeObjectShapeY = probe.shape[-2] + int(spanY) + padY
+        tikeObject = numpy.ones(shape=(tikeObjectShapeY, tikeObjectShapeX), dtype='complex64')
+        logger.debug(f'Tike object: {tikeObjectShapeY,tikeObjectShapeX}')
+
         object_ = self._object.getArray()
         logger.debug(f'Ptychodus object: {object_.shape}')
 
-        tikeObjectShapeX = probe.shape[-1] + int(spanX) + padX
-        tikeObjectShapeY = probe.shape[-2] + int(spanY) + padY
-        logger.debug(f'Tike object: ({tikeObjectShapeY,tikeObjectShapeX})')
-
-        # vvv FIXME vvv
-        objectDiffX = tikeObjectShapeX - object_.shape[-1]
-        objectDiffY = tikeObjectShapeY - object_.shape[-2]
-
-        objectPadX = (padX, objectDiffX - padX)  # TODO verify offset
-        objectPadY = (padY, objectDiffY - padY)  # TODO verify offset
+        tikeObject[padY:padY + object_.shape[-2], padX:padX + object_.shape[-1]] = object_
 
         return TikeArrays(
             scan=numpy.column_stack((scanY, scanX)).astype('float32'),
             probe=probe[numpy.newaxis, numpy.newaxis, ...].astype('complex64'),
-            object_=numpy.pad(object_, (objectPadY, objectPadX)).astype('complex64'),
+            object_=tikeObject,
         )
 
     def importFromTike(self, arrays: TikeArrays) -> None:
-        # TODO only update if correction enabled
+        probe = self._probe.getArray()
+        padX = probe.shape[-1] // 2
+        padY = probe.shape[-2] // 2
+
         # FIXME shift and scale self._scan.setScanPoints(...) using arrays.scan
-        self._object.setArray(arrays.object_)  # FIXME trim padding
+
+        # FIXME only update stuff if correction enabled
         self._probe.setArray(arrays.probe[0, 0])
+
+        object_ = self._object.getArray()
+        self._object.setArray(arrays.object_[padY:padY + object_.shape[-2],
+                                             padX:padX + object_.shape[-1]])
