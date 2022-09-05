@@ -73,14 +73,11 @@ class Scan(ScanPointSequence, Observable, Observer):
         initializerName = self._settings.initializer.value
         name = initializerName.casefold()
 
-        # FIXME this fails to set the active scan
         if name == 'fromfile':
             tabularList = self._initializerFactory.openScanFromSettings()
 
             for tabular in tabularList:
-                fileInfo = tabular.getFileInfo()
-                name = fileInfo.fileSeriesKey if fileInfo else tabular.category
-                self._repository.insertScan(tabular, name)
+                self._repository.insertScan(tabular)
         else:
             initializer = self._initializerFactory.createInitializer(name)
 
@@ -89,7 +86,7 @@ class Scan(ScanPointSequence, Observable, Observer):
             else:
                 self._repository.insertScan(initializer)
 
-        self.setActive(initializerName)
+        self.setActive(self._settings.activeScan.value)
 
     def _syncToSettings(self) -> None:
         self._initializer.syncToSettings(self._settings)

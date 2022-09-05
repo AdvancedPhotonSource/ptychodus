@@ -106,6 +106,8 @@ class WorkflowComputeController(Observer):
         view.dataEndpointIDLineEdit.editingFinished.connect(controller._syncDataEndpointIDToModel)
         view.pathLineEdit.editingFinished.connect(controller._syncPathToModel)
         view.flowIDLineEdit.editingFinished.connect(controller._syncFlowIDToModel)
+        view.reconstructActionIDLineEdit.editingFinished.connect(
+            controller._syncReconstructActionIDToModel)
 
         controller._syncModelToView()
 
@@ -127,11 +129,17 @@ class WorkflowComputeController(Observer):
         flowID = UUID(self._view.flowIDLineEdit.text())
         self._presenter.setFlowID(flowID)
 
+    def _syncReconstructActionIDToModel(self) -> None:
+        actionID = UUID(self._view.reconstructActionIDLineEdit.text())
+        self._presenter.setReconstructActionID(actionID)
+
     def _syncModelToView(self) -> None:
         self._view.endpointIDLineEdit.setText(str(self._presenter.getComputeEndpointID()))
         self._view.dataEndpointIDLineEdit.setText(str(self._presenter.getComputeDataEndpointID()))
         self._view.pathLineEdit.setText(str(self._presenter.getComputeDataPath()))
         self._view.flowIDLineEdit.setText(str(self._presenter.getFlowID()))
+        self._view.reconstructActionIDLineEdit.setText(
+            str(self._presenter.getReconstructActionID()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

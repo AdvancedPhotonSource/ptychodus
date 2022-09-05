@@ -20,13 +20,12 @@ class ScanFileInfo:
     def createFromSettings(cls, settings: ScanSettings) -> ScanFileInfo:
         fileType = settings.inputFileType.value
         filePath = settings.inputFilePath.value
-        fileSeriesKey = settings.inputFileSeriesKey.value
+        fileSeriesKey = settings.activeScan.value
         return cls(fileType, filePath, fileSeriesKey)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         settings.inputFileType.value = self.fileType
         settings.inputFilePath.value = self.filePath
-        settings.inputFileSeriesKey.value = self.fileSeriesKey
 
 
 class TabularScanInitializer(ScanInitializer):
@@ -41,9 +40,12 @@ class TabularScanInitializer(ScanInitializer):
         if self._fileInfo is None:
             raise ValueError('Missing file info.')
 
-        settings.initializer.value = self.variant
         self._fileInfo.syncToSettings(settings)
         super().syncToSettings(settings)
+
+    @property
+    def nameHint(self) -> str:
+        return self._fileInfo.fileSeriesKey if self._fileInfo else self.category
 
     @property
     def category(self) -> str:

@@ -20,18 +20,15 @@ class ScanRepository(Mapping[str, ScanInitializer], Observable):
     def __len__(self) -> int:
         return len(self._initializers)
 
-    def insertScan(self, initializer: ScanInitializer, name: Optional[str] = None) -> None:
-        if name is None:
-            name = initializer.variant
-
-        initializerName = name
+    def insertScan(self, initializer: ScanInitializer) -> None:
+        name = initializer.nameHint
         index = 0
 
-        while initializerName in self._initializers:
+        while name in self._initializers:
             index += 1
-            initializerName = f'{name}-{index}'
+            name = f'{initializer.nameHint}-{index}'
 
-        self._initializers[initializerName] = initializer
+        self._initializers[name] = initializer
         self.notifyObservers()
 
     def canRemoveScan(self, name: str) -> bool:

@@ -85,9 +85,7 @@ class ScanPresenter(Observable, Observer):
         initializerList = self._initializerFactory.openScan(filePath, fileFilter)
 
         for initializer in initializerList:
-            fileInfo = initializer.getFileInfo()
-            name = fileInfo.fileSeriesKey if fileInfo else initializer.variant
-            self._repository.insertScan(initializer, name)
+            self._repository.insertScan(initializer)
 
     def canRemoveScan(self, name: str) -> bool:
         return self._repository.canRemoveScan(name) and name != self._scan.name

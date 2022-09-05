@@ -41,13 +41,18 @@ class ScanInitializer(ScanPointSequence, Observable):
         self._parameters = parameters
 
     @abstractproperty
+    def nameHint(self) -> str:
+        '''returns a name hint'''
+        pass
+
+    @abstractproperty
     def category(self) -> str:
         '''returns a unique category for organizing scan positions'''
         pass
 
     @abstractproperty
     def variant(self) -> str:
-        '''returns a unique name'''
+        '''returns a unique variant name'''
         pass
 
     @abstractmethod
@@ -72,6 +77,8 @@ class ScanInitializer(ScanPointSequence, Observable):
     def syncToSettings(self, settings: ScanSettings) -> None:
         '''synchronizes parameters to settings'''
         self._parameters.syncToSettings(settings)
+        settings.initializer.value = self.variant
+        settings.activeScan.value = self.nameHint
 
     def getTransformNameList(self) -> list[str]:
         return [transform.displayName for transform in ScanPointTransform]

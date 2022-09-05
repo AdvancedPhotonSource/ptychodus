@@ -11,10 +11,10 @@ class ScanSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
+        self.activeScan = settingsGroup.createStringEntry('ActiveScan', 'Snake')
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/scan.csv'))
-        self.inputFileSeriesKey = settingsGroup.createStringEntry('InputFileSeriesKey', 'Default')
         self.numberOfPointsX = settingsGroup.createIntegerEntry('NumberOfPointsX', 10)
         self.numberOfPointsY = settingsGroup.createIntegerEntry('NumberOfPointsY', 10)
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')

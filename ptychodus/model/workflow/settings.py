@@ -22,9 +22,8 @@ class WorkflowSettings(Observable, Observer):
                                                                '/~/path/to/data')
         self.flowID = settingsGroup.createUUIDEntry('FlowID',
                                                     UUID('9fb405f9-be63-4ce7-9605-faf62752bea2'))
-        # FIXME need to create/wire a widget for the FuncX ID
-        self.ptychodusReconstructFuncXID = settingsGroup.createUUIDEntry(
-            'PtychodusReconstructFuncXID', UUID('0148eb97-eac0-4afa-be07-131d18cb5243'))
+        self.reconstructActionID = settingsGroup.createUUIDEntry(
+            'ReconstructActionID', UUID('0148eb97-eac0-4afa-be07-131d18cb5243'))
         self.outputDataEndpointID = settingsGroup.createUUIDEntry(
             'OutputDataEndpointID', UUID('9c9cb97e-de86-11e6-9d15-22000a1e3b52'))
         self.outputDataPath = settingsGroup.createStringEntry('OutputDataPath', '/~/path/to/data')

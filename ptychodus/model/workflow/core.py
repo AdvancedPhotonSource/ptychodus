@@ -73,11 +73,17 @@ class WorkflowPresenter(Observable, Observer):
     def getComputeEndpointID(self) -> UUID:
         return self._settings.computeEndpointID.value
 
-    def setFlowID(self, endpointID: UUID) -> None:
-        self._settings.flowID.value = endpointID
+    def setFlowID(self, flowID: UUID) -> None:
+        self._settings.flowID.value = flowID
 
     def getFlowID(self) -> UUID:
         return self._settings.flowID.value
+
+    def setReconstructActionID(self, actionID: UUID) -> None:
+        self._settings.reconstructActionID.value = actionID
+
+    def getReconstructActionID(self) -> UUID:
+        return self._settings.reconstructActionID.value
 
     def setComputeDataEndpointID(self, endpointID: UUID) -> None:
         self._settings.computeDataEndpointID.value = endpointID

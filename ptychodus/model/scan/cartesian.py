@@ -29,12 +29,15 @@ class CartesianScanInitializer(ScanInitializer):
                    numberOfPointsY, snake)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.initializer.value = self.variant
         settings.stepSizeXInMeters.value = self._stepSizeXInMeters
         settings.stepSizeYInMeters.value = self._stepSizeYInMeters
         settings.numberOfPointsX.value = self._numberOfPointsX
         settings.numberOfPointsY.value = self._numberOfPointsY
         super().syncToSettings(settings)
+
+    @property
+    def nameHint(self) -> str:
+        return self.variant
 
     @property
     def category(self) -> str:
