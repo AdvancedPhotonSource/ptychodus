@@ -21,6 +21,12 @@ class ScanPoint:
     x: Decimal
     y: Decimal
 
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ScanPoint):
+            return (self.x == other.x and self.y == other.y)
+        else:
+            return NotImplemented
+
 
 ScanPointSequence = Sequence[ScanPoint]
 ScanDictionary = Mapping[str, ScanPointSequence]

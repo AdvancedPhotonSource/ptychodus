@@ -79,6 +79,12 @@ class CartesianScanInitializer(ScanInitializer):
             self._numberOfPointsY = numberOfPointsY
             self.notifyObservers()
 
+    def _getIndexCenter(self) -> ScanPoint:
+        return ScanPoint(
+            Decimal(self._numberOfPointsX - 1) / 2,
+            Decimal(self._numberOfPointsY - 1) / 2,
+        )
+
     def _getPoint(self, index: int) -> ScanPoint:
         if index >= len(self):
             raise IndexError(f'Index {index} is out of range')
@@ -88,8 +94,10 @@ class CartesianScanInitializer(ScanInitializer):
         if self._snake and y & 1:
             x = self._numberOfPointsX - 1 - x
 
-        xf = x * self._stepSizeXInMeters
-        yf = y * self._stepSizeYInMeters
+        center = self._getIndexCenter()
+
+        xf = (x - center.x) * self._stepSizeXInMeters
+        yf = (y - center.y) * self._stepSizeYInMeters
 
         return ScanPoint(xf, yf)
 

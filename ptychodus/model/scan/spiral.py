@@ -10,24 +10,25 @@ from .settings import ScanSettings
 
 class SpiralScanInitializer(ScanInitializer):
 
-    def __init__(self, parameters: ScanInitializerParameters, stepSizeXInMeters: Decimal,
-                 stepSizeYInMeters: Decimal, numberOfPoints: int) -> None:
+    def __init__(self, parameters: ScanInitializerParameters,
+            radiusScalarInMeters: Decimal, stepSizeInTurns: Decimal,
+            numberOfPoints: int) -> None:
         super().__init__(parameters)
-        self._stepSizeXInMeters = stepSizeXInMeters
-        self._stepSizeYInMeters = stepSizeYInMeters
+        self._radiusScalarInMeters = radiusScalarInMeters
+        self._stepSizeInTurns = stepSizeInTurns
         self._numberOfPoints = numberOfPoints
 
     @classmethod
     def createFromSettings(cls, parameters: ScanInitializerParameters,
                            settings: ScanSettings) -> SpiralScanInitializer:
-        stepSizeXInMeters = settings.stepSizeXInMeters.value
-        stepSizeYInMeters = settings.stepSizeYInMeters.value
+        radiusScalarInMeters = settings.radiusScalarInMeters.value
+        stepSizeInTurns = settings.stepSizeInTurns.value
         numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value
-        return cls(parameters, stepSizeXInMeters, stepSizeYInMeters, numberOfPoints)
+        return cls(parameters, radiusScalarInMeters, stepSizeInTurns, numberOfPoints)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.stepSizeXInMeters.value = self._stepSizeXInMeters
-        settings.stepSizeYInMeters.value = self._stepSizeYInMeters
+        settings.radiusScalarInMeters.value = self._radiusScalarInMeters
+        settings.stepSizeInTurns.value = self._stepSizeInTurns
         settings.numberOfPointsX.value = self._numberOfPoints
         settings.numberOfPointsY.value = 1
         super().syncToSettings(settings)
@@ -44,20 +45,20 @@ class SpiralScanInitializer(ScanInitializer):
     def variant(self) -> str:
         return 'Fermat'
 
-    def getStepSizeXInMeters(self) -> Decimal:
-        return self._stepSizeXInMeters
+    def getRadiusScalarInMeters(self) -> Decimal:
+        return self._radiusScalarInMeters
 
-    def setStepSizeXInMeters(self, stepSizeXInMeters: Decimal) -> None:
-        if self._stepSizeXInMeters != stepSizeXInMeters:
-            self._stepSizeXInMeters = stepSizeXInMeters
+    def setRadiusScalarInMeters(self, radiusScalarInMeters: Decimal) -> None:
+        if self._radiusScalarInMeters != radiusScalarInMeters:
+            self._radiusScalarInMeters = radiusScalarInMeters
             self.notifyObservers()
 
-    def getStepSizeYInMeters(self) -> Decimal:
-        return self._stepSizeYInMeters
+    def getStepSizeInTurns(self) -> Decimal:
+        return self._stepSizeInTurns
 
-    def setStepSizeYInMeters(self, stepSizeYInMeters: Decimal) -> None:
-        if self._stepSizeYInMeters != stepSizeYInMeters:
-            self._stepSizeYInMeters = stepSizeYInMeters
+    def setStepSizeInTurns(self, stepSizeInTurns: Decimal) -> None:
+        if self._stepSizeInTurns != stepSizeInTurns:
+            self._stepSizeInTurns = stepSizeInTurns
             self.notifyObservers()
 
     def getNumberOfPoints(self) -> int:
@@ -72,17 +73,12 @@ class SpiralScanInitializer(ScanInitializer):
         if index >= len(self):
             raise IndexError(f'Index {index} is out of range')
 
-        sqrtIndex = Decimal(index).sqrt()
-
-        # TODO generalize parameters and redo without casting to float
-        theta = float(4 * sqrtIndex)
+        radius = self._radiusScalarInMeters * Decimal(index).sqrt()
+        theta = 2 * numpy.pi * index * float(self._stepSizeInTurns)
         cosTheta = Decimal(numpy.cos(theta))
         sinTheta = Decimal(numpy.sin(theta))
 
-        x = sqrtIndex * cosTheta * self._stepSizeXInMeters
-        y = sqrtIndex * sinTheta * self._stepSizeYInMeters
-
-        return ScanPoint(x, y)
+        return ScanPoint(radius * cosTheta, radius * sinTheta)
 
     def __len__(self) -> int:
         return self._numberOfPoints

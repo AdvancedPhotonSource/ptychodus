@@ -1,7 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, Final, Generic, Iterator, Optional, TypeVar
+from typing import Any, Callable, Final, Generic, Iterator, Optional, TypeVar, Union
 from uuid import UUID
 import configparser
 
@@ -79,8 +79,10 @@ class SettingsGroup(Observable, Observer):
                                             lambda valueString: int(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 
-    def createRealEntry(self, name: str, defaultValue: str) -> SettingsEntry[Decimal]:
-        candidateEntry = SettingsEntry[Decimal](name, Decimal(defaultValue),
+    def createRealEntry(self, name: str, defaultValue: Union[str,
+                                                             Decimal]) -> SettingsEntry[Decimal]:
+        defaultDecimal = Decimal(defaultValue) if isinstance(defaultValue, str) else defaultValue
+        candidateEntry = SettingsEntry[Decimal](name, defaultDecimal,
                                                 lambda valueString: Decimal(valueString))
         return self._registerEntryIfNonexistent(candidateEntry)
 

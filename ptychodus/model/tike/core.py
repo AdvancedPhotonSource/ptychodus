@@ -1,6 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
-from typing import Any, Final, Union
+from typing import Final
 import logging
 
 import numpy

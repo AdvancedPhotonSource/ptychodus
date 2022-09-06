@@ -20,17 +20,21 @@ class ScanInitializerParameters:
     rng: numpy.random.Generator
     transform: ScanPointTransform = ScanPointTransform.PXPY
     jitterRadiusInMeters: Decimal = Decimal()
+    centroid: ScanPoint = ScanPoint(Decimal(), Decimal())
 
     @classmethod
     def createFromSettings(cls, rng: numpy.random.Generator,
                            settings: ScanSettings) -> ScanInitializerParameters:
         transform = ScanPointTransform.fromSimpleName(settings.transform.value)
         jitterRadiusInMeters = settings.jitterRadiusInMeters.value
-        return cls(rng, transform, jitterRadiusInMeters)
+        centroid = ScanPoint(settings.centroidXInMeters.value, settings.centroidYInMeters.value)
+        return cls(rng, transform, jitterRadiusInMeters, centroid)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         settings.transform.value = self.transform.simpleName
         settings.jitterRadiusInMeters.value = self.jitterRadiusInMeters
+        settings.centroidXInMeters.value = self.centroid.x
+        settings.centroidYInMeters.value = self.centroid.y
 
 
 class ScanInitializer(ScanPointSequence, Observable):
@@ -72,7 +76,12 @@ class ScanInitializer(ScanPointSequence, Observable):
             scalar = self._parameters.jitterRadiusInMeters * (rad / (dirX**2 + dirY**2)).sqrt()
             point = ScanPoint(point.x + scalar * dirX, point.y + scalar * dirY)
 
-        return self._parameters.transform(point)
+        point = self._parameters.transform(point)
+
+        return ScanPoint(
+            self._parameters.centroid.x + point.x,
+            self._parameters.centroid.y + point.y,
+        )
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         '''synchronizes parameters to settings'''
@@ -114,6 +123,16 @@ class ScanInitializer(ScanPointSequence, Observable):
         '''sets the jitter radius'''
         if self._parameters.jitterRadiusInMeters != jitterRadiusInMeters:
             self._parameters.jitterRadiusInMeters = jitterRadiusInMeters
+            self.notifyObservers()
+
+    def getCentroid(self) -> ScanPoint:
+        '''gets the centroid'''
+        return self._parameters.centroid
+
+    def setCentroid(self, centroid: ScanPoint) -> None:
+        '''sets the centroid'''
+        if self._parameters.centroid != centroid:
+            self._parameters.centroid = centroid
             self.notifyObservers()
 
     @overload

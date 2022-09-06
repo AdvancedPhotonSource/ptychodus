@@ -121,7 +121,7 @@ class GlobusWorkflowClient(WorkflowClient):
             'funcx_endpoint_compute':
             str(self._settings.computeEndpointID.value),
             'ptychodus_reconstruct_funcx_id':
-            '',  # FIXME
+            str(self._settings.reconstructActionID.value),
             'output_data_transfer_source_endpoint_id':
             str(self._settings.computeDataEndpointID.value),
             'output_data_transfer_source_path':
@@ -198,14 +198,16 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
 
 def main() -> int:
     client = PtychodusClient()
+
     flow_id = client.get_flow_id()
     print(f'Flow ID: {flow_id}')
-    funcx_ids = client.get_funcx_function_ids()
 
     print('FuncX IDs:')
+    funcx_ids = client.get_funcx_function_ids()
 
     for name, value in funcx_ids.items():
         print(f'\t{name} -> {value}')
+
     return 0
 
 

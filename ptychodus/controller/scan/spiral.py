@@ -19,8 +19,8 @@ class SpiralScanController(Observer):
         initializer.addObserver(controller)
 
         view.numberOfPointsSpinBox.valueChanged.connect(initializer.setNumberOfPoints)
-        view.stepSizeXWidget.lengthChanged.connect(initializer.setStepSizeXInMeters)
-        view.stepSizeYWidget.lengthChanged.connect(initializer.setStepSizeYInMeters)
+        view.radiusScalarWidget.lengthChanged.connect(initializer.setRadiusScalarInMeters)
+        view.stepSizeWidget.lengthChanged.connect(initializer.setStepSizeInTurns)
 
         controller._syncModelToView()
 
@@ -28,8 +28,8 @@ class SpiralScanController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.numberOfPointsSpinBox.setValue(self._initializer.getNumberOfPoints())
-        self._view.stepSizeXWidget.setLengthInMeters(self._initializer.getStepSizeXInMeters())
-        self._view.stepSizeYWidget.setLengthInMeters(self._initializer.getStepSizeYInMeters())
+        self._view.radiusScalarWidget.setLengthInMeters(self._initializer.getRadiusScalarInMeters())
+        self._view.stepSizeWidget.setLengthInMeters(self._initializer.getStepSizeInTurns())
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

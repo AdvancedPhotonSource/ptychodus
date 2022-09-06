@@ -32,18 +32,16 @@ class ScanTableModel(QAbstractTableModel):
         return (name in self._checkedNames)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = 0
+        value = super().flags(index)
 
         if index.isValid():
             entry = self._scanList[index.row()]
 
             if self._presenter.canActivateScan(entry.name):
-                value |= Qt.ItemIsSelectable
+                value = int(value) & ~Qt.ItemIsSelectable
 
             if index.column() == 0:
-                value |= Qt.ItemIsUserCheckable
-
-            value |= Qt.ItemIsEnabled
+                value = int(value) | Qt.ItemIsUserCheckable
 
         return value
 
