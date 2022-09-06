@@ -42,7 +42,7 @@ class SpiralScanInitializer(ScanInitializer):
 
     @property
     def variant(self) -> str:
-        return 'Archimedean'
+        return 'Fermat'
 
     def getStepSizeXInMeters(self) -> Decimal:
         return self._stepSizeXInMeters
@@ -71,11 +71,6 @@ class SpiralScanInitializer(ScanInitializer):
     def _getPoint(self, index: int) -> ScanPoint:
         if index >= len(self):
             raise IndexError(f'Index {index} is out of range')
-
-        # theta = omega * t
-        # r = a + b * theta
-        # x = r * numpy.cos(theta)
-        # y = r * numpy.sin(theta)
 
         sqrtIndex = Decimal(index).sqrt()
 

@@ -45,6 +45,7 @@ class TabularScanInitializer(ScanInitializer):
 
     @property
     def nameHint(self) -> str:
+        # FIXME generalize fileSeriesKey to _nameHint and pull from fileInfo
         return self._fileInfo.fileSeriesKey if self._fileInfo else self.category
 
     @property
