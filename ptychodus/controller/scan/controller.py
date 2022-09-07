@@ -7,12 +7,13 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFi
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
-from ...model import (CartesianScanInitializer, Scan, ScanInitializer, ScanPresenter,
-                      SpiralScanInitializer)
+from ...model import (CartesianScanInitializer, LissajousScanInitializer, Scan, ScanInitializer,
+                      ScanPresenter, SpiralScanInitializer)
 from ...view import (ScanEditorDialog, ScanParametersView, ScanPlotView, ScanPositionDataView,
                      ScanTransformView)
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
+from .lissajous import LissajousScanController
 from .spiral import SpiralScanController
 from .tableModel import ScanTableModel
 from .transformController import ScanTransformController
@@ -119,23 +120,32 @@ class ScanController(Observer):
             category = current.sibling(current.row(), 1).data()
             initializer = self._presenter.getInitializer(name)
 
-            isCartesian = (category.casefold() == 'cartesian')
-            dialog = ScanEditorDialog.createInstance(isCartesian, self._parametersView)
-            dialog.setWindowTitle(name)
-
             if isinstance(initializer, CartesianScanInitializer):
+                cartesianDialog = ScanEditorDialog.createCartesianInstance(self._parametersView)
+                cartesianDialog.setWindowTitle(name)
                 cartesianController = CartesianScanController.createInstance(
-                    initializer, dialog.editorView)
+                    initializer, cartesianDialog.editorView)
+                cartesianTransformController = ScanTransformController.createInstance(
+                    initializer, cartesianDialog.transformView)
+                cartesianDialog.open()
             elif isinstance(initializer, SpiralScanInitializer):
+                spiralDialog = ScanEditorDialog.createSpiralInstance(self._parametersView)
+                spiralDialog.setWindowTitle(name)
                 spiralController = SpiralScanController.createInstance(
-                    initializer, dialog.editorView)
+                    initializer, spiralDialog.editorView)
+                spiralTransformController = ScanTransformController.createInstance(
+                    initializer, spiralDialog.transformView)
+                spiralDialog.open()
+            elif isinstance(initializer, LissajousScanInitializer):
+                lissajousDialog = ScanEditorDialog.createLissajousInstance(self._parametersView)
+                lissajousDialog.setWindowTitle(name)
+                lissajousController = LissajousScanController.createInstance(
+                    initializer, lissajousDialog.editorView)
+                lissajousTransformController = ScanTransformController.createInstance(
+                    initializer, lissajousDialog.transformView)
+                lissajousDialog.open()
             else:
                 logger.debug(f'Unknown category \"{category}\"')
-
-            transformController = ScanTransformController.createInstance(
-                initializer, dialog.transformView)
-
-            dialog.open()
         else:
             logger.error('No scans are selected!')
 

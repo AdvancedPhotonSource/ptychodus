@@ -125,14 +125,24 @@ class ScanInitializer(ScanPointSequence, Observable):
             self._parameters.jitterRadiusInMeters = jitterRadiusInMeters
             self.notifyObservers()
 
-    def getCentroid(self) -> ScanPoint:
-        '''gets the centroid'''
-        return self._parameters.centroid
+    def getCentroidXInMeters(self) -> Decimal:
+        '''gets the x centroid'''
+        return self._parameters.centroid.x
 
-    def setCentroid(self, centroid: ScanPoint) -> None:
-        '''sets the centroid'''
-        if self._parameters.centroid != centroid:
-            self._parameters.centroid = centroid
+    def setCentroidXInMeters(self, value: Decimal) -> None:
+        '''sets the x centroid'''
+        if self._parameters.centroid.x != value:
+            self._parameters.centroid = ScanPoint(value, self._parameters.centroid.y)
+            self.notifyObservers()
+
+    def getCentroidYInMeters(self) -> Decimal:
+        '''gets the y centroid'''
+        return self._parameters.centroid.y
+
+    def setCentroidYInMeters(self, value: Decimal) -> None:
+        '''sets the y centroid'''
+        if self._parameters.centroid.y != value:
+            self._parameters.centroid = ScanPoint(self._parameters.centroid.x, value)
             self.notifyObservers()
 
     @overload

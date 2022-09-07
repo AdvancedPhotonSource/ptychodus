@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from ...api.observer import Observable, Observer
 from ...model import CartesianScanInitializer
-from ...view import ScanEditorView
+from ...view import CartesianScanView
 
 
 class CartesianScanController(Observer):
 
-    def __init__(self, initializer: CartesianScanInitializer, view: ScanEditorView) -> None:
+    def __init__(self, initializer: CartesianScanInitializer, view: CartesianScanView) -> None:
         super().__init__()
         self._initializer = initializer
         self._view = view
 
     @classmethod
     def createInstance(cls, initializer: CartesianScanInitializer,
-                       view: ScanEditorView) -> CartesianScanController:
+                       view: CartesianScanView) -> CartesianScanController:
         controller = cls(initializer, view)
         initializer.addObserver(controller)
 

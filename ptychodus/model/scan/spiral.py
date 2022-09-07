@@ -10,27 +10,26 @@ from .settings import ScanSettings
 
 class SpiralScanInitializer(ScanInitializer):
 
-    def __init__(self, parameters: ScanInitializerParameters,
-            radiusScalarInMeters: Decimal, stepSizeInTurns: Decimal,
-            numberOfPoints: int) -> None:
+    def __init__(self, parameters: ScanInitializerParameters, numberOfPoints: int,
+                 radiusScalarInMeters: Decimal, angularStepInTurns: Decimal) -> None:
         super().__init__(parameters)
-        self._radiusScalarInMeters = radiusScalarInMeters
-        self._stepSizeInTurns = stepSizeInTurns
         self._numberOfPoints = numberOfPoints
+        self._radiusScalarInMeters = radiusScalarInMeters
+        self._angularStepInTurns = angularStepInTurns
 
     @classmethod
     def createFromSettings(cls, parameters: ScanInitializerParameters,
                            settings: ScanSettings) -> SpiralScanInitializer:
-        radiusScalarInMeters = settings.radiusScalarInMeters.value
-        stepSizeInTurns = settings.stepSizeInTurns.value
         numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value
-        return cls(parameters, radiusScalarInMeters, stepSizeInTurns, numberOfPoints)
+        radiusScalarInMeters = settings.radiusScalarInMeters.value
+        angularStepInTurns = settings.angularStepXInTurns.value
+        return cls(parameters, numberOfPoints, radiusScalarInMeters, angularStepInTurns)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.radiusScalarInMeters.value = self._radiusScalarInMeters
-        settings.stepSizeInTurns.value = self._stepSizeInTurns
         settings.numberOfPointsX.value = self._numberOfPoints
         settings.numberOfPointsY.value = 1
+        settings.radiusScalarInMeters.value = self._radiusScalarInMeters
+        settings.angularStepXInTurns.value = self._angularStepInTurns
         super().syncToSettings(settings)
 
     @property
@@ -45,22 +44,6 @@ class SpiralScanInitializer(ScanInitializer):
     def variant(self) -> str:
         return 'Fermat'
 
-    def getRadiusScalarInMeters(self) -> Decimal:
-        return self._radiusScalarInMeters
-
-    def setRadiusScalarInMeters(self, radiusScalarInMeters: Decimal) -> None:
-        if self._radiusScalarInMeters != radiusScalarInMeters:
-            self._radiusScalarInMeters = radiusScalarInMeters
-            self.notifyObservers()
-
-    def getStepSizeInTurns(self) -> Decimal:
-        return self._stepSizeInTurns
-
-    def setStepSizeInTurns(self, stepSizeInTurns: Decimal) -> None:
-        if self._stepSizeInTurns != stepSizeInTurns:
-            self._stepSizeInTurns = stepSizeInTurns
-            self.notifyObservers()
-
     def getNumberOfPoints(self) -> int:
         return self._numberOfPoints
 
@@ -69,16 +52,33 @@ class SpiralScanInitializer(ScanInitializer):
             self._numberOfPoints = numberOfPoints
             self.notifyObservers()
 
+    def getRadiusScalarInMeters(self) -> Decimal:
+        return self._radiusScalarInMeters
+
+    def setRadiusScalarInMeters(self, radiusScalarInMeters: Decimal) -> None:
+        if self._radiusScalarInMeters != radiusScalarInMeters:
+            self._radiusScalarInMeters = radiusScalarInMeters
+            self.notifyObservers()
+
+    def getAngularStepInTurns(self) -> Decimal:
+        return self._angularStepInTurns
+
+    def setAngularStepInTurns(self, angularStepInTurns: Decimal) -> None:
+        if self._angularStepInTurns != angularStepInTurns:
+            self._angularStepInTurns = angularStepInTurns
+            self.notifyObservers()
+
     def _getPoint(self, index: int) -> ScanPoint:
         if index >= len(self):
             raise IndexError(f'Index {index} is out of range')
 
         radius = self._radiusScalarInMeters * Decimal(index).sqrt()
-        theta = 2 * numpy.pi * index * float(self._stepSizeInTurns)
-        cosTheta = Decimal(numpy.cos(theta))
-        sinTheta = Decimal(numpy.sin(theta))
+        theta = 2 * numpy.pi * index * float(self._angularStepInTurns)
 
-        return ScanPoint(radius * cosTheta, radius * sinTheta)
+        return ScanPoint(
+            radius * Decimal(numpy.cos(theta)),
+            radius * Decimal(numpy.sin(theta)),
+        )
 
     def __len__(self) -> int:
         return self._numberOfPoints

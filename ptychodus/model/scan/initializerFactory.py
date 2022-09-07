@@ -9,6 +9,7 @@ from ...api.plugins import PluginChooser
 from ...api.scan import ScanFileReader, ScanPoint
 from .cartesian import CartesianScanInitializer
 from .initializer import ScanInitializer, ScanInitializerParameters
+from .lissajous import LissajousScanInitializer
 from .settings import ScanSettings
 from .spiral import SpiralScanInitializer
 from .tabular import ScanFileInfo, TabularScanInitializer
@@ -67,13 +68,15 @@ class ScanInitializerFactory:
         return self._readScan(fileInfo.filePath)
 
     def getInitializerNameList(self) -> list[str]:
-        return ['Raster', 'Snake', 'Spiral']
+        return ['Lissajous', 'Raster', 'Snake', 'Spiral']
 
     def createInitializer(self, name: str) -> Optional[ScanInitializer]:
         nameLower = name.casefold()
         parameters = self.createInitializerParameters()
 
-        if nameLower == 'raster':
+        if nameLower == 'lissajous':
+            return LissajousScanInitializer.createFromSettings(parameters, self._settings)
+        elif nameLower == 'raster':
             return CartesianScanInitializer.createFromSettings(parameters,
                                                                self._settings,
                                                                snake=False)

@@ -23,6 +23,8 @@ class ScanTransformController(Observer):
 
         view.transformComboBox.currentTextChanged.connect(initializer.setTransformByName)
         view.jitterRadiusWidget.lengthChanged.connect(initializer.setJitterRadiusInMeters)
+        view.centroidXWidget.lengthChanged.connect(initializer.setCentroidXInMeters)
+        view.centroidYWidget.lengthChanged.connect(initializer.setCentroidYInMeters)
 
         controller._syncModelToView()
 
@@ -32,6 +34,8 @@ class ScanTransformController(Observer):
         self._view.transformComboBox.setCurrentText(self._initializer.getTransformName())
         self._view.jitterRadiusWidget.setLengthInMeters(
             self._initializer.getJitterRadiusInMeters())
+        self._view.centroidXWidget.setLengthInMeters(self._initializer.getCentroidXInMeters())
+        self._view.centroidYWidget.setLengthInMeters(self._initializer.getCentroidYInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

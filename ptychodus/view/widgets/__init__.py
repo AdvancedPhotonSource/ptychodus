@@ -1,3 +1,4 @@
+from .angleWidget import AngleWidget
 from .bottomTitledGroupBox import BottomTitledGroupBox
 from .decimalLineEdit import DecimalLineEdit
 from .decimalSlider import DecimalSlider
