@@ -7,17 +7,13 @@ import logging
 import pkgutil
 
 from .data import DataFileReader, DataFileWriter
-from .image import ComplexToRealStrategy, ScalarTransformation
-from .object import ObjectFileReader, ObjectFileWriter, ObjectInitializerType
+from .image import ScalarTransformation
+from .object import ObjectFileReader, ObjectFileWriter
 from .observer import Observable
-from .probe import ProbeFileReader, ProbeFileWriter, ProbeInitializerType
-from .reconstructor import Reconstructor
-from .scan import ScanPointSequence, ScanPointTransform, ScanFileReader, ScanFileWriter
+from .probe import ProbeFileReader, ProbeFileWriter
+from .scan import ScanFileReader, ScanFileWriter
 
-T = TypeVar('T', ComplexToRealStrategy, DataFileReader, DataFileWriter, ObjectFileReader,
-            ObjectFileWriter, ObjectInitializerType, ProbeFileReader, ProbeFileWriter,
-            ProbeInitializerType, Reconstructor, ScalarTransformation, ScanFileReader,
-            ScanFileWriter, ScanPointSequence, ScanPointTransform)
+T = TypeVar('T')
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +98,6 @@ class PluginRegistry:
     def __init__(self) -> None:
         self.dataFileReaders: list[PluginEntry[DataFileReader]] = list()
         self.dataFileWriters: list[PluginEntry[DataFileWriter]] = list()
-        self.complexToRealStrategies: list[PluginEntry[ComplexToRealStrategy]] = list()
         self.scalarTransformations: list[PluginEntry[ScalarTransformation]] = list()
         self.scanFileReaders: list[PluginEntry[ScanFileReader]] = list()
         self.scanFileWriters: list[PluginEntry[ScanFileWriter]] = list()
@@ -140,10 +135,6 @@ class PluginRegistry:
                                                               displayName=plugin.fileFilter,
                                                               strategy=plugin)
             self.dataFileWriters.append(dataFileWriterEntry)
-        elif isinstance(plugin, ComplexToRealStrategy):
-            complexToRealStrategyEntry = PluginEntry[ComplexToRealStrategy](
-                simpleName=plugin.name, displayName=plugin.name, strategy=plugin)
-            self.complexToRealStrategies.append(complexToRealStrategyEntry)
         elif isinstance(plugin, ScalarTransformation):
             scalarTransformationEntry = PluginEntry[ScalarTransformation](simpleName=plugin.name,
                                                                           displayName=plugin.name,
@@ -187,9 +178,6 @@ class PluginRegistry:
 
     def buildDataFileWriterChooser(self) -> PluginChooser[DataFileWriter]:
         return PluginChooser[DataFileWriter].createFromList(self.dataFileWriters)
-
-    def buildComplexToRealStrategyChooser(self) -> PluginChooser[ComplexToRealStrategy]:
-        return PluginChooser[ComplexToRealStrategy].createFromList(self.complexToRealStrategies)
 
     def buildScalarTransformationChooser(self) -> PluginChooser[ScalarTransformation]:
         return PluginChooser[ScalarTransformation].createFromList(self.scalarTransformations)

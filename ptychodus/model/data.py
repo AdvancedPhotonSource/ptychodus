@@ -122,7 +122,7 @@ class Detector(Observable, Observer):
             self.notifyObservers()
 
 
-class CropSizer(Observer, Observable):
+class CropSizer(Observable, Observer):
 
     def __init__(self, settings: CropSettings, detector: Detector) -> None:
         super().__init__()
@@ -156,6 +156,7 @@ class CropSizer(Observer, Observable):
         return limitsInPixels.clamp(self._settings.centerXInPixels.value)
 
     def getSliceX(self) -> slice:
+        # TODO add support for flipX
         centerInPixels = self.getCenterXInPixels()
         radiusInPixels = self.getExtentXInPixels() // 2
         return slice(centerInPixels - radiusInPixels, centerInPixels + radiusInPixels)
@@ -177,6 +178,7 @@ class CropSizer(Observer, Observable):
         return limitsInPixels.clamp(self._settings.centerYInPixels.value)
 
     def getSliceY(self) -> slice:
+        # TODO add support for flipY
         centerInPixels = self.getCenterYInPixels()
         radiusInPixels = self.getExtentYInPixels() // 2
         return slice(centerInPixels - radiusInPixels, centerInPixels + radiusInPixels)
@@ -328,7 +330,7 @@ class ActiveDataFile(DataFile):
         if cropped and self._cropSizer.isCropEnabled():
             sliceX = self._cropSizer.getSliceX()
             sliceY = self._cropSizer.getSliceY()
-            return self._dataArray[:, sliceY, sliceX]
+            return self._dataArray[:, sliceY, sliceX]  # TODO only save populated frames
 
         return self._dataArray
 
@@ -496,6 +498,8 @@ class DataFilePresenter(Observable, Observer):
             fileReader = self._fileReaderChooser.getCurrentStrategy()
             dataFile = fileReader.read(filePath)
             self._activeDataFile.setActive(dataFile)
+        else:
+            logger.debug(f'Refusing to read invalid file path {filePath}')
 
     def openDataFile(self, filePath: Path, fileFilter: str) -> None:
         self._fileReaderChooser.setFromDisplayName(fileFilter)
@@ -531,7 +535,7 @@ class DataFilePresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class CropPresenter(Observer, Observable):
+class CropPresenter(Observable, Observer):
 
     def __init__(self, settings: CropSettings, sizer: CropSizer) -> None:
         super().__init__()

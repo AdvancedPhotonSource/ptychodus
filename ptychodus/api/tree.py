@@ -22,6 +22,10 @@ class SimpleTreeNode:
     def isRoot(self) -> bool:
         return (self.parentItem == None)
 
+    @property
+    def isLeaf(self) -> bool:
+        return not self.childItems
+
     def data(self, column: int) -> Optional[str]:
         try:
             return self.itemData[column]

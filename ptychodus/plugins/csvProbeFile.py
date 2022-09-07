@@ -18,8 +18,10 @@ class CSVProbeFileReader(ProbeFileReader):
 
     def read(self, filePath: Path) -> ProbeArrayType:
         probe = numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
-        # TODO add size checks
-        numberOfProbeModes = probe.shape[0] // probe.shape[1]
+        numberOfProbeModes, remainder = divmod(probe.shape[0], probe.shape[1])
+
+        if remainder != 0:
+            raise ValueError('Failed to determine probe modes!')
 
         if numberOfProbeModes > 1:
             probe = probe.reshape(numberOfProbeModes, probe.shape[1], probe.shape[1])

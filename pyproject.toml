@@ -8,3 +8,17 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
+
+[[tool.mypy.overrides]]
+module = [
+    "funcx",
+    "gladier",
+    "globus_automate_client.*",
+    "h5py",
+    "matplotlib.*",
+    "scipy.*",
+    "skimage.*",
+    "tifffile",
+    "watchdog.*",
+]
+ignore_missing_imports = true

@@ -1,16 +1,13 @@
 #!/usr/bin/env python
 
 from pathlib import Path
+from typing import Optional
 import argparse
 import logging
 import sys
 
 from ptychodus.model import ModelArgs, ModelCore
 import ptychodus
-
-import h5py
-import matplotlib
-import numpy
 
 
 def versionString() -> str:
@@ -23,8 +20,6 @@ def verifyAllArgumentsParsed(parser: argparse.ArgumentParser, argv: list[str]) -
 
 
 def main() -> int:
-    NOT_FOUND_STR = 'NOT FOUND!'
-
     parser = argparse.ArgumentParser(
         prog=ptychodus.__name__.lower(),
         description=f'{ptychodus.__name__} is a ptychography analysis front-end')
@@ -40,49 +35,29 @@ def main() -> int:
     parser.add_argument('-v', '--version', action='version', version=versionString())
     parsedArgs, unparsedArgs = parser.parse_known_args()
 
-    logger = logging.getLogger(ptychodus.__name__)
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
-    logging.getLogger('matplotlib').setLevel(logging.WARNING)
-
-    logger.info(versionString())
-    logger.info(f'\tNumPy {numpy.__version__}')
-    logger.info(f'\tMatplotlib {matplotlib.__version__}')
-    logger.info(f'\tHDF5 {h5py.version.hdf5_version}')
-    logger.info(f'\tH5Py {h5py.__version__}')
-
     modelArgs = ModelArgs(
-        rpcPort=parsedArgs.port,
-        autoExecuteRPCs=False,  # TODO False if using GUI else True
+        settingsFilePath=Path(parsedArgs.settings.name) if parsedArgs.settings else None,
         replacementPathPrefix=parsedArgs.prefix,
-        isDeveloperModeEnabled=parsedArgs.dev)
+        rpcPort=parsedArgs.port,
+        autoExecuteRPCs=parsedArgs.batch,
+        isDeveloperModeEnabled=parsedArgs.dev,
+    )
 
     with ModelCore(modelArgs) as model:
-        if parsedArgs.settings:
-            model.settingsRegistry.openSettings(parsedArgs.settings.name)
-
         if parsedArgs.batch:
             verifyAllArgumentsParsed(parser, unparsedArgs)
             return model.batchModeReconstruct()
 
-        try:
-            import PyQt5
-            from PyQt5.QtWidgets import QApplication
-            from PyQt5.Qt import PYQT_VERSION_STR
-            from PyQt5.QtCore import QT_VERSION_STR
-        except ModuleNotFoundError:
-            logger.error('\tPyQt ' + NOT_FOUND_STR)
-            return -1
+        # Unused PyQt5.Qt import prevents nonsense error message
+        from PyQt5 import Qt
 
-        logger.info('\tQt ' + QT_VERSION_STR if QT_VERSION_STR else NOT_FOUND_STR)
-        logger.info('\tPyQt ' + PYQT_VERSION_STR if PYQT_VERSION_STR else NOT_FOUND_STR)
-
+        from PyQt5.QtWidgets import QApplication
         # QApplication expects the first argument to be the program name
-        qtArgs = sys.argv[:1] + unparsedArgs
-        app = QApplication(qtArgs)
+        app = QApplication(sys.argv[:1] + unparsedArgs)
         verifyAllArgumentsParsed(parser, app.arguments()[1:])
 
         from ptychodus.view import ViewCore
-        view = ViewCore.createInstance()
+        view = ViewCore.createInstance(parsedArgs.dev)
 
         from ptychodus.controller import ControllerCore
         controller = ControllerCore.createInstance(model, view)

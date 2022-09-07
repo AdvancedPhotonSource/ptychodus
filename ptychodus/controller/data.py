@@ -1,12 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Optional
 
 import numpy
 from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QDialog, QFileDialog, QTableView, QTreeView, QWidget
 
 from ..model import DataFilePresenter, Observable, Observer
+from ..view import DataParametersView
 from .tree import SimpleTreeModel
 
 
@@ -21,7 +22,7 @@ class FileDialogFactory:
                         caption: str,
                         nameFilters: Optional[list[str]] = None,
                         mimeTypeFilters: Optional[list[str]] = None,
-                        selectedNameFilter: Optional[str] = None) -> Tuple[Optional[Path], str]:
+                        selectedNameFilter: Optional[str] = None) -> tuple[Optional[Path], str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._openWorkingDirectory))
@@ -52,7 +53,7 @@ class FileDialogFactory:
                         caption: str,
                         nameFilters: Optional[list[str]] = None,
                         mimeTypeFilters: Optional[list[str]] = None,
-                        selectedNameFilter: Optional[str] = None) -> Tuple[Optional[Path], str]:
+                        selectedNameFilter: Optional[str] = None) -> tuple[Optional[Path], str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._saveWorkingDirectory))
@@ -83,10 +84,12 @@ class DataArrayTableModel(QAbstractTableModel):
 
     def __init__(self, parent: QObject = None) -> None:
         super().__init__(parent)
-        self._array = None
+        self._array: Optional[numpy.ndarray] = None
 
-    def headerData(self, section: int, orientation: Qt.Orientation,
-                   role: Qt.ItemDataRole) -> QVariant:
+    def headerData(self,
+                   section: int,
+                   orientation: Qt.Orientation,
+                   role: int = Qt.DisplayRole) -> Any:
         result = None
 
         if role == Qt.DisplayRole:
@@ -94,7 +97,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
         return QVariant(result)
 
-    def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         result = None
 
         if index.isValid() and role == Qt.DisplayRole and self._array is not None:
@@ -118,7 +121,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
         return count
 
-    def setArray(self, data: numpy.ndarray) -> None:
+    def setArray(self, data: Optional[numpy.ndarray]) -> None:
         self.beginResetModel()
         self._array = None
 
@@ -129,41 +132,48 @@ class DataArrayTableModel(QAbstractTableModel):
         self.endResetModel()
 
 
-class DataFileController(Observer):
+class DataParametersController(Observer):
 
-    def __init__(self, presenter: DataFilePresenter, treeView: QTreeView, tableView: QTableView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, presenter: DataFilePresenter, view: DataParametersView,
+                 tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
-        self._treeModel = SimpleTreeModel(presenter.getContentsTree())
-        self._treeView = treeView
-        self._tableModel = DataArrayTableModel()
+        self._view = view
         self._tableView = tableView
         self._fileDialogFactory = fileDialogFactory
+        self._treeModel = SimpleTreeModel(presenter.getContentsTree())
+        self._tableModel = DataArrayTableModel()
 
     @classmethod
-    def createInstance(cls, presenter: DataFilePresenter, treeView: QTreeView,
+    def createInstance(cls, presenter: DataFilePresenter, view: DataParametersView,
                        tableView: QTableView,
-                       fileDialogFactory: FileDialogFactory) -> DataFileController:
-        controller = cls(presenter, treeView, tableView, fileDialogFactory)
-        treeView.setModel(controller._treeModel)
-        treeView.selectionModel().currentChanged.connect(controller.updateDataArrayInTableView)
-        tableView.setModel(controller._tableModel)
+                       fileDialogFactory: FileDialogFactory) -> DataParametersController:
+        controller = cls(presenter, view, tableView, fileDialogFactory)
         presenter.addObserver(controller)
+
+        view.dataView.treeView.setModel(controller._treeModel)
+        view.dataView.treeView.selectionModel().currentChanged.connect(
+            controller._updateDataArrayInTableView)
+        tableView.setModel(controller._tableModel)
+
+        view.dataView.buttonBox.openButton.clicked.connect(controller._openDataFile)
+        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDataFile)
+
         return controller
 
-    def openDataFile(self) -> None:
+    def _openDataFile(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._treeView,
+            self._view,
             'Open Data File',
             nameFilters=self._presenter.getOpenFileFilterList(),
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
             self._presenter.openDataFile(filePath, nameFilter)
+            self._view.dataView.setTitle(f'Data File: {filePath}')
 
-    def saveDataFile(self) -> None:
+    def _saveDataFile(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._treeView,
+            self._view,
             'Save Data File',
             nameFilters=self._presenter.getSaveFileFilterList(),
             selectedNameFilter=self._presenter.getSaveFileFilter())
@@ -171,14 +181,15 @@ class DataFileController(Observer):
         if filePath:
             self._presenter.saveDataFile(filePath, nameFilter)
 
-    def chooseScratchDirectory(self) -> None:
-        scratchDir = QFileDialog.getExistingDirectory(self._treeView, 'Choose Scratch Directory',
+    def _chooseScratchDirectory(self) -> None:
+        # TODO unused
+        scratchDir = QFileDialog.getExistingDirectory(self._view, 'Choose Scratch Directory',
                                                       str(self._presenter.getScratchDirectory()))
 
         if scratchDir:
             self._presenter.setScratchDirectory(Path(scratchDir))
 
-    def updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
+    def _updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
         names = list()
         nodeItem = current.internalPointer()
 

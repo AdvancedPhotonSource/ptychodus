@@ -1,10 +1,12 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListView, QPushButton,
+                             QVBoxLayout, QWidget)
 
 
-class ImportSettingsValuesGroupBox(QGroupBox):
+class SettingsImportValuesGroupBox(QGroupBox):
 
     @staticmethod
     def createCheckBox(text: str) -> QCheckBox:
@@ -22,7 +24,7 @@ class ImportSettingsValuesGroupBox(QGroupBox):
         self.probeEnergyCheckBox = self.createCheckBox('Probe Energy')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImportSettingsValuesGroupBox:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsImportValuesGroupBox:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -38,7 +40,7 @@ class ImportSettingsValuesGroupBox(QGroupBox):
         return view
 
 
-class ImportSettingsOptionsGroupBox(QGroupBox):
+class SettingsImportOptionsGroupBox(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Additional Options', parent)
@@ -47,7 +49,7 @@ class ImportSettingsOptionsGroupBox(QGroupBox):
         self.reinitializeObjectCheckBox = QCheckBox('Reinitialize Object')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImportSettingsOptionsGroupBox:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsImportOptionsGroupBox:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -60,17 +62,17 @@ class ImportSettingsOptionsGroupBox(QGroupBox):
         return view
 
 
-class ImportSettingsDialog(QDialog):
+class SettingsImportDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.valuesGroupBox = ImportSettingsValuesGroupBox.createInstance()
-        self.optionsGroupBox = ImportSettingsOptionsGroupBox.createInstance()
+        self.valuesGroupBox = SettingsImportValuesGroupBox.createInstance()
+        self.optionsGroupBox = SettingsImportOptionsGroupBox.createInstance()
         self.centerWidget = QWidget()
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImportSettingsDialog:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsImportDialog:
         view = cls(parent)
 
         view.setWindowTitle('Import Settings')
@@ -96,3 +98,82 @@ class ImportSettingsDialog(QDialog):
             self.accept()
         else:
             self.reject()
+
+
+class SettingsView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Parameters', parent)
+        self.replacementPathPrefixLineEdit = QLineEdit()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsView:
+        view = cls(parent)
+
+        view.replacementPathPrefixLineEdit.setToolTip(
+            'Path prefix replacement text used when opening or saving settings files.')
+
+        layout = QFormLayout()
+        layout.addRow('Replacement Path Prefix:', view.replacementPathPrefixLineEdit)
+        view.setLayout(layout)
+
+        return view
+
+
+class SettingsButtonBox(QWidget):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.openButton = QPushButton('Open')
+        self.saveButton = QPushButton('Save')
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsButtonBox:
+        view = cls(parent)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.openButton)
+        layout.addWidget(view.saveButton)
+        view.setLayout(layout)
+
+        return view
+
+
+class SettingsGroupView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Groups', parent)
+        self.listView = QListView()
+        self.buttonBox = SettingsButtonBox.createInstance()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsGroupView:
+        view = cls(parent)
+
+        layout = QVBoxLayout()
+        layout.addWidget(view.listView)
+        layout.addWidget(view.buttonBox)
+        view.setLayout(layout)
+
+        return view
+
+
+class SettingsParametersView(QWidget):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.settingsView = SettingsView.createInstance()
+        self.groupView = SettingsGroupView.createInstance()
+        self.importDialog = SettingsImportDialog.createInstance(self)
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsParametersView:
+        view = cls(parent)
+
+        layout = QVBoxLayout()
+        layout.addWidget(view.settingsView)
+        layout.addWidget(view.groupView)
+        view.setLayout(layout)
+
+        return view

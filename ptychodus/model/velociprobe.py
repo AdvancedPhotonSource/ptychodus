@@ -9,7 +9,7 @@ from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup
 from .data import ActiveDataFile, CropSettings, DetectorSettings
 from .probe import ProbeSettings
-from .scan import ScanInitializer
+from .scan import ScanCore
 
 logger = logging.getLogger(__name__)
 
@@ -18,22 +18,22 @@ class VelociprobePresenter(Observable, Observer):
 
     def __init__(self, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
                  cropSettings: CropSettings, probeSettings: ProbeSettings,
-                 activeDataFile: ActiveDataFile, scanInitializer: ScanInitializer) -> None:
+                 activeDataFile: ActiveDataFile, scanCore: ScanCore) -> None:
         super().__init__()
         self._velociprobeReader = velociprobeReader
         self._detectorSettings = detectorSettings
         self._cropSettings = cropSettings
         self._probeSettings = probeSettings
         self._activeDataFile = activeDataFile
-        self._scanInitializer = scanInitializer
+        self._scanCore = scanCore
 
     @classmethod
     def createInstance(cls, velociprobeReader: VelociprobeReader,
                        detectorSettings: DetectorSettings, cropSettings: CropSettings,
                        probeSettings: ProbeSettings, activeDataFile: ActiveDataFile,
-                       scanInitializer: ScanInitializer):
+                       scanCore: ScanCore):
         presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings,
-                        activeDataFile, scanInitializer)
+                        activeDataFile, scanCore)
         velociprobeReader.addObserver(presenter)
         return presenter
 
@@ -95,7 +95,7 @@ class VelociprobePresenter(Observable, Observer):
         fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
         filePath = filePathMaster.parents[2] / 'positions' / fileName
         fileFilter = 'Comma-Separated Values Files (*.csv)'  # TODO refactor; get from somewhere
-        self._scanInitializer.openScan(filePath, fileFilter)
+        self._scanCore.openScan(filePath, fileFilter)
 
     def update(self, observable: Observable) -> None:
         if observable is self._velociprobeReader:

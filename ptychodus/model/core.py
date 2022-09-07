@@ -1,9 +1,13 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from importlib.metadata import version
 from types import TracebackType
-from typing import overload
+from typing import overload, Optional
 import logging
+import sys
 
+import h5py
+import matplotlib
 import numpy
 
 from ..api.plugins import PluginRegistry
@@ -11,101 +15,92 @@ from ..api.settings import SettingsRegistry
 from .data import *
 from .detector import *
 from .image import *
-from .object import *
-from .probe import *
+from .object import ObjectCore, ObjectPresenter
+from .probe import ProbeCore, ProbePresenter
 from .ptychonn import PtychoNNBackend
 from .ptychopy import PtychoPyBackend
 from .reconstructor import *
-from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .rpc import RPCMessageService
-from .scan import *
+from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
+from .scan import ScanCore, ScanPresenter
 from .tike import TikeBackend
 from .velociprobe import *
 from .watcher import DataDirectoryWatcher
-
-import ptychodus.plugins
+from .workflow import WorkflowCore, WorkflowPresenter
 
 logger = logging.getLogger(__name__)
 
 
+def configureLogger() -> None:
+    logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+                        stream=sys.stdout,
+                        encoding='utf-8',
+                        level=logging.DEBUG)
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
+
+    logger.info(f'Ptychodus {version("ptychodus")}')
+    logger.info(f'NumPy {version("numpy")}')
+    logger.info(f'Matplotlib {version("matplotlib")}')
+    logger.info(f'H5Py {version("h5py")}')
+    logger.info(f'HDF5 {h5py.version.hdf5_version}')
+
+
 @dataclass(frozen=True)
 class ModelArgs:
-    rpcPort: int
-    autoExecuteRPCs: bool
+    settingsFilePath: Optional[Path]
     replacementPathPrefix: Optional[str]
+    rpcPort: int = -1
+    autoExecuteRPCs: bool = False
     isDeveloperModeEnabled: bool = False
 
 
 class ModelCore:
 
     def __init__(self, modelArgs: ModelArgs) -> None:
+        configureLogger()
+        self._modelArgs = modelArgs
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
-        self._colormapChooserFactory = ColormapChooserFactory()
 
-        self.detectorImagePresenter = ImagePresenter.createInstance(
-            self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
-            self._pluginRegistry.buildComplexToRealStrategyChooser())
-        self.probeImagePresenter = ImagePresenter.createInstance(
-            self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
-            self._pluginRegistry.buildComplexToRealStrategyChooser())
-        self.objectImagePresenter = ImagePresenter.createInstance(
-            self._colormapChooserFactory, self._pluginRegistry.buildScalarTransformationChooser(),
-            self._pluginRegistry.buildComplexToRealStrategyChooser())
+        self._detectorImageCore = ImageCore(
+            self._pluginRegistry.buildScalarTransformationChooser())
+        self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
+        self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
 
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
-        self._scanSettings = ScanSettings.createInstance(self.settingsRegistry)
-        self._probeSettings = ProbeSettings.createInstance(self.settingsRegistry)
-        self._objectSettings = ObjectSettings.createInstance(self.settingsRegistry)
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
+        # TODO DataDirectoryWatcher should be optional
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
 
         self._detector = Detector.createInstance(self._detectorSettings)
         self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
-
-        self._scan = Scan.createInstance(self._scanSettings)
-        self._fileScanInitializer = FileScanInitializer.createInstance(
-            self._scanSettings, self._pluginRegistry.buildScanFileReaderChooser())
-        self._scanInitializer = ScanInitializer.createInstance(
-            self.rng, self._scanSettings, self._scan, self._fileScanInitializer,
-            self._pluginRegistry.buildScanFileWriterChooser(), self.settingsRegistry)
-
-        self._probeSizer = ProbeSizer.createInstance(self._probeSettings, self._cropSizer)
-        self._probe = Probe(self._probeSettings, self._probeSizer)
-        self._fileProbeInitializer = FileProbeInitializer.createInstance(
-            self._probeSettings, self._probeSizer,
-            self._pluginRegistry.buildProbeFileReaderChooser())
-        self._probeInitializer = ProbeInitializer.createInstance(
-            self._detector, self._probeSettings, self._probeSizer,
-            self._probe, self._fileProbeInitializer,
-            self._pluginRegistry.buildProbeFileWriterChooser(), self.settingsRegistry)
-
-        self._objectSizer = ObjectSizer.createInstance(self._detector, self._cropSizer, self._scan,
-                                                       self._probeSizer)
-        self._object = Object(self._objectSettings, self._objectSizer)
-        self._fileObjectInitializer = FileObjectInitializer.createInstance(
-            self._objectSettings, self._objectSizer,
-            self._pluginRegistry.buildObjectFileReaderChooser())
-        self._objectInitializer = ObjectInitializer.createInstance(
-            self.rng, self._objectSettings, self._objectSizer,
-            self._object, self._fileObjectInitializer,
-            self._pluginRegistry.buildObjectFileWriterChooser(), self.settingsRegistry)
-
         self._activeDataFile = ActiveDataFile(self._dataSettings, self._cropSizer)
+
+        self._scanCore = ScanCore(self.rng, self.settingsRegistry,
+                                  self._pluginRegistry.buildScanFileReaderChooser(),
+                                  self._pluginRegistry.buildScanFileWriterChooser())
+        self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
+                                    self._cropSizer,
+                                    self._pluginRegistry.buildProbeFileReaderChooser(),
+                                    self._pluginRegistry.buildProbeFileWriterChooser())
+        self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
+                                      self._scanCore.scan, self._probeCore.sizer,
+                                      self._pluginRegistry.buildObjectFileReaderChooser(),
+                                      self._pluginRegistry.buildObjectFileWriterChooser())
 
         self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
-        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._activeDataFile,
-                                                      self._scan, self._probeSizer, self._probe,
-                                                      self._objectSizer, self._object,
-                                                      self.reconstructorPlotPresenter,
-                                                      modelArgs.isDeveloperModeEnabled)
+        self.tikeBackend = TikeBackend.createInstance(
+            self.settingsRegistry, self._activeDataFile, self._scanCore.scan,
+            self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
+            self._scanCore.initializerFactory, self._scanCore.repository,
+            self.reconstructorPlotPresenter, modelArgs.isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
         self._selectableReconstructor = SelectableReconstructor.createInstance(
@@ -120,32 +115,40 @@ class ModelCore:
         self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
             self._activeDataFile)
-        self._velociprobeReader = next(entry.strategy
-                                       for entry in self._pluginRegistry.dataFileReaders
-                                       if type(entry.strategy).__name__ ==
-                                       'VelociprobeDataFileReader')  # TODO remove when able
+
+        # TODO remove velociprobePresenter lookup when able
+        self._velociprobeReader = next(
+            entry.strategy for entry in self._pluginRegistry.dataFileReaders
+            if type(entry.strategy).__name__ == 'VelociprobeDataFileReader')
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
-            self._probeSettings, self._activeDataFile, self._scanInitializer)
-        self.probePresenter = ProbePresenter.createInstance(self._probeSettings, self._probeSizer,
-                                                            self._probe, self._probeInitializer)
-        self.scanPresenter = ScanPresenter.createInstance(self._scanSettings, self._scan,
-                                                          self._scanInitializer)
-        self.objectPresenter = ObjectPresenter.createInstance(self._objectSettings,
-                                                              self._objectSizer, self._object,
-                                                              self._objectInitializer)
+            self._probeCore.settings, self._activeDataFile, self._scanCore)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 
-        self._loadResultsExecutor = LoadResultsExecutor(self._probe, self._object)
-        self.rpcMessageService = RPCMessageService(modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
-        self.rpcMessageService.registerMessageClass(LoadResultsMessage)
-        self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
-                                                 self._loadResultsExecutor)
+        self._workflowCore = WorkflowCore(self.settingsRegistry)
+
+        if modelArgs.rpcPort >= 0:
+            self._loadResultsExecutor = LoadResultsExecutor(self._probeCore.probe,
+                                                            self._objectCore.object)
+            self.rpcMessageService: Optional[RPCMessageService] = RPCMessageService(
+                modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
+            self.rpcMessageService.registerMessageClass(LoadResultsMessage)
+            self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
+                                                    self._loadResultsExecutor)
+        else:
+            self.rpcMessageService = None
 
     def __enter__(self) -> ModelCore:
-        self.rpcMessageService.start()
-        self._dataDirectoryWatcher.start()
+        if self._modelArgs.settingsFilePath:
+            self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
+
+        if self.rpcMessageService:
+            self.rpcMessageService.start()
+
+        if self._dataDirectoryWatcher:
+            self._dataDirectoryWatcher.start()
+
         return self
 
     @overload
@@ -159,29 +162,55 @@ class ModelCore:
 
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
-        self._dataDirectoryWatcher.stop()
-        self.rpcMessageService.stop()
+        if self._dataDirectoryWatcher:
+            self._dataDirectoryWatcher.stop()
+
+        if self.rpcMessageService:
+            self.rpcMessageService.stop()
 
     def batchModeReconstruct(self) -> int:
-        outputFilePath = self._reconstructorSettings.outputFilePath.value
-
-        if outputFilePath.exists():
-            logger.error('Output file path already exists!')
-            return -1
-
         result = self.reconstructorPresenter.reconstruct()
 
-        pixelSizeXInMeters = float(self._objectSizer.getPixelSizeXInMeters())
-        pixelSizeYInMeters = float(self._objectSizer.getPixelSizeYInMeters())
+        pixelSizeXInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeXInMeters())
+        pixelSizeYInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeYInMeters())
 
-        scanXInMeters = [float(point.x) for point in self._scan]
-        scanYInMeters = [float(point.y) for point in self._scan]
+        scanXInMeters = [float(point.x) for point in self._scanCore.scan]
+        scanYInMeters = [float(point.y) for point in self._scanCore.scan]
 
+        # TODO document output file format; include cost function values
         dataDump = dict()
         dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
         dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
-        dataDump['probe'] = self._probe.getArray()
-        dataDump['object'] = self._object.getArray()
-        numpy.savez(outputFilePath, **dataDump)
+        dataDump['probe'] = self._probeCore.probe.getArray()
+        dataDump['object'] = self._objectCore.object.getArray()
+        numpy.savez(self._reconstructorSettings.outputFilePath.value, **dataDump)
 
         return result
+
+    @property
+    def detectorImagePresenter(self) -> ImagePresenter:
+        return self._detectorImageCore.presenter
+
+    @property
+    def scanPresenter(self) -> ScanPresenter:
+        return self._scanCore.presenter
+
+    @property
+    def probePresenter(self) -> ProbePresenter:
+        return self._probeCore.presenter
+
+    @property
+    def probeImagePresenter(self) -> ImagePresenter:
+        return self._probeImageCore.presenter
+
+    @property
+    def objectPresenter(self) -> ObjectPresenter:
+        return self._objectCore.presenter
+
+    @property
+    def objectImagePresenter(self) -> ImagePresenter:
+        return self._objectImageCore.presenter
+
+    @property
+    def workflowPresenter(self) -> WorkflowPresenter:
+        return self._workflowCore.presenter

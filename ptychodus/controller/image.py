@@ -7,10 +7,10 @@ from PyQt5.QtGui import QDoubleValidator, QImage, QPixmap, QStandardItem, QStand
 import matplotlib
 import numpy
 
-from ..api.image import ScalarTransformation, ComplexToRealStrategy
+from ..api.image import ScalarTransformation
 from ..api.observer import Observable, Observer
 from ..model import ImagePresenter
-from ..view import ImageDisplayRangeDialog, ImageColormapGroupBox, \
+from ..view import ImageDisplayRangeDialog, ImageColorizerGroupBox, \
         ImageDataRangeGroupBox, ImageFileGroupBox, ImageView, ImageWidget
 from .data import FileDialogFactory
 
@@ -40,57 +40,51 @@ class ImageFileController:
             pixmap.save(str(filePath))
 
 
-class ImageColormapController(Observer):
+class ImageColorizerController(Observer):
 
-    def __init__(self, presenter: ImagePresenter, view: ImageColormapGroupBox) -> None:
+    def __init__(self, presenter: ImagePresenter, view: ImageColorizerGroupBox) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._complexToRealStrategyModel = QStringListModel()
-        self._scalarTransformationModel = QStringListModel()
-        self._colormapModel = QStringListModel()
+        self._colorizerModel = QStringListModel()
+        self._scalarTransformModel = QStringListModel()
+        self._variantModel = QStringListModel()
 
     @classmethod
     def createInstance(cls, presenter: ImagePresenter,
-                       view: ImageColormapGroupBox) -> ImageColormapController:
+                       view: ImageColorizerGroupBox) -> ImageColorizerController:
         controller = cls(presenter, view)
 
-        view.complexToRealStrategyComboBox.setModel(controller._complexToRealStrategyModel)
-        view.scalarTransformationComboBox.setModel(controller._scalarTransformationModel)
-        view.colormapComboBox.setModel(controller._colormapModel)
+        view.colorizerComboBox.setModel(controller._colorizerModel)
+        view.scalarTransformComboBox.setModel(controller._scalarTransformModel)
+        view.variantComboBox.setModel(controller._variantModel)
 
         controller._syncModelToView()
         presenter.addObserver(controller)
 
-        view.complexToRealStrategyComboBox.currentTextChanged.connect(
-            presenter.setComplexToRealStrategy)
-        view.scalarTransformationComboBox.currentTextChanged.connect(
-            presenter.setScalarTransformation)
-        view.colormapComboBox.currentTextChanged.connect(presenter.setColormap)
+        view.colorizerComboBox.currentTextChanged.connect(presenter.setColorizerByName)
+        view.scalarTransformComboBox.currentTextChanged.connect(
+            presenter.setScalarTransformationByName)
+        view.variantComboBox.currentTextChanged.connect(presenter.setVariantByName)
 
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.complexToRealStrategyComboBox.blockSignals(True)
-        self._complexToRealStrategyModel.setStringList(
-            self._presenter.getComplexToRealStrategyList())
-        self._view.complexToRealStrategyComboBox.setCurrentText(
-            self._presenter.getComplexToRealStrategy())
-        self._view.complexToRealStrategyComboBox.blockSignals(False)
-        self._view.complexToRealStrategyComboBox.setVisible(self._presenter.isComplexValued())
+        self._view.colorizerComboBox.blockSignals(True)
+        self._colorizerModel.setStringList(self._presenter.getColorizerNameList())
+        self._view.colorizerComboBox.setCurrentText(self._presenter.getColorizerName())
+        self._view.colorizerComboBox.blockSignals(False)
 
-        self._view.scalarTransformationComboBox.blockSignals(True)
-        self._scalarTransformationModel.setStringList(
-            self._presenter.getScalarTransformationList())
-        self._view.scalarTransformationComboBox.setCurrentText(
-            self._presenter.getScalarTransformation())
-        self._view.scalarTransformationComboBox.blockSignals(False)
+        self._view.scalarTransformComboBox.blockSignals(True)
+        self._scalarTransformModel.setStringList(self._presenter.getScalarTransformationNameList())
+        self._view.scalarTransformComboBox.setCurrentText(
+            self._presenter.getScalarTransformationName())
+        self._view.scalarTransformComboBox.blockSignals(False)
 
-        self._view.colormapComboBox.blockSignals(True)
-        self._colormapModel.setStringList(self._presenter.getColormapList())
-        self._view.colormapComboBox.setCurrentText(self._presenter.getColormap())
-        self._view.colormapComboBox.blockSignals(False)
-        self._view.colormapComboBox.setEnabled(self._presenter.isColormapEnabled())
+        self._view.variantComboBox.blockSignals(True)
+        self._variantModel.setStringList(self._presenter.getVariantNameList())
+        self._view.variantComboBox.setCurrentText(self._presenter.getVariantName())
+        self._view.variantComboBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -149,7 +143,7 @@ class ImageController(Observer):
         self._view = view
         self._fileController = ImageFileController.createInstance(
             view.imageRibbon.imageFileGroupBox, view.imageWidget, fileDialogFactory)
-        self._colormapController = ImageColormapController.createInstance(
+        self._colorizerController = ImageColorizerController.createInstance(
             presenter, view.imageRibbon.colormapGroupBox)
         self._dataRangeController = ImageDataRangeController.createInstance(
             presenter, view.imageRibbon.dataRangeGroupBox)
@@ -166,7 +160,7 @@ class ImageController(Observer):
         realImage = self._presenter.getImage()
         qpixmap = QPixmap()
 
-        if realImage is not None:
+        if realImage is not None and numpy.size(realImage) > 0:
             integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8)
 
             qimage = QImage(integerImage.data, integerImage.shape[1], integerImage.shape[0],

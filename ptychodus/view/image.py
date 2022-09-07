@@ -4,10 +4,11 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QDoubleValidator, QPixmap, QWheelEvent
-from PyQt5.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, \
-        QFormLayout, QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent, \
-        QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout, \
-        QLabel, QPushButton, QSizePolicy, QSpinBox, QStyle, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFormLayout, QGraphicsPixmapItem, QGraphicsScene,
+                             QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
+                             QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
+                             QSpinBox, QStyle, QVBoxLayout, QWidget)
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
@@ -73,27 +74,27 @@ class ImageFileGroupBox(BottomTitledGroupBox):
         return view
 
 
-class ImageColormapGroupBox(BottomTitledGroupBox):
+class ImageColorizerGroupBox(BottomTitledGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Color Map', parent)
-        self.complexToRealStrategyComboBox = QComboBox()
-        self.scalarTransformationComboBox = QComboBox()
-        self.colormapComboBox = QComboBox()
+        super().__init__('Colorize', parent)
+        self.colorizerComboBox = QComboBox()
+        self.scalarTransformComboBox = QComboBox()
+        self.variantComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColormapGroupBox:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColorizerGroupBox:
         view = cls(parent)
 
-        view.complexToRealStrategyComboBox.setToolTip('Complex to Real Strategy')
-        view.scalarTransformationComboBox.setToolTip('Scalar Transformation')
-        view.colormapComboBox.setToolTip('Colormap')
+        view.colorizerComboBox.setToolTip('Array Component')
+        view.scalarTransformComboBox.setToolTip('Scalar Transform')
+        view.variantComboBox.setToolTip('Colorizer')
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 35)
-        layout.addWidget(view.complexToRealStrategyComboBox)
-        layout.addWidget(view.scalarTransformationComboBox)
-        layout.addWidget(view.colormapComboBox)
+        layout.addWidget(view.colorizerComboBox)
+        layout.addWidget(view.scalarTransformComboBox)
+        layout.addWidget(view.variantComboBox)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
@@ -109,7 +110,7 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.autoButton = QPushButton('Auto')
         self.setButton = QPushButton('Set')
-        self.displayRangeDialog = ImageDisplayRangeDialog.createInstance()
+        self.displayRangeDialog = ImageDisplayRangeDialog.createInstance(self)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDataRangeGroupBox:
@@ -164,7 +165,7 @@ class ImageRibbon(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.imageFileGroupBox = ImageFileGroupBox.createInstance()
-        self.colormapGroupBox = ImageColormapGroupBox.createInstance()
+        self.colormapGroupBox = ImageColorizerGroupBox.createInstance()
         self.dataRangeGroupBox = ImageDataRangeGroupBox.createInstance()
         self.indexGroupBox = IndexGroupBox.createInstance()
 

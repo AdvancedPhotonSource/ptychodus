@@ -1,59 +1,52 @@
 from __future__ import annotations
+from typing import Callable
 
-from ..model import ImagePresenter, Observer, Observable, Object, ObjectPresenter
-from ..view import ImageView, ObjectInitializerView, ObjectParametersView
+from ..model import ImagePresenter, Observable, Observer, Object, ObjectPresenter
+from ..view import ImageView, ObjectParametersView
 from .data import FileDialogFactory
 from .image import ImageController
 
 
-class ObjectInitializerController(Observer):
-
-    def __init__(self, presenter: ObjectPresenter, view: ObjectInitializerView) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-
-    @classmethod
-    def createInstance(cls, presenter: ObjectPresenter,
-                       view: ObjectInitializerView) -> ObjectInitializerController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-
-        for initializer in presenter.getInitializerList():
-            view.initializerComboBox.addItem(initializer)
-
-        view.initializerComboBox.currentTextChanged.connect(presenter.setInitializer)
-        view.initializeButton.clicked.connect(presenter.initializeObject)
-
-        controller._syncModelToView()
-
-        return controller
-
-    def _syncModelToView(self) -> None:
-        self._view.initializerComboBox.setCurrentText(self._presenter.getInitializer())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
-
-
-class ObjectParametersController:
+class ObjectParametersController(Observer):
 
     def __init__(self, presenter: ObjectPresenter, view: ObjectParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
-        self._initializerController = ObjectInitializerController.createInstance(
-            presenter, view.initializerView)
 
     @classmethod
     def createInstance(cls, presenter: ObjectPresenter, view: ObjectParametersView,
                        fileDialogFactory: FileDialogFactory) -> ObjectParametersController:
         controller = cls(presenter, view, fileDialogFactory)
+        presenter.addObserver(controller)
+
+        view.objectView.pixelSizeXWidget.setReadOnly(True)
+        view.objectView.pixelSizeYWidget.setReadOnly(True)
+
+        for name in presenter.getInitializerNameList():
+            initAction = view.initializerView.buttonBox.initializeMenu.addAction(name)
+            initAction.triggered.connect(controller._createInitializerLambda(name))
+
+        view.initializerView.buttonBox.saveButton.clicked.connect(controller._saveObject)
+
+        controller._syncModelToView()
+
         return controller
 
-    def openObject(self) -> None:
+    def _initializeObject(self, name: str) -> None:
+        if name == 'Open File...':
+            self._openObject()
+
+        self._presenter.setInitializer(name)
+        self._presenter.initializeObject()
+
+    def _createInitializerLambda(self, name: str) -> Callable[[bool], None]:
+        # NOTE additional defining scope for lambda forces a new instance for each use
+        return lambda checked: self._initializeObject(name)
+
+    def _openObject(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Object',
@@ -61,9 +54,10 @@ class ObjectParametersController:
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openObject(filePath, nameFilter)
+            self._presenter.setOpenFilePath(filePath)
+            self._presenter.setOpenFileFilter(nameFilter)
 
-    def saveObject(self) -> None:
+    def _saveObject(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Object',
@@ -73,6 +67,16 @@ class ObjectParametersController:
         if filePath:
             self._presenter.saveObject(filePath, nameFilter)
 
+    def _syncModelToView(self) -> None:
+        self._view.objectView.pixelSizeXWidget.setLengthInMeters(
+            self._presenter.getPixelSizeXInMeters())
+        self._view.objectView.pixelSizeYWidget.setLengthInMeters(
+            self._presenter.getPixelSizeYInMeters())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
 
 class ObjectImageController(Observer):
 
@@ -81,6 +85,7 @@ class ObjectImageController(Observer):
         super().__init__()
         self._presenter = presenter
         self._imagePresenter = imagePresenter
+        self._view = view
         self._imageController = ImageController.createInstance(imagePresenter, view,
                                                                fileDialogFactory)
 

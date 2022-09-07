@@ -1,13 +1,15 @@
 from __future__ import annotations
 from decimal import Decimal
+from pathlib import Path
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QFileDialog
 
 from ..api.data import DatasetState
 from ..api.observer import Observable, Observer
-from ..model import CropPresenter, DataFilePresenter, DetectorPresenter, \
-        DiffractionDatasetPresenter, ImagePresenter
+from ..model import (CropPresenter, DataFilePresenter, DetectorPresenter,
+                     DiffractionDatasetPresenter, ImagePresenter)
 from ..view import CropView, DatasetView, DetectorView, ImageView
 from .data import FileDialogFactory
 from .image import ImageController
@@ -65,6 +67,10 @@ class DatasetListModel(QAbstractListModel):
         super().__init__(parent)
         self._presenter = presenter
 
+    def refresh(self) -> None:
+        self.beginResetModel()
+        self.endResetModel()
+
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = Qt.NoItemFlags
 
@@ -78,7 +84,7 @@ class DatasetListModel(QAbstractListModel):
 
         return value
 
-    def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
         value = QVariant()
 
         if index.isValid():
@@ -86,10 +92,9 @@ class DatasetListModel(QAbstractListModel):
                 value = self._presenter.getDatasetName(index.row())
             elif role == Qt.FontRole:
                 state = self._presenter.getDatasetState(index.row())
-                value = QFont()
-
-                if state == DatasetState.EXISTS:
-                    value.setItalic(True)
+                font = QFont()
+                font.setItalic(state == DatasetState.EXISTS)
+                value = QVariant(font)
 
         return value
 
@@ -104,8 +109,8 @@ class DatasetParametersController(Observer):
         super().__init__()
         self._dataFilePresenter = dataFilePresenter
         self._datasetPresenter = datasetPresenter
-        self._listModel = DatasetListModel(dataFilePresenter)
         self._view = view
+        self._listModel = DatasetListModel(dataFilePresenter)
 
     @classmethod
     def createInstance(cls, dataFilePresenter: DataFilePresenter,
@@ -113,11 +118,11 @@ class DatasetParametersController(Observer):
                        view: DatasetView) -> DatasetParametersController:
         controller = cls(dataFilePresenter, datasetPresenter, view)
 
-        view.dataFileListView.setModel(controller._listModel)
+        view.listView.setModel(controller._listModel)
         dataFilePresenter.addObserver(controller)
         datasetPresenter.addObserver(controller)
 
-        view.dataFileListView.selectionModel().currentChanged.connect(
+        view.listView.selectionModel().currentChanged.connect(
             controller._updateCurrentDatasetIndex)
 
         return controller
@@ -128,12 +133,11 @@ class DatasetParametersController(Observer):
     def _updateSelection(self) -> None:
         row = self._datasetPresenter.getCurrentDatasetIndex()
         index = self._listModel.index(row, 0)
-        self._view.dataFileListView.setCurrentIndex(index)
+        self._view.listView.setCurrentIndex(index)
 
     def update(self, observable: Observable) -> None:
         if observable is self._dataFilePresenter:
-            self._listModel.beginResetModel()
-            self._listModel.endResetModel()
+            self._listModel.refresh()
         elif observable is self._datasetPresenter:
             self._updateSelection()
 

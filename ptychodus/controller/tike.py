@@ -1,13 +1,16 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from PyQt5.QtCore import QRegExp
-from PyQt5.QtGui import QRegExpValidator
+from PyQt5.QtCore import QRegularExpression
+from PyQt5.QtGui import QRegularExpressionValidator
 from PyQt5.QtWidgets import QWidget
 
-from ..model import Observable, Observer  # TODO, TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter
-from ..view import TikeAdaptiveMomentView, TikeBasicParametersView, TikeObjectCorrectionView, \
-        TikeParametersView, TikePositionCorrectionView, TikeProbeCorrectionView
+from ..api.observer import Observable, Observer
+from ..model import (TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter,
+                     TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter)
+from ..view import (TikeAdaptiveMomentView, TikeBasicParametersView, TikeObjectCorrectionView,
+                    TikeParametersView, TikePositionCorrectionView, TikeProbeCorrectionView,
+                    TikeProbeSupportView)
 from .reconstructor import ReconstructorViewControllerFactory
 
 
@@ -242,15 +245,14 @@ class TikeBasicParametersController(Observer):
         for model in presenter.getNoiseModelList():
             view.noiseModelComboBox.addItem(model)
 
-        view.useMpiCheckBox.setVisible(False)  # TODO make visible when supported
         view.useMpiCheckBox.toggled.connect(presenter.setMpiEnabled)
 
         view.numGpusLineEdit.editingFinished.connect(controller._syncNumGpusToModel)
-        view.numGpusLineEdit.setValidator(QRegExpValidator(QRegExp('[\\d,]+')))
+        view.numGpusLineEdit.setValidator(
+            QRegularExpressionValidator(QRegularExpression('[\\d,]+')))
 
         view.noiseModelComboBox.currentTextChanged.connect(presenter.setNoiseModel)
 
-        view.numProbeModesSpinBox.valueChanged.connect(presenter.setNumProbeModes)
         view.numBatchSpinBox.valueChanged.connect(presenter.setNumBatch)
         view.numIterSpinBox.valueChanged.connect(presenter.setNumIter)
         view.cgIterSpinBox.valueChanged.connect(presenter.setCgIter)
@@ -269,12 +271,6 @@ class TikeBasicParametersController(Observer):
         self._view.useMpiCheckBox.setChecked(self._presenter.isMpiEnabled())
         self._view.numGpusLineEdit.setText(self._presenter.getNumGpus())
         self._view.noiseModelComboBox.setCurrentText(self._presenter.getNoiseModel())
-
-        self._view.numProbeModesSpinBox.blockSignals(True)
-        self._view.numProbeModesSpinBox.setRange(self._presenter.getMinNumProbeModes(),
-                                                 self._presenter.getMaxNumProbeModes())
-        self._view.numProbeModesSpinBox.setValue(self._presenter.getNumProbeModes())
-        self._view.numProbeModesSpinBox.blockSignals(False)
 
         self._view.numBatchSpinBox.blockSignals(True)
         self._view.numBatchSpinBox.setRange(self._presenter.getMinNumBatch(),
