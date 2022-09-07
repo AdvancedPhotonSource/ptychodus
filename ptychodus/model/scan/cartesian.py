@@ -47,6 +47,10 @@ class CartesianScanInitializer(ScanInitializer):
     def variant(self) -> str:
         return 'Snake' if self._snake else 'Raster'
 
+    @property
+    def canActivate(self) -> bool:
+        return True
+
     def getStepSizeXInMeters(self) -> Decimal:
         return self._stepSizeXInMeters
 

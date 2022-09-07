@@ -28,10 +28,10 @@ class ScanInitializerFactory:
     def createInitializerParameters(self) -> ScanInitializerParameters:
         return ScanInitializerParameters.createFromSettings(self._rng, self._settings)
 
-    def createTabularInitializer(self, pointList: list[ScanPoint],
+    def createTabularInitializer(self, pointList: list[ScanPoint], nameHint: str,
                                  fileInfo: Optional[ScanFileInfo]) -> TabularScanInitializer:
         parameters = self.createInitializerParameters()
-        return TabularScanInitializer(parameters, pointList, fileInfo)
+        return TabularScanInitializer(parameters, pointList, nameHint, fileInfo)
 
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -47,14 +47,14 @@ class ScanInitializerFactory:
             logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
             reader = self._fileReaderChooser.getCurrentStrategy()
             namedSequenceDict = reader.read(filePath)
+            fileInfo = ScanFileInfo(fileType, filePath)
 
             for name, pointSequence in namedSequenceDict.items():
                 pointList = [point for point in pointSequence]
-                fileInfo = ScanFileInfo(fileType, filePath, name)
-                initializer = self.createTabularInitializer(pointList, fileInfo)
+                initializer = self.createTabularInitializer(pointList, name, fileInfo)
                 initializerList.append(initializer)
         else:
-            logger.debug(f'Refusing to read invalid file path {filePath}')
+            logger.debug(f'Refusing to read invalid file path \"{filePath}\"')
 
         return initializerList
 

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from decimal import Decimal
 import logging
 
 import numpy
@@ -27,12 +28,15 @@ class TikeArrays:
 class TikeArrayConverter:
 
     def __init__(self, apparatus: Apparatus, scan: Scan, probe: Probe, object_: Object,
-                 dataFile: DataFile) -> None:
+                 dataFile: DataFile, scanInitializerFactory: ScanInitializerFactory,
+                 scanRepository: ScanRepository) -> None:
         self._apparatus = apparatus
         self._scan = scan
         self._probe = probe
         self._object = object_
         self._dataFile = dataFile
+        self._scanInitializerFactory = scanInitializerFactory
+        self._scanRepository = scanRepository
 
     def getDiffractionData(self) -> DataArrayType:
         data = self._dataFile.getDiffractionData()
@@ -82,6 +86,7 @@ class TikeArrayConverter:
         )
 
     def importFromTike(self, arrays: TikeArrays) -> None:
+        # TODO only update scan/probe/object if correction enabled
         pixelSizeXInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
         pixelSizeYInMeters = self._apparatus.getObjectPlanePixelSizeYInMeters()
 
@@ -95,13 +100,15 @@ class TikeArrayConverter:
         pointList: list[ScanPoint] = list()
 
         for xy in arrays.scan:
-            x_m = (xy[1] - shiftX) * pixelSizeXInMeters
-            y_m = (xy[0] - shiftY) * pixelSizeYInMeters
+            x_px = xy[1] - shiftX
+            y_px = xy[0] - shiftY
+            x_m = Decimal(repr(x_px)) * pixelSizeXInMeters
+            y_m = Decimal(repr(y_px)) * pixelSizeYInMeters
             pointList.append(ScanPoint(x_m, y_m))
 
-        # FIXME finish; only update stuff if correction enabled
-        #tabularScan = self._scanInitializerFactory.createTabularInitializer(pointList, None)
-        #self._scanRepository.insertScan(tabularScan)
+        tabularScan = self._scanInitializerFactory.createTabularInitializer(
+            pointList, 'Tike', None)
+        self._scanRepository.insertScan(tabularScan)
 
         self._probe.setArray(arrays.probe[0, 0])
 

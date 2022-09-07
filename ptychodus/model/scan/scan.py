@@ -22,7 +22,8 @@ class Scan(ScanPointSequence, Observable, Observer):
         self._initializerFactory = initializerFactory
         self._repository = repository
         self._reinitObservable = reinitObservable
-        self._initializer: ScanInitializer = initializerFactory.createTabularInitializer([], None)
+        self._initializer: ScanInitializer = initializerFactory.createTabularInitializer([], '',
+                                                                                         None)
         self._name = str()
 
     @classmethod
@@ -37,7 +38,7 @@ class Scan(ScanPointSequence, Observable, Observer):
     def name(self) -> str:
         return self._name
 
-    def setActive(self, name: str) -> None:
+    def setActiveScan(self, name: str) -> None:
         if self._name == name:
             return
 
@@ -86,7 +87,7 @@ class Scan(ScanPointSequence, Observable, Observer):
             else:
                 self._repository.insertScan(initializer)
 
-        self.setActive(self._settings.activeScan.value)
+        self.setActiveScan(self._settings.activeScan.value)
 
     def _syncToSettings(self) -> None:
         self._initializer.syncToSettings(self._settings)

@@ -59,6 +59,10 @@ class ScanInitializer(ScanPointSequence, Observable):
         '''returns a unique variant name'''
         pass
 
+    @abstractproperty
+    def canActivate(self) -> bool:
+        pass
+
     @abstractmethod
     def _getPoint(self, index: int) -> ScanPoint:
         '''returns the scan point'''

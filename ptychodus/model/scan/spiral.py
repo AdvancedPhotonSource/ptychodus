@@ -44,6 +44,10 @@ class SpiralScanInitializer(ScanInitializer):
     def variant(self) -> str:
         return 'Fermat'
 
+    @property
+    def canActivate(self) -> bool:
+        return True
+
     def getNumberOfPoints(self) -> int:
         return self._numberOfPoints
 

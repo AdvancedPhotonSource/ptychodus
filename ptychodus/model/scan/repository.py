@@ -31,6 +31,14 @@ class ScanRepository(Mapping[str, ScanInitializer], Observable):
         self._initializers[name] = initializer
         self.notifyObservers()
 
+    def canActivateScan(self, name: str) -> bool:
+        initializer = self._initializers.get(name)
+
+        if initializer is not None:
+            return initializer.canActivate
+
+        return False
+
     def canRemoveScan(self, name: str) -> bool:
         return len(self._initializers) > 1
 

@@ -127,7 +127,9 @@ class ViewCore(QMainWindow):
         view.workflowAction.setVisible(isDeveloperModeEnabled)
 
         desktopSize = QApplication.desktop().availableGeometry().size()
-        view.resize(desktopSize.width() * 2 // 3, desktopSize.height() * 2 // 3)
+        preferredHeight = desktopSize.height() * 2 // 3
+        preferredWidth = min(desktopSize.width() * 2 // 3, 2 * preferredHeight)
+        view.resize(preferredWidth, preferredHeight)
         view.statusBar().showMessage('Ready')  # TODO make better use of the statusBar
 
         return view

@@ -96,12 +96,11 @@ class ModelCore:
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
-        self.tikeBackend = TikeBackend.createInstance(self.settingsRegistry, self._activeDataFile,
-                                                      self._scanCore.scan, self._probeCore.probe,
-                                                      self._probeCore.apparatus,
-                                                      self._objectCore.object,
-                                                      self.reconstructorPlotPresenter,
-                                                      modelArgs.isDeveloperModeEnabled)
+        self.tikeBackend = TikeBackend.createInstance(
+            self.settingsRegistry, self._activeDataFile, self._scanCore.scan,
+            self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
+            self._scanCore.initializerFactory, self._scanCore.repository,
+            self.reconstructorPlotPresenter, modelArgs.isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
         self._selectableReconstructor = SelectableReconstructor.createInstance(

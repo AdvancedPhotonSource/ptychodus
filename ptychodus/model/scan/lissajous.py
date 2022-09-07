@@ -56,6 +56,10 @@ class LissajousScanInitializer(ScanInitializer):
     def variant(self) -> str:
         return 'Lissajous'
 
+    @property
+    def canActivate(self) -> bool:
+        return True
+
     def getNumberOfPoints(self) -> int:
         return self._numberOfPoints
 

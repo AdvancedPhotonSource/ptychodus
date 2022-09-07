@@ -14,14 +14,12 @@ from .settings import ScanSettings
 class ScanFileInfo:
     fileType: str
     filePath: Path
-    fileSeriesKey: str
 
     @classmethod
     def createFromSettings(cls, settings: ScanSettings) -> ScanFileInfo:
         fileType = settings.inputFileType.value
         filePath = settings.inputFilePath.value
-        fileSeriesKey = settings.activeScan.value
-        return cls(fileType, filePath, fileSeriesKey)
+        return cls(fileType, filePath)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         settings.inputFileType.value = self.fileType
@@ -31,9 +29,10 @@ class ScanFileInfo:
 class TabularScanInitializer(ScanInitializer):
 
     def __init__(self, parameters: ScanInitializerParameters, pointList: list[ScanPoint],
-                 fileInfo: Optional[ScanFileInfo]) -> None:
+                 nameHint: str, fileInfo: Optional[ScanFileInfo]) -> None:
         super().__init__(parameters)
         self._pointList = pointList
+        self._nameHint = nameHint
         self._fileInfo = fileInfo
 
     def syncToSettings(self, settings: ScanSettings) -> None:
@@ -45,8 +44,7 @@ class TabularScanInitializer(ScanInitializer):
 
     @property
     def nameHint(self) -> str:
-        # FIXME generalize fileSeriesKey to _nameHint and pull from fileInfo
-        return self._fileInfo.fileSeriesKey if self._fileInfo else self.category
+        return self._nameHint
 
     @property
     def category(self) -> str:
@@ -55,6 +53,10 @@ class TabularScanInitializer(ScanInitializer):
     @property
     def variant(self) -> str:
         return 'FromMemory' if self._fileInfo is None else 'FromFile'
+
+    @property
+    def canActivate(self) -> bool:
+        return (self._fileInfo is not None)
 
     def getFileInfo(self) -> Optional[ScanFileInfo]:
         return self._fileInfo

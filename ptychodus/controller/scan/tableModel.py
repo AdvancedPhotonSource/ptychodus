@@ -37,8 +37,8 @@ class ScanTableModel(QAbstractTableModel):
         if index.isValid():
             entry = self._scanList[index.row()]
 
-            if self._presenter.canActivateScan(entry.name):
-                value = int(value) & ~Qt.ItemIsSelectable
+            # FIXME if not self._presenter.canActivateScan(entry.name):
+            #         value = int(value) & ~Qt.ItemIsSelectable
 
             if index.column() == 0:
                 value = int(value) | Qt.ItemIsUserCheckable

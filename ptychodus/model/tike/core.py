@@ -12,7 +12,7 @@ from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
 from ..reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
 from .arrayConverter import TikeArrayConverter
-from ..scan import Scan
+from ..scan import Scan, ScanInitializerFactory, ScanRepository
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionPresenter, TikePositionCorrectionSettings
 from .probeCorrection import TikeProbeCorrectionPresenter, TikeProbeCorrectionSettings
@@ -157,6 +157,8 @@ class TikeBackend:
                        probe: Probe,
                        apparatus: Apparatus,
                        object_: Object,
+                       scanInitializerFactory: ScanInitializerFactory,
+                       scanRepository: ScanRepository,
                        reconstructorPlotPresenter: ReconstructorPlotPresenter,
                        isDeveloperModeEnabled: bool = False) -> TikeBackend:
         core = cls(settingsRegistry)
@@ -178,7 +180,8 @@ class TikeBackend:
                 core.reconstructorList.append(NullReconstructor('lstsq_grad', 'Tike'))
                 core.reconstructorList.append(NullReconstructor('dm', 'Tike'))
         else:
-            arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_, dataFile)
+            arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_, dataFile,
+                                                scanInitializerFactory, scanRepository)
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, arrayConverter,
