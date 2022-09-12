@@ -8,41 +8,41 @@ import sys
 from tifffile import TiffFile
 import numpy
 
-from ptychodus.api.data import DataArrayType, DataFile, DataFileMetadata, DataFileReader, \
-        DatasetState, DiffractionDataset
+from ptychodus.api.data import (DiffractionArrayType, DiffractionData, DiffractionDataState,
+                                DiffractionDataset, DiffractionFileReader, DiffractionMetadata)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
 
 
-class TiffDiffractionDataset(DiffractionDataset):
+class TiffDiffractionData(DiffractionData):
 
-    def __init__(self, filePath: Path, flipLR: bool, flipUD: bool) -> None:
+    def __init__(self, filePath: Path) -> None:
         super().__init__()
         self._filePath = filePath
-        self._state = DatasetState.NOT_FOUND
-        self._flipLR = flipLR
-        self._flipUD = flipUD
+        self._state = DiffractionDataState.MISSING
 
     @property
     def datasetName(self) -> str:
         return self._filePath.stem
 
     @property
-    def datasetState(self) -> DatasetState:
+    def datasetState(self) -> DiffractionDataState:
         return self._state
 
     @overload
-    def __getitem__(self, index: int) -> DataArrayType:
+    def __getitem__(self, index: int) -> DiffractionArrayType:
         ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DataArrayType]:
+    def __getitem__(self, index: slice) -> Sequence[DiffractionArrayType]:
         ...
 
-    def __getitem__(self, index: Union[int,
-                                       slice]) -> Union[DataArrayType, Sequence[DataArrayType]]:
+    def __getitem__(
+            self,
+            index: Union[int,
+                         slice]) -> Union[DiffractionArrayType, Sequence[DiffractionArrayType]]:
         array = self.getArray()
         return array[index, ...]
 
@@ -50,11 +50,11 @@ class TiffDiffractionDataset(DiffractionDataset):
         array = self.getArray()
         return array.shape[0]
 
-    def getArray(self) -> DataArrayType:
+    def getArray(self) -> DiffractionArrayType:
         array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
         if self._filePath.is_file():
-            self._state = DatasetState.EXISTS
+            self._state = DiffractionDataState.FOUND
 
             try:
                 with TiffFile(self._filePath) as tif:
@@ -63,32 +63,26 @@ class TiffDiffractionDataset(DiffractionDataset):
                     if array.ndim == 2:
                         array = array[numpy.newaxis, :, :]
 
-                    if self._flipLR:
-                        array = numpy.fliplr(array)
-
-                    if self._flipUD:
-                        array = numpy.flipud(array)
-
             except OSError as err:
                 logger.exception(err)
             else:
-                self._state = DatasetState.VALID
+                self._state = DiffractionDataState.LOADED
         else:
-            self._state = DatasetState.NOT_FOUND
+            self._state = DiffractionDataState.MISSING
 
         return array
 
 
-class TiffDataFile(DataFile):
+class TiffDiffractionDataset(DiffractionDataset):
 
-    def __init__(self, metadata: DataFileMetadata, contentsTree: SimpleTreeNode,
+    def __init__(self, metadata: DiffractionMetadata, contentsTree: SimpleTreeNode,
                  datasetList: list[DiffractionDataset]) -> None:
         self._metadata = metadata
         self._contentsTree = contentsTree
         self._datasetList = datasetList
 
     @property
-    def metadata(self) -> DataFileMetadata:
+    def metadata(self) -> DiffractionMetadata:
         return self._metadata
 
     def getContentsTree(self) -> SimpleTreeNode:
@@ -111,42 +105,18 @@ class TiffDataFile(DataFile):
         return len(self._datasetList)
 
 
-class TiffDataFileReader(DataFileReader):
-
-    def __init__(self, flipLR: bool = False, flipUD: bool = False) -> None:
-        self._flipLR = flipLR
-        self._flipUD = flipUD
+class TiffDiffractionFileReader(DiffractionFileReader):
 
     @property
     def simpleName(self) -> str:
-        sb = ['TIFF']
-
-        if self._flipLR and self._flipUD:
-            sb.append('FLIPBOTH')
-        elif self._flipLR:
-            sb.append('FLIPLR')
-        elif self._flipUD:
-            sb.append('FLIPUD')
-
-        return '-'.join(sb)
+        return 'TIFF'
 
     @property
     def fileFilter(self) -> str:
-        sb = ['Tagged Image File Format Files']
+        return 'Tagged Image File Format Files (*.tif *.tiff)'
 
-        if self._flipLR and self._flipUD:
-            sb.append('[Flip Both]')
-        elif self._flipLR:
-            sb.append('[Flip Left-Right]')
-        elif self._flipUD:
-            sb.append('[Flip Up-Down]')
-
-        sb.append('(*.tif *.tiff)')
-
-        return ' '.join(sb)
-
-    def read(self, filePath: Path) -> DataFile:
-        metadata = DataFileMetadata(filePath, 0, 0, 0)
+    def read(self, filePath: Path) -> DiffractionDataset:
+        metadata = DiffractionMetadata(filePath, 0, 0, 0)
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         datasetList: list[DiffractionDataset] = list()
 
@@ -166,7 +136,7 @@ class TiffDataFileReader(DataFileReader):
                         itemDetails = str(tiff.epics_metadata)
                         contentsTree.createChild([itemName, itemType, itemDetails])
 
-                    dataset = TiffDiffractionDataset(fp, self._flipLR, self._flipUD)
+                    dataset = TiffDiffractionDataset(fp)
                     datasetList.append(dataset)
 
             with TiffFile(filePath) as tiff:
@@ -174,21 +144,18 @@ class TiffDataFileReader(DataFileReader):
                 imageWidth = array.shape[-1]
                 imageHeight = array.shape[-2]
 
-            metadata = DataFileMetadata(filePath.parent / pattern, imageWidth, imageHeight,
-                                        totalNumberOfImages)
+            metadata = DiffractionMetadata(filePath.parent / pattern, imageWidth, imageHeight,
+                                           totalNumberOfImages)
 
-        return TiffDataFile(metadata, contentsTree, datasetList)
+        return TiffDiffractionDataset(metadata, contentsTree, datasetList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(TiffDataFileReader(flipLR=False, flipUD=False))
-    registry.registerPlugin(TiffDataFileReader(flipLR=False, flipUD=True))
-    registry.registerPlugin(TiffDataFileReader(flipLR=True, flipUD=False))
-    registry.registerPlugin(TiffDataFileReader(flipLR=True, flipUD=True))
+    registry.registerPlugin(TiffDiffractionFileReader())
 
 
 if __name__ == '__main__':
     filePath = Path(sys.argv[1])
-    reader = TiffDataFileReader()
+    reader = TiffDiffractionFileReader()
     tiffFile = reader.read(filePath)
     print(tiffFile)

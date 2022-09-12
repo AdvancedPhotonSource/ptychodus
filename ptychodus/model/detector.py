@@ -1,18 +1,66 @@
 from __future__ import annotations
-from collections.abc import Sequence
 from decimal import Decimal
-from typing import overload, Final, Union
-import logging
+from typing import Final
 
 import numpy
 
-from ..api.data import DataArrayType, DatasetState, DiffractionDataset
-from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .data import ActiveDataFile, DetectorSettings, NullDiffractionDataset
 
-logger = logging.getLogger(__name__)
+
+class DetectorSettings(Observable, Observer):
+
+    def __init__(self, settingsGroup: SettingsGroup) -> None:
+        super().__init__()
+        self._settingsGroup = settingsGroup
+        self.numberOfPixelsX = settingsGroup.createIntegerEntry('NumberOfPixelsX', 1024)
+        self.pixelSizeXInMeters = settingsGroup.createRealEntry('PixelSizeXInMeters', '75e-6')
+        self.numberOfPixelsY = settingsGroup.createIntegerEntry('NumberOfPixelsY', 1024)
+        self.pixelSizeYInMeters = settingsGroup.createRealEntry('PixelSizeYInMeters', '75e-6')
+        self.detectorDistanceInMeters = settingsGroup.createRealEntry(
+            'DetectorDistanceInMeters', '2')
+
+    @classmethod
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> DetectorSettings:
+        settings = cls(settingsRegistry.createGroup('Detector'))
+        settings._settingsGroup.addObserver(settings)
+        return settings
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class Detector(Observable, Observer):
+
+    def __init__(self, settings: DetectorSettings) -> None:
+        super().__init__()
+        self._settings = settings
+
+    @classmethod
+    def createInstance(cls, settings: DetectorSettings) -> Detector:
+        detector = cls(settings)
+        settings.addObserver(detector)
+        return detector
+
+    def getNumberOfPixelsX(self) -> int:
+        return self._settings.numberOfPixelsX.value
+
+    def getPixelSizeXInMeters(self) -> Decimal:
+        return self._settings.pixelSizeXInMeters.value
+
+    def getNumberOfPixelsY(self) -> int:
+        return self._settings.numberOfPixelsY.value
+
+    def getPixelSizeYInMeters(self) -> Decimal:
+        return self._settings.pixelSizeYInMeters.value
+
+    def getDetectorDistanceInMeters(self) -> Decimal:
+        return self._settings.detectorDistanceInMeters.value
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self.notifyObservers()
 
 
 class DetectorPresenter(Observable, Observer):
@@ -72,51 +120,4 @@ class DetectorPresenter(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.notifyObservers()
-
-
-class DiffractionDatasetPresenter(Observable, Observer):
-
-    def __init__(self, dataFile: ActiveDataFile) -> None:
-        super().__init__()
-        self._dataFile = dataFile
-        self._dataset: DiffractionDataset = NullDiffractionDataset()
-        self._datasetIndex = 0
-
-    @classmethod
-    def createInstance(cls, dataFile: ActiveDataFile) -> DiffractionDatasetPresenter:
-        presenter = cls(dataFile)
-        dataFile.addObserver(presenter)
-        return presenter
-
-    def setCurrentDatasetIndex(self, index: int) -> None:
-        try:
-            dataset = self._dataFile[index]
-        except IndexError:
-            logger.exception('Invalid dataset index!')
-            return
-
-        self._dataset.removeObserver(self)
-        self._dataset = dataset
-        self._dataset.addObserver(self)
-        self._datasetIndex = index
-
-        self.notifyObservers()
-
-    def getCurrentDatasetIndex(self) -> int:
-        return self._datasetIndex
-
-    def getNumberOfImages(self) -> int:
-        return len(self._dataset)
-
-    def getImage(self, index: int) -> DataArrayType:
-        return self._dataset[index]
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._dataFile:
-            self._dataset.removeObserver(self)
-            self._dataset = NullDiffractionDataset()
-            self._datasetIndex = 0
-            self.notifyObservers()
-        elif observable is self._dataset:
             self.notifyObservers()

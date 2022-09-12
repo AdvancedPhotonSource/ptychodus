@@ -4,8 +4,8 @@ import threading
 import watchdog.events
 import watchdog.observers
 
-from ..api.observer import Observable, Observer
-from .data import DataSettings
+from ...api.observer import Observable, Observer
+from .settings import DataSettings
 
 logger = logging.getLogger(__name__)
 

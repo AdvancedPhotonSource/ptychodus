@@ -6,7 +6,7 @@ import importlib
 import logging
 import pkgutil
 
-from .data import DataFileReader, DataFileWriter
+from .data import DiffractionFileReader, DiffractionFileWriter
 from .image import ScalarTransformation
 from .object import ObjectFileReader, ObjectFileWriter
 from .observer import Observable
@@ -96,8 +96,8 @@ class PluginChooser(Generic[T], Observable):
 class PluginRegistry:
 
     def __init__(self) -> None:
-        self.dataFileReaders: list[PluginEntry[DataFileReader]] = list()
-        self.dataFileWriters: list[PluginEntry[DataFileWriter]] = list()
+        self.diffractionFileReaders: list[PluginEntry[DiffractionFileReader]] = list()
+        self.diffractionFileWriters: list[PluginEntry[DiffractionFileWriter]] = list()
         self.scalarTransformations: list[PluginEntry[ScalarTransformation]] = list()
         self.scanFileReaders: list[PluginEntry[ScanFileReader]] = list()
         self.scanFileWriters: list[PluginEntry[ScanFileWriter]] = list()
@@ -125,16 +125,14 @@ class PluginRegistry:
         return registry
 
     def registerPlugin(self, plugin: T) -> None:
-        if isinstance(plugin, DataFileReader):
-            dataFileReaderEntry = PluginEntry[DataFileReader](simpleName=plugin.simpleName,
-                                                              displayName=plugin.fileFilter,
-                                                              strategy=plugin)
-            self.dataFileReaders.append(dataFileReaderEntry)
-        elif isinstance(plugin, DataFileWriter):
-            dataFileWriterEntry = PluginEntry[DataFileWriter](simpleName=plugin.simpleName,
-                                                              displayName=plugin.fileFilter,
-                                                              strategy=plugin)
-            self.dataFileWriters.append(dataFileWriterEntry)
+        if isinstance(plugin, DiffractionFileReader):
+            diffractionFileReaderEntry = PluginEntry[DiffractionFileReader](
+                simpleName=plugin.simpleName, displayName=plugin.fileFilter, strategy=plugin)
+            self.diffractionFileReaders.append(diffractionFileReaderEntry)
+        elif isinstance(plugin, DiffractionFileWriter):
+            diffractionFileWriterEntry = PluginEntry[DiffractionFileWriter](
+                simpleName=plugin.simpleName, displayName=plugin.fileFilter, strategy=plugin)
+            self.diffractionFileWriters.append(diffractionFileWriterEntry)
         elif isinstance(plugin, ScalarTransformation):
             scalarTransformationEntry = PluginEntry[ScalarTransformation](simpleName=plugin.name,
                                                                           displayName=plugin.name,
@@ -173,11 +171,11 @@ class PluginRegistry:
         else:
             raise TypeError(f'Invalid plugin type \"{type(plugin).__name__}\".')
 
-    def buildDataFileReaderChooser(self) -> PluginChooser[DataFileReader]:
-        return PluginChooser[DataFileReader].createFromList(self.dataFileReaders)
+    def buildDiffractionFileReaderChooser(self) -> PluginChooser[DiffractionFileReader]:
+        return PluginChooser[DiffractionFileReader].createFromList(self.diffractionFileReaders)
 
-    def buildDataFileWriterChooser(self) -> PluginChooser[DataFileWriter]:
-        return PluginChooser[DataFileWriter].createFromList(self.dataFileWriters)
+    def buildDiffractionFileWriterChooser(self) -> PluginChooser[DiffractionFileWriter]:
+        return PluginChooser[DiffractionFileWriter].createFromList(self.diffractionFileWriters)
 
     def buildScalarTransformationChooser(self) -> PluginChooser[ScalarTransformation]:
         return PluginChooser[ScalarTransformation].createFromList(self.scalarTransformations)

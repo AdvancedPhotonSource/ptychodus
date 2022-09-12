@@ -8,9 +8,10 @@ from typing import Final
 import csv
 import math
 
-from .velociprobeDataFile import VelociprobeDataFileReader
+from .nexusDiffractionFile import NeXusDiffractionFileReader
 from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
                                 ScanPointParseError, ScanPointSequence, SimpleScanDictionary)
+from ptychodus.api.plugins import PluginRegistry
 
 
 class VelociprobeScanFileColumn(IntEnum):
@@ -30,7 +31,7 @@ class VelociprobeScanPoint:
 class VelociprobeScanFileReader(ScanFileReader):
     EXPECTED_NUMBER_OF_COLUMNS: Final[int] = 8
 
-    def __init__(self, dataFileReader: VelociprobeDataFileReader) -> None:
+    def __init__(self, dataFileReader: NeXusDiffractionFileReader) -> None:
         self._dataFileReader = dataFileReader
 
     @property
@@ -100,3 +101,7 @@ class VelociprobeScanFileReader(ScanFileReader):
         scanDict[f'{self.simpleName}LaserInterferometerY'] = liPointList
         scanDict[f'{self.simpleName}EncoderY'] = enPointList
         return SimpleScanDictionary(scanDict)
+
+
+def registerPlugins(registry: PluginRegistry) -> None:
+    registry.registerPlugin(VelociprobeScanFileReader())

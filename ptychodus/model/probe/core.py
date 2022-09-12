@@ -9,7 +9,8 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry, SettingsGroup
-from ..data import CropSizer, Detector
+from ..data import CropSizer
+from ..detector import Detector
 from .apparatus import Apparatus
 from .file import FileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer

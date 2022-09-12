@@ -12,7 +12,7 @@ import numpy
 
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
-from .data import *
+from .data import DataCore
 from .detector import *
 from .image import *
 from .object import ObjectCore, ObjectPresenter
@@ -25,7 +25,6 @@ from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
 from .tike import TikeBackend
 from .velociprobe import *
-from .watcher import DataDirectoryWatcher
 from .workflow import WorkflowCore, WorkflowPresenter
 
 logger = logging.getLogger(__name__)
@@ -68,17 +67,13 @@ class ModelCore:
         self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
 
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
-        self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
-        self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
-        self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
-
-        # TODO DataDirectoryWatcher should be optional
-        self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
-
         self._detector = Detector.createInstance(self._detectorSettings)
-        self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
-        self._activeDataFile = ActiveDataFile(self._dataSettings, self._cropSizer)
+        self._dataCore = DataCore(self._detector,
+                                  self._pluginRegistry.buildDataFileReaderChooser(),
+                                  self._pluginRegistry.buildDataFileWriterChooser())
+
+        self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
         self._scanCore = ScanCore(self.rng, self.settingsRegistry,
                                   self._pluginRegistry.buildScanFileReaderChooser(),
@@ -107,18 +102,11 @@ class ModelCore:
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
 
-        self.dataFilePresenter = DataFilePresenter.createInstance(
-            self._dataSettings, self._activeDataFile,
-            self._pluginRegistry.buildDataFileReaderChooser(),
-            self._pluginRegistry.buildDataFileWriterChooser())
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
-        self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
-        self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._activeDataFile)
 
         # TODO remove velociprobePresenter lookup when able
         self._velociprobeReader = next(
-            entry.strategy for entry in self._pluginRegistry.dataFileReaders
+            entry.strategy for entry in self._pluginRegistry.diffractionFileReaders
             if type(entry.strategy).__name__ == 'VelociprobeDataFileReader')
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._cropSettings,
@@ -146,8 +134,7 @@ class ModelCore:
         if self.rpcMessageService:
             self.rpcMessageService.start()
 
-        if self._dataDirectoryWatcher:
-            self._dataDirectoryWatcher.start()
+        self._dataCore.start()
 
         return self
 
@@ -162,8 +149,7 @@ class ModelCore:
 
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
-        if self._dataDirectoryWatcher:
-            self._dataDirectoryWatcher.stop()
+        self._dataCore.stop()
 
         if self.rpcMessageService:
             self.rpcMessageService.stop()

@@ -4,10 +4,11 @@ import logging
 
 import numpy
 
-from ..api.data import DatasetState
+from ..api.data import DiffractionDataState
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup
-from .data import ActiveDataFile, CropSettings, DetectorSettings
+from .data import ActiveDataFile, CropSettings
+from .detector import DetectorSettings
 from .probe import ProbeSettings
 from .scan import ScanCore
 

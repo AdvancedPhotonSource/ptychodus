@@ -90,11 +90,11 @@ class RPCMessageService:
         logger.info(f'Message service is started on {self._socketServer.server_address}.')
 
     def processMessages(self) -> None:
-        while not self._messageQueue.empty():
+        while not self._consumerStopEvent.is_set():
             try:
                 message = self._messageQueue.get(block=False)
             except queue.Empty:
-                continue
+                break
 
             self._runProcess(message)
 

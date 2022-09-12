@@ -2,7 +2,8 @@ from __future__ import annotations
 from decimal import Decimal
 
 from ...api.observer import Observable, Observer
-from ..data import CropSizer, Detector
+from ..data import CropSizer
+from ..detector import Detector
 from .settings import ProbeSettings
 
 

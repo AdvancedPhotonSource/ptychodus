@@ -6,7 +6,7 @@ from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QFileDialog
 
-from ..api.data import DatasetState
+from ..api.data import DiffractionDataState
 from ..api.observer import Observable, Observer
 from ..model import (CropPresenter, DataFilePresenter, DetectorPresenter,
                      DiffractionDatasetPresenter, ImagePresenter)
@@ -75,10 +75,10 @@ class DatasetListModel(QAbstractListModel):
         value = Qt.NoItemFlags
 
         if index.isValid():
-            state = self._presenter.getDatasetState(index.row())
+            state = self._presenter.getDiffractionDataState(index.row())
             value = super().flags(index)
 
-            if state != DatasetState.VALID:
+            if state != DiffractionDataState.VALID:
                 value &= ~Qt.ItemIsSelectable
                 value &= ~Qt.ItemIsEnabled
 
@@ -91,9 +91,9 @@ class DatasetListModel(QAbstractListModel):
             if role == Qt.DisplayRole:
                 value = self._presenter.getDatasetName(index.row())
             elif role == Qt.FontRole:
-                state = self._presenter.getDatasetState(index.row())
+                state = self._presenter.getDiffractionDataState(index.row())
                 font = QFont()
-                font.setItalic(state == DatasetState.EXISTS)
+                font.setItalic(state == DiffractionDataState.EXISTS)
                 value = QVariant(font)
 
         return value
