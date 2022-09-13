@@ -10,7 +10,9 @@ import h5py
 import numpy
 
 from .h5DiffractionFile import H5DiffractionFileTreeBuilder
-from ptychodus.api.data import (DiffractionArrayType, DiffractionData, DiffractionDataState, DiffractionDataset, DiffractionFileReader, DiffractionMetadata, SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionArrayType, DiffractionData, DiffractionDataState,
+                                DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -34,7 +36,7 @@ class NeXusDiffractionData(DiffractionData):
         return self._state
 
     def getStartIndex(self) -> int:
-        return 0 # FIXME
+        return 0  # FIXME
 
     def getArray(self) -> DiffractionArrayType:
         array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
@@ -188,7 +190,7 @@ class EntryGroup:
 class NeXusDiffractionDataset(DiffractionDataset):
 
     def __init__(self, metadata: DiffractionMetadata, contentsTree: SimpleTreeNode,
-            entry: EntryGroup) -> None:
+                 entry: EntryGroup) -> None:
         self._metadata = metadata
         self._contentsTree = contentsTree
         self._entry = entry
@@ -207,9 +209,8 @@ class NeXusDiffractionDataset(DiffractionDataset):
     def __getitem__(self, index: slice) -> Sequence[DiffractionData]:
         ...
 
-    def __getitem__(
-            self, index: Union[int,
-                               slice]) -> Union[DiffractionData, Sequence[DiffractionData]]:
+    def __getitem__(self,
+                    index: Union[int, slice]) -> Union[DiffractionData, Sequence[DiffractionData]]:
         return self._entry.data.dataList[index]
 
     def __len__(self) -> int:

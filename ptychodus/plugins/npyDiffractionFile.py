@@ -3,7 +3,9 @@ import logging
 
 import numpy
 
-from ptychodus.api.data import (DiffractionArrayType, DiffractionData, DiffractionDataState, DiffractionDataset, DiffractionFileReader, DiffractionFileWriter, DiffractionMetadata, SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionArrayType, DiffractionData, DiffractionDataState,
+                                DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
+                                DiffractionMetadata, SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -35,9 +37,13 @@ class NPYDiffractionData(DiffractionData):
 
             try:
                 array = numpy.load(self._filePath)
-                # FIXME atleast_3d
             except OSError as err:
                 logger.exception(err)
+            else:
+                self._state = DiffractionDataState.LOADED
+
+                if array.ndim == 2:
+                    array = array[numpy.newaxis, :, :]
         else:
             self._state = DiffractionDataState.MISSING
 
@@ -60,7 +66,7 @@ class NPYDiffractionFileReader(DiffractionFileReader):
         metadata = DiffractionMetadata(filePath, array.shape[1], array.shape[2], array.shape[0])
 
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
-        dataList: list[DiffractionData] = [ data ]
+        dataList: list[DiffractionData] = [data]
         return SimpleDiffractionDataset(metadata, contentsTree, dataList)
 
 

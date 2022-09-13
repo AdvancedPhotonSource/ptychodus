@@ -5,7 +5,7 @@ import logging
 
 import numpy
 
-from ...api.data import DiffractionDataset
+from ...api.data import DiffractionData
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from ..object import Object
@@ -152,7 +152,7 @@ class TikeBackend:
     @classmethod
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
-                       diffractionDataset: DiffractionDataset,
+                       diffractionData: DiffractionData,
                        scan: Scan,
                        probe: Probe,
                        apparatus: Apparatus,
@@ -180,9 +180,8 @@ class TikeBackend:
                 core.reconstructorList.append(NullReconstructor('lstsq_grad', 'Tike'))
                 core.reconstructorList.append(NullReconstructor('dm', 'Tike'))
         else:
-            arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_,
-                                                diffractionDataset, scanInitializerFactory,
-                                                scanRepository)
+            arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_, diffractionData,
+                                                scanInitializerFactory, scanRepository)
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, arrayConverter,

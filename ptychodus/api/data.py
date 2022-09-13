@@ -89,9 +89,8 @@ class SimpleDiffractionDataset(DiffractionDataset):
     def __getitem__(self, index: slice) -> Sequence[DiffractionData]:
         ...
 
-    def __getitem__(
-            self, index: Union[int,
-                               slice]) -> Union[DiffractionData, Sequence[DiffractionData]]:
+    def __getitem__(self,
+                    index: Union[int, slice]) -> Union[DiffractionData, Sequence[DiffractionData]]:
         return self._dataList[index]
 
     def __len__(self) -> int:

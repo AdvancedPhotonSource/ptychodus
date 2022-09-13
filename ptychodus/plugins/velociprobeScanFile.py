@@ -31,8 +31,8 @@ class VelociprobeScanPoint:
 class VelociprobeScanFileReader(ScanFileReader):
     EXPECTED_NUMBER_OF_COLUMNS: Final[int] = 8
 
-    def __init__(self, dataFileReader: NeXusDiffractionFileReader) -> None:
-        self._dataFileReader = dataFileReader
+    def __init__(self, diffractionFileReader: NeXusDiffractionFileReader) -> None:
+        self._diffractionFileReader = diffractionFileReader
 
     @property
     def simpleName(self) -> str:
@@ -49,8 +49,8 @@ class VelociprobeScanFileReader(ScanFileReader):
         xMean = sum([point.x for point in pointList], start=zero) / numberOfPoints
         yMean = sum([point.y for point in pointList], start=zero) / numberOfPoints
 
-        stageRotationInRadians = self._dataFileReader.entry.sample.goniometer.chi_rad \
-                if self._dataFileReader.entry else 0.
+        stageRotationInRadians = self._diffractionFileReader.entry.sample.goniometer.chi_rad \
+                if self._diffractionFileReader.entry else 0.
         stageRotationCosine = Decimal(math.cos(stageRotationInRadians))
 
         for idx, point in enumerate(pointList):
@@ -104,4 +104,5 @@ class VelociprobeScanFileReader(ScanFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(VelociprobeScanFileReader())
+    # FIXME registry.registerPlugin(VelociprobeScanFileReader(diffractionFileReader))
+    pass

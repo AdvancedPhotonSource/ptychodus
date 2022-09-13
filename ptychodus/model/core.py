@@ -70,8 +70,8 @@ class ModelCore:
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._detector = Detector.createInstance(self._detectorSettings)
         self._dataCore = DataCore(self._detector,
-                                  self._pluginRegistry.buildDataFileReaderChooser(),
-                                  self._pluginRegistry.buildDataFileWriterChooser())
+                                  self._pluginRegistry.buildDiffractionFileReaderChooser(),
+                                  self._pluginRegistry.buildDiffractionFileWriterChooser())
 
         self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
 
@@ -79,7 +79,7 @@ class ModelCore:
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())
         self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
-                                    self._cropSizer,
+                                    self._dataCore.cropSizer,
                                     self._pluginRegistry.buildProbeFileReaderChooser(),
                                     self._pluginRegistry.buildProbeFileWriterChooser())
         self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
@@ -92,7 +92,7 @@ class ModelCore:
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(
-            self.settingsRegistry, self._activeDataFile, self._scanCore.scan,
+            self.settingsRegistry, self._activeDiffractionFile, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
             self._scanCore.initializerFactory, self._scanCore.repository,
             self.reconstructorPlotPresenter, modelArgs.isDeveloperModeEnabled)
@@ -107,10 +107,10 @@ class ModelCore:
         # TODO remove velociprobePresenter lookup when able
         self._velociprobeReader = next(
             entry.strategy for entry in self._pluginRegistry.diffractionFileReaders
-            if type(entry.strategy).__name__ == 'VelociprobeDataFileReader')
+            if type(entry.strategy).__name__ == 'VelociprobeDiffractionFileReader')
         self.velociprobePresenter = VelociprobePresenter.createInstance(
-            self._velociprobeReader, self._detectorSettings, self._cropSettings,
-            self._probeCore.settings, self._activeDataFile, self._scanCore)
+            self._velociprobeReader, self._detectorSettings, self._dataCore.cropSettings,
+            self._probeCore.settings, self._activeDiffractionFile, self._scanCore)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 

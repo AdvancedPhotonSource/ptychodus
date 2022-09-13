@@ -4,7 +4,8 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.data import (DiffractionData, DiffractionDataset, DiffractionFileReader, DiffractionMetadata, SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionData, DiffractionDataset, DiffractionFileReader,
+                                DiffractionMetadata, SimpleDiffractionDataset)
 from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
