@@ -6,52 +6,14 @@ import sys
 from tifffile import TiffFile
 import numpy
 
-from ptychodus.api.data import (DiffractionArrayType, DiffractionData, DiffractionDataState,
+from ptychodus.api.data import (DiffractionArray, DiffractionArrayState, DiffractionDataType,
                                 DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
-                                DiffractionMetadata, SimpleDiffractionDataset)
+                                DiffractionMetadata, SimpleDiffractionArray,
+                                SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
-
-
-class TiffDiffractionData(DiffractionData):
-
-    def __init__(self, filePath: Path) -> None:
-        super().__init__()
-        self._filePath = filePath
-        self._state = DiffractionDataState.MISSING
-
-    @property
-    def name(self) -> str:
-        return self._filePath.stem
-
-    def getState(self) -> DiffractionDataState:
-        return self._state
-
-    def getStartIndex(self) -> int:
-        return 0
-
-    def getArray(self) -> DiffractionArrayType:
-        array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
-
-        if self._filePath.is_file():
-            self._state = DiffractionDataState.FOUND
-
-            try:
-                with TiffFile(self._filePath) as tif:
-                    array = tif.asarray()
-            except OSError as err:
-                logger.exception(err)
-            else:
-                self._state = DiffractionDataState.LOADED
-
-                if array.ndim == 2:
-                    array = array[numpy.newaxis, :, :]
-        else:
-            self._state = DiffractionDataState.MISSING
-
-        return array
 
 
 class TiffDiffractionFileReader(DiffractionFileReader):
@@ -67,7 +29,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
     def read(self, filePath: Path) -> DiffractionDataset:
         metadata = DiffractionMetadata(filePath, 0, 0, 0)
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
-        dataList: list[DiffractionData] = list()
+        arrayList: list[DiffractionArray] = list()
 
         if filePath:
             digits = re.findall(r'\d+', filePath.stem)
@@ -85,18 +47,25 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                         itemDetails = str(tiff.epics_metadata)
                         contentsTree.createChild([itemName, itemType, itemDetails])
 
-                    dataset = TiffDiffractionData(fp)
-                    dataList.append(dataset)
+                    index = 0  # FIXME from digits
+                    dataOffset = 0  # FIXME see totalNumberOfImages
+                    data = tiff.asarray()
 
-            with TiffFile(filePath) as tiff:
-                array = tiff.asarray()
-                imageWidth = array.shape[-1]
-                imageHeight = array.shape[-2]
+                    if data.ndim == 2:
+                        data = data[numpy.newaxis, :, :]
+
+                    array = SimpleDiffractionArray(fp.stem, index, dataOffset, data)
+                    arrayList.append(array)
+
+            with TiffFile(filePath) as tiff:  # FIXME not needed
+                data = tiff.asarray()
+                imageWidth = data.shape[-1]
+                imageHeight = data.shape[-2]
 
             metadata = DiffractionMetadata(filePath.parent / pattern, imageWidth, imageHeight,
                                            totalNumberOfImages)
 
-        return SimpleDiffractionDataset(metadata, contentsTree, dataList)
+        return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

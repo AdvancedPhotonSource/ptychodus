@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 import logging
 import queue
 import tempfile
@@ -6,7 +7,7 @@ import threading
 
 import numpy
 
-from ...api.data import DiffractionData
+from ...api.data import DiffractionDataType, DiffractionArray
 from ...api.observer import Observable
 from .crop import CropSizer
 from .settings import DataSettings
@@ -20,8 +21,8 @@ class DiffractionDataAssembler(Observable):
         super().__init__()
         self._settings = settings
         self._cropSizer = cropSizer
-        self._dataQueue: queue.Queue[DiffractionData] = queue.Queue()
-        self._dataArray = numpy.empty((0, 0, 0), dtype=numpy.uint16)
+        self._arrayQueue: queue.Queue[DiffractionArray] = queue.Queue()
+        self._assembledData = numpy.empty((0, 0, 0), dtype=numpy.uint16)
         self._consumerThreads: list[threading.Thread] = list()
         self._consumerStopEvent = threading.Event()
         self._changedEvent = threading.Event()
@@ -31,8 +32,8 @@ class DiffractionDataAssembler(Observable):
         return len(self._consumerThreads) > 0
 
     def _clearQueue(self) -> None:
-        with self._dataQueue.mutex:
-            self._dataQueue.queue.clear()
+        with self._arrayQueue.mutex:
+            self._arrayQueue.queue.clear()
 
     def _reallocateDataArray(self, maximumNumberOfImages: int) -> None:
         shape = (
@@ -45,10 +46,10 @@ class DiffractionDataAssembler(Observable):
         if scratchDirectory.is_dir():
             npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
             logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
-            self._dataArray = numpy.memmap(npyTempFile, dtype=numpy.uint16, shape=shape)
+            self._assembledData = numpy.memmap(npyTempFile, dtype=numpy.uint16, shape=shape)
         else:
             logger.debug(f'Scratch memory is {shape}')
-            self._dataArray = numpy.zeros(shape, dtype=numpy.uint16)
+            self._assembledData = numpy.zeros(shape, dtype=numpy.uint16)
 
     def _startConsumerThreads(self) -> None:
         self._consumerStopEvent.clear()
@@ -62,6 +63,7 @@ class DiffractionDataAssembler(Observable):
         if self.isActive:
             self.stop()
 
+        # TODO if ru
         logger.info('Starting data assembler...')
         self._reallocateDataArray(maximumNumberOfImages)
         self._startConsumerThreads()
@@ -85,35 +87,44 @@ class DiffractionDataAssembler(Observable):
         # FIXME maintain scan order; maybe bool array?
         while not self._consumerStopEvent.is_set():
             try:
-                data = self._dataQueue.get(block=True, timeout=1)
+                array = self._arrayQueue.get(block=True, timeout=1)
             except queue.Empty:
                 continue
 
-            logger.debug(f'Reading {data.name}...')
-            array = data.getArray()
-
-            startIndex = data.getStartIndex()
-            sliceZ = slice(startIndex, startIndex + array.shape[0])
+            logger.debug(f'Reading {array.getLabel()}...')
+            data = array.getData()
+            dataOffset = array.getDataOffset()
+            sliceZ = slice(dataOffset, dataOffset + data.shape[0])
 
             if self._cropSizer.isCropEnabled():
                 sliceY = self._cropSizer.getSliceY()
                 sliceX = self._cropSizer.getSliceX()
-                array = array[:, sliceY, sliceX]
+                data = data[:, sliceY, sliceX]
 
             threshold = self._settings.threshold.value
-            array[array < threshold] = threshold
+            data[data < threshold] = threshold
 
             if self._settings.flipX.value:
-                array = numpy.fliplr(array)
+                data = numpy.fliplr(data)
 
             if self._settings.flipY.value:
-                array = numpy.flipud(array)
+                data = numpy.flipud(data)
 
-            self._dataArray[sliceZ, :, :] = array
+            self._assembledData[sliceZ, :, :] = data
             self._changedEvent.set()
 
-    def assemble(self, data: DiffractionData) -> None:
-        self._dataQueue.put(data)
+    def assemble(self, array: DiffractionArray) -> None:
+        self._arrayQueue.put(array)
+
+    def getData(self) -> DiffractionDataType:
+        # FIXME only return slice that has been assembled so far
+        return self._assembledData
+
+    def setData(self, dataArray: DiffractionDataType) -> None:
+        if self.isActive:
+            self.stop()
+
+        self._assembledData = dataArray
 
     def processEvents(self) -> None:
         # FIXME let main thread trigger gui updates on timer

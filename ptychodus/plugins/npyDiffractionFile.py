@@ -3,7 +3,7 @@ import logging
 
 import numpy
 
-from ptychodus.api.data import (DiffractionArrayType, DiffractionData, DiffractionDataState,
+from ptychodus.api.data import (DiffractionArray, DiffractionArrayState, DiffractionDataType,
                                 DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
                                 DiffractionMetadata, SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
@@ -12,40 +12,42 @@ from ptychodus.api.tree import SimpleTreeNode
 logger = logging.getLogger(__name__)
 
 
-class NPYDiffractionData(DiffractionData):
+class NPYDiffractionArray(DiffractionArray):
 
     def __init__(self, filePath: Path) -> None:
         super().__init__()
         self._filePath = filePath
-        self._state = DiffractionDataState.MISSING
+        self._state = DiffractionArrayState.MISSING
 
-    @property
-    def name(self) -> str:
+    def getLabel(self) -> str:
         return self._filePath.stem
 
-    def getState(self) -> DiffractionDataState:
-        return self._state
-
-    def getStartIndex(self) -> int:
+    def getIndex(self) -> int:
         return 0
 
-    def getArray(self) -> DiffractionArrayType:
+    def getState(self) -> DiffractionArrayState:
+        return self._state
+
+    def getDataOffset(self) -> int:
+        return 0
+
+    def getData(self) -> DiffractionDataType:
         array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
         if self._filePath.is_file():
-            self._state = DiffractionDataState.FOUND
+            self._state = DiffractionArrayState.FOUND
 
             try:
                 array = numpy.load(self._filePath)
             except OSError as err:
                 logger.exception(err)
             else:
-                self._state = DiffractionDataState.LOADED
+                self._state = DiffractionArrayState.LOADED
 
                 if array.ndim == 2:
                     array = array[numpy.newaxis, :, :]
         else:
-            self._state = DiffractionDataState.MISSING
+            self._state = DiffractionArrayState.MISSING
 
         return array
 
@@ -61,13 +63,13 @@ class NPYDiffractionFileReader(DiffractionFileReader):
         return 'NumPy Binary Files (*.npy)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        data = NPYDiffractionData(filePath)
-        array = data.getArray()
-        metadata = DiffractionMetadata(filePath, array.shape[1], array.shape[2], array.shape[0])
+        array = NPYDiffractionArray(filePath)
+        data = array.getData()
+        metadata = DiffractionMetadata(filePath, data.shape[1], data.shape[2], data.shape[0])
 
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
-        dataList: list[DiffractionData] = [data]
-        return SimpleDiffractionDataset(metadata, contentsTree, dataList)
+        arrayList: list[DiffractionArray] = [array]
+        return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 
 
 class NPYDiffractionFileWriter(DiffractionFileWriter):
@@ -81,8 +83,8 @@ class NPYDiffractionFileWriter(DiffractionFileWriter):
         return 'NumPy Binary Files (*.npy)'
 
     def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
-        array = dataset[0].getArray()
-        numpy.save(filePath, array)
+        data = dataset[0].getData()
+        numpy.save(filePath, data)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

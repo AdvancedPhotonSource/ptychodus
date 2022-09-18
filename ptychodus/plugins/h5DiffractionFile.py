@@ -4,7 +4,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.data import (DiffractionData, DiffractionDataset, DiffractionFileReader,
+from ptychodus.api.data import (DiffractionArray, DiffractionDataset, DiffractionFileReader,
                                 DiffractionMetadata, SimpleDiffractionDataset)
 from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
@@ -106,13 +106,13 @@ class H5DiffractionFileReader(DiffractionFileReader):
     def read(self, filePath: Path) -> DiffractionDataset:
         metadata = DiffractionMetadata(filePath, 0, 0, 0)
         contentsTree = self._treeBuilder.createRootNode()
-        dataList: list[DiffractionData] = list()
+        arrayList: list[DiffractionArray] = list()
 
         if filePath:
             with h5py.File(filePath, 'r') as h5File:
                 contentsTree = self._treeBuilder.build(h5File)
 
-        return SimpleDiffractionDataset(metadata, contentsTree, dataList)
+        return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

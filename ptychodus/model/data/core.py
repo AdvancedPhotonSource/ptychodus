@@ -12,45 +12,48 @@ import tempfile
 import h5py
 import numpy
 
-from ...api.data import (DiffractionArrayType, DiffractionData, DiffractionDataState,
+from ...api.data import (DiffractionArray, DiffractionArrayState, DiffractionDataType,
                          DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
-                         DiffractionMetadata)
+                         DiffractionMetadata, SimpleDiffractionArray)
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ...api.tree import SimpleTreeNode
-
-from .crop import CropSizer
+from ..detector import Detector
+from .active import ActiveDiffractionDataset
+from .assembler import DiffractionDataAssembler
+from .crop import CropPresenter, CropSettings, CropSizer
 from .settings import DataSettings
 from .watcher import DataDirectoryWatcher
 
 logger = logging.getLogger(__name__)
 
 
-class DiffractionFilePresenter(Observable, Observer):
+class DiffractionDatasetPresenter(Observable, Observer):
 
-    def __init__(self, settings: DataSettings, activeDiffractionFile: ActiveDiffractionFile,
+    def __init__(self, settings: DataSettings, activeDiffractionDataset: ActiveDiffractionDataset,
                  fileReaderChooser: PluginChooser[DiffractionFileReader],
                  fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
         super().__init__()
         self._settings = settings
-        self._activeDiffractionFile = activeDiffractionFile
+        self._activeDiffractionDataset = activeDiffractionDataset
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
 
     @classmethod
     def createInstance(
-            cls, settings: DataSettings, activeDiffractionFile: ActiveDiffractionFile,
+            cls, settings: DataSettings, activeDiffractionDataset: ActiveDiffractionDataset,
             fileReaderChooser: PluginChooser[DiffractionFileReader],
-            fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> DiffractionFilePresenter:
-        presenter = cls(settings, activeDiffractionFile, fileReaderChooser, fileWriterChooser)
+            fileWriterChooser: PluginChooser[DiffractionFileWriter]
+    ) -> DiffractionDatasetPresenter:
+        presenter = cls(settings, activeDiffractionDataset, fileReaderChooser, fileWriterChooser)
         settings.fileType.addObserver(presenter)
         fileReaderChooser.addObserver(presenter)
         presenter._syncFileReaderFromSettings()
         settings.filePath.addObserver(presenter)
         presenter._openDiffractionFileFromSettings()
-        activeDiffractionFile.addObserver(presenter)
+        activeDiffractionDataset.addObserver(presenter)
         return presenter
 
     def getScratchDirectory(self) -> Path:
@@ -60,19 +63,19 @@ class DiffractionFilePresenter(Observable, Observer):
         self._settings.scratchDirectory.value = directory
 
     def getContentsTree(self) -> SimpleTreeNode:
-        return self._activeDiffractionFile.getContentsTree()
+        return self._activeDiffractionDataset.getContentsTree()
 
-    def getDatasetName(self, index: int) -> str:
-        return self._activeDiffractionFile[index].datasetName
+    def getDataLabel(self, index: int) -> str:
+        return self._activeDiffractionDataset[index].getLabel()
 
-    def getDiffractionDataState(self, index: int) -> DiffractionDataState:
-        return self._activeDiffractionFile[index].datasetState
+    def getDataState(self, index: int) -> DiffractionArrayState:
+        return self._activeDiffractionDataset[index].getState()
 
-    def getNumberOfDatasets(self) -> int:
-        return len(self._activeDiffractionFile)
+    def getNumberOfData(self) -> int:
+        return len(self._activeDiffractionDataset)
 
-    def openDataset(self, dataPath: str) -> Any:
-        filePath = self._activeDiffractionFile.metadata.filePath
+    def openData(self, dataPath: str) -> Any:  # FIXME
+        filePath = self._activeDiffractionDataset.getMetadata().filePath
         data = None
 
         if filePath and h5py.is_hdf5(filePath) and dataPath:
@@ -118,8 +121,8 @@ class DiffractionFilePresenter(Observable, Observer):
         if filePath is not None and filePath.is_file():
             logger.debug(f'Reading {filePath}')
             fileReader = self._fileReaderChooser.getCurrentStrategy()
-            dataFile = fileReader.read(filePath)
-            self._activeDiffractionFile.setActive(dataFile)
+            dataset = fileReader.read(filePath)
+            self._activeDiffractionDataset.switchTo(dataset)
         else:
             logger.debug(f'Refusing to read invalid file path {filePath}')
 
@@ -141,11 +144,10 @@ class DiffractionFilePresenter(Observable, Observer):
         return self._fileWriterChooser.getCurrentDisplayName()
 
     def saveDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
-        # TODO only save populated frames
         logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
         self._fileWriterChooser.setFromDisplayName(fileFilter)
         writer = self._fileWriterChooser.getCurrentStrategy()
-        writer.write(filePath, self._activeDiffractionFile.getDiffractionData(cropped=False))
+        writer.write(filePath, self._activeDiffractionDataset)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.fileType:
@@ -154,83 +156,79 @@ class DiffractionFilePresenter(Observable, Observer):
             self._syncFileReaderToSettings()
         elif observable is self._settings.filePath:
             self._openDiffractionFileFromSettings()
-        elif observable is self._activeDiffractionFile:
+        elif observable is self._activeDiffractionDataset:
             self.notifyObservers()
 
 
-class DiffractionDatasetPresenter(Observable, Observer):
+class DiffractionArrayPresenter(Observable, Observer):
 
-    def __init__(self, dataFile: ActiveDiffractionFile) -> None:
+    def __init__(self, dataset: DiffractionDataset) -> None:
         super().__init__()
-        self._dataFile = dataFile
-        self._dataset: DiffractionDataset = NullDiffractionDataset()
-        self._datasetIndex = 0
+        self._dataset = dataset
+        self._data: DiffractionArray = SimpleDiffractionArray.createNullInstance()
+        self._dataIndex = 0
 
     @classmethod
-    def createInstance(cls, dataFile: ActiveDiffractionFile) -> DiffractionDatasetPresenter:
-        presenter = cls(dataFile)
-        dataFile.addObserver(presenter)
+    def createInstance(cls, dataset: DiffractionDataset) -> DiffractionArrayPresenter:
+        presenter = cls(dataset)
+        dataset.addObserver(presenter)
         return presenter
 
-    def setCurrentDatasetIndex(self, index: int) -> None:
+    def setCurrentDataIndex(self, index: int) -> None:
         try:
-            dataset = self._dataFile[index]
+            data = self._dataset[index]
         except IndexError:
-            logger.exception('Invalid dataset index!')
+            logger.exception('Invalid data index!')
             return
 
-        self._dataset.removeObserver(self)
-        self._dataset = dataset
-        self._dataset.addObserver(self)
-        self._datasetIndex = index
+        self._data.removeObserver(self)
+        self._data = data
+        self._data.addObserver(self)
+        self._dataIndex = index
 
         self.notifyObservers()
 
-    def getCurrentDatasetIndex(self) -> int:
-        return self._datasetIndex
+    def getCurrentDataIndex(self) -> int:
+        return self._dataIndex
 
     def getNumberOfImages(self) -> int:
-        return len(self._dataset)
+        return len(self._data.getData())  # FIXME get from shape
 
-    def getImage(self, index: int) -> DiffractionArrayType:
-        return self._dataset[index]
+    def getImage(self, index: int) -> DiffractionDataType:
+        return self._data.getData()[index]
 
     def update(self, observable: Observable) -> None:
-        if observable is self._dataFile:
-            self._dataset.removeObserver(self)
-            self._dataset = NullDiffractionDataset()
-            self._datasetIndex = 0
+        if observable is self._dataset:
+            self._data.removeObserver(self)
+            self._data = SimpleDiffractionArray.createNullInstance()
+            self._dataIndex = 0
             self.notifyObservers()
-        elif observable is self._dataset:
+        elif observable is self._data:
             self.notifyObservers()
 
 
 class DataCore:
 
-    def __init__(self, detector: Detector, fileReaderChooser: PluginChooser[DiffractionFileReader],
+    def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
+                 fileReaderChooser: PluginChooser[DiffractionFileReader],
                  fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
-        self.cropSettings = CropSettings.createInstance(self.settingsRegistry)
+        self.cropSettings = CropSettings.createInstance(settingsRegistry)
         self.cropSizer = CropSizer.createInstance(self.cropSettings, detector)
-
-        self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
-        self._activeDiffractionFile = ActiveDiffractionFile(self._dataSettings, self.cropSizer)
-
         self.cropPresenter = CropPresenter.createInstance(self.cropSettings, self.cropSizer)
 
-        # TODO DataDirectoryWatcher should be optional
-        self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
+        self._settings = DataSettings.createInstance(settingsRegistry)
+        self.assembler = DiffractionDataAssembler(self._settings, self.cropSizer)
+        self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(
+            self._settings, self.assembler)
+        self.activeDataset = ActiveDiffractionDataset.createInstance(self.assembler)
 
-        self.dataFilePresenter = DiffractionFilePresenter.createInstance(
-            self._dataSettings, self._activeDiffractionFile,
-            self._pluginRegistry.buildDiffractionFileReaderChooser(),
-            self._pluginRegistry.buildDiffractionFileWriterChooser())
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._activeDiffractionFile)
+            self._settings, self.activeDataset, fileReaderChooser, fileWriterChooser)
+        self.diffractionArrayPresenter = DiffractionArrayPresenter.createInstance(
+            self.activeDataset)
 
     def start(self) -> None:
-        if self._dataDirectoryWatcher:
-            self._dataDirectoryWatcher.start()
+        self._dataDirectoryWatcher.start()
 
     def stop(self) -> None:
-        if self._dataDirectoryWatcher:
-            self._dataDirectoryWatcher.stop()
+        self._dataDirectoryWatcher.stop()

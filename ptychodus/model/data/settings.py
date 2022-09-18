@@ -18,6 +18,7 @@ class DataSettings(Observable, Observer):
         self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory',
                                                               Path('/dev/null'))
         self.numberOfDataThreads = settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)
+        self.watchForFiles = settingsGroup.createBooleanEntry('WatchForFiles', False)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DataSettings:

@@ -10,7 +10,7 @@ import h5py
 import numpy
 
 from .h5DiffractionFile import H5DiffractionFileTreeBuilder
-from ptychodus.api.data import (DiffractionArrayType, DiffractionData, DiffractionDataState,
+from ptychodus.api.data import (DiffractionArray, DiffractionDataType, DiffractionArrayState,
                                 DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
@@ -19,30 +19,32 @@ from ptychodus.api.tree import SimpleTreeNode
 logger = logging.getLogger(__name__)
 
 
-class NeXusDiffractionData(DiffractionData):
+class NeXusDiffractionArray(DiffractionArray):
 
-    def __init__(self, name: str, filePath: Path, dataPath: str) -> None:
+    def __init__(self, label: str, filePath: Path, dataPath: str) -> None:
         super().__init__()
-        self._name = name
-        self._state = DiffractionDataState.MISSING
+        self._label = label
+        self._state = DiffractionArrayState.MISSING
         self._filePath = filePath
         self._dataPath = dataPath
 
-    @property
-    def name(self) -> str:
-        return self._name
+    def getLabel(self) -> str:
+        return self._label
 
-    def getState(self) -> DiffractionDataState:
-        return self._state
-
-    def getStartIndex(self) -> int:
+    def getIndex(self) -> int:
         return 0  # FIXME
 
-    def getArray(self) -> DiffractionArrayType:
+    def getState(self) -> DiffractionArrayState:
+        return self._state
+
+    def getDataOffset(self) -> int:
+        return 0  # FIXME
+
+    def getData(self) -> DiffractionDataType:
         array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
         if self._filePath.is_file():
-            self._state = DiffractionDataState.FOUND
+            self._state = DiffractionArrayState.FOUND
 
             try:
                 with h5py.File(self._filePath, 'r') as h5File:
@@ -50,25 +52,25 @@ class NeXusDiffractionData(DiffractionData):
 
                     if isinstance(item, h5py.Dataset):
                         array = item[()]
-                        self._state = DiffractionDataState.LOADED
+                        self._state = DiffractionArrayState.LOADED
                     else:
                         logger.error(
                             f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
             except OSError as err:
                 logger.exception(err)
         else:
-            self._state = DiffractionDataState.MISSING
+            self._state = DiffractionArrayState.MISSING
 
         return array
 
 
 @dataclass(frozen=True)
 class DataGroup:
-    dataList: list[DiffractionData] = field(default_factory=list)
+    arrayList: list[DiffractionArray] = field(default_factory=list)
 
     @classmethod
     def read(cls, group: h5py.Group) -> DataGroup:
-        dataList: list[DiffractionData] = list()
+        arrayList: list[DiffractionArray] = list()
         masterFilePath = Path(group.file.filename)
 
         for name, h5Item in group.items():
@@ -77,19 +79,19 @@ class DataGroup:
             if isinstance(h5Item, h5py.ExternalLink):
                 filePath = masterFilePath.parent / h5Item.filename
                 dataPath = str(h5Item.path)
-                data = NeXusDiffractionData(name, filePath, dataPath)
-                dataList.append(data)
+                array = NeXusDiffractionArray(name, filePath, dataPath)
+                arrayList.append(array)
 
-        return cls(dataList)
+        return cls(arrayList)
 
     def __iter__(self):
-        return iter(self.dataList)
+        return iter(self.arrayList)
 
-    def __getitem__(self, index: int) -> DiffractionData:
-        return self.dataList[index]
+    def __getitem__(self, index: int) -> DiffractionArray:
+        return self.arrayList[index]
 
     def __len__(self) -> int:
-        return len(self.dataList)
+        return len(self.arrayList)
 
 
 @dataclass(frozen=True)
@@ -202,19 +204,19 @@ class NeXusDiffractionDataset(DiffractionDataset):
         return self._contentsTree
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionData:
+    def __getitem__(self, index: int) -> DiffractionArray:
         ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionData]:
+    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]:
         ...
 
-    def __getitem__(self,
-                    index: Union[int, slice]) -> Union[DiffractionData, Sequence[DiffractionData]]:
-        return self._entry.data.dataList[index]
+    def __getitem__(
+            self, index: Union[int, slice]) -> Union[DiffractionArray, Sequence[DiffractionArray]]:
+        return self._entry.data.arrayList[index]
 
     def __len__(self) -> int:
-        return len(self._entry.data.dataList)
+        return len(self._entry.data.arrayList)
 
 
 class NeXusDiffractionFileReader(DiffractionFileReader):
@@ -234,8 +236,8 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
     def read(self, filePath: Path) -> DiffractionDataset:
         metadata = DiffractionMetadata(filePath, 0, 0, 0)
         contentsTree = self._treeBuilder.createRootNode()
-        dataList: list[DiffractionData] = list()
-        dataset: DiffractionDataset = SimpleDiffractionDataset(metadata, contentsTree, dataList)
+        arrayList: list[DiffractionArray] = list()
+        dataset: DiffractionDataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 
         if filePath is None:
             return dataset

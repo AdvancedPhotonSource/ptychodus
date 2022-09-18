@@ -69,7 +69,7 @@ class ModelCore:
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._detector = Detector.createInstance(self._detectorSettings)
-        self._dataCore = DataCore(self._detector,
+        self._dataCore = DataCore(self.settingsRegistry, self._detector,
                                   self._pluginRegistry.buildDiffractionFileReaderChooser(),
                                   self._pluginRegistry.buildDiffractionFileWriterChooser())
 
@@ -92,7 +92,7 @@ class ModelCore:
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(
-            self.settingsRegistry, self._activeDiffractionFile, self._scanCore.scan,
+            self.settingsRegistry, self._dataCore.assembler, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
             self._scanCore.initializerFactory, self._scanCore.repository,
             self.reconstructorPlotPresenter, modelArgs.isDeveloperModeEnabled)
@@ -110,7 +110,7 @@ class ModelCore:
             if type(entry.strategy).__name__ == 'VelociprobeDiffractionFileReader')
         self.velociprobePresenter = VelociprobePresenter.createInstance(
             self._velociprobeReader, self._detectorSettings, self._dataCore.cropSettings,
-            self._probeCore.settings, self._activeDiffractionFile, self._scanCore)
+            self._probeCore.settings, self._dataCore.activeDataset, self._scanCore)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 

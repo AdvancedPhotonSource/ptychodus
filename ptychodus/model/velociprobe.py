@@ -4,10 +4,10 @@ import logging
 
 import numpy
 
-from ..api.data import DiffractionDataState
+from ..api.data import DiffractionArrayState
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup
-from .data import ActiveDataFile, CropSettings
+from .data import ActiveDiffractionDataset, CropSettings
 from .detector import DetectorSettings
 from .probe import ProbeSettings
 from .scan import ScanCore
@@ -15,26 +15,26 @@ from .scan import ScanCore
 logger = logging.getLogger(__name__)
 
 
-class VelociprobePresenter(Observable, Observer):
+class VelociprobePresenter(Observable, Observer):  # FIXME
 
     def __init__(self, velociprobeReader: VelociprobeReader, detectorSettings: DetectorSettings,
                  cropSettings: CropSettings, probeSettings: ProbeSettings,
-                 activeDataFile: ActiveDataFile, scanCore: ScanCore) -> None:
+                 activeDiffractionDataset: ActiveDiffractionDataset, scanCore: ScanCore) -> None:
         super().__init__()
         self._velociprobeReader = velociprobeReader
         self._detectorSettings = detectorSettings
         self._cropSettings = cropSettings
         self._probeSettings = probeSettings
-        self._activeDataFile = activeDataFile
+        self._activeDiffractionDataset = activeDiffractionDataset
         self._scanCore = scanCore
 
     @classmethod
     def createInstance(cls, velociprobeReader: VelociprobeReader,
                        detectorSettings: DetectorSettings, cropSettings: CropSettings,
-                       probeSettings: ProbeSettings, activeDataFile: ActiveDataFile,
-                       scanCore: ScanCore):
+                       probeSettings: ProbeSettings,
+                       activeDiffractionDataset: ActiveDiffractionDataset, scanCore: ScanCore):
         presenter = cls(velociprobeReader, detectorSettings, cropSettings, probeSettings,
-                        activeDataFile, scanCore)
+                        activeDiffractionDataset, scanCore)
         velociprobeReader.addObserver(presenter)
         return presenter
 
@@ -92,7 +92,7 @@ class VelociprobePresenter(Observable, Observer):
                 SettingsGroup.convertFloatToDecimal(self._detectorSpecificGroup.photon_energy_eV)
 
     def loadScanFile(self) -> None:
-        filePathMaster = self._activeDataFile.metadata.filePath
+        filePathMaster = self._activeDiffractionDataset.getMetadata().filePath
         fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
         filePath = filePathMaster.parents[2] / 'positions' / fileName
         fileFilter = 'Comma-Separated Values Files (*.csv)'  # TODO refactor; get from somewhere

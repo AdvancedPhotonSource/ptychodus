@@ -12,32 +12,65 @@ import numpy.typing
 from .observer import Observable
 from .tree import SimpleTreeNode
 
-DiffractionArrayType = numpy.typing.NDArray[numpy.integer]
+DiffractionDataType = numpy.typing.NDArray[numpy.integer]
 
 
-class DiffractionDataState(Enum):
+class DiffractionArrayState(Enum):
     MISSING = auto()
     FOUND = auto()
     LOADED = auto()
 
 
-class DiffractionData(Observable):
+class DiffractionArray(Observable):
 
-    @abstractproperty
-    def name(self) -> str:
+    @abstractmethod
+    def getLabel(self) -> str:
         pass
 
     @abstractmethod
-    def getState(self) -> DiffractionDataState:
+    def getIndex(self) -> int:
         pass
 
     @abstractmethod
-    def getStartIndex(self) -> int:
+    def getState(self) -> DiffractionArrayState:
         pass
 
     @abstractmethod
-    def getArray(self) -> DiffractionArrayType:
+    def getDataOffset(self) -> int:
         pass
+
+    @abstractmethod
+    def getData(self) -> DiffractionDataType:
+        pass
+
+
+class SimpleDiffractionArray(DiffractionArray):
+
+    def __init__(self, label: str, index: int, dataOffset: int, data: DiffractionDataType) -> None:
+        super().__init__()
+        self._label = label
+        self._index = index
+        self._dataOffset = dataOffset
+        self._data = data
+
+    @classmethod
+    def createNullInstance(cls) -> DiffractionArray:
+        return cls('Null', 0, 0, numpy.empty((0, 0, 0), dtype=int))
+
+    def getLabel(self) -> str:
+        return self._label
+
+    def getIndex(self) -> int:
+        return self._index
+
+    def getState(self) -> DiffractionArrayState:
+        return DiffractionArrayState.LOADED
+
+    def getDataOffset(self) -> int:
+        return self._dataOffset
+
+    def getData(self) -> DiffractionDataType:
+        return self._data
 
 
 @dataclass(frozen=True)
@@ -56,7 +89,7 @@ class DiffractionMetadata:
     probeEnergyInElectronVolts: Optional[Decimal] = None
 
 
-class DiffractionDataset(Sequence[DiffractionData], Observable):
+class DiffractionDataset(Sequence[DiffractionArray], Observable):
 
     @abstractmethod
     def getMetadata(self) -> DiffractionMetadata:
@@ -70,10 +103,11 @@ class DiffractionDataset(Sequence[DiffractionData], Observable):
 class SimpleDiffractionDataset(DiffractionDataset):
 
     def __init__(self, metadata: DiffractionMetadata, contentsTree: SimpleTreeNode,
-                 dataList: list[DiffractionData]) -> None:
+                 arrayList: list[DiffractionArray]) -> None:
+        super().__init__()
         self._metadata = metadata
         self._contentsTree = contentsTree
-        self._dataList = dataList
+        self._arrayList = arrayList
 
     def getMetadata(self) -> DiffractionMetadata:
         return self._metadata
@@ -82,19 +116,19 @@ class SimpleDiffractionDataset(DiffractionDataset):
         return self._contentsTree
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionData:
+    def __getitem__(self, index: int) -> DiffractionArray:
         ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionData]:
+    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]:
         ...
 
-    def __getitem__(self,
-                    index: Union[int, slice]) -> Union[DiffractionData, Sequence[DiffractionData]]:
-        return self._dataList[index]
+    def __getitem__(
+            self, index: Union[int, slice]) -> Union[DiffractionArray, Sequence[DiffractionArray]]:
+        return self._arrayList[index]
 
     def __len__(self) -> int:
-        return len(self._dataList)
+        return len(self._arrayList)
 
 
 class DiffractionFileReader(ABC):

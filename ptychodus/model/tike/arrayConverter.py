@@ -5,10 +5,11 @@ import logging
 import numpy
 import numpy.typing
 
-from ...api.data import DiffractionArrayType, DiffractionData
+from ...api.data import DiffractionDataType
 from ...api.object import ObjectArrayType
 from ...api.probe import ProbeArrayType
 from ...api.scan import ScanPoint
+from ..data import DiffractionDataAssembler
 from ..object import Object
 from ..probe import Apparatus, Probe
 from ..scan import Scan, ScanInitializerFactory, ScanRepository
@@ -28,18 +29,19 @@ class TikeArrays:
 class TikeArrayConverter:
 
     def __init__(self, apparatus: Apparatus, scan: Scan, probe: Probe, object_: Object,
-                 diffractionData: DiffractionData, scanInitializerFactory: ScanInitializerFactory,
+                 diffractionDataAssembler: DiffractionDataAssembler,
+                 scanInitializerFactory: ScanInitializerFactory,
                  scanRepository: ScanRepository) -> None:
         self._apparatus = apparatus
         self._scan = scan
         self._probe = probe
         self._object = object_
-        self._diffractionData = diffractionData
+        self._diffractionDataAssembler = diffractionDataAssembler
         self._scanInitializerFactory = scanInitializerFactory
         self._scanRepository = scanRepository
 
-    def getDiffractionData(self) -> DiffractionArrayType:
-        data = self._diffractionData.getArray()
+    def getDiffractionData(self) -> DiffractionDataType:
+        data = self._diffractionDataAssembler.getData()
         return numpy.fft.ifftshift(data, axes=(-2, -1))
 
     def exportToTike(self) -> TikeArrays:
