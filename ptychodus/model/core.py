@@ -13,8 +13,9 @@ import numpy
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
 from .data import DataCore
-from .detector import *
+from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import *
+from .metadata import DiffractionMetadataPresenter
 from .object import ObjectCore, ObjectPresenter
 from .probe import ProbeCore, ProbePresenter
 from .ptychonn import PtychoNNBackend
@@ -24,7 +25,6 @@ from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
 from .tike import TikeBackend
-from .velociprobe import *
 from .workflow import WorkflowCore, WorkflowPresenter
 
 logger = logging.getLogger(__name__)
@@ -61,20 +61,16 @@ class ModelCore:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
-        self._detectorImageCore = ImageCore(
-            self._pluginRegistry.buildScalarTransformationChooser())
-        self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
-        self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
-
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._detector = Detector.createInstance(self._detectorSettings)
+        self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
+        self._detectorImageCore = ImageCore(
+            self._pluginRegistry.buildScalarTransformationChooser())
+
         self._dataCore = DataCore(self.settingsRegistry, self._detector,
                                   self._pluginRegistry.buildDiffractionFileReaderChooser(),
                                   self._pluginRegistry.buildDiffractionFileWriterChooser())
-
-        self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
-
         self._scanCore = ScanCore(self.rng, self.settingsRegistry,
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())
@@ -82,11 +78,14 @@ class ModelCore:
                                     self._dataCore.cropSizer,
                                     self._pluginRegistry.buildProbeFileReaderChooser(),
                                     self._pluginRegistry.buildProbeFileWriterChooser())
+        self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
         self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
                                       self._scanCore.scan, self._probeCore.sizer,
                                       self._pluginRegistry.buildObjectFileReaderChooser(),
                                       self._pluginRegistry.buildObjectFileWriterChooser())
+        self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
 
+        self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
         self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
@@ -98,19 +97,13 @@ class ModelCore:
             self.reconstructorPlotPresenter, modelArgs.isDeveloperModeEnabled)
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
+
+        self.diffractionMetadataPresenter = DiffractionMetadataPresenter.createInstance(
+            self._dataCore.activeDataset, self._detectorSettings, self._dataCore.cropSettings,
+            self._probeCore.settings, self._scanCore)
         self._selectableReconstructor = SelectableReconstructor.createInstance(
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
-
-        self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
-
-        # TODO remove velociprobePresenter lookup when able
-        self._velociprobeReader = next(
-            entry.strategy for entry in self._pluginRegistry.diffractionFileReaders
-            if type(entry.strategy).__name__ == 'VelociprobeDiffractionFileReader')
-        self.velociprobePresenter = VelociprobePresenter.createInstance(
-            self._velociprobeReader, self._detectorSettings, self._dataCore.cropSettings,
-            self._probeCore.settings, self._dataCore.activeDataset, self._scanCore)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 

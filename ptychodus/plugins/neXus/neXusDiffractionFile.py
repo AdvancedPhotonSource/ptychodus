@@ -9,7 +9,7 @@ import logging
 import h5py
 import numpy
 
-from .h5DiffractionFile import H5DiffractionFileTreeBuilder
+from ..h5DiffractionFile import H5DiffractionFileTreeBuilder
 from ptychodus.api.data import (DiffractionArray, DiffractionDataType, DiffractionArrayState,
                                 DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 SimpleDiffractionDataset)
@@ -270,7 +270,3 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
             dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
 
         return dataset
-
-
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(NeXusDiffractionFileReader())

@@ -8,7 +8,7 @@ from typing import Final
 import csv
 import math
 
-from .nexusDiffractionFile import NeXusDiffractionFileReader
+from .neXusDiffractionFile import NeXusDiffractionFileReader
 from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
                                 ScanPointParseError, ScanPointSequence, SimpleScanDictionary)
 from ptychodus.api.plugins import PluginRegistry
@@ -49,6 +49,7 @@ class VelociprobeScanFileReader(ScanFileReader):
         xMean = sum([point.x for point in pointList], start=zero) / numberOfPoints
         yMean = sum([point.y for point in pointList], start=zero) / numberOfPoints
 
+        # vvv FIXME vvv
         stageRotationInRadians = self._diffractionFileReader.entry.sample.goniometer.chi_rad \
                 if self._diffractionFileReader.entry else 0.
         stageRotationCosine = Decimal(math.cos(stageRotationInRadians))
@@ -101,8 +102,3 @@ class VelociprobeScanFileReader(ScanFileReader):
         scanDict[f'{self.simpleName}LaserInterferometerY'] = liPointList
         scanDict[f'{self.simpleName}EncoderY'] = enPointList
         return SimpleScanDictionary(scanDict)
-
-
-def registerPlugins(registry: PluginRegistry) -> None:
-    # FIXME registry.registerPlugin(VelociprobeScanFileReader(diffractionFileReader))
-    pass

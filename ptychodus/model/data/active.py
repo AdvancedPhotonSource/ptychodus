@@ -54,7 +54,7 @@ class ActiveDiffractionDataset(DiffractionDataset, Observer):
     def switchTo(self, dataset: DiffractionDataset) -> None:
         # self._diffractionDataset.getMetadata()
         # self._diffractionDataset.getContentsTree()
-        pass  # FIXME assemble data
+        self.notifyObservers()  # FIXME assemble data
 
     def update(self, observable: Observable) -> None:
         if observable is self._assembler:
