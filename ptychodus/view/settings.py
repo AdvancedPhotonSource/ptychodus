@@ -1,103 +1,10 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListView, QPushButton,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QListView,
+                             QPushButton, QVBoxLayout, QWidget)
 
-
-class SettingsImportValuesGroupBox(QGroupBox):
-
-    @staticmethod
-    def createCheckBox(text: str) -> QCheckBox:
-        widget = QCheckBox(text)
-        widget.setChecked(True)
-        return widget
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Choose Settings', parent)
-        self.detectorPixelCountCheckBox = self.createCheckBox('Detector Pixel Count')
-        self.detectorPixelSizeCheckBox = self.createCheckBox('Detector Pixel Size')
-        self.detectorDistanceCheckBox = self.createCheckBox('Detector Distance')
-        self.imageCropCenterCheckBox = self.createCheckBox('Image Crop Center')
-        self.imageCropExtentCheckBox = self.createCheckBox('Image Crop Extent')
-        self.probeEnergyCheckBox = self.createCheckBox('Probe Energy')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsImportValuesGroupBox:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.detectorPixelCountCheckBox)
-        layout.addWidget(view.detectorPixelSizeCheckBox)
-        layout.addWidget(view.detectorDistanceCheckBox)
-        layout.addWidget(view.imageCropCenterCheckBox)
-        layout.addWidget(view.imageCropExtentCheckBox)
-        layout.addWidget(view.probeEnergyCheckBox)
-        layout.addStretch()
-        view.setLayout(layout)
-
-        return view
-
-
-class SettingsImportOptionsGroupBox(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Additional Options', parent)
-        self.loadScanCheckBox = QCheckBox('Load Scan')
-        self.reinitializeProbeCheckBox = QCheckBox('Reinitialize Probe')
-        self.reinitializeObjectCheckBox = QCheckBox('Reinitialize Object')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsImportOptionsGroupBox:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.loadScanCheckBox)
-        layout.addWidget(view.reinitializeProbeCheckBox)
-        layout.addWidget(view.reinitializeObjectCheckBox)
-        layout.addStretch()
-        view.setLayout(layout)
-
-        return view
-
-
-class SettingsImportDialog(QDialog):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.valuesGroupBox = SettingsImportValuesGroupBox.createInstance()
-        self.optionsGroupBox = SettingsImportOptionsGroupBox.createInstance()
-        self.centerWidget = QWidget()
-        self.buttonBox = QDialogButtonBox()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsImportDialog:
-        view = cls(parent)
-
-        view.setWindowTitle('Import Settings')
-
-        centerLayout = QHBoxLayout()
-        centerLayout.addWidget(view.valuesGroupBox)
-        centerLayout.addWidget(view.optionsGroupBox)
-        view.centerWidget.setLayout(centerLayout)
-
-        view.buttonBox.addButton(QDialogButtonBox.Apply)
-        view.buttonBox.addButton(QDialogButtonBox.Cancel)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.centerWidget)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ApplyRole:
-            self.accept()
-        else:
-            self.reject()
+from .metadata import MetadataDialog
 
 
 class SettingsView(QGroupBox):
@@ -165,7 +72,7 @@ class SettingsParametersView(QWidget):
         super().__init__(parent)
         self.settingsView = SettingsView.createInstance()
         self.groupView = SettingsGroupView.createInstance()
-        self.importDialog = SettingsImportDialog.createInstance(self)
+        self.importDialog = MetadataDialog.createInstance(self)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsParametersView:

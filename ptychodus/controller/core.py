@@ -6,12 +6,13 @@ from ..view import ViewCore
 from .data import DataParametersController, FileDialogFactory
 from .detector import (CropController, DatasetImageController, DatasetParametersController,
                        DetectorController)
+from .metadata import MetadataController
 from .object import ObjectImageController, ObjectParametersController
 from .probe import ProbeImageController, ProbeParametersController
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import ReconstructorParametersController, ReconstructorPlotController
 from .scan import ScanController
-from .settings import SettingsController, SettingsImportController
+from .settings import SettingsController
 from .tike import TikeViewControllerFactory
 from .workflow import WorkflowController
 
@@ -27,8 +28,8 @@ class ControllerCore:
         self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(model.ptychopyBackend)
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeBackend)
 
-        self._settingsImportController = SettingsImportController.createInstance(
-            model.probePresenter, model.objectPresenter, model.velociprobePresenter,
+        self._metadataController = MetadataController.createInstance(
+            model.probePresenter, model.objectPresenter, model.metadataPresenter,
             view.settingsParametersView.importDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
                                                                      view.settingsParametersView,
@@ -37,13 +38,13 @@ class ControllerCore:
         self._detectorController = DetectorController.createInstance(
             model.detectorPresenter, view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
-            model.dataFilePresenter, model.diffractionDatasetPresenter,
+            model.diffractionDatasetPresenter, model.diffractionArrayPresenter,
             view.detectorParametersView.datasetView)
         self._cropController = CropController.createInstance(
             model.cropPresenter, view.detectorParametersView.imageCropView)
         self._datasetImageController = DatasetImageController.createInstance(
-            model.diffractionDatasetPresenter, model.detectorImagePresenter,
-            view.detectorImageView, self._fileDialogFactory)
+            model.diffractionArrayPresenter, model.detectorImagePresenter, view.detectorImageView,
+            self._fileDialogFactory)
         self._probeParametersController = ProbeParametersController.createInstance(
             model.probePresenter, view.probeParametersView, model.probeImagePresenter,
             view.probeImageView, self._fileDialogFactory)
@@ -57,7 +58,7 @@ class ControllerCore:
             model.objectPresenter, model.objectImagePresenter, view.objectImageView,
             self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
-            model.dataFilePresenter, view.dataParametersView, view.dataTableView,
+            model.diffractionDatasetPresenter, view.dataParametersView, view.dataTableView,
             self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter, view.reconstructorParametersView,

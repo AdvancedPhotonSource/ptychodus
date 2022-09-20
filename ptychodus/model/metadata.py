@@ -11,7 +11,7 @@ from .probe import ProbeSettings
 from .scan import ScanCore
 
 
-class DiffractionMetadataPresenter(Observable, Observer):
+class MetadataPresenter(Observable, Observer):
 
     def __init__(self, diffractionDataset: DiffractionDataset, detectorSettings: DetectorSettings,
                  cropSettings: CropSettings, probeSettings: ProbeSettings,
@@ -26,7 +26,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
     @classmethod
     def createInstance(cls, diffractionDataset: DiffractionDataset,
                        detectorSettings: DetectorSettings, cropSettings: CropSettings,
-                       probeSettings: ProbeSettings, scanCore: ScanCore):
+                       probeSettings: ProbeSettings, scanCore: ScanCore) -> MetadataPresenter:
         presenter = cls(diffractionDataset, detectorSettings, cropSettings, probeSettings,
                         scanCore)
         diffractionDataset.addObserver(presenter)

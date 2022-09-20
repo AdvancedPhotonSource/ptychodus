@@ -65,16 +65,16 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def getContentsTree(self) -> SimpleTreeNode:
         return self._activeDiffractionDataset.getContentsTree()
 
-    def getDataLabel(self, index: int) -> str:
+    def getArrayLabel(self, index: int) -> str:
         return self._activeDiffractionDataset[index].getLabel()
 
-    def getDataState(self, index: int) -> DiffractionArrayState:
+    def getArrayState(self, index: int) -> DiffractionArrayState:
         return self._activeDiffractionDataset[index].getState()
 
-    def getNumberOfData(self) -> int:
+    def getNumberOfArrays(self) -> int:
         return len(self._activeDiffractionDataset)
 
-    def openData(self, dataPath: str) -> Any:  # FIXME
+    def openArray(self, dataPath: str) -> Any:  # FIXME
         filePath = self._activeDiffractionDataset.getMetadata().filePath
         data = None
 
@@ -174,7 +174,7 @@ class DiffractionArrayPresenter(Observable, Observer):
         dataset.addObserver(presenter)
         return presenter
 
-    def setCurrentDataIndex(self, index: int) -> None:
+    def setCurrentArrayIndex(self, index: int) -> None:
         try:
             data = self._dataset[index]
         except IndexError:
@@ -188,7 +188,7 @@ class DiffractionArrayPresenter(Observable, Observer):
 
         self.notifyObservers()
 
-    def getCurrentDataIndex(self) -> int:
+    def getCurrentArrayIndex(self) -> int:
         return self._dataIndex
 
     def getNumberOfImages(self) -> int:

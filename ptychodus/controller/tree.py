@@ -1,6 +1,8 @@
+from typing import overload, Optional, Union
+
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
 
-from ..model import SimpleTreeNode
+from ..api.tree import SimpleTreeNode
 
 
 class SimpleTreeModel(QAbstractItemModel):
@@ -54,19 +56,30 @@ class SimpleTreeModel(QAbstractItemModel):
 
         return value
 
+    @overload
     def parent(self, child: QModelIndex) -> QModelIndex:
-        value = QModelIndex()
+        ...
 
-        if child.isValid():
-            childItem = child.internalPointer()
-            parentItem = childItem.parentItem
+    @overload
+    def parent(self) -> QObject:
+        ...
 
-            if parentItem is self._rootNode:
-                value = QModelIndex()
-            else:
-                value = self.createIndex(parentItem.row(), 0, parentItem)
+    def parent(self, child: Optional[QModelIndex] = None) -> Union[QModelIndex, QObject]:
+        if child is None:
+            return super().parent()
+        else:
+            value = QModelIndex()
 
-        return value
+            if child.isValid():
+                childItem = child.internalPointer()
+                parentItem = childItem.parentItem
+
+                if parentItem is self._rootNode:
+                    value = QModelIndex()
+                else:
+                    value = self.createIndex(parentItem.row(), 0, parentItem)
+
+            return value
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.column() > 0:

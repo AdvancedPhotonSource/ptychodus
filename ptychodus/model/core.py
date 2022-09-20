@@ -12,10 +12,10 @@ import numpy
 
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
-from .data import DataCore
+from .data import CropPresenter, DataCore, DiffractionArrayPresenter, DiffractionDatasetPresenter
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import *
-from .metadata import DiffractionMetadataPresenter
+from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter
 from .probe import ProbeCore, ProbePresenter
 from .ptychonn import PtychoNNBackend
@@ -98,9 +98,11 @@ class ModelCore:
         self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
 
-        self.diffractionMetadataPresenter = DiffractionMetadataPresenter.createInstance(
-            self._dataCore.activeDataset, self._detectorSettings, self._dataCore.cropSettings,
-            self._probeCore.settings, self._scanCore)
+        self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.activeDataset,
+                                                                  self._detectorSettings,
+                                                                  self._dataCore.cropSettings,
+                                                                  self._probeCore.settings,
+                                                                  self._scanCore)
         self._selectableReconstructor = SelectableReconstructor.createInstance(
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
@@ -169,6 +171,18 @@ class ModelCore:
     @property
     def detectorImagePresenter(self) -> ImagePresenter:
         return self._detectorImageCore.presenter
+
+    @property
+    def cropPresenter(self) -> CropPresenter:
+        return self._dataCore.cropPresenter
+
+    @property
+    def diffractionArrayPresenter(self) -> DiffractionArrayPresenter:
+        return self._dataCore.diffractionArrayPresenter
+
+    @property
+    def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
+        return self._dataCore.diffractionDatasetPresenter
 
     @property
     def scanPresenter(self) -> ScanPresenter:

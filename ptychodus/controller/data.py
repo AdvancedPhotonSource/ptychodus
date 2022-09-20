@@ -6,7 +6,7 @@ import numpy
 from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QDialog, QFileDialog, QTableView, QTreeView, QWidget
 
-from ..model import DataFilePresenter, Observable, Observer
+from ..model import DiffractionDatasetPresenter, Observable, Observer
 from ..view import DataParametersView
 from .tree import SimpleTreeModel
 
@@ -134,7 +134,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
 class DataParametersController(Observer):
 
-    def __init__(self, presenter: DataFilePresenter, view: DataParametersView,
+    def __init__(self, presenter: DiffractionDatasetPresenter, view: DataParametersView,
                  tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
         self._view = view
@@ -144,7 +144,7 @@ class DataParametersController(Observer):
         self._tableModel = DataArrayTableModel()
 
     @classmethod
-    def createInstance(cls, presenter: DataFilePresenter, view: DataParametersView,
+    def createInstance(cls, presenter: DiffractionDatasetPresenter, view: DataParametersView,
                        tableView: QTableView,
                        fileDialogFactory: FileDialogFactory) -> DataParametersController:
         controller = cls(presenter, view, tableView, fileDialogFactory)
@@ -155,12 +155,12 @@ class DataParametersController(Observer):
             controller._updateDataArrayInTableView)
         tableView.setModel(controller._tableModel)
 
-        view.dataView.buttonBox.openButton.clicked.connect(controller._openDataFile)
-        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDataFile)
+        view.dataView.buttonBox.openButton.clicked.connect(controller._openDiffractionFile)
+        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDiffractionFile)
 
         return controller
 
-    def _openDataFile(self) -> None:
+    def _openDiffractionFile(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Data File',
@@ -168,10 +168,10 @@ class DataParametersController(Observer):
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openDataFile(filePath, nameFilter)
+            self._presenter.openDiffractionFile(filePath, nameFilter)
             self._view.dataView.setTitle(f'Data File: {filePath}')
 
-    def _saveDataFile(self) -> None:
+    def _saveDiffractionFile(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Data File',
@@ -179,7 +179,7 @@ class DataParametersController(Observer):
             selectedNameFilter=self._presenter.getSaveFileFilter())
 
         if filePath:
-            self._presenter.saveDataFile(filePath, nameFilter)
+            self._presenter.saveDiffractionFile(filePath, nameFilter)
 
     def _chooseScratchDirectory(self) -> None:
         # TODO unused
@@ -197,9 +197,9 @@ class DataParametersController(Observer):
             names.append(nodeItem.data(0))
             nodeItem = nodeItem.parentItem
 
-        dataPath = '/' + '/'.join(reversed(names))
-        data = self._presenter.openDataset(dataPath)
-        self._tableModel.setArray(data)
+        arrayPath = '/' + '/'.join(reversed(names))
+        array = self._presenter.openArray(arrayPath)
+        self._tableModel.setArray(array)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

@@ -50,8 +50,7 @@ class VelociprobeScanFileReader(ScanFileReader):
         yMean = sum([point.y for point in pointList], start=zero) / numberOfPoints
 
         # vvv FIXME vvv
-        stageRotationInRadians = self._diffractionFileReader.entry.sample.goniometer.chi_rad \
-                if self._diffractionFileReader.entry else 0.
+        stageRotationInRadians = self._diffractionFileReader.entry.sample.goniometer.chi_rad
         stageRotationCosine = Decimal(math.cos(stageRotationInRadians))
 
         for idx, point in enumerate(pointList):

@@ -3,12 +3,11 @@ from typing import Optional
 
 from PyQt5.QtCore import (Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject,
                           QVariant)
-from PyQt5.QtWidgets import QDialog, QListView, QTableView
+from PyQt5.QtWidgets import QTableView
 
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup, SettingsRegistry
-from ..model import ObjectPresenter, ProbePresenter, ScanPresenter, VelociprobePresenter
-from ..view import SettingsImportDialog, SettingsParametersView
+from ..view import SettingsParametersView
 from .data import FileDialogFactory
 
 
@@ -144,8 +143,13 @@ class SettingsController(Observer):
         self._entryTableView.setModel(entryTableModel)
 
     def _syncModelToView(self) -> None:
-        self._parametersView.settingsView.replacementPathPrefixLineEdit.setText(
-            self._settingsRegistry.getReplacementPathPrefix())
+        replacementPathPrefix = self._settingsRegistry.getReplacementPathPrefix()
+
+        if replacementPathPrefix:
+            self._parametersView.settingsView.replacementPathPrefixLineEdit.setText(
+                replacementPathPrefix)
+        else:
+            self._parametersView.settingsView.replacementPathPrefixLineEdit.clear()
 
         self._groupListModel.refresh()
         current = self._parametersView.groupView.listView.currentIndex()
@@ -154,55 +158,3 @@ class SettingsController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:
             self._syncModelToView()
-
-
-class SettingsImportController(Observer):
-
-    def __init__(self, probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
-                 velociprobePresenter: VelociprobePresenter, dialog: SettingsImportDialog) -> None:
-        super().__init__()
-        self._probePresenter = probePresenter
-        self._objectPresenter = objectPresenter
-        self._velociprobePresenter = velociprobePresenter
-        self._dialog = dialog
-
-    @classmethod
-    def createInstance(cls, probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
-                       velociprobePresenter: VelociprobePresenter, dialog: SettingsImportDialog):
-        controller = cls(probePresenter, objectPresenter, velociprobePresenter, dialog)
-        velociprobePresenter.addObserver(controller)
-        dialog.finished.connect(controller._importSettings)
-        return controller
-
-    def _importSettings(self, result: int) -> None:
-        if result != QDialog.Accepted:
-            return
-
-        if self._dialog.valuesGroupBox.detectorPixelCountCheckBox.isChecked():
-            self._velociprobePresenter.syncDetectorPixelCount()
-
-        if self._dialog.valuesGroupBox.detectorPixelSizeCheckBox.isChecked():
-            self._velociprobePresenter.syncDetectorPixelSize()
-
-        if self._dialog.valuesGroupBox.detectorDistanceCheckBox.isChecked():
-            self._velociprobePresenter.syncDetectorDistance()
-
-        self._velociprobePresenter.syncImageCrop(
-            syncCenter=self._dialog.valuesGroupBox.imageCropCenterCheckBox.isChecked(),
-            syncExtent=self._dialog.valuesGroupBox.imageCropExtentCheckBox.isChecked())
-
-        if self._dialog.valuesGroupBox.probeEnergyCheckBox.isChecked():
-            self._velociprobePresenter.syncProbeEnergy()
-
-        if self._dialog.optionsGroupBox.loadScanCheckBox.isChecked():
-            self._velociprobePresenter.loadScanFile()
-
-        if self._dialog.optionsGroupBox.reinitializeProbeCheckBox.isChecked():
-            self._probePresenter.initializeProbe()
-
-        if self._dialog.optionsGroupBox.reinitializeObjectCheckBox.isChecked():
-            self._objectPresenter.initializeObject()
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._velociprobePresenter:
-            self._dialog.open()

@@ -2,6 +2,7 @@ from .core import *
 from .data import *
 from .detector import *
 from .image import *
+from .metadata import *
 from .monitor import *
 from .object import *
 from .probe import *

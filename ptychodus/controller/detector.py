@@ -6,9 +6,9 @@ from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QFileDialog
 
-from ..api.data import DiffractionDataState
+from ..api.data import DiffractionArrayState
 from ..api.observer import Observable, Observer
-from ..model import (CropPresenter, DataFilePresenter, DetectorPresenter,
+from ..model import (CropPresenter, DetectorPresenter, DiffractionArrayPresenter,
                      DiffractionDatasetPresenter, ImagePresenter)
 from ..view import CropView, DatasetView, DetectorView, ImageView
 from .data import FileDialogFactory
@@ -63,7 +63,7 @@ class DetectorController(Observer):
 
 class DatasetListModel(QAbstractListModel):
 
-    def __init__(self, presenter: DataFilePresenter, parent: QObject = None) -> None:
+    def __init__(self, presenter: DiffractionDatasetPresenter, parent: QObject = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
 
@@ -75,10 +75,10 @@ class DatasetListModel(QAbstractListModel):
         value = Qt.NoItemFlags
 
         if index.isValid():
-            state = self._presenter.getDiffractionDataState(index.row())
+            state = self._presenter.getArrayState(index.row())
             value = super().flags(index)
 
-            if state != DiffractionDataState.VALID:
+            if state != DiffractionArrayState.LOADED:
                 value &= ~Qt.ItemIsSelectable
                 value &= ~Qt.ItemIsEnabled
 
@@ -89,56 +89,57 @@ class DatasetListModel(QAbstractListModel):
 
         if index.isValid():
             if role == Qt.DisplayRole:
-                value = self._presenter.getDatasetName(index.row())
+                label = self._presenter.getArrayLabel(index.row())
+                value = QVariant(label)
             elif role == Qt.FontRole:
-                state = self._presenter.getDiffractionDataState(index.row())
+                state = self._presenter.getArrayState(index.row())
                 font = QFont()
-                font.setItalic(state == DiffractionDataState.EXISTS)
+                font.setItalic(state == DiffractionArrayState.FOUND)
                 value = QVariant(font)
 
         return value
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return self._presenter.getNumberOfDatasets()
+        return self._presenter.getNumberOfArrays()
 
 
 class DatasetParametersController(Observer):
 
-    def __init__(self, dataFilePresenter: DataFilePresenter,
-                 datasetPresenter: DiffractionDatasetPresenter, view: DatasetView) -> None:
+    def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
+                 arrayPresenter: DiffractionArrayPresenter, view: DatasetView) -> None:
         super().__init__()
-        self._dataFilePresenter = dataFilePresenter
         self._datasetPresenter = datasetPresenter
+        self._arrayPresenter = arrayPresenter
         self._view = view
-        self._listModel = DatasetListModel(dataFilePresenter)
+        self._listModel = DatasetListModel(datasetPresenter)
 
     @classmethod
-    def createInstance(cls, dataFilePresenter: DataFilePresenter,
-                       datasetPresenter: DiffractionDatasetPresenter,
+    def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
+                       arrayPresenter: DiffractionArrayPresenter,
                        view: DatasetView) -> DatasetParametersController:
-        controller = cls(dataFilePresenter, datasetPresenter, view)
+        controller = cls(datasetPresenter, arrayPresenter, view)
 
         view.listView.setModel(controller._listModel)
-        dataFilePresenter.addObserver(controller)
         datasetPresenter.addObserver(controller)
+        arrayPresenter.addObserver(controller)
 
         view.listView.selectionModel().currentChanged.connect(
-            controller._updateCurrentDatasetIndex)
+            controller._updateCurrentArrayIndex)
 
         return controller
 
-    def _updateCurrentDatasetIndex(self, index: QModelIndex) -> None:
-        self._datasetPresenter.setCurrentDatasetIndex(index.row())
+    def _updateCurrentArrayIndex(self, index: QModelIndex) -> None:
+        self._arrayPresenter.setCurrentArrayIndex(index.row())
 
     def _updateSelection(self) -> None:
-        row = self._datasetPresenter.getCurrentDatasetIndex()
+        row = self._arrayPresenter.getCurrentArrayIndex()
         index = self._listModel.index(row, 0)
         self._view.listView.setCurrentIndex(index)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._dataFilePresenter:
+        if observable is self._datasetPresenter:
             self._listModel.refresh()
-        elif observable is self._datasetPresenter:
+        elif observable is self._arrayPresenter:
             self._updateSelection()
 
 
@@ -200,22 +201,21 @@ class CropController(Observer):
 
 class DatasetImageController(Observer):
 
-    def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
-                 imagePresenter: ImagePresenter, view: ImageView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, arrayPresenter: DiffractionArrayPresenter, imagePresenter: ImagePresenter,
+                 view: ImageView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
-        self._datasetPresenter = datasetPresenter
+        self._arrayPresenter = arrayPresenter
         self._imagePresenter = imagePresenter
         self._view = view
         self._imageController = ImageController.createInstance(imagePresenter, view,
                                                                fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
+    def createInstance(cls, arrayPresenter: DiffractionArrayPresenter,
                        imagePresenter: ImagePresenter, view: ImageView,
                        fileDialogFactory: FileDialogFactory) -> DatasetImageController:
-        controller = cls(datasetPresenter, imagePresenter, view, fileDialogFactory)
-        datasetPresenter.addObserver(controller)
+        controller = cls(arrayPresenter, imagePresenter, view, fileDialogFactory)
+        arrayPresenter.addObserver(controller)
         controller._syncModelToView()
         view.imageRibbon.indexGroupBox.setTitle('Frame')
         view.imageRibbon.indexGroupBox.indexSpinBox.valueChanged.connect(
@@ -223,11 +223,11 @@ class DatasetImageController(Observer):
         return controller
 
     def _renderImageData(self, index: int) -> None:
-        array = self._datasetPresenter.getImage(index)
+        array = self._arrayPresenter.getImage(index)
         self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
-        numberOfImages = self._datasetPresenter.getNumberOfImages()
+        numberOfImages = self._arrayPresenter.getNumberOfImages()
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setEnabled(numberOfImages > 0)
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setRange(0, numberOfImages - 1)
 
@@ -235,5 +235,5 @@ class DatasetImageController(Observer):
         self._renderImageData(index)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._datasetPresenter:
+        if observable is self._arrayPresenter:
             self._syncModelToView()
