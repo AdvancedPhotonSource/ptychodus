@@ -9,8 +9,10 @@ pytest
 python>=3.9
 scikit-image
 scipy
+setuptools_scm
 setuptools>=46.4.0
 tifffile
 toml
 watchdog
+wheel
 yapf
