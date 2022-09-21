@@ -123,8 +123,7 @@ class DatasetParametersController(Observer):
         datasetPresenter.addObserver(controller)
         arrayPresenter.addObserver(controller)
 
-        view.listView.selectionModel().currentChanged.connect(
-            controller._updateCurrentArrayIndex)
+        view.listView.selectionModel().currentChanged.connect(controller._updateCurrentArrayIndex)
 
         return controller
 

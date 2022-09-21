@@ -55,7 +55,7 @@ class SimpleDiffractionArray(DiffractionArray):
 
     @classmethod
     def createNullInstance(cls) -> DiffractionArray:
-        return cls('Null', 0, 0, numpy.empty((0, 0, 0), dtype=int))
+        return cls('Null', 0, 0, numpy.empty((1, 0, 0), dtype=int))
 
     def getLabel(self) -> str:
         return self._label

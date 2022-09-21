@@ -63,7 +63,6 @@ class DiffractionDataAssembler(Observable):
         if self.isActive:
             self.stop()
 
-        # TODO if ru
         logger.info('Starting data assembler...')
         self._reallocateDataArray(maximumNumberOfImages)
         self._startConsumerThreads()
@@ -84,7 +83,7 @@ class DiffractionDataAssembler(Observable):
         logger.info('Data assembler stopped.')
 
     def _assemble(self) -> None:
-        # FIXME maintain scan order; maybe bool array?
+        # FIXME explicitly maintain scan order
         while not self._consumerStopEvent.is_set():
             try:
                 array = self._arrayQueue.get(block=True, timeout=1)

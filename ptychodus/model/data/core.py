@@ -165,8 +165,7 @@ class DiffractionArrayPresenter(Observable, Observer):
     def __init__(self, dataset: DiffractionDataset) -> None:
         super().__init__()
         self._dataset = dataset
-        self._data: DiffractionArray = SimpleDiffractionArray.createNullInstance()
-        self._dataIndex = 0
+        self._array: DiffractionArray = SimpleDiffractionArray.createNullInstance()
 
     @classmethod
     def createInstance(cls, dataset: DiffractionDataset) -> DiffractionArrayPresenter:
@@ -181,29 +180,26 @@ class DiffractionArrayPresenter(Observable, Observer):
             logger.exception('Invalid data index!')
             return
 
-        self._data.removeObserver(self)
-        self._data = data
-        self._data.addObserver(self)
-        self._dataIndex = index
-
+        self._array.removeObserver(self)
+        self._array = data
+        self._array.addObserver(self)
         self.notifyObservers()
 
     def getCurrentArrayIndex(self) -> int:
-        return self._dataIndex
+        return self._array.getIndex()
 
     def getNumberOfImages(self) -> int:
-        return len(self._data.getData())  # FIXME get from shape
+        return self._array.getData().shape[0]
 
     def getImage(self, index: int) -> DiffractionDataType:
-        return self._data.getData()[index]
+        return self._array.getData()[index]
 
     def update(self, observable: Observable) -> None:
         if observable is self._dataset:
-            self._data.removeObserver(self)
-            self._data = SimpleDiffractionArray.createNullInstance()
-            self._dataIndex = 0
+            self._array.removeObserver(self)
+            self._array = SimpleDiffractionArray.createNullInstance()
             self.notifyObservers()
-        elif observable is self._data:
+        elif observable is self._array:
             self.notifyObservers()
 
 

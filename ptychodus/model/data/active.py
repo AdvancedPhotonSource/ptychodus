@@ -49,12 +49,20 @@ class ActiveDiffractionDataset(DiffractionDataset, Observer):
             return self._arrayDict[index]
 
     def __len__(self) -> int:
-        return max(self._arrayDict.keys())
+        return max(self._arrayDict.keys(), default=0)
 
     def switchTo(self, dataset: DiffractionDataset) -> None:
-        # self._diffractionDataset.getMetadata()
-        # self._diffractionDataset.getContentsTree()
-        self.notifyObservers()  # FIXME assemble data
+        self._metadata = self._diffractionDataset.getMetadata()
+        self._contentsTree = self._diffractionDataset.getContentsTree()
+
+        self._assembler.start(self._metadata.totalNumberOfImages)
+
+        for array in dataset:
+            self._assembler.assemble(array)
+
+        # FIXME when new frames come in, update arrayDict and notifyObservers
+
+        self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._assembler:
