@@ -15,6 +15,7 @@ class DataSettings(Observable, Observer):
         self.flipX = settingsGroup.createBooleanEntry('FlipX', False)
         self.flipY = settingsGroup.createBooleanEntry('FlipY', False)
         self.threshold = settingsGroup.createIntegerEntry('Threshold', 0)
+        self.arrayDataType = settingsGroup.createStringEntry('ArrayDataType', 'uint16')
         self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory',
                                                               Path('/dev/null'))
         self.numberOfDataThreads = settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)

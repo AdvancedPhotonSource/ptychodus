@@ -5,7 +5,7 @@ import watchdog.events
 import watchdog.observers
 
 from ...api.observer import Observable, Observer
-from .assembler import DiffractionDataAssembler
+from .data import ActiveDiffractionDataset
 from .settings import DataSettings
 
 logger = logging.getLogger(__name__)
@@ -13,27 +13,27 @@ logger = logging.getLogger(__name__)
 
 class DataFileEventHandler(watchdog.events.PatternMatchingEventHandler):
 
-    def __init__(self, assembler: DiffractionDataAssembler, patterns: list[str]) -> None:
+    def __init__(self, dataset: ActiveDiffractionDataset, patterns: list[str]) -> None:
         super().__init__(patterns=patterns, ignore_directories=True, case_sensitive=False)
-        self._assembler = assembler
+        self._dataset = dataset
 
     def on_any_event(self, event) -> None:
         logger.debug(f'{event.event_type}: {event.src_path}')
-        # TODO call assembler
+        # TODO insert array into dataset
 
 
 class DataDirectoryWatcher(Observer):
 
-    def __init__(self, settings: DataSettings, assembler: DiffractionDataAssembler) -> None:
+    def __init__(self, settings: DataSettings, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
-        self._assembler = assembler
+        self._dataset = dataset
         self._observer = watchdog.observers.Observer()
 
     @classmethod
     def createInstance(cls, settings: DataSettings,
-                       assembler: DiffractionDataAssembler) -> DataDirectoryWatcher:
-        watcher = cls(settings, assembler)
+                       dataset: ActiveDiffractionDataset) -> DataDirectoryWatcher:
+        watcher = cls(settings, dataset)
         settings.filePath.addObserver(watcher)
         return watcher
 
@@ -49,7 +49,7 @@ class DataDirectoryWatcher(Observer):
 
         if filePath.is_file():
             patterns = [f'*{filePath.suffix}']
-            eventHandler = DataFileEventHandler(self._assembler, patterns)
+            eventHandler = DataFileEventHandler(self._dataset, patterns)
             directory = filePath.parent
 
             self._observer = watchdog.observers.Observer()

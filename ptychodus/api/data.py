@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -32,30 +33,29 @@ class DiffractionArray(Observable):
         pass
 
     @abstractmethod
-    def getState(self) -> DiffractionArrayState:
-        pass
-
-    @abstractmethod
-    def getDataOffset(self) -> int:
-        pass
-
-    @abstractmethod
     def getData(self) -> DiffractionDataType:
+        pass
+
+    @abstractmethod
+    def getState(self) -> DiffractionArrayState:
         pass
 
 
 class SimpleDiffractionArray(DiffractionArray):
 
-    def __init__(self, label: str, index: int, dataOffset: int, data: DiffractionDataType) -> None:
+    def __init__(self, label: str, index: int, data: DiffractionDataType,
+                 state: DiffractionArrayState) -> None:
         super().__init__()
         self._label = label
         self._index = index
-        self._dataOffset = dataOffset
         self._data = data
+        self._state = state
 
     @classmethod
     def createNullInstance(cls) -> DiffractionArray:
-        return cls('Null', 0, 0, numpy.empty((1, 0, 0), dtype=int))
+        data = numpy.zeros((1, 0, 0), dtype=numpy.uint16)
+        state = DiffractionArrayState.MISSING
+        return cls('Null', 0, data, state)
 
     def getLabel(self) -> str:
         return self._label
@@ -63,14 +63,15 @@ class SimpleDiffractionArray(DiffractionArray):
     def getIndex(self) -> int:
         return self._index
 
-    def getState(self) -> DiffractionArrayState:
-        return DiffractionArrayState.LOADED
-
-    def getDataOffset(self) -> int:
-        return self._dataOffset
-
     def getData(self) -> DiffractionDataType:
         return self._data
+
+    def getState(self) -> DiffractionArrayState:
+        return self._state
+
+    def setState(self, state: DiffractionArrayState) -> None:
+        self._state = state
+        self.notifyObservers()
 
 
 @dataclass(frozen=True)
@@ -78,7 +79,8 @@ class DiffractionMetadata:
     filePath: Path
     imageWidth: int
     imageHeight: int
-    totalNumberOfImages: int
+    numberOfImagesPerArray: int
+    numberOfImagesTotal: int
     detectorNumberOfPixelsX: Optional[int] = None
     detectorNumberOfPixelsY: Optional[int] = None
     detectorPixelSizeXInMeters: Optional[Decimal] = None
@@ -87,6 +89,10 @@ class DiffractionMetadata:
     cropCenterXInPixels: Optional[int] = None
     cropCenterYInPixels: Optional[int] = None
     probeEnergyInElectronVolts: Optional[Decimal] = None
+
+    @classmethod
+    def createNullInstance(cls) -> DiffractionMetadata:
+        return cls(Path('/dev/null'), 0, 0, 0, 0)
 
 
 class DiffractionDataset(Sequence[DiffractionArray], Observable):

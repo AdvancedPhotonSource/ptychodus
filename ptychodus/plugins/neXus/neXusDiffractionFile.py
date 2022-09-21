@@ -37,9 +37,6 @@ class NeXusDiffractionArray(DiffractionArray):
     def getState(self) -> DiffractionArrayState:
         return self._state
 
-    def getDataOffset(self) -> int:
-        return 0  # FIXME
-
     def getData(self) -> DiffractionDataType:
         array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 
@@ -256,7 +253,8 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 filePath=filePath,
                 imageWidth=detectorSpecific.x_pixels_in_detector,
                 imageHeight=detectorSpecific.y_pixels_in_detector,
-                totalNumberOfImages=detectorSpecific.nimages,
+                numberOfImagesPerArray=0,  # FIXME
+                numberOfImagesTotal=detectorSpecific.nimages,
                 detectorNumberOfPixelsX=detectorSpecific.x_pixels_in_detector,
                 detectorNumberOfPixelsY=detectorSpecific.y_pixels_in_detector,
                 detectorPixelSizeXInMeters=Decimal(repr(detector.x_pixel_size_m)),

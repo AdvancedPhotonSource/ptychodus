@@ -7,7 +7,7 @@ import numpy
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
-from ..data import DiffractionDataAssembler
+from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
 from ..reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
@@ -152,7 +152,7 @@ class TikeBackend:
     @classmethod
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
-                       diffractionDataAssembler: DiffractionDataAssembler,
+                       diffractionDataset: ActiveDiffractionDataset,
                        scan: Scan,
                        probe: Probe,
                        apparatus: Apparatus,
@@ -181,7 +181,7 @@ class TikeBackend:
                 core.reconstructorList.append(NullReconstructor('dm', 'Tike'))
         else:
             arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_,
-                                                diffractionDataAssembler, scanInitializerFactory,
+                                                diffractionDataset, scanInitializerFactory,
                                                 scanRepository)
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,

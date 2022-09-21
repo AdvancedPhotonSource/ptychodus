@@ -28,9 +28,6 @@ class NPYDiffractionArray(DiffractionArray):
     def getState(self) -> DiffractionArrayState:
         return self._state
 
-    def getDataOffset(self) -> int:
-        return 0
-
     def getData(self) -> DiffractionDataType:
         array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
 

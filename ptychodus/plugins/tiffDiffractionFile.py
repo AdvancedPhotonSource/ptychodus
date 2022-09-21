@@ -35,12 +35,12 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             digits = re.findall(r'\d+', filePath.stem)
             longest_digits = max(digits, key=len)
             pattern = filePath.name.replace(longest_digits, f'\\d{{{len(longest_digits)}}}')
-            totalNumberOfImages = 0
+            numberOfImagesTotal = 0
 
             for fp in filePath.parent.iterdir():
                 if re.search(pattern, fp.name):
                     with TiffFile(fp) as tiff:
-                        totalNumberOfImages += len(tiff.pages)
+                        numberOfImagesTotal += len(tiff.pages)
 
                         itemName = fp.stem
                         itemType = 'TIFF'
@@ -48,7 +48,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                         contentsTree.createChild([itemName, itemType, itemDetails])
 
                     index = 0  # FIXME from digits
-                    dataOffset = 0  # FIXME see totalNumberOfImages
+                    dataOffset = 0  # FIXME see numberOfImagesTotal
                     data = tiff.asarray()
 
                     if data.ndim == 2:
@@ -62,8 +62,13 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                 imageWidth = data.shape[-1]
                 imageHeight = data.shape[-2]
 
-            metadata = DiffractionMetadata(filePath.parent / pattern, imageWidth, imageHeight,
-                                           totalNumberOfImages)
+            metadata = DiffractionMetadata(
+                filePath=filePath.parent / pattern,
+                imageWidth=imageWidth,
+                imageHeight=imageHeight,
+                numberOfImagesPerArray=0,  # FIXME
+                numberOfImagesTotal=numberOfImagesTotal,
+            )
 
         return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 

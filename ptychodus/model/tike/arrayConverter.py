@@ -9,7 +9,7 @@ from ...api.data import DiffractionDataType
 from ...api.object import ObjectArrayType
 from ...api.probe import ProbeArrayType
 from ...api.scan import ScanPoint
-from ..data import DiffractionDataAssembler
+from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus, Probe
 from ..scan import Scan, ScanInitializerFactory, ScanRepository
@@ -26,22 +26,22 @@ class TikeArrays:
     object_: ObjectArrayType
 
 
-class TikeArrayConverter:
+class TikeArrayConverter:  # FIXME use dataset array indexes to select scan points
 
     def __init__(self, apparatus: Apparatus, scan: Scan, probe: Probe, object_: Object,
-                 diffractionDataAssembler: DiffractionDataAssembler,
+                 diffractionDataset: ActiveDiffractionDataset,
                  scanInitializerFactory: ScanInitializerFactory,
                  scanRepository: ScanRepository) -> None:
         self._apparatus = apparatus
         self._scan = scan
         self._probe = probe
         self._object = object_
-        self._diffractionDataAssembler = diffractionDataAssembler
+        self._diffractionDataset = diffractionDataset
         self._scanInitializerFactory = scanInitializerFactory
         self._scanRepository = scanRepository
 
     def getDiffractionData(self) -> DiffractionDataType:
-        data = self._diffractionDataAssembler.getData()
+        data = self._diffractionDataset.getAssembledData()
         return numpy.fft.ifftshift(data, axes=(-2, -1))
 
     def exportToTike(self) -> TikeArrays:

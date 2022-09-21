@@ -91,7 +91,7 @@ class ModelCore:
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(
-            self.settingsRegistry, self._dataCore.assembler, self._scanCore.scan,
+            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
             self._scanCore.initializerFactory, self._scanCore.repository,
             self.reconstructorPlotPresenter, modelArgs.isDeveloperModeEnabled)

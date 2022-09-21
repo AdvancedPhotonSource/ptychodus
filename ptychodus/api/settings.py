@@ -185,7 +185,7 @@ class SettingsRegistry(Observable):
 
     def saveSettings(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
-        config.optionxform = lambda option: option
+        setattr(config, 'optionxform', lambda option: option)
 
         for settingsGroup in self._groupList:
             config.add_section(settingsGroup.name)

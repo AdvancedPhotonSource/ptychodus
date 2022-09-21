@@ -21,8 +21,7 @@ from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
-from .active import ActiveDiffractionDataset
-from .assembler import DiffractionDataAssembler
+from .data import ActiveDiffractionDataset
 from .crop import CropPresenter, CropSettings, CropSizer
 from .settings import DataSettings
 from .watcher import DataDirectoryWatcher
@@ -213,10 +212,9 @@ class DataCore:
         self.cropPresenter = CropPresenter.createInstance(self.cropSettings, self.cropSizer)
 
         self._settings = DataSettings.createInstance(settingsRegistry)
-        self.assembler = DiffractionDataAssembler(self._settings, self.cropSizer)
+        self.activeDataset = ActiveDiffractionDataset(self._settings, self.cropSizer)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(
-            self._settings, self.assembler)
-        self.activeDataset = ActiveDiffractionDataset.createInstance(self.assembler)
+            self._settings, self.activeDataset)
 
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
             self._settings, self.activeDataset, fileReaderChooser, fileWriterChooser)
@@ -228,3 +226,4 @@ class DataCore:
 
     def stop(self) -> None:
         self._dataDirectoryWatcher.stop()
+        self.activeDataset.stop()
