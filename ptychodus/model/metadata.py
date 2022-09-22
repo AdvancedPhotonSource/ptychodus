@@ -37,18 +37,18 @@ class MetadataPresenter(Observable, Observer):
         return self._diffractionDataset.getMetadata()
 
     def syncDetectorPixelCount(self) -> None:
-        if self._metadata.detectorNumberOfPixelsX and self._metadata.detectorNumberOfPixelsY:
+        if self._metadata.detectorNumberOfPixels:
             self._detectorSettings.numberOfPixelsX.value = \
-                self._metadata.detectorNumberOfPixelsX
+                self._metadata.detectorNumberOfPixels.x
             self._detectorSettings.numberOfPixelsY.value = \
-                self._metadata.detectorNumberOfPixelsY
+                self._metadata.detectorNumberOfPixels.y
 
     def syncDetectorPixelSize(self) -> None:
-        if self._metadata.detectorPixelSizeXInMeters and self._metadata.detectorPixelSizeYInMeters:
+        if self._metadata.detectorPixelSizeInMeters:
             self._detectorSettings.pixelSizeXInMeters.value = \
-                self._metadata.detectorPixelSizeXInMeters
+                self._metadata.detectorPixelSizeInMeters.x
             self._detectorSettings.pixelSizeYInMeters.value = \
-                self._metadata.detectorPixelSizeYInMeters
+                self._metadata.detectorPixelSizeInMeters.y
 
     def syncDetectorDistance(self) -> None:
         if self._metadata.detectorDistanceInMeters:
@@ -56,18 +56,18 @@ class MetadataPresenter(Observable, Observer):
                 self._metadata.detectorDistanceInMeters
 
     def syncImageCrop(self, syncCenter: bool, syncExtent: bool) -> None:
-        if syncCenter and self._metadata.cropCenterXInPixels and self._metadata.cropCenterYInPixels:
+        if syncCenter and self._metadata.cropCenterInPixels:
             self._cropSettings.centerXInPixels.value = \
-                    self._metadata.cropCenterXInPixels
+                    self._metadata.cropCenterInPixels.x
             self._cropSettings.centerYInPixels.value = \
-                    self._metadata.cropCenterYInPixels
+                    self._metadata.cropCenterInPixels.y
 
-        if syncExtent and self._metadata.detectorNumberOfPixelsX and self._metadata.detectorNumberOfPixelsY:
+        if syncExtent and self._metadata.detectorNumberOfPixels:
             centerX = self._cropSettings.centerXInPixels.value
             centerY = self._cropSettings.centerYInPixels.value
 
-            extentX = int(self._metadata.detectorNumberOfPixelsX)
-            extentY = int(self._metadata.detectorNumberOfPixelsY)
+            extentX = int(self._metadata.detectorNumberOfPixels.x)
+            extentY = int(self._metadata.detectorNumberOfPixels.y)
 
             maxRadiusX = min(centerX, extentX - centerX)
             maxRadiusY = min(centerY, extentY - centerY)

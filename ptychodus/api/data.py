@@ -11,12 +11,14 @@ import numpy
 import numpy.typing
 
 from .observer import Observable
+from .geometry import Vector2D
 from .tree import SimpleTreeNode
 
 DiffractionDataType = numpy.typing.NDArray[numpy.integer]
 
 
 class DiffractionArrayState(Enum):
+    UNKNOWN = auto()
     MISSING = auto()
     FOUND = auto()
     LOADED = auto()
@@ -81,13 +83,10 @@ class DiffractionMetadata:
     imageHeight: int
     numberOfImagesPerArray: int
     numberOfImagesTotal: int
-    detectorNumberOfPixelsX: Optional[int] = None
-    detectorNumberOfPixelsY: Optional[int] = None
-    detectorPixelSizeXInMeters: Optional[Decimal] = None
-    detectorPixelSizeYInMeters: Optional[Decimal] = None
     detectorDistanceInMeters: Optional[Decimal] = None
-    cropCenterXInPixels: Optional[int] = None
-    cropCenterYInPixels: Optional[int] = None
+    detectorNumberOfPixels: Optional[Vector2D[int]] = None
+    detectorPixelSizeInMeters: Optional[Vector2D[Decimal]] = None
+    cropCenterInPixels: Optional[Vector2D[int]] = None
     probeEnergyInElectronVolts: Optional[Decimal] = None
 
     @classmethod

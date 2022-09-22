@@ -9,8 +9,8 @@ from PyQt5.QtWidgets import QAbstractItemView
 from ...api.observer import Observable, Observer
 from ...model import (CartesianScanInitializer, LissajousScanInitializer, Scan, ScanInitializer,
                       ScanPresenter, SpiralScanInitializer)
-from ...view import (ScanEditorDialog, ScanParametersView, ScanPlotView, ScanPositionDataView,
-                     ScanTransformView)
+from ...view import (CartesianScanView, LissajousScanView, ScanEditorDialog, ScanParametersView,
+                     ScanPlotView, ScanPositionDataView, ScanTransformView, SpiralScanView)
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
 from .lissajous import LissajousScanController
@@ -121,7 +121,8 @@ class ScanController(Observer):
             initializer = self._presenter.getInitializer(name)
 
             if isinstance(initializer, CartesianScanInitializer):
-                cartesianDialog = ScanEditorDialog.createCartesianInstance(self._parametersView)
+                cartesianDialog = ScanEditorDialog.createInstance(
+                    CartesianScanView.createInstance(), self._parametersView)
                 cartesianDialog.setWindowTitle(name)
                 cartesianController = CartesianScanController.createInstance(
                     initializer, cartesianDialog.editorView)
@@ -129,7 +130,8 @@ class ScanController(Observer):
                     initializer, cartesianDialog.transformView)
                 cartesianDialog.open()
             elif isinstance(initializer, SpiralScanInitializer):
-                spiralDialog = ScanEditorDialog.createSpiralInstance(self._parametersView)
+                spiralDialog = ScanEditorDialog.createInstance(SpiralScanView.createInstance(),
+                                                               self._parametersView)
                 spiralDialog.setWindowTitle(name)
                 spiralController = SpiralScanController.createInstance(
                     initializer, spiralDialog.editorView)
@@ -137,7 +139,8 @@ class ScanController(Observer):
                     initializer, spiralDialog.transformView)
                 spiralDialog.open()
             elif isinstance(initializer, LissajousScanInitializer):
-                lissajousDialog = ScanEditorDialog.createLissajousInstance(self._parametersView)
+                lissajousDialog = ScanEditorDialog.createInstance(
+                    LissajousScanView.createInstance(), self._parametersView)
                 lissajousDialog.setWindowTitle(name)
                 lissajousController = LissajousScanController.createInstance(
                     initializer, lissajousDialog.editorView)

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Generic, Optional, TypeVar
 
 from PyQt5.QtCore import QEvent, QObject
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
@@ -12,6 +12,8 @@ from matplotlib.figure import Figure
 import matplotlib
 
 from .widgets import AngleWidget, LengthWidget
+
+T = TypeVar('T', bound=QGroupBox)
 
 
 class CartesianScanView(QGroupBox):
@@ -118,9 +120,9 @@ class ScanTransformView(QGroupBox):
         return view
 
 
-class ScanEditorDialog(QDialog):
+class ScanEditorDialog(Generic[T], QDialog):
 
-    def __init__(self, editorView: QGroupBox, parent: Optional[QWidget]) -> None:
+    def __init__(self, editorView: T, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.editorView = editorView
         self.transformView = ScanTransformView.createInstance()
@@ -129,8 +131,8 @@ class ScanEditorDialog(QDialog):
 
     @classmethod
     def createInstance(cls,
-                       editorView: QGroupBox,
-                       parent: Optional[QWidget] = None) -> ScanEditorDialog:
+                       editorView: T,
+                       parent: Optional[QWidget] = None) -> ScanEditorDialog[T]:
         view = cls(editorView, parent)
 
         centerLayout = QVBoxLayout()
@@ -147,18 +149,6 @@ class ScanEditorDialog(QDialog):
         view.setLayout(layout)
 
         return view
-
-    @classmethod
-    def createCartesianInstance(cls, parent: Optional[QWidget] = None) -> ScanEditorDialog:
-        return cls.createInstance(CartesianScanView.createInstance(), parent)
-
-    @classmethod
-    def createSpiralInstance(cls, parent: Optional[QWidget] = None) -> ScanEditorDialog:
-        return cls.createInstance(SpiralScanView.createInstance(), parent)
-
-    @classmethod
-    def createLissajousInstance(cls, parent: Optional[QWidget] = None) -> ScanEditorDialog:
-        return cls.createInstance(LissajousScanView.createInstance(), parent)
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
         if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:

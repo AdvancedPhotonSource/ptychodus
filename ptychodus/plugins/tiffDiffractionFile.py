@@ -27,7 +27,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         return 'Tagged Image File Format Files (*.tif *.tiff)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(filePath, 0, 0, 0)
+        metadata = DiffractionMetadata(filePath, 0, 0, 0, 0)
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionArray] = list()
 
@@ -48,27 +48,24 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                         contentsTree.createChild([itemName, itemType, itemDetails])
 
                     index = 0  # FIXME from digits
-                    dataOffset = 0  # FIXME see numberOfImagesTotal
                     data = tiff.asarray()
 
                     if data.ndim == 2:
                         data = data[numpy.newaxis, :, :]
 
-                    array = SimpleDiffractionArray(fp.stem, index, dataOffset, data)
+                    array = SimpleDiffractionArray(fp.stem, index, data,
+                                                   DiffractionArrayState.LOADED)
                     arrayList.append(array)
 
-            with TiffFile(filePath) as tiff:  # FIXME not needed
+            with TiffFile(filePath) as tiff:
                 data = tiff.asarray()
-                imageWidth = data.shape[-1]
-                imageHeight = data.shape[-2]
-
-            metadata = DiffractionMetadata(
-                filePath=filePath.parent / pattern,
-                imageWidth=imageWidth,
-                imageHeight=imageHeight,
-                numberOfImagesPerArray=0,  # FIXME
-                numberOfImagesTotal=numberOfImagesTotal,
-            )
+                metadata = DiffractionMetadata(
+                    filePath=filePath.parent / pattern,
+                    imageWidth=data.shape[-1],
+                    imageHeight=data.shape[-2],
+                    numberOfImagesPerArray=len(tiff.pages),
+                    numberOfImagesTotal=numberOfImagesTotal,
+                )
 
         return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 

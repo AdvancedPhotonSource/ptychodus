@@ -17,7 +17,7 @@ class NPYDiffractionArray(DiffractionArray):
     def __init__(self, filePath: Path) -> None:
         super().__init__()
         self._filePath = filePath
-        self._state = DiffractionArrayState.MISSING
+        self._state = DiffractionArrayState.UNKNOWN
 
     def getLabel(self) -> str:
         return self._filePath.stem
@@ -29,7 +29,7 @@ class NPYDiffractionArray(DiffractionArray):
         return self._state
 
     def getData(self) -> DiffractionDataType:
-        array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
+        array = numpy.empty((1, 0, 0), dtype=numpy.uint16)
 
         if self._filePath.is_file():
             self._state = DiffractionArrayState.FOUND
@@ -62,7 +62,13 @@ class NPYDiffractionFileReader(DiffractionFileReader):
     def read(self, filePath: Path) -> DiffractionDataset:
         array = NPYDiffractionArray(filePath)
         data = array.getData()
-        metadata = DiffractionMetadata(filePath, data.shape[1], data.shape[2], data.shape[0])
+        metadata = DiffractionMetadata(
+            filePath=filePath,
+            imageWidth=data.shape[-1],
+            imageHeight=data.shape[-2],
+            numberOfImagesPerArray=data.shape[0],
+            numberOfImagesTotal=data.shape[0],
+        )
 
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionArray] = [array]

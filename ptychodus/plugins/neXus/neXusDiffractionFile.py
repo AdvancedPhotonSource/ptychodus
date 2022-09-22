@@ -13,6 +13,7 @@ from ..h5DiffractionFile import H5DiffractionFileTreeBuilder
 from ptychodus.api.data import (DiffractionArray, DiffractionDataType, DiffractionArrayState,
                                 DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 SimpleDiffractionDataset)
+from ptychodus.api.geometry import Vector2D
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -231,7 +232,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         return 'NeXus Master Files (*.h5 *.hdf5)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(filePath, 0, 0, 0)
+        metadata = DiffractionMetadata(filePath, 0, 0, 0, 0)
         contentsTree = self._treeBuilder.createRootNode()
         arrayList: list[DiffractionArray] = list()
         dataset: DiffractionDataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
@@ -247,21 +248,31 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 return dataset
 
             detector = entry.instrument.detector
+            detectorPixelSizeInMeters = Vector2D[Decimal](
+                Decimal(repr(detector.x_pixel_size_m)),
+                Decimal(repr(detector.y_pixel_size_m)),
+            )
+            cropCenterInPixels = Vector2D[int](
+                int(round(detector.beam_center_x_px)),
+                int(round(detector.beam_center_y_px)),
+            )
+
             detectorSpecific = detector.detectorSpecific
+            detectorNumberOfPixels = Vector2D[int](
+                detectorSpecific.x_pixels_in_detector,
+                detectorSpecific.y_pixels_in_detector,
+            )
 
             metadata = DiffractionMetadata(
                 filePath=filePath,
                 imageWidth=detectorSpecific.x_pixels_in_detector,
                 imageHeight=detectorSpecific.y_pixels_in_detector,
-                numberOfImagesPerArray=0,  # FIXME
+                numberOfImagesPerArray=1,  # FIXME
                 numberOfImagesTotal=detectorSpecific.nimages,
-                detectorNumberOfPixelsX=detectorSpecific.x_pixels_in_detector,
-                detectorNumberOfPixelsY=detectorSpecific.y_pixels_in_detector,
-                detectorPixelSizeXInMeters=Decimal(repr(detector.x_pixel_size_m)),
-                detectorPixelSizeYInMeters=Decimal(repr(detector.y_pixel_size_m)),
                 detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
-                cropCenterXInPixels=int(round(detector.beam_center_x_px)),
-                cropCenterYInPixels=int(round(detector.beam_center_y_px)),
+                detectorNumberOfPixels=detectorNumberOfPixels,
+                detectorPixelSizeInMeters=detectorPixelSizeInMeters,
+                cropCenterInPixels=cropCenterInPixels,
                 probeEnergyInElectronVolts=Decimal(repr(detectorSpecific.photon_energy_eV)),
             )
             contentsTree = self._treeBuilder.build(h5File)
