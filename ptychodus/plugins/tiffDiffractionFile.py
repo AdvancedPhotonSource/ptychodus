@@ -16,6 +16,45 @@ from ptychodus.api.tree import SimpleTreeNode
 logger = logging.getLogger(__name__)
 
 
+class TiffDiffractionArray(DiffractionArray):
+
+    def __init__(self, filePath: Path, index: int) -> None:
+        super().__init__()
+        self._filePath = filePath
+        self._index = index
+        self._state = DiffractionArrayState.UNKNOWN
+
+    def getLabel(self) -> str:
+        return self._filePath.stem
+
+    def getIndex(self) -> int:
+        return self._index
+
+    def getState(self) -> DiffractionArrayState:
+        return self._state
+
+    def getData(self) -> DiffractionDataType:
+        data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
+
+        if self._filePath.is_file():
+            self._state = DiffractionArrayState.FOUND
+
+            try:
+                with TiffFile(self._filePath) as tiff:
+                    data = tiff.asarray()
+            except OSError as err:
+                logger.debug(f'Unable to read \"{self.getLabel()}\"!')
+            else:
+                self._state = DiffractionArrayState.LOADED
+
+                if data.ndim == 2:
+                    data = data[numpy.newaxis, :, :]
+        else:
+            self._state = DiffractionArrayState.MISSING
+
+        return data
+
+
 class TiffDiffractionFileReader(DiffractionFileReader):
 
     @property
@@ -28,33 +67,19 @@ class TiffDiffractionFileReader(DiffractionFileReader):
 
     def read(self, filePath: Path) -> DiffractionDataset:
         metadata = DiffractionMetadata(filePath, 0, 0, 0, 0)
-        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionArray] = list()
 
         if filePath:
             digits = re.findall(r'\d+', filePath.stem)
             longest_digits = max(digits, key=len)
-            pattern = filePath.name.replace(longest_digits, f'\\d{{{len(longest_digits)}}}')
-            numberOfImagesTotal = 0
+            pattern = filePath.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
 
             for fp in filePath.parent.iterdir():
-                if re.search(pattern, fp.name):
-                    with TiffFile(fp) as tiff:
-                        numberOfImagesTotal += len(tiff.pages)
+                z = re.match(pattern, fp.name)
 
-                        itemName = fp.stem
-                        itemType = 'TIFF'
-                        itemDetails = str(tiff.epics_metadata)
-                        contentsTree.createChild([itemName, itemType, itemDetails])
-
-                    index = 0  # FIXME from digits
-                    data = tiff.asarray()
-
-                    if data.ndim == 2:
-                        data = data[numpy.newaxis, :, :]
-
-                    array = SimpleDiffractionArray(fp.stem, index, data,
-                                                   DiffractionArrayState.LOADED)
+                if z:
+                    index = int(z.group(1).lstrip('0'))
+                    array: DiffractionArray = TiffDiffractionArray(fp, index)
                     arrayList.append(array)
 
             with TiffFile(filePath) as tiff:
@@ -64,8 +89,14 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                     imageWidth=data.shape[-1],
                     imageHeight=data.shape[-2],
                     numberOfImagesPerArray=len(tiff.pages),
-                    numberOfImagesTotal=numberOfImagesTotal,
+                    numberOfImagesTotal=len(tiff.pages) * len(arrayList),
                 )
+
+        arrayList.sort(key=lambda array: array.getIndex())
+        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+
+        for array in arrayList:
+            contentsTree.createChild([array.getLabel(), 'TIFF', str(array.getIndex())])
 
         return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 

@@ -38,7 +38,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         self._arrayDict: dict[int, DiffractionArray] = dict()
         self._arrayDictLock = threading.RLock()
         self._arrayData: DiffractionDataType = numpy.zeros(
-            (1, 0, 0), dtype=self._settings.arrayDataType.value)
+            (1, 1, 1), dtype=self._settings.arrayDataType.value)
 
         self._taskQueue: queue.Queue[AssemblyTask] = queue.Queue()
         self._workers: list[threading.Thread] = list()
@@ -110,7 +110,6 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
             logger.debug(f'Reading {task.array.getLabel()}...')
             data = task.array.getData()
-            # TODO handle getData failures (e.g. missing file)
 
             if self._cropSizer.isCropEnabled():
                 sliceY = self._cropSizer.getSliceY()

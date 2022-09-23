@@ -22,10 +22,11 @@ logger = logging.getLogger(__name__)
 
 class NeXusDiffractionArray(DiffractionArray):
 
-    def __init__(self, label: str, filePath: Path, dataPath: str) -> None:
+    def __init__(self, label: str, index: int, filePath: Path, dataPath: str) -> None:
         super().__init__()
         self._label = label
-        self._state = DiffractionArrayState.MISSING
+        self._index = index
+        self._state = DiffractionArrayState.UNKNOWN
         self._filePath = filePath
         self._dataPath = dataPath
 
@@ -33,13 +34,13 @@ class NeXusDiffractionArray(DiffractionArray):
         return self._label
 
     def getIndex(self) -> int:
-        return 0  # FIXME
+        return self._index
 
     def getState(self) -> DiffractionArrayState:
         return self._state
 
     def getData(self) -> DiffractionDataType:
-        array = numpy.empty((0, 0, 0), dtype=numpy.uint16)
+        data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
 
         if self._filePath.is_file():
             self._state = DiffractionArrayState.FOUND
@@ -49,17 +50,17 @@ class NeXusDiffractionArray(DiffractionArray):
                     item = h5File.get(self._dataPath)
 
                     if isinstance(item, h5py.Dataset):
-                        array = item[()]
+                        data = item[()]
                         self._state = DiffractionArrayState.LOADED
                     else:
                         logger.error(
                             f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
             except OSError as err:
-                logger.exception(err)
+                logger.debug(f'Unable to read \"{self._label}\"!')
         else:
             self._state = DiffractionArrayState.MISSING
 
-        return array
+        return data
 
 
 @dataclass(frozen=True)
@@ -77,7 +78,7 @@ class DataGroup:
             if isinstance(h5Item, h5py.ExternalLink):
                 filePath = masterFilePath.parent / h5Item.filename
                 dataPath = str(h5Item.path)
-                array = NeXusDiffractionArray(name, filePath, dataPath)
+                array = NeXusDiffractionArray(name, len(arrayList), filePath, dataPath)
                 arrayList.append(array)
 
         return cls(arrayList)
@@ -85,7 +86,16 @@ class DataGroup:
     def __iter__(self):
         return iter(self.arrayList)
 
+    @overload
     def __getitem__(self, index: int) -> DiffractionArray:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]:
+        ...
+
+    def __getitem__(
+            self, index: Union[int, slice]) -> Union[DiffractionArray, Sequence[DiffractionArray]]:
         return self.arrayList[index]
 
     def __len__(self) -> int:
@@ -211,10 +221,10 @@ class NeXusDiffractionDataset(DiffractionDataset):
 
     def __getitem__(
             self, index: Union[int, slice]) -> Union[DiffractionArray, Sequence[DiffractionArray]]:
-        return self._entry.data.arrayList[index]
+        return self._entry.data[index]
 
     def __len__(self) -> int:
-        return len(self._entry.data.arrayList)
+        return len(self._entry.data)
 
 
 class NeXusDiffractionFileReader(DiffractionFileReader):
@@ -263,11 +273,23 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 detectorSpecific.y_pixels_in_detector,
             )
 
+            numberOfImagesPerArray = 0
+
+            for array in entry.data:
+                try:
+                    data = array.getData()
+                except OSError as err:
+                    logger.debug(f'Array \"{array.getLabel()}\" does not exist!')
+                    continue
+
+                numberOfImagesPerArray = data.shape[0]
+                break
+
             metadata = DiffractionMetadata(
                 filePath=filePath,
                 imageWidth=detectorSpecific.x_pixels_in_detector,
                 imageHeight=detectorSpecific.y_pixels_in_detector,
-                numberOfImagesPerArray=1,  # FIXME
+                numberOfImagesPerArray=numberOfImagesPerArray,
                 numberOfImagesTotal=detectorSpecific.nimages,
                 detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
                 detectorNumberOfPixels=detectorNumberOfPixels,

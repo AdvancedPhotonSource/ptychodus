@@ -73,7 +73,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def getNumberOfArrays(self) -> int:
         return len(self._activeDiffractionDataset)
 
-    def openArray(self, dataPath: str) -> Any:  # FIXME
+    def openArray(self, dataPath: str) -> Any:  # TODO generalize for other file formats
         filePath = self._activeDiffractionDataset.getMetadata().filePath
         data = None
 

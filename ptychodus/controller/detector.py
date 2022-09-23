@@ -72,7 +72,7 @@ class DatasetListModel(QAbstractListModel):
         self.endResetModel()
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = Qt.NoItemFlags
+        value = Qt.ItemFlags()
 
         if index.isValid():
             state = self._presenter.getArrayState(index.row())

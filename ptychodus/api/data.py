@@ -55,7 +55,7 @@ class SimpleDiffractionArray(DiffractionArray):
 
     @classmethod
     def createNullInstance(cls) -> DiffractionArray:
-        data = numpy.zeros((1, 0, 0), dtype=numpy.uint16)
+        data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
         state = DiffractionArrayState.MISSING
         return cls('Null', 0, data, state)
 
