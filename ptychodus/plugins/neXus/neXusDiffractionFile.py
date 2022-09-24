@@ -40,25 +40,21 @@ class NeXusDiffractionArray(DiffractionArray):
         return self._state
 
     def getData(self) -> DiffractionDataType:
-        data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
+        self._state = DiffractionArrayState.MISSING
 
-        if self._filePath.is_file():
-            self._state = DiffractionArrayState.FOUND
-
+        with h5py.File(self._filePath, 'r') as h5File:
             try:
-                with h5py.File(self._filePath, 'r') as h5File:
-                    item = h5File.get(self._dataPath)
+                item = h5File[self._dataPath]
+            except KeyError:
+                raise ValueError(f'Symlink {self._filePath}:{self._dataPath} is broken!')
+            else:
+                if isinstance(item, h5py.Dataset):
+                    self._state = DiffractionArrayState.FOUND
+                else:
+                    raise ValueError(
+                        f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
 
-                    if isinstance(item, h5py.Dataset):
-                        data = item[()]
-                        self._state = DiffractionArrayState.LOADED
-                    else:
-                        logger.error(
-                            f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
-            except OSError as err:
-                logger.debug(f'Unable to read \"{self._label}\"!')
-        else:
-            self._state = DiffractionArrayState.MISSING
+            data = item[()]
 
         return data
 
@@ -278,7 +274,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
             for array in entry.data:
                 try:
                     data = array.getData()
-                except OSError as err:
+                except OSError:
                     logger.debug(f'Array \"{array.getLabel()}\" does not exist!')
                     continue
 

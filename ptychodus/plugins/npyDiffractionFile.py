@@ -29,22 +29,16 @@ class NPYDiffractionArray(DiffractionArray):
         return self._state
 
     def getData(self) -> DiffractionDataType:
-        data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
-
-        if self._filePath.is_file():
+        try:
+            data = numpy.load(self._filePath)
+        except:
+            self._state = DiffractionArrayState.MISSING
+            raise
+        else:
             self._state = DiffractionArrayState.FOUND
 
-            try:
-                data = numpy.load(self._filePath)
-            except OSError as err:
-                logger.debug(f'Unable to read \"{self.getLabel()}\"!')
-            else:
-                self._state = DiffractionArrayState.LOADED
-
-                if data.ndim == 2:
-                    data = data[numpy.newaxis, :, :]
-        else:
-            self._state = DiffractionArrayState.MISSING
+        if data.ndim == 2:
+            data = data[numpy.newaxis, :, :]
 
         return data
 

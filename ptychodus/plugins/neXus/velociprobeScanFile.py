@@ -63,7 +63,7 @@ class VelociprobeScanFileReader(ScanFileReader):
         liPointList: list[ScanPoint] = list()
         enPointList: list[ScanPoint] = list()
 
-        with open(filePath, newline='') as csvFile:
+        with filePath.open(newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
 
             for row in csvReader:

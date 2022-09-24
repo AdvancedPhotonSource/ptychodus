@@ -34,23 +34,18 @@ class TiffDiffractionArray(DiffractionArray):
         return self._state
 
     def getData(self) -> DiffractionDataType:
-        data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
+        self._state = DiffractionArrayState.MISSING
 
-        if self._filePath.is_file():
-            self._state = DiffractionArrayState.FOUND
-
+        with TiffFile(self._filePath) as tiff:
             try:
-                with TiffFile(self._filePath) as tiff:
-                    data = tiff.asarray()
-            except OSError as err:
-                logger.debug(f'Unable to read \"{self.getLabel()}\"!')
+                data = tiff.asarray()
+            except:
+                raise
             else:
-                self._state = DiffractionArrayState.LOADED
+                self._state = DiffractionArrayState.FOUND
 
-                if data.ndim == 2:
-                    data = data[numpy.newaxis, :, :]
-        else:
-            self._state = DiffractionArrayState.MISSING
+        if data.ndim == 2:
+            data = data[numpy.newaxis, :, :]
 
         return data
 
@@ -73,14 +68,20 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             digits = re.findall(r'\d+', filePath.stem)
             longest_digits = max(digits, key=len)
             pattern = filePath.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
+            filePathList: list[Path] = list()
 
             for fp in filePath.parent.iterdir():
                 z = re.match(pattern, fp.name)
 
                 if z:
                     index = int(z.group(1).lstrip('0'))
-                    array: DiffractionArray = TiffDiffractionArray(fp, index)
-                    arrayList.append(array)
+                    filePathList.append(fp)
+
+            filePathList.sort(key=lambda fp: fp.stem)
+
+            for fp in filePathList:
+                array: DiffractionArray = TiffDiffractionArray(fp, len(arrayList))
+                arrayList.append(array)
 
             with TiffFile(filePath) as tiff:
                 data = tiff.asarray()
@@ -92,7 +93,6 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                     numberOfImagesTotal=len(tiff.pages) * len(arrayList),
                 )
 
-        arrayList.sort(key=lambda array: array.getIndex())
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
 
         for array in arrayList:

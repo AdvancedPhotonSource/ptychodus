@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from typing import Any
 
 
@@ -7,8 +7,8 @@ class RPCMessage(ABC):
     '''interface for remote procedure call messages'''
 
     @classmethod
-    @abstractproperty
-    def procedure(cls) -> str:
+    @abstractmethod
+    def getProcedure(cls) -> str:
         '''returns a unique name for the procedure'''
         pass
 
@@ -20,7 +20,7 @@ class RPCMessage(ABC):
 
     def toDict(self) -> dict[str, Any]:
         '''creates and populates a dictionary from a message class'''
-        return {'procedure': self.procedure}
+        return {'procedure': self.getProcedure()}
 
 
 class RPCExecutor(ABC):

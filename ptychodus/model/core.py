@@ -21,7 +21,7 @@ from .probe import ProbeCore, ProbePresenter
 from .ptychonn import PtychoNNBackend
 from .ptychopy import PtychoPyBackend
 from .reconstructor import *
-from .rpc import RPCMessageService
+from .rpc import RPCCore, RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
 from .tike import TikeBackend
@@ -110,25 +110,16 @@ class ModelCore:
             self._reconstructorSettings, self._selectableReconstructor)
 
         self._workflowCore = WorkflowCore(self.settingsRegistry)
-
-        if modelArgs.rpcPort >= 0:
-            self._loadResultsExecutor = LoadResultsExecutor(self._probeCore.probe,
-                                                            self._objectCore.object)
-            self.rpcMessageService: Optional[RPCMessageService] = RPCMessageService(
-                modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
-            self.rpcMessageService.registerMessageClass(LoadResultsMessage)
-            self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
-                                                    self._loadResultsExecutor)
-        else:
-            self.rpcMessageService = None
+        self._rpcCore = RPCCore(modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
+        self._rpcCore.messageService.registerProcedure(
+            LoadResultsMessage, LoadResultsExecutor(self._probeCore.probe,
+                                                    self._objectCore.object))
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
 
-        if self.rpcMessageService:
-            self.rpcMessageService.start()
-
+        self._rpcCore.start()
         self._dataCore.start()
 
         return self
@@ -145,9 +136,7 @@ class ModelCore:
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataCore.stop()
-
-        if self.rpcMessageService:
-            self.rpcMessageService.stop()
+        self._rpcCore.stop()
 
     def batchModeReconstruct(self) -> int:
         result = self.reconstructorPresenter.reconstruct()
@@ -167,6 +156,13 @@ class ModelCore:
         numpy.savez(self._reconstructorSettings.outputFilePath.value, **dataDump)
 
         return result
+
+    def refreshActiveDataset(self) -> None:
+        self._dataCore.activeDataset.notifyObserversIfDatasetChanged()
+
+    @property
+    def rpcMessageService(self) -> RPCMessageService:
+        return self._rpcCore.messageService
 
     @property
     def detectorImagePresenter(self) -> ImagePresenter:

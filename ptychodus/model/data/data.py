@@ -35,8 +35,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         self._metadata = DiffractionMetadata.createNullInstance()
         self._contentsTree = SimpleTreeNode.createRoot(list())
-        self._arrayDict: dict[int, DiffractionArray] = dict()
-        self._arrayDictLock = threading.RLock()
+        self._arrayList: list[DiffractionArray] = list()
+        self._arrayListLock = threading.RLock()
         self._arrayData: DiffractionDataType = numpy.zeros(
             (1, 1, 1), dtype=self._settings.arrayDataType.value)
 
@@ -61,24 +61,12 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     def __getitem__(
             self, index: Union[int, slice]) -> Union[DiffractionArray, Sequence[DiffractionArray]]:
-        if isinstance(index, slice):
-            valueList: list[DiffractionArray] = list()
-
-            with self._arrayDictLock:
-                for idx in range(index.start, index.stop, index.step):
-                    value = self._arrayDict.get(idx)
-
-                    if value:
-                        valueList.append(value)
-
-            return valueList
-        else:
-            with self._arrayDictLock:
-                return self._arrayDict[index]
+        with self._arrayListLock:
+            return self._arrayList[index]
 
     def __len__(self) -> int:
-        with self._arrayDictLock:
-            return max(self._arrayDict.keys(), default=0)
+        with self._arrayListLock:
+            return len(self._arrayList)
 
     def _reallocate(self, maximumNumberOfImages: int) -> None:
         scratchDirectory = self._settings.scratchDirectory.value
@@ -98,8 +86,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
             logger.debug(f'Scratch memory is {shape}')
             self._arrayData = numpy.zeros(shape, dtype=dtype)
 
-        with self._arrayDictLock:
-            self._arrayDict.clear()
+        with self._arrayListLock:
+            self._arrayList.clear()
 
     def _assemble(self) -> None:
         while not self._stopWorkEvent.is_set():
@@ -108,34 +96,51 @@ class ActiveDiffractionDataset(DiffractionDataset):
             except queue.Empty:
                 continue
 
-            logger.debug(f'Reading {task.array.getLabel()}...')
-            data = task.array.getData()
+            logger.debug(f'Assembling {task.array.getLabel()}...')
 
-            if self._cropSizer.isCropEnabled():
-                sliceY = self._cropSizer.getSliceY()
-                sliceX = self._cropSizer.getSliceX()
-                data = data[:, sliceY, sliceX]
+            try:
+                data = task.array.getData()
+            except:
+                sliceZ = slice(task.offset, task.offset + self._metadata.numberOfImagesPerArray)
+                dataView = self._arrayData[sliceZ, :, :]
+                dataView.flags.writeable = False
 
-            threshold = self._settings.threshold.value
-            data[data < threshold] = threshold
+                arrayView = SimpleDiffractionArray(
+                    task.array.getLabel(),
+                    task.array.getIndex(),
+                    dataView,
+                    DiffractionArrayState.MISSING,
+                )
+            else:
+                if self._cropSizer.isCropEnabled():
+                    sliceY = self._cropSizer.getSliceY()
+                    sliceX = self._cropSizer.getSliceX()
+                    data = data[:, sliceY, sliceX]
 
-            if self._settings.flipX.value:
-                data = numpy.fliplr(data)
+                threshold = self._settings.threshold.value
+                data[data < threshold] = threshold
 
-            if self._settings.flipY.value:
-                data = numpy.flipud(data)
+                if self._settings.flipX.value:
+                    data = numpy.fliplr(data)
 
-            sliceZ = slice(task.offset, task.offset + data.shape[0])
-            dataView = self._arrayData[sliceZ, :, :]
-            dataView = data
-            dataView.flags.writeable = False
+                if self._settings.flipY.value:
+                    data = numpy.flipud(data)
 
-            arrayView = SimpleDiffractionArray(
-                task.array.getLabel(),
-                task.array.getIndex(),
-                dataView,
-                DiffractionArrayState.LOADED,
-            )
+                sliceZ = slice(task.offset, task.offset + data.shape[0])
+                dataView = self._arrayData[sliceZ, :, :]
+                dataView = data
+                dataView.flags.writeable = False
+
+                arrayView = SimpleDiffractionArray(
+                    task.array.getLabel(),
+                    task.array.getIndex(),
+                    dataView,
+                    DiffractionArrayState.LOADED,
+                )
+
+            with self._arrayListLock:
+                self._arrayList.append(arrayView)
+                self._arrayList.sort(key=lambda array: array.getIndex())
 
             self._changedEvent.set()
 
@@ -180,6 +185,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         self._contentsTree = dataset.getContentsTree()
         self.start(self._metadata.numberOfImagesTotal)
 
+        # FIXME split into two stages so that user can sync crop settings before loading data
         for array in dataset:
             self.insertArray(array)
 
@@ -191,9 +197,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
         self._taskQueue.put(task)
 
     def getAssembledData(self) -> DiffractionDataType:
-        indexes = list(self._arrayDict.keys())
-        indexes.sort()
-        return self._arrayData[indexes]
+        with self._arrayListLock:
+            return self._arrayData[[array.getIndex() for array in self._arrayList]]
 
     def notifyObserversIfDatasetChanged(self) -> None:
         # FIXME let main thread trigger gui updates on timer

@@ -74,6 +74,7 @@ class ControllerCore:
         self._monitorObjectController = ObjectImageController.createInstance(
             model.objectPresenter, model.objectImagePresenter, view.monitorObjectView.imageView,
             self._fileDialogFactory)
+        self._refreshDataTimer = QTimer()
         self._processMessagesTimer = QTimer()
 
     @classmethod
@@ -83,7 +84,10 @@ class ControllerCore:
         view.navigationActionGroup.triggered.connect(
             lambda action: controller.swapCentralWidgets(action))
 
-        if model.rpcMessageService:
+        controller._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
+        controller._refreshDataTimer.start(1000)  # TODO make configurable
+
+        if model.rpcMessageService.isActive:
             controller._processMessagesTimer.timeout.connect(
                 model.rpcMessageService.processMessages)
             controller._processMessagesTimer.start(1000)  # TODO make configurable
