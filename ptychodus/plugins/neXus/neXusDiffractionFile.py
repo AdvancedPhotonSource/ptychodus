@@ -10,9 +10,9 @@ import h5py
 import numpy
 
 from ..h5DiffractionFile import H5DiffractionFileTreeBuilder
-from ptychodus.api.data import (DiffractionArray, DiffractionDataType, DiffractionArrayState,
-                                DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                DiffractionPatternArray, DiffractionPatternData,
+                                DiffractionPatternState, SimpleDiffractionDataset)
 from ptychodus.api.geometry import Vector2D
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -20,13 +20,13 @@ from ptychodus.api.tree import SimpleTreeNode
 logger = logging.getLogger(__name__)
 
 
-class NeXusDiffractionArray(DiffractionArray):
+class NeXusDiffractionPatternArray(DiffractionPatternArray):
 
     def __init__(self, label: str, index: int, filePath: Path, dataPath: str) -> None:
         super().__init__()
         self._label = label
         self._index = index
-        self._state = DiffractionArrayState.UNKNOWN
+        self._state = DiffractionPatternState.UNKNOWN
         self._filePath = filePath
         self._dataPath = dataPath
 
@@ -36,11 +36,11 @@ class NeXusDiffractionArray(DiffractionArray):
     def getIndex(self) -> int:
         return self._index
 
-    def getState(self) -> DiffractionArrayState:
+    def getState(self) -> DiffractionPatternState:
         return self._state
 
-    def getData(self) -> DiffractionDataType:
-        self._state = DiffractionArrayState.MISSING
+    def getData(self) -> DiffractionPatternData:
+        self._state = DiffractionPatternState.MISSING
 
         with h5py.File(self._filePath, 'r') as h5File:
             try:
@@ -49,7 +49,7 @@ class NeXusDiffractionArray(DiffractionArray):
                 raise ValueError(f'Symlink {self._filePath}:{self._dataPath} is broken!')
             else:
                 if isinstance(item, h5py.Dataset):
-                    self._state = DiffractionArrayState.FOUND
+                    self._state = DiffractionPatternState.FOUND
                 else:
                     raise ValueError(
                         f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
@@ -61,11 +61,11 @@ class NeXusDiffractionArray(DiffractionArray):
 
 @dataclass(frozen=True)
 class DataGroup:
-    arrayList: list[DiffractionArray] = field(default_factory=list)
+    arrayList: list[DiffractionPatternArray] = field(default_factory=list)
 
     @classmethod
     def read(cls, group: h5py.Group) -> DataGroup:
-        arrayList: list[DiffractionArray] = list()
+        arrayList: list[DiffractionPatternArray] = list()
         masterFilePath = Path(group.file.filename)
 
         for name, h5Item in group.items():
@@ -74,7 +74,7 @@ class DataGroup:
             if isinstance(h5Item, h5py.ExternalLink):
                 filePath = masterFilePath.parent / h5Item.filename
                 dataPath = str(h5Item.path)
-                array = NeXusDiffractionArray(name, len(arrayList), filePath, dataPath)
+                array = NeXusDiffractionPatternArray(name, len(arrayList), filePath, dataPath)
                 arrayList.append(array)
 
         return cls(arrayList)
@@ -83,15 +83,17 @@ class DataGroup:
         return iter(self.arrayList)
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionArray:
+    def __getitem__(self, index: int) -> DiffractionPatternArray:
         ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]:
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
         ...
 
     def __getitem__(
-            self, index: Union[int, slice]) -> Union[DiffractionArray, Sequence[DiffractionArray]]:
+        self,
+        index: Union[int,
+                     slice]) -> Union[DiffractionPatternArray, Sequence[DiffractionPatternArray]]:
         return self.arrayList[index]
 
     def __len__(self) -> int:
@@ -208,15 +210,17 @@ class NeXusDiffractionDataset(DiffractionDataset):
         return self._contentsTree
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionArray:
+    def __getitem__(self, index: int) -> DiffractionPatternArray:
         ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]:
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
         ...
 
     def __getitem__(
-            self, index: Union[int, slice]) -> Union[DiffractionArray, Sequence[DiffractionArray]]:
+        self,
+        index: Union[int,
+                     slice]) -> Union[DiffractionPatternArray, Sequence[DiffractionPatternArray]]:
         return self._entry.data[index]
 
     def __len__(self) -> int:
@@ -238,9 +242,9 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         return 'NeXus Master Files (*.h5 *.hdf5)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(filePath, 0, 0, 0, 0)
+        metadata = DiffractionMetadata(filePath, 0, 0)
         contentsTree = self._treeBuilder.createRootNode()
-        arrayList: list[DiffractionArray] = list()
+        arrayList: list[DiffractionPatternArray] = list()
         dataset: DiffractionDataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 
         if filePath is None:
@@ -269,7 +273,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 detectorSpecific.y_pixels_in_detector,
             )
 
-            numberOfImagesPerArray = 0
+            numberOfPatternsPerArray = 0
 
             for array in entry.data:
                 try:
@@ -278,15 +282,13 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     logger.debug(f'Array \"{array.getLabel()}\" does not exist!')
                     continue
 
-                numberOfImagesPerArray = data.shape[0]
+                numberOfPatternsPerArray = data.shape[0]
                 break
 
             metadata = DiffractionMetadata(
                 filePath=filePath,
-                imageWidth=detectorSpecific.x_pixels_in_detector,
-                imageHeight=detectorSpecific.y_pixels_in_detector,
-                numberOfImagesPerArray=numberOfImagesPerArray,
-                numberOfImagesTotal=detectorSpecific.nimages,
+                numberOfPatternsPerArray=numberOfPatternsPerArray,
+                numberOfPatternsTotal=detectorSpecific.nimages,
                 detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
                 detectorNumberOfPixels=detectorNumberOfPixels,
                 detectorPixelSizeInMeters=detectorPixelSizeInMeters,

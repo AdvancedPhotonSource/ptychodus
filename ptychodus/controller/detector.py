@@ -6,10 +6,10 @@ from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QFileDialog
 
-from ..api.data import DiffractionArrayState
+from ..api.data import DiffractionPatternState
 from ..api.observer import Observable, Observer
-from ..model import (CropPresenter, DetectorPresenter, DiffractionArrayPresenter,
-                     DiffractionDatasetPresenter, ImagePresenter)
+from ..model import (CropPresenter, DetectorPresenter, DiffractionDatasetPresenter,
+                     DiffractionPatternPresenter, ImagePresenter)
 from ..view import CropView, DatasetView, DetectorView, ImageView
 from .data import FileDialogFactory
 from .image import ImageController
@@ -75,10 +75,10 @@ class DatasetListModel(QAbstractListModel):
         value = Qt.ItemFlags()
 
         if index.isValid():
-            state = self._presenter.getArrayState(index.row())
+            state = self._presenter.getPatternState(index.row())
             value = super().flags(index)
 
-            if state != DiffractionArrayState.LOADED:
+            if state != DiffractionPatternState.LOADED:
                 value &= ~Qt.ItemIsSelectable
                 value &= ~Qt.ItemIsEnabled
 
@@ -92,9 +92,9 @@ class DatasetListModel(QAbstractListModel):
                 label = self._presenter.getArrayLabel(index.row())
                 value = QVariant(label)
             elif role == Qt.FontRole:
-                state = self._presenter.getArrayState(index.row())
+                state = self._presenter.getPatternState(index.row())
                 font = QFont()
-                font.setItalic(state == DiffractionArrayState.FOUND)
+                font.setItalic(state == DiffractionPatternState.FOUND)
                 value = QVariant(font)
 
         return value
@@ -106,39 +106,40 @@ class DatasetListModel(QAbstractListModel):
 class DatasetParametersController(Observer):
 
     def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
-                 arrayPresenter: DiffractionArrayPresenter, view: DatasetView) -> None:
+                 patternPresenter: DiffractionPatternPresenter, view: DatasetView) -> None:
         super().__init__()
         self._datasetPresenter = datasetPresenter
-        self._arrayPresenter = arrayPresenter
+        self._patternPresenter = patternPresenter
         self._view = view
         self._listModel = DatasetListModel(datasetPresenter)
 
     @classmethod
     def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
-                       arrayPresenter: DiffractionArrayPresenter,
+                       patternPresenter: DiffractionPatternPresenter,
                        view: DatasetView) -> DatasetParametersController:
-        controller = cls(datasetPresenter, arrayPresenter, view)
+        controller = cls(datasetPresenter, patternPresenter, view)
 
         view.listView.setModel(controller._listModel)
         datasetPresenter.addObserver(controller)
-        arrayPresenter.addObserver(controller)
+        patternPresenter.addObserver(controller)
 
-        view.listView.selectionModel().currentChanged.connect(controller._updateCurrentArrayIndex)
+        view.listView.selectionModel().currentChanged.connect(
+            controller._updateCurrentPatternIndex)
 
         return controller
 
-    def _updateCurrentArrayIndex(self, index: QModelIndex) -> None:
-        self._arrayPresenter.setCurrentArrayIndex(index.row())
+    def _updateCurrentPatternIndex(self, index: QModelIndex) -> None:
+        self._patternPresenter.setCurrentPatternIndex(index.row())
 
     def _updateSelection(self) -> None:
-        row = self._arrayPresenter.getCurrentArrayIndex()
+        row = self._patternPresenter.getCurrentPatternIndex()
         index = self._listModel.index(row, 0)
         self._view.listView.setCurrentIndex(index)
 
     def update(self, observable: Observable) -> None:
         if observable is self._datasetPresenter:
             self._listModel.refresh()
-        elif observable is self._arrayPresenter:
+        elif observable is self._patternPresenter:
             self._updateSelection()
 
 
@@ -200,21 +201,22 @@ class CropController(Observer):
 
 class DatasetImageController(Observer):
 
-    def __init__(self, arrayPresenter: DiffractionArrayPresenter, imagePresenter: ImagePresenter,
-                 view: ImageView, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, patternPresenter: DiffractionPatternPresenter,
+                 imagePresenter: ImagePresenter, view: ImageView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
-        self._arrayPresenter = arrayPresenter
+        self._patternPresenter = patternPresenter
         self._imagePresenter = imagePresenter
         self._view = view
         self._imageController = ImageController.createInstance(imagePresenter, view,
                                                                fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, arrayPresenter: DiffractionArrayPresenter,
+    def createInstance(cls, patternPresenter: DiffractionPatternPresenter,
                        imagePresenter: ImagePresenter, view: ImageView,
                        fileDialogFactory: FileDialogFactory) -> DatasetImageController:
-        controller = cls(arrayPresenter, imagePresenter, view, fileDialogFactory)
-        arrayPresenter.addObserver(controller)
+        controller = cls(patternPresenter, imagePresenter, view, fileDialogFactory)
+        patternPresenter.addObserver(controller)
         controller._syncModelToView()
         view.imageRibbon.indexGroupBox.setTitle('Frame')
         view.imageRibbon.indexGroupBox.indexSpinBox.valueChanged.connect(
@@ -222,11 +224,11 @@ class DatasetImageController(Observer):
         return controller
 
     def _renderImageData(self, index: int) -> None:
-        array = self._arrayPresenter.getImage(index)
+        array = self._patternPresenter.getImage(index)
         self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
-        numberOfImages = self._arrayPresenter.getNumberOfImages()
+        numberOfImages = self._patternPresenter.getNumberOfImages()
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setEnabled(numberOfImages > 0)
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setRange(0, numberOfImages - 1)
 
@@ -234,5 +236,5 @@ class DatasetImageController(Observer):
         self._renderImageData(index)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._arrayPresenter:
+        if observable is self._patternPresenter:
             self._syncModelToView()

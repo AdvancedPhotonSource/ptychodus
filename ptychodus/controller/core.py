@@ -38,13 +38,13 @@ class ControllerCore:
         self._detectorController = DetectorController.createInstance(
             model.detectorPresenter, view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
-            model.diffractionDatasetPresenter, model.diffractionArrayPresenter,
+            model.diffractionDatasetPresenter, model.diffractionPatternPresenter,
             view.detectorParametersView.datasetView)
         self._cropController = CropController.createInstance(
             model.cropPresenter, view.detectorParametersView.imageCropView)
         self._datasetImageController = DatasetImageController.createInstance(
-            model.diffractionArrayPresenter, model.detectorImagePresenter, view.detectorImageView,
-            self._fileDialogFactory)
+            model.diffractionPatternPresenter, model.detectorImagePresenter,
+            view.detectorImageView, self._fileDialogFactory)
         self._probeParametersController = ProbeParametersController.createInstance(
             model.probePresenter, view.probeParametersView, model.probeImagePresenter,
             view.probeImageView, self._fileDialogFactory)

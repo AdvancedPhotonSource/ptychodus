@@ -12,7 +12,7 @@ import numpy
 
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
-from .data import CropPresenter, DataCore, DiffractionArrayPresenter, DiffractionDatasetPresenter
+from .data import CropPresenter, DataCore, DiffractionPatternPresenter, DiffractionDatasetPresenter
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import *
 from .metadata import MetadataPresenter
@@ -173,8 +173,8 @@ class ModelCore:
         return self._dataCore.cropPresenter
 
     @property
-    def diffractionArrayPresenter(self) -> DiffractionArrayPresenter:
-        return self._dataCore.diffractionArrayPresenter
+    def diffractionPatternPresenter(self) -> DiffractionPatternPresenter:
+        return self._dataCore.diffractionPatternPresenter
 
     @property
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:

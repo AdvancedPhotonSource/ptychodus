@@ -5,7 +5,7 @@ import logging
 import numpy
 import numpy.typing
 
-from ...api.data import DiffractionDataType
+from ...api.data import DiffractionPatternData
 from ...api.object import ObjectArrayType
 from ...api.probe import ProbeArrayType
 from ...api.scan import ScanPoint
@@ -40,7 +40,7 @@ class TikeArrayConverter:  # FIXME use dataset array indexes to select scan poin
         self._scanInitializerFactory = scanInitializerFactory
         self._scanRepository = scanRepository
 
-    def getDiffractionData(self) -> DiffractionDataType:
+    def getDiffractionData(self) -> DiffractionPatternData:
         data = self._diffractionDataset.getAssembledData()
         return numpy.fft.ifftshift(data, axes=(-2, -1))
 

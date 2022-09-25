@@ -6,23 +6,23 @@ import sys
 from tifffile import TiffFile
 import numpy
 
-from ptychodus.api.data import (DiffractionArray, DiffractionArrayState, DiffractionDataType,
-                                DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
-                                DiffractionMetadata, SimpleDiffractionArray,
-                                SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
+                                DiffractionMetadata, DiffractionPatternArray,
+                                DiffractionPatternData, DiffractionPatternState,
+                                SimpleDiffractionDataset, SimpleDiffractionPatternArray)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
 
 
-class TiffDiffractionArray(DiffractionArray):
+class TiffDiffractionPatternArray(DiffractionPatternArray):
 
     def __init__(self, filePath: Path, index: int) -> None:
         super().__init__()
         self._filePath = filePath
         self._index = index
-        self._state = DiffractionArrayState.UNKNOWN
+        self._state = DiffractionPatternState.UNKNOWN
 
     def getLabel(self) -> str:
         return self._filePath.stem
@@ -30,11 +30,11 @@ class TiffDiffractionArray(DiffractionArray):
     def getIndex(self) -> int:
         return self._index
 
-    def getState(self) -> DiffractionArrayState:
+    def getState(self) -> DiffractionPatternState:
         return self._state
 
-    def getData(self) -> DiffractionDataType:
-        self._state = DiffractionArrayState.MISSING
+    def getData(self) -> DiffractionPatternData:
+        self._state = DiffractionPatternState.MISSING
 
         with TiffFile(self._filePath) as tiff:
             try:
@@ -42,7 +42,7 @@ class TiffDiffractionArray(DiffractionArray):
             except:
                 raise
             else:
-                self._state = DiffractionArrayState.FOUND
+                self._state = DiffractionPatternState.FOUND
 
         if data.ndim == 2:
             data = data[numpy.newaxis, :, :]
@@ -61,8 +61,8 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         return 'Tagged Image File Format Files (*.tif *.tiff)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(filePath, 0, 0, 0, 0)
-        arrayList: list[DiffractionArray] = list()
+        metadata = DiffractionMetadata(filePath, 0, 0)
+        arrayList: list[DiffractionPatternArray] = list()
 
         if filePath:
             digits = re.findall(r'\d+', filePath.stem)
@@ -80,17 +80,15 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             filePathList.sort(key=lambda fp: fp.stem)
 
             for fp in filePathList:
-                array: DiffractionArray = TiffDiffractionArray(fp, len(arrayList))
+                array: DiffractionPatternArray = TiffDiffractionPatternArray(fp, len(arrayList))
                 arrayList.append(array)
 
             with TiffFile(filePath) as tiff:
                 data = tiff.asarray()
                 metadata = DiffractionMetadata(
                     filePath=filePath.parent / pattern,
-                    imageWidth=data.shape[-1],
-                    imageHeight=data.shape[-2],
-                    numberOfImagesPerArray=len(tiff.pages),
-                    numberOfImagesTotal=len(tiff.pages) * len(arrayList),
+                    numberOfPatternsPerArray=len(tiff.pages),
+                    numberOfPatternsTotal=len(tiff.pages) * len(arrayList),
                 )
 
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy
 
-from ..api.data import DiffractionArrayState, DiffractionDataset, DiffractionMetadata
+from ..api.data import DiffractionDataset, DiffractionMetadata
 from ..api.observer import Observable, Observer
 from .data import CropSettings
 from .detector import DetectorSettings

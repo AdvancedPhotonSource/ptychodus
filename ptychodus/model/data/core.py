@@ -12,17 +12,17 @@ import tempfile
 import h5py
 import numpy
 
-from ...api.data import (DiffractionArray, DiffractionArrayState, DiffractionDataType,
-                         DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
-                         DiffractionMetadata, SimpleDiffractionArray)
+from ...api.data import (DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
+                         DiffractionMetadata, DiffractionPatternArray, DiffractionPatternData,
+                         DiffractionPatternState, SimpleDiffractionPatternArray)
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
-from .data import ActiveDiffractionDataset
 from .crop import CropPresenter, CropSettings, CropSizer
+from .data import ActiveDiffractionDataset
 from .settings import DataSettings
 from .watcher import DataDirectoryWatcher
 
@@ -67,7 +67,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def getArrayLabel(self, index: int) -> str:
         return self._activeDiffractionDataset[index].getLabel()
 
-    def getArrayState(self, index: int) -> DiffractionArrayState:
+    def getPatternState(self, index: int) -> DiffractionPatternState:
         return self._activeDiffractionDataset[index].getState()
 
     def getNumberOfArrays(self) -> int:
@@ -159,20 +159,20 @@ class DiffractionDatasetPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class DiffractionArrayPresenter(Observable, Observer):
+class DiffractionPatternPresenter(Observable, Observer):
 
     def __init__(self, dataset: DiffractionDataset) -> None:
         super().__init__()
         self._dataset = dataset
-        self._array: DiffractionArray = SimpleDiffractionArray.createNullInstance()
+        self._array: DiffractionPatternArray = SimpleDiffractionPatternArray.createNullInstance()
 
     @classmethod
-    def createInstance(cls, dataset: DiffractionDataset) -> DiffractionArrayPresenter:
+    def createInstance(cls, dataset: DiffractionDataset) -> DiffractionPatternPresenter:
         presenter = cls(dataset)
         dataset.addObserver(presenter)
         return presenter
 
-    def setCurrentArrayIndex(self, index: int) -> None:
+    def setCurrentPatternIndex(self, index: int) -> None:
         try:
             data = self._dataset[index]
         except IndexError:
@@ -184,19 +184,19 @@ class DiffractionArrayPresenter(Observable, Observer):
         self._array.addObserver(self)
         self.notifyObservers()
 
-    def getCurrentArrayIndex(self) -> int:
+    def getCurrentPatternIndex(self) -> int:
         return self._array.getIndex()
 
     def getNumberOfImages(self) -> int:
         return self._array.getData().shape[0]
 
-    def getImage(self, index: int) -> DiffractionDataType:
+    def getImage(self, index: int) -> DiffractionPatternData:
         return self._array.getData()[index]
 
     def update(self, observable: Observable) -> None:
         if observable is self._dataset:
             self._array.removeObserver(self)
-            self._array = SimpleDiffractionArray.createNullInstance()
+            self._array = SimpleDiffractionPatternArray.createNullInstance()
             self.notifyObservers()
         elif observable is self._array:
             self.notifyObservers()
@@ -218,7 +218,7 @@ class DataCore:
 
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
             self._settings, self.activeDataset, fileReaderChooser, fileWriterChooser)
-        self.diffractionArrayPresenter = DiffractionArrayPresenter.createInstance(
+        self.diffractionPatternPresenter = DiffractionPatternPresenter.createInstance(
             self.activeDataset)
 
     def start(self) -> None:

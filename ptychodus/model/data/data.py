@@ -10,8 +10,9 @@ import threading
 
 import numpy
 
-from ...api.data import (DiffractionArray, DiffractionArrayState, DiffractionDataType,
-                         DiffractionDataset, DiffractionMetadata, SimpleDiffractionArray)
+from ...api.data import (DiffractionDataset, DiffractionMetadata, DiffractionPatternArray,
+                         DiffractionPatternData, DiffractionPatternState,
+                         SimpleDiffractionPatternArray)
 from ...api.observer import Observable, Observer
 from ...api.tree import SimpleTreeNode
 from .crop import CropSizer
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AssemblyTask:
-    array: DiffractionArray
+    array: DiffractionPatternArray
     offset: int
 
 
@@ -35,9 +36,9 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         self._metadata = DiffractionMetadata.createNullInstance()
         self._contentsTree = SimpleTreeNode.createRoot(list())
-        self._arrayList: list[DiffractionArray] = list()
+        self._arrayList: list[DiffractionPatternArray] = list()
         self._arrayListLock = threading.RLock()
-        self._arrayData: DiffractionDataType = numpy.zeros(
+        self._arrayData: DiffractionPatternData = numpy.zeros(
             (1, 1, 1), dtype=self._settings.arrayDataType.value)
 
         self._taskQueue: queue.Queue[AssemblyTask] = queue.Queue()
@@ -52,15 +53,15 @@ class ActiveDiffractionDataset(DiffractionDataset):
         return self._contentsTree
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionArray:
+    def __getitem__(self, index: int) -> DiffractionPatternArray:
         ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]:
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
         ...
 
-    def __getitem__(
-            self, index: Union[int, slice]) -> Union[DiffractionArray, Sequence[DiffractionArray]]:
+    def __getitem__(self, index: Union[int, slice]) -> \
+            Union[DiffractionPatternArray, Sequence[DiffractionPatternArray]]:
         with self._arrayListLock:
             return self._arrayList[index]
 
@@ -68,11 +69,11 @@ class ActiveDiffractionDataset(DiffractionDataset):
         with self._arrayListLock:
             return len(self._arrayList)
 
-    def _reallocate(self, maximumNumberOfImages: int) -> None:
+    def _reallocate(self, maximumNumberOfPatterns: int) -> None:
         scratchDirectory = self._settings.scratchDirectory.value
         dtype = self._settings.arrayDataType.value
         shape = (
-            maximumNumberOfImages,
+            maximumNumberOfPatterns,
             self._cropSizer.getExtentYInPixels(),
             self._cropSizer.getExtentXInPixels(),
         )
@@ -101,15 +102,15 @@ class ActiveDiffractionDataset(DiffractionDataset):
             try:
                 data = task.array.getData()
             except:
-                sliceZ = slice(task.offset, task.offset + self._metadata.numberOfImagesPerArray)
+                sliceZ = slice(task.offset, task.offset + self._metadata.numberOfPatternsPerArray)
                 dataView = self._arrayData[sliceZ, :, :]
                 dataView.flags.writeable = False
 
-                arrayView = SimpleDiffractionArray(
+                arrayView = SimpleDiffractionPatternArray(
                     task.array.getLabel(),
                     task.array.getIndex(),
                     dataView,
-                    DiffractionArrayState.MISSING,
+                    DiffractionPatternState.MISSING,
                 )
             else:
                 if self._cropSizer.isCropEnabled():
@@ -131,11 +132,11 @@ class ActiveDiffractionDataset(DiffractionDataset):
                 dataView = data
                 dataView.flags.writeable = False
 
-                arrayView = SimpleDiffractionArray(
+                arrayView = SimpleDiffractionPatternArray(
                     task.array.getLabel(),
                     task.array.getIndex(),
                     dataView,
-                    DiffractionArrayState.LOADED,
+                    DiffractionPatternState.LOADED,
                 )
 
             with self._arrayListLock:
@@ -148,14 +149,14 @@ class ActiveDiffractionDataset(DiffractionDataset):
     def isActive(self) -> bool:
         return (len(self._workers) > 0)
 
-    def start(self, maximumNumberOfImages: int) -> None:
+    def start(self, maximumNumberOfPatterns: int) -> None:
         if self.isActive:
             self.stop()
 
         logger.info('Starting data assembler...')
         self._stopWorkEvent.clear()
 
-        self._reallocate(maximumNumberOfImages)
+        self._reallocate(maximumNumberOfPatterns)
 
         for idx in range(self._settings.numberOfDataThreads.value):
             thread = threading.Thread(target=self._assemble)
@@ -183,7 +184,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         self._metadata = dataset.getMetadata()
         self._contentsTree = dataset.getContentsTree()
-        self.start(self._metadata.numberOfImagesTotal)
+        self.start(self._metadata.numberOfPatternsTotal)
 
         # FIXME split into two stages so that user can sync crop settings before loading data
         for array in dataset:
@@ -191,12 +192,12 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         self.notifyObservers()
 
-    def insertArray(self, array: DiffractionArray) -> None:
-        offset = self._metadata.numberOfImagesPerArray * array.getIndex()
+    def insertArray(self, array: DiffractionPatternArray) -> None:
+        offset = self._metadata.numberOfPatternsPerArray * array.getIndex()
         task = AssemblyTask(array, offset)
         self._taskQueue.put(task)
 
-    def getAssembledData(self) -> DiffractionDataType:
+    def getAssembledData(self) -> DiffractionPatternData:
         with self._arrayListLock:
             return self._arrayData[[array.getIndex() for array in self._arrayList]]
 

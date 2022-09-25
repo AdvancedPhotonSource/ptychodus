@@ -4,8 +4,8 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.data import (DiffractionArray, DiffractionDataset, DiffractionFileReader,
-                                DiffractionMetadata, SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                DiffractionPatternArray, SimpleDiffractionDataset)
 from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -104,9 +104,9 @@ class H5DiffractionFileReader(DiffractionFileReader):
         return 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(filePath, 0, 0, 0, 0)
+        metadata = DiffractionMetadata(filePath, 0, 0)
         contentsTree = self._treeBuilder.createRootNode()
-        arrayList: list[DiffractionArray] = list()
+        arrayList: list[DiffractionPatternArray] = list()
 
         if filePath:
             with h5py.File(filePath, 'r') as h5File:
