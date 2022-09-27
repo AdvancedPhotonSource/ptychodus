@@ -3,7 +3,7 @@ from pathlib import Path
 import logging
 import re
 
-from PyQt5.QtCore import QModelIndex
+from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import QFileSystemModel
 
 from ...model import DiffractionDatasetPresenter, Observable, Observer
@@ -22,6 +22,7 @@ class DatasetFileController(Observer):
         self._view = view
         self._fileDialogFactory = fileDialogFactory
         self._fileSystemModel = QFileSystemModel()
+        self._fileSystemProxyModel = QSortFilterProxyModel()
 
     @classmethod
     def createInstance(cls, presenter: DiffractionDatasetPresenter,
@@ -36,7 +37,10 @@ class DatasetFileController(Observer):
         rootPath = controller._fileSystemModel.setRootPath(
             str(fileDialogFactory.getOpenWorkingDirectory()))
         controller._fileSystemModel.setNameFilterDisables(False)
-        view.contentsView.fileSystemTreeView.setModel(controller._fileSystemModel)
+        controller._fileSystemProxyModel.setSourceModel(controller._fileSystemModel)
+
+        view.contentsView.fileSystemTreeView.setModel(controller._fileSystemProxyModel)
+        view.contentsView.fileSystemTreeView.setSortingEnabled(True)
         view.contentsView.fileSystemTreeView.selectionModel().currentChanged.connect(
             controller._updateEnabledNavigationButtons)
 

@@ -21,9 +21,10 @@ from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
-from .crop import CropPresenter, CropSettings, CropSizer
-from .data import ActiveDiffractionDataset
-from .settings import DataSettings
+from .crop import CropSizer
+from .dataset import ActiveDiffractionDataset
+from .patterns import DiffractionPatternPresenter
+from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
 from .watcher import DataDirectoryWatcher
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,8 @@ logger = logging.getLogger(__name__)
 
 class DiffractionDatasetPresenter(Observable, Observer):
 
-    def __init__(self, settings: DataSettings, activeDiffractionDataset: ActiveDiffractionDataset,
+    def __init__(self, settings: DiffractionDatasetSettings,
+                 activeDiffractionDataset: ActiveDiffractionDataset,
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
         super().__init__()
         self._settings = settings
@@ -40,7 +42,8 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     @classmethod
     def createInstance(
-            cls, settings: DataSettings, activeDiffractionDataset: ActiveDiffractionDataset,
+            cls, settings: DiffractionDatasetSettings,
+            activeDiffractionDataset: ActiveDiffractionDataset,
             fileReaderChooser: PluginChooser[DiffractionFileReader]
     ) -> DiffractionDatasetPresenter:
         presenter = cls(settings, activeDiffractionDataset, fileReaderChooser)
@@ -148,7 +151,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class DiffractionPatternPresenter(Observable, Observer):
+class ActiveDiffractionPatternPresenter(Observable, Observer):
 
     def __init__(self, dataset: DiffractionDataset) -> None:
         super().__init__()
@@ -156,7 +159,7 @@ class DiffractionPatternPresenter(Observable, Observer):
         self._array: DiffractionPatternArray = SimpleDiffractionPatternArray.createNullInstance()
 
     @classmethod
-    def createInstance(cls, dataset: DiffractionDataset) -> DiffractionPatternPresenter:
+    def createInstance(cls, dataset: DiffractionDataset) -> ActiveDiffractionPatternPresenter:
         presenter = cls(dataset)
         dataset.addObserver(presenter)
         return presenter
@@ -195,18 +198,21 @@ class DataCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
-        self.cropSettings = CropSettings.createInstance(settingsRegistry)
-        self.cropSizer = CropSizer.createInstance(self.cropSettings, detector)
-        self.cropPresenter = CropPresenter.createInstance(self.cropSettings, self.cropSizer)
+        self._datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
+        self.patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
 
-        self._settings = DataSettings.createInstance(settingsRegistry)
-        self.activeDataset = ActiveDiffractionDataset(self._settings, self.cropSizer)
+        self.cropSizer = CropSizer.createInstance(self.patternSettings, detector)
+        self.patternPresenter = DiffractionPatternPresenter.createInstance(
+            self.patternSettings, self.cropSizer)
+
+        self.activeDataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
+                                                      self.cropSizer)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(
-            self._settings, self.activeDataset)
+            self._datasetSettings, self.activeDataset)
 
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._settings, self.activeDataset, fileReaderChooser)
-        self.diffractionPatternPresenter = DiffractionPatternPresenter.createInstance(
+            self._datasetSettings, self.activeDataset, fileReaderChooser)
+        self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
             self.activeDataset)
 
     def start(self) -> None:

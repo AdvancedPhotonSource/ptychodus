@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import QFileDialog
 
 from ..api.data import DiffractionPatternState
 from ..api.observer import Observable, Observer
-from ..model import (DetectorPresenter, DiffractionDatasetPresenter, DiffractionPatternPresenter,
-                     ImagePresenter)
+from ..model import (DetectorPresenter, DiffractionDatasetPresenter,
+                     ActiveDiffractionPatternPresenter, ImagePresenter)
 from ..view import DiffractionPatternView, DetectorView, ImageView
 from .data import FileDialogFactory
 from .image import ImageController
@@ -106,23 +106,23 @@ class DatasetListModel(QAbstractListModel):
 class DatasetParametersController(Observer):
 
     def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
-                 patternPresenter: DiffractionPatternPresenter,
+                 activePatternPresenter: ActiveDiffractionPatternPresenter,
                  view: DiffractionPatternView) -> None:
         super().__init__()
         self._datasetPresenter = datasetPresenter
-        self._patternPresenter = patternPresenter
+        self._activePatternPresenter = activePatternPresenter
         self._view = view
         self._listModel = DatasetListModel(datasetPresenter)
 
     @classmethod
     def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
-                       patternPresenter: DiffractionPatternPresenter,
+                       activePatternPresenter: ActiveDiffractionPatternPresenter,
                        view: DiffractionPatternView) -> DatasetParametersController:
-        controller = cls(datasetPresenter, patternPresenter, view)
+        controller = cls(datasetPresenter, activePatternPresenter, view)
 
         view.listView.setModel(controller._listModel)
         datasetPresenter.addObserver(controller)
-        patternPresenter.addObserver(controller)
+        activePatternPresenter.addObserver(controller)
 
         view.listView.selectionModel().currentChanged.connect(
             controller._updateCurrentPatternIndex)
@@ -130,38 +130,38 @@ class DatasetParametersController(Observer):
         return controller
 
     def _updateCurrentPatternIndex(self, index: QModelIndex) -> None:
-        self._patternPresenter.setCurrentPatternIndex(index.row())
+        self._activePatternPresenter.setCurrentPatternIndex(index.row())
 
     def _updateSelection(self) -> None:
-        row = self._patternPresenter.getCurrentPatternIndex()
+        row = self._activePatternPresenter.getCurrentPatternIndex()
         index = self._listModel.index(row, 0)
         self._view.listView.setCurrentIndex(index)
 
     def update(self, observable: Observable) -> None:
         if observable is self._datasetPresenter:
             self._listModel.refresh()
-        elif observable is self._patternPresenter:
+        elif observable is self._activePatternPresenter:
             self._updateSelection()
 
 
 class DatasetImageController(Observer):
 
-    def __init__(self, patternPresenter: DiffractionPatternPresenter,
+    def __init__(self, activePatternPresenter: ActiveDiffractionPatternPresenter,
                  imagePresenter: ImagePresenter, view: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
-        self._patternPresenter = patternPresenter
+        self._activePatternPresenter = activePatternPresenter
         self._imagePresenter = imagePresenter
         self._view = view
         self._imageController = ImageController.createInstance(imagePresenter, view,
                                                                fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, patternPresenter: DiffractionPatternPresenter,
+    def createInstance(cls, activePatternPresenter: ActiveDiffractionPatternPresenter,
                        imagePresenter: ImagePresenter, view: ImageView,
                        fileDialogFactory: FileDialogFactory) -> DatasetImageController:
-        controller = cls(patternPresenter, imagePresenter, view, fileDialogFactory)
-        patternPresenter.addObserver(controller)
+        controller = cls(activePatternPresenter, imagePresenter, view, fileDialogFactory)
+        activePatternPresenter.addObserver(controller)
         controller._syncModelToView()
         view.imageRibbon.indexGroupBox.setTitle('Frame')
         view.imageRibbon.indexGroupBox.indexSpinBox.valueChanged.connect(
@@ -169,11 +169,11 @@ class DatasetImageController(Observer):
         return controller
 
     def _renderImageData(self, index: int) -> None:
-        array = self._patternPresenter.getImage(index)
+        array = self._activePatternPresenter.getImage(index)
         self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
-        numberOfImages = self._patternPresenter.getNumberOfImages()
+        numberOfImages = self._activePatternPresenter.getNumberOfImages()
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setEnabled(numberOfImages > 0)
         self._view.imageRibbon.indexGroupBox.indexSpinBox.setRange(0, numberOfImages - 1)
 
@@ -181,5 +181,5 @@ class DatasetImageController(Observer):
         self._renderImageData(index)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._patternPresenter:
+        if observable is self._activePatternPresenter:
             self._syncModelToView()

@@ -12,7 +12,8 @@ import numpy
 
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
-from .data import CropPresenter, DataCore, DiffractionPatternPresenter, DiffractionDatasetPresenter
+from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
+                   DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import *
 from .metadata import MetadataPresenter
@@ -99,7 +100,7 @@ class ModelCore:
 
         self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.activeDataset,
                                                                   self._detectorSettings,
-                                                                  self._dataCore.cropSettings,
+                                                                  self._dataCore.patternSettings,
                                                                   self._probeCore.settings,
                                                                   self._scanCore)
         self._selectableReconstructor = SelectableReconstructor.createInstance(
@@ -168,12 +169,12 @@ class ModelCore:
         return self._detectorImageCore.presenter
 
     @property
-    def cropPresenter(self) -> CropPresenter:
-        return self._dataCore.cropPresenter
+    def patternPresenter(self) -> DiffractionPatternPresenter:
+        return self._dataCore.patternPresenter
 
     @property
-    def diffractionPatternPresenter(self) -> DiffractionPatternPresenter:
-        return self._dataCore.diffractionPatternPresenter
+    def activeDiffractionPatternPresenter(self) -> ActiveDiffractionPatternPresenter:
+        return self._dataCore.activePatternPresenter
 
     @property
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:

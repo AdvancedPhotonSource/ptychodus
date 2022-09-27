@@ -16,7 +16,7 @@ from ...api.data import (DiffractionDataset, DiffractionMetadata, DiffractionPat
 from ...api.observer import Observable, Observer
 from ...api.tree import SimpleTreeNode
 from .crop import CropSizer
-from .settings import DataSettings
+from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +29,11 @@ class AssemblyTask:
 
 class ActiveDiffractionDataset(DiffractionDataset):
 
-    def __init__(self, settings: DataSettings, cropSizer: CropSizer) -> None:
+    def __init__(self, datasetSettings: DiffractionDatasetSettings,
+                 patternSettings: DiffractionPatternSettings, cropSizer: CropSizer) -> None:
         super().__init__()
-        self._settings = settings
+        self._datasetSettings = datasetSettings
+        self._patternSettings = patternSettings
         self._cropSizer = cropSizer
 
         self._metadata = DiffractionMetadata.createNullInstance()
@@ -96,13 +98,13 @@ class ActiveDiffractionDataset(DiffractionDataset):
                     sliceX = self._cropSizer.getSliceX()
                     data = data[:, sliceY, sliceX]
 
-                threshold = self._settings.threshold.value
+                threshold = self._patternSettings.threshold.value
                 data[data < threshold] = threshold
 
-                if self._settings.flipX.value:
+                if self._patternSettings.flipXEnabled.value:
                     data = numpy.fliplr(data)
 
-                if self._settings.flipY.value:
+                if self._patternSettings.flipYEnabled.value:
                     data = numpy.flipud(data)
 
                 sliceZ = slice(task.offset, task.offset + data.shape[0])
@@ -134,7 +136,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         logger.info('Resetting data assembler...')
         self._stopWorkEvent.clear()
 
-        scratchDirectory = self._settings.scratchDirectory.value
+        scratchDirectory = self._datasetSettings.scratchDirectory.value
         dtype = numpy.uint16  # FIXME get from metadata
         shape = (
             maximumNumberOfPatterns,
@@ -163,7 +165,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         logger.info('Starting data assembler...')
 
-        for idx in range(self._settings.numberOfDataThreads.value):
+        for idx in range(self._patternSettings.numberOfDataThreads.value):
             thread = threading.Thread(target=self._assemble)
             thread.start()
             self._workers.append(thread)

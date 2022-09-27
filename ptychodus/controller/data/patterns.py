@@ -1,18 +1,48 @@
 from __future__ import annotations
 
-from ...model import CropPresenter, DiffractionDatasetPresenter, Observable, Observer
-from ...view import DataNavigationPage, PatternCropView, PatternsView
+from ...model import DiffractionDatasetPresenter, DiffractionPatternPresenter, Observable, Observer
+from ...view import DataNavigationPage, PatternCropView, PatternLoadView, PatternsView
 
 
-class PatternCropController(Observer):
+class PatternLoadController(Observer):
 
-    def __init__(self, presenter: CropPresenter, view: PatternCropView) -> None:
+    def __init__(self, presenter: DiffractionPatternPresenter, view: PatternLoadView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: CropPresenter,
+    def createInstance(cls, presenter: DiffractionPatternPresenter,
+                       view: PatternLoadView) -> PatternLoadController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.numberOfThreadsSpinBox.valueChanged.connect(presenter.setNumberOfDataThreads)
+
+        controller._syncModelToView()
+        return controller
+
+    def _syncModelToView(self) -> None:
+        self._view.numberOfThreadsSpinBox.blockSignals(True)
+        self._view.numberOfThreadsSpinBox.setRange(self._presenter.getMinNumberOfDataThreads(),
+                                                   self._presenter.getMaxNumberOfDataThreads())
+        self._view.numberOfThreadsSpinBox.setValue(self._presenter.getNumberOfDataThreads())
+        self._view.numberOfThreadsSpinBox.blockSignals(False)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
+class PatternCropController(Observer):
+
+    def __init__(self, presenter: DiffractionPatternPresenter, view: PatternCropView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: DiffractionPatternPresenter,
                        view: PatternCropView) -> PatternCropController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
@@ -20,10 +50,10 @@ class PatternCropController(Observer):
         view.setCheckable(True)
         view.toggled.connect(presenter.setCropEnabled)
 
-        view.centerXSpinBox.valueChanged.connect(presenter.setCenterXInPixels)
-        view.centerYSpinBox.valueChanged.connect(presenter.setCenterYInPixels)
-        view.extentXSpinBox.valueChanged.connect(presenter.setExtentXInPixels)
-        view.extentYSpinBox.valueChanged.connect(presenter.setExtentYInPixels)
+        view.centerXSpinBox.valueChanged.connect(presenter.setCropCenterXInPixels)
+        view.centerYSpinBox.valueChanged.connect(presenter.setCropCenterYInPixels)
+        view.extentXSpinBox.valueChanged.connect(presenter.setCropExtentXInPixels)
+        view.extentYSpinBox.valueChanged.connect(presenter.setCropExtentYInPixels)
 
         controller._syncModelToView()
 
@@ -33,27 +63,27 @@ class PatternCropController(Observer):
         self._view.setChecked(self._presenter.isCropEnabled())
 
         self._view.centerXSpinBox.blockSignals(True)
-        self._view.centerXSpinBox.setRange(self._presenter.getMinCenterXInPixels(),
-                                           self._presenter.getMaxCenterXInPixels())
-        self._view.centerXSpinBox.setValue(self._presenter.getCenterXInPixels())
+        self._view.centerXSpinBox.setRange(self._presenter.getMinCropCenterXInPixels(),
+                                           self._presenter.getMaxCropCenterXInPixels())
+        self._view.centerXSpinBox.setValue(self._presenter.getCropCenterXInPixels())
         self._view.centerXSpinBox.blockSignals(False)
 
         self._view.centerYSpinBox.blockSignals(True)
-        self._view.centerYSpinBox.setRange(self._presenter.getMinCenterYInPixels(),
-                                           self._presenter.getMaxCenterYInPixels())
-        self._view.centerYSpinBox.setValue(self._presenter.getCenterYInPixels())
+        self._view.centerYSpinBox.setRange(self._presenter.getMinCropCenterYInPixels(),
+                                           self._presenter.getMaxCropCenterYInPixels())
+        self._view.centerYSpinBox.setValue(self._presenter.getCropCenterYInPixels())
         self._view.centerYSpinBox.blockSignals(False)
 
         self._view.extentXSpinBox.blockSignals(True)
-        self._view.extentXSpinBox.setRange(self._presenter.getMinExtentXInPixels(),
-                                           self._presenter.getMaxExtentXInPixels())
-        self._view.extentXSpinBox.setValue(self._presenter.getExtentXInPixels())
+        self._view.extentXSpinBox.setRange(self._presenter.getMinCropExtentXInPixels(),
+                                           self._presenter.getMaxCropExtentXInPixels())
+        self._view.extentXSpinBox.setValue(self._presenter.getCropExtentXInPixels())
         self._view.extentXSpinBox.blockSignals(False)
 
         self._view.extentYSpinBox.blockSignals(True)
-        self._view.extentYSpinBox.setRange(self._presenter.getMinExtentYInPixels(),
-                                           self._presenter.getMaxExtentYInPixels())
-        self._view.extentYSpinBox.setValue(self._presenter.getExtentYInPixels())
+        self._view.extentYSpinBox.setRange(self._presenter.getMinCropExtentYInPixels(),
+                                           self._presenter.getMaxCropExtentYInPixels())
+        self._view.extentYSpinBox.setValue(self._presenter.getCropExtentYInPixels())
         self._view.extentYSpinBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
@@ -63,18 +93,21 @@ class PatternCropController(Observer):
 
 class PatternsController:
 
-    def __init__(self, datasetPresenter: DiffractionDatasetPresenter, cropPresenter: CropPresenter,
+    def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
+                 patternPresenter: DiffractionPatternPresenter,
                  view: DataNavigationPage[PatternsView]) -> None:
         self._datasetPresenter = datasetPresenter
-        self._cropPresenter = cropPresenter
+        self._patternPresenter = patternPresenter
         self._view = view
-        self._cropController = PatternCropController.createInstance(cropPresenter,
+        self._loadController = PatternLoadController.createInstance(patternPresenter,
+                                                                    view.contentsView.loadView)
+        self._cropController = PatternCropController.createInstance(patternPresenter,
                                                                     view.contentsView.cropView)
 
     @classmethod
     def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
-                       cropPresenter: CropPresenter,
+                       patternPresenter: DiffractionPatternPresenter,
                        view: DataNavigationPage[PatternsView]) -> PatternsController:
-        controller = cls(datasetPresenter, cropPresenter, view)
+        controller = cls(datasetPresenter, patternPresenter, view)
         view.forwardButton.clicked.connect(datasetPresenter.processDiffractionPatterns)
         return controller

@@ -33,10 +33,10 @@ class ControllerCore:
         self._detectorController = DetectorController.createInstance(
             model.detectorPresenter, view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
-            model.diffractionDatasetPresenter, model.diffractionPatternPresenter,
+            model.diffractionDatasetPresenter, model.activeDiffractionPatternPresenter,
             view.detectorParametersView.patternView)
         self._datasetImageController = DatasetImageController.createInstance(
-            model.diffractionPatternPresenter, model.detectorImagePresenter,
+            model.activeDiffractionPatternPresenter, model.detectorImagePresenter,
             view.detectorImageView, self._fileDialogFactory)
         self._probeParametersController = ProbeParametersController.createInstance(
             model.probePresenter, view.probeParametersView, model.probeImagePresenter,
@@ -51,7 +51,7 @@ class ControllerCore:
             model.objectPresenter, model.objectImagePresenter, view.objectImageView,
             self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
-            model.diffractionDatasetPresenter, model.metadataPresenter, model.cropPresenter,
+            model.diffractionDatasetPresenter, model.metadataPresenter, model.patternPresenter,
             view.dataParametersView, view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter, view.reconstructorParametersView,

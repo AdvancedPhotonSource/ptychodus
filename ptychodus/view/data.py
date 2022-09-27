@@ -92,7 +92,6 @@ class PatternLoadView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Load', parent)
         self.numberOfThreadsSpinBox = QSpinBox()
-        self.numberOfPatternsSpinBox = QSpinBox()
         # TODO controls to assemble in-memory or use scratch directory
 
     @classmethod
@@ -101,7 +100,6 @@ class PatternLoadView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Number of Data Threads:', view.numberOfThreadsSpinBox)
-        layout.addRow('Total Number of Patterns:', view.numberOfPatternsSpinBox)
         view.setLayout(layout)
 
         return view
@@ -213,7 +211,7 @@ class DataParametersView(QStackedWidget):
         self.metadataPage = DataNavigationPage.createInstance( \
                 MetadataView.createInstance(), 'Reload Dataset', 'Import Metadata')
         self.patternsPage = DataNavigationPage.createInstance( \
-                PatternsView.createInstance(), 'Revisit Metadata', 'Load Patterns')
+                PatternsView.createInstance(), 'Reload Metadata', 'Load Patterns')
         self.datasetPage = DataNavigationPage.createInstance( \
                 DatasetView.createInstance(), 'Reload Patterns', 'Export Patterns')
 

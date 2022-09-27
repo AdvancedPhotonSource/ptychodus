@@ -5,7 +5,7 @@ import numpy
 
 from ..api.data import DiffractionDataset, DiffractionMetadata
 from ..api.observer import Observable, Observer
-from .data import CropSettings
+from .data import DiffractionPatternSettings
 from .detector import DetectorSettings
 from .probe import ProbeSettings
 from .scan import ScanCore
@@ -14,20 +14,21 @@ from .scan import ScanCore
 class MetadataPresenter(Observable, Observer):
 
     def __init__(self, diffractionDataset: DiffractionDataset, detectorSettings: DetectorSettings,
-                 cropSettings: CropSettings, probeSettings: ProbeSettings,
+                 patternSettings: DiffractionPatternSettings, probeSettings: ProbeSettings,
                  scanCore: ScanCore) -> None:
         super().__init__()
         self._diffractionDataset = diffractionDataset
         self._detectorSettings = detectorSettings
-        self._cropSettings = cropSettings
+        self._patternSettings = patternSettings
         self._probeSettings = probeSettings
         self._scanCore = scanCore
 
     @classmethod
     def createInstance(cls, diffractionDataset: DiffractionDataset,
-                       detectorSettings: DetectorSettings, cropSettings: CropSettings,
-                       probeSettings: ProbeSettings, scanCore: ScanCore) -> MetadataPresenter:
-        presenter = cls(diffractionDataset, detectorSettings, cropSettings, probeSettings,
+                       detectorSettings: DetectorSettings,
+                       patternSettings: DiffractionPatternSettings, probeSettings: ProbeSettings,
+                       scanCore: ScanCore) -> MetadataPresenter:
+        presenter = cls(diffractionDataset, detectorSettings, patternSettings, probeSettings,
                         scanCore)
         diffractionDataset.addObserver(presenter)
         return presenter
@@ -57,14 +58,14 @@ class MetadataPresenter(Observable, Observer):
 
     def syncImageCrop(self, syncCenter: bool, syncExtent: bool) -> None:
         if syncCenter and self._metadata.cropCenterInPixels:
-            self._cropSettings.centerXInPixels.value = \
+            self._patternSettings.cropCenterXInPixels.value = \
                     self._metadata.cropCenterInPixels.x
-            self._cropSettings.centerYInPixels.value = \
+            self._patternSettings.cropCenterYInPixels.value = \
                     self._metadata.cropCenterInPixels.y
 
         if syncExtent and self._metadata.detectorNumberOfPixels:
-            centerX = self._cropSettings.centerXInPixels.value
-            centerY = self._cropSettings.centerYInPixels.value
+            centerX = self._patternSettings.cropCenterXInPixels.value
+            centerY = self._patternSettings.cropCenterYInPixels.value
 
             extentX = int(self._metadata.detectorNumberOfPixels.x)
             extentY = int(self._metadata.detectorNumberOfPixels.y)
@@ -77,8 +78,8 @@ class MetadataPresenter(Observable, Observer):
             while cropDiameterInPixels < maxRadius:
                 cropDiameterInPixels <<= 1
 
-            self._cropSettings.extentXInPixels.value = cropDiameterInPixels
-            self._cropSettings.extentYInPixels.value = cropDiameterInPixels
+            self._patternSettings.cropExtentXInPixels.value = cropDiameterInPixels
+            self._patternSettings.cropExtentYInPixels.value = cropDiameterInPixels
 
     def syncProbeEnergy(self) -> None:
         if self._metadata.probeEnergyInElectronVolts:

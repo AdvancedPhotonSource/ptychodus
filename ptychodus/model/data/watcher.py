@@ -5,8 +5,8 @@ import watchdog.events
 import watchdog.observers
 
 from ...api.observer import Observable, Observer
-from .data import ActiveDiffractionDataset
-from .settings import DataSettings
+from .dataset import ActiveDiffractionDataset
+from .settings import DiffractionDatasetSettings
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +24,15 @@ class DataFileEventHandler(watchdog.events.PatternMatchingEventHandler):
 
 class DataDirectoryWatcher(Observer):
 
-    def __init__(self, settings: DataSettings, dataset: ActiveDiffractionDataset) -> None:
+    def __init__(self, settings: DiffractionDatasetSettings,
+                 dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
         self._dataset = dataset
         self._observer = watchdog.observers.Observer()
 
     @classmethod
-    def createInstance(cls, settings: DataSettings,
+    def createInstance(cls, settings: DiffractionDatasetSettings,
                        dataset: ActiveDiffractionDataset) -> DataDirectoryWatcher:
         watcher = cls(settings, dataset)
         settings.filePath.addObserver(watcher)
