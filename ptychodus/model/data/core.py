@@ -133,6 +133,10 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def _openDiffractionFileFromSettings(self) -> None:
         self._openDiffractionFile(self._settings.filePath.value)
 
+    def processDiffractionPatterns(self) -> None:
+        # FIXME make sure this is called in batch mode
+        self._activeDiffractionDataset.start()
+
     def update(self, observable: Observable) -> None:
         if observable is self._settings.fileType:
             self._syncFileReaderFromSettings()

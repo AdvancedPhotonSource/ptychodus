@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from ...model import CropPresenter
-from ...view import PatternCropView
+from ...model import CropPresenter, DiffractionDatasetPresenter, Observable, Observer
+from ...view import DataNavigationPage, PatternCropView, PatternsView
 
 
 class PatternCropController(Observer):
@@ -12,7 +12,8 @@ class PatternCropController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: CropPresenter, view: PatternCropView) -> PatternCropController:
+    def createInstance(cls, presenter: CropPresenter,
+                       view: PatternCropView) -> PatternCropController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -60,3 +61,20 @@ class PatternCropController(Observer):
             self._syncModelToView()
 
 
+class PatternsController:
+
+    def __init__(self, datasetPresenter: DiffractionDatasetPresenter, cropPresenter: CropPresenter,
+                 view: DataNavigationPage[PatternsView]) -> None:
+        self._datasetPresenter = datasetPresenter
+        self._cropPresenter = cropPresenter
+        self._view = view
+        self._cropController = PatternCropController.createInstance(cropPresenter,
+                                                                    view.contentsView.cropView)
+
+    @classmethod
+    def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
+                       cropPresenter: CropPresenter,
+                       view: DataNavigationPage[PatternsView]) -> PatternsController:
+        controller = cls(datasetPresenter, cropPresenter, view)
+        view.forwardButton.clicked.connect(datasetPresenter.processDiffractionPatterns)
+        return controller

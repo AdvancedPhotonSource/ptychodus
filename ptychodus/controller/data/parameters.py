@@ -4,20 +4,23 @@ from pathlib import Path
 from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import QFileDialog, QTableView, QTreeView, QWidget
 
-from ...model import DiffractionDatasetPresenter, MetadataPresenter, Observable, Observer
+from ...model import (CropPresenter, DiffractionDatasetPresenter, MetadataPresenter, Observable,
+                      Observer)
 from ...view import DataParametersView
 from ..tree import SimpleTreeModel
 from .dialogFactory import FileDialogFactory
 from .file import DatasetFileController
 from .metadata import MetadataController
+from .patterns import PatternsController
 from .tableModel import DataArrayTableModel
 
 
 class DataParametersController(Observer):
 
     def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
-                 metadataPresenter: MetadataPresenter, view: DataParametersView,
-                 tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
+                 metadataPresenter: MetadataPresenter, cropPresenter: CropPresenter,
+                 view: DataParametersView, tableView: QTableView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         self._datasetPresenter = datasetPresenter
         self._view = view
         self._tableView = tableView
@@ -29,15 +32,18 @@ class DataParametersController(Observer):
                                                                     fileDialogFactory)
         self._metadataController = MetadataController.createInstance(metadataPresenter,
                                                                      view.metadataPage)
-        # FIXME patternsPage
+        self._patternsController = PatternsController.createInstance(datasetPresenter,
+                                                                     cropPresenter,
+                                                                     view.patternsPage)
         # FIXME datasetPage
 
     @classmethod
     def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
-                       metadataPresenter: MetadataPresenter, view: DataParametersView,
-                       tableView: QTableView,
+                       metadataPresenter: MetadataPresenter, cropPresenter: CropPresenter,
+                       view: DataParametersView, tableView: QTableView,
                        fileDialogFactory: FileDialogFactory) -> DataParametersController:
-        controller = cls(datasetPresenter, metadataPresenter, view, tableView, fileDialogFactory)
+        controller = cls(datasetPresenter, metadataPresenter, cropPresenter, view, tableView,
+                         fileDialogFactory)
         datasetPresenter.addObserver(controller)
 
         view.datasetPage.contentsView.treeView.setModel(controller._treeModel)

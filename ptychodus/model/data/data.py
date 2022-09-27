@@ -68,27 +68,6 @@ class ActiveDiffractionDataset(DiffractionDataset):
         with self._arrayListLock:
             return len(self._arrayList)
 
-    def _reallocate(self, maximumNumberOfPatterns: int) -> None:
-        scratchDirectory = self._settings.scratchDirectory.value
-        dtype = numpy.uint16  # FIXME get from metadata
-        shape = (
-            maximumNumberOfPatterns,
-            self._cropSizer.getExtentYInPixels(),
-            self._cropSizer.getExtentXInPixels(),
-        )
-
-        if scratchDirectory.is_dir():
-            npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
-            logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
-            self._arrayData = numpy.memmap(npyTempFile, dtype=dtype, shape=shape)
-            self._arrayData[:] = 0
-        else:
-            logger.debug(f'Scratch memory is {shape}')
-            self._arrayData = numpy.zeros(shape, dtype=dtype)
-
-        with self._arrayListLock:
-            self._arrayList.clear()
-
     def _assemble(self) -> None:
         while not self._stopWorkEvent.is_set():
             try:
@@ -148,14 +127,41 @@ class ActiveDiffractionDataset(DiffractionDataset):
     def isActive(self) -> bool:
         return (len(self._workers) > 0)
 
-    def start(self, maximumNumberOfPatterns: int) -> None:
+    def reset(self, maximumNumberOfPatterns: int) -> None:
         if self.isActive:
             self.stop()
 
-        logger.info('Starting data assembler...')
+        logger.info('Resetting data assembler...')
         self._stopWorkEvent.clear()
 
-        self._reallocate(maximumNumberOfPatterns)
+        scratchDirectory = self._settings.scratchDirectory.value
+        dtype = numpy.uint16  # FIXME get from metadata
+        shape = (
+            maximumNumberOfPatterns,
+            self._cropSizer.getExtentYInPixels(),
+            self._cropSizer.getExtentXInPixels(),
+        )
+
+        if scratchDirectory.is_dir():
+            npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
+            logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
+            self._arrayData = numpy.memmap(npyTempFile, dtype=dtype, shape=shape)
+            self._arrayData[:] = 0
+        else:
+            logger.debug(f'Scratch memory is {shape}')
+            self._arrayData = numpy.zeros(shape, dtype=dtype)
+
+        with self._arrayListLock:
+            self._arrayList.clear()
+
+        logger.info('Data assembler reset.')
+
+    def start(self) -> None:
+        if self.isActive:
+            logger.error('Data assembler already started!')
+            return
+
+        logger.info('Starting data assembler...')
 
         for idx in range(self._settings.numberOfDataThreads.value):
             thread = threading.Thread(target=self._assemble)
@@ -183,9 +189,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         self._metadata = dataset.getMetadata()
         self._contentsTree = dataset.getContentsTree()
-        self.start(self._metadata.numberOfPatternsTotal)
+        self.reset(self._metadata.numberOfPatternsTotal)
 
-        # FIXME split into two stages so that user can sync crop settings before loading data
         for array in dataset:
             self.insertArray(array)
 

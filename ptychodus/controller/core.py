@@ -4,8 +4,7 @@ from PyQt5.QtWidgets import QApplication, QAction
 from ..model import ModelCore
 from ..view import ViewCore
 from .data import DataParametersController, FileDialogFactory
-from .detector import (DatasetImageController, DatasetParametersController,
-                       DetectorController)
+from .detector import (DatasetImageController, DatasetParametersController, DetectorController)
 from .object import ObjectImageController, ObjectParametersController
 from .probe import ProbeImageController, ProbeParametersController
 from .ptychopy import PtychoPyViewControllerFactory
@@ -52,8 +51,8 @@ class ControllerCore:
             model.objectPresenter, model.objectImagePresenter, view.objectImageView,
             self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
-            model.diffractionDatasetPresenter, model.metadataPresenter, view.dataParametersView,
-            view.dataTableView, self._fileDialogFactory)
+            model.diffractionDatasetPresenter, model.metadataPresenter, model.cropPresenter,
+            view.dataParametersView, view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter, view.reconstructorParametersView,
             [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])

@@ -16,8 +16,17 @@ class MetadataController:
     def createInstance(cls, metadataPresenter: MetadataPresenter,
                        view: DataNavigationPage[MetadataView]):
         controller = cls(metadataPresenter, view)
+
         # TODO only show available metadata
+        view.contentsView.detectorPixelCountCheckBox.setChecked(True)
+        view.contentsView.detectorPixelSizeCheckBox.setChecked(True)
+        view.contentsView.detectorDistanceCheckBox.setChecked(True)
+        view.contentsView.imageCropCenterCheckBox.setChecked(True)
+        view.contentsView.imageCropExtentCheckBox.setChecked(True)
+        view.contentsView.probeEnergyCheckBox.setChecked(True)
+
         view.forwardButton.clicked.connect(controller._importMetadata)
+
         return controller
 
     def _importMetadata(self) -> None:
