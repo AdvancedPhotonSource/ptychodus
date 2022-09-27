@@ -4,9 +4,8 @@ from PyQt5.QtWidgets import QApplication, QAction
 from ..model import ModelCore
 from ..view import ViewCore
 from .data import DataParametersController, FileDialogFactory
-from .detector import (CropController, DatasetImageController, DatasetParametersController,
+from .detector import (DatasetImageController, DatasetParametersController,
                        DetectorController)
-from .metadata import MetadataController
 from .object import ObjectImageController, ObjectParametersController
 from .probe import ProbeImageController, ProbeParametersController
 from .ptychopy import PtychoPyViewControllerFactory
@@ -28,9 +27,6 @@ class ControllerCore:
         self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(model.ptychopyBackend)
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeBackend)
 
-        self._metadataController = MetadataController.createInstance(
-            model.probePresenter, model.objectPresenter, model.metadataPresenter,
-            view.settingsParametersView.importDialog)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
                                                                      view.settingsParametersView,
                                                                      view.settingsEntryView,
@@ -39,9 +35,7 @@ class ControllerCore:
             model.detectorPresenter, view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
             model.diffractionDatasetPresenter, model.diffractionPatternPresenter,
-            view.detectorParametersView.datasetView)
-        self._cropController = CropController.createInstance(
-            model.cropPresenter, view.detectorParametersView.imageCropView)
+            view.detectorParametersView.patternView)
         self._datasetImageController = DatasetImageController.createInstance(
             model.diffractionPatternPresenter, model.detectorImagePresenter,
             view.detectorImageView, self._fileDialogFactory)
@@ -58,8 +52,8 @@ class ControllerCore:
             model.objectPresenter, model.objectImagePresenter, view.objectImageView,
             self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
-            model.diffractionDatasetPresenter, view.dataParametersView, view.dataTableView,
-            self._fileDialogFactory)
+            model.diffractionDatasetPresenter, model.metadataPresenter, view.dataParametersView,
+            view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter, view.reconstructorParametersView,
             [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])

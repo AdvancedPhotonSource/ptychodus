@@ -69,8 +69,7 @@ class ModelCore:
             self._pluginRegistry.buildScalarTransformationChooser())
 
         self._dataCore = DataCore(self.settingsRegistry, self._detector,
-                                  self._pluginRegistry.buildDiffractionFileReaderChooser(),
-                                  self._pluginRegistry.buildDiffractionFileWriterChooser())
+                                  self._pluginRegistry.buildDiffractionFileReaderChooser())
         self._scanCore = ScanCore(self.rng, self.settingsRegistry,
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())

@@ -12,9 +12,9 @@ import tempfile
 import h5py
 import numpy
 
-from ...api.data import (DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
-                         DiffractionMetadata, DiffractionPatternArray, DiffractionPatternData,
-                         DiffractionPatternState, SimpleDiffractionPatternArray)
+from ...api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                         DiffractionPatternArray, DiffractionPatternData, DiffractionPatternState,
+                         SimpleDiffractionPatternArray)
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
@@ -32,21 +32,18 @@ logger = logging.getLogger(__name__)
 class DiffractionDatasetPresenter(Observable, Observer):
 
     def __init__(self, settings: DataSettings, activeDiffractionDataset: ActiveDiffractionDataset,
-                 fileReaderChooser: PluginChooser[DiffractionFileReader],
-                 fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
+                 fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
         super().__init__()
         self._settings = settings
         self._activeDiffractionDataset = activeDiffractionDataset
         self._fileReaderChooser = fileReaderChooser
-        self._fileWriterChooser = fileWriterChooser
 
     @classmethod
     def createInstance(
             cls, settings: DataSettings, activeDiffractionDataset: ActiveDiffractionDataset,
-            fileReaderChooser: PluginChooser[DiffractionFileReader],
-            fileWriterChooser: PluginChooser[DiffractionFileWriter]
+            fileReaderChooser: PluginChooser[DiffractionFileReader]
     ) -> DiffractionDatasetPresenter:
-        presenter = cls(settings, activeDiffractionDataset, fileReaderChooser, fileWriterChooser)
+        presenter = cls(settings, activeDiffractionDataset, fileReaderChooser)
         settings.fileType.addObserver(presenter)
         fileReaderChooser.addObserver(presenter)
         presenter._syncFileReaderFromSettings()
@@ -136,18 +133,6 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def _openDiffractionFileFromSettings(self) -> None:
         self._openDiffractionFile(self._settings.filePath.value)
 
-    def getSaveFileFilterList(self) -> list[str]:
-        return self._fileWriterChooser.getDisplayNameList()
-
-    def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.getCurrentDisplayName()
-
-    def saveDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
-        logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
-        self._fileWriterChooser.setFromDisplayName(fileFilter)
-        writer = self._fileWriterChooser.getCurrentStrategy()
-        writer.write(filePath, self._activeDiffractionDataset)
-
     def update(self, observable: Observable) -> None:
         if observable is self._settings.fileType:
             self._syncFileReaderFromSettings()
@@ -205,8 +190,7 @@ class DiffractionPatternPresenter(Observable, Observer):
 class DataCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
-                 fileReaderChooser: PluginChooser[DiffractionFileReader],
-                 fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
+                 fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
         self.cropSettings = CropSettings.createInstance(settingsRegistry)
         self.cropSizer = CropSizer.createInstance(self.cropSettings, detector)
         self.cropPresenter = CropPresenter.createInstance(self.cropSettings, self.cropSizer)
@@ -217,7 +201,7 @@ class DataCore:
             self._settings, self.activeDataset)
 
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._settings, self.activeDataset, fileReaderChooser, fileWriterChooser)
+            self._settings, self.activeDataset, fileReaderChooser)
         self.diffractionPatternPresenter = DiffractionPatternPresenter.createInstance(
             self.activeDataset)
 

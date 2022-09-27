@@ -4,8 +4,6 @@ from typing import Optional
 from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QListView,
                              QPushButton, QVBoxLayout, QWidget)
 
-from .metadata import MetadataDialog
-
 
 class SettingsView(QGroupBox):
 
@@ -72,7 +70,6 @@ class SettingsParametersView(QWidget):
         super().__init__(parent)
         self.settingsView = SettingsView.createInstance()
         self.groupView = SettingsGroupView.createInstance()
-        self.importDialog = MetadataDialog.createInstance(self)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsParametersView:

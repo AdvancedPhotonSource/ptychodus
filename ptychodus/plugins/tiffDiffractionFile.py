@@ -6,10 +6,10 @@ import sys
 from tifffile import TiffFile
 import numpy
 
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
-                                DiffractionMetadata, DiffractionPatternArray,
-                                DiffractionPatternData, DiffractionPatternState,
-                                SimpleDiffractionDataset, SimpleDiffractionPatternArray)
+from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                DiffractionPatternArray, DiffractionPatternData,
+                                DiffractionPatternState, SimpleDiffractionDataset,
+                                SimpleDiffractionPatternArray)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 

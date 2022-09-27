@@ -38,8 +38,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         self._contentsTree = SimpleTreeNode.createRoot(list())
         self._arrayList: list[DiffractionPatternArray] = list()
         self._arrayListLock = threading.RLock()
-        self._arrayData: DiffractionPatternData = numpy.zeros(
-            (1, 1, 1), dtype=self._settings.arrayDataType.value)
+        self._arrayData: DiffractionPatternData = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
 
         self._taskQueue: queue.Queue[AssemblyTask] = queue.Queue()
         self._workers: list[threading.Thread] = list()
@@ -71,7 +70,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     def _reallocate(self, maximumNumberOfPatterns: int) -> None:
         scratchDirectory = self._settings.scratchDirectory.value
-        dtype = self._settings.arrayDataType.value
+        dtype = numpy.uint16  # FIXME get from metadata
         shape = (
             maximumNumberOfPatterns,
             self._cropSizer.getExtentYInPixels(),

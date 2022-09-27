@@ -33,41 +33,18 @@ class DetectorView(QGroupBox):
         return view
 
 
-class DatasetView(QGroupBox):
+class DiffractionPatternView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Diffraction Data', parent)
+        super().__init__('Diffraction Patterns', parent)
         self.listView = QListView()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DiffractionPatternView:
         view = cls(parent)
 
         layout = QVBoxLayout()
         layout.addWidget(view.listView)
-        view.setLayout(layout)
-
-        return view
-
-
-class CropView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Image Crop', parent)
-        self.centerXSpinBox = QSpinBox()
-        self.centerYSpinBox = QSpinBox()
-        self.extentXSpinBox = QSpinBox()
-        self.extentYSpinBox = QSpinBox()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> CropView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Center X [px]:', view.centerXSpinBox)
-        layout.addRow('Center Y [px]:', view.centerYSpinBox)
-        layout.addRow('Extent X [px]:', view.extentXSpinBox)
-        layout.addRow('Extent Y [px]:', view.extentYSpinBox)
         view.setLayout(layout)
 
         return view
@@ -78,8 +55,7 @@ class DetectorParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.detectorView = DetectorView.createInstance()
-        self.imageCropView = CropView.createInstance()
-        self.datasetView = DatasetView.createInstance()
+        self.patternView = DiffractionPatternView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorParametersView:
@@ -87,8 +63,7 @@ class DetectorParametersView(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(view.detectorView)
-        layout.addWidget(view.imageCropView)
-        layout.addWidget(view.datasetView)
+        layout.addWidget(view.patternView)
         view.setLayout(layout)
 
         return view

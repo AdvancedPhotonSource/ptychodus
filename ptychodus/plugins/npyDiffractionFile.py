@@ -3,10 +3,9 @@ import logging
 
 import numpy
 
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionFileWriter,
-                                DiffractionMetadata, DiffractionPatternArray,
-                                DiffractionPatternData, DiffractionPatternState,
-                                SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                DiffractionPatternArray, DiffractionPatternData,
+                                DiffractionPatternState, SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -68,21 +67,5 @@ class NPYDiffractionFileReader(DiffractionFileReader):
         return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 
 
-class NPYDiffractionFileWriter(DiffractionFileWriter):
-
-    @property
-    def simpleName(self) -> str:
-        return 'NPY'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'NumPy Binary Files (*.npy)'
-
-    def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
-        data = dataset[0].getData()
-        numpy.save(filePath, data)
-
-
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.registerPlugin(NPYDiffractionFileReader())
-    registry.registerPlugin(NPYDiffractionFileWriter())

@@ -147,22 +147,3 @@ class DiffractionFileReader(ABC):
     def read(self, filePath: Path) -> DiffractionDataset:
         '''reads a diffraction dataset from file'''
         pass
-
-
-class DiffractionFileWriter(ABC):
-    '''interface for plugins that write diffraction files'''
-
-    @abstractproperty
-    def simpleName(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
-        pass
-
-    @abstractproperty
-    def fileFilter(self) -> str:
-        '''returns a unique name that is prettified for visual display'''
-        pass
-
-    @abstractmethod
-    def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
-        '''writes a diffraction dataset to file'''
-        pass

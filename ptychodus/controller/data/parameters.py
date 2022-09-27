@@ -1,0 +1,73 @@
+from __future__ import annotations
+from pathlib import Path
+
+from PyQt5.QtCore import QModelIndex
+from PyQt5.QtWidgets import QFileDialog, QTableView, QTreeView, QWidget
+
+from ...model import DiffractionDatasetPresenter, MetadataPresenter, Observable, Observer
+from ...view import DataParametersView
+from ..tree import SimpleTreeModel
+from .dialogFactory import FileDialogFactory
+from .file import DatasetFileController
+from .metadata import MetadataController
+from .tableModel import DataArrayTableModel
+
+
+class DataParametersController(Observer):
+
+    def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
+                 metadataPresenter: MetadataPresenter, view: DataParametersView,
+                 tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
+        self._datasetPresenter = datasetPresenter
+        self._view = view
+        self._tableView = tableView
+        self._fileDialogFactory = fileDialogFactory
+        self._treeModel = SimpleTreeModel(datasetPresenter.getContentsTree())
+        self._tableModel = DataArrayTableModel()
+        self._fileController = DatasetFileController.createInstance(datasetPresenter,
+                                                                    view.filePage,
+                                                                    fileDialogFactory)
+        self._metadataController = MetadataController.createInstance(metadataPresenter,
+                                                                     view.metadataPage)
+        # FIXME patternsPage
+        # FIXME datasetPage
+
+    @classmethod
+    def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
+                       metadataPresenter: MetadataPresenter, view: DataParametersView,
+                       tableView: QTableView,
+                       fileDialogFactory: FileDialogFactory) -> DataParametersController:
+        controller = cls(datasetPresenter, metadataPresenter, view, tableView, fileDialogFactory)
+        datasetPresenter.addObserver(controller)
+
+        view.datasetPage.contentsView.treeView.setModel(controller._treeModel)
+        view.datasetPage.contentsView.treeView.selectionModel().currentChanged.connect(
+            controller._updateDataArrayInTableView)
+        tableView.setModel(controller._tableModel)
+
+        return controller
+
+    def _chooseScratchDirectory(self) -> None:
+        # TODO unused
+        scratchDir = QFileDialog.getExistingDirectory(
+            self._view, 'Choose Scratch Directory',
+            str(self._datasetPresenter.getScratchDirectory()))
+
+        if scratchDir:
+            self._datasetPresenter.setScratchDirectory(Path(scratchDir))
+
+    def _updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
+        names = list()
+        nodeItem = current.internalPointer()
+
+        while not nodeItem.isRoot:
+            names.append(nodeItem.data(0))
+            nodeItem = nodeItem.parentItem
+
+        arrayPath = '/' + '/'.join(reversed(names))
+        array = self._datasetPresenter.openArray(arrayPath)
+        self._tableModel.setArray(array)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._datasetPresenter:
+            self._treeModel.setRootNode(self._datasetPresenter.getContentsTree())
