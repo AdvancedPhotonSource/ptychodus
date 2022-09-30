@@ -13,6 +13,18 @@ import matplotlib
 
 from .widgets import AngleWidget, LengthWidget
 
+__all__ = [
+    'CartesianScanView',
+    'LissajousScanView',
+    'ScanButtonBox',
+    'ScanEditorDialog',
+    'ScanParametersView',
+    'ScanPlotView',
+    'ScanPositionDataView',
+    'ScanTransformView',
+    'SpiralScanView',
+]
+
 T = TypeVar('T', bound=QGroupBox)
 
 

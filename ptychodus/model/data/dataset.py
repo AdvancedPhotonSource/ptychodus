@@ -123,6 +123,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
                 self._arrayList.append(arrayView)
                 self._arrayList.sort(key=lambda array: array.getIndex())
 
+            self._taskQueue.task_done()
             self._changedEvent.set()
 
     @property
@@ -193,6 +194,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         self._contentsTree = dataset.getContentsTree()
         self.reset(self._metadata.numberOfPatternsTotal)
 
+        # FIXME need to re-insert arrays after stop/start
         for array in dataset:
             self.insertArray(array)
 

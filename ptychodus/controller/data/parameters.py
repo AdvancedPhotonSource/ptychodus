@@ -8,6 +8,7 @@ from ...model import (DiffractionDatasetPresenter, DiffractionPatternPresenter, 
                       Observable, Observer)
 from ...view import DataParametersView
 from ..tree import SimpleTreeModel
+from .dataset import DatasetController
 from .dialogFactory import FileDialogFactory
 from .file import DatasetFileController
 from .metadata import MetadataController
@@ -35,7 +36,9 @@ class DataParametersController(Observer):
         self._patternsController = PatternsController.createInstance(datasetPresenter,
                                                                      patternPresenter,
                                                                      view.patternsPage)
-        # FIXME datasetPage
+        self._datasetController = DatasetController.createInstance(datasetPresenter,
+                                                                   view.datasetPage,
+                                                                   fileDialogFactory)
 
     @classmethod
     def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,

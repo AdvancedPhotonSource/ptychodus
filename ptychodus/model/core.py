@@ -139,6 +139,7 @@ class ModelCore:
         self._rpcCore.stop()
 
     def batchModeReconstruct(self) -> int:
+        self._dataCore.diffractionDatasetPresenter.startProcessingDiffractionPatterns(block=True)
         result = self.reconstructorPresenter.reconstruct()
 
         pixelSizeXInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeXInMeters())

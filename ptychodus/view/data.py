@@ -6,6 +6,18 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGridLayout, QGr
                              QHBoxLayout, QHeaderView, QLabel, QPushButton, QSpinBox,
                              QStackedWidget, QTreeView, QVBoxLayout, QWidget)
 
+__all__ = [
+    'DataNavigationPage',
+    'DataParametersView',
+    'DatasetFileView',
+    'DatasetView',
+    'MetadataView',
+    'PatternCropView',
+    'PatternLoadView',
+    'PatternTransformView',
+    'PatternsView',
+]
+
 T = TypeVar('T', bound=QGroupBox)
 
 

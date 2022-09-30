@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from ...model import DiffractionDatasetPresenter, DiffractionPatternPresenter, Observable, Observer
-from ...view import DataNavigationPage, PatternCropView, PatternLoadView, PatternsView
+from ...view import (DataNavigationPage, PatternCropView, PatternLoadView, PatternTransformView,
+                     PatternsView)
 
 
 class PatternLoadController(Observer):
@@ -91,6 +92,41 @@ class PatternCropController(Observer):
             self._syncModelToView()
 
 
+class PatternTransformController(Observer):
+
+    def __init__(self, presenter: DiffractionPatternPresenter, view: PatternTransformView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: DiffractionPatternPresenter,
+                       view: PatternTransformView) -> PatternTransformController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.thresholdSpinBox.valueChanged.connect(presenter.setThreshold)
+        view.flipXCheckBox.toggled.connect(presenter.setFlipXEnabled)
+        view.flipYCheckBox.toggled.connect(presenter.setFlipYEnabled)
+
+        controller._syncModelToView()
+        return controller
+
+    def _syncModelToView(self) -> None:
+        self._view.thresholdSpinBox.blockSignals(True)
+        self._view.thresholdSpinBox.setRange(self._presenter.getMinThreshold(),
+                                             self._presenter.getMaxThreshold())
+        self._view.thresholdSpinBox.setValue(self._presenter.getThreshold())
+        self._view.thresholdSpinBox.blockSignals(False)
+
+        self._view.flipXCheckBox.setChecked(self._presenter.isFlipXEnabled())
+        self._view.flipYCheckBox.setChecked(self._presenter.isFlipYEnabled())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
 class PatternsController:
 
     def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
@@ -103,11 +139,13 @@ class PatternsController:
                                                                     view.contentsView.loadView)
         self._cropController = PatternCropController.createInstance(patternPresenter,
                                                                     view.contentsView.cropView)
+        self._transformController = PatternTransformController.createInstance(
+            patternPresenter, view.contentsView.transformView)
 
     @classmethod
     def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
                        patternPresenter: DiffractionPatternPresenter,
                        view: DataNavigationPage[PatternsView]) -> PatternsController:
         controller = cls(datasetPresenter, patternPresenter, view)
-        view.forwardButton.clicked.connect(datasetPresenter.processDiffractionPatterns)
+        view.forwardButton.clicked.connect(datasetPresenter.startProcessingDiffractionPatterns)
         return controller

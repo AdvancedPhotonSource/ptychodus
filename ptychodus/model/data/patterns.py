@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Final
 
 from ...api.observer import Observable, Observer
 from .crop import CropSizer
@@ -6,6 +7,7 @@ from .settings import DiffractionPatternSettings
 
 
 class DiffractionPatternPresenter(Observable, Observer):
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: DiffractionPatternSettings, sizer: CropSizer) -> None:
         super().__init__()
@@ -96,6 +98,12 @@ class DiffractionPatternPresenter(Observable, Observer):
 
     def setFlipYEnabled(self, value: bool) -> None:
         self._settings.flipYEnabled.value = value
+
+    def getMinThreshold(self) -> int:
+        return 0
+
+    def getMaxThreshold(self) -> int:
+        return self.MAX_INT
 
     def getThreshold(self) -> int:
         return self._settings.threshold.value

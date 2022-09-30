@@ -40,7 +40,7 @@ class ViewCore(QMainWindow):
         self.settingsParametersView = SettingsParametersView.createInstance()
         self.settingsEntryView = QTableView()
 
-        self.dataAction = self.navigationToolBar.addAction(fileIcon, 'Data')
+        self.dataAction = self.navigationToolBar.addAction(fileIcon, 'Dataset')
         self.dataParametersView = DataParametersView.createInstance()
         self.dataTableView = QTableView()
 

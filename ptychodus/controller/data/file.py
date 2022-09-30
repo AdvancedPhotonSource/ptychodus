@@ -18,6 +18,7 @@ class DatasetFileController(Observer):
     def __init__(self, presenter: DiffractionDatasetPresenter,
                  view: DataNavigationPage[DatasetFileView],
                  fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
@@ -74,9 +75,7 @@ class DatasetFileController(Observer):
         filePath = self._convertModelIndexToPath(
             self._view.contentsView.fileSystemTreeView.currentIndex())
         fileFilter = self._view.contentsView.fileTypeComboBox.currentText()
-        print(f'{filePath} :: {fileFilter}')
         self._presenter.openDiffractionFile(filePath, fileFilter)
-        # FIXME self._view.datasetPage.contentsView.setTitle(f'Data File: {filePath}')
 
     def _updateEnabledNavigationButtons(self, current: QModelIndex, previous: QModelIndex) -> None:
         currentPath = self._convertModelIndexToPath(current)
