@@ -152,8 +152,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
         numpy.save(filePath, array)
 
     def startProcessingDiffractionPatterns(self, block: bool = False) -> None:
-        self._activeDiffractionDataset.start()
-        # FIXME if block: run until queue finished: see queue.join()
+        self._activeDiffractionDataset.start(block)
 
     def stopProcessingDiffractionPatterns(self) -> None:
         self._activeDiffractionDataset.stop()

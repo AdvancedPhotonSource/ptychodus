@@ -54,7 +54,7 @@ class SimpleDiffractionPatternArray(DiffractionPatternArray):
         self._state = state
 
     @classmethod
-    def createNullInstance(cls) -> DiffractionPatternArray:
+    def createNullInstance(cls) -> SimpleDiffractionPatternArray:
         data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
         state = DiffractionPatternState.MISSING
         return cls('Null', 0, data, state)
@@ -77,6 +77,7 @@ class DiffractionMetadata:
     filePath: Path
     numberOfPatternsPerArray: int
     numberOfPatternsTotal: int
+    patternDataType: numpy.dtype
     detectorDistanceInMeters: Optional[Decimal] = None
     detectorNumberOfPixels: Optional[Vector2D[int]] = None
     detectorPixelSizeInMeters: Optional[Vector2D[Decimal]] = None
@@ -85,7 +86,7 @@ class DiffractionMetadata:
 
     @classmethod
     def createNullInstance(cls) -> DiffractionMetadata:
-        return cls(Path('/dev/null'), 0, 0)
+        return cls(Path('/dev/null'), 0, 0, numpy.dtype(numpy.ubyte))
 
 
 class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):
@@ -107,6 +108,13 @@ class SimpleDiffractionDataset(DiffractionDataset):
         self._metadata = metadata
         self._contentsTree = contentsTree
         self._arrayList = arrayList
+
+    @classmethod
+    def createNullInstance(cls) -> SimpleDiffractionDataset:
+        metadata = DiffractionMetadata.createNullInstance()
+        contentsTree = SimpleTreeNode.createRoot(list())
+        arrayList: list[DiffractionPatternArray] = list()
+        return cls(metadata, contentsTree, arrayList)
 
     def getMetadata(self) -> DiffractionMetadata:
         return self._metadata

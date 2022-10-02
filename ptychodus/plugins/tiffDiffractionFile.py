@@ -61,7 +61,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         return 'Tagged Image File Format Files (*.tif *.tiff)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(filePath, 0, 0)
+        metadata = DiffractionMetadata(filePath, 0, 0, numpy.dtype(numpy.ubyte))
         arrayList: list[DiffractionPatternArray] = list()
 
         if filePath:
@@ -89,6 +89,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                     filePath=filePath.parent / pattern,
                     numberOfPatternsPerArray=len(tiff.pages),
                     numberOfPatternsTotal=len(tiff.pages) * len(arrayList),
+                    patternDataType=data.dtype,
                 )
 
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])

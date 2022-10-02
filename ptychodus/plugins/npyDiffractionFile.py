@@ -60,6 +60,7 @@ class NPYDiffractionFileReader(DiffractionFileReader):
             filePath=filePath,
             numberOfPatternsPerArray=data.shape[0],
             numberOfPatternsTotal=data.shape[0],
+            patternDataType=data.dtype,
         )
 
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])

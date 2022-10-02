@@ -104,7 +104,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
         return 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(filePath, 0, 0)
+        metadata = DiffractionMetadata(filePath, 0, 0, numpy.dtype(numpy.ubyte))
         contentsTree = self._treeBuilder.createRootNode()
         arrayList: list[DiffractionPatternArray] = list()
 
