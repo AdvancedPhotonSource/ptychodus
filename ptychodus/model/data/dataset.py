@@ -189,7 +189,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
             self.stop()
 
     def insertArray(self, array: DiffractionPatternArray) -> None:
-        offset = self.getMetadata().numberOfPatternsPerArray * array.getIndex()
+        stride = self.getMetadata().numberOfPatternsPerArray
+        offset = stride * array.getIndex()
         task = AssemblyTask(array, offset)
         self._taskQueue.put(task)
 
@@ -206,10 +207,22 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         logger.info('Data assembler stopped.')
 
-    def getAssembledData(self) -> DiffractionPatternData:
+    def getAssembledIndexes(self) -> list[int]:
+        indexes: list[int] = list()
+        stride = self.getMetadata().numberOfPatternsPerArray
+
         with self._arrayListLock:
-            return self._arrayData
-            #return self._arrayData[[array.getIndex() for array in self._arrayList]]  # FIXME
+            for array in self._arrayList:
+                if array.getState() == DiffractionPatternState.LOADED:
+                    offset = stride * array.getIndex()
+                    size = array.getNumberOfPatterns()
+                    indexes.extend(range(offset, offset + size))
+
+        return indexes
+
+    def getAssembledData(self) -> DiffractionPatternData:
+        indexes = self.getAssembledIndexes()
+        return self._arrayData[indexes]
 
     def notifyObserversIfDatasetChanged(self) -> None:
         if self._changedEvent.is_set():

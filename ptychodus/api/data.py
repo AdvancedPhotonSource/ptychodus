@@ -38,6 +38,9 @@ class DiffractionPatternArray(Observable):
     def getData(self) -> DiffractionPatternData:
         pass
 
+    def getNumberOfPatterns(self) -> int:
+        return self.getData().shape[0]
+
     @abstractmethod
     def getState(self) -> DiffractionPatternState:
         pass

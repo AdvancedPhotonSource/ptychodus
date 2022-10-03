@@ -26,7 +26,7 @@ class TikeArrays:
     object_: ObjectArrayType
 
 
-class TikeArrayConverter:  # FIXME use dataset array indexes to select scan points
+class TikeArrayConverter:
 
     def __init__(self, apparatus: Apparatus, scan: Scan, probe: Probe, object_: Object,
                  diffractionDataset: ActiveDiffractionDataset,
@@ -45,13 +45,19 @@ class TikeArrayConverter:  # FIXME use dataset array indexes to select scan poin
         return numpy.fft.ifftshift(data, axes=(-2, -1))
 
     def exportToTike(self) -> TikeArrays:
+        assembledIndexes = self._diffractionDataset.getAssembledIndexes()
         pixelSizeXInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
         pixelSizeYInMeters = self._apparatus.getObjectPlanePixelSizeYInMeters()
 
         scanX: list[float] = list()
         scanY: list[float] = list()
 
-        for point in self._scan:
+        for index in assembledIndexes:
+            try:
+                point = self._scan[index]
+            except IndexError:
+                continue
+
             scanX.append(float(point.x / pixelSizeXInMeters))
             scanY.append(float(point.y / pixelSizeYInMeters))
 

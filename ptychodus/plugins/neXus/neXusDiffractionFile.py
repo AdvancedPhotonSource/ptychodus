@@ -269,8 +269,8 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
 
             detectorSpecific = detector.detectorSpecific
             detectorNumberOfPixels = Vector2D[int](
-                detectorSpecific.x_pixels_in_detector,
-                detectorSpecific.y_pixels_in_detector,
+                int(detectorSpecific.x_pixels_in_detector),
+                int(detectorSpecific.y_pixels_in_detector),
             )
 
             numberOfPatternsPerArray = 0
