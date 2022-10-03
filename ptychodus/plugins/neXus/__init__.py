@@ -9,4 +9,4 @@ def registerPlugins(registry: PluginRegistry) -> None:
     neXusFileReader = NeXusDiffractionFileReader()
     registry.registerPlugin(neXusFileReader)
     registry.registerPlugin(LynxScanFileReader())
-    registry.registerPlugin(VelociprobeScanFileReader(neXusFileReader))
+    registry.registerPlugin(VelociprobeScanFileReader())

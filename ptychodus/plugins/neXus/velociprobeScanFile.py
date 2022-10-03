@@ -4,11 +4,12 @@ from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
 from statistics import median
-from typing import Final
+from typing import Final, Optional
 import csv
-import math
 
-from .neXusDiffractionFile import NeXusDiffractionFileReader
+import numpy
+
+from .neXusDiffractionFile import EntryGroup
 from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
                                 ScanPointParseError, ScanPointSequence, SimpleScanDictionary)
 from ptychodus.api.plugins import PluginRegistry
@@ -31,8 +32,9 @@ class VelociprobeScanPoint:
 class VelociprobeScanFileReader(ScanFileReader):
     EXPECTED_NUMBER_OF_COLUMNS: Final[int] = 8
 
-    def __init__(self, diffractionFileReader: NeXusDiffractionFileReader) -> None:
-        self._diffractionFileReader = diffractionFileReader
+    def __init__(self) -> None:
+        # FIXME sync entry group when NeXus file loaded
+        self._entry: Optional[EntryGroup] = None
 
     @property
     def simpleName(self) -> str:
@@ -45,13 +47,14 @@ class VelociprobeScanFileReader(ScanFileReader):
     def _applyTransform(self, pointList: list[ScanPoint]) -> None:
         zero = Decimal()
         numberOfPoints = Decimal(len(pointList))
+        stageRotationCosine = Decimal(1)
 
         xMean = sum([point.x for point in pointList], start=zero) / numberOfPoints
         yMean = sum([point.y for point in pointList], start=zero) / numberOfPoints
 
-        # vvv FIXME vvv
-        stageRotationInRadians = self._diffractionFileReader.entry.sample.goniometer.chi_rad
-        stageRotationCosine = Decimal(math.cos(stageRotationInRadians))
+        if self._entry is not None:
+            stageRotationInRadians = self._entry.sample.goniometer.chi_rad
+            stageRotationCosine = Decimal(numpy.cos(stageRotationInRadians))
 
         for idx, point in enumerate(pointList):
             x = (point.x - xMean) * stageRotationCosine

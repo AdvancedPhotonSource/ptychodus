@@ -23,7 +23,7 @@ class H5DiffractionFileTreeBuilder:
 
             if stringInfo:
                 valueStr = f'STRING = "{value.decode(stringInfo.encoding)}"'
-            elif numpy.isscalar(value):
+            elif numpy.ndim(value) == 0:
                 valueStr = f'SCALAR {value.dtype} = {value}'
             elif isinstance(value, numpy.ndarray):
                 valueStr = f'{value.shape} {value.dtype}'
@@ -69,7 +69,7 @@ class H5DiffractionFileTreeBuilder:
 
                             if stringInfo:
                                 valueStr = f'STRING = "{value.decode(stringInfo.encoding)}"'
-                            elif numpy.isscalar(value):
+                            elif numpy.ndim(value) == 0:
                                 valueStr = f'SCALAR {value.dtype} = {value}'
                             else:
                                 logger.debug(f'UNKNOWN: {value} {type(value)}')
