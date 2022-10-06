@@ -14,7 +14,7 @@ import numpy
 
 from ...api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                          DiffractionPatternArray, DiffractionPatternData, DiffractionPatternState,
-                         SimpleDiffractionPatternArray)
+                         SimpleDiffractionDataset, SimpleDiffractionPatternArray)
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
@@ -74,7 +74,8 @@ class DiffractionDatasetPresenter(Observable, Observer):
         return len(self._activeDiffractionDataset)
 
     def getDatasetLabel(self) -> str:
-        return self._activeDiffractionDataset.getMetadata().filePath.stem
+        filePath = self._activeDiffractionDataset.getMetadata().filePath
+        return filePath.stem if filePath else 'Unknown'
 
     def openArray(self, dataPath: str) -> Any:  # TODO generalize for other file formats
         filePath = self._activeDiffractionDataset.getMetadata().filePath
@@ -156,6 +157,19 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     def stopProcessingDiffractionPatterns(self) -> None:
         self._activeDiffractionDataset.stop()
+
+    def configureStreaming(self, metadata: DiffractionMetadata) -> None:
+        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+        arrayList: list[DiffractionPatternArray] = list()
+        dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+        self._activeDiffractionDataset.switchTo(dataset)
+        self._activeDiffractionDataset.start(block=False)
+
+    def assemble(self, array: DiffractionPatternArray) -> None:
+        self._activeDiffractionDataset.insertArray(array)
+
+    def getAssemblyQueueSize(self) -> int:
+        return self._activeDiffractionDataset.getAssemblyQueueSize()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.fileType:

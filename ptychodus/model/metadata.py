@@ -88,6 +88,10 @@ class MetadataPresenter(Observable, Observer):
 
     def loadScanFile(self) -> None:  # TODO velociprobe only
         filePathMaster = self._metadata.filePath
+
+        if filePathMaster is None:
+            return
+
         fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
         filePath = filePathMaster.parents[2] / 'positions' / fileName
         fileFilter = 'Comma-Separated Values Files (*.csv)'  # TODO refactor; get from somewhere

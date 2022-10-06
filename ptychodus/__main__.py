@@ -46,6 +46,7 @@ def main() -> int:
     with ModelCore(modelArgs) as model:
         if parsedArgs.batch:
             verifyAllArgumentsParsed(parser, unparsedArgs)
+            model.batchModeSetupForFileBasedWorkflow()
             return model.batchModeReconstruct()
 
         # Unused PyQt5.Qt import prevents nonsense error message

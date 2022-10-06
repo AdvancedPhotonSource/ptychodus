@@ -77,7 +77,6 @@ class SimpleDiffractionPatternArray(DiffractionPatternArray):
 
 @dataclass(frozen=True)
 class DiffractionMetadata:
-    filePath: Path
     numberOfPatternsPerArray: int
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype
@@ -86,10 +85,11 @@ class DiffractionMetadata:
     detectorPixelSizeInMeters: Optional[Vector2D[Decimal]] = None
     cropCenterInPixels: Optional[Vector2D[int]] = None
     probeEnergyInElectronVolts: Optional[Decimal] = None
+    filePath: Optional[Path] = None
 
     @classmethod
     def createNullInstance(cls) -> DiffractionMetadata:
-        return cls(Path('/dev/null'), 0, 0, numpy.dtype(numpy.ubyte))
+        return cls(0, 0, numpy.dtype(numpy.ubyte))
 
 
 class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):

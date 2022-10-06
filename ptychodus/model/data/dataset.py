@@ -207,6 +207,9 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         logger.info('Data assembler stopped.')
 
+    def getAssemblyQueueSize(self) -> int:
+        return self._taskQueue.qsize()
+
     def getAssembledIndexes(self) -> list[int]:
         indexes: list[int] = list()
         stride = self.getMetadata().numberOfPatternsPerArray

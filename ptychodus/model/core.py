@@ -10,6 +10,7 @@ import h5py
 import matplotlib
 import numpy
 
+from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
 from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
@@ -138,29 +139,6 @@ class ModelCore:
         self._dataCore.stop()
         self._rpcCore.stop()
 
-    def batchModeReconstruct(self) -> int:
-        self._dataCore.diffractionDatasetPresenter.startProcessingDiffractionPatterns(block=True)
-        result = self.reconstructorPresenter.reconstruct()
-
-        pixelSizeXInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeXInMeters())
-        pixelSizeYInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeYInMeters())
-
-        scanXInMeters = [float(point.x) for point in self._scanCore.scan]
-        scanYInMeters = [float(point.y) for point in self._scanCore.scan]
-
-        # TODO document output file format; include cost function values
-        dataDump = dict()
-        dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
-        dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
-        dataDump['probe'] = self._probeCore.probe.getArray()
-        dataDump['object'] = self._objectCore.object.getArray()
-        numpy.savez(self._reconstructorSettings.outputFilePath.value, **dataDump)
-
-        return result
-
-    def refreshActiveDataset(self) -> None:
-        self._dataCore.activeDataset.notifyObserversIfDatasetChanged()
-
     @property
     def rpcMessageService(self) -> RPCMessageService:
         return self._rpcCore.messageService
@@ -180,6 +158,40 @@ class ModelCore:
     @property
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
         return self._dataCore.diffractionDatasetPresenter
+
+    def batchModeSetupForFileBasedWorkflow(self) -> None:
+        self.diffractionDatasetPresenter.startProcessingDiffractionPatterns(block=True)
+
+    def batchModeSetupForStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
+        self.diffractionDatasetPresenter.configureStreaming(metadata)
+
+    def assembleDiffractionPattern(self, array: DiffractionPatternArray) -> None:
+        self.diffractionDatasetPresenter.assemble(array)
+
+    def getDiffractionPatternAssemblyQueueSize(self) -> int:
+        return self.diffractionDatasetPresenter.getAssemblyQueueSize()
+
+    def refreshActiveDataset(self) -> None:
+        self._dataCore.activeDataset.notifyObserversIfDatasetChanged()
+
+    def batchModeReconstruct(self) -> int:
+        result = self.reconstructorPresenter.reconstruct()
+
+        pixelSizeXInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeXInMeters())
+        pixelSizeYInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeYInMeters())
+
+        scanXInMeters = [float(point.x) for point in self._scanCore.scan]
+        scanYInMeters = [float(point.y) for point in self._scanCore.scan]
+
+        # TODO document output file format; include cost function values
+        dataDump = dict()
+        dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
+        dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
+        dataDump['probe'] = self._probeCore.probe.getArray()
+        dataDump['object'] = self._objectCore.object.getArray()
+        numpy.savez(self._reconstructorSettings.outputFilePath.value, **dataDump)
+
+        return result
 
     @property
     def scanPresenter(self) -> ScanPresenter:

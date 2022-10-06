@@ -15,6 +15,8 @@ module = [
     "globus_automate_client.*",
     "h5py",
     "matplotlib.*",
+    "pvaccess",
+    "pvapy.*",
     "scipy.*",
     "skimage.*",
     "tifffile",

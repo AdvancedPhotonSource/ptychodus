@@ -242,7 +242,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         return 'NeXus Master Files (*.h5 *.hdf5)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(filePath, 0, 0, numpy.dtype(numpy.ubyte))
+        metadata = DiffractionMetadata(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
         contentsTree = self._treeBuilder.createRootNode()
         arrayList: list[DiffractionPatternArray] = list()
         dataset: DiffractionDataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)

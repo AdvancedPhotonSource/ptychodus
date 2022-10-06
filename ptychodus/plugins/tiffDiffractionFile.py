@@ -61,7 +61,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         return 'Tagged Image File Format Files (*.tif *.tiff)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(filePath, 0, 0, numpy.dtype(numpy.ubyte))
+        metadata = DiffractionMetadata(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
         arrayList: list[DiffractionPatternArray] = list()
 
         if filePath:
