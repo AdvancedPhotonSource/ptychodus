@@ -37,12 +37,18 @@ class MetadataPresenter(Observable, Observer):
     def _metadata(self) -> DiffractionMetadata:
         return self._diffractionDataset.getMetadata()
 
+    def canSyncDetectorPixelCount(self) -> bool:
+        return (self._metadata.detectorNumberOfPixels is not None)
+
     def syncDetectorPixelCount(self) -> None:
         if self._metadata.detectorNumberOfPixels:
             self._detectorSettings.numberOfPixelsX.value = \
                 self._metadata.detectorNumberOfPixels.x
             self._detectorSettings.numberOfPixelsY.value = \
                 self._metadata.detectorNumberOfPixels.y
+
+    def canSyncDetectorPixelSize(self) -> bool:
+        return (self._metadata.detectorPixelSizeInMeters is not None)
 
     def syncDetectorPixelSize(self) -> None:
         if self._metadata.detectorPixelSizeInMeters:
@@ -51,12 +57,21 @@ class MetadataPresenter(Observable, Observer):
             self._detectorSettings.pixelSizeYInMeters.value = \
                 self._metadata.detectorPixelSizeInMeters.y
 
+    def canSyncDetectorDistance(self) -> bool:
+        return (self._metadata.detectorDistanceInMeters is not None)
+
     def syncDetectorDistance(self) -> None:
         if self._metadata.detectorDistanceInMeters:
             self._detectorSettings.detectorDistanceInMeters.value = \
                 self._metadata.detectorDistanceInMeters
 
-    def syncImageCrop(self, syncCenter: bool, syncExtent: bool) -> None:
+    def canSyncPatternCropCenter(self) -> bool:
+        return (self._metadata.cropCenterInPixels is not None)
+
+    def canSyncPatternCropExtent(self) -> bool:
+        return (self._metadata.detectorNumberOfPixels is not None)
+
+    def syncPatternCrop(self, syncCenter: bool, syncExtent: bool) -> None:
         if syncCenter and self._metadata.cropCenterInPixels:
             self._patternSettings.cropCenterXInPixels.value = \
                     self._metadata.cropCenterInPixels.x
@@ -80,6 +95,9 @@ class MetadataPresenter(Observable, Observer):
 
             self._patternSettings.cropExtentXInPixels.value = cropDiameterInPixels
             self._patternSettings.cropExtentYInPixels.value = cropDiameterInPixels
+
+    def canSyncProbeEnergy(self) -> bool:
+        return (self._metadata.probeEnergyInElectronVolts is not None)
 
     def syncProbeEnergy(self) -> None:
         if self._metadata.probeEnergyInElectronVolts:

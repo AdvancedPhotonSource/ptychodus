@@ -78,8 +78,8 @@ class MetadataView(QGroupBox):
         self.detectorPixelCountCheckBox = QCheckBox('Detector Pixel Count')
         self.detectorPixelSizeCheckBox = QCheckBox('Detector Pixel Size')
         self.detectorDistanceCheckBox = QCheckBox('Detector Distance')
-        self.imageCropCenterCheckBox = QCheckBox('Image Crop Center')
-        self.imageCropExtentCheckBox = QCheckBox('Image Crop Extent')
+        self.patternCropCenterCheckBox = QCheckBox('Pattern Crop Center')
+        self.patternCropExtentCheckBox = QCheckBox('Pattern Crop Extent')
         self.probeEnergyCheckBox = QCheckBox('Probe Energy')
 
     @classmethod
@@ -90,8 +90,8 @@ class MetadataView(QGroupBox):
         layout.addWidget(view.detectorPixelCountCheckBox)
         layout.addWidget(view.detectorPixelSizeCheckBox)
         layout.addWidget(view.detectorDistanceCheckBox)
-        layout.addWidget(view.imageCropCenterCheckBox)
-        layout.addWidget(view.imageCropExtentCheckBox)
+        layout.addWidget(view.patternCropCenterCheckBox)
+        layout.addWidget(view.patternCropExtentCheckBox)
         layout.addWidget(view.probeEnergyCheckBox)
         layout.addStretch()
         view.setLayout(layout)

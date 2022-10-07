@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QPushButton, QScrollArea,
-                             QStackedWidget, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGridLayout, QGroupBox, QLabel, QPushButton,
+                             QScrollArea, QStackedWidget, QVBoxLayout, QWidget)
 
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvas
@@ -13,17 +13,38 @@ from matplotlib.figure import Figure
 class ReconstructorView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Reconstructor', parent)
-        self.reconstructorComboBox = QComboBox()
+        super().__init__('Parameters', parent)
+        self.algorithmLabel = QLabel('Algorithm:')
+        self.algorithmComboBox = QComboBox()
+        self.scanLabel = QLabel('Scan:')
+        self.scanComboBox = QComboBox()
+        self.scanValidationLabel = QLabel()
+        self.probeLabel = QLabel('Probe:')
+        self.probeComboBox = QComboBox()
+        self.probeValidationLabel = QLabel()
+        self.objectLabel = QLabel('Object:')
+        self.objectComboBox = QComboBox()
+        self.objectValidationLabel = QLabel()
         self.reconstructButton = QPushButton('Reconstruct')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorView:
         view = cls(parent)
 
-        layout = QVBoxLayout()
-        layout.addWidget(view.reconstructorComboBox)
-        layout.addWidget(view.reconstructButton)
+        layout = QGridLayout()
+        layout.addWidget(view.algorithmLabel, 0, 0)
+        layout.addWidget(view.algorithmComboBox, 0, 1, 1, 2)
+        layout.addWidget(view.scanLabel, 1, 0)
+        layout.addWidget(view.scanComboBox, 1, 1)
+        layout.addWidget(view.scanValidationLabel, 1, 2)
+        layout.addWidget(view.probeLabel, 2, 0)
+        layout.addWidget(view.probeComboBox, 2, 1)
+        layout.addWidget(view.probeValidationLabel, 2, 2)
+        layout.addWidget(view.objectLabel, 3, 0)
+        layout.addWidget(view.objectComboBox, 3, 1)
+        layout.addWidget(view.objectValidationLabel, 3, 2)
+        layout.addWidget(view.reconstructButton, 4, 0, 1, 3)
+        layout.setColumnStretch(1, 1)
         view.setLayout(layout)
 
         return view
@@ -39,7 +60,7 @@ class ReconstructorParametersView(QWidget):
 
     @property
     def algorithmComboBox(self) -> QComboBox:
-        return self.reconstructorView.reconstructorComboBox
+        return self.reconstructorView.algorithmComboBox
 
     @property
     def reconstructButton(self) -> QPushButton:

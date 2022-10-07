@@ -7,8 +7,8 @@ from PyQt5.QtGui import QDoubleValidator, QPixmap, QWheelEvent
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
                              QFormLayout, QGraphicsPixmapItem, QGraphicsScene,
                              QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
-                             QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
-                             QSpinBox, QStyle, QVBoxLayout, QWidget)
+                             QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSpinBox, QStyle,
+                             QVBoxLayout, QWidget)
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 

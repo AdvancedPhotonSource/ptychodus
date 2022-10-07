@@ -5,43 +5,66 @@ from ...model import MetadataPresenter
 from ...view import DataNavigationPage, MetadataView
 
 
-class MetadataController:
+class MetadataController(Observer):
 
-    def __init__(self, metadataPresenter: MetadataPresenter,
+    def __init__(self, presenter: MetadataPresenter,
                  view: DataNavigationPage[MetadataView]) -> None:
-        self._metadataPresenter = metadataPresenter
+        super().__init__()
+        self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, metadataPresenter: MetadataPresenter,
-                       view: DataNavigationPage[MetadataView]):
-        controller = cls(metadataPresenter, view)
-
-        # FIXME only show available metadata
-        view.contentsView.detectorPixelCountCheckBox.setChecked(True)
-        view.contentsView.detectorPixelSizeCheckBox.setChecked(True)
-        view.contentsView.detectorDistanceCheckBox.setChecked(True)
-        view.contentsView.imageCropCenterCheckBox.setChecked(True)
-        view.contentsView.imageCropExtentCheckBox.setChecked(True)
-        view.contentsView.probeEnergyCheckBox.setChecked(True)
+    def createInstance(cls, presenter: MetadataPresenter, view: DataNavigationPage[MetadataView]):
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
 
         view.forwardButton.clicked.connect(controller._importMetadata)
 
+        controller._syncModelToView()
         return controller
 
     def _importMetadata(self) -> None:
         if self._view.contentsView.detectorPixelCountCheckBox.isChecked():
-            self._metadataPresenter.syncDetectorPixelCount()
+            self._presenter.syncDetectorPixelCount()
 
         if self._view.contentsView.detectorPixelSizeCheckBox.isChecked():
-            self._metadataPresenter.syncDetectorPixelSize()
+            self._presenter.syncDetectorPixelSize()
 
         if self._view.contentsView.detectorDistanceCheckBox.isChecked():
-            self._metadataPresenter.syncDetectorDistance()
+            self._presenter.syncDetectorDistance()
 
-        self._metadataPresenter.syncImageCrop(
-            syncCenter=self._view.contentsView.imageCropCenterCheckBox.isChecked(),
-            syncExtent=self._view.contentsView.imageCropExtentCheckBox.isChecked())
+        self._presenter.syncPatternCrop(
+            syncCenter=self._view.contentsView.patternCropCenterCheckBox.isChecked(),
+            syncExtent=self._view.contentsView.patternCropExtentCheckBox.isChecked())
 
         if self._view.contentsView.probeEnergyCheckBox.isChecked():
-            self._metadataPresenter.syncProbeEnergy()
+            self._presenter.syncProbeEnergy()
+
+    def _syncModelToView(self) -> None:
+        canSyncDetectorPixelCount = self._presenter.canSyncDetectorPixelCount()
+        self._view.contentsView.detectorPixelCountCheckBox.setVisible(canSyncDetectorPixelCount)
+        self._view.contentsView.detectorPixelCountCheckBox.setChecked(canSyncDetectorPixelCount)
+
+        canSyncDetectorPixelSize = self._presenter.canSyncDetectorPixelSize()
+        self._view.contentsView.detectorPixelSizeCheckBox.setVisible(canSyncDetectorPixelSize)
+        self._view.contentsView.detectorPixelSizeCheckBox.setChecked(canSyncDetectorPixelSize)
+
+        canSyncDetectorDistance = self._presenter.canSyncDetectorDistance()
+        self._view.contentsView.detectorDistanceCheckBox.setVisible(canSyncDetectorDistance)
+        self._view.contentsView.detectorDistanceCheckBox.setChecked(canSyncDetectorDistance)
+
+        canSyncPatternCropCenter = self._presenter.canSyncPatternCropCenter()
+        self._view.contentsView.patternCropCenterCheckBox.setVisible(canSyncPatternCropCenter)
+        self._view.contentsView.patternCropCenterCheckBox.setChecked(canSyncPatternCropCenter)
+
+        canSyncPatternCropExtent = self._presenter.canSyncPatternCropExtent()
+        self._view.contentsView.patternCropExtentCheckBox.setVisible(canSyncPatternCropExtent)
+        self._view.contentsView.patternCropExtentCheckBox.setChecked(canSyncPatternCropExtent)
+
+        canSyncProbeEnergy = self._presenter.canSyncProbeEnergy()
+        self._view.contentsView.probeEnergyCheckBox.setVisible(canSyncProbeEnergy)
+        self._view.contentsView.probeEnergyCheckBox.setChecked(canSyncProbeEnergy)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
