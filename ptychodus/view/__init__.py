@@ -1,3 +1,4 @@
+from . import resources
 from .core import *
 from .data import *
 from .detector import *

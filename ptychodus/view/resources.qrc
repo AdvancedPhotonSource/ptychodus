@@ -1,0 +1,17 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="icons">
+        <file alias="check">Font-Awesome-6.2.0/svgs/solid/check.svg</file>
+        <file alias="dataset">Font-Awesome-6.2.0/svgs/solid/database.svg</file>
+        <file alias="detector">Font-Awesome-6.2.0/svgs/solid/table-cells.svg</file>
+        <file alias="monitor">Font-Awesome-6.2.0/svgs/solid/display.svg</file>
+        <file alias="object">Font-Awesome-6.2.0/svgs/solid/cube.svg</file>
+        <file alias="probe">Font-Awesome-6.2.0/svgs/solid/circle-radiation.svg</file>
+        <file alias="reconstructor">Font-Awesome-6.2.0/svgs/solid/screwdriver-wrench.svg</file>
+        <file alias="save">Font-Awesome-6.2.0/svgs/solid/floppy-disk.svg</file>
+        <file alias="scan">Font-Awesome-6.2.0/svgs/solid/route.svg</file>
+        <file alias="settings">Font-Awesome-6.2.0/svgs/solid/gear.svg</file>
+        <file alias="workflow">Font-Awesome-6.2.0/svgs/solid/toolbox.svg</file>
+        <file alias="xmark">Font-Awesome-6.2.0/svgs/solid/xmark.svg</file>
+    </qresource>
+</RCC>

@@ -58,14 +58,6 @@ class ReconstructorParametersView(QWidget):
         self.stackedWidget = QStackedWidget()
         self.scrollArea = QScrollArea()
 
-    @property
-    def algorithmComboBox(self) -> QComboBox:
-        return self.reconstructorView.algorithmComboBox
-
-    @property
-    def reconstructButton(self) -> QPushButton:
-        return self.reconstructorView.reconstructButton
-
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorParametersView:
         view = cls(parent)

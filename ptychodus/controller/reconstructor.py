@@ -4,10 +4,11 @@ import logging
 import traceback
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
 from ..model import (Observable, Observer, ReconstructorPlotPresenter, ReconstructorPresenter)
-from ..view import ReconstructorParametersView, ReconstructorPlotView
+from ..view import ReconstructorParametersView, ReconstructorPlotView, resources
 
 logger = logging.getLogger(__name__)
 
@@ -43,17 +44,18 @@ class ReconstructorParametersController(Observer):
         for reconstructorName, backendName in presenter.getAlgorithmDict().items():
             controller._addReconstructor(reconstructorName, backendName)
 
-        view.algorithmComboBox.currentTextChanged.connect(presenter.setAlgorithm)
-        view.algorithmComboBox.currentIndexChanged.connect(view.stackedWidget.setCurrentIndex)
-        view.reconstructButton.clicked.connect(controller._reconstruct)
+        view.reconstructorView.algorithmComboBox.currentTextChanged.connect(presenter.setAlgorithm)
+        view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
+            view.stackedWidget.setCurrentIndex)
+        view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
 
         controller._syncModelToView()
 
         return controller
 
     def _addReconstructor(self, reconstructorName: str, backendName: str) -> None:
-        self._view.algorithmComboBox.addItem(reconstructorName,
-                                             self._view.algorithmComboBox.count())
+        self._view.reconstructorView.algorithmComboBox.addItem(
+            reconstructorName, self._view.reconstructorView.algorithmComboBox.count())
 
         if backendName in self._viewControllerFactoryDict:
             viewControllerFactory = self._viewControllerFactoryDict[backendName]
@@ -83,7 +85,10 @@ class ReconstructorParametersController(Observer):
         print(result)  # TODO
 
     def _syncModelToView(self) -> None:
-        self._view.algorithmComboBox.setCurrentText(self._presenter.getAlgorithm())
+        self._view.reconstructorView.algorithmComboBox.setCurrentText(
+            self._presenter.getAlgorithm())
+        # TODO self._view.reconstructorView.probeValidationLabel.setPixmap(QPixmap(':/icons/check'))
+        # TODO self._view.reconstructorView.objectValidationLabel.setPixmap(QPixmap(':/icons/xmark'))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
