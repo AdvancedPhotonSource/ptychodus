@@ -57,6 +57,9 @@ class ProbePresenter(Observable, Observer):
 
         return presenter
 
+    def isActiveProbeValid(self) -> bool:
+        return True  # FIXME
+
     def initializeProbe(self) -> None:
         initializer = self._initializerChooser.getCurrentStrategy()
         simpleName = self._initializerChooser.getCurrentSimpleName()

@@ -60,6 +60,9 @@ class ObjectPresenter(Observable, Observer):
 
         return presenter
 
+    def isActiveObjectValid(self) -> bool:
+        return True  # FIXME
+
     def initializeObject(self) -> None:
         initializer = self._initializerChooser.getCurrentStrategy()
         simpleName = self._initializerChooser.getCurrentSimpleName()

@@ -54,7 +54,8 @@ class ControllerCore:
             model.diffractionDatasetPresenter, model.metadataPresenter, model.patternPresenter,
             view.dataParametersView, view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
-            model.reconstructorPresenter, view.reconstructorParametersView,
+            model.reconstructorPresenter, model.scanPresenter, model.probePresenter,
+            model.objectPresenter, view.reconstructorParametersView,
             [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
             model.reconstructorPlotPresenter, view.reconstructorPlotView)
