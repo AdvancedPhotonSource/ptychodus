@@ -215,7 +215,10 @@ class ScanController(Observer):
         for _, initializer in self._presenter.getScanRepositoryContents():
             initializer.addObserver(self)
 
+        self._parametersView.positionDataView.tableView.blockSignals(True)
         self._tableModel.refresh()
+        self._parametersView.positionDataView.tableView.blockSignals(False)
+
         self._setButtonsEnabled()
         self._redrawPlot()
 

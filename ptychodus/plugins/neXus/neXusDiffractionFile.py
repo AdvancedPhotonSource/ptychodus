@@ -74,6 +74,7 @@ class DataGroup:
             if isinstance(h5Item, h5py.ExternalLink):
                 filePath = masterFilePath.parent / h5Item.filename
                 dataPath = str(h5Item.path)
+                # TODO use entry/data/data/image_nr_{low,high}
                 array = NeXusDiffractionPatternArray(name, len(arrayList), filePath, dataPath)
                 arrayList.append(array)
 
@@ -274,6 +275,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
             )
 
             numberOfPatternsPerArray = 0
+            patternDataType = numpy.dtype(numpy.ubyte)
 
             for array in entry.data:
                 try:
@@ -283,13 +285,14 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     continue
 
                 numberOfPatternsPerArray = data.shape[0]
+                patternDataType = data.dtype
                 break
 
             metadata = DiffractionMetadata(
                 filePath=filePath,
                 numberOfPatternsPerArray=numberOfPatternsPerArray,
                 numberOfPatternsTotal=detectorSpecific.nimages,
-                patternDataType=numpy.dtype(numpy.uint16),  # TODO get from dataset
+                patternDataType=patternDataType,
                 detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
                 detectorNumberOfPixels=detectorNumberOfPixels,
                 detectorPixelSizeInMeters=detectorPixelSizeInMeters,

@@ -143,9 +143,11 @@ class ReconstructorParametersController(Observer):
         print(result)  # TODO
 
     def _refreshScanListModel(self) -> None:
+        self._view.reconstructorView.scanComboBox.blockSignals(True)
         self._scanListModel.refresh()
         self._view.reconstructorView.scanComboBox.setCurrentText(
             self._scanPresenter.getActiveScan())
+        self._view.reconstructorView.scanComboBox.blockSignals(False)
 
     def _getValidationPixmap(self, isValid: bool) -> QPixmap:
         pixmap = QPixmap(':/icons/check' if isValid else ':/icons/xmark')
