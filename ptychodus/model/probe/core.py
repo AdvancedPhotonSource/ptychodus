@@ -58,7 +58,7 @@ class ProbePresenter(Observable, Observer):
         return presenter
 
     def isActiveProbeValid(self) -> bool:
-        return True  # FIXME
+        return (self._probe.getProbeExtent() == self._sizer.getProbeExtent())
 
     def initializeProbe(self) -> None:
         initializer = self._initializerChooser.getCurrentStrategy()

@@ -19,6 +19,12 @@ class ImageExtent:
         '''returns the shape (height, width) tuple'''
         return self.height, self.width
 
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ImageExtent):
+            return (self.width == other.width and self.height == other.height)
+
+        return False
+
     def __add__(self, other: ImageExtent) -> ImageExtent:
         if isinstance(other, ImageExtent):
             w = self.width + other.width
