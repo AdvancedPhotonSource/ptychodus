@@ -86,7 +86,7 @@ class ViewCore(QMainWindow):
         view.navigationToolBar.setContextMenuPolicy(Qt.PreventContextMenu)
         view.addToolBar(Qt.LeftToolBarArea, view.navigationToolBar)
         view.navigationToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        view.navigationToolBar.setIconSize(QSize(64, 64))
+        view.navigationToolBar.setIconSize(QSize(32, 32))
 
         for index, action in enumerate(view.navigationToolBar.actions()):
             action.setCheckable(True)

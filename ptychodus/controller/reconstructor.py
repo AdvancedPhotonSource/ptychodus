@@ -151,7 +151,7 @@ class ReconstructorParametersController(Observer):
 
     def _getValidationPixmap(self, isValid: bool) -> QPixmap:
         pixmap = QPixmap(':/icons/check' if isValid else ':/icons/xmark')
-        return pixmap.scaledToHeight(48)
+        return pixmap.scaledToHeight(24)
 
     def _syncModelToView(self) -> None:
         self._view.reconstructorView.algorithmComboBox.setCurrentText(

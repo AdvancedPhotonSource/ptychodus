@@ -62,6 +62,9 @@ class DatasetFileView(QGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetFileView:
         view = cls(parent)
 
+        view.fileSystemTableView.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeToContents)
+
         layout = QVBoxLayout()
         layout.addWidget(view.filePathLineEdit)
         layout.addWidget(view.fileSystemTableView)

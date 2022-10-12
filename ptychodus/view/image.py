@@ -61,8 +61,7 @@ class ImageFileGroupBox(BottomTitledGroupBox):
         view = cls(parent)
 
         view.saveButton.setIcon(QIcon(':/icons/save'))
-        view.saveButton.setIconSize(QSize(48, 48))
-        view.saveButton.setFixedSize(96, 96)
+        view.saveButton.setIconSize(QSize(32, 32))
         view.saveButton.setToolTip('Save Image')
 
         layout = QVBoxLayout()
