@@ -32,7 +32,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
 
         self._ptychodus = ModelCore(modelArgs)
         self._reconstructor = Thread(target=self._ptychodus.batchModeReconstruct)
-        self._reconstructFrameId = int(configDict['reconstructFrameId']),
+        self._reconstructFrameId = int(configDict['reconstructFrameId'])
         self._nFramesProcessed = 0
         self._processingTime = 0.
         self.logger.debug(f'Created {type(self).__name__}')

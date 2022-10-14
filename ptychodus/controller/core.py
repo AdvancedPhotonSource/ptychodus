@@ -82,7 +82,7 @@ class ControllerCore:
         controller._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
         controller._refreshDataTimer.start(1000)  # TODO make configurable
 
-        if model.rpcMessageService.isActive:
+        if model.rpcMessageService and model.rpcMessageService.isActive:
             controller._processMessagesTimer.timeout.connect(
                 model.rpcMessageService.processMessages)
             controller._processMessagesTimer.start(1000)  # TODO make configurable

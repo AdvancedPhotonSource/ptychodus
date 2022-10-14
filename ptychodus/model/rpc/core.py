@@ -20,9 +20,6 @@ class RPCMessageService:
         self._consumerStopEvent = threading.Event()
         self._executors: dict[str, RPCExecutor] = dict()
 
-    def getPortNumber(self) -> int:
-        return self._socketServer.server_address[1]
-
     def registerProcedure(self, messageClass: type[RPCMessage], executor: RPCExecutor) -> None:
         self._socketServer.registerMessageClass(messageClass)
         self._executors[messageClass.getProcedure()] = executor
@@ -80,16 +77,3 @@ class RPCMessageService:
             self._consumerThread.join()
 
         logger.info('Message service stopped.')
-
-
-class RPCCore:
-
-    def __init__(self, rpcPort: int, autoExecuteRPCs: bool) -> None:
-        self.messageService = RPCMessageService(rpcPort, autoExecuteRPCs)
-
-    def start(self) -> None:
-        if self.messageService.getPortNumber() >= 0:
-            self.messageService.start()
-
-    def stop(self) -> None:
-        self.messageService.stop()

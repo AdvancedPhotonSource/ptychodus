@@ -23,7 +23,7 @@ from .probe import ProbeCore, ProbePresenter
 from .ptychonn import PtychoNNBackend
 from .ptychopy import PtychoPyBackend
 from .reconstructor import *
-from .rpc import RPCCore, RPCMessageService
+from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
 from .tike import TikeBackend
@@ -112,16 +112,22 @@ class ModelCore:
             self._reconstructorSettings, self._selectableReconstructor)
 
         self._workflowCore = WorkflowCore(self.settingsRegistry)
-        self._rpcCore = RPCCore(modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
-        self._rpcCore.messageService.registerProcedure(
-            LoadResultsMessage, LoadResultsExecutor(self._probeCore.probe,
-                                                    self._objectCore.object))
+        self.rpcMessageService: Optional[RPCMessageService] = None
+
+        if modelArgs.rpcPort >= 0:
+            self.rpcMessageService = RPCMessageService(modelArgs.rpcPort,
+                                                       modelArgs.autoExecuteRPCs)
+            self.rpcMessageService.registerProcedure(
+                LoadResultsMessage,
+                LoadResultsExecutor(self._probeCore.probe, self._objectCore.object))
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
 
-        self._rpcCore.start()
+        if self.rpcMessageService:
+            self.rpcMessageService.start()
+
         self._dataCore.start()
 
         return self
@@ -138,11 +144,9 @@ class ModelCore:
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._dataCore.stop()
-        self._rpcCore.stop()
 
-    @property
-    def rpcMessageService(self) -> RPCMessageService:
-        return self._rpcCore.messageService
+        if self.rpcMessageService:
+            self.rpcMessageService.stop()
 
     @property
     def detectorImagePresenter(self) -> ImagePresenter:

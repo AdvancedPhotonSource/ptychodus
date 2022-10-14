@@ -136,9 +136,14 @@ class GlobusWorkflowClient(WorkflowClient):
         }
 
         flowInput = {'input': flowInput}
-        flowLabel = 'Run Label'
+        flowLabel = 'Ptychodus'  # TODO
+        flowTags = ['aps', 'ptychography']
 
-        runResponse = self._client.run_flow(flowID, flowScope, flowInput, label=flowLabel)
+        runResponse = self._client.run_flow(flowID,
+                                            flowScope,
+                                            flowInput,
+                                            label=flowLabel,
+                                            tags=flowTags)
         logger.info(f'Run Flow Response: {json.dumps(runResponse.data, indent=4)}')
 
 

@@ -1,4 +1,4 @@
-from .core import RPCCore, RPCMessageService
+from .core import RPCMessageService
 
 
 def main() -> int:
