@@ -10,11 +10,14 @@ import h5py
 import matplotlib
 import numpy
 
+from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
-from .data import *
-from .detector import *
+from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
+                   DiffractionPatternPresenter)
+from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import *
+from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter
 from .probe import ProbeCore, ProbePresenter
 from .ptychonn import PtychoNNBackend
@@ -24,8 +27,6 @@ from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
 from .tike import TikeBackend
-from .velociprobe import *
-from .watcher import DataDirectoryWatcher
 from .workflow import WorkflowCore, WorkflowPresenter
 
 logger = logging.getLogger(__name__)
@@ -62,82 +63,63 @@ class ModelCore:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
+        self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
+        self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
+        self._detector = Detector.createInstance(self._detectorSettings)
+        self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
         self._detectorImageCore = ImageCore(
             self._pluginRegistry.buildScalarTransformationChooser())
-        self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
-        self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
 
-        self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
-        self._dataSettings = DataSettings.createInstance(self.settingsRegistry)
-        self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
-        self._cropSettings = CropSettings.createInstance(self.settingsRegistry)
-        self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
-
-        # TODO DataDirectoryWatcher should be optional
-        self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(self._dataSettings)
-
-        self._detector = Detector.createInstance(self._detectorSettings)
-        self._cropSizer = CropSizer.createInstance(self._cropSettings, self._detector)
-        self._activeDataFile = ActiveDataFile(self._dataSettings, self._cropSizer)
-
+        self._dataCore = DataCore(self.settingsRegistry, self._detector,
+                                  self._pluginRegistry.buildDiffractionFileReaderChooser())
         self._scanCore = ScanCore(self.rng, self.settingsRegistry,
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())
         self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
-                                    self._cropSizer,
+                                    self._dataCore.cropSizer,
                                     self._pluginRegistry.buildProbeFileReaderChooser(),
                                     self._pluginRegistry.buildProbeFileWriterChooser())
+        self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
         self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
                                       self._scanCore.scan, self._probeCore.sizer,
                                       self._pluginRegistry.buildObjectFileReaderChooser(),
                                       self._pluginRegistry.buildObjectFileWriterChooser())
+        self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
 
+        self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
         self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
 
         self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
                                                               modelArgs.isDeveloperModeEnabled)
         self.tikeBackend = TikeBackend.createInstance(
-            self.settingsRegistry, self._activeDataFile, self._scanCore.scan,
+            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
             self._scanCore.initializerFactory, self._scanCore.repository,
             self.reconstructorPlotPresenter, modelArgs.isDeveloperModeEnabled)
-        self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
-                                                              modelArgs.isDeveloperModeEnabled)
+        self.ptychonnBackend = PtychoNNBackend.createInstance(
+            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
+            self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
+
+        self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.activeDataset,
+                                                                  self._detectorSettings,
+                                                                  self._dataCore.patternSettings,
+                                                                  self._probeCore.settings,
+                                                                  self._scanCore)
         self._selectableReconstructor = SelectableReconstructor.createInstance(
             self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
             self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
-
-        self.dataFilePresenter = DataFilePresenter.createInstance(
-            self._dataSettings, self._activeDataFile,
-            self._pluginRegistry.buildDataFileReaderChooser(),
-            self._pluginRegistry.buildDataFileWriterChooser())
-        self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
-        self.cropPresenter = CropPresenter.createInstance(self._cropSettings, self._cropSizer)
-        self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._activeDataFile)
-
-        # TODO remove velociprobePresenter lookup when able
-        self._velociprobeReader = next(
-            entry.strategy for entry in self._pluginRegistry.dataFileReaders
-            if type(entry.strategy).__name__ == 'VelociprobeDataFileReader')
-        self.velociprobePresenter = VelociprobePresenter.createInstance(
-            self._velociprobeReader, self._detectorSettings, self._cropSettings,
-            self._probeCore.settings, self._activeDataFile, self._scanCore)
         self.reconstructorPresenter = ReconstructorPresenter.createInstance(
             self._reconstructorSettings, self._selectableReconstructor)
 
         self._workflowCore = WorkflowCore(self.settingsRegistry)
+        self.rpcMessageService: Optional[RPCMessageService] = None
 
         if modelArgs.rpcPort >= 0:
-            self._loadResultsExecutor = LoadResultsExecutor(self._probeCore.probe,
-                                                            self._objectCore.object)
-            self.rpcMessageService: Optional[RPCMessageService] = RPCMessageService(
-                modelArgs.rpcPort, modelArgs.autoExecuteRPCs)
-            self.rpcMessageService.registerMessageClass(LoadResultsMessage)
-            self.rpcMessageService.registerExecutor(LoadResultsMessage.procedure,
-                                                    self._loadResultsExecutor)
-        else:
-            self.rpcMessageService = None
+            self.rpcMessageService = RPCMessageService(modelArgs.rpcPort,
+                                                       modelArgs.autoExecuteRPCs)
+            self.rpcMessageService.registerProcedure(
+                LoadResultsMessage,
+                LoadResultsExecutor(self._probeCore.probe, self._objectCore.object))
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
@@ -146,8 +128,7 @@ class ModelCore:
         if self.rpcMessageService:
             self.rpcMessageService.start()
 
-        if self._dataDirectoryWatcher:
-            self._dataDirectoryWatcher.start()
+        self._dataCore.start()
 
         return self
 
@@ -162,11 +143,41 @@ class ModelCore:
 
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
-        if self._dataDirectoryWatcher:
-            self._dataDirectoryWatcher.stop()
+        self._dataCore.stop()
 
         if self.rpcMessageService:
             self.rpcMessageService.stop()
+
+    @property
+    def detectorImagePresenter(self) -> ImagePresenter:
+        return self._detectorImageCore.presenter
+
+    @property
+    def patternPresenter(self) -> DiffractionPatternPresenter:
+        return self._dataCore.patternPresenter
+
+    @property
+    def activeDiffractionPatternPresenter(self) -> ActiveDiffractionPatternPresenter:
+        return self._dataCore.activePatternPresenter
+
+    @property
+    def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
+        return self._dataCore.diffractionDatasetPresenter
+
+    def batchModeSetupForFileBasedWorkflow(self) -> None:
+        self.diffractionDatasetPresenter.startProcessingDiffractionPatterns(block=True)
+
+    def batchModeSetupForStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
+        self.diffractionDatasetPresenter.configureStreaming(metadata)
+
+    def assembleDiffractionPattern(self, array: DiffractionPatternArray) -> None:
+        self.diffractionDatasetPresenter.assemble(array)
+
+    def getDiffractionPatternAssemblyQueueSize(self) -> int:
+        return self.diffractionDatasetPresenter.getAssemblyQueueSize()
+
+    def refreshActiveDataset(self) -> None:
+        self._dataCore.activeDataset.notifyObserversIfDatasetChanged()
 
     def batchModeReconstruct(self) -> int:
         result = self.reconstructorPresenter.reconstruct()
@@ -186,10 +197,6 @@ class ModelCore:
         numpy.savez(self._reconstructorSettings.outputFilePath.value, **dataDump)
 
         return result
-
-    @property
-    def detectorImagePresenter(self) -> ImagePresenter:
-        return self._detectorImageCore.presenter
 
     @property
     def scanPresenter(self) -> ScanPresenter:

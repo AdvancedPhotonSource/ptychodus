@@ -18,8 +18,7 @@ class LoadResultsMessage(RPCMessage):
         self._filePath = filePath
 
     @classmethod
-    @property
-    def procedure(cls) -> str:
+    def getProcedure(cls) -> str:
         return 'LoadResults'
 
     @classmethod

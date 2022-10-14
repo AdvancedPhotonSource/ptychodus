@@ -9,7 +9,8 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry, SettingsGroup
-from ..data import CropSizer, Detector
+from ..data import CropSizer
+from ..detector import Detector
 from .apparatus import Apparatus
 from .file import FileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
@@ -55,6 +56,9 @@ class ProbePresenter(Observable, Observer):
         presenter._syncFromSettings()
 
         return presenter
+
+    def isActiveProbeValid(self) -> bool:
+        return (self._probe.getProbeExtent() == self._sizer.getProbeExtent())
 
     def initializeProbe(self) -> None:
         initializer = self._initializerChooser.getCurrentStrategy()

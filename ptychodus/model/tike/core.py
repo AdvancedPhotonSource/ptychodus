@@ -5,14 +5,14 @@ import logging
 
 import numpy
 
-from ...api.data import DataFile
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
+from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
 from ..reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
-from .arrayConverter import TikeArrayConverter
 from ..scan import Scan, ScanInitializerFactory, ScanRepository
+from .arrayConverter import TikeArrayConverter
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionPresenter, TikePositionCorrectionSettings
 from .probeCorrection import TikeProbeCorrectionPresenter, TikeProbeCorrectionSettings
@@ -152,7 +152,7 @@ class TikeBackend:
     @classmethod
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
-                       dataFile: DataFile,
+                       diffractionDataset: ActiveDiffractionDataset,
                        scan: Scan,
                        probe: Probe,
                        apparatus: Apparatus,
@@ -171,7 +171,7 @@ class TikeBackend:
             from .reconstructor import RegularizedPIEReconstructor
             from .reconstructor import TikeReconstructor
         except ModuleNotFoundError:
-            logger.info('tike not found.')
+            logger.info('Tike not found.')
 
             if isDeveloperModeEnabled:
                 core.reconstructorList.append(NullReconstructor('rpie', 'Tike'))
@@ -180,8 +180,9 @@ class TikeBackend:
                 core.reconstructorList.append(NullReconstructor('lstsq_grad', 'Tike'))
                 core.reconstructorList.append(NullReconstructor('dm', 'Tike'))
         else:
-            arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_, dataFile,
-                                                scanInitializerFactory, scanRepository)
+            arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_,
+                                                diffractionDataset, scanInitializerFactory,
+                                                scanRepository)
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings, arrayConverter,

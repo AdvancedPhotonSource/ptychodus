@@ -22,7 +22,7 @@ def verifyAllArgumentsParsed(parser: argparse.ArgumentParser, argv: list[str]) -
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog=ptychodus.__name__.lower(),
-        description=f'{ptychodus.__name__} is a ptychography analysis front-end')
+        description=f'{ptychodus.__name__} is a ptychography analysis application')
     parser.add_argument('-b', '--batch', action='store_true', \
             help='run reconstruction non-interactively')
     parser.add_argument('-d', '--dev', action='store_true', help='run in developer mode')
@@ -46,6 +46,7 @@ def main() -> int:
     with ModelCore(modelArgs) as model:
         if parsedArgs.batch:
             verifyAllArgumentsParsed(parser, unparsedArgs)
+            model.batchModeSetupForFileBasedWorkflow()
             return model.batchModeReconstruct()
 
         # Unused PyQt5.Qt import prevents nonsense error message

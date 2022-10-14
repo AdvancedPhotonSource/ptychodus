@@ -2,13 +2,15 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QDoubleValidator, QPixmap, QWheelEvent
+from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QIcon, QPixmap, QWheelEvent
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
                              QFormLayout, QGraphicsPixmapItem, QGraphicsScene,
                              QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
-                             QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
-                             QSpinBox, QStyle, QVBoxLayout, QWidget)
+                             QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSpinBox, QToolButton,
+                             QVBoxLayout, QWidget)
+
+from . import resources
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
@@ -52,16 +54,14 @@ class ImageFileGroupBox(BottomTitledGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('File', parent)
-        self.saveButton = QPushButton()
+        self.saveButton = QToolButton()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageFileGroupBox:
         view = cls(parent)
 
-        pixmapi = getattr(QStyle, 'SP_DialogSaveButton')
-        saveIcon = view.style().standardIcon(pixmapi)
-        view.saveButton.setIcon(saveIcon)
-        view.saveButton.setMinimumSize(48, 48)
+        view.saveButton.setIcon(QIcon(':/icons/save'))
+        view.saveButton.setIconSize(QSize(32, 32))
         view.saveButton.setToolTip('Save Image')
 
         layout = QVBoxLayout()

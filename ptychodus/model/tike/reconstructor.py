@@ -1,3 +1,4 @@
+from importlib.metadata import version
 from typing import Union
 import logging
 import pprint
@@ -15,7 +16,6 @@ from .probeCorrection import TikeProbeCorrectionSettings
 from .settings import TikeSettings
 
 logger = logging.getLogger(__name__)
-logger.info(f'{tike.__name__} ({tike.__version__})')
 
 
 class TikeReconstructor:
@@ -32,6 +32,9 @@ class TikeReconstructor:
         self._probeCorrectionSettings = probeCorrectionSettings
         self._arrayConverter = arrayConverter
         self._reconstructorPlotPresenter = reconstructorPlotPresenter
+
+        tikeVersion = version('tike')
+        logger.info(f'\tTike {tikeVersion}')
 
     @property
     def backendName(self) -> str:

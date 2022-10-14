@@ -25,7 +25,7 @@ class CSVScanFileReader(ScanFileReader):
         pointList = list()
         minimumColumnCount = max(self._xcol, self._ycol) + 1
 
-        with open(filePath, newline='') as csvFile:
+        with filePath.open(newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
 
             for row in csvReader:
@@ -59,7 +59,7 @@ class CSVScanFileWriter(ScanFileWriter):
             className = type(self).__name__
             raise ValueError(f'{className} only supports single sequence scan files!')
 
-        with open(filePath, 'wt') as csvFile:
+        with filePath.open(mode='wt') as csvFile:
             for sequence in scanDict.values():
                 for point in sequence:
                     csvFile.write(f'{point.y},{point.x}\n')

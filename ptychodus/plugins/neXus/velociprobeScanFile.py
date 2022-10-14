@@ -4,13 +4,15 @@ from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
 from statistics import median
-from typing import Final
+from typing import Final, Optional
 import csv
-import math
 
-from .velociprobeDataFile import VelociprobeDataFileReader
+import numpy
+
+from .neXusDiffractionFile import EntryGroup
 from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
                                 ScanPointParseError, ScanPointSequence, SimpleScanDictionary)
+from ptychodus.api.plugins import PluginRegistry
 
 
 class VelociprobeScanFileColumn(IntEnum):
@@ -30,8 +32,9 @@ class VelociprobeScanPoint:
 class VelociprobeScanFileReader(ScanFileReader):
     EXPECTED_NUMBER_OF_COLUMNS: Final[int] = 8
 
-    def __init__(self, dataFileReader: VelociprobeDataFileReader) -> None:
-        self._dataFileReader = dataFileReader
+    def __init__(self) -> None:
+        # FIXME sync entry group when NeXus file loaded
+        self._entry: Optional[EntryGroup] = None
 
     @property
     def simpleName(self) -> str:
@@ -44,13 +47,14 @@ class VelociprobeScanFileReader(ScanFileReader):
     def _applyTransform(self, pointList: list[ScanPoint]) -> None:
         zero = Decimal()
         numberOfPoints = Decimal(len(pointList))
+        stageRotationCosine = Decimal(1)
 
         xMean = sum([point.x for point in pointList], start=zero) / numberOfPoints
         yMean = sum([point.y for point in pointList], start=zero) / numberOfPoints
 
-        stageRotationInRadians = self._dataFileReader.entry.sample.goniometer.chi_rad \
-                if self._dataFileReader.entry else 0.
-        stageRotationCosine = Decimal(math.cos(stageRotationInRadians))
+        if self._entry is not None:
+            stageRotationInRadians = self._entry.sample.goniometer.chi_rad
+            stageRotationCosine = Decimal(numpy.cos(stageRotationInRadians))
 
         for idx, point in enumerate(pointList):
             x = (point.x - xMean) * stageRotationCosine
@@ -62,7 +66,7 @@ class VelociprobeScanFileReader(ScanFileReader):
         liPointList: list[ScanPoint] = list()
         enPointList: list[ScanPoint] = list()
 
-        with open(filePath, newline='') as csvFile:
+        with filePath.open(newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
 
             for row in csvReader:

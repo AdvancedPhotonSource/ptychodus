@@ -1,9 +1,16 @@
 from __future__ import annotations
 from collections.abc import Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Generic, Iterable, Iterator, overload, TypeVar, Union
 
 T = TypeVar('T', int, float, Decimal)
+
+
+@dataclass(frozen=True)
+class Vector2D(Generic[T]):
+    x: T
+    y: T
 
 
 class Interval(Generic[T]):

@@ -12,6 +12,6 @@ class UniformRandomObjectInitializer:
 
     def __call__(self) -> ObjectArrayType:
         size = self._sizer.getObjectExtent().shape
-        magnitude = numpy.sqrt(self._rng.uniform(low=0., high=1., size=size))
+        magnitude = numpy.sqrt(self._rng.uniform(low=0., high=1e-6, size=size))
         phase = self._rng.uniform(low=0., high=2. * numpy.pi, size=size)
         return magnitude * numpy.exp(1.j * phase)

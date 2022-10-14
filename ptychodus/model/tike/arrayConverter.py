@@ -5,10 +5,11 @@ import logging
 import numpy
 import numpy.typing
 
-from ...api.data import DataArrayType, DataFile
+from ...api.data import DiffractionPatternData
 from ...api.object import ObjectArrayType
 from ...api.probe import ProbeArrayType
 from ...api.scan import ScanPoint
+from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus, Probe
 from ..scan import Scan, ScanInitializerFactory, ScanRepository
@@ -28,28 +29,35 @@ class TikeArrays:
 class TikeArrayConverter:
 
     def __init__(self, apparatus: Apparatus, scan: Scan, probe: Probe, object_: Object,
-                 dataFile: DataFile, scanInitializerFactory: ScanInitializerFactory,
+                 diffractionDataset: ActiveDiffractionDataset,
+                 scanInitializerFactory: ScanInitializerFactory,
                  scanRepository: ScanRepository) -> None:
         self._apparatus = apparatus
         self._scan = scan
         self._probe = probe
         self._object = object_
-        self._dataFile = dataFile
+        self._diffractionDataset = diffractionDataset
         self._scanInitializerFactory = scanInitializerFactory
         self._scanRepository = scanRepository
 
-    def getDiffractionData(self) -> DataArrayType:
-        data = self._dataFile.getDiffractionData()
+    def getDiffractionData(self) -> DiffractionPatternData:
+        data = self._diffractionDataset.getAssembledData()
         return numpy.fft.ifftshift(data, axes=(-2, -1))
 
     def exportToTike(self) -> TikeArrays:
+        assembledIndexes = self._diffractionDataset.getAssembledIndexes()
         pixelSizeXInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
         pixelSizeYInMeters = self._apparatus.getObjectPlanePixelSizeYInMeters()
 
         scanX: list[float] = list()
         scanY: list[float] = list()
 
-        for point in self._scan:
+        for index in assembledIndexes:
+            try:
+                point = self._scan[index]
+            except IndexError:
+                continue
+
             scanX.append(float(point.x / pixelSizeXInMeters))
             scanY.append(float(point.y / pixelSizeYInMeters))
 

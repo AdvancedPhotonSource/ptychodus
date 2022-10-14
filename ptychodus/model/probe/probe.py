@@ -3,6 +3,7 @@ import logging
 
 import numpy
 
+from ...api.image import ImageExtent
 from ...api.observer import Observable
 from ...api.probe import ProbeArrayType
 from .sizer import ProbeSizer
@@ -15,6 +16,9 @@ class Probe(Observable):
     def __init__(self, sizer: ProbeSizer) -> None:
         super().__init__()
         self._array = numpy.zeros((1, *sizer.getProbeExtent().shape), dtype=complex)
+
+    def getProbeExtent(self) -> ImageExtent:
+        return ImageExtent(width=self._array.shape[2], height=self._array.shape[1])
 
     def getNumberOfProbeModes(self) -> int:
         return self._array.shape[0]

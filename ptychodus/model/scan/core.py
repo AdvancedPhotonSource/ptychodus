@@ -43,6 +43,10 @@ class ScanPresenter(Observable, Observer):
     def getScanRepositoryContents(self) -> ItemsView[str, ScanInitializer]:
         return self._repository.items()
 
+    def isActiveScanValid(self) -> bool:
+        # TODO isActiveScanValid should require more than one common index with active dataset
+        return (len(self._scan) > 1)
+
     def getActiveScanPointList(self) -> list[ScanPoint]:
         return [point for point in self._scan]
 

@@ -40,7 +40,7 @@ class LynxScanFileReader(ScanFileReader):
         pointDict: dict[int, list[LynxScanPoint]] = defaultdict(list[LynxScanPoint])
         pointList: list[ScanPoint] = list()
 
-        with open(filePath, newline='') as csvFile:
+        with filePath.open(newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=' ')
             csvIterator = iter(csvReader)
 
@@ -75,7 +75,3 @@ class LynxScanFileReader(ScanFileReader):
             pointList.append(ScanPoint(x_m, y_m))
 
         return SimpleScanDictionary({self.simpleName: pointList})
-
-
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(LynxScanFileReader())

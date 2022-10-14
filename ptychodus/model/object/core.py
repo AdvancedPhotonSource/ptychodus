@@ -10,7 +10,8 @@ from ...api.object import (ObjectArrayType, ObjectFileReader, ObjectFileWriter,
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from ...api.settings import SettingsRegistry
-from ..data import CropSizer, Detector
+from ..data import CropSizer
+from ..detector import Detector
 from ..probe import Apparatus, ProbeSizer
 from ..scan import Scan
 from .file import FileObjectInitializer
@@ -25,13 +26,14 @@ logger = logging.getLogger(__name__)
 
 class ObjectPresenter(Observable, Observer):
 
-    def __init__(self, settings: ObjectSettings, apparatus: Apparatus, object_: Object,
-                 initializerChooser: PluginChooser[ObjectInitializerType],
+    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, apparatus: Apparatus,
+                 object_: Object, initializerChooser: PluginChooser[ObjectInitializerType],
                  fileReaderChooser: PluginChooser[ObjectFileReader],
                  fileWriterChooser: PluginChooser[ObjectFileWriter],
                  reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
+        self._sizer = sizer
         self._apparatus = apparatus
         self._object = object_
         self._initializerChooser = initializerChooser
@@ -40,15 +42,16 @@ class ObjectPresenter(Observable, Observer):
         self._reinitObservable = reinitObservable
 
     @classmethod
-    def createInstance(cls, settings: ObjectSettings, apparatus: Apparatus, object_: Object,
-                       initializerChooser: PluginChooser[ObjectInitializerType],
+    def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer, apparatus: Apparatus,
+                       object_: Object, initializerChooser: PluginChooser[ObjectInitializerType],
                        fileReaderChooser: PluginChooser[ObjectFileReader],
                        fileWriterChooser: PluginChooser[ObjectFileWriter],
                        reinitObservable: Observable) -> ObjectPresenter:
-        presenter = cls(settings, apparatus, object_, initializerChooser, fileReaderChooser,
+        presenter = cls(settings, sizer, apparatus, object_, initializerChooser, fileReaderChooser,
                         fileWriterChooser, reinitObservable)
 
         settings.addObserver(presenter)
+        sizer.addObserver(presenter)
         apparatus.addObserver(presenter)
         object_.addObserver(presenter)
         initializerChooser.addObserver(presenter)
@@ -58,6 +61,13 @@ class ObjectPresenter(Observable, Observer):
         presenter._syncFromSettings()
 
         return presenter
+
+    def isActiveObjectValid(self) -> bool:
+        actualExtent = self._object.getObjectExtent()
+        expectedExtent = self._sizer.getObjectExtent()
+        widthIsBigEnough = (actualExtent.width >= expectedExtent.width)
+        heightIsBigEnough = (actualExtent.height >= expectedExtent.height)
+        return (widthIsBigEnough and heightIsBigEnough)
 
     def initializeObject(self) -> None:
         initializer = self._initializerChooser.getCurrentStrategy()
@@ -126,6 +136,8 @@ class ObjectPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self._syncFromSettings()
+        elif observable is self._sizer:
+            self.notifyObservers()
         elif observable is self._apparatus:
             self.notifyObservers()
         elif observable is self._object:
@@ -166,7 +178,7 @@ class ObjectCore:
         self._initializerChooser = PluginChooser[ObjectInitializerType].createFromList(
             [self._filePlugin, self._uniformPlugin, self._urandPlugin])
 
-        self.presenter = ObjectPresenter.createInstance(self.settings, apparatus, self.object,
-                                                        self._initializerChooser,
+        self.presenter = ObjectPresenter.createInstance(self.settings, self.sizer, apparatus,
+                                                        self.object, self._initializerChooser,
                                                         fileReaderChooser, fileWriterChooser,
                                                         settingsRegistry)

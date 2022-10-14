@@ -48,6 +48,10 @@ class Scan(ScanPointSequence, Observable, Observer):
             logger.error(f'Failed to activate \"{name}\"!')
             return
 
+        if not initializer.canActivate:
+            logger.error(f'Failed to activate \"{name}\"!')
+            return
+
         self._initializer.removeObserver(self)
         self._initializer = initializer
         self._name = name

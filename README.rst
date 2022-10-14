@@ -1,7 +1,7 @@
 Ptychodus
 =========
 
-`ptychodus`_ is a ptychography analysis front-end that supports multiple reconstruction back-ends. Current reconstructor status:
+`ptychodus`_ is a ptychography analysis application that supports multiple reconstruction libraries. Current reconstructor status:
 
 * `tike`_ is working
 * `ptychopy`_ is under development
@@ -40,7 +40,7 @@ Standard Installation
        $ ptychodus -h
        usage: ptychodus [-h] [-b] [-d] [-f PREFIX] [-p PORT] [-s SETTINGS] [-v]
 
-       ptychodus is a ptychography analysis front-end
+       ptychodus is a ptychography analysis application
 
        optional arguments:
          -h, --help            show this help message and exit

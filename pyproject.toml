@@ -15,9 +15,14 @@ module = [
     "globus_automate_client.*",
     "h5py",
     "matplotlib.*",
+    "ptychonn.*",
+    "ptychopy",
+    "pvaccess",
+    "pvapy.*",
     "scipy.*",
     "skimage.*",
     "tifffile",
+    "tike.*",
     "watchdog.*",
 ]
 ignore_missing_imports = true

@@ -10,5 +10,5 @@ class UniformObjectInitializer:
         self._sizer = sizer
 
     def __call__(self) -> ObjectArrayType:
-        size = self._sizer.getObjectExtent().shape
-        return numpy.ones(size, dtype=complex)
+        shape = self._sizer.getObjectExtent().shape
+        return numpy.full(shape, 0.5, dtype=complex)
