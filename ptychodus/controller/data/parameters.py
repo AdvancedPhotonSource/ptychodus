@@ -4,6 +4,7 @@ from pathlib import Path
 from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import QFileDialog, QTableView, QTreeView, QWidget
 
+from ...api.settings import SettingsRegistry
 from ...model import (DiffractionDatasetPresenter, DiffractionPatternPresenter, MetadataPresenter,
                       Observable, Observer)
 from ...view import DataParametersView
@@ -18,10 +19,12 @@ from .tableModel import DataArrayTableModel
 
 class DataParametersController(Observer):
 
-    def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
+    def __init__(self, settingsRegistry: SettingsRegistry,
+                 datasetPresenter: DiffractionDatasetPresenter,
                  metadataPresenter: MetadataPresenter,
                  patternPresenter: DiffractionPatternPresenter, view: DataParametersView,
                  tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
+        self._settingsRegistry = settingsRegistry
         self._datasetPresenter = datasetPresenter
         self._view = view
         self._tableView = tableView
@@ -40,13 +43,15 @@ class DataParametersController(Observer):
                                                                    fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
+    def createInstance(cls, settingsRegistry: SettingsRegistry,
+                       datasetPresenter: DiffractionDatasetPresenter,
                        metadataPresenter: MetadataPresenter,
                        patternPresenter: DiffractionPatternPresenter, view: DataParametersView,
                        tableView: QTableView,
                        fileDialogFactory: FileDialogFactory) -> DataParametersController:
-        controller = cls(datasetPresenter, metadataPresenter, patternPresenter, view, tableView,
-                         fileDialogFactory)
+        controller = cls(settingsRegistry, datasetPresenter, metadataPresenter, patternPresenter,
+                         view, tableView, fileDialogFactory)
+        settingsRegistry.addObserver(controller)
         datasetPresenter.addObserver(controller)
 
         view.datasetPage.contentsView.treeView.setModel(controller._treeModel)
@@ -78,5 +83,8 @@ class DataParametersController(Observer):
         self._tableModel.setArray(array)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._datasetPresenter:
+        if observable is self._settingsRegistry:
+            self._datasetPresenter.startProcessingDiffractionPatterns()
+            self._view.setCurrentIndex(self._view.count() - 1)
+        elif observable is self._datasetPresenter:
             self._treeModel.setRootNode(self._datasetPresenter.getContentsTree())

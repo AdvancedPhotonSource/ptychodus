@@ -7,7 +7,6 @@ import numpy
 
 from pvapy.hpc.adImageProcessor import AdImageProcessor
 from pvapy.utility.floatWithUnits import FloatWithUnits
-from pvapy.utility.timeUtility import TimeUtility
 import pvaccess as pva
 
 import ptychodus

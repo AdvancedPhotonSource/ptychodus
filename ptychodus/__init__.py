@@ -3,7 +3,17 @@ from importlib.metadata import version, PackageNotFoundError
 try:
     __version__ = version('ptychodus')
 except PackageNotFoundError:
-    # package is not installed
     pass
 
-__all__ = ['api', 'model', 'view', 'controller']
+try:
+    from .ptychodusAdImageProcessor import PtychodusAdImageProcessor
+except ModuleNotFoundError:
+    pass
+
+__all__ = [
+    'api',
+    'model',
+    'view',
+    'controller',
+    'PtychodusAdImageProcessor',
+]

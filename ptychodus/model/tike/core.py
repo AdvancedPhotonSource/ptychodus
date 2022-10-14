@@ -171,7 +171,7 @@ class TikeBackend:
             from .reconstructor import RegularizedPIEReconstructor
             from .reconstructor import TikeReconstructor
         except ModuleNotFoundError:
-            logger.info('tike not found.')
+            logger.info('Tike not found.')
 
             if isDeveloperModeEnabled:
                 core.reconstructorList.append(NullReconstructor('rpie', 'Tike'))

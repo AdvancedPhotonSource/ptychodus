@@ -96,8 +96,9 @@ class ModelCore:
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
             self._scanCore.initializerFactory, self._scanCore.repository,
             self.reconstructorPlotPresenter, modelArgs.isDeveloperModeEnabled)
-        self.ptychonnBackend = PtychoNNBackend.createInstance(self.settingsRegistry,
-                                                              modelArgs.isDeveloperModeEnabled)
+        self.ptychonnBackend = PtychoNNBackend.createInstance(
+            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
+            self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
 
         self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.activeDataset,
                                                                   self._detectorSettings,
