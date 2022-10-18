@@ -6,9 +6,10 @@ import pprint
 import numpy
 import tike.ptycho
 
+from ...api.reconstructor import Reconstructor
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
-from ..reconstructor import Reconstructor, ReconstructorPlotPresenter
+from ..reconstructor import ReconstructorPlotPresenter
 from .arrayConverter import TikeArrays, TikeArrayConverter
 from .objectCorrection import TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionSettings
@@ -35,10 +36,6 @@ class TikeReconstructor:
 
         tikeVersion = version('tike')
         logger.info(f'\tTike {tikeVersion}')
-
-    @property
-    def backendName(self) -> str:
-        return 'Tike'
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings
@@ -160,10 +157,6 @@ class RegularizedPIEReconstructor(Reconstructor):
         return self._algorithmOptions.name
 
     @property
-    def backendName(self) -> str:
-        return self._tikeReconstructor.backendName
-
-    @property
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
@@ -184,10 +177,6 @@ class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
     @property
     def name(self) -> str:
         return self._algorithmOptions.name
-
-    @property
-    def backendName(self) -> str:
-        return self._tikeReconstructor.backendName
 
     @property
     def _settings(self) -> TikeSettings:
@@ -213,10 +202,6 @@ class ConjugateGradientReconstructor(Reconstructor):
         return self._algorithmOptions.name
 
     @property
-    def backendName(self) -> str:
-        return self._tikeReconstructor.backendName
-
-    @property
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
@@ -240,10 +225,6 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
         return self._algorithmOptions.name
 
     @property
-    def backendName(self) -> str:
-        return self._tikeReconstructor.backendName
-
-    @property
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
@@ -263,10 +244,6 @@ class DifferenceMapReconstructor(Reconstructor):
     @property
     def name(self) -> str:
         return self._algorithmOptions.name
-
-    @property
-    def backendName(self) -> str:
-        return self._tikeReconstructor.backendName
 
     @property
     def _settings(self) -> TikeSettings:

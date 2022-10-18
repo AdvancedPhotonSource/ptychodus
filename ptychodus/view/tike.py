@@ -11,7 +11,7 @@ from .widgets import DecimalLineEdit, DecimalSlider
 class TikeBasicParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Basic Parameters', parent)
+        super().__init__('Tike Parameters', parent)
         self.useMpiCheckBox = QCheckBox('Use MPI')
         self.numGpusLineEdit = QLineEdit()
         self.noiseModelComboBox = QComboBox()

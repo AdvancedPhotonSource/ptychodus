@@ -6,10 +6,10 @@ import numpy
 import ptychonn
 from ptychonn._model import ReconSmallPhaseModel, Tester
 
+from ...api.reconstructor import Reconstructor
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus
-from ..reconstructor import Reconstructor
 from ..scan import Scan
 from .settings import PtychoNNSettings
 
@@ -33,10 +33,6 @@ class PtychoNNReconstructor(Reconstructor):
     def name(self) -> str:
         return 'PtychoNN'
 
-    @property
-    def backendName(self) -> str:
-        return 'PtychoNN'
-
     def reconstruct(self) -> int:
         stitchedPixelWidthInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
         inferencePixelWidthInMeters = 0.  # FIXME
@@ -54,15 +50,15 @@ class PtychoNNReconstructor(Reconstructor):
             scanXInMeters.append(float(point.x))
             scanYInMeters.append(float(point.y))
 
-        # TODO swapXY? astype? use of float32 dtype in ptychonn?
-        scanInMeters = numpy.column_stack((scanXInMeters, scanYInMeters)).astype('float32')
+        # TODO swapXY?
+        scanInMeters = numpy.column_stack((scanYInMeters, scanXInMeters)).astype('float32')
 
         data = self._diffractionDataset.getAssembledData()
         # TODO resize data
 
         # Load best_model.pth
         tester = Tester(model=ReconSmallPhaseModel(),
-                        model_params_path=self._settings.modelParametersPath.value)
+                        model_params_path=self._settings.modelStateFilePath.value)
 
         # Predict
         tester.setTestData(data, batch_size=self._settings.batchSize.value)

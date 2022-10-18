@@ -92,10 +92,11 @@ class ReconstructorParametersController(Observer):
         probePresenter.addObserver(controller)
         objectPresenter.addObserver(controller)
 
-        for reconstructorName, backendName in presenter.getAlgorithmDict().items():
-            controller._addReconstructor(reconstructorName, backendName)
+        for name in presenter.getReconstructorList():
+            controller._addReconstructor(name)
 
-        view.reconstructorView.algorithmComboBox.currentTextChanged.connect(presenter.setAlgorithm)
+        view.reconstructorView.algorithmComboBox.currentTextChanged.connect(
+            presenter.setReconstructor)
         view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex)
 
@@ -111,9 +112,10 @@ class ReconstructorParametersController(Observer):
 
         return controller
 
-    def _addReconstructor(self, reconstructorName: str, backendName: str) -> None:
+    def _addReconstructor(self, name: str) -> None:
+        backendName, reconstructorName = name.split('/')  # FIXME REDO
         self._view.reconstructorView.algorithmComboBox.addItem(
-            reconstructorName, self._view.reconstructorView.algorithmComboBox.count())
+            name, self._view.reconstructorView.algorithmComboBox.count())
 
         if backendName in self._viewControllerFactoryDict:
             viewControllerFactory = self._viewControllerFactoryDict[backendName]
@@ -155,7 +157,7 @@ class ReconstructorParametersController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.reconstructorView.algorithmComboBox.setCurrentText(
-            self._presenter.getAlgorithm())
+            self._presenter.getReconstructor())
 
         isScanValid = self._scanPresenter.isActiveScanValid()
         isProbeValid = self._probePresenter.isActiveProbeValid()

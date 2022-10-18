@@ -7,6 +7,7 @@ from .data import DataParametersController, FileDialogFactory
 from .detector import (DatasetImageController, DatasetParametersController, DetectorController)
 from .object import ObjectImageController, ObjectParametersController
 from .probe import ProbeImageController, ProbeParametersController
+from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import ReconstructorParametersController, ReconstructorPlotController
 from .scan import ScanController
@@ -23,8 +24,11 @@ class ControllerCore:
 
         self._fileDialogFactory = FileDialogFactory()
 
-        self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(model.ptychopyBackend)
-        self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeBackend)
+        self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(
+            model.ptychopyReconstructorLibrary)
+        self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
+            model.ptychonnReconstructorLibrary)
+        self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
 
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
                                                                      view.settingsParametersView,
@@ -56,8 +60,10 @@ class ControllerCore:
             self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter, model.scanPresenter, model.probePresenter,
-            model.objectPresenter, view.reconstructorParametersView,
-            [self._ptychopyViewControllerFactory, self._tikeViewControllerFactory])
+            model.objectPresenter, view.reconstructorParametersView, [
+                self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory,
+                self._tikeViewControllerFactory
+            ])
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
             model.reconstructorPlotPresenter, view.reconstructorPlotView)
         self._workflowController = WorkflowController.createInstance(model.workflowPresenter,

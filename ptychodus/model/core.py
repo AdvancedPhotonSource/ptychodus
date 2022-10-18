@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from importlib.metadata import version
+from pathlib import Path
 from types import TracebackType
 from typing import overload, Optional
 import logging
@@ -20,13 +21,13 @@ from .image import *
 from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter
 from .probe import ProbeCore, ProbePresenter
-from .ptychonn import PtychoNNBackend
-from .ptychopy import PtychoPyBackend
-from .reconstructor import *
+from .ptychonn import PtychoNNReconstructorLibrary
+from .ptychopy import PtychoPyReconstructorLibrary
+from .reconstructor import ReconstructorCore, ReconstructorPresenter, ReconstructorPlotPresenter
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
-from .tike import TikeBackend
+from .tike import TikeReconstructorLibrary
 from .workflow import WorkflowCore, WorkflowPresenter
 
 logger = logging.getLogger(__name__)
@@ -85,33 +86,30 @@ class ModelCore:
                                       self._pluginRegistry.buildObjectFileReaderChooser(),
                                       self._pluginRegistry.buildObjectFileWriterChooser())
         self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
-
-        self._reconstructorSettings = ReconstructorSettings.createInstance(self.settingsRegistry)
-        self.reconstructorPlotPresenter = ReconstructorPlotPresenter()
-
-        self.ptychopyBackend = PtychoPyBackend.createInstance(self.settingsRegistry,
-                                                              modelArgs.isDeveloperModeEnabled)
-        self.tikeBackend = TikeBackend.createInstance(
-            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
-            self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
-            self._scanCore.initializerFactory, self._scanCore.repository,
-            self.reconstructorPlotPresenter, modelArgs.isDeveloperModeEnabled)
-        self.ptychonnBackend = PtychoNNBackend.createInstance(
-            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
-            self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
-
         self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.activeDataset,
                                                                   self._detectorSettings,
                                                                   self._dataCore.patternSettings,
                                                                   self._probeCore.settings,
                                                                   self._scanCore)
-        self._selectableReconstructor = SelectableReconstructor.createInstance(
-            self._reconstructorSettings, self.ptychopyBackend.reconstructorList +
-            self.tikeBackend.reconstructorList + self.ptychonnBackend.reconstructorList)
-        self.reconstructorPresenter = ReconstructorPresenter.createInstance(
-            self._reconstructorSettings, self._selectableReconstructor)
-
+        self._reconstructorCore = ReconstructorCore(self.settingsRegistry)
         self._workflowCore = WorkflowCore(self.settingsRegistry)
+
+        self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
+            self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
+        self._reconstructorCore.registerLibrary(self.ptychopyReconstructorLibrary)
+
+        self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
+            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
+            self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
+            self._scanCore.initializerFactory, self._scanCore.repository,
+            self._reconstructorCore.plotPresenter, modelArgs.isDeveloperModeEnabled)
+        self._reconstructorCore.registerLibrary(self.tikeReconstructorLibrary)
+
+        self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
+            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
+            self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
+        self._reconstructorCore.registerLibrary(self.ptychonnReconstructorLibrary)
+
         self.rpcMessageService: Optional[RPCMessageService] = None
 
         if modelArgs.rpcPort >= 0:
@@ -180,7 +178,7 @@ class ModelCore:
         self._dataCore.activeDataset.notifyObserversIfDatasetChanged()
 
     def batchModeReconstruct(self) -> int:
-        result = self.reconstructorPresenter.reconstruct()
+        result = self._reconstructorCore.presenter.reconstruct()
 
         pixelSizeXInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeXInMeters())
         pixelSizeYInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeYInMeters())
@@ -194,7 +192,7 @@ class ModelCore:
         dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
         dataDump['probe'] = self._probeCore.probe.getArray()
         dataDump['object'] = self._objectCore.object.getArray()
-        numpy.savez(self._reconstructorSettings.outputFilePath.value, **dataDump)
+        numpy.savez(self._reconstructorCore.settings.outputFilePath.value, **dataDump)
 
         return result
 
@@ -217,6 +215,14 @@ class ModelCore:
     @property
     def objectImagePresenter(self) -> ImagePresenter:
         return self._objectImageCore.presenter
+
+    @property
+    def reconstructorPresenter(self) -> ReconstructorPresenter:
+        return self._reconstructorCore.presenter
+
+    @property
+    def reconstructorPlotPresenter(self) -> ReconstructorPlotPresenter:
+        return self._reconstructorCore.plotPresenter
 
     @property
     def workflowPresenter(self) -> WorkflowPresenter:

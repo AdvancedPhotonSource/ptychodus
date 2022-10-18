@@ -49,9 +49,6 @@ def main() -> int:
             model.batchModeSetupForFileBasedWorkflow()
             return model.batchModeReconstruct()
 
-        # Unused PyQt5.Qt import prevents nonsense error message
-        from PyQt5 import Qt
-
         from PyQt5.QtWidgets import QApplication
         # QApplication expects the first argument to be the program name
         app = QApplication(sys.argv[:1] + unparsedArgs)

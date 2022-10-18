@@ -3,8 +3,7 @@ from pathlib import Path
 from typing import Optional
 import logging
 
-from PyQt5.Qt import PYQT_VERSION_STR
-from PyQt5.QtCore import QSize, QT_VERSION_STR, Qt
+from PyQt5.QtCore import PYQT_VERSION_STR, QSize, QT_VERSION_STR, Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu,
                              QSplitter, QTableView, QToolBar, QToolButton, QTreeView)

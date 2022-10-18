@@ -10,8 +10,10 @@ class PtychoNNSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.modelParametersPath = settingsGroup.createPathEntry('ModelParametersPath',
-                                                                 Path('/dev/null'))
+        self.modelInputSize = settingsGroup.createIntegerEntry('ModelInputSize', 128)
+        self.modelOutputSize = settingsGroup.createIntegerEntry('ModelOutputSize', 128)
+        self.modelStateFilePath = settingsGroup.createPathEntry('ModelStateFilePath',
+                                                                Path('/dev/null'))
         self.batchSize = settingsGroup.createIntegerEntry('BatchSize', 1)
 
     @classmethod

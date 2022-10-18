@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Final
+from typing import Final, Iterator
 import logging
 
 try:
@@ -9,8 +9,8 @@ except ModuleNotFoundError:
     ptychopy = None
 
 from ..api.observer import Observable, Observer
+from ..api.reconstructor import Reconstructor, ReconstructorLibrary
 from ..api.settings import SettingsRegistry, SettingsGroup
-from .reconstructor import Reconstructor
 
 logger = logging.getLogger(__name__)
 
@@ -330,10 +330,6 @@ class ExtendedPIEReconstructor(Reconstructor):
     def name(self) -> str:
         return 'ePIE'
 
-    @property
-    def backendName(self) -> str:
-        return 'PtychoPy'
-
     def reconstruct(self) -> int:
         return 0  # TODO
 
@@ -358,10 +354,6 @@ class DifferenceMapReconstructor(Reconstructor):
     def name(self) -> str:
         return 'DM'
 
-    @property
-    def backendName(self) -> str:
-        return 'PtychoPy'
-
     def reconstruct(self) -> int:
         return 0  # TODO
 
@@ -376,10 +368,6 @@ class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
     @property
     def name(self) -> str:
         return 'MLs'
-
-    @property
-    def backendName(self) -> str:
-        return 'PtychoPy'
 
     def reconstruct(self) -> int:
         return 0  # TODO
@@ -402,9 +390,10 @@ class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
 # TODO probeNP
 
 
-class PtychoPyBackend:
+class PtychoPyReconstructorLibrary(ReconstructorLibrary):
 
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
+        super().__init__()
         self._settings = PtychoPySettings.createInstance(settingsRegistry)
         self.presenter = PtychoPyPresenter.createInstance(self._settings)
         self.reconstructorList: list[Reconstructor] = list()
@@ -412,7 +401,7 @@ class PtychoPyBackend:
     @classmethod
     def createInstance(cls,
                        settingsRegistry: SettingsRegistry,
-                       isDeveloperModeEnabled: bool = False) -> PtychoPyBackend:
+                       isDeveloperModeEnabled: bool = False) -> PtychoPyReconstructorLibrary:
         core = cls(settingsRegistry)
 
         if ptychopy or isDeveloperModeEnabled:
@@ -423,3 +412,10 @@ class PtychoPyBackend:
             logger.info('ptychopy not found.')
 
         return core
+
+    @property
+    def name(self) -> str:
+        return 'PtychoPy'
+
+    def __iter__(self) -> Iterator[Reconstructor]:
+        return iter(self.reconstructorList)

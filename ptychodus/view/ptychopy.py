@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QCheckBox, QFormLayout, QGroupBox, QSpinBox, QVBoxLa
 class PtychoPyBasicView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Basic Parameters', parent)
+        super().__init__('PtychoPy Parameters', parent)
         self.probeModesSpinBox = QSpinBox()
         self.thresholdSpinBox = QSpinBox()
         self.iterationLimitSpinBox = QSpinBox()
