@@ -125,7 +125,13 @@ Basic RPC Demonstration
 Streaming Demonstration
 -----------------------
 
-1) In terminal 1:
+* To install the `PvaPy`_ backend:
+
+.. code-block:: shell
+
+   $ conda install -n ptychodus -c apsu pvapy
+
+* In terminal 1:
 
 .. code-block:: shell
 
@@ -139,7 +145,7 @@ Streaming Demonstration
        --report-period 10 \
        --log-level debug
 
-2) In terminal 2:
+* In terminal 2:
 
 .. code-block:: shell
 
@@ -155,7 +161,7 @@ Streaming Demonstration
    # start area detector sim server
    $ pvapy-ad-sim-server -cn pvapy:image -if /path/to/fly001.npy -rt 120 -fps 1000
 
-At the end of the demo,
+* At the end of the demo,
 
 .. code-block:: shell
 
@@ -164,7 +170,7 @@ At the end of the demo,
 
 
 Reporting bugs
---------------
+-------------
 
 Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
 
@@ -172,3 +178,4 @@ Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
 .. _`tike`: https://github.com/tomography/tike
 .. _`ptychopy`: https://github.com/AdvancedPhotonSource/ptychopy
 .. _`PtychoNN`: https://github.com/mcherukara/PtychoNN
+.. _`PvaPy`: https://github.com/epics-base/pvaPy
