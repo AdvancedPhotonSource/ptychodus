@@ -69,10 +69,11 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         if nx is None:
             self.logger.debug(f'Frame id {frameId} contains an empty image.')
         else:
+            image3d = image[numpy.newaxis, :, :].copy()
             array = ptychodus.api.data.SimpleDiffractionPatternArray(
                 label=f'Frame{frameId}',
                 index=frameId,
-                data=image,
+                data=image3d,
                 state=ptychodus.api.data.DiffractionPatternState.LOADED,
             )
             self._ptychodus.assembleDiffractionPattern(array)
