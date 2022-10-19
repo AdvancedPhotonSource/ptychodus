@@ -125,35 +125,40 @@ Basic RPC Demonstration
 Streaming Demonstration
 -----------------------
 
-Terminal 1
+1) In terminal 1:
 
-pvapy-hpc-consumer \
+```sh
+$ pvapy-hpc-consumer \
     --input-channel pvapy:image \
     --control-channel consumer:*:control \
     --status-channel consumer:*:status \
     --output-channel consumer:*:output \
     --processor-class ptychodus.PtychodusAdImageProcessor \
-    --processor-args '{ "settingsFilePath": "/home/beams/SHENKE/Ptychography/ptychodus/ptychodus.ini", "reconstructFrameId": 10300 }' \
+    --processor-args '{ "settingsFilePath": "/path/to/ptychodus.ini", "reconstructFrameId": 1000 }' \
     --report-period 10 \
     --log-level debug
+```
 
-Terminal 2
+2) In terminal 2:
 
+```sh
 # application status
-pvget consumer:1:status
+$ pvget consumer:1:status
 
 # configure application
-pvput consumer:1:control '{"command" : "configure", "args" : "{\"nPatternsTotal\":10400}"}'
+$ pvput consumer:1:control '{"command" : "configure", "args" : "{\"nPatternsTotal\": 1000}"}'
 
 # get last command status
-pvget consumer:1:control
+$ pvget consumer:1:control
 
-# $ pvapy-ad-sim-server -cn pvapy:image -nx 128 -ny 128 -dt uint8 -rt 60 -fps 10
-pvapy-ad-sim-server -cn pvapy:image -if /home/beams/SHENKE/Ptychography/ptychodus/fly001.npy -rt 120 -fps 1000
-
+# start area detector sim server
+$ pvapy-ad-sim-server -cn pvapy:image -if /path/to/fly001.npy -rt 120 -fps 1000
+```
+At the end of the demo,
+```sh
 # shutdown consumer process
 pvput consumer:1:control '{"command" : "stop"}'
-
+```
 
 Reporting bugs
 --------------
