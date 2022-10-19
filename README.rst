@@ -121,8 +121,56 @@ Basic RPC Demonstration
 
    $ ptychodus-rpc -p 9999 -m '{"procedure": "LoadResults", "filePath": "/path/to/results.npz"}'
 
+
+Streaming Demonstration
+-----------------------
+
+* To install the `PvaPy`_ backend:
+
+.. code-block:: shell
+
+   $ conda install -n ptychodus -c apsu pvapy
+
+* In terminal 1:
+
+.. code-block:: shell
+
+   $ pvapy-hpc-consumer \
+       --input-channel pvapy:image \
+       --control-channel consumer:*:control \
+       --status-channel consumer:*:status \
+       --output-channel consumer:*:output \
+       --processor-class ptychodus.PtychodusAdImageProcessor \
+       --processor-args '{ "settingsFilePath": "/path/to/ptychodus.ini", "reconstructFrameId": 1000 }' \
+       --report-period 10 \
+       --log-level debug
+
+* In terminal 2:
+
+.. code-block:: shell
+
+   # application status
+   $ pvget consumer:1:status
+
+   # configure application
+   $ pvput consumer:1:control '{"command" : "configure", "args" : "{\"nPatternsTotal\": 1000}"}'
+
+   # get last command status
+   $ pvget consumer:1:control
+
+   # start area detector sim server
+   $ pvapy-ad-sim-server -cn pvapy:image -if /path/to/fly001.npy -rt 120 -fps 1000
+
+* At the end of the demo,
+
+.. code-block:: shell
+
+   # shutdown consumer process
+   pvput consumer:1:control '{"command" : "stop"}'
+
+
 Reporting bugs
---------------
+-------------
 
 Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
 
@@ -130,3 +178,4 @@ Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
 .. _`tike`: https://github.com/tomography/tike
 .. _`ptychopy`: https://github.com/AdvancedPhotonSource/ptychopy
 .. _`PtychoNN`: https://github.com/mcherukara/PtychoNN
+.. _`PvaPy`: https://github.com/epics-base/pvaPy

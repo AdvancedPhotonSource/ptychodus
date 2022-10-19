@@ -68,7 +68,7 @@ class TikeArrayConverter:
         shiftX = padX - min(scanX)
         shiftY = padY - min(scanY)
 
-        for n in range(len(self._scan)):
+        for n in range(len(scanX)):
             scanX[n] += shiftX
             scanY[n] += shiftY
 
