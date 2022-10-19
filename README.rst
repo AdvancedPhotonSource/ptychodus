@@ -127,7 +127,7 @@ Streaming Demonstration
 
 1) In terminal 1:
 
-```sh
+'''sh
 $ pvapy-hpc-consumer \
     --input-channel pvapy:image \
     --control-channel consumer:*:control \
@@ -137,11 +137,11 @@ $ pvapy-hpc-consumer \
     --processor-args '{ "settingsFilePath": "/path/to/ptychodus.ini", "reconstructFrameId": 1000 }' \
     --report-period 10 \
     --log-level debug
-```
+'''
 
 2) In terminal 2:
 
-```sh
+'''sh
 # application status
 $ pvget consumer:1:status
 
@@ -153,12 +153,12 @@ $ pvget consumer:1:control
 
 # start area detector sim server
 $ pvapy-ad-sim-server -cn pvapy:image -if /path/to/fly001.npy -rt 120 -fps 1000
-```
+'''
 At the end of the demo,
-```sh
+'''sh
 # shutdown consumer process
 pvput consumer:1:control '{"command" : "stop"}'
-```
+'''
 
 Reporting bugs
 --------------
