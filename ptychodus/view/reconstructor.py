@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGridLayout, QGroupBox, QLabel, QPushButton,
-                             QScrollArea, QStackedWidget, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QLabel, QPushButton, QScrollArea,
+                             QStackedWidget, QVBoxLayout, QWidget)
 
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvas

@@ -30,10 +30,10 @@ class PtychoNNPresenter(Observable, Observer):
         settings.addObserver(presenter)
         return presenter
 
-    def getFileFilterList(self) -> list[str]:
+    def getModelStateFileFilterList(self) -> list[str]:
         return self._fileFilterList
 
-    def getFileFilter(self) -> str:
+    def getModelStateFileFilter(self) -> str:
         return self._fileFilterList[0]
 
     def getModelStateFilePath(self) -> Path:

@@ -9,9 +9,9 @@ class PtychoNNBasicParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('PtychoNN Parameters', parent)
-        self.weightsLabel = QLabel('Weights:')
-        self.weightsLineEdit = QLineEdit()
-        self.weightsBrowseButton = QPushButton('Browse')
+        self.modelStateLabel = QLabel('Model State:')
+        self.modelStateLineEdit = QLineEdit()
+        self.modelStateBrowseButton = QPushButton('Browse')
         self.batchSizeLabel = QLabel('Batch Size:')
         self.batchSizeSpinBox = QSpinBox()
 
@@ -20,9 +20,9 @@ class PtychoNNBasicParametersView(QGroupBox):
         view = cls(parent)
 
         layout = QGridLayout()
-        layout.addWidget(view.weightsLabel, 0, 0)
-        layout.addWidget(view.weightsLineEdit, 0, 1)
-        layout.addWidget(view.weightsBrowseButton, 0, 2)
+        layout.addWidget(view.modelStateLabel, 0, 0)
+        layout.addWidget(view.modelStateLineEdit, 0, 1)
+        layout.addWidget(view.modelStateBrowseButton, 0, 2)
         layout.addWidget(view.batchSizeLabel, 1, 0)
         layout.addWidget(view.batchSizeSpinBox, 1, 1, 1, 2)
         layout.setColumnStretch(1, 1)

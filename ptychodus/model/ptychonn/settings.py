@@ -13,8 +13,8 @@ class PtychoNNSettings(Observable, Observer):
         self.modelInputSize = settingsGroup.createIntegerEntry('ModelInputSize', 128)
         self.modelOutputSize = settingsGroup.createIntegerEntry('ModelOutputSize', 128)
         self.modelStateFilePath = settingsGroup.createPathEntry('ModelStateFilePath',
-                                                                Path('/dev/null'))
-        self.batchSize = settingsGroup.createIntegerEntry('BatchSize', 1)
+                                                                Path('/path/to/best_model.pth'))
+        self.batchSize = settingsGroup.createIntegerEntry('BatchSize', 10)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoNNSettings:

@@ -113,7 +113,7 @@ class ReconstructorParametersController(Observer):
         return controller
 
     def _addReconstructor(self, name: str) -> None:
-        backendName, reconstructorName = name.split('/')  # FIXME REDO
+        backendName, reconstructorName = name.split('/')  # TODO REDO
         self._view.reconstructorView.algorithmComboBox.addItem(
             name, self._view.reconstructorView.algorithmComboBox.count())
 
