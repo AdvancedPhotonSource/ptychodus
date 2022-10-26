@@ -11,7 +11,6 @@ from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
-from ..reconstructor import ReconstructorPlotPresenter
 from ..scan import Scan, ScanInitializerFactory, ScanRepository
 from .arrayConverter import TikeArrayConverter
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
@@ -161,7 +160,6 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                        object_: Object,
                        scanInitializerFactory: ScanInitializerFactory,
                        scanRepository: ScanRepository,
-                       reconstructorPlotPresenter: ReconstructorPlotPresenter,
                        isDeveloperModeEnabled: bool = False) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
 
@@ -187,8 +185,7 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                                                 scanRepository)
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
-                                                  core._probeCorrectionSettings, arrayConverter,
-                                                  reconstructorPlotPresenter)
+                                                  core._probeCorrectionSettings, arrayConverter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

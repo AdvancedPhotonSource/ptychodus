@@ -91,24 +91,27 @@ class ModelCore:
                                                                   self._dataCore.patternSettings,
                                                                   self._probeCore.settings,
                                                                   self._scanCore)
-        self._reconstructorCore = ReconstructorCore(self.settingsRegistry)
-        self._workflowCore = WorkflowCore(self.settingsRegistry)
-
-        self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
-            self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
-        self._reconstructorCore.registerLibrary(self.ptychopyReconstructorLibrary)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
             self._scanCore.initializerFactory, self._scanCore.repository,
-            self._reconstructorCore.plotPresenter, modelArgs.isDeveloperModeEnabled)
-        self._reconstructorCore.registerLibrary(self.tikeReconstructorLibrary)
-
+            modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
             self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
-        self._reconstructorCore.registerLibrary(self.ptychonnReconstructorLibrary)
+        self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
+            self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
+        self._reconstructorCore = ReconstructorCore(
+            self.settingsRegistry,
+            [
+                self.ptychopyReconstructorLibrary,
+                self.tikeReconstructorLibrary,
+                self.ptychonnReconstructorLibrary,
+            ],
+        )
+
+        self._workflowCore = WorkflowCore(self.settingsRegistry)
 
         self.rpcMessageService: Optional[RPCMessageService] = None
 

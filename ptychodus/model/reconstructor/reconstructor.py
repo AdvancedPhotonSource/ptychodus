@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Mapping
-from typing import Iterator
+from typing import Iterable, Iterator
 import logging
 
 from ...api.observer import Observable, Observer
@@ -16,6 +16,15 @@ class ReconstructorRepository(Mapping[str, Reconstructor], Observable):
     def __init__(self) -> None:
         super().__init__()
         self._reconstructorDict: dict[str, Reconstructor] = dict()
+
+    @classmethod
+    def createInstance(cls, libraries: Iterable[ReconstructorLibrary]) -> ReconstructorRepository:
+        repository = cls()
+
+        for library in libraries:
+            repository.registerLibrary(library)
+
+        return repository
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._reconstructorDict)

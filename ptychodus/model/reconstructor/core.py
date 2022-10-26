@@ -92,14 +92,12 @@ class ReconstructorPlotPresenter(Observable):
 
 class ReconstructorCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry,
+                 libraryList: list[ReconstructorLibrary]) -> None:
         self.settings = ReconstructorSettings.createInstance(settingsRegistry)
-        self._repository = ReconstructorRepository()
+        self._repository = ReconstructorRepository.createInstance(libraryList)
         self._activeReconstructor = ActiveReconstructor.createInstance(
             self.settings, self._repository)
         self.presenter = ReconstructorPresenter.createInstance(self.settings, self._repository,
                                                                self._activeReconstructor)
         self.plotPresenter = ReconstructorPlotPresenter()
-
-    def registerLibrary(self, library: ReconstructorLibrary) -> None:
-        self._repository.registerLibrary(library)

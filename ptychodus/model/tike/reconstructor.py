@@ -9,7 +9,6 @@ import tike.ptycho
 from ...api.reconstructor import Reconstructor
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
-from ..reconstructor import ReconstructorPlotPresenter
 from .arrayConverter import TikeArrays, TikeArrayConverter
 from .objectCorrection import TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionSettings
@@ -25,14 +24,12 @@ class TikeReconstructor:
                  objectCorrectionSettings: TikeObjectCorrectionSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings,
-                 arrayConverter: TikeArrayConverter,
-                 reconstructorPlotPresenter: ReconstructorPlotPresenter) -> None:
+                 arrayConverter: TikeArrayConverter) -> None:
         self._settings = settings
         self._objectCorrectionSettings = objectCorrectionSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
         self._arrayConverter = arrayConverter
-        self._reconstructorPlotPresenter = reconstructorPlotPresenter
 
         tikeVersion = version('tike')
         logger.info(f'\tTike {tikeVersion}')
@@ -140,7 +137,7 @@ class TikeReconstructor:
 
         outputArrays = TikeArrays(scan=result.scan, probe=result.probe, object_=result.psi)
         self._arrayConverter.importFromTike(outputArrays)
-        self._reconstructorPlotPresenter.setEnumeratedYValues(result.algorithm_options.costs)
+        # FIXME self._reconstructorPlotPresenter.setEnumeratedYValues(result.algorithm_options.costs)
 
         return 0
 

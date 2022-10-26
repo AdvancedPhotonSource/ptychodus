@@ -34,9 +34,6 @@ class PtychoNNReconstructor(Reconstructor):
         return 'PtychoNN'
 
     def reconstruct(self) -> int:
-        stitchedPixelWidthInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
-        inferencePixelWidthInMeters = 0.  # FIXME
-
         assembledIndexes = self._diffractionDataset.getAssembledIndexes()
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
@@ -50,11 +47,23 @@ class PtychoNNReconstructor(Reconstructor):
             scanXInMeters.append(float(point.x))
             scanYInMeters.append(float(point.y))
 
-        # TODO swapXY?
         scanInMeters = numpy.column_stack((scanYInMeters, scanXInMeters)).astype('float32')
 
         data = self._diffractionDataset.getAssembledData()
-        # TODO resize data
+        dataSize = data.shape[-1]
+
+        if dataSize != data.shape[-2]:
+            raise ValueError('PtychoNN expects square diffraction data!')
+
+        isDataSizePow2 = (dataSize & (dataSize - 1) and dataSize > 0)
+
+        if not isDataSizePow2:
+            raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
+
+        binnedData = data  # FIXME data binning
+
+        stitchedPixelWidthInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
+        inferencePixelWidthInMeters = stitchedPixelWidthInMeters * dataSize / binnedData.shape[-1]
 
         # Load best_model.pth
         tester = Tester(model=ReconSmallPhaseModel(),
@@ -66,8 +75,8 @@ class PtychoNNReconstructor(Reconstructor):
 
         # Stitch
         stitched = ptychonn.stitch_from_inference(inferences, scanInMeters,
-                                                  stitchedPixelWidthInMeters,
-                                                  inferencePixelWidthInMeters)
+                                                  float(stitchedPixelWidthInMeters),
+                                                  float(inferencePixelWidthInMeters))
         self._object.setArray(stitched)
 
         return 0
