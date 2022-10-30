@@ -7,14 +7,7 @@ import logging
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from .settings import WorkflowSettings
-from .client import WorkflowRun
-
-try:
-    from .globusClient import GlobusWorkflowClient as WorkflowClient
-    from .globusClient import GlobusWorkflowClientBuilder as WorkflowClientBuilder
-except ModuleNotFoundError:
-    from .client import WorkflowClient
-    from .client import WorkflowClientBuilder
+from .client import WorkflowClient, WorkflowClientBuilder, WorkflowRun
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +17,13 @@ class WorkflowPresenter(Observable, Observer):
     def __init__(self, settings: WorkflowSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._clientBuilder = WorkflowClientBuilder(settings)
+
+        try:
+            from .globusClient import GlobusWorkflowClientBuilder
+            self._clientBuilder: WorkflowClientBuilder = GlobusWorkflowClientBuilder(settings)
+        except ModuleNotFoundError:
+            self._clientBuilder = WorkflowClientBuilder()
+
         self._client: Optional[WorkflowClient] = None
 
     @classmethod

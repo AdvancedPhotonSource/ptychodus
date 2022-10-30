@@ -28,9 +28,6 @@ class WorkflowClient:
 
 class WorkflowClientBuilder:
 
-    def __init__(self, settings: WorkflowSettings) -> None:
-        self._settings = settings
-
     def getAuthorizeURL(self) -> str:
         return str()
 

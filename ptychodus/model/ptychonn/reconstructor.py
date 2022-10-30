@@ -60,10 +60,18 @@ class PtychoNNReconstructor(Reconstructor):
         if not isDataSizePow2:
             raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
 
-        binnedData = data  # FIXME data binning
+        # Bin diffraction data
+        inputSize = self._settings.modelInputSize.value
+        binnedData = numpy.zeros((data.shape[0], inputSize, inputSize))
+        binSize = dataSize // inputSize
+
+        for i in range(inputSize):
+            for j in range(inputSize):
+                binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
+                                                     binSize * j:binSize * (j + 1)])
 
         stitchedPixelWidthInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
-        inferencePixelWidthInMeters = stitchedPixelWidthInMeters * dataSize / binnedData.shape[-1]
+        inferencePixelWidthInMeters = stitchedPixelWidthInMeters * binSize
 
         # Load best_model.pth
         tester = Tester(model=ReconSmallPhaseModel(),

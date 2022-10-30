@@ -227,6 +227,28 @@ class ActiveDiffractionDataset(DiffractionDataset):
         indexes = self.getAssembledIndexes()
         return self._arrayData[indexes]
 
+    def setAssembledData(self, arrayData: DiffractionPatternData) -> None:
+        metadata = DiffractionMetadata(
+            numberOfPatternsPerArray=arrayData.shape[0],
+            numberOfPatternsTotal=arrayData.shape[0],
+            patternDataType=arrayData.dtype,
+        )
+
+        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+
+        arrayList: list[DiffractionPatternArray] = [
+            SimpleDiffractionPatternArray(
+                label='Restart',
+                index=0,
+                data=arrayData,
+                state=DiffractionPatternState.LOADED,
+            ),
+        ]
+
+        dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+        self.switchTo(dataset)
+        self.start(block=True)
+
     def notifyObserversIfDatasetChanged(self) -> None:
         if self._changedEvent.is_set():
             self.notifyObservers()

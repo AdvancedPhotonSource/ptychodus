@@ -1,11 +1,11 @@
 from collections.abc import Mapping
 from importlib.metadata import version
 from pathlib import Path
+from pprint import pformat, pprint
 from typing import Any, Final, Optional
 from uuid import UUID
 import json
 import logging
-import pprint
 import sys
 
 from gladier import GladierBaseClient, GladierBaseTool, generate_flow_definition
@@ -150,7 +150,8 @@ class GlobusWorkflowClient(WorkflowClient):
 class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
 
     def __init__(self, settings: WorkflowSettings) -> None:
-        super().__init__(settings)
+        super().__init__()
+        self._settings = settings
         self._authClient: Optional[NativeAppAuthClient] = None
 
     def getAuthorizeURL(self) -> str:
@@ -173,7 +174,7 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
             f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
         ]
 
-        logger.debug('Requested Scopes: {pprint.pformat(requestedScopes)}')
+        logger.debug('Requested Scopes: {pformat(requestedScopes)}')
 
         self._authClient.oauth2_start_flow(requested_scopes=requestedScopes, refresh_tokens=True)
         return self._authClient.oauth2_get_authorize_url()
@@ -197,7 +198,7 @@ class GlobusWorkflowClientBuilder(WorkflowClientBuilder):
             for scope in tokenData['scope'].split():
                 authorizerDict[scope] = authorizer
 
-        logger.debug('Authorizers: {pprint.pformat(authorizerDict)}')
+        logger.debug('Authorizers: {pformat(authorizerDict)}')
 
         return GlobusWorkflowClient(self._settings, authorizerDict)
 
@@ -207,6 +208,8 @@ def main() -> int:
 
     flow_id = client.get_flow_id()
     print(f'Flow ID: {flow_id}')
+
+    pprint(client.flow_definition)
 
     print('FuncX IDs:')
     funcx_ids = client.get_funcx_function_ids()

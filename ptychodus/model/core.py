@@ -49,6 +49,7 @@ def configureLogger() -> None:
 
 @dataclass(frozen=True)
 class ModelArgs:
+    restartFilePath: Optional[Path]
     settingsFilePath: Optional[Path]
     replacementPathPrefix: Optional[str]
     rpcPort: int = -1
@@ -86,19 +87,19 @@ class ModelCore:
                                       self._pluginRegistry.buildObjectFileReaderChooser(),
                                       self._pluginRegistry.buildObjectFileWriterChooser())
         self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
-        self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.activeDataset,
+        self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.dataset,
                                                                   self._detectorSettings,
                                                                   self._dataCore.patternSettings,
                                                                   self._probeCore.settings,
                                                                   self._scanCore)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
+            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
             self._scanCore.initializerFactory, self._scanCore.repository,
             modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._dataCore.activeDataset, self._scanCore.scan,
+            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
@@ -178,7 +179,25 @@ class ModelCore:
         return self.diffractionDatasetPresenter.getAssemblyQueueSize()
 
     def refreshActiveDataset(self) -> None:
-        self._dataCore.activeDataset.notifyObserversIfDatasetChanged()
+        self._dataCore.dataset.notifyObserversIfDatasetChanged()
+
+    def saveRestartFile(self, filePath: Path) -> None:
+        restartData = {
+            'data': self._dataCore.dataset.getAssembledData(),
+            'scanInMeters': self._scanCore.scan.getArray(),  # FIXME
+            'probe': self._probeCore.probe.getArray(),
+            'object': self._objectCore.object.getArray(),
+        }
+
+        numpy.savez(filePath, **restartData)
+
+    def openRestartFile(self, filePath: Path) -> None:
+        restartData = numpy.load(filePath)
+
+        self._dataCore.dataset.setAssembledData(restartData['data'])
+        self._scanCore.scan.setArray(restartData['scanInMeters'])  # FIXME
+        self._probeCore.probe.setArray(restartData['probe'])
+        self._objectCore.object.setArray(restartData['object'])
 
     def batchModeReconstruct(self) -> int:
         result = self._reconstructorCore.presenter.reconstruct()

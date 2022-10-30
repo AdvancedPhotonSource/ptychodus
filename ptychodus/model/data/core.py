@@ -236,19 +236,19 @@ class DataCore:
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
             self.patternSettings, self.cropSizer)
 
-        self.activeDataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
-                                                      self.cropSizer)
+        self.dataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
+                                                self.cropSizer)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(
-            self._datasetSettings, self.activeDataset)
+            self._datasetSettings, self.dataset)
 
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._datasetSettings, self.activeDataset, fileReaderChooser)
+            self._datasetSettings, self.dataset, fileReaderChooser)
         self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
-            self.activeDataset)
+            self.dataset)
 
     def start(self) -> None:
         self._dataDirectoryWatcher.start()
 
     def stop(self) -> None:
         self._dataDirectoryWatcher.stop()
-        self.activeDataset.stop()
+        self.dataset.stop()

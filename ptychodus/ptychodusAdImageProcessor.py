@@ -23,6 +23,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         from ptychodus.model import ModelArgs, ModelCore
 
         modelArgs = ModelArgs(
+            restartFilePath=None,
             settingsFilePath=Path(settingsFilePath) if settingsFilePath else None,
             replacementPathPrefix=configDict.get('replacementPathPrefix'),
             rpcPort=-1,
