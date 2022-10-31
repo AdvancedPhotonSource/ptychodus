@@ -59,11 +59,17 @@ class ControllerCore:
             model.patternPresenter, view.dataParametersView, view.dataTableView,
             self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
-            model.reconstructorPresenter, model.scanPresenter, model.probePresenter,
-            model.objectPresenter, view.reconstructorParametersView, [
+            model.reconstructorPresenter,
+            model.reconstructorPlotPresenter,
+            model.scanPresenter,
+            model.probePresenter,
+            model.objectPresenter,
+            view.reconstructorParametersView,
+            [
                 self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory,
                 self._tikeViewControllerFactory
-            ])
+            ],
+        )
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
             model.reconstructorPlotPresenter, view.reconstructorPlotView)
         self._workflowController = WorkflowController.createInstance(model.workflowPresenter,

@@ -5,7 +5,8 @@ import logging
 
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginEntry
-from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
+from ...api.reconstructor import (NullReconstructor, ReconstructResult, Reconstructor,
+                                  ReconstructorLibrary)
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ class ActiveReconstructor(Reconstructor, Observable, Observer):
     def name(self) -> str:
         return self._reconstructorPlugin.displayName
 
-    def reconstruct(self) -> int:
+    def reconstruct(self) -> ReconstructResult:
         return self._reconstructorPlugin.strategy.reconstruct()
 
     @staticmethod

@@ -6,7 +6,7 @@ import numpy
 import ptychonn
 from ptychonn._model import ReconSmallPhaseModel, Tester
 
-from ...api.reconstructor import Reconstructor
+from ...api.reconstructor import ReconstructResult, Reconstructor
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus
@@ -33,7 +33,7 @@ class PtychoNNReconstructor(Reconstructor):
     def name(self) -> str:
         return 'PtychoNN'
 
-    def reconstruct(self) -> int:
+    def reconstruct(self) -> ReconstructResult:
         assembledIndexes = self._diffractionDataset.getAssembledIndexes()
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
@@ -87,4 +87,4 @@ class PtychoNNReconstructor(Reconstructor):
                                                   float(inferencePixelWidthInMeters))
         self._object.setArray(stitched)
 
-        return 0
+        return ReconstructResult(0, [[]])

@@ -216,7 +216,7 @@ class ModelCore:
         dataDump['object'] = self._objectCore.object.getArray()
         numpy.savez(self._reconstructorCore.settings.outputFilePath.value, **dataDump)
 
-        return result
+        return result.result
 
     @property
     def scanPresenter(self) -> ScanPresenter:

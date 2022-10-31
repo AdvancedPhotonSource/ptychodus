@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...api.reconstructor import Reconstructor, ReconstructorLibrary
+from ...api.reconstructor import ReconstructResult, Reconstructor, ReconstructorLibrary
 from ...api.settings import SettingsRegistry
 from .reconstructor import ReconstructorRepository, ActiveReconstructor
 from .settings import ReconstructorSettings
@@ -33,7 +33,7 @@ class ReconstructorPresenter(Observable, Observer):
     def setReconstructor(self, name: str) -> None:
         self._activeReconstructor.setActiveReconstructor(name)
 
-    def reconstruct(self) -> int:
+    def reconstruct(self) -> ReconstructResult:
         return self._activeReconstructor.reconstruct()
 
     def update(self, observable: Observable) -> None:

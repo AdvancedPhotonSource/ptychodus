@@ -6,7 +6,7 @@ import pprint
 import numpy
 import tike.ptycho
 
-from ...api.reconstructor import Reconstructor
+from ...api.reconstructor import ReconstructResult, Reconstructor
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
 from .arrayConverter import TikeArrays, TikeArrayConverter
@@ -99,7 +99,8 @@ class TikeReconstructor:
 
         return 1
 
-    def __call__(self, algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> int:
+    def __call__(self,
+                 algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> ReconstructResult:
         inputArrays = self._arrayConverter.exportToTike()
 
         data = self._arrayConverter.getDiffractionData()
@@ -137,9 +138,8 @@ class TikeReconstructor:
 
         outputArrays = TikeArrays(scan=result.scan, probe=result.probe, object_=result.psi)
         self._arrayConverter.importFromTike(outputArrays)
-        # FIXME self._reconstructorPlotPresenter.setEnumeratedYValues(result.algorithm_options.costs)
 
-        return 0
+        return ReconstructResult(0, result.algorithm_options.costs)
 
 
 class RegularizedPIEReconstructor(Reconstructor):
@@ -157,7 +157,7 @@ class RegularizedPIEReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> int:
+    def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.alpha = float(self._settings.alpha.value)
@@ -179,7 +179,7 @@ class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> int:
+    def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.alpha = float(self._settings.alpha.value)
@@ -202,7 +202,7 @@ class ConjugateGradientReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> int:
+    def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.cg_iter = self._settings.cgIter.value
@@ -225,7 +225,7 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> int:
+    def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         return self._tikeReconstructor(self._algorithmOptions)
@@ -246,7 +246,7 @@ class DifferenceMapReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> int:
+    def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         return self._tikeReconstructor(self._algorithmOptions)
