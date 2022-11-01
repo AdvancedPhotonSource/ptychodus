@@ -6,7 +6,9 @@ from .velociprobeScanFile import VelociprobeScanFileReader
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    neXusFileReader = NeXusDiffractionFileReader()
+    velociprobeFileReader = VelociprobeScanFileReader()
+    neXusFileReader = NeXusDiffractionFileReader(velociprobeFileReader)
+
     registry.registerPlugin(neXusFileReader)
     registry.registerPlugin(LynxScanFileReader())
-    registry.registerPlugin(VelociprobeScanFileReader())
+    registry.registerPlugin(velociprobeFileReader)

@@ -10,6 +10,7 @@ import h5py
 import numpy
 
 from ..h5DiffractionFile import H5DiffractionFileTreeBuilder
+from .velociprobeScanFile import VelociprobeScanFileReader
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, DiffractionPatternData,
                                 DiffractionPatternState, SimpleDiffractionDataset)
@@ -160,10 +161,6 @@ class InstrumentGroup:
 class GoniometerGroup:
     chi_deg: float
 
-    @property
-    def chi_rad(self) -> float:
-        return numpy.deg2rad(self.chi_deg)
-
     @classmethod
     def read(cls, group: h5py.Group) -> GoniometerGroup:
         chiDataset = group['chi']
@@ -230,8 +227,9 @@ class NeXusDiffractionDataset(DiffractionDataset):
 
 class NeXusDiffractionFileReader(DiffractionFileReader):
 
-    def __init__(self) -> None:
+    def __init__(self, velociprobeScanFileReader: VelociprobeScanFileReader) -> None:
         super().__init__()
+        self._velociprobeScanFileReader = velociprobeScanFileReader
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
     @property
@@ -301,5 +299,9 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
             )
             contentsTree = self._treeBuilder.build(h5File)
             dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
+
+            # vvv TODO This is a hack; remove when able! vvv
+            self._velociprobeScanFileReader.setStageRotationInDegrees(
+                entry.sample.goniometer.chi_deg)
 
         return dataset
