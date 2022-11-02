@@ -59,7 +59,13 @@ class DataParametersController(Observer):
             controller._updateDataArrayInTableView)
         tableView.setModel(controller._tableModel)
 
+        if datasetPresenter.isAssembled:
+            controller._switchToDatasetView()
+
         return controller
+
+    def _switchToDatasetView(self) -> None:
+        self._view.setCurrentIndex(self._view.count() - 1)
 
     def _chooseScratchDirectory(self) -> None:
         # TODO unused
@@ -85,6 +91,6 @@ class DataParametersController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:
             self._datasetPresenter.startProcessingDiffractionPatterns()
-            self._view.setCurrentIndex(self._view.count() - 1)
+            self._switchToDatasetView()
         elif observable is self._datasetPresenter:
             self._treeModel.setRootNode(self._datasetPresenter.getContentsTree())

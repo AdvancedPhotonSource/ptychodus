@@ -49,7 +49,6 @@ def main() -> int:
     with ModelCore(modelArgs) as model:
         if parsedArgs.batch:
             verifyAllArgumentsParsed(parser, unparsedArgs)
-            model.batchModeSetupForFileBasedWorkflow()
             return model.batchModeReconstruct()
 
         from PyQt5.QtWidgets import QApplication

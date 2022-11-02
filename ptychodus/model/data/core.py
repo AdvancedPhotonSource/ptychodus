@@ -61,6 +61,14 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def setScratchDirectory(self, directory: Path) -> None:
         self._settings.scratchDirectory.value = directory
 
+    @property
+    def isReadyToAssemble(self) -> bool:
+        return self._activeDiffractionDataset.isReadyToAssemble
+
+    @property
+    def isAssembled(self) -> bool:
+        return (len(self._activeDiffractionDataset) > 0)
+
     def getContentsTree(self) -> SimpleTreeNode:
         return self._activeDiffractionDataset.getContentsTree()
 

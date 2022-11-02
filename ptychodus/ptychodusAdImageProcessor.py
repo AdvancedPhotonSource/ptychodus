@@ -26,9 +26,6 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             restartFilePath=None,
             settingsFilePath=Path(settingsFilePath) if settingsFilePath else None,
             replacementPathPrefix=configDict.get('replacementPathPrefix'),
-            rpcPort=-1,
-            autoExecuteRPCs=True,
-            isDeveloperModeEnabled=False,
         )
 
         self._ptychodus = ModelCore(modelArgs)
@@ -59,7 +56,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             numberOfPatternsTotal=int(numberOfPatternsTotal),
             patternDataType=numpy.dtype(patternDataType),
         )
-        self._ptychodus.batchModeSetupForStreamingWorkflow(metadata)
+        self._ptychodus.setupForStreamingWorkflow(metadata)
 
     def process(self, pvObject: pva.PvObject) -> pva.PvObject:
         '''Processes monitor update'''

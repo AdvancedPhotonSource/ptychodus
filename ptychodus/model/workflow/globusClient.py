@@ -30,7 +30,6 @@ def ptychodus_reconstruct(**data):
     )
 
     with ModelCore(modelArgs) as model:
-        model.batchModeSetupForFileBasedWorkflow()
         model.batchModeReconstruct()
 
 

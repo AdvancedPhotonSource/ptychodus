@@ -127,6 +127,9 @@ class ModelCore:
         if self._modelArgs.settingsFilePath:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
 
+        if self.diffractionDatasetPresenter.isReadyToAssemble:
+            self.diffractionDatasetPresenter.startProcessingDiffractionPatterns(block=True)
+
         if self.rpcMessageService:
             self.rpcMessageService.start()
 
@@ -166,10 +169,7 @@ class ModelCore:
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
         return self._dataCore.diffractionDatasetPresenter
 
-    def batchModeSetupForFileBasedWorkflow(self) -> None:
-        self.diffractionDatasetPresenter.startProcessingDiffractionPatterns(block=True)
-
-    def batchModeSetupForStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
+    def setupForStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
         self.diffractionDatasetPresenter.configureStreaming(metadata)
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray) -> None:
