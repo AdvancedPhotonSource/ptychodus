@@ -3,7 +3,8 @@ from decimal import Decimal
 
 from PyQt5.QtWidgets import QWidget
 
-from ..model import Observable, Observer  # TODO , PtychoPyBackend, PtychoPyPresenter
+from ..api.observer import Observable, Observer
+from ..model import PtychoPyReconstructorLibrary, PtychoPyPresenter
 from ..view import PtychoPyParametersView, PtychoPyBasicView, PtychoPyAdvancedView
 from .reconstructor import ReconstructorViewControllerFactory
 
@@ -110,7 +111,7 @@ class PtychoPyAdvancedParametersController(Observer):
 
 class PtychoPyParametersController:
 
-    def __init__(self, model: PtychoPyBackend, view: PtychoPyParametersView) -> None:
+    def __init__(self, model: PtychoPyReconstructorLibrary, view: PtychoPyParametersView) -> None:
         self._model = model
         self._view = view
         self._basicParametersController = PtychoPyBasicParametersController.createInstance(
@@ -119,7 +120,7 @@ class PtychoPyParametersController:
             model.presenter, view.advancedView)
 
     @classmethod
-    def createInstance(cls, model: PtychoPyBackend,
+    def createInstance(cls, model: PtychoPyReconstructorLibrary,
                        view: PtychoPyParametersView) -> PtychoPyParametersController:
         controller = cls(model, view)
         return controller
@@ -127,7 +128,7 @@ class PtychoPyParametersController:
 
 class PtychoPyViewControllerFactory(ReconstructorViewControllerFactory):
 
-    def __init__(self, model: PtychoPyBackend) -> None:
+    def __init__(self, model: PtychoPyReconstructorLibrary) -> None:
         super().__init__()
         self._model = model
         self._controllerList: list[PtychoPyParametersController] = list()

@@ -6,8 +6,9 @@ from PyQt5.QtGui import QRegularExpressionValidator
 from PyQt5.QtWidgets import QWidget
 
 from ..api.observer import Observable, Observer
-from ..model import (TikeAdaptiveMomentPresenter, TikeBackend, TikeObjectCorrectionPresenter,
-                     TikePositionCorrectionPresenter, TikePresenter, TikeProbeCorrectionPresenter)
+from ..model import (TikeAdaptiveMomentPresenter, TikeReconstructorLibrary,
+                     TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter,
+                     TikeProbeCorrectionPresenter)
 from ..view import (TikeAdaptiveMomentView, TikeBasicParametersView, TikeObjectCorrectionView,
                     TikeParametersView, TikePositionCorrectionView, TikeProbeCorrectionView,
                     TikeProbeSupportView)
@@ -306,7 +307,7 @@ class TikeBasicParametersController(Observer):
 
 class TikeParametersController:
 
-    def __init__(self, model: TikeBackend, view: TikeParametersView) -> None:
+    def __init__(self, model: TikeReconstructorLibrary, view: TikeParametersView) -> None:
         self._model = model
         self._view = view
         self._positionCorrectionController = TikePositionCorrectionController.createInstance(
@@ -319,7 +320,7 @@ class TikeParametersController:
             model.presenter, view.basicParametersView)
 
     @classmethod
-    def createInstance(cls, model: TikeBackend,
+    def createInstance(cls, model: TikeReconstructorLibrary,
                        view: TikeParametersView) -> TikeParametersController:
         controller = cls(model, view)
         return controller
@@ -327,7 +328,7 @@ class TikeParametersController:
 
 class TikeViewControllerFactory(ReconstructorViewControllerFactory):
 
-    def __init__(self, model: TikeBackend) -> None:
+    def __init__(self, model: TikeReconstructorLibrary) -> None:
         super().__init__()
         self._model = model
         self._controllerList: list[TikeParametersController] = list()

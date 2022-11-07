@@ -46,6 +46,14 @@ class ActiveDiffractionDataset(DiffractionDataset):
         self._stopWorkEvent = threading.Event()
         self._changedEvent = threading.Event()
 
+    @property
+    def isReadyToAssemble(self) -> bool:
+        return (len(self) < len(self._dataset))
+
+    @property
+    def isAssembling(self) -> bool:
+        return (len(self._workers) > 0)
+
     def getMetadata(self) -> DiffractionMetadata:
         return self._dataset.getMetadata()
 
@@ -132,12 +140,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         self._changedEvent.set()
 
-    @property
-    def isActive(self) -> bool:
-        return (len(self._workers) > 0)
-
     def switchTo(self, dataset: DiffractionDataset) -> None:
-        if self.isActive:
+        if self.isAssembling:
             self.stop()
 
         self._arrayList.clear()
@@ -145,7 +149,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         self.notifyObservers()
 
     def start(self, block: bool) -> None:
-        if self.isActive:
+        if self.isAssembling:
             self.stop()
 
         logger.info('Resetting data assembler...')
@@ -226,6 +230,28 @@ class ActiveDiffractionDataset(DiffractionDataset):
     def getAssembledData(self) -> DiffractionPatternData:
         indexes = self.getAssembledIndexes()
         return self._arrayData[indexes]
+
+    def setAssembledData(self, arrayData: DiffractionPatternData) -> None:
+        metadata = DiffractionMetadata(
+            numberOfPatternsPerArray=arrayData.shape[0],
+            numberOfPatternsTotal=arrayData.shape[0],
+            patternDataType=arrayData.dtype,
+        )
+
+        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+
+        arrayList: list[DiffractionPatternArray] = [
+            SimpleDiffractionPatternArray(
+                label='Restart',
+                index=0,
+                data=arrayData,
+                state=DiffractionPatternState.LOADED,
+            ),
+        ]
+
+        dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+        self.switchTo(dataset)
+        self.start(block=True)
 
     def notifyObserversIfDatasetChanged(self) -> None:
         if self._changedEvent.is_set():

@@ -1,5 +1,5 @@
 from .adaptiveMoment import TikeAdaptiveMomentPresenter
-from .core import TikeBackend, TikePresenter
+from .core import TikeReconstructorLibrary, TikePresenter
 from .objectCorrection import TikeObjectCorrectionPresenter
 from .positionCorrection import TikePositionCorrectionPresenter
 from .probeCorrection import TikeProbeCorrectionPresenter

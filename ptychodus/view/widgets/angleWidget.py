@@ -42,7 +42,6 @@ class AngleWidget(QWidget):
 
     def setReadOnly(self, enable: bool) -> None:
         self.angleLineEdit.setReadOnly(enable)
-        self.unitsComboBox.setEnabled(not enable)
 
     def getAngleInTurns(self) -> Decimal:
         return self.angleInTurns

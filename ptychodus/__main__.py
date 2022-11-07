@@ -30,12 +30,15 @@ def main() -> int:
             help='replace file path prefix')
     parser.add_argument('-p', '--port', action='store', type=int, default=9999, \
             help='remote process communication port number')
+    parser.add_argument('-r', '--restart', action='store', type=argparse.FileType('r'), \
+            help='use restart data from file')
     parser.add_argument('-s', '--settings', action='store', type=argparse.FileType('r'), \
             help='use settings from file')
     parser.add_argument('-v', '--version', action='version', version=versionString())
     parsedArgs, unparsedArgs = parser.parse_known_args()
 
     modelArgs = ModelArgs(
+        restartFilePath=Path(parsedArgs.restart.name) if parsedArgs.restart else None,
         settingsFilePath=Path(parsedArgs.settings.name) if parsedArgs.settings else None,
         replacementPathPrefix=parsedArgs.prefix,
         rpcPort=parsedArgs.port,
@@ -46,11 +49,7 @@ def main() -> int:
     with ModelCore(modelArgs) as model:
         if parsedArgs.batch:
             verifyAllArgumentsParsed(parser, unparsedArgs)
-            model.batchModeSetupForFileBasedWorkflow()
             return model.batchModeReconstruct()
-
-        # Unused PyQt5.Qt import prevents nonsense error message
-        from PyQt5 import Qt
 
         from PyQt5.QtWidgets import QApplication
         # QApplication expects the first argument to be the program name

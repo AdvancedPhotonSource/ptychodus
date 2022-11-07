@@ -10,7 +10,7 @@ from .colorizer import Colorizer
 from .displayRange import DisplayRange
 from .mappedColorizer import MappedColorizer
 from .modelColorizer import CylindricalColorModelColorizer
-from .visarray import *
+from .visarray import NumericArrayType, VisualizationArray
 
 logger = logging.getLogger(__name__)
 

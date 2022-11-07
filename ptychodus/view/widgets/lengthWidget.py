@@ -28,6 +28,7 @@ class LengthWidget(QWidget):
         widget.unitsComboBox.addItem('mm', -3)
         widget.unitsComboBox.addItem('\u00B5m', -6)
         widget.unitsComboBox.addItem('nm', -9)
+        widget.unitsComboBox.addItem('\u212B', -10)
         widget.unitsComboBox.addItem('pm', -12)
         widget.unitsComboBox.activated.connect(widget._updateDisplay)
 
@@ -44,7 +45,6 @@ class LengthWidget(QWidget):
 
     def setReadOnly(self, enable: bool) -> None:
         self.magnitudeLineEdit.setReadOnly(enable)
-        self.unitsComboBox.setEnabled(not enable)
 
     def getLengthInMeters(self) -> Decimal:
         return self.lengthInMeters

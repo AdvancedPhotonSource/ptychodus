@@ -8,6 +8,7 @@ from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
+from ..api.reconstructor import ReconstructResult
 from ..model import (ObjectPresenter, Observable, Observer, ProbePresenter,
                      ReconstructorPlotPresenter, ReconstructorPresenter, ScanInitializer,
                      ScanPresenter)
@@ -64,12 +65,19 @@ class ScanListModel(QAbstractListModel):
 
 class ReconstructorParametersController(Observer):
 
-    def __init__(self, presenter: ReconstructorPresenter, scanPresenter: ScanPresenter,
-                 probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
-                 view: ReconstructorParametersView,
-                 viewControllerFactoryList: list[ReconstructorViewControllerFactory]) -> None:
+    def __init__(
+        self,
+        presenter: ReconstructorPresenter,
+        plotPresenter: ReconstructorPlotPresenter,
+        scanPresenter: ScanPresenter,
+        probePresenter: ProbePresenter,
+        objectPresenter: ObjectPresenter,
+        view: ReconstructorParametersView,
+        viewControllerFactoryList: list[ReconstructorViewControllerFactory],
+    ) -> None:
         super().__init__()
         self._presenter = presenter
+        self._plotPresenter = plotPresenter
         self._scanPresenter = scanPresenter
         self._probePresenter = probePresenter
         self._objectPresenter = objectPresenter
@@ -80,22 +88,27 @@ class ReconstructorParametersController(Observer):
 
     @classmethod
     def createInstance(
-        cls, presenter: ReconstructorPresenter, scanPresenter: ScanPresenter,
-        probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
+        cls,
+        presenter: ReconstructorPresenter,
+        plotPresenter: ReconstructorPlotPresenter,
+        scanPresenter: ScanPresenter,
+        probePresenter: ProbePresenter,
+        objectPresenter: ObjectPresenter,
         view: ReconstructorParametersView,
-        viewControllerFactoryList: list[ReconstructorViewControllerFactory]
+        viewControllerFactoryList: list[ReconstructorViewControllerFactory],
     ) -> ReconstructorParametersController:
-        controller = cls(presenter, scanPresenter, probePresenter, objectPresenter, view,
-                         viewControllerFactoryList)
+        controller = cls(presenter, plotPresenter, scanPresenter, probePresenter, objectPresenter,
+                         view, viewControllerFactoryList)
         presenter.addObserver(controller)
         scanPresenter.addObserver(controller)
         probePresenter.addObserver(controller)
         objectPresenter.addObserver(controller)
 
-        for reconstructorName, backendName in presenter.getAlgorithmDict().items():
-            controller._addReconstructor(reconstructorName, backendName)
+        for name in presenter.getReconstructorList():
+            controller._addReconstructor(name)
 
-        view.reconstructorView.algorithmComboBox.currentTextChanged.connect(presenter.setAlgorithm)
+        view.reconstructorView.algorithmComboBox.currentTextChanged.connect(
+            presenter.setReconstructor)
         view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex)
 
@@ -111,9 +124,10 @@ class ReconstructorParametersController(Observer):
 
         return controller
 
-    def _addReconstructor(self, reconstructorName: str, backendName: str) -> None:
+    def _addReconstructor(self, name: str) -> None:
+        backendName, reconstructorName = name.split('/')  # TODO REDO
         self._view.reconstructorView.algorithmComboBox.addItem(
-            reconstructorName, self._view.reconstructorView.algorithmComboBox.count())
+            name, self._view.reconstructorView.algorithmComboBox.count())
 
         if backendName in self._viewControllerFactoryDict:
             viewControllerFactory = self._viewControllerFactoryDict[backendName]
@@ -125,7 +139,7 @@ class ReconstructorParametersController(Observer):
         self._view.stackedWidget.addWidget(widget)
 
     def _reconstruct(self) -> None:
-        result = -1
+        result = ReconstructResult(-1, [[]])
 
         try:
             result = self._presenter.reconstruct()
@@ -139,8 +153,10 @@ class ReconstructorParametersController(Observer):
             msgBox.setInformativeText(str(err))
             msgBox.setDetailedText(traceback.format_exc())
             retval = msgBox.exec_()
+        else:
+            self._plotPresenter.setEnumeratedYValues(result.objective)
 
-        print(result)  # TODO
+        print(result.result)  # TODO
 
     def _refreshScanListModel(self) -> None:
         self._view.reconstructorView.scanComboBox.blockSignals(True)
@@ -155,7 +171,7 @@ class ReconstructorParametersController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.reconstructorView.algorithmComboBox.setCurrentText(
-            self._presenter.getAlgorithm())
+            self._presenter.getReconstructor())
 
         isScanValid = self._scanPresenter.isActiveScanValid()
         isProbeValid = self._probePresenter.isActiveProbeValid()

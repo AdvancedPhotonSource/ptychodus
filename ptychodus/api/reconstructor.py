@@ -1,4 +1,13 @@
 from abc import ABC, abstractmethod, abstractproperty
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+from typing import Iterator
+
+
+@dataclass(frozen=True)
+class ReconstructResult:
+    result: int
+    objective: list[list[float]]
 
 
 class Reconstructor(ABC):
@@ -7,10 +16,26 @@ class Reconstructor(ABC):
     def name(self) -> str:
         pass
 
-    @abstractproperty
-    def backendName(self) -> str:
+    @abstractmethod
+    def reconstruct(self) -> ReconstructResult:
         pass
 
-    @abstractmethod
-    def reconstruct(self) -> int:
+
+class NullReconstructor(Reconstructor):
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def reconstruct(self) -> ReconstructResult:
+        return ReconstructResult(0, [[]])
+
+
+class ReconstructorLibrary(Iterable[Reconstructor]):
+
+    @abstractproperty
+    def name(self) -> str:
         pass

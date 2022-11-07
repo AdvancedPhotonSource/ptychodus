@@ -1,16 +1,16 @@
 from __future__ import annotations
 from decimal import Decimal
-from typing import Final
+from typing import Final, Iterator
 import logging
 
 import numpy
 
 from ...api.observer import Observable, Observer
+from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
-from ..reconstructor import Reconstructor, NullReconstructor, ReconstructorPlotPresenter
 from ..scan import Scan, ScanInitializerFactory, ScanRepository
 from .arrayConverter import TikeArrayConverter
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
@@ -128,9 +128,10 @@ class TikePresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class TikeBackend:
+class TikeReconstructorLibrary(ReconstructorLibrary):
 
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
+        super().__init__()
         self._settings = TikeSettings.createInstance(settingsRegistry)
         self._positionCorrectionSettings = TikePositionCorrectionSettings.createInstance(
             settingsRegistry)
@@ -159,8 +160,7 @@ class TikeBackend:
                        object_: Object,
                        scanInitializerFactory: ScanInitializerFactory,
                        scanRepository: ScanRepository,
-                       reconstructorPlotPresenter: ReconstructorPlotPresenter,
-                       isDeveloperModeEnabled: bool = False) -> TikeBackend:
+                       isDeveloperModeEnabled: bool = False) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
 
         try:
@@ -174,19 +174,18 @@ class TikeBackend:
             logger.info('Tike not found.')
 
             if isDeveloperModeEnabled:
-                core.reconstructorList.append(NullReconstructor('rpie', 'Tike'))
-                core.reconstructorList.append(NullReconstructor('adam_grad', 'Tike'))
-                core.reconstructorList.append(NullReconstructor('cgrad', 'Tike'))
-                core.reconstructorList.append(NullReconstructor('lstsq_grad', 'Tike'))
-                core.reconstructorList.append(NullReconstructor('dm', 'Tike'))
+                core.reconstructorList.append(NullReconstructor('rpie'))
+                core.reconstructorList.append(NullReconstructor('adam_grad'))
+                core.reconstructorList.append(NullReconstructor('cgrad'))
+                core.reconstructorList.append(NullReconstructor('lstsq_grad'))
+                core.reconstructorList.append(NullReconstructor('dm'))
         else:
             arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_,
                                                 diffractionDataset, scanInitializerFactory,
                                                 scanRepository)
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
-                                                  core._probeCorrectionSettings, arrayConverter,
-                                                  reconstructorPlotPresenter)
+                                                  core._probeCorrectionSettings, arrayConverter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))
@@ -195,3 +194,10 @@ class TikeBackend:
             core.reconstructorList.append(DifferenceMapReconstructor(tikeReconstructor))
 
         return core
+
+    @property
+    def name(self) -> str:
+        return 'Tike'
+
+    def __iter__(self) -> Iterator[Reconstructor]:
+        return iter(self.reconstructorList)
