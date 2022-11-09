@@ -21,7 +21,7 @@ class CylindricalColorModel(ABC):
         pass
 
     @abstractmethod
-    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
+    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         pass
 
 
@@ -31,8 +31,8 @@ class HSVSaturationColorModel(CylindricalColorModel):
     def name(self) -> str:
         return 'HSV Saturation'
 
-    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
-        return colorsys.hsv_to_rgb(h, x, y)
+    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
+        return *colorsys.hsv_to_rgb(h, x, 1.0), 1.0
 
 
 class HSVValueColorModel(CylindricalColorModel):
@@ -41,8 +41,18 @@ class HSVValueColorModel(CylindricalColorModel):
     def name(self) -> str:
         return 'HSV Value'
 
-    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
-        return colorsys.hsv_to_rgb(h, y, x)
+    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
+        return *colorsys.hsv_to_rgb(h, 1.0, x), 1.0
+
+
+class HSVAlphaColorModel(CylindricalColorModel):
+
+    @property
+    def name(self) -> str:
+        return 'HSV Alpha'
+
+    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
+        return *colorsys.hsv_to_rgb(h, 1.0, 1.0), x
 
 
 class HLSLightnessColorModel(CylindricalColorModel):
@@ -51,8 +61,8 @@ class HLSLightnessColorModel(CylindricalColorModel):
     def name(self) -> str:
         return 'HLS Lightness'
 
-    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
-        return colorsys.hls_to_rgb(h, x, y)
+    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
+        return *colorsys.hls_to_rgb(h, x, 1.0), 1.0
 
 
 class HLSSaturationColorModel(CylindricalColorModel):
@@ -61,8 +71,18 @@ class HLSSaturationColorModel(CylindricalColorModel):
     def name(self) -> str:
         return 'HLS Saturation'
 
-    def __call__(self, h: float, x: float, y: float) -> tuple[float, float, float]:
-        return colorsys.hls_to_rgb(h, y, x)
+    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
+        return *colorsys.hls_to_rgb(h, 0.5, x), 1.0
+
+
+class HLSAlphaColorModel(CylindricalColorModel):
+
+    @property
+    def name(self) -> str:
+        return 'HLS Alpha'
+
+    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
+        return *colorsys.hls_to_rgb(h, 0.5, 1.0), x
 
 
 class CylindricalColorModelColorizer(Colorizer):
@@ -82,8 +102,10 @@ class CylindricalColorModelColorizer(Colorizer):
         modelList = [
             HSVSaturationColorModel(),
             HSVValueColorModel(),
+            HSVAlphaColorModel(),
             HLSLightnessColorModel(),
-            HLSSaturationColorModel()
+            HLSSaturationColorModel(),
+            HLSAlphaColorModel(),
         ]
         variantList = [
             PluginEntry[CylindricalColorModel](simpleName=model.name,
@@ -120,13 +142,10 @@ class CylindricalColorModelColorizer(Colorizer):
                          vmax=float(self._displayRange.getUpper()),
                          clip=False)
 
+        model = numpy.vectorize(self._variantChooser.getCurrentStrategy())
         h = (phaseInRadians + numpy.pi) / (2 * numpy.pi)
         x = norm(transform(amplitude))
-        y = numpy.ones_like(h)
-        a = numpy.ones_like(h)
-
-        model = numpy.vectorize(self._variantChooser.getCurrentStrategy())
-        r, g, b = model(h, x, y)
+        r, g, b, a = model(h, x)
 
         return numpy.stack((r, g, b, a), axis=-1)
 
