@@ -4,7 +4,7 @@ Ptychodus
 `ptychodus`_ is a ptychography analysis application that supports multiple reconstruction libraries. Current reconstructor status:
 
 * `tike`_ is working
-* `PtychoNN`_ is implemented, but needs more testing
+* `PtychoNN`_ is working
 * `ptychopy`_ is under development
 
 Standard Installation

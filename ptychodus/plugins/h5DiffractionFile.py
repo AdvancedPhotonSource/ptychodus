@@ -1,16 +1,42 @@
 from pathlib import Path
 import logging
 
+try:
+    # NOTE must import hdf5plugin before h5py
+    import hdf5plugin
+except ModuleNotFoundError:
+    pass
+
 import h5py
 import numpy
 
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionPatternData, DiffractionDataset, DiffractionFileReader,
+                                DiffractionMetadata, DiffractionPatternArray,
+                                DiffractionPatternState, SimpleDiffractionDataset)
 from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
+
+
+class H5DiffractionPatternArray(DiffractionPatternArray):
+
+    def __init__(self, data: DiffractionPatternData) -> None:
+        super().__init__()
+        self._data = data
+
+    def getLabel(self) -> str:
+        return '/entry/data/data'
+
+    def getIndex(self) -> int:
+        return 0
+
+    def getState(self) -> DiffractionPatternState:
+        return DiffractionPatternState.FOUND
+
+    def getData(self) -> DiffractionPatternData:
+        return self._data
 
 
 class H5DiffractionFileTreeBuilder:
@@ -111,6 +137,23 @@ class H5DiffractionFileReader(DiffractionFileReader):
         if filePath:
             with h5py.File(filePath, 'r') as h5File:
                 contentsTree = self._treeBuilder.build(h5File)
+
+                try:
+                    data = h5File['/entry/data/data'][()]
+                except KeyError:
+                    logger.debug('Unable to find data.')
+                except OSError:
+                    logger.debug('Unable to read found data.')
+                else:
+                    array = H5DiffractionPatternArray(data)
+                    arrayList.append(array)
+
+                    metadata = DiffractionMetadata(
+                        filePath=filePath,
+                        numberOfPatternsPerArray=data.shape[0],
+                        numberOfPatternsTotal=data.shape[0],
+                        patternDataType=data.dtype,
+                    )
 
         return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 

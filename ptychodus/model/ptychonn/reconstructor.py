@@ -35,6 +35,9 @@ class PtychoNNReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         assembledIndexes = self._diffractionDataset.getAssembledIndexes()
+
+        logger.debug('Preparing scan data...')
+
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
 
@@ -49,42 +52,51 @@ class PtychoNNReconstructor(Reconstructor):
 
         scanInMeters = numpy.column_stack((scanYInMeters, scanXInMeters)).astype('float32')
 
+        logger.debug('Validating diffraction pattern data...')
+
         data = self._diffractionDataset.getAssembledData()
         dataSize = data.shape[-1]
 
         if dataSize != data.shape[-2]:
             raise ValueError('PtychoNN expects square diffraction data!')
 
-        isDataSizePow2 = (dataSize & (dataSize - 1) and dataSize > 0)
+        isDataSizePow2 = (dataSize & (dataSize - 1) == 0 and dataSize > 0)
 
         if not isDataSizePow2:
             raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
 
         # Bin diffraction data
         inputSize = self._settings.modelInputSize.value
-        binnedData = numpy.zeros((data.shape[0], inputSize, inputSize))
         binSize = dataSize // inputSize
 
-        for i in range(inputSize):
-            for j in range(inputSize):
-                binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
-                                                     binSize * j:binSize * (j + 1)])
+        if binSize == 1:
+            binnedData = data
+        else:
+            binnedData = numpy.zeros((data.shape[0], inputSize, inputSize))
+
+            for i in range(inputSize):
+                for j in range(inputSize):
+                    binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
+                                                         binSize * j:binSize * (j + 1)])
 
         stitchedPixelWidthInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
         inferencePixelWidthInMeters = stitchedPixelWidthInMeters * binSize
 
-        # Load best_model.pth
+        logger.debug('Loading model state...')
         tester = Tester(model=ReconSmallPhaseModel(),
                         model_params_path=self._settings.modelStateFilePath.value)
 
-        # Predict
-        tester.setTestData(data, batch_size=self._settings.batchSize.value)
+        logger.debug('Inferring...')
+        tester.setTestData(binnedData, batch_size=self._settings.batchSize.value)
         inferences = tester.predictTestData()
 
-        # Stitch
-        stitched = ptychonn.stitch_from_inference(inferences, scanInMeters,
-                                                  float(stitchedPixelWidthInMeters),
-                                                  float(inferencePixelWidthInMeters))
+        logger.debug('Stitching...')
+        stitchedPhase = ptychonn.stitch_from_inference(
+            inferences,
+            scanInMeters,
+            stitched_pixel_width=float(stitchedPixelWidthInMeters),
+            inference_pixel_width=float(inferencePixelWidthInMeters))
+        stitched = numpy.exp(1j * stitchedPhase)
         self._object.setArray(stitched)
 
         return ReconstructResult(0, [[]])

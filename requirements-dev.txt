@@ -1,5 +1,6 @@
 h5py
 hdf5-external-filter-plugins-lz4
+hdf5plugin
 matplotlib
 mypy
 numpy
@@ -9,8 +10,8 @@ pytest
 python>=3.9
 scikit-image
 scipy
-setuptools_scm
 setuptools>=46.4.0
+setuptools_scm
 tifffile
 toml
 watchdog
