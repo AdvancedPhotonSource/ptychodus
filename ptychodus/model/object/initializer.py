@@ -28,6 +28,7 @@ class ObjectInitializer(Observable, ABC):
         '''returns a unique name that is appropriate for a settings file'''
         return ''.join(self.displayName.split())
 
+    @abstractmethod
     def __call__(self) -> ObjectArrayType:
         '''produces an initial object guess'''
         pass

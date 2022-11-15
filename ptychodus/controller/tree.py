@@ -7,7 +7,7 @@ from ..api.tree import SimpleTreeNode
 
 class SimpleTreeModel(QAbstractItemModel):
 
-    def __init__(self, rootNode: SimpleTreeNode, parent: QObject = None) -> None:
+    def __init__(self, rootNode: SimpleTreeNode, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._rootNode = rootNode
 

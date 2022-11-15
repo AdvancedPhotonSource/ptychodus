@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QV
 
 class DataArrayTableModel(QAbstractTableModel):
 
-    def __init__(self, parent: QObject = None) -> None:
+    def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._array: Optional[numpy.ndarray] = None
 

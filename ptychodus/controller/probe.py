@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable
+from typing import Callable, Optional
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QWidget
@@ -127,7 +127,7 @@ class FresnelZonePlateProbeController(Observer):
 
 class ProbeModesTableModel(QAbstractTableModel):
 
-    def __init__(self, presenter: ProbePresenter, parent: QObject = None) -> None:
+    def __init__(self, presenter: ProbePresenter, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
 
