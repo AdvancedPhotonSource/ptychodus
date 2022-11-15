@@ -32,6 +32,7 @@ class ProbeInitializer(Observable, ABC):
         '''returns a unique name that is appropriate for a settings file'''
         return ''.join(self.displayName.split())
 
+    @abstractmethod
     def __call__(self) -> ProbeArrayType:
         '''produces an initial probe guess'''
         pass

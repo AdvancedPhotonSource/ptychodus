@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import Optional
 from uuid import UUID
 import logging
 
@@ -148,7 +149,7 @@ class WorkflowComputeController(Observer):
 
 class WorkflowTableModel(QAbstractTableModel):
 
-    def __init__(self, presenter: WorkflowPresenter, parent: QObject = None) -> None:
+    def __init__(self, presenter: WorkflowPresenter, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._sectionHeaders = [

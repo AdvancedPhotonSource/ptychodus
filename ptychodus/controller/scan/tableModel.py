@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
@@ -14,7 +15,7 @@ class ScanRepositoryEntry:
 
 class ScanTableModel(QAbstractTableModel):
 
-    def __init__(self, presenter: ScanPresenter, parent: QObject = None) -> None:
+    def __init__(self, presenter: ScanPresenter, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._scanList: list[ScanRepositoryEntry] = list()

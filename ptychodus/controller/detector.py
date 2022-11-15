@@ -1,6 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
+from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
@@ -63,7 +64,9 @@ class DetectorController(Observer):
 
 class DatasetListModel(QAbstractListModel):
 
-    def __init__(self, presenter: DiffractionDatasetPresenter, parent: QObject = None) -> None:
+    def __init__(self,
+                 presenter: DiffractionDatasetPresenter,
+                 parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
 

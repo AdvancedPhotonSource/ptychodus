@@ -1,7 +1,10 @@
 from __future__ import annotations
 from typing import Callable
 
-from ..model import ImagePresenter, Observable, Observer, Object, ObjectPresenter
+from PyQt5.QtWidgets import QDialog
+
+from ..model import (FileObjectInitializer, ImagePresenter, Observable, Observer, Object,
+                     ObjectPresenter)
 from ..view import ImageView, ObjectParametersView
 from .data import FileDialogFactory
 from .image import ImageController
@@ -35,27 +38,36 @@ class ObjectParametersController(Observer):
 
         return controller
 
-    def _initializeObject(self, name: str) -> None:
-        if name == 'Open File...':
-            self._openObject()
+    def _editObject(self) -> None:
+        initializerName = self._presenter.getInitializerName()
+        initializer = self._presenter.getInitializer()
 
-        self._presenter.setInitializer(name)
-        self._presenter.initializeObject()
+        # TODO show live update while editing
+        if isinstance(initializer, FileObjectInitializer):
+            filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+                self._view,
+                'Open Object',
+                nameFilters=initializer.getOpenFileFilterList(),
+                selectedNameFilter=initializer.getOpenFileFilter())
+
+            if filePath:
+                initializer.setOpenFilePath(filePath)
+                initializer.setOpenFileFilter(nameFilter)
+                self._presenter.initializeObject()
+        else:
+            self._finishInitialization(QDialog.Accepted)
+
+    def _startInitialization(self, name: str) -> None:
+        self._presenter.setInitializerByName(name)
+        self._editObject()
+
+    def _finishInitialization(self, result: int) -> None:
+        if result == QDialog.Accepted:
+            self._presenter.initializeObject()
 
     def _createInitializerLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
-        return lambda checked: self._initializeObject(name)
-
-    def _openObject(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Object',
-            nameFilters=self._presenter.getOpenFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenFileFilter())
-
-        if filePath:
-            self._presenter.setOpenFilePath(filePath)
-            self._presenter.setOpenFileFilter(nameFilter)
+        return lambda checked: self._startInitialization(name)
 
     def _saveObject(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(

@@ -8,7 +8,7 @@ import numpy
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
-from ...api.settings import SettingsRegistry, SettingsGroup
+from ...api.settings import SettingsRegistry
 from ..data import CropSizer
 from ..detector import Detector
 from .apparatus import Apparatus

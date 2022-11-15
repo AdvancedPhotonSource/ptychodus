@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
+from typing import Optional
 import logging
 import traceback
 
@@ -36,7 +37,7 @@ class ScanRepositoryEntry:
 
 class ScanListModel(QAbstractListModel):
 
-    def __init__(self, presenter: ScanPresenter, parent: QObject = None) -> None:
+    def __init__(self, presenter: ScanPresenter, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._scanList: list[ScanRepositoryEntry] = list()

@@ -72,7 +72,7 @@ class PtychoNNReconstructor(Reconstructor):
         if binSize == 1:
             binnedData = data
         else:
-            binnedData = numpy.zeros((data.shape[0], inputSize, inputSize))
+            binnedData = numpy.zeros((data.shape[0], inputSize, inputSize), dtype=data.dtype)
 
             for i in range(inputSize):
                 for j in range(inputSize):
