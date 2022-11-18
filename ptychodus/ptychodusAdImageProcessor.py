@@ -1,6 +1,7 @@
 from pathlib import Path
-import threading
 from typing import Any
+import logging
+import threading
 import time
 
 import numpy
@@ -16,23 +17,34 @@ import ptychodus.model
 
 class ReconstructionThread(threading.Thread):
 
-    def __init__(self, ptychodus: ptychodus.model.ModelCore, channel: pvapy.Channel) -> None:
+    def __init__(self, ptychodus: ptychodus.model.ModelCore, reconstructPV: str) -> None:
         super().__init__()
         self._ptychodus = ptychodus
-        self._channel = channel
+        self._channel = pvapy.Channel(reconstructPV, pvapy.CA)
         self._reconstructEvent = threading.Event()
         self._stopEvent = threading.Event()
+
+        self._channel.subscribe('reconstructor', self._monitor)
+        self._channel.startMonitor()
+        logging.debug(
+            f'{self._channel.getName()} {self._channel.isConnected()} {self._channel.isMonitorActive()}'
+        )
 
     def run(self) -> None:
         while not self._stopEvent.is_set():
             if self._reconstructEvent.wait(timeout=1.):
                 self._ptychodus.batchModeReconstruct()
-                self._channel.put(0)
                 self._reconstructEvent.clear()
+                # When reconstruction is done, reconstruction should set this back to 0 indicating results are ready.
+                self._channel.put(0)
 
-    def monitorReconstructPV(self, pv) -> None:  # FIXME typing
-        print(f'ReconstructPV :: {type(pv)} :: {pv}')
+    def _monitor(self, pv) -> None:
+        # NOTE caput bdpgp:gp:bit3 1
+        logging.debug(f'{type(pv)} :: {pv}')
 
+        # When bluesky is ready to trigger reconstruction, it will set bdpgp:gp:bit3 to 1.
+        # When reconstruction starts, it should make sure this bit is set to 0.
+        # The bluesky process will do the same, to ensure there is only one trigger, at the end of image streaming.
         if pv['value'] == 1:
             self._reconstructEvent.set()
 
@@ -46,6 +58,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         super().__init__(configDict)
 
         settingsFilePath = configDict['settingsFilePath']
+        reconstructPV = configDict.get('reconstructPV', 'bdpgp:gp:bit3')
 
         self.logger.debug(f'{ptychodus.__name__.title()} ({ptychodus.__version__})')
 
@@ -55,20 +68,12 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             replacementPathPrefix=configDict.get('replacementPathPrefix'),
         )
 
-        reconstructPV = configDict.get('reconstructPV', 'bdpgp:gp:bit3')
-        self.logger.debug(f'ReconstructPV: \"{reconstructPV}\"')
-        reconstructionChannel = pvapy.Channel(reconstructPV, pvapy.CA)
-
         self._ptychodus = ptychodus.model.ModelCore(modelArgs)
-        self._reconstructionThread = ReconstructionThread(self._ptychodus, reconstructionChannel)
-        self._scanXPV = configDict['scanXPV']
-        self._scanYPV = configDict['scanYPV']
+        self._reconstructionThread = ReconstructionThread(self._ptychodus, reconstructPV)
+        self._posXPV = configDict.get('posXPV', 'bluesky:pos_x')
+        self._posYPV = configDict.get('posYPV', 'bluesky:pos_y')
         self._nFramesProcessed = 0
         self._processingTime = 0.
-
-        reconstructionChannel.monitor(self._reconstructionThread.monitorReconstructPV,
-                                      'field(value,alarm,timeStamp)')
-        self.logger.debug(f'Created {type(self).__name__}')
 
     def start(self):
         '''Called at startup'''
@@ -83,8 +88,6 @@ class PtychodusAdImageProcessor(AdImageProcessor):
 
     def configure(self, configDict: dict[str, Any]) -> None:
         '''Configures user processor'''
-        self.logger.debug(f'Configuration update: {configDict}')
-
         numberOfPatternsTotal = configDict['nPatternsTotal']
         numberOfPatternsPerArray = configDict.get('nPatternsPerArray', 1)
         patternDataType = configDict.get('PatternDataType', 'uint16')
@@ -102,15 +105,6 @@ class PtychodusAdImageProcessor(AdImageProcessor):
 
         (frameId, image, nx, ny, nz, colorMode, fieldKey) = self.reshapeNtNdArray(pvObject)
 
-        # The bluesky code is ready to try. It will publish image frames with
-        # position attributes (each single frame with pos_x and pos_y attributes)
-        # to PVA PV bluesky:image. When bluesky is ready to trigger
-        # reconstruction, it will set bdpgp:gp:bit3 to 1. When reconstruction is
-        # done, reconstruction should set this back to 0 indicating results are
-        # ready. When reconstruction starts, it should make sure this bit is set
-        # to 0. The bluesky process will do the same, to ensure there is only one
-        # trigger, at the end of image streaming.
-
         if nx is None:
             self.logger.debug(f'Frame id {frameId} contains an empty image.')
         else:
@@ -123,21 +117,27 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             )
             self._ptychodus.assembleDiffractionPattern(array)
 
-        index = 0  # FIXME read indexes with positions
+        posXQueue = self.metadataQueueMap[self._posXPV]
 
-        for metadataChannel, metadataQueue in self.metadataQueueMap.items():
-            while True:
-                try:
-                    value = metadataQueue.get(0)
-                except pvaccess.QueueEmpty as ex:
-                    break
-                else:
-                    if metadataChannel == self._scanXPV:
-                        # TODO rescale value to meters
-                        self._ptychodus.assembleScanPositionX(index, value)
-                    elif metadataChannel == self._scanYPV:
-                        # TODO rescale value to meters
-                        self._ptychodus.assembleScanPositionY(index, value)
+        while True:
+            try:
+                posX = posXQueue.get(0)
+            except pvaccess.QueueEmpty:
+                break
+            else:
+                # TODO rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
+                self._ptychodus.assembleScanPositionX(posX['values'], posX['t'])
+
+        posYQueue = self.metadataQueueMap[self._posYPV]
+
+        while True:
+            try:
+                posY = posYQueue.get(0)
+            except pvaccess.QueueEmpty:
+                break
+            else:
+                # TODO rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
+                self._ptychodus.assembleScanPositionY(posY['values'], posY['t'])
 
         processingEndTime = time.time()
         self.processingTime += (processingEndTime - processingBeginTime)
