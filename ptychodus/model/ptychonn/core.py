@@ -1,16 +1,17 @@
 from __future__ import annotations
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Final, Iterator
+from typing import Final
 import logging
 
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
+from ...api.scan import Scan
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus
-from ..scan import Scan
 from .settings import PtychoNNSettings
 
 logger = logging.getLogger(__name__)

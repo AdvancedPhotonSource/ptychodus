@@ -1,16 +1,19 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Final, Iterator
+from statistics import median
 import logging
 
 import numpy
+import numpy.typing
 
 from .observer import Observable
+
+ScanArrayType = numpy.typing.NDArray[numpy.floating]
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +29,6 @@ class ScanPoint:
             return (self.x == other.x and self.y == other.y)
         else:
             return NotImplemented
-
-
-ScanPointSequence = Sequence[ScanPoint]
-ScanDictionary = Mapping[str, ScanPointSequence]
 
 
 class ScanPointTransform(Enum):
@@ -91,30 +90,48 @@ class ScanPointTransform(Enum):
         return ScanPoint(yp, xp) if self.swapXY else ScanPoint(xp, yp)
 
 
-class SimpleScanDictionary(ScanDictionary):
-    '''a dictionary-based scan file implementation'''
-    DEFAULT_SEQUENCE_NAME: Final[str] = 'Default'
+class Scan(Mapping[int, ScanPoint], Observable):
+    '''interface for an enumerated collection of scan points'''
 
-    def __init__(self, sequences: Mapping[str, ScanPointSequence]) -> None:
+    @abstractproperty
+    def name(self) -> str:
+        '''returns a unique name that is appropriate for a settings file'''
+        pass
+
+
+class TabularScan(Scan):
+
+    def __init__(self, name: str, data: Mapping[int, Sequence[ScanPoint]]) -> None:
         super().__init__()
-        self._sequences = sequences
+        self._name = name
+        self._data = data
 
     @classmethod
-    def createFromUnnamedSequence(cls, sequence: ScanPointSequence) -> SimpleScanDictionary:
-        '''creates a dictionary containing one unnamed scan sequence'''
-        return cls({cls.DEFAULT_SEQUENCE_NAME: sequence})
+    def createFromPointSequence(cls, name: str, pointSeq: Sequence[ScanPoint]) -> TabularScan:
+        return cls(name, {idx: [point] for idx, point in enumerate(pointSeq)})
 
-    def __getitem__(self, key: str) -> ScanPointSequence:
-        '''retrieves a scan point sequence from the dictionary'''
-        return self._sequences[key]
+    @property
+    def name(self) -> str:
+        return self._name
 
-    def __iter__(self) -> Iterator[str]:
-        '''iterates over scan point sequence names'''
-        return iter(self._sequences)
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._data)
+
+    def __getitem__(self, index: int) -> ScanPoint:
+        pointList = self._data[index]
+
+        return ScanPoint(
+            x=median(point.x for point in pointList),
+            y=median(point.y for point in pointList),
+        )
 
     def __len__(self) -> int:
-        '''returns the number of scan point sequences in the dictionary'''
-        return len(self._sequences)
+        return len(self._data)
+
+
+class ScanPointParseError(Exception):
+    '''raised when the scan file cannot be parsed'''
+    pass
 
 
 class ScanFileReader(ABC):
@@ -131,14 +148,9 @@ class ScanFileReader(ABC):
         pass
 
     @abstractmethod
-    def read(self, filePath: Path) -> ScanDictionary:
+    def read(self, filePath: Path) -> Sequence[Scan]:
         '''reads a scan dictionary from file'''
         pass
-
-
-class ScanPointParseError(Exception):
-    '''raised when the scan file cannot be parsed'''
-    pass
 
 
 class ScanFileWriter(ABC):
@@ -155,6 +167,6 @@ class ScanFileWriter(ABC):
         pass
 
     @abstractmethod
-    def write(self, filePath: Path, scanDict: ScanDictionary) -> None:
+    def write(self, filePath: Path, scanSeq: Sequence[Scan]) -> None:
         '''writes a scan dictionary to file'''
         pass

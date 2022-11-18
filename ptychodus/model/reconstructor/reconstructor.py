@@ -1,6 +1,5 @@
 from __future__ import annotations
-from collections.abc import Mapping
-from typing import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 import logging
 
 from ...api.observer import Observable, Observer

@@ -4,13 +4,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ...model import ScanInitializer, ScanPresenter
-
-
-@dataclass(frozen=True)
-class ScanRepositoryEntry:
-    name: str
-    initializer: ScanInitializer
+from ...model import ScanPresenter, ScanRepositoryKeyAndValue
 
 
 class ScanTableModel(QAbstractTableModel):
@@ -18,15 +12,12 @@ class ScanTableModel(QAbstractTableModel):
     def __init__(self, presenter: ScanPresenter, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
-        self._scanList: list[ScanRepositoryEntry] = list()
+        self._scanList: list[ScanRepositoryKeyAndValue] = list()
         self._checkedNames: set[str] = set()
 
     def refresh(self) -> None:
         self.beginResetModel()
-        self._scanList = [
-            ScanRepositoryEntry(name, initializer)
-            for name, initializer in self._presenter.getScanRepositoryContents()
-        ]
+        self._scanList = self._presenter.getScanRepositoryKeysAndValues()
         self.endResetModel()
 
     def isChecked(self, name: str) -> bool:
@@ -75,11 +66,11 @@ class ScanTableModel(QAbstractTableModel):
                 if index.column() == 0:
                     value = QVariant(entry.name)
                 elif index.column() == 1:
-                    value = QVariant(entry.initializer.category)
+                    value = QVariant(entry.item.category)
                 elif index.column() == 2:
-                    value = QVariant(entry.initializer.variant)
+                    value = QVariant(entry.item.variant)
                 elif index.column() == 3:
-                    value = QVariant(len(entry.initializer))
+                    value = QVariant(len(entry.item))
             elif role == Qt.FontRole:
                 font = QFont()
                 font.setBold(entry.name == self._presenter.getActiveScan())

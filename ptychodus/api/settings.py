@@ -1,7 +1,8 @@
 from __future__ import annotations
+from collections.abc import Iterator
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, Final, Generic, Iterator, Optional, TypeVar, Union
+from typing import Any, Callable, Final, Generic, Optional, TypeVar, Union
 from uuid import UUID
 import configparser
 

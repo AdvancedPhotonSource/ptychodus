@@ -11,8 +11,8 @@ from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
 from ..api.reconstructor import ReconstructResult
 from ..model import (ObjectPresenter, Observable, Observer, ProbePresenter,
-                     ReconstructorPlotPresenter, ReconstructorPresenter, ScanInitializer,
-                     ScanPresenter)
+                     ReconstructorPlotPresenter, ReconstructorPresenter, ScanPresenter,
+                     ScanRepositoryKeyAndValue)
 from ..view import ReconstructorParametersView, ReconstructorPlotView, resources
 
 logger = logging.getLogger(__name__)
@@ -29,25 +29,18 @@ class ReconstructorViewControllerFactory(ABC):
         pass
 
 
-@dataclass(frozen=True)
-class ScanRepositoryEntry:
-    name: str
-    initializer: ScanInitializer
-
-
 class ScanListModel(QAbstractListModel):
 
     def __init__(self, presenter: ScanPresenter, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
-        self._scanList: list[ScanRepositoryEntry] = list()
+        self._scanList: list[ScanRepositoryKeyAndValue] = list()
 
     def refresh(self) -> None:
         self.beginResetModel()
         self._scanList = [
-            ScanRepositoryEntry(name, initializer)
-            for name, initializer in self._presenter.getScanRepositoryContents()
-            if self._presenter.canActivateScan(name)
+            kv for kv in self._presenter.getScanRepositoryKeysAndValues()
+            if self._presenter.canActivateScan(kv.name)
         ]
         self.endResetModel()
 

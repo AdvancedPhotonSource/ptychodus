@@ -7,10 +7,10 @@ import ptychonn
 from ptychonn._model import ReconSmallPhaseModel, Tester
 
 from ...api.reconstructor import ReconstructResult, Reconstructor
+from ...api.scan import Scan
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus
-from ..scan import Scan
 from .settings import PtychoNNSettings
 
 logger = logging.getLogger(__name__)

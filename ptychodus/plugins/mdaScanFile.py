@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import IntEnum
@@ -12,7 +13,7 @@ import xdrlib
 import numpy
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import ScanDictionary, ScanFileReader, ScanPoint, SimpleScanDictionary
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
 
 T = TypeVar('T')
 
@@ -354,7 +355,7 @@ class MDAScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'EPICS MDA Files (*.mda)'
 
-    def read(self, filePath: Path) -> ScanDictionary:
+    def read(self, filePath: Path) -> Sequence[Scan]:
         pointList = list()
 
         micronsToMeters = Decimal('1e-6')
@@ -370,7 +371,7 @@ class MDAScanFileReader(ScanFileReader):
 
             pointList.append(point)
 
-        return SimpleScanDictionary({self.simpleName: pointList})
+        return [TabularScan.createFromPointSequence(self.simpleName, pointList)]
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

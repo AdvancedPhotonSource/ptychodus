@@ -169,11 +169,18 @@ class ModelCore:
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
         return self._dataCore.diffractionDatasetPresenter
 
-    def setupForStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
+    def resetStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
         self.diffractionDatasetPresenter.configureStreaming(metadata)
+        # FIXME reset scan positions self.scanPresenter
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray) -> None:
         self.diffractionDatasetPresenter.assemble(array)
+
+    def assembleScanPositionX(self, index: int, valueInMeters: float) -> None:
+        pass  # FIXME
+
+    def assembleScanPositionY(self, index: int, valueInMeters: float) -> None:
+        pass  # FIXME
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
         return self.diffractionDatasetPresenter.getAssemblyQueueSize()
@@ -184,7 +191,7 @@ class ModelCore:
     def saveRestartFile(self, filePath: Path) -> None:
         restartData = {
             'data': self._dataCore.dataset.getAssembledData(),
-            'scanInMeters': self._scanCore.scan.getArray(),  # FIXME
+            'scanInMeters': self._scanCore.getScanArrayInMeters(),
             'probe': self._probeCore.probe.getArray(),
             'object': self._objectCore.object.getArray(),
         }
@@ -195,7 +202,7 @@ class ModelCore:
         restartData = numpy.load(filePath)
 
         self._dataCore.dataset.setAssembledData(restartData['data'])
-        self._scanCore.scan.setArray(restartData['scanInMeters'])  # FIXME
+        self._scanCore.setScanArrayInMeters(restartData['scanInMeters'])
         self._probeCore.probe.setArray(restartData['probe'])
         self._objectCore.object.setArray(restartData['object'])
 
@@ -205,13 +212,10 @@ class ModelCore:
         pixelSizeXInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeXInMeters())
         pixelSizeYInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeYInMeters())
 
-        scanXInMeters = [float(point.x) for point in self._scanCore.scan]
-        scanYInMeters = [float(point.y) for point in self._scanCore.scan]
-
         # TODO document output file format; include cost function values
         dataDump = dict()
         dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
-        dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
+        dataDump['scanInMeters'] = self._scanCore.getScanArrayInMeters()
         dataDump['probe'] = self._probeCore.probe.getArray()
         dataDump['object'] = self._objectCore.object.getArray()
         numpy.savez(self._reconstructorCore.settings.outputFilePath.value, **dataDump)

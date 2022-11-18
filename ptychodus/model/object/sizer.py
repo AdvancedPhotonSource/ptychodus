@@ -4,8 +4,8 @@ from decimal import Decimal, ROUND_CEILING
 from ...api.geometry import Interval
 from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
+from ...api.scan import Scan
 from ..probe import Apparatus, ProbeSizer
-from ..scan import Scan
 
 
 class ObjectSizer(Observable, Observer):
@@ -30,7 +30,7 @@ class ObjectSizer(Observable, Observer):
         xint_m = None
         yint_m = None
 
-        for point in self._scan:
+        for point in self._scan.values():
             if xint_m and yint_m:
                 xint_m.hull(point.x)
                 yint_m.hull(point.y)

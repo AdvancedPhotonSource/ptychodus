@@ -8,11 +8,11 @@ import numpy.typing
 from ...api.data import DiffractionPatternData
 from ...api.object import ObjectArrayType
 from ...api.probe import ProbeArrayType
-from ...api.scan import ScanPoint
+from ...api.scan import Scan, ScanPoint, TabularScan
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus, Probe
-from ..scan import Scan, ScanInitializerFactory, ScanRepository
+from ..scan import ScanRepositoryItemFactory, ScanRepository
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +30,14 @@ class TikeArrayConverter:
 
     def __init__(self, apparatus: Apparatus, scan: Scan, probe: Probe, object_: Object,
                  diffractionDataset: ActiveDiffractionDataset,
-                 scanInitializerFactory: ScanInitializerFactory,
+                 scanRepositoryItemFactory: ScanRepositoryItemFactory,
                  scanRepository: ScanRepository) -> None:
         self._apparatus = apparatus
         self._scan = scan
         self._probe = probe
         self._object = object_
         self._diffractionDataset = diffractionDataset
-        self._scanInitializerFactory = scanInitializerFactory
+        self._scanRepositoryItemFactory = scanRepositoryItemFactory
         self._scanRepository = scanRepository
 
     def getDiffractionData(self) -> DiffractionPatternData:
@@ -102,8 +102,8 @@ class TikeArrayConverter:
         padX = probe.shape[-1] // 2
         padY = probe.shape[-2] // 2
 
-        shiftX = padX - min(float(point.x / pixelSizeXInMeters) for point in self._scan)
-        shiftY = padY - min(float(point.y / pixelSizeYInMeters) for point in self._scan)
+        shiftX = padX - min(float(point.x / pixelSizeXInMeters) for point in self._scan.values())
+        shiftY = padY - min(float(point.y / pixelSizeYInMeters) for point in self._scan.values())
 
         pointList: list[ScanPoint] = list()
 
@@ -114,9 +114,10 @@ class TikeArrayConverter:
             y_m = Decimal(repr(y_px)) * pixelSizeYInMeters
             pointList.append(ScanPoint(x_m, y_m))
 
-        tabularScan = self._scanInitializerFactory.createTabularInitializer(
-            pointList, 'Tike', None)
-        self._scanRepository.insertScan(tabularScan)
+        tabularScan = TabularScan.createFromPointSequence('Tike', pointList)
+        tabularScanRepositoryItem = self._scanRepositoryItemFactory.createTabularInitializer(
+            tabularScan, None)
+        self._scanRepository.insertItem(tabularScanRepositoryItem)
 
         self._probe.setArray(arrays.probe[0, 0])
 

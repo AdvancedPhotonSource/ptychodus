@@ -1,51 +1,26 @@
-from __future__ import annotations
+from collections.abc import Iterator
 from decimal import Decimal
 
 import numpy
 
 from ...api.scan import ScanPoint
-from .initializer import ScanInitializer, ScanInitializerParameters
+from .repositoryItem import ContiguousScanIterator, ScanRepositoryItem
 from .settings import ScanSettings
 
 
-class LissajousScanInitializer(ScanInitializer):
+class LissajousScanRepositoryItem(ScanRepositoryItem):
 
-    def __init__(self, parameters: ScanInitializerParameters, numberOfPoints: int,
-                 amplitudeXInMeters: Decimal, amplitudeYInMeters: Decimal,
-                 angularStepXInTurns: Decimal, angularStepYInTurns: Decimal,
-                 angularShiftInTurns: Decimal) -> None:
-        super().__init__(parameters)
-        self._numberOfPoints = numberOfPoints
-        self._amplitudeXInMeters = amplitudeXInMeters
-        self._amplitudeYInMeters = amplitudeYInMeters
-        self._angularStepXInTurns = angularStepXInTurns
-        self._angularStepYInTurns = angularStepYInTurns
-        self._angularShiftInTurns = angularShiftInTurns
-
-    @classmethod
-    def createFromSettings(cls, parameters: ScanInitializerParameters,
-                           settings: ScanSettings) -> LissajousScanInitializer:
-        numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value
-        amplitudeXInMeters = settings.amplitudeXInMeters.value
-        amplitudeYInMeters = settings.amplitudeYInMeters.value
-        angularStepXInTurns = settings.angularStepXInTurns.value
-        angularStepYInTurns = settings.angularStepYInTurns.value
-        angularShiftInTurns = settings.angularShiftInTurns.value
-        return cls(parameters, numberOfPoints, amplitudeXInMeters, amplitudeYInMeters,
-                   angularStepXInTurns, angularStepYInTurns, angularShiftInTurns)
-
-    def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.numberOfPointsX.value = self._numberOfPoints
-        settings.numberOfPointsY.value = 1
-        settings.amplitudeXInMeters.value = self._amplitudeXInMeters
-        settings.amplitudeYInMeters.value = self._amplitudeYInMeters
-        settings.angularStepXInTurns.value = self._angularStepXInTurns
-        settings.angularStepYInTurns.value = self._angularStepYInTurns
-        settings.angularShiftInTurns.value = self._angularShiftInTurns
-        super().syncToSettings(settings)
+    def __init__(self) -> None:
+        super().__init__()
+        self._numberOfPoints = 0
+        self._amplitudeXInMeters = Decimal()
+        self._amplitudeYInMeters = Decimal()
+        self._angularStepXInTurns = Decimal()
+        self._angularStepYInTurns = Decimal()
+        self._angularShiftInTurns = Decimal()
 
     @property
-    def nameHint(self) -> str:
+    def name(self) -> str:
         return self.variant
 
     @property
@@ -59,6 +34,43 @@ class LissajousScanInitializer(ScanInitializer):
     @property
     def canActivate(self) -> bool:
         return True
+
+    def syncFromSettings(self, settings: ScanSettings) -> None:
+        self._numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value
+        self._amplitudeXInMeters = settings.amplitudeXInMeters.value
+        self._amplitudeYInMeters = settings.amplitudeYInMeters.value
+        self._angularStepXInTurns = settings.angularStepXInTurns.value
+        self._angularStepYInTurns = settings.angularStepYInTurns.value
+        self._angularShiftInTurns = settings.angularShiftInTurns.value
+        self.notifyObservers()
+
+    def syncToSettings(self, settings: ScanSettings) -> None:
+        settings.numberOfPointsX.value = self._numberOfPoints
+        settings.numberOfPointsY.value = 1
+        settings.amplitudeXInMeters.value = self._amplitudeXInMeters
+        settings.amplitudeYInMeters.value = self._amplitudeYInMeters
+        settings.angularStepXInTurns.value = self._angularStepXInTurns
+        settings.angularStepYInTurns.value = self._angularStepYInTurns
+        settings.angularShiftInTurns.value = self._angularShiftInTurns
+
+    def __iter__(self) -> Iterator[int]:
+        return ContiguousScanIterator(self)
+
+    def __getitem__(self, index: int) -> ScanPoint:
+        if index >= len(self):
+            raise IndexError(f'Index {index} is out of range')
+
+        twoPi = 2 * numpy.pi
+        thetaX = twoPi * float(self._angularStepXInTurns * index + self._angularShiftInTurns)
+        thetaY = twoPi * float(self._angularStepYInTurns * index)
+
+        return ScanPoint(
+            self._amplitudeXInMeters * Decimal(numpy.sin(thetaX)),
+            self._amplitudeYInMeters * Decimal(numpy.sin(thetaY)),
+        )
+
+    def __len__(self) -> int:
+        return self._numberOfPoints
 
     def getNumberOfPoints(self) -> int:
         return self._numberOfPoints
@@ -107,19 +119,3 @@ class LissajousScanInitializer(ScanInitializer):
         if self._angularShiftInTurns != angularShiftInTurns:
             self._angularShiftInTurns = angularShiftInTurns
             self.notifyObservers()
-
-    def _getPoint(self, index: int) -> ScanPoint:
-        if index >= len(self):
-            raise IndexError(f'Index {index} is out of range')
-
-        twoPi = 2 * numpy.pi
-        thetaX = twoPi * float(self._angularStepXInTurns * index + self._angularShiftInTurns)
-        thetaY = twoPi * float(self._angularStepYInTurns * index)
-
-        return ScanPoint(
-            self._amplitudeXInMeters * Decimal(numpy.sin(thetaX)),
-            self._amplitudeYInMeters * Decimal(numpy.sin(thetaY)),
-        )
-
-    def __len__(self) -> int:
-        return self._numberOfPoints

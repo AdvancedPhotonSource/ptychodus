@@ -1,6 +1,7 @@
 from __future__ import annotations
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Final, Iterator
+from typing import Final
 import logging
 
 try:

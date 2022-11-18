@@ -7,8 +7,8 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFi
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
-from ...model import (CartesianScanInitializer, LissajousScanInitializer, Scan, ScanInitializer,
-                      ScanPresenter, SpiralScanInitializer)
+from ...model import (CartesianScanInitializer, LissajousScanInitializer, ScanPresenter,
+                      SpiralScanInitializer)
 from ...view import (CartesianScanView, LissajousScanView, ScanEditorDialog, ScanParametersView,
                      ScanPlotView, ScanPositionDataView, ScanTransformView, SpiralScanView)
 from ..data import FileDialogFactory
@@ -195,8 +195,8 @@ class ScanController(Observer):
 
             name = index.data()
             initializer = initializerDict[name]
-            x = [point.x for point in initializer]
-            y = [point.y for point in initializer]
+            x = [point.x for point in initializer.values()]
+            y = [point.y for point in initializer.values()]
 
             self._plotView.axes.plot(x, y, '.-', label=name, linewidth=1.5)
 

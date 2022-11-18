@@ -1,42 +1,41 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...model import ScanInitializer
+from ...model import TransformedScanRepositoryItem
 from ...view import ScanTransformView
 
 
 class ScanTransformController(Observer):
 
-    def __init__(self, initializer: ScanInitializer, view: ScanTransformView) -> None:
+    def __init__(self, item: TransformedScanRepositoryItem, view: ScanTransformView) -> None:
         super().__init__()
-        self._initializer = initializer
+        self._item = item
         self._view = view
 
     @classmethod
-    def createInstance(cls, initializer: ScanInitializer,
+    def createInstance(cls, item: TransformedScanRepositoryItem,
                        view: ScanTransformView) -> ScanTransformController:
-        controller = cls(initializer, view)
-        initializer.addObserver(controller)
+        controller = cls(item, view)
+        item.addObserver(controller)
 
-        for name in initializer.getTransformNameList():
+        for name in item.getTransformNameList():
             view.transformComboBox.addItem(name)
 
-        view.transformComboBox.currentTextChanged.connect(initializer.setTransformByName)
-        view.jitterRadiusWidget.lengthChanged.connect(initializer.setJitterRadiusInMeters)
-        view.centroidXWidget.lengthChanged.connect(initializer.setCentroidXInMeters)
-        view.centroidYWidget.lengthChanged.connect(initializer.setCentroidYInMeters)
+        view.transformComboBox.currentTextChanged.connect(item.setTransformByName)
+        view.jitterRadiusWidget.lengthChanged.connect(item.setJitterRadiusInMeters)
+        view.centroidXWidget.lengthChanged.connect(item.setCentroidXInMeters)
+        view.centroidYWidget.lengthChanged.connect(item.setCentroidYInMeters)
 
         controller._syncModelToView()
 
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.transformComboBox.setCurrentText(self._initializer.getTransformName())
-        self._view.jitterRadiusWidget.setLengthInMeters(
-            self._initializer.getJitterRadiusInMeters())
-        self._view.centroidXWidget.setLengthInMeters(self._initializer.getCentroidXInMeters())
-        self._view.centroidYWidget.setLengthInMeters(self._initializer.getCentroidYInMeters())
+        self._view.transformComboBox.setCurrentText(self._item.getTransformName())
+        self._view.jitterRadiusWidget.setLengthInMeters(self._item.getJitterRadiusInMeters())
+        self._view.centroidXWidget.setLengthInMeters(self._item.getCentroidXInMeters())
+        self._view.centroidYWidget.setLengthInMeters(self._item.getCentroidYInMeters())
 
     def update(self, observable: Observable) -> None:
-        if observable is self._initializer:
+        if observable is self._item:
             self._syncModelToView()

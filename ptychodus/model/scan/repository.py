@@ -1,54 +1,51 @@
-from collections.abc import Mapping
-from typing import Iterator, Optional
+from __future__ import annotations
+from collections.abc import Iterator, Mapping
+import logging
 
 from ...api.observer import Observable
-from .initializer import ScanInitializer
+from .repositoryItem import ScanRepositoryItem
+
+logger = logging.getLogger(__name__)
 
 
-class ScanRepository(Mapping[str, ScanInitializer], Observable):
+class ScanRepository(Mapping[str, ScanRepositoryItem], Observable):
 
     def __init__(self) -> None:
         super().__init__()
-        self._initializers: dict[str, ScanInitializer] = dict()
+        self._itemDict: dict[str, ScanRepositoryItem] = dict()
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._initializers)
+        return iter(self._itemDict)
 
-    def __getitem__(self, name: str) -> ScanInitializer:
-        return self._initializers[name]
+    def __getitem__(self, name: str) -> ScanRepositoryItem:
+        return self._itemDict[name]
 
     def __len__(self) -> int:
-        return len(self._initializers)
+        return len(self._itemDict)
 
-    def insertScan(self, initializer: ScanInitializer) -> None:
-        name = initializer.nameHint
+    def insertItem(self, item: ScanRepositoryItem) -> None:
+        uniqueName = item.name
         index = 0
 
-        while name in self._initializers:
+        while uniqueName in self._itemDict:
             index += 1
-            name = f'{initializer.nameHint}-{index}'
+            uniqueName = f'{item.name}-{index}'
 
-        self._initializers[name] = initializer
+        self._itemDict[uniqueName] = item
         self.notifyObservers()
 
-    def canActivateScan(self, name: str) -> bool:
-        initializer = self._initializers.get(name)
+    def canRemoveItem(self, name: str) -> bool:
+        return len(self._itemDict) > 1
 
-        if initializer is not None:
-            return initializer.canActivate
-
-        return False
-
-    def canRemoveScan(self, name: str) -> bool:
-        return len(self._initializers) > 1
-
-    def removeScan(self, name: str) -> None:
-        if self.canRemoveScan(name):
+    def removeItem(self, name: str) -> None:
+        if self.canRemoveItem(name):
             try:
-                initializer = self._initializers.pop(name)
+                item = self._itemDict.pop(name)
             except KeyError:
                 pass
             else:
-                initializer.clearObservers()
+                item.clearObservers()
+        else:
+            logger.debug(f'Cannot remove item \"{name}\"')
 
         self.notifyObservers()

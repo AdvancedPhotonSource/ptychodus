@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from importlib.metadata import version
 from pathlib import Path
 from pprint import pformat, pprint
