@@ -7,8 +7,8 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFi
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
-from ...model import (CartesianScanInitializer, LissajousScanInitializer, ScanPresenter,
-                      SpiralScanInitializer)
+from ...model import (CartesianScanRepositoryItem, LissajousScanRepositoryItem, ScanPresenter,
+                      SpiralScanRepositoryItem)
 from ...view import (CartesianScanView, LissajousScanView, ScanEditorDialog, ScanParametersView,
                      ScanPlotView, ScanPositionDataView, ScanTransformView, SpiralScanView)
 from ..data import FileDialogFactory
@@ -55,12 +55,12 @@ class ScanController(Observer):
         parametersView.positionDataView.tableView.horizontalHeader().sectionClicked.connect(
             lambda logicalIndex: controller._redrawPlot())
 
-        initializerNameList = presenter.getInitializerNameList()
-        initializerNameList.insert(0, ScanController.OPEN_FILE)
+        itemNameList = presenter.getItemNameList()
+        itemNameList.insert(0, ScanController.OPEN_FILE)
 
-        for name in initializerNameList:
+        for name in itemNameList:
             insertAction = parametersView.positionDataView.buttonBox.insertMenu.addAction(name)
-            insertAction.triggered.connect(controller._createInitializerLambda(name))
+            insertAction.triggered.connect(controller._createItemLambda(name))
 
         parametersView.positionDataView.buttonBox.editButton.clicked.connect(
             controller._editSelectedScan)
@@ -81,7 +81,7 @@ class ScanController(Observer):
         else:
             self._presenter.initializeScan(name)
 
-    def _createInitializerLambda(self, name: str) -> Callable[[bool], None]:
+    def _createItemLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
         return lambda checked: self._initializeScan(name)
 
@@ -118,34 +118,34 @@ class ScanController(Observer):
         if current.isValid():
             name = current.sibling(current.row(), 0).data()
             category = current.sibling(current.row(), 1).data()
-            initializer = self._presenter.getInitializer(name)
+            item = self._presenter.getItem(name)
 
-            if isinstance(initializer, CartesianScanInitializer):
+            if isinstance(item._item, CartesianScanRepositoryItem):
                 cartesianDialog = ScanEditorDialog.createInstance(
                     CartesianScanView.createInstance(), self._parametersView)
                 cartesianDialog.setWindowTitle(name)
                 cartesianController = CartesianScanController.createInstance(
-                    initializer, cartesianDialog.editorView)
+                    item._item, cartesianDialog.editorView)
                 cartesianTransformController = ScanTransformController.createInstance(
-                    initializer, cartesianDialog.transformView)
+                    item, cartesianDialog.transformView)
                 cartesianDialog.open()
-            elif isinstance(initializer, SpiralScanInitializer):
+            elif isinstance(item._item, SpiralScanRepositoryItem):
                 spiralDialog = ScanEditorDialog.createInstance(SpiralScanView.createInstance(),
                                                                self._parametersView)
                 spiralDialog.setWindowTitle(name)
                 spiralController = SpiralScanController.createInstance(
-                    initializer, spiralDialog.editorView)
+                    item._item, spiralDialog.editorView)
                 spiralTransformController = ScanTransformController.createInstance(
-                    initializer, spiralDialog.transformView)
+                    item, spiralDialog.transformView)
                 spiralDialog.open()
-            elif isinstance(initializer, LissajousScanInitializer):
+            elif isinstance(item._item, LissajousScanRepositoryItem):
                 lissajousDialog = ScanEditorDialog.createInstance(
                     LissajousScanView.createInstance(), self._parametersView)
                 lissajousDialog.setWindowTitle(name)
                 lissajousController = LissajousScanController.createInstance(
-                    initializer, lissajousDialog.editorView)
+                    item._item, lissajousDialog.editorView)
                 lissajousTransformController = ScanTransformController.createInstance(
-                    initializer, lissajousDialog.transformView)
+                    item, lissajousDialog.transformView)
                 lissajousDialog.open()
             else:
                 logger.debug(f'Unknown category \"{category}\"')
@@ -181,10 +181,7 @@ class ScanController(Observer):
         self._presenter.setActiveScan(name)
 
     def _redrawPlot(self) -> None:
-        initializerDict = {
-            name: initializer
-            for name, initializer in self._presenter.getScanRepositoryContents()
-        }
+        itemDict = {name: item for name, item in self._presenter.getScanRepositoryContents()}
         self._plotView.axes.clear()
 
         for row in range(self._proxyModel.rowCount()):
@@ -194,9 +191,9 @@ class ScanController(Observer):
                 continue
 
             name = index.data()
-            initializer = initializerDict[name]
-            x = [point.x for point in initializer.values()]
-            y = [point.y for point in initializer.values()]
+            item = itemDict[name]
+            x = [point.x for point in item.values()]
+            y = [point.y for point in item.values()]
 
             self._plotView.axes.plot(x, y, '.-', label=name, linewidth=1.5)
 
@@ -212,8 +209,8 @@ class ScanController(Observer):
         self._plotView.figureCanvas.draw()
 
     def _syncModelToView(self) -> None:
-        for _, initializer in self._presenter.getScanRepositoryContents():
-            initializer.addObserver(self)
+        for _, item in self._presenter.getScanRepositoryContents():
+            item.addObserver(self)
 
         self._parametersView.positionDataView.tableView.blockSignals(True)
         self._tableModel.refresh()
@@ -226,7 +223,7 @@ class ScanController(Observer):
         if observable is self._presenter:
             self._syncModelToView()
         else:
-            for name, initializer in self._presenter.getScanRepositoryContents():
-                if observable is initializer and self._tableModel.isChecked(name):
+            for name, item in self._presenter.getScanRepositoryContents():
+                if observable is item and self._tableModel.isChecked(name):
                     self._redrawPlot()
                     break

@@ -15,20 +15,20 @@ logger = logging.getLogger(__name__)
 
 class ActiveScan(Scan, Observer):
 
-    def __init__(self, settings: ScanSettings, initializerFactory: ScanRepositoryItemFactory,
+    def __init__(self, settings: ScanSettings, factory: ScanRepositoryItemFactory,
                  repository: ScanRepository, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
-        self._initializerFactory = initializerFactory
+        self._factory = factory
         self._repository = repository
         self._reinitObservable = reinitObservable
-        self._initializer: ScanRepositoryItem = CartesianScanRepositoryItem(snake=True)
+        self._item: ScanRepositoryItem = CartesianScanRepositoryItem(snake=True)
         self._name = str()
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings, initializerFactory: ScanRepositoryItemFactory,
+    def createInstance(cls, settings: ScanSettings, factory: ScanRepositoryItemFactory,
                        repository: ScanRepository, reinitObservable: Observable) -> ActiveScan:
-        scan = cls(settings, initializerFactory, repository, reinitObservable)
+        scan = cls(settings, factory, repository, reinitObservable)
         scan._syncFromSettings()
         reinitObservable.addObserver(scan)
         return scan
@@ -50,58 +50,58 @@ class ActiveScan(Scan, Observer):
             return
 
         try:
-            initializer = self._repository[name]
+            item = self._repository[name]
         except KeyError:
             logger.error(f'Failed to activate \"{name}\"!')
             return
 
-        if not initializer.canActivate:
+        if not item.canActivate:
             logger.error(f'Failed to activate \"{name}\"!')
             return
 
-        self._initializer.removeObserver(self)
-        self._initializer = initializer
+        self._item.removeObserver(self)
+        self._item = item
         self._name = name
-        self._initializer.addObserver(self)
+        self._item.addObserver(self)
 
         self._syncToSettings()
         self.notifyObservers()
 
     def __iter__(self) -> Iterator[int]:
-        return iter(self._initializer)
+        return iter(self._item)
 
     def __getitem__(self, index: int) -> ScanPoint:
-        return self._initializer[index]
+        return self._item[index]
 
     def __len__(self) -> int:
-        return len(self._initializer)
+        return len(self._item)
 
     def _syncFromSettings(self) -> None:
-        initializerName = self._settings.initializer.value
-        name = initializerName.casefold()
+        itemName = self._settings.initializer.value
+        name = itemName.casefold()
 
         if name == 'fromfile':
-            tabularList = self._initializerFactory.openScanFromSettings()
+            tabularList = self._factory.openScanFromSettings()
 
             for tabular in tabularList:
                 self._repository.insertItem(tabular)
         else:
-            initializer = self._initializerFactory.createInitializer(name)
+            item = self._factory.createItem(name)
 
-            if initializer is None:
-                logger.error(f'Unknown scan initializer \"{initializerName}\"!')
+            if item is None:
+                logger.error(f'Unknown scan initializer \"{itemName}\"!')
             else:
-                self._repository.insertItem(initializer)
+                self._repository.insertItem(item)
 
         self.setActiveScan(self._settings.activeScan.value)
 
     def _syncToSettings(self) -> None:
-        self._settings.initializer.value = self._initializer.name
-        self._initializer.syncToSettings(self._settings)
+        self._settings.initializer.value = self._item.name
+        self._item.syncToSettings(self._settings)
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._initializer:
+        if observable is self._item:
             self._syncToSettings()
         elif observable is self._reinitObservable:
             self._syncFromSettings()

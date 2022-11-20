@@ -16,16 +16,16 @@ class ContiguousScanIterator(Iterator[int]):
         return self
 
     def __next__(self) -> int:
-        self._index += 1
-
         if self._index < len(self._scan):
-            return self._index
+            index = self._index
+            self._index += 1
+            return index
 
         raise StopIteration
 
 
 class ScanRepositoryItem(Scan):
-    '''ABC for plugins that can initialize scan sequences'''
+    '''ABC for items that can be stored in a scan repository'''
 
     @abstractproperty
     def category(self) -> str:
@@ -39,15 +39,15 @@ class ScanRepositoryItem(Scan):
 
     @abstractproperty
     def canActivate(self) -> bool:
-        '''indicates whether initializer can be made active'''
+        '''indicates whether item can be made active'''
         pass
 
     @abstractmethod
     def syncFromSettings(self, settings: ScanSettings) -> None:
-        '''synchronizes initializer state from settings'''
+        '''synchronizes item state from settings'''
         pass
 
     @abstractmethod
     def syncToSettings(self, settings: ScanSettings) -> None:
-        '''synchronizes initializer state to settings'''
+        '''synchronizes item state to settings'''
         pass

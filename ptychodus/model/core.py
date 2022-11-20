@@ -96,8 +96,7 @@ class ModelCore:
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
-            self._scanCore.initializerFactory, self._scanCore.repository,
-            modelArgs.isDeveloperModeEnabled)
+            self._scanCore.factory, self._scanCore.repository, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
@@ -106,9 +105,9 @@ class ModelCore:
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             [
-                self.ptychopyReconstructorLibrary,
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
+                self.ptychopyReconstructorLibrary,
             ],
         )
 
@@ -171,16 +170,16 @@ class ModelCore:
 
     def resetStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
         self.diffractionDatasetPresenter.configureStreaming(metadata)
-        # FIXME reset scan positions self.scanPresenter
+        self.scanPresenter.activateNewStreamingScan()
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray) -> None:
         self.diffractionDatasetPresenter.assemble(array)
 
-    def assembleScanPositionX(self, index: int, valueInMeters: float) -> None:
-        pass  # FIXME
+    def assembleScanPositionsX(self, arrayIndexes: list[int], valuesInMeters: list[float]) -> None:
+        self.scanPresenter.assembleScanPositionsX(arrayIndexes, valuesInMeters)
 
-    def assembleScanPositionY(self, index: int, valueInMeters: float) -> None:
-        pass  # FIXME
+    def assembleScanPositionsY(self, arrayIndexes: list[int], valuesInMeters: list[float]) -> None:
+        self.scanPresenter.assembleScanPositionsY(arrayIndexes, valuesInMeters)
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
         return self.diffractionDatasetPresenter.getAssemblyQueueSize()

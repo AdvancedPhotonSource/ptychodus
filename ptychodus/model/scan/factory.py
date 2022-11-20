@@ -1,3 +1,4 @@
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 import logging
@@ -5,7 +6,7 @@ import logging
 import numpy
 
 from ...api.plugins import PluginChooser
-from ...api.scan import Scan, ScanFileReader, ScanPoint
+from ...api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
 from .cartesian import CartesianScanRepositoryItem
 from .lissajous import LissajousScanRepositoryItem
 from .repositoryItem import ScanRepositoryItem
@@ -25,8 +26,8 @@ class ScanRepositoryItemFactory:
         self._settings = settings
         self._fileReaderChooser = fileReaderChooser
 
-    def createTabularInitializer(self, scan: Scan,
-                                 fileInfo: Optional[ScanFileInfo]) -> ScanRepositoryItem:
+    def createTabularItem(self, scan: Scan,
+                          fileInfo: Optional[ScanFileInfo]) -> ScanRepositoryItem:
         item = TabularScanRepositoryItem(scan, fileInfo)
         return TransformedScanRepositoryItem(self._rng, item)
 
@@ -47,7 +48,7 @@ class ScanRepositoryItemFactory:
             fileInfo = ScanFileInfo(fileType, filePath)
 
             for scan in scanSequence:
-                item = self.createTabularInitializer(scan, fileInfo)
+                item = self.createTabularItem(scan, fileInfo)
                 itemList.append(item)
         else:
             logger.debug(f'Refusing to read invalid file path \"{filePath}\"')
@@ -63,10 +64,10 @@ class ScanRepositoryItemFactory:
         self._fileReaderChooser.setFromSimpleName(fileInfo.fileType)
         return self._readScan(fileInfo.filePath)
 
-    def getInitializerNameList(self) -> list[str]:
+    def getItemNameList(self) -> list[str]:
         return ['Lissajous', 'Raster', 'Snake', 'Spiral']
 
-    def createInitializer(self, name: str) -> Optional[ScanRepositoryItem]:
+    def createItem(self, name: str) -> Optional[ScanRepositoryItem]:
         item: Optional[ScanRepositoryItem] = None
         nameLower = name.casefold()
 
@@ -78,6 +79,9 @@ class ScanRepositoryItemFactory:
             item = CartesianScanRepositoryItem(snake=True)
         elif nameLower == 'spiral':
             item = SpiralScanRepositoryItem()
+        elif nameLower == 'tabular':
+            item = TabularScanRepositoryItem(
+                TabularScan('Empty', {0: [ScanPoint(Decimal(), Decimal())]}), None)
 
         if item is not None:
             item = TransformedScanRepositoryItem(self._rng, item)

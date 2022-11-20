@@ -115,7 +115,7 @@ class TikeArrayConverter:
             pointList.append(ScanPoint(x_m, y_m))
 
         tabularScan = TabularScan.createFromPointSequence('Tike', pointList)
-        tabularScanRepositoryItem = self._scanRepositoryItemFactory.createTabularInitializer(
+        tabularScanRepositoryItem = self._scanRepositoryItemFactory.createTabularItem(
             tabularScan, None)
         self._scanRepository.insertItem(tabularScanRepositoryItem)
 

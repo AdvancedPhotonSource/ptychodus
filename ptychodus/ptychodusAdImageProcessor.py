@@ -126,7 +126,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 break
             else:
                 # TODO rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
-                self._ptychodus.assembleScanPositionX(posX['values'], posX['t'])
+                # FIXME need to match pos[t] with frame numbers
+                self._ptychodus.assembleScanPositionsX(posX['values'], posX['t'])
 
         posYQueue = self.metadataQueueMap[self._posYPV]
 
@@ -137,7 +138,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 break
             else:
                 # TODO rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
-                self._ptychodus.assembleScanPositionY(posY['values'], posY['t'])
+                # FIXME need to match pos[t] with frame numbers
+                self._ptychodus.assembleScanPositionsY(posY['values'], posY['t'])
 
         processingEndTime = time.time()
         self.processingTime += (processingEndTime - processingBeginTime)
