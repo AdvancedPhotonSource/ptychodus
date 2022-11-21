@@ -34,7 +34,7 @@ class LynxScanFileReader(ScanFileReader):
         return 'LYNX Scan Files (*.dat)'
 
     def read(self, filePath: Path) -> Sequence[Scan]:
-        pointDict: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
+        pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
         micronsToMeters = Decimal('1e-6')
 
         with filePath.open(newline='') as csvFile:
@@ -59,6 +59,6 @@ class LynxScanFileReader(ScanFileReader):
                     x=Decimal(row[LynxScanFileColumn.X]) * micronsToMeters,
                     y=Decimal(row[LynxScanFileColumn.Y]) * micronsToMeters,
                 )
-                pointDict[detector_count].append(point)
+                pointSeqMap[detector_count].append(point)
 
-        return [TabularScan(self.simpleName, pointDict)]
+        return [TabularScan.createFromMappedPointSequence(self.simpleName, pointSeqMap)]

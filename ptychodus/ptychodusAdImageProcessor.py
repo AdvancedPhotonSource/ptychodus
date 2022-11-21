@@ -35,16 +35,14 @@ class ReconstructionThread(threading.Thread):
             if self._reconstructEvent.wait(timeout=1.):
                 self._ptychodus.batchModeReconstruct()
                 self._reconstructEvent.clear()
-                # When reconstruction is done, reconstruction should set this back to 0 indicating results are ready.
+                # reconstruction done; indicate that results are ready
                 self._channel.put(0)
 
     def _monitor(self, pv) -> None:
         # NOTE caput bdpgp:gp:bit3 1
         logging.debug(f'{type(pv)} :: {pv}')
 
-        # When bluesky is ready to trigger reconstruction, it will set bdpgp:gp:bit3 to 1.
-        # When reconstruction starts, it should make sure this bit is set to 0.
-        # The bluesky process will do the same, to ensure there is only one trigger, at the end of image streaming.
+        # start reconstructing
         if pv['value'] == 1:
             self._reconstructEvent.set()
 
@@ -97,7 +95,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             numberOfPatternsTotal=int(numberOfPatternsTotal),
             patternDataType=numpy.dtype(patternDataType),
         )
-        self._ptychodus.resetStreamingWorkflow(metadata)
+        self._ptychodus.initializeStreamingWorkflow(metadata)
 
     def process(self, pvObject: pvaccess.PvObject) -> pvaccess.PvObject:
         '''Processes monitor update'''
@@ -125,8 +123,9 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             except pvaccess.QueueEmpty:
                 break
             else:
-                # TODO rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
+                # FIXME rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
                 # FIXME need to match pos[t] with frame numbers
+                # FIXME do not process scan positions newer than most recent frame
                 self._ptychodus.assembleScanPositionsX(posX['values'], posX['t'])
 
         posYQueue = self.metadataQueueMap[self._posYPV]
@@ -137,8 +136,9 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             except pvaccess.QueueEmpty:
                 break
             else:
-                # TODO rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
+                # FIXME rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
                 # FIXME need to match pos[t] with frame numbers
+                # FIXME do not process scan positions newer than most recent frame
                 self._ptychodus.assembleScanPositionsY(posY['values'], posY['t'])
 
         processingEndTime = time.time()

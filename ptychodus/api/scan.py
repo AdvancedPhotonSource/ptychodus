@@ -101,14 +101,27 @@ class Scan(Mapping[int, ScanPoint], Observable):
 
 class TabularScan(Scan):
 
-    def __init__(self, name: str, data: Mapping[int, Sequence[ScanPoint]]) -> None:
+    def __init__(self, name: str, pointMap: Mapping[int, ScanPoint]) -> None:
         super().__init__()
         self._name = name
-        self._data = data
+        self._data = dict(pointMap)
 
     @classmethod
     def createFromPointSequence(cls, name: str, pointSeq: Sequence[ScanPoint]) -> TabularScan:
-        return cls(name, {idx: [point] for idx, point in enumerate(pointSeq)})
+        return cls(name, {index: point for index, point in enumerate(pointSeq)})
+
+    @classmethod
+    def createFromMappedPointSequence(
+            cls, name: str, pointSeqMap: Mapping[int, Sequence[ScanPoint]]) -> TabularScan:
+        pointMap: dict[int, ScanPoint] = dict()
+
+        for index, pointSeq in pointSeqMap.items():
+            pointMap[index] = ScanPoint(
+                x=median(point.x for point in pointSeq),
+                y=median(point.y for point in pointSeq),
+            )
+
+        return cls(name, pointMap)
 
     @property
     def name(self) -> str:
@@ -118,12 +131,7 @@ class TabularScan(Scan):
         return iter(self._data)
 
     def __getitem__(self, index: int) -> ScanPoint:
-        pointList = self._data[index]
-
-        return ScanPoint(
-            x=median(point.x for point in pointList),
-            y=median(point.y for point in pointList),
-        )
+        return self._data[index]
 
     def __len__(self) -> int:
         return len(self._data)

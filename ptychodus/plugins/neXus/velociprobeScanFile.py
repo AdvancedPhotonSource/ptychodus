@@ -38,24 +38,23 @@ class VelociprobeScanFileReader(ScanFileReader):
         cosine = numpy.cos(radians)
         self._stageRotationCosine = Decimal(repr(cosine))
 
-    def _applyTransform(self, pointDict: dict[int, list[ScanPoint]]) -> None:
-        xValues = [median(p.x for p in pl) for pl in pointDict.values()]
-        yValues = [median(p.y for p in pl) for pl in pointDict.values()]
-
+    def _applyTransform(self, scan: Scan) -> Scan:
         zero = Decimal()
-        xMean = sum(xValues, start=zero) / len(xValues)
-        yMean = sum(yValues, start=zero) / len(yValues)
+        xMean = sum((p.x for p in scan.values()), start=zero) / len(scan)
+        yMean = sum((p.y for p in scan.values()), start=zero) / len(scan)
+        pointMap: dict[int, ScanPoint] = dict()
 
-        for pointList in pointDict.values():
-            for idx, point in enumerate(pointList):
-                pointList[idx] = ScanPoint(
-                    x=(point.x - xMean) * self._stageRotationCosine,
-                    y=(point.y - yMean),
-                )
+        for index, point in scan.items():
+            pointMap[index] = ScanPoint(
+                x=(point.x - xMean) * self._stageRotationCosine,
+                y=(point.y - yMean),
+            )
+
+        return TabularScan(scan.name, pointMap)
 
     def read(self, filePath: Path) -> Sequence[Scan]:
-        enPointDict: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
-        liPointDict: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
+        enPointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
+        liPointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
         minimumColumnCount = max(col.value for col in VelociprobeScanFileColumn) + 1
         nanometersToMeters = Decimal('1e-9')
 
@@ -78,18 +77,20 @@ class VelociprobeScanFileReader(ScanFileReader):
                     x=x_nm * nanometersToMeters,
                     y=+y_li_nm * nanometersToMeters,
                 )
-                liPointDict[trigger].append(liPoint)
+                liPointSeqMap[trigger].append(liPoint)
 
                 enPoint = ScanPoint(
                     x=x_nm * nanometersToMeters,
                     y=-y_en_nm * nanometersToMeters,
                 )
-                enPointDict[trigger].append(enPoint)
+                enPointSeqMap[trigger].append(enPoint)
 
-        self._applyTransform(liPointDict)
-        self._applyTransform(enPointDict)
+        liScan: Scan = TabularScan.createFromMappedPointSequence('VelociprobeLaserInterferometerY',
+                                                                 liPointSeqMap)
+        liScan = self._applyTransform(liScan)
 
-        return [
-            TabularScan('VelociprobeLaserInterferometerY', liPointDict),
-            TabularScan('VelociprobeEncoderY', enPointDict),
-        ]
+        enScan: Scan = TabularScan.createFromMappedPointSequence('VelociprobeEncoderY',
+                                                                 enPointSeqMap)
+        enScan = self._applyTransform(enScan)
+
+        return [liScan, enScan]

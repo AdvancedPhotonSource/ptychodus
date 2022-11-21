@@ -23,7 +23,7 @@ class ScanRepository(Mapping[str, ScanRepositoryItem], Observable):
     def __len__(self) -> int:
         return len(self._itemDict)
 
-    def insertItem(self, item: ScanRepositoryItem) -> None:
+    def insertItem(self, item: ScanRepositoryItem) -> str:
         uniqueName = item.name
         index = 0
 
@@ -33,6 +33,7 @@ class ScanRepository(Mapping[str, ScanRepositoryItem], Observable):
 
         self._itemDict[uniqueName] = item
         self.notifyObservers()
+        return uniqueName
 
     def canRemoveItem(self, name: str) -> bool:
         return len(self._itemDict) > 1

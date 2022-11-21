@@ -81,7 +81,7 @@ class ScanRepositoryItemFactory:
             item = SpiralScanRepositoryItem()
         elif nameLower == 'tabular':
             item = TabularScanRepositoryItem(
-                TabularScan('Empty', {0: [ScanPoint(Decimal(), Decimal())]}), None)
+                TabularScan('Empty', {0: ScanPoint(Decimal(), Decimal())}), None)
 
         if item is not None:
             item = TransformedScanRepositoryItem(self._rng, item)

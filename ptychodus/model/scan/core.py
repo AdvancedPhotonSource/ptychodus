@@ -16,6 +16,7 @@ from .factory import ScanRepositoryItemFactory
 from .repository import ScanRepository
 from .repositoryItem import ScanRepositoryItem
 from .settings import ScanSettings
+from .streaming import StreamingScanBuilder
 from .tabular import ScanFileInfo, TabularScanRepositoryItem
 
 logger = logging.getLogger(__name__)
@@ -30,18 +31,20 @@ class ScanRepositoryKeyAndValue:
 class ScanPresenter(Observable, Observer):
 
     def __init__(self, factory: ScanRepositoryItemFactory, repository: ScanRepository,
-                 scan: ActiveScan, fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
+                 scan: ActiveScan, builder: StreamingScanBuilder,
+                 fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
         super().__init__()
         self._factory = factory
         self._repository = repository
         self._scan = scan
+        self._builder = builder
         self._fileWriterChooser = fileWriterChooser
 
     @classmethod
     def createInstance(cls, factory: ScanRepositoryItemFactory, repository: ScanRepository,
-                       scan: ActiveScan,
+                       scan: ActiveScan, builder: StreamingScanBuilder,
                        fileWriterChooser: PluginChooser[ScanFileWriter]) -> ScanPresenter:
-        presenter = cls(factory, repository, scan, fileWriterChooser)
+        presenter = cls(factory, repository, scan, builder, fileWriterChooser)
         repository.addObserver(presenter)
         scan.addObserver(presenter)
         return presenter
@@ -75,12 +78,12 @@ class ScanPresenter(Observable, Observer):
         return self._repository[name]
 
     def initializeScan(self, name: str) -> None:
-        initializer = self._factory.createItem(name)
+        scan = self._factory.createItem(name)
 
-        if initializer is None:
+        if scan is None:
             logger.error(f'Unknown scan initializer \"{name}\"!')
         else:
-            self._repository.insertItem(initializer)
+            self._repository.insertItem(scan)
 
     def getOpenFileFilterList(self) -> list[str]:
         return self._factory.getOpenFileFilterList()
@@ -125,14 +128,19 @@ class ScanPresenter(Observable, Observer):
                 fileInfo = ScanFileInfo(fileType, filePath)
                 initializer.setFileInfo(fileInfo)
 
-    def activateNewStreamingScan(self) -> None:
-        pass  # FIXME
+    def initializeStreamingScan(self) -> None:
+        self._builder.reset()
 
     def assembleScanPositionsX(self, arrayIndexes: list[int], valuesInMeters: list[float]) -> None:
-        pass  # FIXME
+        self._builder.assembleScanPositionsX(arrayIndexes, valuesInMeters)
 
     def assembleScanPositionsY(self, arrayIndexes: list[int], valuesInMeters: list[float]) -> None:
-        pass  # FIXME
+        self._builder.assembleScanPositionsY(arrayIndexes, valuesInMeters)
+
+    def finalizeStreamingScan(self) -> None:
+        scan = self._builder.build()
+        name = self._repository.insertItem(scan)
+        self._scan.setActiveScan(name)
 
     def update(self, observable: Observable) -> None:
         if observable is self._repository:
@@ -149,10 +157,11 @@ class ScanCore:
         self.repository = ScanRepository()
         self._settings = ScanSettings.createInstance(settingsRegistry)
         self.factory = ScanRepositoryItemFactory(rng, self._settings, fileReaderChooser)
+        self._builder = StreamingScanBuilder(self.factory)
         self.scan = ActiveScan.createInstance(self._settings, self.factory, self.repository,
                                               settingsRegistry)
         self.presenter = ScanPresenter.createInstance(self.factory, self.repository, self.scan,
-                                                      fileWriterChooser)
+                                                      self._builder, fileWriterChooser)
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self.presenter.openScan(filePath, fileFilter)

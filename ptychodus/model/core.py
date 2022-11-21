@@ -168,9 +168,9 @@ class ModelCore:
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
         return self._dataCore.diffractionDatasetPresenter
 
-    def resetStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
+    def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
         self.diffractionDatasetPresenter.configureStreaming(metadata)
-        self.scanPresenter.activateNewStreamingScan()
+        self.scanPresenter.initializeStreamingScan()
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray) -> None:
         self.diffractionDatasetPresenter.assemble(array)
@@ -180,6 +180,10 @@ class ModelCore:
 
     def assembleScanPositionsY(self, arrayIndexes: list[int], valuesInMeters: list[float]) -> None:
         self.scanPresenter.assembleScanPositionsY(arrayIndexes, valuesInMeters)
+
+    def finalizeStreamingWorkflow(self) -> None:
+        self.scanPresenter.finalizeStreamingScan()
+        self.objectPresenter.initializeObject()
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
         return self.diffractionDatasetPresenter.getAssemblyQueueSize()
