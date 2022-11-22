@@ -35,8 +35,13 @@ class PositionStream:
 
         for valueInMeters, timeStamp in zip(self.valuesInMeters, self.timeStamps):
             index = bisect(arrayTimeStampList, timeStamp)
-            arrayIndex = arrayIndexList[index]
-            valuesSeqMap[arrayIndex].append(valueInMeters)
+
+            try:
+                arrayIndex = arrayIndexList[index]
+            except IndexError:
+                break
+            else:
+                valuesSeqMap[arrayIndex].append(valueInMeters)
 
         return {index: median(values) for index, values in valuesSeqMap.items()}
 

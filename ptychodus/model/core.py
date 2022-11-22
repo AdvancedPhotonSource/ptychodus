@@ -127,7 +127,9 @@ class ModelCore:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
 
         if self.diffractionDatasetPresenter.isReadyToAssemble:
-            self.diffractionDatasetPresenter.startProcessingDiffractionPatterns(block=True)
+            self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
+            self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(
+                finishAssembling=True)
 
         if self.rpcMessageService:
             self.rpcMessageService.start()
@@ -169,7 +171,8 @@ class ModelCore:
         return self._dataCore.diffractionDatasetPresenter
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self.diffractionDatasetPresenter.configureStreaming(metadata)
+        self.diffractionDatasetPresenter.initializeStreaming(metadata)
+        self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
         self.scanPresenter.initializeStreamingScan()
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
@@ -183,6 +186,7 @@ class ModelCore:
         self.scanPresenter.assembleScanPositionsY(valuesInMeters, timeStamps)
 
     def finalizeStreamingWorkflow(self) -> None:
+        self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(finishAssembling=True)
         self.scanPresenter.finalizeStreamingScan()
         self.objectPresenter.initializeObject()
 

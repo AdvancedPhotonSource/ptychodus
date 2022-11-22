@@ -142,15 +142,15 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     def switchTo(self, dataset: DiffractionDataset) -> None:
         if self.isAssembling:
-            self.stop()
+            self.stop(finishAssembling=False)
 
         self._arrayList.clear()
         self._dataset = dataset
         self.notifyObservers()
 
-    def start(self, block: bool) -> None:
+    def start(self) -> None:
         if self.isAssembling:
-            self.stop()
+            self.stop(finishAssembling=False)
 
         logger.info('Resetting data assembler...')
 
@@ -188,17 +188,16 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         logger.info('Data assembler started.')
 
-        if block:
-            self._taskQueue.join()
-            self.stop()
-
     def insertArray(self, array: DiffractionPatternArray) -> None:
         stride = self.getMetadata().numberOfPatternsPerArray
         offset = stride * array.getIndex()
         task = AssemblyTask(array, offset)
         self._taskQueue.put(task)
 
-    def stop(self) -> None:
+    def stop(self, finishAssembling: bool) -> None:
+        if finishAssembling:
+            self._taskQueue.join()
+
         logger.info('Stopping data assembler...')
         self._stopWorkEvent.set()
 
@@ -251,7 +250,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
         self.switchTo(dataset)
-        self.start(block=True)
+        self.start()
+        self.stop(finishAssembling=True)
 
     def notifyObserversIfDatasetChanged(self) -> None:
         if self._changedEvent.is_set():

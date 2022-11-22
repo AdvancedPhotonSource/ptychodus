@@ -160,18 +160,17 @@ class DiffractionDatasetPresenter(Observable, Observer):
         array = self._activeDiffractionDataset.getAssembledData()
         numpy.save(filePath, array)
 
-    def startProcessingDiffractionPatterns(self, block: bool = False) -> None:
-        self._activeDiffractionDataset.start(block)
+    def startProcessingDiffractionPatterns(self) -> None:
+        self._activeDiffractionDataset.start()
 
-    def stopProcessingDiffractionPatterns(self) -> None:
-        self._activeDiffractionDataset.stop()
+    def stopProcessingDiffractionPatterns(self, finishAssembling: bool) -> None:
+        self._activeDiffractionDataset.stop(finishAssembling)
 
-    def configureStreaming(self, metadata: DiffractionMetadata) -> None:
+    def initializeStreaming(self, metadata: DiffractionMetadata) -> None:
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
         dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
         self._activeDiffractionDataset.switchTo(dataset)
-        self._activeDiffractionDataset.start(block=False)
 
     def assemble(self, array: DiffractionPatternArray) -> None:
         self._activeDiffractionDataset.insertArray(array)
@@ -259,4 +258,4 @@ class DataCore:
 
     def stop(self) -> None:
         self._dataDirectoryWatcher.stop()
-        self.dataset.stop()
+        self.dataset.stop(finishAssembling=False)
