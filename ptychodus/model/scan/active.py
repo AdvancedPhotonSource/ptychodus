@@ -45,7 +45,7 @@ class ActiveScan(Scan, Observer):
 
         return False
 
-    def setActiveScan(self, name: str) -> None:
+    def setActiveScan(self, name: str, force: bool = False) -> None:
         if self._name == name:
             return
 
@@ -55,7 +55,7 @@ class ActiveScan(Scan, Observer):
             logger.error(f'Failed to activate \"{name}\"!')
             return
 
-        if not item.canActivate:
+        if not (item.canActivate or force):
             logger.error(f'Failed to activate \"{name}\"!')
             return
 

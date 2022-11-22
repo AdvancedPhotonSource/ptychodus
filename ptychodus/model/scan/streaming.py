@@ -1,3 +1,4 @@
+from bisect import bisect
 from collections import defaultdict
 from decimal import Decimal
 from statistics import median
@@ -21,11 +22,19 @@ class PositionStream:
         self.valuesInMeters.extend(valuesInMeters)
         self.timeStamps.extend(timeStamps)
 
-    def getMedianPositions(self, arrayTimeStamps: dict[int, float]) -> dict[int, float]:
+    def getMedianPositions(self, arrayTimeStampDict: dict[int, float]) -> dict[int, float]:
         valuesSeqMap: dict[int, list[float]] = defaultdict(list[float])
+        arrayIndexList: list[int] = list()
+        arrayTimeStampList: list[float] = list()
 
-        for arrayIndex, arrayTimeStamp in sorted(self._arrayTimeStamps.items()):
-            pass  # FIXME
+        for index, timeStamp in sorted(arrayTimeStampDict.items()):
+            arrayIndexList.append(index)
+            arrayTimeStampList.append(timeStamp)
+
+        for valueInMeters, timeStamp in zip(self.valuesInMeters, self.timeStamps):
+            index = bisect(arrayTimeStampList, timeStamp)
+            arrayIndex = arrayIndexList[index]
+            valuesSeqMap[arrayIndex].append(valueInMeters)
 
         return {index: median(values) for index, values in valuesSeqMap.items()}
 

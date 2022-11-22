@@ -143,7 +143,7 @@ class ScanPresenter(Observable, Observer):
     def finalizeStreamingScan(self) -> None:
         scan = self._builder.build()
         name = self._repository.insertItem(scan)
-        self._scan.setActiveScan(name)
+        self._scan.setActiveScan(name, force=True)
 
     def update(self, observable: Observable) -> None:
         if observable is self._repository:
