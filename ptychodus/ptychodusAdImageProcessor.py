@@ -31,7 +31,9 @@ class ReconstructionThread(threading.Thread):
     def run(self) -> None:
         while not self._stopEvent.is_set():
             if self._reconstructEvent.wait(timeout=1.):
+                logging.debug('ReconstructionThread: Begin assembling scan positions')
                 self._ptychodus.finalizeStreamingWorkflow()
+                logging.debug('ReconstructionThread: End assembling scan positions')
                 self._ptychodus.batchModeReconstruct()
                 self._reconstructEvent.clear()
                 # reconstruction done; indicate that results are ready
@@ -39,9 +41,14 @@ class ReconstructionThread(threading.Thread):
 
     def _monitor(self, pvObject: pvaccess.PvObject) -> None:
         # NOTE caput bdpgp:gp:bit3 1
-        if pvObject['value'] == 1:
+        logging.debug(f'ReconstructionThread::monitor {pvObject}')
+
+        if pvObject['value']['index'] == 1:
+            logging.debug('ReconstructionThread: Reconstruct PV triggered!')
             # start reconstructing
             self._reconstructEvent.set()
+        else:
+            logging.debug('ReconstructionThread: Reconstruct PV not triggered!')
 
     def stop(self) -> None:
         self._stopEvent.set()
@@ -121,7 +128,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             except pvaccess.QueueEmpty:
                 break
             else:
-                self._ptychodus.assembleScanPositionsX(posX['values'], posX['t'])
+                self._ptychodus.assembleScanPositionsX(
+                    posX['values'], [TimeUtility.getTimeStampAsFloat(ts) for ts in posX['t']])
 
         posYQueue = self.metadataQueueMap[self._posYPV]
 
@@ -131,7 +139,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             except pvaccess.QueueEmpty:
                 break
             else:
-                self._ptychodus.assembleScanPositionsY(posY['values'], posY['t'])
+                self._ptychodus.assembleScanPositionsY(
+                    posY['values'], [TimeUtility.getTimeStampAsFloat(ts) for ts in posY['t']])
 
         processingEndTime = time.time()
         self.processingTime += (processingEndTime - processingBeginTime)
