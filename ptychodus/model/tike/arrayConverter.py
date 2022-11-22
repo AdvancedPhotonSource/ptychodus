@@ -55,7 +55,7 @@ class TikeArrayConverter:
         for index in assembledIndexes:
             try:
                 point = self._scan[index]
-            except IndexError:
+            except KeyError:
                 continue
 
             scanX.append(float(point.x / pixelSizeXInMeters))
