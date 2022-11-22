@@ -172,14 +172,15 @@ class ModelCore:
         self.diffractionDatasetPresenter.configureStreaming(metadata)
         self.scanPresenter.initializeStreamingScan()
 
-    def assembleDiffractionPattern(self, array: DiffractionPatternArray) -> None:
+    def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
         self.diffractionDatasetPresenter.assemble(array)
+        self.scanPresenter.insertArrayTimeStamp(array.getIndex(), timeStamp)
 
-    def assembleScanPositionsX(self, arrayIndexes: list[int], valuesInMeters: list[float]) -> None:
-        self.scanPresenter.assembleScanPositionsX(arrayIndexes, valuesInMeters)
+    def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+        self.scanPresenter.assembleScanPositionsX(valuesInMeters, timeStamps)
 
-    def assembleScanPositionsY(self, arrayIndexes: list[int], valuesInMeters: list[float]) -> None:
-        self.scanPresenter.assembleScanPositionsY(arrayIndexes, valuesInMeters)
+    def assembleScanPositionsY(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+        self.scanPresenter.assembleScanPositionsY(valuesInMeters, timeStamps)
 
     def finalizeStreamingWorkflow(self) -> None:
         self.scanPresenter.finalizeStreamingScan()

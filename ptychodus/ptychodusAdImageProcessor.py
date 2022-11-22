@@ -8,6 +8,7 @@ import numpy
 
 from pvapy.hpc.adImageProcessor import AdImageProcessor
 from pvapy.utility.floatWithUnits import FloatWithUnits
+from pvapy.utility.timeUtility import TimeUtility
 import pvaccess
 import pvapy
 
@@ -26,24 +27,20 @@ class ReconstructionThread(threading.Thread):
 
         self._channel.subscribe('reconstructor', self._monitor)
         self._channel.startMonitor()
-        logging.debug(
-            f'{self._channel.getName()} {self._channel.isConnected()} {self._channel.isMonitorActive()}'
-        )
 
     def run(self) -> None:
         while not self._stopEvent.is_set():
             if self._reconstructEvent.wait(timeout=1.):
+                self._ptychodus.finalizeStreamingWorkflow()
                 self._ptychodus.batchModeReconstruct()
                 self._reconstructEvent.clear()
                 # reconstruction done; indicate that results are ready
                 self._channel.put(0)
 
-    def _monitor(self, pv) -> None:
+    def _monitor(self, pvObject: pvaccess.PvObject) -> None:
         # NOTE caput bdpgp:gp:bit3 1
-        logging.debug(f'{type(pv)} :: {pv}')
-
-        # start reconstructing
-        if pv['value'] == 1:
+        if pvObject['value'] == 1:
+            # start reconstructing
             self._reconstructEvent.set()
 
     def stop(self) -> None:
@@ -55,10 +52,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
     def __init__(self, configDict: dict[str, Any] = {}) -> None:
         super().__init__(configDict)
 
-        settingsFilePath = configDict['settingsFilePath']
-        reconstructPV = configDict.get('reconstructPV', 'bdpgp:gp:bit3')
-
         self.logger.debug(f'{ptychodus.__name__.title()} ({ptychodus.__version__})')
+        settingsFilePath = configDict['settingsFilePath']
 
         modelArgs = ptychodus.model.ModelArgs(
             restartFilePath=None,
@@ -67,7 +62,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         )
 
         self._ptychodus = ptychodus.model.ModelCore(modelArgs)
-        self._reconstructionThread = ReconstructionThread(self._ptychodus, reconstructPV)
+        self._reconstructionThread = ReconstructionThread(
+            self._ptychodus, configDict.get('reconstructPV', 'bdpgp:gp:bit3'))
         self._posXPV = configDict.get('posXPV', 'bluesky:pos_x')
         self._posYPV = configDict.get('posYPV', 'bluesky:pos_y')
         self._nFramesProcessed = 0
@@ -102,10 +98,12 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         processingBeginTime = time.time()
 
         (frameId, image, nx, ny, nz, colorMode, fieldKey) = self.reshapeNtNdArray(pvObject)
+        frameTimeStamp = TimeUtility.getTimeStampAsFloat(pvObject['timeStamp'])
 
         if nx is None:
             self.logger.debug(f'Frame id {frameId} contains an empty image.')
         else:
+            self.logger.debug(f'Frame id {frameId} time stamp {frameTimeStamp}')
             image3d = image[numpy.newaxis, :, :].copy()
             array = ptychodus.api.data.SimpleDiffractionPatternArray(
                 label=f'Frame{frameId}',
@@ -113,7 +111,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 data=image3d,
                 state=ptychodus.api.data.DiffractionPatternState.LOADED,
             )
-            self._ptychodus.assembleDiffractionPattern(array)
+            self._ptychodus.assembleDiffractionPattern(array, frameTimeStamp)
 
         posXQueue = self.metadataQueueMap[self._posXPV]
 
@@ -123,9 +121,6 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             except pvaccess.QueueEmpty:
                 break
             else:
-                # FIXME rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
-                # FIXME need to match pos[t] with frame numbers
-                # FIXME do not process scan positions newer than most recent frame
                 self._ptychodus.assembleScanPositionsX(posX['values'], posX['t'])
 
         posYQueue = self.metadataQueueMap[self._posYPV]
@@ -136,9 +131,6 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             except pvaccess.QueueEmpty:
                 break
             else:
-                # FIXME rescale value to meters, values is a numpy.array(list[float]), t is list[time_t]
-                # FIXME need to match pos[t] with frame numbers
-                # FIXME do not process scan positions newer than most recent frame
                 self._ptychodus.assembleScanPositionsY(posY['values'], posY['t'])
 
         processingEndTime = time.time()

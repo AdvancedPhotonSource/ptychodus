@@ -131,11 +131,14 @@ class ScanPresenter(Observable, Observer):
     def initializeStreamingScan(self) -> None:
         self._builder.reset()
 
-    def assembleScanPositionsX(self, arrayIndexes: list[int], valuesInMeters: list[float]) -> None:
-        self._builder.assembleScanPositionsX(arrayIndexes, valuesInMeters)
+    def insertArrayTimeStamp(self, arrayIndex: int, timeStamp: float) -> None:
+        self._builder.insertArrayTimeStamp(arrayIndex, timeStamp)
 
-    def assembleScanPositionsY(self, arrayIndexes: list[int], valuesInMeters: list[float]) -> None:
-        self._builder.assembleScanPositionsY(arrayIndexes, valuesInMeters)
+    def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+        self._builder.assembleScanPositionsX(valuesInMeters, timeStamps)
+
+    def assembleScanPositionsY(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+        self._builder.assembleScanPositionsY(valuesInMeters, timeStamps)
 
     def finalizeStreamingScan(self) -> None:
         scan = self._builder.build()
