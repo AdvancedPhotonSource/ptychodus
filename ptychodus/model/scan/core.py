@@ -170,7 +170,7 @@ class ScanCore:
         self.presenter.openScan(filePath, fileFilter)
 
     def getScanArrayInMeters(self) -> ScanArrayType:
-        # TODO use indexes
+        # FIXME use indexes
         scanXInMeters = [float(point.x) for point in self.scan.values()]
         scanYInMeters = [float(point.y) for point in self.scan.values()]
         return numpy.column_stack((scanYInMeters, scanXInMeters))
@@ -178,7 +178,7 @@ class ScanCore:
     def setScanArrayInMeters(self, array: ScanArrayType) -> None:
         pointList: list[ScanPoint] = list()
 
-        # TODO use indexes
+        # FIXME use indexes
         for row in array:
             point = ScanPoint(
                 x=Decimal(repr(row[1])),

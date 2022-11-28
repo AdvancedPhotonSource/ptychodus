@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model import (CartesianScanRepositoryItem, LissajousScanRepositoryItem, ScanPresenter,
-                      SpiralScanRepositoryItem)
+                      SpiralScanRepositoryItem, TransformedScanRepositoryItem)
 from ...view import (CartesianScanView, LissajousScanView, ScanEditorDialog, ScanParametersView,
                      ScanPlotView, ScanPositionDataView, ScanTransformView, SpiralScanView)
 from ..data import FileDialogFactory
@@ -120,35 +120,38 @@ class ScanController(Observer):
             category = current.sibling(current.row(), 1).data()
             item = self._presenter.getItem(name)
 
-            if isinstance(item._item, CartesianScanRepositoryItem):
-                cartesianDialog = ScanEditorDialog.createInstance(
-                    CartesianScanView.createInstance(), self._parametersView)
-                cartesianDialog.setWindowTitle(name)
-                cartesianController = CartesianScanController.createInstance(
-                    item._item, cartesianDialog.editorView)
-                cartesianTransformController = ScanTransformController.createInstance(
-                    item, cartesianDialog.transformView)
-                cartesianDialog.open()
-            elif isinstance(item._item, SpiralScanRepositoryItem):
-                spiralDialog = ScanEditorDialog.createInstance(SpiralScanView.createInstance(),
-                                                               self._parametersView)
-                spiralDialog.setWindowTitle(name)
-                spiralController = SpiralScanController.createInstance(
-                    item._item, spiralDialog.editorView)
-                spiralTransformController = ScanTransformController.createInstance(
-                    item, spiralDialog.transformView)
-                spiralDialog.open()
-            elif isinstance(item._item, LissajousScanRepositoryItem):
-                lissajousDialog = ScanEditorDialog.createInstance(
-                    LissajousScanView.createInstance(), self._parametersView)
-                lissajousDialog.setWindowTitle(name)
-                lissajousController = LissajousScanController.createInstance(
-                    item._item, lissajousDialog.editorView)
-                lissajousTransformController = ScanTransformController.createInstance(
-                    item, lissajousDialog.transformView)
-                lissajousDialog.open()
+            if isinstance(item, TransformedScanRepositoryItem):
+                if isinstance(item._item, CartesianScanRepositoryItem):
+                    cartesianDialog = ScanEditorDialog.createInstance(
+                        CartesianScanView.createInstance(), self._parametersView)
+                    cartesianDialog.setWindowTitle(name)
+                    cartesianController = CartesianScanController.createInstance(
+                        item._item, cartesianDialog.editorView)
+                    cartesianTransformController = ScanTransformController.createInstance(
+                        item, cartesianDialog.transformView)
+                    cartesianDialog.open()
+                elif isinstance(item._item, SpiralScanRepositoryItem):
+                    spiralDialog = ScanEditorDialog.createInstance(SpiralScanView.createInstance(),
+                                                                   self._parametersView)
+                    spiralDialog.setWindowTitle(name)
+                    spiralController = SpiralScanController.createInstance(
+                        item._item, spiralDialog.editorView)
+                    spiralTransformController = ScanTransformController.createInstance(
+                        item, spiralDialog.transformView)
+                    spiralDialog.open()
+                elif isinstance(item._item, LissajousScanRepositoryItem):
+                    lissajousDialog = ScanEditorDialog.createInstance(
+                        LissajousScanView.createInstance(), self._parametersView)
+                    lissajousDialog.setWindowTitle(name)
+                    lissajousController = LissajousScanController.createInstance(
+                        item._item, lissajousDialog.editorView)
+                    lissajousTransformController = ScanTransformController.createInstance(
+                        item, lissajousDialog.transformView)
+                    lissajousDialog.open()
+                else:
+                    logger.debug(f'Unknown category \"{category}\"')
             else:
-                logger.debug(f'Unknown category \"{category}\"')
+                logger.debug(f'Repository item is not a transformed scan!')
         else:
             logger.error('No scans are selected!')
 

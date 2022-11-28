@@ -48,9 +48,9 @@ class ReconstructorPlotPresenter(Observable):
     def __init__(self) -> None:
         super().__init__()
         self._xlabel: str = 'Iteration'
-        self._xvalues: list[float] = list()
+        self._xvalues: list[list[float]] = list()
         self._ylabel: str = 'Objective'
-        self._yvalues: list[float] = list()
+        self._yvalues: list[list[float]] = list()
 
     @property
     def xlabel(self) -> str:
@@ -73,20 +73,20 @@ class ReconstructorPlotPresenter(Observable):
             self.notifyObservers()
 
     @property
-    def xvalues(self) -> list[float]:
+    def xvalues(self) -> list[list[float]]:
         return self._xvalues
 
     @property
-    def yvalues(self) -> list[float]:
+    def yvalues(self) -> list[list[float]]:
         return self._yvalues
 
-    def setValues(self, xvalues: list[float], yvalues: list[float]) -> None:
+    def setValues(self, xvalues: list[list[float]], yvalues: list[list[float]]) -> None:
         self._xvalues = xvalues
         self._yvalues = yvalues
         self.notifyObservers()
 
-    def setEnumeratedYValues(self, yvalues: list[float]) -> None:
-        xvalues = [float(idx) for idx, _ in enumerate(yvalues)]
+    def setEnumeratedYValues(self, yvalues: list[list[float]]) -> None:
+        xvalues = [[float(idx) for idx in range(len(series))] for series in yvalues]
         self.setValues(xvalues, yvalues)
 
 

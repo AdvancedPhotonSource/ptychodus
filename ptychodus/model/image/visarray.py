@@ -32,10 +32,12 @@ class VisualizationArray(Observable):
         elif numpy.size(array) < 1:
             logger.error('Refusing to assign empty array!')
             self._reset()
-        elif numpy.issubdtype(array.dtype, numpy.inexact):
-            self._array = array
+        elif numpy.issubdtype(array.dtype, numpy.complexfloating):
+            self._array = array.astype(numpy.complex_)
+        elif numpy.issubdtype(array.dtype, numpy.floating):
+            self._array = array.astype(numpy.float_)
         elif numpy.issubdtype(array.dtype, numpy.integer):
-            self._array = array.astype(numpy.float64)
+            self._array = array.astype(numpy.float_)
         else:
             logger.error(f'Refusing to assign array with non-numeric dtype \"{array.dtype}\"!')
             self._reset()
