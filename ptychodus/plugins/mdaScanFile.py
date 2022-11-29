@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 import logging
 import sys
 import typing
@@ -232,8 +232,8 @@ class MDAScanInfo:
 
 @dataclass(frozen=True)
 class MDAScanData:
-    readback_array: numpy.typing.NDArray[numpy.floating]  # double, shape: np x npts
-    detector_array: numpy.typing.NDArray[numpy.floating]  # float, shape: nd x npts
+    readback_array: numpy.typing.NDArray[numpy.floating[Any]]  # double, shape: np x npts
+    detector_array: numpy.typing.NDArray[numpy.floating[Any]]  # float, shape: nd x npts
 
     @classmethod
     def read(cls, fp: typing.BinaryIO, scanHeader: MDAScanHeader,
@@ -288,7 +288,7 @@ class MDAProcessVariable(Generic[T]):
 class MDAFile:
     header: MDAHeader
     scan: MDAScan
-    extra_pvs: list[MDAProcessVariable]
+    extra_pvs: list[MDAProcessVariable[Any]]
 
     @staticmethod
     def _read_pv(unpacker: xdrlib.Unpacker) -> MDAProcessVariable[typing.Any]:
@@ -324,7 +324,7 @@ class MDAFile:
 
     @classmethod
     def read(cls, filePath: Path) -> MDAFile:
-        extra_pvs: list[MDAProcessVariable] = list()
+        extra_pvs: list[MDAProcessVariable[Any]] = list()
 
         try:
             with filePath.open(mode='rb') as fp:

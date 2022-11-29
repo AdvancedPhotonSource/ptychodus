@@ -1,8 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 import numpy
+import numpy.typing
 
 from ...api.probe import ProbeArrayType
 from .apparatus import Apparatus
@@ -22,7 +24,7 @@ class FresnelZonePlate:
                 / centralWavelengthInMeters
 
 
-def gaussian_spectrum(lambda0, bandwidth, energy):
+def gaussian_spectrum(lambda0: float, bandwidth: float, energy: int) -> numpy.typing.NDArray[Any]:
     spectrum = numpy.zeros((energy, 2))
     sigma = lambda0 * bandwidth / 2.355
     d_lam = sigma * 4 / (energy - 1)
@@ -32,8 +34,9 @@ def gaussian_spectrum(lambda0, bandwidth, energy):
     return spectrum
 
 
-def fzp_calculate(wavelength: Decimal, dis_defocus: Decimal, probeSize: int, dx: Decimal,
-                  zonePlate: FresnelZonePlate):
+def fzp_calculate(
+        wavelength: Decimal, dis_defocus: Decimal, probeSize: int, dx: Decimal,
+        zonePlate: FresnelZonePlate) -> tuple[numpy.typing.NDArray[Any], Decimal, Decimal]:
     """
     this function can calculate the transfer function of zone plate
     return the transfer function, and the pixel sizes
@@ -58,7 +61,8 @@ def fzp_calculate(wavelength: Decimal, dis_defocus: Decimal, probeSize: int, dx:
     return T * C * H, dx_fzp, FL
 
 
-def fresnel_propagation(input, dxy, z, wavelength):
+def fresnel_propagation(input: numpy.typing.NDArray[Any], dxy: float, z: float,
+                        wavelength: float) -> numpy.typing.NDArray[Any]:
     """
     This is the python version code for fresnel propagation
     Summary of this function goes here

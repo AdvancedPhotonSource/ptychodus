@@ -150,7 +150,7 @@ class ImageController(Observer):
 
     @classmethod
     def createInstance(cls, presenter: ImagePresenter, view: ImageView,
-                       fileDialogFactory: FileDialogFactory):
+                       fileDialogFactory: FileDialogFactory) -> ImageController:
         controller = cls(presenter, view, fileDialogFactory)
         controller._syncModelToView()
         presenter.addObserver(controller)

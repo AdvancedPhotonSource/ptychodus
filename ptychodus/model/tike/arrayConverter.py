@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 import logging
 
 import numpy
@@ -16,7 +17,7 @@ from ..scan import ScanRepositoryItemFactory, ScanRepository
 
 logger = logging.getLogger(__name__)
 
-ScanArrayType = numpy.typing.NDArray[numpy.floating]
+ScanArrayType = numpy.typing.NDArray[numpy.floating[Any]]
 
 
 @dataclass(frozen=True)

@@ -121,7 +121,7 @@ class TikePresenter(Observable, Observer):
         self._settings.stepLength.value = value
 
     @staticmethod
-    def _clamp(x, xmin, xmax):
+    def _clamp(x, xmin, xmax):  # TODO typing
         assert xmin <= xmax
         return max(xmin, min(x, xmax))
 

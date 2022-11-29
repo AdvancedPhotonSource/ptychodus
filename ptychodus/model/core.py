@@ -17,7 +17,7 @@ from ..api.settings import SettingsRegistry
 from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
                    DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
-from .image import *
+from .image import ImageCore, ImagePresenter
 from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter
 from .probe import ProbeCore, ProbePresenter

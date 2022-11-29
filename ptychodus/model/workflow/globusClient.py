@@ -19,11 +19,12 @@ from .settings import WorkflowSettings
 logger = logging.getLogger(__name__)
 
 
-def ptychodus_reconstruct(**data):
+def ptychodus_reconstruct(**data: str) -> None:
     from pathlib import Path
     from ptychodus.model import ModelArgs, ModelCore
 
     modelArgs = ModelArgs(
+        restartFilePath=Path(data['restart_file']),
         settingsFilePath=Path(data['settings_file']),
         replacementPathPrefix=data['replacement_path_prefix'],
     )
@@ -35,6 +36,7 @@ def ptychodus_reconstruct(**data):
 @generate_flow_definition
 class PtychodusReconstruct(GladierBaseTool):
     required_input = [
+        'restart_file',
         'settings_file',
         'replacement_path_prefix',
     ]

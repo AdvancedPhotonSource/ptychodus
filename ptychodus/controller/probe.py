@@ -4,8 +4,9 @@ from typing import Callable, Optional
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QWidget
 
-from ..model import (FileProbeInitializer, FresnelZonePlateProbeInitializer, ImagePresenter,
-                     Observable, Observer, Probe, ProbePresenter, SuperGaussianProbeInitializer)
+from ..api.observer import Observable, Observer
+from ..model import (FileProbeInitializer, FresnelZonePlateProbeInitializer, ImagePresenter, Probe,
+                     ProbePresenter, SuperGaussianProbeInitializer)
 from ..view import (FresnelZonePlateProbeDialog, FresnelZonePlateProbeView, ImageView,
                     ProbeParametersView, ProbeView, ProgressBarItemDelegate,
                     SuperGaussianProbeDialog, SuperGaussianProbeView)

@@ -1,5 +1,9 @@
 from .core import RPCMessageService
 
+__all__ = [
+    'RPCMessageService',
+]
+
 
 def main() -> int:
     import argparse

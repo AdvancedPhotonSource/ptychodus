@@ -6,6 +6,7 @@ from decimal import Decimal
 from enum import Enum
 from pathlib import Path
 from statistics import median
+from typing import Any
 import logging
 
 import numpy
@@ -13,7 +14,7 @@ import numpy.typing
 
 from .observer import Observable
 
-ScanArrayType = numpy.typing.NDArray[numpy.floating]
+ScanArrayType = numpy.typing.NDArray[numpy.floating[Any]]
 
 logger = logging.getLogger(__name__)
 

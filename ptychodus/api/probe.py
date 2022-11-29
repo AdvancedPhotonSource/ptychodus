@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod, abstractproperty
 from pathlib import Path
+from typing import Any
 
 import numpy
 import numpy.typing
 
-ProbeArrayType = numpy.typing.NDArray[numpy.complexfloating]
+ProbeArrayType = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
 
 class ProbeFileReader(ABC):

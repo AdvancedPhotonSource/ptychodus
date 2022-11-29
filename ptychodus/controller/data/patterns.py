@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from ...model import DiffractionDatasetPresenter, DiffractionPatternPresenter, Observable, Observer
+from ...api.observer import Observable, Observer
+from ...model import DiffractionDatasetPresenter, DiffractionPatternPresenter
 from ...view import (DataNavigationPage, PatternCropView, PatternLoadView, PatternTransformView,
                      PatternsView)
 

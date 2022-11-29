@@ -6,7 +6,8 @@ import re
 from PyQt5.QtCore import Qt, QDir, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import QFileSystemModel
 
-from ...model import DiffractionDatasetPresenter, Observable, Observer
+from ...api.observer import Observable, Observer
+from ...model import DiffractionDatasetPresenter
 from ...view import DataNavigationPage, DatasetFileView
 from .dialogFactory import FileDialogFactory
 
@@ -93,7 +94,7 @@ class DatasetFileController(Observer):
         openFileFilter = self._presenter.getOpenFileFilter()
         self._view.contentsView.fileTypeComboBox.setCurrentText(openFileFilter)
 
-    def _setNameFiltersInFileSystemModel(self, currentText) -> None:
+    def _setNameFiltersInFileSystemModel(self, currentText: str) -> None:
         z = re.search('\((.+)\)', currentText)
 
         if z:

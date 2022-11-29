@@ -1,6 +1,7 @@
 from typing import Any, Optional
 
 import numpy
+import numpy.typing
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QVariant
 
@@ -9,7 +10,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
-        self._array: Optional[numpy.ndarray] = None
+        self._array: Optional[numpy.typing.NDArray[Any]] = None
 
     def headerData(self,
                    section: int,
@@ -46,7 +47,7 @@ class DataArrayTableModel(QAbstractTableModel):
 
         return count
 
-    def setArray(self, data: Optional[numpy.ndarray]) -> None:
+    def setArray(self, data: Optional[numpy.typing.NDArray[Any]]) -> None:
         self.beginResetModel()
         self._array = None
 

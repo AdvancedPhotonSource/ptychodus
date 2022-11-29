@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 import logging
 
 from skimage.restoration import unwrap_phase
@@ -7,8 +8,8 @@ import numpy.typing
 
 from ...api.observer import Observable, Observer
 
-InexactArrayType = numpy.typing.NDArray[numpy.inexact]
-NumericArrayType = numpy.typing.NDArray[numpy.number]
+InexactArrayType = numpy.typing.NDArray[numpy.inexact[Any]]
+NumericArrayType = numpy.typing.NDArray[numpy.number[Any]]
 
 logger = logging.getLogger(__name__)
 

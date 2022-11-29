@@ -76,12 +76,12 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         self._nFramesProcessed = 0
         self._processingTime = 0.
 
-    def start(self):
+    def start(self) -> None:
         '''Called at startup'''
         self._ptychodus.__enter__()
         self._reconstructionThread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         '''Called at shutdown'''
         self._reconstructionThread.stop()
         self._reconstructionThread.join()

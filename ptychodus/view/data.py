@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Any, Callable, Generic, Optional, TypeVar
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGridLayout, QGroupBox,
@@ -239,7 +239,7 @@ class DataParametersView(QStackedWidget):
         view = cls(parent)
 
         # TODO data size/rate stats live view; assembled size on memory/disk
-        pages: list[DataNavigationPage] = [
+        pages: list[DataNavigationPage[Any]] = [
             view.filePage, view.metadataPage, view.patternsPage, view.datasetPage
         ]
 

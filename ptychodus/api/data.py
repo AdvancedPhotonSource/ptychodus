@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum, auto
 from pathlib import Path
-from typing import overload, Optional, Union
+from typing import overload, Any, Optional, Union
 
 import numpy
 import numpy.typing
@@ -14,7 +14,7 @@ from .geometry import Vector2D
 from .observer import Observable
 from .tree import SimpleTreeNode
 
-DiffractionPatternData = numpy.typing.NDArray[numpy.integer]
+DiffractionPatternData = numpy.typing.NDArray[numpy.integer[Any]]
 
 
 class DiffractionPatternState(Enum):
@@ -79,7 +79,7 @@ class SimpleDiffractionPatternArray(DiffractionPatternArray):
 class DiffractionMetadata:
     numberOfPatternsPerArray: int
     numberOfPatternsTotal: int
-    patternDataType: numpy.dtype
+    patternDataType: numpy.dtype[numpy.integer[Any]]
     detectorDistanceInMeters: Optional[Decimal] = None
     detectorNumberOfPixels: Optional[Vector2D[int]] = None
     detectorPixelSizeInMeters: Optional[Vector2D[Decimal]] = None

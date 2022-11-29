@@ -10,9 +10,9 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
 from ..api.reconstructor import ReconstructResult
-from ..model import (ObjectPresenter, Observable, Observer, ProbePresenter,
-                     ReconstructorPlotPresenter, ReconstructorPresenter, ScanPresenter,
-                     ScanRepositoryKeyAndValue)
+from ..api.observer import Observable, Observer
+from ..model import (ObjectPresenter, ProbePresenter, ReconstructorPlotPresenter,
+                     ReconstructorPresenter, ScanPresenter, ScanRepositoryKeyAndValue)
 from ..view import ReconstructorParametersView, ReconstructorPlotView, resources
 
 logger = logging.getLogger(__name__)
@@ -198,7 +198,8 @@ class ReconstructorPlotController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ReconstructorPlotPresenter, view: ReconstructorPlotView):
+    def createInstance(cls, presenter: ReconstructorPlotPresenter,
+                       view: ReconstructorPlotView) -> ReconstructorPlotController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
         controller._syncModelToView()
