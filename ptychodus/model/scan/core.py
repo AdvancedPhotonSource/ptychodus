@@ -11,6 +11,7 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanArrayType, ScanFileReader, ScanFileWriter, ScanPoint, TabularScan
 from ...api.settings import SettingsRegistry
+from ..statefulCore import StateDataType, StatefulCore
 from .active import ActiveScan
 from .factory import ScanRepositoryItemFactory
 from .repository import ScanRepository
@@ -56,7 +57,7 @@ class ScanPresenter(Observable, Observer):
         return [ScanRepositoryKeyAndValue(name, item) for name, item in self._repository.items()]
 
     def isActiveScanValid(self) -> bool:
-        # FIXME isActiveScanValid should require more than one common index with active dataset
+        # TODO isActiveScanValid should require more than one common index with active dataset
         return (len(self._scan) > 1)
 
     def getActiveScanPointList(self) -> list[ScanPoint]:
@@ -152,7 +153,7 @@ class ScanPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class ScanCore:
+class ScanCore(StatefulCore):
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
                  fileReaderChooser: PluginChooser[ScanFileReader],
@@ -169,25 +170,37 @@ class ScanCore:
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self.presenter.openScan(filePath, fileFilter)
 
-    def getScanArrayInMeters(self) -> ScanArrayType:
-        # FIXME use indexes
-        scanXInMeters = [float(point.x) for point in self.scan.values()]
-        scanYInMeters = [float(point.y) for point in self.scan.values()]
-        return numpy.column_stack((scanYInMeters, scanXInMeters))
+    def getStateData(self, *, restartable: bool) -> StateDataType:
+        scanArrayIndex: list[int] = list()
+        scanXInMeters: list[float] = list()
+        scanYInMeters: list[float] = list()
 
-    def setScanArrayInMeters(self, array: ScanArrayType) -> None:
-        pointList: list[ScanPoint] = list()
+        for index, point in self.scan.items():
+            scanArrayIndex.append(index)
+            scanXInMeters.append(float(point.x))
+            scanYInMeters.append(float(point.y))
 
-        # FIXME use indexes
-        for row in array:
-            point = ScanPoint(
-                x=Decimal(repr(row[1])),
-                y=Decimal(repr(row[0])),
+        state: StateDataType = {
+            'scanArrayIndex': numpy.array(scanArrayIndex),
+            'scanXInMeters': numpy.array(scanXInMeters),
+            'scanYInMeters': numpy.array(scanYInMeters),
+        }
+        return state
+
+    def setStateData(self, state: StateDataType) -> None:
+        pointMap: dict[int, ScanPoint] = dict()
+        scanArrayIndex = state['scanArrayIndex']
+        scanXInMeters = state['scanXInMeters']
+        scanYInMeters = state['scanYInMeters']
+
+        for index, x, y in zip(scanArrayIndex, scanXInMeters, scanYInMeters):
+            pointMap[index] = ScanPoint(
+                x=Decimal(repr(x)),
+                y=Decimal(repr(y)),
             )
-            pointList.append(point)
 
         name = 'Restart'
-        scan = TabularScan.createFromPointSequence(name, pointList)
+        scan = TabularScan(name, pointMap)
         item = self.factory.createTabularItem(scan, None)
         self.repository.insertItem(item)
         self.scan.setActiveScan(name)

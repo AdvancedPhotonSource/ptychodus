@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
@@ -27,6 +28,7 @@ from .reconstructor import ReconstructorCore, ReconstructorPresenter, Reconstruc
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
+from .statefulCore import StateDataKeyType, StateDataValueType, StatefulCore
 from .tike import TikeReconstructorLibrary
 from .workflow import WorkflowCore, WorkflowPresenter
 
@@ -122,6 +124,13 @@ class ModelCore:
                 LoadResultsMessage,
                 LoadResultsExecutor(self._probeCore.probe, self._objectCore.object))
 
+        self._statefulCores = [
+            self._dataCore,
+            self._scanCore,
+            self._probeCore,
+            self._objectCore,
+        ]
+
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
@@ -130,6 +139,9 @@ class ModelCore:
             self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
             self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(
                 finishAssembling=True)
+
+        if self._modelArgs.restartFilePath:
+            self.openStateData(self._modelArgs.restartFilePath)
 
         if self.rpcMessageService:
             self.rpcMessageService.start()
@@ -196,38 +208,28 @@ class ModelCore:
     def refreshActiveDataset(self) -> None:
         self._dataCore.dataset.notifyObserversIfDatasetChanged()
 
-    def saveRestartFile(self, filePath: Path) -> None:
-        restartData = {
-            'data': self._dataCore.dataset.getAssembledData(),
-            'scanInMeters': self._scanCore.getScanArrayInMeters(),
-            'probe': self._probeCore.probe.getArray(),
-            'object': self._objectCore.object.getArray(),
-        }
+    def saveStateData(self, filePath: Path, *, restartable: bool) -> None:
+        # TODO document file format
+        # TODO include cost function values
+        logger.debug(f'Writing state data to \"{filePath}\" [restartable={restartable}]')
+        data: dict[StateDataKeyType, StateDataValueType] = dict()
 
-        numpy.savez(filePath, **restartData)
+        for core in self._statefulCores:
+            data.update(core.getStateData(restartable=restartable))
 
-    def openRestartFile(self, filePath: Path) -> None:
-        restartData = numpy.load(filePath)
+        numpy.savez(filePath, **data)
 
-        self._dataCore.dataset.setAssembledData(restartData['data'])
-        self._scanCore.setScanArrayInMeters(restartData['scanInMeters'])
-        self._probeCore.probe.setArray(restartData['probe'])
-        self._objectCore.object.setArray(restartData['object'])
+    def openStateData(self, filePath: Path) -> None:
+        logger.debug(f'Reading state data from \"{filePath}\"')
+        data = numpy.load(filePath)
+
+        for core in self._statefulCores:
+            core.setStateData(data)
 
     def batchModeReconstruct(self) -> int:
         result = self._reconstructorCore.presenter.reconstruct()
-
-        pixelSizeXInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeXInMeters())
-        pixelSizeYInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeYInMeters())
-
-        # TODO document output file format; include cost function values
-        dataDump = dict()
-        dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
-        dataDump['scanInMeters'] = self._scanCore.getScanArrayInMeters()
-        dataDump['probe'] = self._probeCore.probe.getArray()
-        dataDump['object'] = self._objectCore.object.getArray()
-        numpy.savez(self._reconstructorCore.settings.outputFilePath.value, **dataDump)
-
+        self.saveStateData(self._reconstructorCore.settings.outputFilePath.value,
+                           restartable=False)
         return result.result
 
     @property

@@ -21,6 +21,7 @@ from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
+from ..statefulCore import StateDataType, StatefulCore
 from .crop import CropSizer
 from .dataset import ActiveDiffractionDataset
 from .patterns import DiffractionPatternPresenter
@@ -232,7 +233,7 @@ class ActiveDiffractionPatternPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class DataCore:
+class DataCore(StatefulCore):
 
     def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
@@ -252,6 +253,24 @@ class DataCore:
             self._datasetSettings, self.dataset, fileReaderChooser)
         self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
             self.dataset)
+
+    def getStateData(self, *, restartable: bool) -> StateDataType:
+        # FIXME use indexes
+        state = dict()
+
+        if restartable:
+            state['data'] = self.dataset.getAssembledData()
+
+        return state
+
+    def setStateData(self, state: StateDataType) -> None:
+        # FIXME use indexes
+        try:
+            data = state['data']
+        except KeyError:
+            pass
+        else:
+            self.dataset.setAssembledData(data)
 
     def start(self) -> None:
         self._dataDirectoryWatcher.start()

@@ -11,6 +11,7 @@ from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry
 from ..data import CropSizer
 from ..detector import Detector
+from ..statefulCore import StateDataType, StatefulCore
 from .apparatus import Apparatus
 from .file import FileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
@@ -148,7 +149,7 @@ class ProbePresenter(Observable, Observer):
             self.initializeProbe()
 
 
-class ProbeCore:
+class ProbeCore(StatefulCore):
 
     @staticmethod
     def _createInitializerChooser(
@@ -188,3 +189,17 @@ class ProbeCore:
         self.presenter = ProbePresenter.createInstance(self.settings, self.sizer, self.probe,
                                                        self.apparatus, self._initializerChooser,
                                                        fileWriterChooser, settingsRegistry)
+
+    def getStateData(self, *, restartable: bool) -> StateDataType:
+        pixelSizeXInMeters = float(self.apparatus.getObjectPlanePixelSizeXInMeters())
+        pixelSizeYInMeters = float(self.apparatus.getObjectPlanePixelSizeYInMeters())
+
+        state: StateDataType = {
+            'probe': self.probe.getArray(),
+            'pixelSizeXInMeters': numpy.array([pixelSizeXInMeters]),
+            'pixelSizeYInMeters': numpy.array([pixelSizeYInMeters]),
+        }
+        return state
+
+    def setStateData(self, state: StateDataType) -> None:
+        self.probe.setArray(state['probe'])

@@ -86,7 +86,7 @@ class ReconstructorPlotPresenter(Observable):
         self.notifyObservers()
 
     def setEnumeratedYValues(self, yvalues: list[list[float]]) -> None:
-        xvalues = [[float(idx) for idx in range(len(series))] for series in yvalues]
+        xvalues = [*range(len(yvalues))]
         self.setValues(xvalues, yvalues)
 
 
