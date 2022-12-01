@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod, abstractproperty
 from pathlib import Path
+from typing import Any
 
 import numpy
 import numpy.typing
 
-ObjectArrayType = numpy.typing.NDArray[numpy.complexfloating]
+ObjectArrayType = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
 
 class ObjectFileReader(ABC):

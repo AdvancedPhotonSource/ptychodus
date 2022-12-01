@@ -1,50 +1,39 @@
 from __future__ import annotations
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import numpy
 
-from ...api.scan import ScanPoint
-from .initializer import ScanInitializer, ScanInitializerParameters
+from ...api.scan import Scan, ScanPoint
+from .repositoryItem import ScanRepositoryItem
 from .settings import ScanSettings
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScanFileInfo:
     fileType: str
     filePath: Path
 
     @classmethod
     def createFromSettings(cls, settings: ScanSettings) -> ScanFileInfo:
-        fileType = settings.inputFileType.value
-        filePath = settings.inputFilePath.value
-        return cls(fileType, filePath)
-
-    def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.inputFileType.value = self.fileType
-        settings.inputFilePath.value = self.filePath
+        return cls(
+            fileType=settings.inputFileType.value,
+            filePath=settings.inputFilePath.value,
+        )
 
 
-class TabularScanInitializer(ScanInitializer):
+class TabularScanRepositoryItem(ScanRepositoryItem):
 
-    def __init__(self, parameters: ScanInitializerParameters, pointList: list[ScanPoint],
-                 nameHint: str, fileInfo: Optional[ScanFileInfo]) -> None:
-        super().__init__(parameters)
-        self._pointList = pointList
-        self._nameHint = nameHint
+    def __init__(self, scan: Scan, fileInfo: Optional[ScanFileInfo]) -> None:
+        super().__init__()
+        self._scan = scan
         self._fileInfo = fileInfo
 
-    def syncToSettings(self, settings: ScanSettings) -> None:
-        if self._fileInfo is None:
-            raise ValueError('Missing file info.')
-
-        self._fileInfo.syncToSettings(settings)
-        super().syncToSettings(settings)
-
     @property
-    def nameHint(self) -> str:
-        return self._nameHint
+    def name(self) -> str:
+        return self._scan.name
 
     @property
     def category(self) -> str:
@@ -58,15 +47,29 @@ class TabularScanInitializer(ScanInitializer):
     def canActivate(self) -> bool:
         return (self._fileInfo is not None)
 
+    def syncFromSettings(self, settings: ScanSettings) -> None:
+        fileInfo = ScanFileInfo.createFromSettings(settings)
+        self.setFileInfo(fileInfo)
+
+    def syncToSettings(self, settings: ScanSettings) -> None:
+        if self._fileInfo is None:
+            raise ValueError('Missing file info.')
+        else:
+            settings.inputFileType.value = self._fileInfo.fileType
+            settings.inputFilePath.value = self._fileInfo.filePath
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._scan)
+
+    def __getitem__(self, index: int) -> ScanPoint:
+        return self._scan[index]
+
+    def __len__(self) -> int:
+        return len(self._scan)
+
     def getFileInfo(self) -> Optional[ScanFileInfo]:
         return self._fileInfo
 
     def setFileInfo(self, fileInfo: ScanFileInfo) -> None:
         self._fileInfo = fileInfo
         self.notifyObservers()
-
-    def _getPoint(self, index: int) -> ScanPoint:
-        return self._pointList[index]
-
-    def __len__(self) -> int:
-        return len(self._pointList)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
@@ -17,7 +18,7 @@ from ..api.settings import SettingsRegistry
 from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
                    DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
-from .image import *
+from .image import ImageCore, ImagePresenter
 from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter
 from .probe import ProbeCore, ProbePresenter
@@ -27,6 +28,7 @@ from .reconstructor import ReconstructorCore, ReconstructorPresenter, Reconstruc
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
+from .statefulCore import StateDataKeyType, StateDataValueType, StatefulCore
 from .tike import TikeReconstructorLibrary
 from .workflow import WorkflowCore, WorkflowPresenter
 
@@ -96,8 +98,7 @@ class ModelCore:
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
-            self._scanCore.initializerFactory, self._scanCore.repository,
-            modelArgs.isDeveloperModeEnabled)
+            self._scanCore.factory, self._scanCore.repository, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
@@ -106,9 +107,9 @@ class ModelCore:
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             [
-                self.ptychopyReconstructorLibrary,
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
+                self.ptychopyReconstructorLibrary,
             ],
         )
 
@@ -123,12 +124,24 @@ class ModelCore:
                 LoadResultsMessage,
                 LoadResultsExecutor(self._probeCore.probe, self._objectCore.object))
 
+        self._statefulCores = [
+            self._dataCore,
+            self._scanCore,
+            self._probeCore,
+            self._objectCore,
+        ]
+
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
 
         if self.diffractionDatasetPresenter.isReadyToAssemble:
-            self.diffractionDatasetPresenter.startProcessingDiffractionPatterns(block=True)
+            self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
+            self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(
+                finishAssembling=True)
+
+        if self._modelArgs.restartFilePath:
+            self.openStateData(self._modelArgs.restartFilePath)
 
         if self.rpcMessageService:
             self.rpcMessageService.start()
@@ -169,11 +182,25 @@ class ModelCore:
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
         return self._dataCore.diffractionDatasetPresenter
 
-    def setupForStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self.diffractionDatasetPresenter.configureStreaming(metadata)
+    def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
+        self.diffractionDatasetPresenter.initializeStreaming(metadata)
+        self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
+        self.scanPresenter.initializeStreamingScan()
 
-    def assembleDiffractionPattern(self, array: DiffractionPatternArray) -> None:
+    def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
         self.diffractionDatasetPresenter.assemble(array)
+        self.scanPresenter.insertArrayTimeStamp(array.getIndex(), timeStamp)
+
+    def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+        self.scanPresenter.assembleScanPositionsX(valuesInMeters, timeStamps)
+
+    def assembleScanPositionsY(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+        self.scanPresenter.assembleScanPositionsY(valuesInMeters, timeStamps)
+
+    def finalizeStreamingWorkflow(self) -> None:
+        self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(finishAssembling=True)
+        self.scanPresenter.finalizeStreamingScan()
+        self.objectPresenter.initializeObject()
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
         return self.diffractionDatasetPresenter.getAssemblyQueueSize()
@@ -181,41 +208,28 @@ class ModelCore:
     def refreshActiveDataset(self) -> None:
         self._dataCore.dataset.notifyObserversIfDatasetChanged()
 
-    def saveRestartFile(self, filePath: Path) -> None:
-        restartData = {
-            'data': self._dataCore.dataset.getAssembledData(),
-            'scanInMeters': self._scanCore.scan.getArray(),  # FIXME
-            'probe': self._probeCore.probe.getArray(),
-            'object': self._objectCore.object.getArray(),
-        }
+    def saveStateData(self, filePath: Path, *, restartable: bool) -> None:
+        # TODO document file format
+        # TODO include cost function values
+        logger.debug(f'Writing state data to \"{filePath}\" [restartable={restartable}]')
+        data: dict[StateDataKeyType, StateDataValueType] = dict()
 
-        numpy.savez(filePath, **restartData)
+        for core in self._statefulCores:
+            data.update(core.getStateData(restartable=restartable))
 
-    def openRestartFile(self, filePath: Path) -> None:
-        restartData = numpy.load(filePath)
+        numpy.savez(filePath, **data)
 
-        self._dataCore.dataset.setAssembledData(restartData['data'])
-        self._scanCore.scan.setArray(restartData['scanInMeters'])  # FIXME
-        self._probeCore.probe.setArray(restartData['probe'])
-        self._objectCore.object.setArray(restartData['object'])
+    def openStateData(self, filePath: Path) -> None:
+        logger.debug(f'Reading state data from \"{filePath}\"')
+        data = numpy.load(filePath)
+
+        for core in self._statefulCores:
+            core.setStateData(data)
 
     def batchModeReconstruct(self) -> int:
         result = self._reconstructorCore.presenter.reconstruct()
-
-        pixelSizeXInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeXInMeters())
-        pixelSizeYInMeters = float(self._probeCore.apparatus.getObjectPlanePixelSizeYInMeters())
-
-        scanXInMeters = [float(point.x) for point in self._scanCore.scan]
-        scanYInMeters = [float(point.y) for point in self._scanCore.scan]
-
-        # TODO document output file format; include cost function values
-        dataDump = dict()
-        dataDump['pixelSizeInMeters'] = numpy.array([pixelSizeYInMeters, pixelSizeXInMeters])
-        dataDump['scanInMeters'] = numpy.column_stack((scanYInMeters, scanXInMeters))
-        dataDump['probe'] = self._probeCore.probe.getArray()
-        dataDump['object'] = self._objectCore.object.getArray()
-        numpy.savez(self._reconstructorCore.settings.outputFilePath.value, **dataDump)
-
+        self.saveStateData(self._reconstructorCore.settings.outputFilePath.value,
+                           restartable=False)
         return result.result
 
     @property

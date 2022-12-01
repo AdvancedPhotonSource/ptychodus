@@ -10,9 +10,9 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
 from ..api.reconstructor import ReconstructResult
-from ..model import (ObjectPresenter, Observable, Observer, ProbePresenter,
-                     ReconstructorPlotPresenter, ReconstructorPresenter, ScanInitializer,
-                     ScanPresenter)
+from ..api.observer import Observable, Observer
+from ..model import (ObjectPresenter, ProbePresenter, ReconstructorPlotPresenter,
+                     ReconstructorPresenter, ScanPresenter, ScanRepositoryKeyAndValue)
 from ..view import ReconstructorParametersView, ReconstructorPlotView, resources
 
 logger = logging.getLogger(__name__)
@@ -29,25 +29,18 @@ class ReconstructorViewControllerFactory(ABC):
         pass
 
 
-@dataclass(frozen=True)
-class ScanRepositoryEntry:
-    name: str
-    initializer: ScanInitializer
-
-
 class ScanListModel(QAbstractListModel):
 
     def __init__(self, presenter: ScanPresenter, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
-        self._scanList: list[ScanRepositoryEntry] = list()
+        self._scanList: list[ScanRepositoryKeyAndValue] = list()
 
     def refresh(self) -> None:
         self.beginResetModel()
         self._scanList = [
-            ScanRepositoryEntry(name, initializer)
-            for name, initializer in self._presenter.getScanRepositoryContents()
-            if self._presenter.canActivateScan(name)
+            kv for kv in self._presenter.getScanRepositoryKeysAndValues()
+            if self._presenter.canActivateScan(kv.name)
         ]
         self.endResetModel()
 
@@ -205,7 +198,8 @@ class ReconstructorPlotController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ReconstructorPlotPresenter, view: ReconstructorPlotView):
+    def createInstance(cls, presenter: ReconstructorPlotPresenter,
+                       view: ReconstructorPlotView) -> ReconstructorPlotController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
         controller._syncModelToView()

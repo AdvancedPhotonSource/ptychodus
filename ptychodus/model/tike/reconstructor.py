@@ -1,9 +1,11 @@
 from importlib.metadata import version
-from typing import Union
+from typing import Any, Union
 import logging
 import pprint
 
 import numpy
+import numpy.typing
+
 import tike.ptycho
 
 from ...api.reconstructor import ReconstructResult, Reconstructor
@@ -49,7 +51,8 @@ class TikeReconstructor:
 
         return options
 
-    def getPositionOptions(self, initialScan: numpy.ndarray) -> tike.ptycho.PositionOptions:
+    def getPositionOptions(self,
+                           initialScan: numpy.typing.NDArray[Any]) -> tike.ptycho.PositionOptions:
         settings = self._positionCorrectionSettings
         options = None
 

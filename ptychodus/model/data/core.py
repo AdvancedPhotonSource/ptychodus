@@ -21,6 +21,7 @@ from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
+from ..statefulCore import StateDataType, StatefulCore
 from .crop import CropSizer
 from .dataset import ActiveDiffractionDataset
 from .patterns import DiffractionPatternPresenter
@@ -160,18 +161,17 @@ class DiffractionDatasetPresenter(Observable, Observer):
         array = self._activeDiffractionDataset.getAssembledData()
         numpy.save(filePath, array)
 
-    def startProcessingDiffractionPatterns(self, block: bool = False) -> None:
-        self._activeDiffractionDataset.start(block)
+    def startProcessingDiffractionPatterns(self) -> None:
+        self._activeDiffractionDataset.start()
 
-    def stopProcessingDiffractionPatterns(self) -> None:
-        self._activeDiffractionDataset.stop()
+    def stopProcessingDiffractionPatterns(self, finishAssembling: bool) -> None:
+        self._activeDiffractionDataset.stop(finishAssembling)
 
-    def configureStreaming(self, metadata: DiffractionMetadata) -> None:
+    def initializeStreaming(self, metadata: DiffractionMetadata) -> None:
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
         dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
         self._activeDiffractionDataset.switchTo(dataset)
-        self._activeDiffractionDataset.start(block=False)
 
     def assemble(self, array: DiffractionPatternArray) -> None:
         self._activeDiffractionDataset.insertArray(array)
@@ -233,7 +233,7 @@ class ActiveDiffractionPatternPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class DataCore:
+class DataCore(StatefulCore):
 
     def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
@@ -254,9 +254,27 @@ class DataCore:
         self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
             self.dataset)
 
+    def getStateData(self, *, restartable: bool) -> StateDataType:
+        state = dict()
+
+        if restartable:
+            state['dataIndex'] = numpy.array(self.dataset.getAssembledIndexes())
+            state['data'] = self.dataset.getAssembledData()
+
+        return state
+
+    def setStateData(self, state: StateDataType) -> None:
+        # FIXME use dataIndex = state['dataIndex']
+        try:
+            data = state['data']
+        except KeyError:
+            logger.debug('Skipped restoring data array state.')
+        else:
+            self.dataset.setAssembledData(data)
+
     def start(self) -> None:
         self._dataDirectoryWatcher.start()
 
     def stop(self) -> None:
         self._dataDirectoryWatcher.stop()
-        self.dataset.stop()
+        self.dataset.stop(finishAssembling=False)

@@ -1,1 +1,6 @@
-from .core import PtychoNNReconstructorLibrary, PtychoNNPresenter
+from .core import PtychoNNPresenter, PtychoNNReconstructorLibrary
+
+__all__ = [
+    'PtychoNNPresenter',
+    'PtychoNNReconstructorLibrary',
+]

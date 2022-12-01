@@ -1,7 +1,8 @@
 from __future__ import annotations
+from collections.abc import Iterator
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Generic, Iterator, TypeVar
+from typing import Generic, TypeVar
 import importlib
 import logging
 import pkgutil
@@ -33,7 +34,7 @@ class PluginChooser(Generic[T], Observable):
         self._entry: PluginEntry[T] = defaultEntry
 
     @classmethod
-    def createFromList(cls, entryList: list[PluginEntry[T]]) -> PluginChooser:
+    def createFromList(cls, entryList: list[PluginEntry[T]]) -> PluginChooser[T]:
         chooser = cls(entryList[0])
         chooser._entryList = entryList.copy()
         return chooser

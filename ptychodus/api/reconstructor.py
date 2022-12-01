@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod, abstractproperty
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Iterator
 
 
 @dataclass(frozen=True)

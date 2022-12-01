@@ -1,16 +1,15 @@
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
 from statistics import median
-from typing import Final, Optional
 import csv
 
 import numpy
 
-from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
-                                ScanPointParseError, ScanPointSequence, SimpleScanDictionary)
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
 from ptychodus.api.plugins import PluginRegistry
 
 
@@ -21,15 +20,7 @@ class VelociprobeScanFileColumn(IntEnum):
     TRIGGER = 7
 
 
-@dataclass(frozen=True)
-class VelociprobeScanPoint:
-    x_nm: int
-    y_li_nm: int
-    y_en_nm: int
-
-
 class VelociprobeScanFileReader(ScanFileReader):
-    EXPECTED_NUMBER_OF_COLUMNS: Final[int] = 8
 
     def __init__(self) -> None:
         self._stageRotationCosine = Decimal(1)
@@ -47,22 +38,25 @@ class VelociprobeScanFileReader(ScanFileReader):
         cosine = numpy.cos(radians)
         self._stageRotationCosine = Decimal(repr(cosine))
 
-    def _applyTransform(self, pointList: list[ScanPoint]) -> None:
+    def _applyTransform(self, scan: Scan) -> Scan:
         zero = Decimal()
-        numberOfPoints = Decimal(len(pointList))
+        xMean = sum((p.x for p in scan.values()), start=zero) / len(scan)
+        yMean = sum((p.y for p in scan.values()), start=zero) / len(scan)
+        pointMap: dict[int, ScanPoint] = dict()
 
-        xMean = sum([point.x for point in pointList], start=zero) / numberOfPoints
-        yMean = sum([point.y for point in pointList], start=zero) / numberOfPoints
+        for index, point in scan.items():
+            pointMap[index] = ScanPoint(
+                x=(point.x - xMean) * self._stageRotationCosine,
+                y=(point.y - yMean),
+            )
 
-        for idx, point in enumerate(pointList):
-            x = (point.x - xMean) * self._stageRotationCosine
-            y = (point.y - yMean)
-            pointList[idx] = ScanPoint(x, y)
+        return TabularScan(scan.name, pointMap)
 
-    def read(self, filePath: Path) -> ScanDictionary:
-        pointDict: dict[int, list[VelociprobeScanPoint]] = defaultdict(list[VelociprobeScanPoint])
-        liPointList: list[ScanPoint] = list()
-        enPointList: list[ScanPoint] = list()
+    def read(self, filePath: Path) -> Sequence[Scan]:
+        enPointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
+        liPointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
+        minimumColumnCount = max(col.value for col in VelociprobeScanFileColumn) + 1
+        nanometersToMeters = Decimal('1e-9')
 
         with filePath.open(newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
@@ -71,7 +65,7 @@ class VelociprobeScanFileReader(ScanFileReader):
                 if row[0].startswith('#'):
                     continue
 
-                if len(row) != VelociprobeScanFileReader.EXPECTED_NUMBER_OF_COLUMNS:
+                if len(row) < minimumColumnCount:
                     raise ScanPointParseError('Bad number of columns!')
 
                 x_nm = int(row[VelociprobeScanFileColumn.X])
@@ -79,26 +73,24 @@ class VelociprobeScanFileReader(ScanFileReader):
                 y_en_nm = int(row[VelociprobeScanFileColumn.ENCODER_Y])
                 trigger = int(row[VelociprobeScanFileColumn.TRIGGER])
 
-                point = VelociprobeScanPoint(x_nm, y_li_nm, -y_en_nm)
-                pointDict[trigger].append(point)
+                liPoint = ScanPoint(
+                    x=x_nm * nanometersToMeters,
+                    y=+y_li_nm * nanometersToMeters,
+                )
+                liPointSeqMap[trigger].append(liPoint)
 
-        for trigger, pointList in pointDict.items():
-            xf_nm = median([p.x_nm for p in pointList])
-            yf_li_nm = median([p.y_li_nm for p in pointList])
-            yf_en_nm = median([p.y_en_nm for p in pointList])
+                enPoint = ScanPoint(
+                    x=x_nm * nanometersToMeters,
+                    y=-y_en_nm * nanometersToMeters,
+                )
+                enPointSeqMap[trigger].append(enPoint)
 
-            nm_to_m = Decimal('1e-9')
-            x_m = Decimal(xf_nm) * nm_to_m
-            y_li_m = Decimal(yf_li_nm) * nm_to_m
-            y_en_m = Decimal(yf_en_nm) * nm_to_m
+        liScan: Scan = TabularScan.createFromMappedPointSequence('VelociprobeLaserInterferometerY',
+                                                                 liPointSeqMap)
+        liScan = self._applyTransform(liScan)
 
-            liPointList.append(ScanPoint(x_m, y_li_m))
-            enPointList.append(ScanPoint(x_m, y_en_m))
+        enScan: Scan = TabularScan.createFromMappedPointSequence('VelociprobeEncoderY',
+                                                                 enPointSeqMap)
+        enScan = self._applyTransform(enScan)
 
-        self._applyTransform(liPointList)
-        self._applyTransform(enPointList)
-
-        scanDict: dict[str, ScanPointSequence] = dict()
-        scanDict[f'{self.simpleName}LaserInterferometerY'] = liPointList
-        scanDict[f'{self.simpleName}EncoderY'] = enPointList
-        return SimpleScanDictionary(scanDict)
+        return [liScan, enScan]

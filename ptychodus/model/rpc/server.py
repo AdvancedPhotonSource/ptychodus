@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class RPCStreamRequestHandler(socketserver.StreamRequestHandler):
 
-    def handle(self):
+    def handle(self) -> None:
         message = self.rfile.readline().decode('utf-8').strip()
         logger.debug(f'RECV: \"{message}\" from {self.client_address[0]}')
         response = self.server.processMessage(message)
@@ -20,7 +20,7 @@ class RPCStreamRequestHandler(socketserver.StreamRequestHandler):
 
 class RPCSocketServer(socketserver.TCPServer):
 
-    def __init__(self, rpcPort: int, messageQueue: queue.Queue) -> None:
+    def __init__(self, rpcPort: int, messageQueue: queue.Queue[RPCMessage]) -> None:
         super().__init__(('127.0.0.1', rpcPort), RPCStreamRequestHandler)
         self._messageQueue = messageQueue
         self._messageClasses: dict[str, type[RPCMessage]] = dict()

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from PyQt5.QtWidgets import QDialog, QListView
 
 from ...api.observer import Observable, Observer
@@ -19,7 +20,7 @@ class DatasetController(Observer):
     @classmethod
     def createInstance(cls, presenter: DiffractionDatasetPresenter,
                        view: DataNavigationPage[DatasetView],
-                       fileDialogFactory: FileDialogFactory):
+                       fileDialogFactory: FileDialogFactory) -> DatasetController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 

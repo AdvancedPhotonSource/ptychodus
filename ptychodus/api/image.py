@@ -1,11 +1,12 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
+from typing import Any
 
 import numpy
 import numpy.typing
 
-RealArrayType = numpy.typing.NDArray[numpy.floating]
+RealArrayType = numpy.typing.NDArray[numpy.floating[Any]]
 
 
 @dataclass(frozen=True)

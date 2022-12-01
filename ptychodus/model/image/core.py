@@ -91,7 +91,7 @@ class ImagePresenter(Observable, Observer):
 
         self._displayRange.setRangeAndLimits(dataRange)
 
-    def setCustomDisplayRange(self, minValue: Decimal, maxValue) -> None:
+    def setCustomDisplayRange(self, minValue: Decimal, maxValue: Decimal) -> None:
         self._displayRange.setLimits(minValue, maxValue)
 
     def getVariantNameList(self) -> list[str]:

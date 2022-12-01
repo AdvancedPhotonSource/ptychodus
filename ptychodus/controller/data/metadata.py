@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt5.QtWidgets import QDialog, QListView
 
 from ...api.observer import Observable, Observer
@@ -14,7 +16,8 @@ class MetadataController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: MetadataPresenter, view: DataNavigationPage[MetadataView]):
+    def createInstance(cls, presenter: MetadataPresenter,
+                       view: DataNavigationPage[MetadataView]) -> MetadataController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 

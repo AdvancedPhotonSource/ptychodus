@@ -6,3 +6,15 @@ from .probe import Probe
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
 from .superGaussian import SuperGaussianProbeInitializer
+
+__all__ = [
+    'Apparatus',
+    'FileProbeInitializer',
+    'FresnelZonePlateProbeInitializer',
+    'Probe',
+    'ProbeCore',
+    'ProbePresenter',
+    'ProbeSettings',
+    'ProbeSizer',
+    'SuperGaussianProbeInitializer',
+]

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication, QAction
 
@@ -85,7 +87,7 @@ class ControllerCore:
         self._processMessagesTimer = QTimer()
 
     @classmethod
-    def createInstance(cls, model: ModelCore, view: ViewCore):
+    def createInstance(cls, model: ModelCore, view: ViewCore) -> ControllerCore:
         controller = cls(model, view)
 
         view.navigationActionGroup.triggered.connect(

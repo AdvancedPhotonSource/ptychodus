@@ -6,11 +6,13 @@ import logging
 from PyQt5.QtCore import PYQT_VERSION_STR, QSize, QT_VERSION_STR, Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu,
-                             QSplitter, QTableView, QToolBar, QToolButton, QTreeView)
+                             QSizePolicy, QSplitter, QStackedWidget, QTableView, QToolBar,
+                             QToolButton, QTreeView, QWidget)
 
 from . import resources
 from .data import DataParametersView
 from .detector import *
+from .image import ImageView
 from .monitor import *
 from .object import *
 from .probe import *

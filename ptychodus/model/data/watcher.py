@@ -17,7 +17,7 @@ class DataFileEventHandler(watchdog.events.PatternMatchingEventHandler):
         super().__init__(patterns=patterns, ignore_directories=True, case_sensitive=False)
         self._dataset = dataset
 
-    def on_any_event(self, event) -> None:
+    def on_any_event(self, event: watchdog.events.FileSystemEvent) -> None:
         logger.debug(f'{event.event_type}: {event.src_path}')
         # TODO insert array into dataset
 

@@ -8,11 +8,12 @@ import numpy
 from ...api.object import ObjectArrayType, ObjectFileReader, ObjectFileWriter
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
+from ...api.scan import Scan
 from ...api.settings import SettingsRegistry
 from ..data import CropSizer
 from ..detector import Detector
 from ..probe import Apparatus, ProbeSizer
-from ..scan import Scan
+from ..statefulCore import StateDataType, StatefulCore
 from .file import FileObjectInitializer
 from .initializer import ObjectInitializer
 from .object import Object
@@ -125,7 +126,7 @@ class ObjectPresenter(Observable, Observer):
             self.initializeObject()
 
 
-class ObjectCore:
+class ObjectCore(StatefulCore):
 
     @staticmethod
     def _createInitializerChooser(
@@ -160,3 +161,17 @@ class ObjectCore:
         self.presenter = ObjectPresenter.createInstance(self.settings, self.sizer, apparatus,
                                                         self.object, self._initializerChooser,
                                                         fileWriterChooser, settingsRegistry)
+
+    def getStateData(self, *, restartable: bool) -> StateDataType:
+        state: StateDataType = {
+            'object': self.object.getArray(),
+        }
+        return state
+
+    def setStateData(self, state: StateDataType) -> None:
+        try:
+            array = state['object']
+        except KeyError:
+            logger.debug('Failed to restore object array state!')
+        else:
+            self.object.setArray(array)

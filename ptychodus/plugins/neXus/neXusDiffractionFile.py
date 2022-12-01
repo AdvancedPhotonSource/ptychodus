@@ -1,9 +1,9 @@
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import overload, Optional, Union
+from typing import overload, Any, Optional, Union
 import logging
 
 import h5py
@@ -81,7 +81,7 @@ class DataGroup:
 
         return cls(arrayList)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[DiffractionPatternArray]:
         return iter(self.arrayList)
 
     @overload
@@ -273,7 +273,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
             )
 
             numberOfPatternsPerArray = 0
-            patternDataType = numpy.dtype(numpy.ubyte)
+            patternDataType: numpy.dtype[numpy.integer[Any]] = numpy.dtype(numpy.ubyte)
 
             for array in entry.data:
                 try:

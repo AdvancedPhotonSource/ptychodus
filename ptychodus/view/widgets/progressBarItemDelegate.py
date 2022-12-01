@@ -1,10 +1,12 @@
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QStyle, QStyleOptionProgressBar, QStyledItemDelegate
+from PyQt5.QtCore import Qt, QModelIndex
+from PyQt5.QtGui import QPainter
+from PyQt5.QtWidgets import (QApplication, QStyle, QStyleOptionProgressBar, QStyledItemDelegate,
+                             QStyleOptionViewItem)
 
 
 class ProgressBarItemDelegate(QStyledItemDelegate):
 
-    def paint(self, painter, option, index):
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
         progress = index.data(Qt.UserRole)
         opt = QStyleOptionProgressBar()
         opt.rect = option.rect

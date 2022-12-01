@@ -1,10 +1,11 @@
+from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 import csv
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import (ScanDictionary, ScanFileReader, ScanFileWriter, ScanPoint,
-                                ScanPointParseError, SimpleScanDictionary)
+from ptychodus.api.scan import (Scan, ScanFileReader, ScanFileWriter, ScanPoint,
+                                ScanPointParseError, TabularScan)
 
 
 class CSVScanFileReader(ScanFileReader):
@@ -21,7 +22,7 @@ class CSVScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'Comma-Separated Values Files (*.csv)'
 
-    def read(self, filePath: Path) -> ScanDictionary:
+    def read(self, filePath: Path) -> Sequence[Scan]:
         pointList = list()
         minimumColumnCount = max(self._xcol, self._ycol) + 1
 
@@ -33,15 +34,15 @@ class CSVScanFileReader(ScanFileReader):
                     continue
 
                 if len(row) < minimumColumnCount:
-                    raise ScanPointParseError()
+                    raise ScanPointParseError('Bad number of columns!')
 
-                x = Decimal(row[self._xcol])
-                y = Decimal(row[self._ycol])
-                point = ScanPoint(x, y)
-
+                point = ScanPoint(
+                    x=Decimal(row[self._xcol]),
+                    y=Decimal(row[self._ycol]),
+                )
                 pointList.append(point)
 
-        return SimpleScanDictionary({self.simpleName: pointList})
+        return [TabularScan.createFromPointSequence(self.simpleName, pointList)]
 
 
 class CSVScanFileWriter(ScanFileWriter):
@@ -54,14 +55,14 @@ class CSVScanFileWriter(ScanFileWriter):
     def fileFilter(self) -> str:
         return 'Comma-Separated Values Files (*.csv)'
 
-    def write(self, filePath: Path, scanDict: ScanDictionary) -> None:
-        if len(scanDict) != 1:
+    def write(self, filePath: Path, scanSeq: Sequence[Scan]) -> None:
+        if len(scanSeq) != 1:
             className = type(self).__name__
             raise ValueError(f'{className} only supports single sequence scan files!')
 
         with filePath.open(mode='wt') as csvFile:
-            for sequence in scanDict.values():
-                for point in sequence:
+            for scan in scanSeq:
+                for point in scan.values():
                     csvFile.write(f'{point.y},{point.x}\n')
 
 

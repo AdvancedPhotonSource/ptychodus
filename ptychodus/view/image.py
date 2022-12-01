@@ -197,13 +197,13 @@ class ImageItem(QGraphicsPixmapItem):
         app = QApplication.instance()
 
         if app:
-            app.setOverrideCursor(Qt.OpenHandCursor)
+            app.setOverrideCursor(Qt.OpenHandCursor)  # type: ignore
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         app = QApplication.instance()
 
         if app:
-            app.restoreOverrideCursor()
+            app.restoreOverrideCursor()  # type: ignore
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         pass

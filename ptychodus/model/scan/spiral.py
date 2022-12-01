@@ -1,39 +1,23 @@
-from __future__ import annotations
+from collections.abc import Iterator
 from decimal import Decimal
 
 import numpy
 
 from ...api.scan import ScanPoint
-from .initializer import ScanInitializer, ScanInitializerParameters
+from .repositoryItem import ContiguousScanIterator, ScanRepositoryItem
 from .settings import ScanSettings
 
 
-class SpiralScanInitializer(ScanInitializer):
+class SpiralScanRepositoryItem(ScanRepositoryItem):
 
-    def __init__(self, parameters: ScanInitializerParameters, numberOfPoints: int,
-                 radiusScalarInMeters: Decimal, angularStepInTurns: Decimal) -> None:
-        super().__init__(parameters)
-        self._numberOfPoints = numberOfPoints
-        self._radiusScalarInMeters = radiusScalarInMeters
-        self._angularStepInTurns = angularStepInTurns
-
-    @classmethod
-    def createFromSettings(cls, parameters: ScanInitializerParameters,
-                           settings: ScanSettings) -> SpiralScanInitializer:
-        numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value
-        radiusScalarInMeters = settings.radiusScalarInMeters.value
-        angularStepInTurns = settings.angularStepXInTurns.value
-        return cls(parameters, numberOfPoints, radiusScalarInMeters, angularStepInTurns)
-
-    def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.numberOfPointsX.value = self._numberOfPoints
-        settings.numberOfPointsY.value = 1
-        settings.radiusScalarInMeters.value = self._radiusScalarInMeters
-        settings.angularStepXInTurns.value = self._angularStepInTurns
-        super().syncToSettings(settings)
+    def __init__(self) -> None:
+        super().__init__()
+        self._numberOfPoints = 0
+        self._radiusScalarInMeters = Decimal()
+        self._angularStepInTurns = Decimal()
 
     @property
-    def nameHint(self) -> str:
+    def name(self) -> str:
         return self.variant
 
     @property
@@ -47,6 +31,36 @@ class SpiralScanInitializer(ScanInitializer):
     @property
     def canActivate(self) -> bool:
         return True
+
+    def syncFromSettings(self, settings: ScanSettings) -> None:
+        self._numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value
+        self._radiusScalarInMeters = settings.radiusScalarInMeters.value
+        self._angularStepInTurns = settings.angularStepXInTurns.value
+        self.notifyObservers()
+
+    def syncToSettings(self, settings: ScanSettings) -> None:
+        settings.numberOfPointsX.value = self._numberOfPoints
+        settings.numberOfPointsY.value = 1
+        settings.radiusScalarInMeters.value = self._radiusScalarInMeters
+        settings.angularStepXInTurns.value = self._angularStepInTurns
+
+    def __iter__(self) -> Iterator[int]:
+        return ContiguousScanIterator(self)
+
+    def __getitem__(self, index: int) -> ScanPoint:
+        if index >= len(self):
+            raise IndexError(f'Index {index} is out of range')
+
+        radius = self._radiusScalarInMeters * Decimal(index).sqrt()
+        theta = 2 * numpy.pi * index * float(self._angularStepInTurns)
+
+        return ScanPoint(
+            radius * Decimal(numpy.cos(theta)),
+            radius * Decimal(numpy.sin(theta)),
+        )
+
+    def __len__(self) -> int:
+        return self._numberOfPoints
 
     def getNumberOfPoints(self) -> int:
         return self._numberOfPoints
@@ -71,18 +85,3 @@ class SpiralScanInitializer(ScanInitializer):
         if self._angularStepInTurns != angularStepInTurns:
             self._angularStepInTurns = angularStepInTurns
             self.notifyObservers()
-
-    def _getPoint(self, index: int) -> ScanPoint:
-        if index >= len(self):
-            raise IndexError(f'Index {index} is out of range')
-
-        radius = self._radiusScalarInMeters * Decimal(index).sqrt()
-        theta = 2 * numpy.pi * index * float(self._angularStepInTurns)
-
-        return ScanPoint(
-            radius * Decimal(numpy.cos(theta)),
-            radius * Decimal(numpy.sin(theta)),
-        )
-
-    def __len__(self) -> int:
-        return self._numberOfPoints

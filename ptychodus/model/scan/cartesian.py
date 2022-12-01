@@ -1,42 +1,23 @@
-from __future__ import annotations
+from collections.abc import Iterator
 from decimal import Decimal
 
 from ...api.scan import ScanPoint
-from .initializer import ScanInitializer, ScanInitializerParameters
+from .repositoryItem import ContiguousScanIterator, ScanRepositoryItem
 from .settings import ScanSettings
 
 
-class CartesianScanInitializer(ScanInitializer):
+class CartesianScanRepositoryItem(ScanRepositoryItem):
 
-    def __init__(self, parameters: ScanInitializerParameters, stepSizeXInMeters: Decimal,
-                 stepSizeYInMeters: Decimal, numberOfPointsX: int, numberOfPointsY: int,
-                 snake: bool) -> None:
-        super().__init__(parameters)
-        self._stepSizeXInMeters = stepSizeXInMeters
-        self._stepSizeYInMeters = stepSizeYInMeters
-        self._numberOfPointsX = numberOfPointsX
-        self._numberOfPointsY = numberOfPointsY
+    def __init__(self, snake: bool) -> None:
+        super().__init__()
+        self._stepSizeXInMeters = Decimal()
+        self._stepSizeYInMeters = Decimal()
+        self._numberOfPointsX = 0
+        self._numberOfPointsY = 0
         self._snake = snake
 
-    @classmethod
-    def createFromSettings(cls, parameters: ScanInitializerParameters, settings: ScanSettings,
-                           snake: bool) -> CartesianScanInitializer:
-        stepSizeXInMeters = settings.stepSizeXInMeters.value
-        stepSizeYInMeters = settings.stepSizeYInMeters.value
-        numberOfPointsX = settings.numberOfPointsX.value
-        numberOfPointsY = settings.numberOfPointsY.value
-        return cls(parameters, stepSizeXInMeters, stepSizeYInMeters, numberOfPointsX,
-                   numberOfPointsY, snake)
-
-    def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.stepSizeXInMeters.value = self._stepSizeXInMeters
-        settings.stepSizeYInMeters.value = self._stepSizeYInMeters
-        settings.numberOfPointsX.value = self._numberOfPointsX
-        settings.numberOfPointsY.value = self._numberOfPointsY
-        super().syncToSettings(settings)
-
     @property
-    def nameHint(self) -> str:
+    def name(self) -> str:
         return self.variant
 
     @property
@@ -50,6 +31,41 @@ class CartesianScanInitializer(ScanInitializer):
     @property
     def canActivate(self) -> bool:
         return True
+
+    def syncFromSettings(self, settings: ScanSettings) -> None:
+        self._stepSizeXInMeters = settings.stepSizeXInMeters.value
+        self._stepSizeYInMeters = settings.stepSizeYInMeters.value
+        self._numberOfPointsX = settings.numberOfPointsX.value
+        self._numberOfPointsY = settings.numberOfPointsY.value
+        self.notifyObservers()
+
+    def syncToSettings(self, settings: ScanSettings) -> None:
+        settings.stepSizeXInMeters.value = self._stepSizeXInMeters
+        settings.stepSizeYInMeters.value = self._stepSizeYInMeters
+        settings.numberOfPointsX.value = self._numberOfPointsX
+        settings.numberOfPointsY.value = self._numberOfPointsY
+
+    def __iter__(self) -> Iterator[int]:
+        return ContiguousScanIterator(self)
+
+    def __getitem__(self, index: int) -> ScanPoint:
+        if index >= len(self):
+            raise IndexError(f'Index {index} is out of range')
+
+        y, x = divmod(index, self._numberOfPointsX)
+
+        if self._snake and y & 1:
+            x = self._numberOfPointsX - 1 - x
+
+        center = self._getIndexCenter()
+
+        xf = (x - center.x) * self._stepSizeXInMeters
+        yf = (y - center.y) * self._stepSizeYInMeters
+
+        return ScanPoint(xf, yf)
+
+    def __len__(self) -> int:
+        return self._numberOfPointsX * self._numberOfPointsY
 
     def getStepSizeXInMeters(self) -> Decimal:
         return self._stepSizeXInMeters
@@ -88,22 +104,3 @@ class CartesianScanInitializer(ScanInitializer):
             Decimal(self._numberOfPointsX - 1) / 2,
             Decimal(self._numberOfPointsY - 1) / 2,
         )
-
-    def _getPoint(self, index: int) -> ScanPoint:
-        if index >= len(self):
-            raise IndexError(f'Index {index} is out of range')
-
-        y, x = divmod(index, self._numberOfPointsX)
-
-        if self._snake and y & 1:
-            x = self._numberOfPointsX - 1 - x
-
-        center = self._getIndexCenter()
-
-        xf = (x - center.x) * self._stepSizeXInMeters
-        yf = (y - center.y) * self._stepSizeYInMeters
-
-        return ScanPoint(xf, yf)
-
-    def __len__(self) -> int:
-        return self._numberOfPointsX * self._numberOfPointsY

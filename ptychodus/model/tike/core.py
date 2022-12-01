@@ -1,17 +1,19 @@
 from __future__ import annotations
+from collections.abc import Iterator
 from decimal import Decimal
-from typing import Final, Iterator
+from typing import Final
 import logging
 
 import numpy
 
 from ...api.observer import Observable, Observer
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
+from ...api.scan import Scan
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
-from ..scan import Scan, ScanInitializerFactory, ScanRepository
+from ..scan import ScanRepositoryItemFactory, ScanRepository
 from .arrayConverter import TikeArrayConverter
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionPresenter, TikePositionCorrectionSettings
@@ -119,7 +121,7 @@ class TikePresenter(Observable, Observer):
         self._settings.stepLength.value = value
 
     @staticmethod
-    def _clamp(x, xmin, xmax):
+    def _clamp(x, xmin, xmax):  # TODO typing
         assert xmin <= xmax
         return max(xmin, min(x, xmax))
 
@@ -158,7 +160,7 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                        probe: Probe,
                        apparatus: Apparatus,
                        object_: Object,
-                       scanInitializerFactory: ScanInitializerFactory,
+                       scanRepositoryItemFactory: ScanRepositoryItemFactory,
                        scanRepository: ScanRepository,
                        isDeveloperModeEnabled: bool = False) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
@@ -181,7 +183,7 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                 core.reconstructorList.append(NullReconstructor('dm'))
         else:
             arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_,
-                                                diffractionDataset, scanInitializerFactory,
+                                                diffractionDataset, scanRepositoryItemFactory,
                                                 scanRepository)
             tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
                                                   core._positionCorrectionSettings,
