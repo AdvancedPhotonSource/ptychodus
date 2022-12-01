@@ -169,4 +169,9 @@ class ObjectCore(StatefulCore):
         return state
 
     def setStateData(self, state: StateDataType) -> None:
-        self.object.setArray(state['object'])
+        try:
+            array = state['object']
+        except KeyError:
+            logger.debug('Failed to restore object array state!')
+        else:
+            self.object.setArray(array)

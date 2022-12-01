@@ -202,4 +202,9 @@ class ProbeCore(StatefulCore):
         return state
 
     def setStateData(self, state: StateDataType) -> None:
-        self.probe.setArray(state['probe'])
+        try:
+            array = state['probe']
+        except KeyError:
+            logger.debug('Failed to restore probe array state!')
+        else:
+            self.probe.setArray(array)

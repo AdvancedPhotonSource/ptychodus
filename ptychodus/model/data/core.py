@@ -255,20 +255,20 @@ class DataCore(StatefulCore):
             self.dataset)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
-        # FIXME use indexes
         state = dict()
 
         if restartable:
+            state['dataIndex'] = numpy.array(self.dataset.getAssembledIndexes())
             state['data'] = self.dataset.getAssembledData()
 
         return state
 
     def setStateData(self, state: StateDataType) -> None:
-        # FIXME use indexes
+        # FIXME use dataIndex = state['dataIndex']
         try:
             data = state['data']
         except KeyError:
-            pass
+            logger.debug('Skipped restoring data array state.')
         else:
             self.dataset.setAssembledData(data)
 

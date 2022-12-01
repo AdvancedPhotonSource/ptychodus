@@ -171,17 +171,18 @@ class ScanCore(StatefulCore):
         self.presenter.openScan(filePath, fileFilter)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
-        scanArrayIndex: list[int] = list()
+        scanIndex: list[int] = list()
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
 
+        # FIXME get untransformed scan
         for index, point in self.scan.items():
-            scanArrayIndex.append(index)
+            scanIndex.append(index)
             scanXInMeters.append(float(point.x))
             scanYInMeters.append(float(point.y))
 
         state: StateDataType = {
-            'scanArrayIndex': numpy.array(scanArrayIndex),
+            'scanIndex': numpy.array(scanIndex),
             'scanXInMeters': numpy.array(scanXInMeters),
             'scanYInMeters': numpy.array(scanYInMeters),
         }
@@ -189,11 +190,11 @@ class ScanCore(StatefulCore):
 
     def setStateData(self, state: StateDataType) -> None:
         pointMap: dict[int, ScanPoint] = dict()
-        scanArrayIndex = state['scanArrayIndex']
+        scanIndex = state['scanIndex']
         scanXInMeters = state['scanXInMeters']
         scanYInMeters = state['scanYInMeters']
 
-        for index, x, y in zip(scanArrayIndex, scanXInMeters, scanYInMeters):
+        for index, x, y in zip(scanIndex, scanXInMeters, scanYInMeters):
             pointMap[index] = ScanPoint(
                 x=Decimal(repr(x)),
                 y=Decimal(repr(y)),
