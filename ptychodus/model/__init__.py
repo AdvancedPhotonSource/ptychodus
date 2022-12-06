@@ -1,6 +1,4 @@
 from .core import ModelArgs, ModelCore
-from .data import (ActiveDiffractionPatternPresenter, DiffractionDatasetPresenter,
-                   DiffractionPatternPresenter)
 from .detector import *
 from .image import *
 from .metadata import MetadataPresenter

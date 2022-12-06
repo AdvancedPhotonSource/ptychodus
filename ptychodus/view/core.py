@@ -128,9 +128,6 @@ class ViewCore(QMainWindow):
 
         view.setCentralWidget(view.splitter)
 
-        # TODO make visible when complete
-        view.workflowAction.setVisible(isDeveloperModeEnabled)
-
         desktopSize = QApplication.desktop().availableGeometry().size()
         preferredHeight = desktopSize.height() * 2 // 3
         preferredWidth = min(desktopSize.width() * 2 // 3, 2 * preferredHeight)

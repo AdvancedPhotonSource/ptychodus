@@ -10,7 +10,7 @@ from PyQt5.QtGui import QColor, QDesktopServices, QFont, QRegularExpressionValid
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QTableView, QWidget
 
 from ..api.observer import Observable, Observer
-from ..model import WorkflowPresenter, WorkflowRun
+from ..model.workflow import WorkflowPresenter, WorkflowRun
 from ..view import WorkflowComputeView, WorkflowDataView, WorkflowParametersView
 
 logger = logging.getLogger(__name__)
@@ -106,9 +106,6 @@ class WorkflowComputeController(Observer):
         view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
         view.dataEndpointIDLineEdit.editingFinished.connect(controller._syncDataEndpointIDToModel)
         view.pathLineEdit.editingFinished.connect(controller._syncPathToModel)
-        view.flowIDLineEdit.editingFinished.connect(controller._syncFlowIDToModel)
-        view.reconstructActionIDLineEdit.editingFinished.connect(
-            controller._syncReconstructActionIDToModel)
 
         controller._syncModelToView()
 
@@ -126,21 +123,10 @@ class WorkflowComputeController(Observer):
         dataPath = self._view.pathLineEdit.text()
         self._presenter.setComputeDataPath(dataPath)
 
-    def _syncFlowIDToModel(self) -> None:
-        flowID = UUID(self._view.flowIDLineEdit.text())
-        self._presenter.setFlowID(flowID)
-
-    def _syncReconstructActionIDToModel(self) -> None:
-        actionID = UUID(self._view.reconstructActionIDLineEdit.text())
-        self._presenter.setReconstructActionID(actionID)
-
     def _syncModelToView(self) -> None:
         self._view.endpointIDLineEdit.setText(str(self._presenter.getComputeEndpointID()))
         self._view.dataEndpointIDLineEdit.setText(str(self._presenter.getComputeDataEndpointID()))
         self._view.pathLineEdit.setText(str(self._presenter.getComputeDataPath()))
-        self._view.flowIDLineEdit.setText(str(self._presenter.getFlowID()))
-        self._view.reconstructActionIDLineEdit.setText(
-            str(self._presenter.getReconstructActionID()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -280,7 +266,7 @@ class WorkflowController(Observer):
         if seconds > 0:
             self._statusRefreshTimer.start(seconds)
         else:
-            # TODO can't restart
+            # FIXME can't restart
             self._statusRefreshTimer.stop()
 
     def _startAuthorization(self) -> None:

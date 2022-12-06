@@ -176,7 +176,7 @@ class ScanCore(StatefulCore):
         scanYInMeters: list[float] = list()
 
         # FIXME get untransformed scan
-        for index, point in self.scan.items():
+        for index, point in self.scan.untransformed.items():
             scanIndex.append(index)
             scanXInMeters.append(float(point.x))
             scanYInMeters.append(float(point.y))

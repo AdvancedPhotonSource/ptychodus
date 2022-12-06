@@ -9,6 +9,7 @@ from .factory import ScanRepositoryItemFactory
 from .repository import ScanRepository
 from .repositoryItem import ScanRepositoryItem
 from .settings import ScanSettings
+from .transformed import TransformedScanRepositoryItem
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,15 @@ class ActiveScan(Scan, Observer):
 
         self._syncToSettings()
         self.notifyObservers()
+
+    @property
+    def untransformed(self) -> Scan:
+        item: Scan = self._item
+
+        if isinstance(self._item, TransformedScanRepositoryItem):
+            item = self._item._item  # TODO clean up
+
+        return item
 
     def __iter__(self) -> Iterator[int]:
         return iter(self._item)

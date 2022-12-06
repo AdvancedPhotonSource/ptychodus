@@ -135,13 +135,13 @@ class ModelCore:
         if self._modelArgs.settingsFilePath:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
 
+        if self._modelArgs.restartFilePath:
+            self.openStateData(self._modelArgs.restartFilePath)
+
         if self.diffractionDatasetPresenter.isReadyToAssemble:
             self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
             self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(
                 finishAssembling=True)
-
-        if self._modelArgs.restartFilePath:
-            self.openStateData(self._modelArgs.restartFilePath)
 
         if self.rpcMessageService:
             self.rpcMessageService.start()

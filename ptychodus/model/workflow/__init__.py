@@ -1,4 +1,4 @@
-from .client import WorkflowRun
+from .api import WorkflowRun
 from .core import WorkflowCore, WorkflowPresenter
 
 __all__ = [

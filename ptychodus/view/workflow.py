@@ -76,8 +76,6 @@ class WorkflowComputeView(QGroupBox):
         self.endpointIDLineEdit = UUIDLineEdit()
         self.dataEndpointIDLineEdit = UUIDLineEdit()
         self.pathLineEdit = QLineEdit()
-        self.flowIDLineEdit = UUIDLineEdit()
-        self.reconstructActionIDLineEdit = UUIDLineEdit()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowComputeView:
@@ -87,8 +85,6 @@ class WorkflowComputeView(QGroupBox):
         layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
         layout.addRow('Data Endpoint ID:', view.dataEndpointIDLineEdit)
         layout.addRow('Data Path:', view.pathLineEdit)
-        layout.addRow('Flow ID:', view.flowIDLineEdit)
-        layout.addRow('Reconstruct Action ID:', view.reconstructActionIDLineEdit)
         view.setLayout(layout)
 
         return view

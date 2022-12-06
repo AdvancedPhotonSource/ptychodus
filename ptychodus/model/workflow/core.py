@@ -6,10 +6,42 @@ import logging
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
+from .api import WorkflowClient, WorkflowRun
 from .settings import WorkflowSettings
-from .client import WorkflowClient, WorkflowClientBuilder, WorkflowRun
 
 logger = logging.getLogger(__name__)
+
+# TODO ideally initial_authorizers will contain all of the scopes needed so no login is needed
+#from globus_automate_client.flows_client import (MANAGE_FLOWS_SCOPE, RUN_FLOWS_SCOPE,
+#                                                 RUN_STATUS_SCOPE, VIEW_FLOWS_SCOPE)
+
+#FLOW_ID = str(self._settings.flowID.value)
+#FLOW_ID_ = FLOW_ID.replace('-', '_')
+
+#requestedScopes = [
+#    # Automate scopes
+#    MANAGE_FLOWS_SCOPE,
+#    RUN_FLOWS_SCOPE,
+#    RUN_STATUS_SCOPE,
+#    VIEW_FLOWS_SCOPE,
+#
+#    # Flow scope
+#    f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
+#]
+
+# def _reauthorizeCallback(self, scopes: list[str]) -> ScopeAuthorizerMapping:
+#     # TODO complete a Globus Auth flow
+#     # TODO secure tokens for future invocations
+#     self.reauthorize(scopes)
+#     # FIXME controller uses authService to present GUI for user to reauth
+#     # FIXME wait for authorizers
+#     return authorizers
+
+# def buildLoginManager(self, authCode: str) -> BaseLoginManager:
+#     return CallbackLoginManager(
+#         initial_authorizers=authorizers,
+#         callback=self._reauthorizeCallback,
+#     )
 
 
 class WorkflowPresenter(Observable, Observer):
@@ -72,18 +104,6 @@ class WorkflowPresenter(Observable, Observer):
     def getComputeEndpointID(self) -> UUID:
         return self._settings.computeEndpointID.value
 
-    def setFlowID(self, flowID: UUID) -> None:
-        self._settings.flowID.value = flowID
-
-    def getFlowID(self) -> UUID:
-        return self._settings.flowID.value
-
-    def setReconstructActionID(self, actionID: UUID) -> None:
-        self._settings.reconstructActionID.value = actionID
-
-    def getReconstructActionID(self) -> UUID:
-        return self._settings.reconstructActionID.value
-
     def setComputeDataEndpointID(self, endpointID: UUID) -> None:
         self._settings.computeDataEndpointID.value = endpointID
 
@@ -112,7 +132,7 @@ class WorkflowPresenter(Observable, Observer):
 
     def runFlow(self) -> None:
         if self._client:
-            self._client.runFlow()
+            self._client.runFlow(label='Ptychodus')  # TODO label
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

@@ -6,7 +6,8 @@ from PyQt5.QtWidgets import QFileDialog, QTableView, QTreeView, QWidget
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
-from ...model import DiffractionDatasetPresenter, DiffractionPatternPresenter, MetadataPresenter
+from ...model import MetadataPresenter
+from ...model.data import DiffractionDatasetPresenter, DiffractionPatternPresenter
 from ...view import DataParametersView
 from ..tree import SimpleTreeModel
 from .dataset import DatasetController

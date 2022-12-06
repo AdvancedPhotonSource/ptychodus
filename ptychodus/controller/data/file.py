@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QDir, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import QFileSystemModel
 
 from ...api.observer import Observable, Observer
-from ...model import DiffractionDatasetPresenter
+from ...model.data import DiffractionDatasetPresenter
 from ...view import DataNavigationPage, DatasetFileView
 from .dialogFactory import FileDialogFactory
 
