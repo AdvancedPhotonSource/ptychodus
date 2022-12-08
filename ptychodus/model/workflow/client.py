@@ -12,10 +12,45 @@ import gladier
 
 from .api import WorkflowClient, WorkflowRun
 from .authorizerRepository import GlobusAuthorizerRepository, ScopeAuthorizerMapping
-from .flow import PtychodusClient
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
+
+
+def ptychodus_reconstruct(**data: str) -> None:
+    from pathlib import Path
+    from ptychodus.model import ModelArgs, ModelCore
+
+    modelArgs = ModelArgs(
+        restartFilePath=Path(data['restart_file']),
+        settingsFilePath=Path(data['settings_file']),
+        replacementPathPrefix=data['replacement_path_prefix'],
+    )
+
+    with ModelCore(modelArgs) as model:
+        model.batchModeReconstruct()
+
+
+@gladier.generate_flow_definition
+class PtychodusReconstruct(gladier.GladierBaseTool):
+    funcx_functions = [ptychodus_reconstruct]
+    required_input = [
+        'restart_file',
+        'settings_file',
+        'replacement_path_prefix',
+    ]
+
+
+@gladier.generate_flow_definition
+class PtychodusClient(gladier.GladierBaseClient):
+    client_id = GlobusAuthorizerRepository.CLIENT_ID
+    gladier_tools = [
+        'gladier_tools.globus.transfer.Transfer:Settings',
+        'gladier_tools.globus.transfer.Transfer:State',
+        PtychodusReconstruct,
+        'gladier_tools.globus.transfer.Transfer:Results',
+        # TODO 'gladier_tools.publish.Publish',
+    ]
 
 
 @dataclass(frozen=True)
@@ -84,11 +119,11 @@ class GlobusWorkflowThread(threading.Thread):
 
         return runList
 
-    def runFlow(self, label: str, flowInput: Mapping[str,Any]) -> None:
+    def runFlow(self, label: str, flowInput: Mapping[str, Any]) -> None:
         input_ = WorkflowInput(label, flowInput)
         self._inputQueue.put(input_)
 
-    def _runFlow(self, label: str, flowInput: Mapping[str,Any]) -> None:
+    def _runFlow(self, label: str, flowInput: Mapping[str, Any]) -> None:
         self._requireClient()
 
         if self._client is not None:

@@ -7,8 +7,8 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFi
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
-from ...model import (CartesianScanRepositoryItem, LissajousScanRepositoryItem, ScanPresenter,
-                      SpiralScanRepositoryItem, TransformedScanRepositoryItem)
+from ...model.scan import (CartesianScanRepositoryItem, LissajousScanRepositoryItem, ScanPresenter,
+                           SpiralScanRepositoryItem, TransformedScanRepositoryItem)
 from ...view import (CartesianScanView, LissajousScanView, ScanEditorDialog, ScanParametersView,
                      ScanPlotView, ScanPositionDataView, ScanTransformView, SpiralScanView)
 from ..data import FileDialogFactory

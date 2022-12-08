@@ -6,9 +6,9 @@ from PyQt5.QtGui import QRegularExpressionValidator
 from PyQt5.QtWidgets import QWidget
 
 from ..api.observer import Observable, Observer
-from ..model import (TikeAdaptiveMomentPresenter, TikeReconstructorLibrary,
-                     TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter, TikePresenter,
-                     TikeProbeCorrectionPresenter)
+from ..model.tike import (TikeAdaptiveMomentPresenter, TikeReconstructorLibrary,
+                          TikeObjectCorrectionPresenter, TikePositionCorrectionPresenter,
+                          TikePresenter, TikeProbeCorrectionPresenter)
 from ..view import (TikeAdaptiveMomentView, TikeBasicParametersView, TikeObjectCorrectionView,
                     TikeParametersView, TikePositionCorrectionView, TikeProbeCorrectionView,
                     TikeProbeSupportView)

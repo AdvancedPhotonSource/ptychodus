@@ -4,7 +4,7 @@ from pathlib import Path
 from PyQt5.QtWidgets import QWidget
 
 from ..api.observer import Observable, Observer
-from ..model import PtychoNNReconstructorLibrary, PtychoNNPresenter
+from ..model.ptychonn import PtychoNNReconstructorLibrary, PtychoNNPresenter
 from ..view import PtychoNNParametersView, PtychoNNBasicParametersView
 from .data import FileDialogFactory
 from .reconstructor import ReconstructorViewControllerFactory

@@ -9,7 +9,8 @@ from PyQt5.QtWidgets import QFileDialog
 
 from ..api.data import DiffractionPatternState
 from ..api.observer import Observable, Observer
-from ..model import DetectorPresenter, ImagePresenter
+from ..model import DetectorPresenter
+from ..model.image import ImagePresenter
 from ..model.data import ActiveDiffractionPatternPresenter, DiffractionDatasetPresenter
 from ..view import DiffractionPatternView, DetectorView, ImageView
 from .data import FileDialogFactory

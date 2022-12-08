@@ -23,6 +23,8 @@ class WorkflowSettings(Observable, Observer):
         self.outputDataEndpointID = settingsGroup.createUUIDEntry(
             'OutputDataEndpointID', UUID('9c9cb97e-de86-11e6-9d15-22000a1e3b52'))
         self.outputDataPath = settingsGroup.createStringEntry('OutputDataPath', '/~/path/to/data')
+        self.stagingDirectory = settingsGroup.createPathEntry('StagingDirectory',
+                                                              Path.home() / '.ptychodus')
         self.statusRefreshIntervalInSeconds = settingsGroup.createIntegerEntry(
             'StatusRefreshIntervalInSeconds', 10)
 

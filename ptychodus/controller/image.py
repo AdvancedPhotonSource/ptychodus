@@ -9,9 +9,9 @@ import numpy
 
 from ..api.image import ScalarTransformation
 from ..api.observer import Observable, Observer
-from ..model import ImagePresenter
-from ..view import ImageDisplayRangeDialog, ImageColorizerGroupBox, \
-        ImageDataRangeGroupBox, ImageFileGroupBox, ImageView, ImageWidget
+from ..model.image import ImagePresenter
+from ..view import (ImageDisplayRangeDialog, ImageColorizerGroupBox, ImageDataRangeGroupBox,
+                    ImageFileGroupBox, ImageView, ImageWidget)
 from .data import FileDialogFactory
 
 

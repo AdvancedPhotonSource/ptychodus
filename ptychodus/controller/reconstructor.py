@@ -9,10 +9,12 @@ from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
-from ..api.reconstructor import ReconstructResult
 from ..api.observer import Observable, Observer
-from ..model import (ObjectPresenter, ProbePresenter, ReconstructorPlotPresenter,
-                     ReconstructorPresenter, ScanPresenter, ScanRepositoryKeyAndValue)
+from ..api.reconstructor import ReconstructResult
+from ..model.object import ObjectPresenter
+from ..model.probe import ProbePresenter
+from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
+from ..model.scan import ScanPresenter, ScanRepositoryKeyAndValue
 from ..view import ReconstructorParametersView, ReconstructorPlotView, resources
 
 logger = logging.getLogger(__name__)

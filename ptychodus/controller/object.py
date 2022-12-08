@@ -4,7 +4,8 @@ from typing import Callable
 from PyQt5.QtWidgets import QDialog
 
 from ..api.observer import Observable, Observer
-from ..model import FileObjectInitializer, ImagePresenter, Object, ObjectPresenter
+from ..model.image import ImagePresenter
+from ..model.object import FileObjectInitializer, Object, ObjectPresenter
 from ..view import ImageView, ObjectParametersView
 from .data import FileDialogFactory
 from .image import ImageController

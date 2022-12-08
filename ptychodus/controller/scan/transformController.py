@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...model import TransformedScanRepositoryItem
+from ...model.scan import TransformedScanRepositoryItem
 from ...view import ScanTransformView
 
 
