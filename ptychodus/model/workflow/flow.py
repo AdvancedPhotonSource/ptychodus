@@ -1,6 +1,6 @@
 from gladier import GladierBaseClient, GladierBaseTool, generate_flow_definition
 
-from .authorizationService import GlobusAuthorizationService
+from .authorizerRepository import GlobusAuthorizerRepository
 
 
 def ptychodus_reconstruct(**data: str) -> None:
@@ -29,7 +29,7 @@ class PtychodusReconstruct(GladierBaseTool):
 
 @generate_flow_definition
 class PtychodusClient(GladierBaseClient):
-    client_id = GlobusAuthorizationService.CLIENT_ID
+    client_id = GlobusAuthorizerRepository.CLIENT_ID
     gladier_tools = [
         'gladier_tools.globus.transfer.Transfer:Settings',
         'gladier_tools.globus.transfer.Transfer:State',

@@ -236,6 +236,7 @@ class WorkflowController(Observer):
         parametersView.statusView.refreshIntervalSpinBox.setRange(1, 600)
         parametersView.statusView.refreshIntervalSpinBox.valueChanged.connect(
             presenter.setStatusRefreshIntervalInSeconds)
+        # FIXME controller: present GUI to get code[str] from user
         parametersView.buttonBox.authorizeButton.clicked.connect(controller._startAuthorization)
         parametersView.buttonBox.executeButton.clicked.connect(controller._execute)
         parametersView.authorizeDialog.finished.connect(controller._finishAuthorization)
@@ -282,7 +283,7 @@ class WorkflowController(Observer):
             return
 
         authCode = self._parametersView.authorizeDialog.lineEdit.text()
-        self._presenter.setAuthorizationCode(authCode)
+        self._presenter.setCodeFromAuthorizeURL(authCode)
         self._restartStatusRefreshTimer()
 
     def _refreshStatus(self) -> None:
