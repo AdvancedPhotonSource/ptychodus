@@ -102,7 +102,20 @@ class WorkflowCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
-        self._authorizerRepository = GlobusAuthorizerRepository()  # FIXME hide globus
-        self._client = GlobusWorkflowClient()  # FIXME hide globus
+
+        try:
+            from .authorizerRepository import GlobusAuthorizerRepository
+            from .client import GlobusClient
+        except ModuleNotFoundError:
+            logger.info('Globus not found.')
+
+            from .null import NullAuthorizerRepository, NullClient
+            self._authorizerRepository: WorkflowAuthorizerRepository = NullAuthorizerRepository()
+            self._client: WorkflowClient = NullClient()
+        else:
+            globusAuthorizerRepository = GlobusAuthorizerRepository()
+            self._authorizerRepository = globusAuthorizerRepository
+            self._client = GlobusClient(self._settings, globusAuthorizerRepository)
+
         self.presenter = WorkflowPresenter.createInstance(self._settings,
                                                           self._authorizerRepository, self._client)

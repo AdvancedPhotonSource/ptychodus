@@ -237,7 +237,6 @@ class WorkflowController(Observer):
         parametersView.statusView.refreshIntervalSpinBox.valueChanged.connect(
             presenter.setStatusRefreshIntervalInSeconds)
         # FIXME controller: present GUI to get code[str] from user
-        parametersView.buttonBox.authorizeButton.clicked.connect(controller._startAuthorization)
         parametersView.buttonBox.executeButton.clicked.connect(controller._execute)
         parametersView.authorizeDialog.finished.connect(controller._finishAuthorization)
 
@@ -270,7 +269,7 @@ class WorkflowController(Observer):
             # FIXME can't restart
             self._statusRefreshTimer.stop()
 
-    def _startAuthorization(self) -> None:
+    def _startAuthorization(self) -> None:  # FIXME need to trigger
         authorizeURL = self._presenter.getAuthorizeURL()
         text = f'Input the Globus authorization code from <a href="{authorizeURL}">this link</a>:'
 
@@ -298,7 +297,6 @@ class WorkflowController(Observer):
             self._presenter.getStatusRefreshIntervalInSeconds())
 
         isAuthorized = self._presenter.isAuthorized()
-        self._parametersView.buttonBox.authorizeButton.setEnabled(not isAuthorized)
         self._parametersView.buttonBox.executeButton.setEnabled(isAuthorized)
 
     def update(self, observable: Observable) -> None:

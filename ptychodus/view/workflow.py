@@ -111,7 +111,6 @@ class WorkflowButtonBox(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.authorizeButton = QPushButton('Authorize')
         self.executeButton = QPushButton('Execute')
 
     @classmethod
@@ -120,7 +119,6 @@ class WorkflowButtonBox(QWidget):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.authorizeButton)
         layout.addWidget(view.executeButton)
         view.setLayout(layout)
 

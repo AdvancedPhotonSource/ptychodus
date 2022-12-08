@@ -61,13 +61,15 @@ class WorkflowInput:
 
 class GlobusWorkflowThread(threading.Thread):
 
-    def __init__(self, authorizerRepository: GlobusAuthorizerRepository) -> None:
+    def __init__(self, settings: WorkflowSettings,
+                 authorizerRepository: GlobusAuthorizerRepository) -> None:
         # TODO handle auth cancelled
         # TODO secure tokens for future invocations
         super().__init__()
         logger.info('\tGladier ' + version('gladier'))
-        self._client: Optional[gladier.GladierBaseClient] = None
+        self._settings = settings
         self._authorizerRepository = authorizerRepository
+        self._client: Optional[gladier.GladierBaseClient] = None
         self._inputQueue: queue.Queue[WorkflowInput] = queue.Queue()
         self._stopEvent = threading.Event()
 
@@ -78,13 +80,12 @@ class GlobusWorkflowThread(threading.Thread):
 
     def _requireClient(self) -> None:
         if self._client is None:
-            # FIXME need flow ID
-            #FLOW_ID = str(self._settings.flowID.value)
-            #FLOW_ID_ = FLOW_ID.replace('-', '_')
+            FLOW_ID = str(self._settings.flowID.value)  # TODO how to get this from gladier?
+            FLOW_ID_ = FLOW_ID.replace('-', '_')
 
             scopes = [
                 gladier.FlowsManager.AVAILABLE_SCOPES,
-                #f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
+                f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
             ]
             loginManager = CallbackLoginManager(
                 initial_authorizers=self._authorize(scopes),
@@ -163,15 +164,18 @@ class GlobusWorkflowThread(threading.Thread):
         logger.info('Workflow thread stopped.')
 
 
-class GlobusWorkflowClient(WorkflowClient):
+class GlobusClient(WorkflowClient):
 
     def __init__(self, settings: WorkflowSettings,
                  authorizerRepository: GlobusAuthorizerRepository) -> None:
 
         super().__init__()
         self._settings = settings
-        self._authorizerRepository = authorizerRepository
-        self._thread = GlobusWorkflowThread(authorizerRepository)
+        self._thread = GlobusWorkflowThread(settings, authorizerRepository)
+
+    def listFlowRuns(self) -> list[WorkflowRun]:
+        flowRuns: list[WorkflowRun] = list()
+        return flowRuns
 
     def runFlow(self, label: str) -> None:
         flowInput = {
@@ -208,5 +212,7 @@ class GlobusWorkflowClient(WorkflowClient):
             'results_transfer_recursive':
             False
         }
+
+        # FIXME save data files
 
         self._thread.runFlow(label, flowInput)
