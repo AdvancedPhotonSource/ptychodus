@@ -21,6 +21,8 @@ class GlobusAuthorizerRepository(WorkflowAuthorizerRepository):
     def __init__(self) -> None:
         super().__init__()
         logger.info('\tGlobus SDK ' + version('globus-sdk'))
+        # TODO handle auth cancelled
+        # TODO secure tokens for future invocations
         self._authClient = NativeAppAuthClient(GlobusAuthorizerRepository.CLIENT_ID)
         self._authorizers: dict[str, AuthorizerTypes] = dict()
         self.isAuthorizedEvent = threading.Event()

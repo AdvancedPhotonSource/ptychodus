@@ -28,9 +28,10 @@ from .reconstructor import ReconstructorCore, ReconstructorPresenter, Reconstruc
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
-from .statefulCore import StateDataKeyType, StateDataValueType, StatefulCore
+from .statefulCore import StateDataRegistry
 from .tike import TikeReconstructorLibrary
-from .workflow import WorkflowCore, WorkflowPresenter
+from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
+                       WorkflowParametersPresenter)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def configureLogger() -> None:
 class ModelArgs:
     restartFilePath: Optional[Path]
     settingsFilePath: Optional[Path]
-    replacementPathPrefix: Optional[str]
+    replacementPathPrefix: Optional[str] = None
     rpcPort: int = -1
     autoExecuteRPCs: bool = False
     isDeveloperModeEnabled: bool = False
@@ -113,7 +114,9 @@ class ModelCore:
             ],
         )
 
-        self._workflowCore = WorkflowCore(self.settingsRegistry)
+        self._stateDataRegistry = StateDataRegistry(
+            (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
+        self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
 
         self.rpcMessageService: Optional[RPCMessageService] = None
 
@@ -123,13 +126,6 @@ class ModelCore:
             self.rpcMessageService.registerProcedure(
                 LoadResultsMessage,
                 LoadResultsExecutor(self._probeCore.probe, self._objectCore.object))
-
-        self._statefulCores = [
-            self._dataCore,
-            self._scanCore,
-            self._probeCore,
-            self._objectCore,
-        ]
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
@@ -209,22 +205,10 @@ class ModelCore:
         self._dataCore.dataset.notifyObserversIfDatasetChanged()
 
     def saveStateData(self, filePath: Path, *, restartable: bool) -> None:
-        # TODO document file format
-        # TODO include cost function values
-        logger.debug(f'Writing state data to \"{filePath}\" [restartable={restartable}]')
-        data: dict[StateDataKeyType, StateDataValueType] = dict()
-
-        for core in self._statefulCores:
-            data.update(core.getStateData(restartable=restartable))
-
-        numpy.savez(filePath, **data)
+        self._stateDataRegistry.saveStateData(filePath, restartable=restartable)
 
     def openStateData(self, filePath: Path) -> None:
-        logger.debug(f'Reading state data from \"{filePath}\"')
-        data = numpy.load(filePath)
-
-        for core in self._statefulCores:
-            core.setStateData(data)
+        self._stateDataRegistry.openStateData(filePath)
 
     def batchModeReconstruct(self) -> int:
         result = self._reconstructorCore.presenter.reconstruct()
@@ -261,5 +245,13 @@ class ModelCore:
         return self._reconstructorCore.plotPresenter
 
     @property
-    def workflowPresenter(self) -> WorkflowPresenter:
-        return self._workflowCore.presenter
+    def workflowAuthorizationPresenter(self) -> WorkflowAuthorizationPresenter:
+        return self._workflowCore.authorizationPresenter
+
+    @property
+    def workflowExecutionPresenter(self) -> WorkflowExecutionPresenter:
+        return self._workflowCore.executionPresenter
+
+    @property
+    def workflowParametersPresenter(self) -> WorkflowParametersPresenter:
+        return self._workflowCore.parametersPresenter

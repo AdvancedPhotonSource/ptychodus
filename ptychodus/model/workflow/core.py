@@ -1,43 +1,32 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypeAlias
 from uuid import UUID
 import logging
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
+from ..statefulCore import StateDataRegistry
 from .api import WorkflowAuthorizerRepository, WorkflowClient, WorkflowRun
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
 
+WorkflowAuthorizationPresenter: TypeAlias = WorkflowAuthorizerRepository
+WorkflowExecutionPresenter: TypeAlias = WorkflowClient
 
-class WorkflowPresenter(Observable, Observer):
 
-    def __init__(self, settings: WorkflowSettings,
-                 authorizerRepository: WorkflowAuthorizerRepository,
-                 client: WorkflowClient) -> None:
+class WorkflowParametersPresenter(Observable, Observer):
+
+    def __init__(self, settings: WorkflowSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._authorizerRepository = authorizerRepository
-        self._client = client
 
     @classmethod
-    def createInstance(cls, settings: WorkflowSettings,
-                       authorizerRepository: WorkflowAuthorizerRepository,
-                       client: WorkflowClient) -> WorkflowPresenter:
-        presenter = cls(settings, authorizerRepository, client)
+    def createInstance(cls, settings: WorkflowSettings) -> WorkflowParametersPresenter:
+        presenter = cls(settings)
         settings.addObserver(presenter)
         return presenter
-
-    def isAuthorized(self) -> bool:
-        return self._authorizerRepository.isAuthorized
-
-    def getAuthorizeURL(self) -> str:
-        return self._authorizerRepository.getAuthorizeURL()
-
-    def setCodeFromAuthorizeURL(self, code: str) -> None:
-        self._authorizerRepository.setCodeFromAuthorizeURL(code)
 
     def setInputDataEndpointID(self, endpointID: UUID) -> None:
         self._settings.inputDataEndpointID.value = endpointID
@@ -45,29 +34,23 @@ class WorkflowPresenter(Observable, Observer):
     def getInputDataEndpointID(self) -> UUID:
         return self._settings.inputDataEndpointID.value
 
-    def setInputDataPath(self, inputDataPath: str) -> None:
-        self._settings.inputDataPath.value = inputDataPath
+    def setInputDataGlobusPath(self, inputDataGlobusPath: str) -> None:
+        self._settings.inputDataGlobusPath.value = inputDataGlobusPath
 
-    def getInputDataPath(self) -> str:
-        return self._settings.inputDataPath.value
+    def getInputDataGlobusPath(self) -> str:
+        return self._settings.inputDataGlobusPath.value
 
-    def setOutputDataEndpointID(self, endpointID: UUID) -> None:
-        self._settings.outputDataEndpointID.value = endpointID
+    def setInputDataPosixPath(self, inputDataPosixPath: str) -> None:
+        self._settings.inputDataPosixPath.value = inputDataPosixPath
 
-    def getOutputDataEndpointID(self) -> UUID:
-        return self._settings.outputDataEndpointID.value
+    def getInputDataPosixPath(self) -> str:
+        return self._settings.inputDataPosixPath.value
 
-    def setOutputDataPath(self, outputDataPath: str) -> None:
-        self._settings.outputDataPath.value = outputDataPath
+    def setComputeFuncXEndpointID(self, endpointID: UUID) -> None:
+        self._settings.computeFuncXEndpointID.value = endpointID
 
-    def getOutputDataPath(self) -> str:
-        return self._settings.outputDataPath.value
-
-    def setComputeEndpointID(self, endpointID: UUID) -> None:
-        self._settings.computeEndpointID.value = endpointID
-
-    def getComputeEndpointID(self) -> UUID:
-        return self._settings.computeEndpointID.value
+    def getComputeFuncXEndpointID(self) -> UUID:
+        return self._settings.computeFuncXEndpointID.value
 
     def setComputeDataEndpointID(self, endpointID: UUID) -> None:
         self._settings.computeDataEndpointID.value = endpointID
@@ -75,23 +58,41 @@ class WorkflowPresenter(Observable, Observer):
     def getComputeDataEndpointID(self) -> UUID:
         return self._settings.computeDataEndpointID.value
 
-    def setComputeDataPath(self, computeDataPath: str) -> None:
-        self._settings.computeDataPath.value = computeDataPath
+    def setComputeDataGlobusPath(self, computeDataGlobusPath: str) -> None:
+        self._settings.computeDataGlobusPath.value = computeDataGlobusPath
 
-    def getComputeDataPath(self) -> str:
-        return self._settings.computeDataPath.value
+    def getComputeDataGlobusPath(self) -> str:
+        return self._settings.computeDataGlobusPath.value
+
+    def setComputeDataPosixPath(self, computeDataPosixPath: str) -> None:
+        self._settings.computeDataPosixPath.value = computeDataPosixPath
+
+    def getComputeDataPosixPath(self) -> str:
+        return self._settings.computeDataPosixPath.value
+
+    def setOutputDataEndpointID(self, endpointID: UUID) -> None:
+        self._settings.outputDataEndpointID.value = endpointID
+
+    def getOutputDataEndpointID(self) -> UUID:
+        return self._settings.outputDataEndpointID.value
+
+    def setOutputDataGlobusPath(self, outputDataGlobusPath: str) -> None:
+        self._settings.outputDataGlobusPath.value = outputDataGlobusPath
+
+    def getOutputDataGlobusPath(self) -> str:
+        return self._settings.outputDataGlobusPath.value
+
+    def setOutputDataPosixPath(self, outputDataPosixPath: str) -> None:
+        self._settings.outputDataPosixPath.value = outputDataPosixPath
+
+    def getOutputDataPosixPath(self) -> str:
+        return self._settings.outputDataPosixPath.value
 
     def setStatusRefreshIntervalInSeconds(self, seconds: int) -> None:
         self._settings.statusRefreshIntervalInSeconds.value = seconds
 
     def getStatusRefreshIntervalInSeconds(self) -> int:
         return self._settings.statusRefreshIntervalInSeconds.value
-
-    def listFlowRuns(self) -> list[WorkflowRun]:
-        return self._client.listFlowRuns()
-
-    def runFlow(self) -> None:
-        self._client.runFlow(label='Ptychodus')  # TODO label
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
@@ -100,7 +101,8 @@ class WorkflowPresenter(Observable, Observer):
 
 class WorkflowCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry,
+                 stateDataRegistry: StateDataRegistry) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
 
         try:
@@ -115,7 +117,15 @@ class WorkflowCore:
         else:
             globusAuthorizerRepository = GlobusAuthorizerRepository()
             self._authorizerRepository = globusAuthorizerRepository
-            self._client = GlobusClient(self._settings, globusAuthorizerRepository)
+            self._client = GlobusClient(self._settings, settingsRegistry, stateDataRegistry,
+                                        globusAuthorizerRepository)
 
-        self.presenter = WorkflowPresenter.createInstance(self._settings,
-                                                          self._authorizerRepository, self._client)
+        self.parametersPresenter = WorkflowParametersPresenter.createInstance(self._settings)
+
+    @property
+    def authorizationPresenter(self) -> WorkflowAuthorizationPresenter:
+        return self._authorizerRepository
+
+    @property
+    def executionPresenter(self) -> WorkflowExecutionPresenter:
+        return self._client

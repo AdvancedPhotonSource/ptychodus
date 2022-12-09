@@ -55,7 +55,8 @@ class WorkflowDataView(QGroupBox):
     def __init__(self, title: str, parent: Optional[QWidget]) -> None:
         super().__init__(title, parent)
         self.endpointIDLineEdit = UUIDLineEdit()
-        self.pathLineEdit = QLineEdit()
+        self.globusPathLineEdit = QLineEdit()
+        self.posixPathLineEdit = QLineEdit()
 
     @classmethod
     def createInstance(cls, title: str, parent: Optional[QWidget] = None) -> WorkflowDataView:
@@ -63,7 +64,8 @@ class WorkflowDataView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
-        layout.addRow('Data Path:', view.pathLineEdit)
+        layout.addRow('Globus Path:', view.globusPathLineEdit)
+        layout.addRow('POSIX Path:', view.posixPathLineEdit)
         view.setLayout(layout)
 
         return view
@@ -73,18 +75,20 @@ class WorkflowComputeView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Compute', parent)
-        self.endpointIDLineEdit = UUIDLineEdit()
+        self.funcXEndpointIDLineEdit = UUIDLineEdit()
         self.dataEndpointIDLineEdit = UUIDLineEdit()
-        self.pathLineEdit = QLineEdit()
+        self.dataGlobusPathLineEdit = QLineEdit()
+        self.dataPosixPathLineEdit = QLineEdit()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowComputeView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
+        layout.addRow('FuncX Endpoint ID:', view.funcXEndpointIDLineEdit)
         layout.addRow('Data Endpoint ID:', view.dataEndpointIDLineEdit)
-        layout.addRow('Data Path:', view.pathLineEdit)
+        layout.addRow('Data Globus Path:', view.dataGlobusPathLineEdit)
+        layout.addRow('Data POSIX Path:', view.dataPosixPathLineEdit)
         view.setLayout(layout)
 
         return view
@@ -107,24 +111,6 @@ class WorkflowStatusView(QGroupBox):
         return view
 
 
-class WorkflowButtonBox(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.executeButton = QPushButton('Execute')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowButtonBox:
-        view = cls(parent)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.executeButton)
-        view.setLayout(layout)
-
-        return view
-
-
 class WorkflowParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
@@ -133,7 +119,7 @@ class WorkflowParametersView(QWidget):
         self.computeView = WorkflowComputeView.createInstance()
         self.outputDataView = WorkflowDataView.createInstance('Output Data')
         self.statusView = WorkflowStatusView.createInstance()
-        self.buttonBox = WorkflowButtonBox.createInstance()
+        self.executeButton = QPushButton('Execute')
         self.authorizeDialog = WorkflowAuthorizeDialog.createInstance(self)
 
     @classmethod
@@ -145,7 +131,7 @@ class WorkflowParametersView(QWidget):
         layout.addWidget(view.computeView)
         layout.addWidget(view.outputDataView)
         layout.addWidget(view.statusView)
-        layout.addWidget(view.buttonBox)
+        layout.addWidget(view.executeButton)
         layout.addStretch()
         view.setLayout(layout)
 

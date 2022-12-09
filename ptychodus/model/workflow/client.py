@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib.metadata import version
+from pathlib import Path
 from typing import Any, Optional
 import json
 import logging
@@ -10,6 +11,8 @@ import threading
 from gladier.managers import CallbackLoginManager
 import gladier
 
+from ...api.settings import SettingsRegistry
+from ..statefulCore import StateDataRegistry
 from .api import WorkflowClient, WorkflowRun
 from .authorizerRepository import GlobusAuthorizerRepository, ScopeAuthorizerMapping
 from .settings import WorkflowSettings
@@ -22,9 +25,8 @@ def ptychodus_reconstruct(**data: str) -> None:
     from ptychodus.model import ModelArgs, ModelCore
 
     modelArgs = ModelArgs(
-        restartFilePath=Path(data['restart_file']),
-        settingsFilePath=Path(data['settings_file']),
-        replacementPathPrefix=data['replacement_path_prefix'],
+        restartFilePath=Path(data['ptychodus_restart_file']),
+        settingsFilePath=Path(data['ptychodus_settings_file']),
     )
 
     with ModelCore(modelArgs) as model:
@@ -35,9 +37,8 @@ def ptychodus_reconstruct(**data: str) -> None:
 class PtychodusReconstruct(gladier.GladierBaseTool):
     funcx_functions = [ptychodus_reconstruct]
     required_input = [
-        'restart_file',
-        'settings_file',
-        'replacement_path_prefix',
+        'ptychodus_restart_file',
+        'ptychodus_settings_file',
     ]
 
 
@@ -63,8 +64,6 @@ class GlobusWorkflowThread(threading.Thread):
 
     def __init__(self, settings: WorkflowSettings,
                  authorizerRepository: GlobusAuthorizerRepository) -> None:
-        # TODO handle auth cancelled
-        # TODO secure tokens for future invocations
         super().__init__()
         logger.info('\tGladier ' + version('gladier'))
         self._settings = settings
@@ -80,12 +79,12 @@ class GlobusWorkflowThread(threading.Thread):
 
     def _requireClient(self) -> None:
         if self._client is None:
-            FLOW_ID = str(self._settings.flowID.value)  # TODO how to get this from gladier?
-            FLOW_ID_ = FLOW_ID.replace('-', '_')
+            #FLOW_ID = str(self._settings.flowID.value)
+            #FLOW_ID_ = FLOW_ID.replace('-', '_')
 
             scopes = [
                 gladier.FlowsManager.AVAILABLE_SCOPES,
-                f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
+                # TODO f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
             ]
             loginManager = CallbackLoginManager(
                 initial_authorizers=self._authorize(scopes),
@@ -166,53 +165,73 @@ class GlobusWorkflowThread(threading.Thread):
 
 class GlobusClient(WorkflowClient):
 
-    def __init__(self, settings: WorkflowSettings,
+    def __init__(self, settings: WorkflowSettings, settingsRegistry: SettingsRegistry,
+                 stateDataRegistry: StateDataRegistry,
                  authorizerRepository: GlobusAuthorizerRepository) -> None:
-
         super().__init__()
         self._settings = settings
+        self._settingsRegistry = settingsRegistry
+        self._stateDataRegistry = stateDataRegistry
         self._thread = GlobusWorkflowThread(settings, authorizerRepository)
 
     def listFlowRuns(self) -> list[WorkflowRun]:
         flowRuns: list[WorkflowRun] = list()
+        # FIXME GlobusClient::listFlowRuns
         return flowRuns
 
     def runFlow(self, label: str) -> None:
+        settingsFileName = f'{label}.ini'
+        restartFileName = f'{label}.in.npz'
+        resultsFileName = f'{label}.out.npz'
+        inputDataPosixPath = Path(self._settings.inputDataPosixPath.value)
+
+        try:
+            inputDataPosixPath.mkdir(mode=0o755, parents=True, exist_ok=True)
+        except FileExistsError:
+            logger.error('Input data POSIX path must be a directory!')
+            return
+
+        self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFileName)
+        self._stateDataRegistry.saveStateData(inputDataPosixPath / restartFileName,
+                                              restartable=True)
+
         flowInput = {
             'settings_transfer_source_endpoint_id':
             str(self._settings.inputDataEndpointID.value),
             'settings_transfer_source_path':
-            str(self._settings.inputDataPath.value),
+            f'{self._settings.inputDataGlobusPath.value}/{settingsFileName}',
             'settings_transfer_destination_endpoint_id':
             str(self._settings.computeDataEndpointID.value),
             'settings_transfer_destination_path':
-            str(self._settings.computeDataPath.value),
+            str(self._settings.computeDataGlobusPath.value),
             'settings_transfer_recursive':
             False,
             'state_transfer_source_endpoint_id':
             str(self._settings.inputDataEndpointID.value),
             'state_transfer_source_path':
-            str(self._settings.inputDataPath.value),
+            f'{self._settings.inputDataGlobusPath.value}/{restartFileName}',
             'state_transfer_destination_endpoint_id':
             str(self._settings.computeDataEndpointID.value),
             'state_transfer_destination_path':
-            str(self._settings.computeDataPath.value),
+            str(self._settings.computeDataGlobusPath.value),
             'state_transfer_recursive':
             False,
             'funcx_endpoint_compute':
-            str(self._settings.computeEndpointID.value),
+            str(self._settings.computeFuncXEndpointID.value),
+            'ptychodus_restart_file':
+            f'{self._settings.computeDataPosixPath.value}/{restartFileName}',
+            'ptychodus_settings_file':
+            f'{self._settings.computeDataPosixPath.value}/{settingsFileName}',
             'results_transfer_source_endpoint_id':
             str(self._settings.computeDataEndpointID.value),
             'results_transfer_source_path':
-            str(self._settings.computeDataPath.value),
+            f'{self._settings.computeDataGlobusPath.value}/{resultsFileName}',
             'results_transfer_destination_endpoint_id':
             str(self._settings.outputDataEndpointID.value),
             'results_transfer_destination_path':
-            str(self._settings.outputDataPath.value),
+            str(self._settings.outputDataGlobusPath.value),
             'results_transfer_recursive':
             False
         }
-
-        # FIXME save data files
 
         self._thread.runFlow(label, flowInput)

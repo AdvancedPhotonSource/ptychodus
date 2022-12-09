@@ -74,9 +74,9 @@ class ControllerCore:
         )
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
             model.reconstructorPlotPresenter, view.reconstructorPlotView)
-        self._workflowController = WorkflowController.createInstance(model.workflowPresenter,
-                                                                     view.workflowParametersView,
-                                                                     view.workflowTableView)
+        self._workflowController = WorkflowController.createInstance(
+            model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
+            model.workflowExecutionPresenter, view.workflowParametersView, view.workflowTableView)
         self._monitorProbeController = ProbeImageController.createInstance(
             model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
             self._fileDialogFactory)

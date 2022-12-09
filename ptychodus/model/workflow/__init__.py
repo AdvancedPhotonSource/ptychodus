@@ -1,8 +1,11 @@
 from .api import WorkflowRun
-from .core import WorkflowCore, WorkflowPresenter
+from .core import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
+                   WorkflowParametersPresenter)
 
 __all__ = [
+    'WorkflowAuthorizationPresenter',
     'WorkflowCore',
-    'WorkflowPresenter',
+    'WorkflowExecutionPresenter',
+    'WorkflowParametersPresenter',
     'WorkflowRun',
 ]

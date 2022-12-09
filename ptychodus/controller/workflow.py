@@ -10,7 +10,8 @@ from PyQt5.QtGui import QColor, QDesktopServices, QFont, QRegularExpressionValid
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QTableView, QWidget
 
 from ..api.observer import Observable, Observer
-from ..model.workflow import WorkflowPresenter, WorkflowRun
+from ..model.workflow import (WorkflowAuthorizationPresenter, WorkflowExecutionPresenter,
+                              WorkflowParametersPresenter, WorkflowRun)
 from ..view import WorkflowComputeView, WorkflowDataView, WorkflowParametersView
 
 logger = logging.getLogger(__name__)
@@ -18,19 +19,20 @@ logger = logging.getLogger(__name__)
 
 class WorkflowInputDataController(Observer):
 
-    def __init__(self, presenter: WorkflowPresenter, view: WorkflowDataView) -> None:
+    def __init__(self, presenter: WorkflowParametersPresenter, view: WorkflowDataView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: WorkflowPresenter,
+    def createInstance(cls, presenter: WorkflowParametersPresenter,
                        view: WorkflowDataView) -> WorkflowInputDataController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
         view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
-        view.pathLineEdit.editingFinished.connect(controller._syncPathToModel)
+        view.globusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
+        view.posixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
 
         controller._syncModelToView()
 
@@ -40,13 +42,18 @@ class WorkflowInputDataController(Observer):
         endpointID = UUID(self._view.endpointIDLineEdit.text())
         self._presenter.setInputDataEndpointID(endpointID)
 
-    def _syncPathToModel(self) -> None:
-        dataPath = self._view.pathLineEdit.text()
-        self._presenter.setInputDataPath(dataPath)
+    def _syncGlobusPathToModel(self) -> None:
+        dataPath = self._view.globusPathLineEdit.text()
+        self._presenter.setInputDataGlobusPath(dataPath)
+
+    def _syncPosixPathToModel(self) -> None:
+        dataPath = self._view.posixPathLineEdit.text()
+        self._presenter.setInputDataPosixPath(dataPath)
 
     def _syncModelToView(self) -> None:
         self._view.endpointIDLineEdit.setText(str(self._presenter.getInputDataEndpointID()))
-        self._view.pathLineEdit.setText(str(self._presenter.getInputDataPath()))
+        self._view.globusPathLineEdit.setText(str(self._presenter.getInputDataGlobusPath()))
+        self._view.posixPathLineEdit.setText(str(self._presenter.getInputDataPosixPath()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -55,19 +62,20 @@ class WorkflowInputDataController(Observer):
 
 class WorkflowOutputDataController(Observer):
 
-    def __init__(self, presenter: WorkflowPresenter, view: WorkflowDataView) -> None:
+    def __init__(self, presenter: WorkflowParametersPresenter, view: WorkflowDataView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: WorkflowPresenter,
+    def createInstance(cls, presenter: WorkflowParametersPresenter,
                        view: WorkflowDataView) -> WorkflowOutputDataController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
         view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
-        view.pathLineEdit.editingFinished.connect(controller._syncPathToModel)
+        view.globusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
+        view.posixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
 
         controller._syncModelToView()
 
@@ -77,13 +85,18 @@ class WorkflowOutputDataController(Observer):
         endpointID = UUID(self._view.endpointIDLineEdit.text())
         self._presenter.setOutputDataEndpointID(endpointID)
 
-    def _syncPathToModel(self) -> None:
-        dataPath = self._view.pathLineEdit.text()
-        self._presenter.setOutputDataPath(dataPath)
+    def _syncGlobusPathToModel(self) -> None:
+        dataPath = self._view.globusPathLineEdit.text()
+        self._presenter.setOutputDataGlobusPath(dataPath)
+
+    def _syncPosixPathToModel(self) -> None:
+        dataPath = self._view.posixPathLineEdit.text()
+        self._presenter.setOutputDataPosixPath(dataPath)
 
     def _syncModelToView(self) -> None:
         self._view.endpointIDLineEdit.setText(str(self._presenter.getOutputDataEndpointID()))
-        self._view.pathLineEdit.setText(str(self._presenter.getOutputDataPath()))
+        self._view.globusPathLineEdit.setText(str(self._presenter.getOutputDataGlobusPath()))
+        self._view.posixPathLineEdit.setText(str(self._presenter.getOutputDataPosixPath()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -92,41 +105,49 @@ class WorkflowOutputDataController(Observer):
 
 class WorkflowComputeController(Observer):
 
-    def __init__(self, presenter: WorkflowPresenter, view: WorkflowComputeView) -> None:
+    def __init__(self, presenter: WorkflowParametersPresenter, view: WorkflowComputeView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: WorkflowPresenter,
+    def createInstance(cls, presenter: WorkflowParametersPresenter,
                        view: WorkflowComputeView) -> WorkflowComputeController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
+        view.funcXEndpointIDLineEdit.editingFinished.connect(
+            controller._syncFuncXEndpointIDToModel)
         view.dataEndpointIDLineEdit.editingFinished.connect(controller._syncDataEndpointIDToModel)
-        view.pathLineEdit.editingFinished.connect(controller._syncPathToModel)
+        view.dataGlobusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
+        view.dataPosixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
 
         controller._syncModelToView()
 
         return controller
 
-    def _syncEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._view.endpointIDLineEdit.text())
-        self._presenter.setComputeEndpointID(endpointID)
+    def _syncFuncXEndpointIDToModel(self) -> None:
+        endpointID = UUID(self._view.funcXEndpointIDLineEdit.text())
+        self._presenter.setComputeFuncXEndpointID(endpointID)
 
     def _syncDataEndpointIDToModel(self) -> None:
         endpointID = UUID(self._view.dataEndpointIDLineEdit.text())
         self._presenter.setComputeDataEndpointID(endpointID)
 
-    def _syncPathToModel(self) -> None:
-        dataPath = self._view.pathLineEdit.text()
-        self._presenter.setComputeDataPath(dataPath)
+    def _syncGlobusPathToModel(self) -> None:
+        dataPath = self._view.dataGlobusPathLineEdit.text()
+        self._presenter.setComputeDataGlobusPath(dataPath)
+
+    def _syncPosixPathToModel(self) -> None:
+        dataPath = self._view.dataPosixPathLineEdit.text()
+        self._presenter.setComputeDataPosixPath(dataPath)
 
     def _syncModelToView(self) -> None:
-        self._view.endpointIDLineEdit.setText(str(self._presenter.getComputeEndpointID()))
+        self._view.funcXEndpointIDLineEdit.setText(str(
+            self._presenter.getComputeFuncXEndpointID()))
         self._view.dataEndpointIDLineEdit.setText(str(self._presenter.getComputeDataEndpointID()))
-        self._view.pathLineEdit.setText(str(self._presenter.getComputeDataPath()))
+        self._view.dataGlobusPathLineEdit.setText(str(self._presenter.getComputeDataGlobusPath()))
+        self._view.dataPosixPathLineEdit.setText(str(self._presenter.getComputeDataPosixPath()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -135,7 +156,9 @@ class WorkflowComputeController(Observer):
 
 class WorkflowTableModel(QAbstractTableModel):
 
-    def __init__(self, presenter: WorkflowPresenter, parent: Optional[QObject] = None) -> None:
+    def __init__(self,
+                 presenter: WorkflowExecutionPresenter,
+                 parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._sectionHeaders = [
@@ -205,27 +228,35 @@ class WorkflowTableModel(QAbstractTableModel):
 
 class WorkflowController(Observer):
 
-    def __init__(self, presenter: WorkflowPresenter, parametersView: WorkflowParametersView,
-                 tableView: QTableView) -> None:
+    def __init__(self, parametersPresenter: WorkflowParametersPresenter,
+                 authorizationPresenter: WorkflowAuthorizationPresenter,
+                 executionPresenter: WorkflowExecutionPresenter,
+                 parametersView: WorkflowParametersView, tableView: QTableView) -> None:
         super().__init__()
-        self._presenter = presenter
+        self._parametersPresenter = parametersPresenter
+        self._authorizationPresenter = authorizationPresenter
+        self._executionPresenter = executionPresenter
         self._parametersView = parametersView
         self._inputDataController = WorkflowInputDataController.createInstance(
-            presenter, parametersView.inputDataView)
+            parametersPresenter, parametersView.inputDataView)
         self._outputDataController = WorkflowOutputDataController.createInstance(
-            presenter, parametersView.outputDataView)
+            parametersPresenter, parametersView.outputDataView)
         self._computeController = WorkflowComputeController.createInstance(
-            presenter, parametersView.computeView)
+            parametersPresenter, parametersView.computeView)
         self._tableView = tableView
-        self._tableModel = WorkflowTableModel(presenter)
+        self._tableModel = WorkflowTableModel(executionPresenter)
         self._proxyModel = QSortFilterProxyModel()
         self._statusRefreshTimer = QTimer()
 
     @classmethod
-    def createInstance(cls, presenter: WorkflowPresenter, parametersView: WorkflowParametersView,
+    def createInstance(cls, parametersPresenter: WorkflowParametersPresenter,
+                       authorizationPresenter: WorkflowAuthorizationPresenter,
+                       executionPresenter: WorkflowExecutionPresenter,
+                       parametersView: WorkflowParametersView,
                        tableView: QTableView) -> WorkflowController:
-        controller = cls(presenter, parametersView, tableView)
-        presenter.addObserver(controller)
+        controller = cls(parametersPresenter, authorizationPresenter, executionPresenter,
+                         parametersView, tableView)
+        parametersPresenter.addObserver(controller)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
         tableView.setModel(controller._proxyModel)
@@ -235,9 +266,9 @@ class WorkflowController(Observer):
 
         parametersView.statusView.refreshIntervalSpinBox.setRange(1, 600)
         parametersView.statusView.refreshIntervalSpinBox.valueChanged.connect(
-            presenter.setStatusRefreshIntervalInSeconds)
-        # FIXME controller: present GUI to get code[str] from user
-        parametersView.buttonBox.executeButton.clicked.connect(controller._execute)
+            parametersPresenter.setStatusRefreshIntervalInSeconds)
+        parametersView.executeButton.clicked.connect(controller._execute)
+        # FIXME controller: extract AuthController, use authTimer to present GUI to get code[str] from user
         parametersView.authorizeDialog.finished.connect(controller._finishAuthorization)
 
         parametersView.authorizeDialog.lineEdit.textChanged.connect(
@@ -261,7 +292,7 @@ class WorkflowController(Observer):
         self._parametersView.authorizeDialog.okButton.setEnabled(len(text) > 0)
 
     def _restartStatusRefreshTimer(self) -> None:
-        seconds = 1000 * self._presenter.getStatusRefreshIntervalInSeconds()
+        seconds = 1000 * self._parametersPresenter.getStatusRefreshIntervalInSeconds()
 
         if seconds > 0:
             self._statusRefreshTimer.start(seconds)
@@ -270,7 +301,7 @@ class WorkflowController(Observer):
             self._statusRefreshTimer.stop()
 
     def _startAuthorization(self) -> None:  # FIXME need to trigger
-        authorizeURL = self._presenter.getAuthorizeURL()
+        authorizeURL = self._authorizationPresenter.getAuthorizeURL()
         text = f'Input the Globus authorization code from <a href="{authorizeURL}">this link</a>:'
 
         self._parametersView.authorizeDialog.label.setText(text)
@@ -282,7 +313,7 @@ class WorkflowController(Observer):
             return
 
         authCode = self._parametersView.authorizeDialog.lineEdit.text()
-        self._presenter.setCodeFromAuthorizeURL(authCode)
+        self._authorizationPresenter.setCodeFromAuthorizeURL(authCode)
         self._restartStatusRefreshTimer()
 
     def _refreshStatus(self) -> None:
@@ -290,15 +321,12 @@ class WorkflowController(Observer):
         self._restartStatusRefreshTimer()
 
     def _execute(self) -> None:
-        self._presenter.runFlow()
+        self._executionPresenter.runFlow(label='Ptychodus')  # TODO label
 
     def _syncModelToView(self) -> None:
-        self._parametersView.statusView.refreshIntervalSpinBox.setValue(
-            self._presenter.getStatusRefreshIntervalInSeconds())
-
-        isAuthorized = self._presenter.isAuthorized()
-        self._parametersView.buttonBox.executeButton.setEnabled(isAuthorized)
+        intervalInSeconds = self._parametersPresenter.getStatusRefreshIntervalInSeconds()
+        self._parametersView.statusView.refreshIntervalSpinBox.setValue(intervalInSeconds)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._parametersPresenter:
             self._syncModelToView()
