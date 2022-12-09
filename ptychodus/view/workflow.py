@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 from .widgets import UUIDLineEdit
 
 
-class WorkflowAuthorizeDialog(QDialog):
+class WorkflowAuthorizationDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
@@ -25,7 +25,7 @@ class WorkflowAuthorizeDialog(QDialog):
         self.cancelButton = self.buttonBox.addButton(QDialogButtonBox.Cancel)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowAuthorizeDialog:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowAuthorizationDialog:
         view = cls(parent)
 
         view.setWindowTitle('Authorize Workflow')
@@ -120,7 +120,7 @@ class WorkflowParametersView(QWidget):
         self.outputDataView = WorkflowDataView.createInstance('Output Data')
         self.statusView = WorkflowStatusView.createInstance()
         self.executeButton = QPushButton('Execute')
-        self.authorizeDialog = WorkflowAuthorizeDialog.createInstance(self)
+        self.authorizationDialog = WorkflowAuthorizationDialog.createInstance(self)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowParametersView:
