@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 from uuid import UUID
 
 from ...api.observer import Observable, Observer
@@ -36,7 +37,7 @@ class WorkflowInputDataController(Observer):
         self._presenter.setInputDataGlobusPath(dataPath)
 
     def _syncPosixPathToModel(self) -> None:
-        dataPath = self._view.posixPathLineEdit.text()
+        dataPath = Path(self._view.posixPathLineEdit.text()).expanduser()
         self._presenter.setInputDataPosixPath(dataPath)
 
     def _syncModelToView(self) -> None:

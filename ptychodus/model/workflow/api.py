@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod, abstractproperty
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 
-class WorkflowAuthorizerRepository(ABC):
+class WorkflowAuthorizer(ABC):
 
     @abstractproperty
     def isAuthorized(self) -> bool:
@@ -30,12 +30,31 @@ class WorkflowRun:
     runURL: str
 
 
-class WorkflowClient(ABC):
+class WorkflowExecutor(ABC):
 
     @abstractmethod
-    def listFlowRuns(self) -> list[WorkflowRun]:
+    def listFlowRuns(self) -> Sequence[WorkflowRun]:
         pass
 
     @abstractmethod
     def runFlow(self, label: str) -> None:
+        pass
+
+
+class WorkflowThread(ABC):
+
+    @abstractmethod
+    def listFlowRuns(self) -> Sequence[WorkflowRun]:
+        pass
+
+    @abstractmethod
+    def runFlow(self, label: str, flowInput: Mapping[str, Any]) -> None:
+        pass
+
+    @abstractmethod
+    def start(self) -> None:
+        pass
+
+    @abstractmethod
+    def stop(self) -> None:
         pass

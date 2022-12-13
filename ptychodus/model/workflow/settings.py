@@ -16,8 +16,8 @@ class WorkflowSettings(Observable, Observer):
                                                                  UUID(int=0))
         self.inputDataGlobusPath = settingsGroup.createStringEntry('InputDataGlobusPath',
                                                                    '/~/path/to/input/data')
-        self.inputDataPosixPath = settingsGroup.createStringEntry('InputDataPosixPath',
-                                                                  '/path/to/input/data')
+        self.inputDataPosixPath = settingsGroup.createPathEntry('InputDataPosixPath',
+                                                                Path.home() / 'ptychodus-staging')
         self.computeFuncXEndpointID = settingsGroup.createUUIDEntry('ComputeFuncXEndpointID',
                                                                     UUID(int=1))
         self.computeDataEndpointID = settingsGroup.createUUIDEntry('ComputeDataEndpointID',

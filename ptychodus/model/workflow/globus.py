@@ -1,23 +1,61 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, Optional
+from pprint import pformat
+from typing import Any, Final, Optional, Union
 import json
 import logging
 import queue
 import threading
 
-from gladier.managers import CallbackLoginManager
+import fair_research_login
 import gladier
+import gladier.managers
+import globus_sdk
 
 from ...api.settings import SettingsRegistry
 from ..statefulCore import StateDataRegistry
-from .api import WorkflowClient, WorkflowRun
-from .authorizerRepository import GlobusAuthorizerRepository, ScopeAuthorizerMapping
+from .api import WorkflowAuthorizer, WorkflowExecutor, WorkflowRun, WorkflowThread
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
+
+AuthorizerTypes = Union[globus_sdk.AccessTokenAuthorizer, globus_sdk.RefreshTokenAuthorizer]
+ScopeAuthorizerMapping = Mapping[str, AuthorizerTypes]
+
+
+class GlobusWorkflowAuthorizer(WorkflowAuthorizer):
+    CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._authorizeCode = str()
+        self._authorizeURL = str()
+        self.isAuthorizedEvent = threading.Event()
+        self.isAuthorizedEvent.set()
+
+    @property
+    def isAuthorized(self) -> bool:
+        return self.isAuthorizedEvent.is_set()
+
+    def getAuthorizeURL(self) -> str:
+        return self._authorizeURL
+
+    def setCodeFromAuthorizeURL(self, authorizeCode: str) -> None:
+        self._authorizeCode = authorizeCode
+        self.isAuthorizedEvent.set()
+
+    def getCodeFromAuthorizeURL(self) -> str:
+        return self._authorizeCode
+
+    def authenticate(self, authorizeURL: str) -> str:
+        logger.debug(f'Authenticate at {authorizeURL}')
+        self._authorizeURL = authorizeURL
+        self.isAuthorizedEvent.clear()
+        # TODO figure out how to shut down nicely
+        self.isAuthorizedEvent.wait()
+        return self._authorizeCode
 
 
 def ptychodus_reconstruct(**data: str) -> None:
@@ -44,7 +82,7 @@ class PtychodusReconstruct(gladier.GladierBaseTool):
 
 @gladier.generate_flow_definition
 class PtychodusClient(gladier.GladierBaseClient):
-    client_id = GlobusAuthorizerRepository.CLIENT_ID
+    client_id = GlobusWorkflowAuthorizer.CLIENT_ID
     gladier_tools = [
         'gladier_tools.globus.transfer.Transfer:Settings',
         'gladier_tools.globus.transfer.Transfer:State',
@@ -54,68 +92,91 @@ class PtychodusClient(gladier.GladierBaseClient):
     ]
 
 
+class CustomCodeHandler(fair_research_login.CodeHandler):
+
+    def __init__(self, authorizer: GlobusWorkflowAuthorizer) -> None:
+        self._authorizer = authorizer
+
+    def authenticate(self, url: str) -> str:
+        return self._authorizer.authenticate(url)
+
+    def get_code(self) -> str:
+        return self._authorizer.getCodeFromAuthorizeURL()
+
+
 @dataclass(frozen=True)
 class WorkflowInput:
     label: str
     flowInput: Mapping[str, Any]
 
 
-class GlobusWorkflowThread(threading.Thread):
+class GlobusWorkflowThread(WorkflowThread, threading.Thread):
 
-    def __init__(self, settings: WorkflowSettings,
-                 authorizerRepository: GlobusAuthorizerRepository) -> None:
+    def __init__(self, settings: WorkflowSettings, authorizer: GlobusWorkflowAuthorizer) -> None:
         super().__init__()
+        logger.info('\tGlobus SDK ' + version('globus-sdk'))
+        logger.info('\tFair Research Login ' + version('fair-research-login'))
         logger.info('\tGladier ' + version('gladier'))
         self._settings = settings
-        self._authorizerRepository = authorizerRepository
-        self._client: Optional[gladier.GladierBaseClient] = None
+        self._authClient = fair_research_login.NativeClient(
+            client_id=GlobusWorkflowAuthorizer.CLIENT_ID,
+            app_name='Ptychodus',
+            code_handlers=[CustomCodeHandler(authorizer)],
+            token_storage=fair_research_login.JSONTokenStorage('mytokens.json'),
+        )
+        self._gladierClient: Optional[gladier.GladierBaseClient] = None
         self._inputQueue: queue.Queue[WorkflowInput] = queue.Queue()
         self._stopEvent = threading.Event()
+        self.isAuthorizedEvent = threading.Event()
 
-    def _authorize(self, scopes: list[str]) -> ScopeAuthorizerMapping:
-        self._authorizerRepository.requestAuthorization(scopes)
-        self._authorizerRepository.isAuthorizedEvent.wait()
-        return self._authorizerRepository.getAuthorizers()
+    def _requestAuthorization(self, scopes: list[str]) -> ScopeAuthorizerMapping:
+        logger.debug('Requested authorization scopes: {pformat(scopes)}')
+
+        # 'force' is used for any underlying scope changes. For example, if a flow adds transfer
+        # functionality since it was last run, running it again would require a re-login.
+        self._authClient.login(requested_scopes=scopes, force=True, refresh_tokens=True)
+        return self._authClient.get_authorizers_by_scope()
 
     def _requireClient(self) -> None:
-        if self._client is None:
-            #FLOW_ID = str(self._settings.flowID.value)
-            #FLOW_ID_ = FLOW_ID.replace('-', '_')
+        if self._gladierClient is None:
+            try:
+                # Try to use a previous login to avoid a new login flow
+                initial_authorizers = self._authClient.get_authorizers_by_scope()
+            except fair_research_login.LoadError:
+                # Passing in an empty dict will trigger the callback below
+                initial_authorizers = dict()
 
-            scopes = [
-                gladier.FlowsManager.AVAILABLE_SCOPES,
-                # TODO f'https://auth.globus.org/scopes/{FLOW_ID}/flow_{FLOW_ID_}_user',
-            ]
-            loginManager = CallbackLoginManager(
-                initial_authorizers=self._authorize(scopes),
-                callback=self._authorize,
+            loginManager = gladier.managers.CallbackLoginManager(
+                authorizers=initial_authorizers,
+                # If additional logins are needed, the callback is used.
+                callback=self._requestAuthorization,
             )
-            self._client = PtychodusClient(login_manager=loginManager)
 
-    def listFlowRuns(self) -> list[WorkflowRun]:
+            self._gladierClient = PtychodusClient(login_manager=loginManager)
+
+    def listFlowRuns(self) -> Sequence[WorkflowRun]:
         runList: list[WorkflowRun] = list()
-        self._requireClient()
 
-        if self._client is not None:
-            response = self._client.list_flow_runs(
-                flow_id=self._client.flows_manager.get_flow_id(),
-                orderings={'start_time': 'desc'},  # order by start_time (descending)
-            )
-            logger.debug(f'Flow Run List: {response}')
-
-            for runDict in response['runs']:
-                action = runDict.get('display_status', '')  # TODO display_status -> current action
-                runID = runDict.get('run_id', '')
-                run = WorkflowRun(
-                    label=runDict.get('label', ''),
-                    startTime=runDict.get('start_time', ''),
-                    completionTime=runDict.get('completion_time', ''),
-                    status=runDict.get('status', ''),
-                    action=action,
-                    runID=runID,
-                    runURL=f'https://app.globus.org/runs/{runID}/logs',
-                )
-                runList.append(run)
+        # FIXME listFlowRuns
+        # response = self._gladierClient.list_flow_runs(
+        #     flow_id=self._gladierClient.flows_manager.get_flow_id(),
+        #     orderings={'start_time': 'desc'},  # order by start_time (descending)
+        # )
+        # logger.debug(f'Flow Run List: {response}')
+        #
+        # for runDict in response['runs']:
+        #     action = runDict.get('display_status', '')  # TODO display_status -> current action
+        #     runID = runDict.get('run_id', '')
+        #     run = WorkflowRun(
+        #         label=runDict.get('label', ''),
+        #         startTime=runDict.get('start_time', ''),
+        #         completionTime=runDict.get('completion_time', ''),
+        #         status=runDict.get('status', ''),
+        #         action=action,
+        #         runID=runID,
+        #         runURL=f'https://app.globus.org/runs/{runID}/logs',
+        #     )
+        #     runList.append(run)
 
         return runList
 
@@ -126,8 +187,8 @@ class GlobusWorkflowThread(threading.Thread):
     def _runFlow(self, label: str, flowInput: Mapping[str, Any]) -> None:
         self._requireClient()
 
-        if self._client is not None:
-            response = self._client.run_flow(
+        if self._gladierClient is not None:
+            response = self._gladierClient.run_flow(
                 flow_input={'input': flowInput},
                 label=label,
                 tags=['aps', 'ptychography'],
@@ -149,6 +210,9 @@ class GlobusWorkflowThread(threading.Thread):
             except:
                 logger.exception('Error running flow!')
 
+    def start(self) -> None:
+        threading.Thread.start(self)
+
     def stop(self) -> None:
         self._inputQueue.join()
 
@@ -163,27 +227,24 @@ class GlobusWorkflowThread(threading.Thread):
         logger.info('Workflow thread stopped.')
 
 
-class GlobusClient(WorkflowClient):
+class GlobusWorkflowExecutor(WorkflowExecutor):
 
-    def __init__(self, settings: WorkflowSettings, settingsRegistry: SettingsRegistry,
-                 stateDataRegistry: StateDataRegistry,
-                 authorizerRepository: GlobusAuthorizerRepository) -> None:
+    def __init__(self, settings: WorkflowSettings, thread: WorkflowThread,
+                 settingsRegistry: SettingsRegistry, stateDataRegistry: StateDataRegistry) -> None:
         super().__init__()
         self._settings = settings
+        self._thread = thread
         self._settingsRegistry = settingsRegistry
         self._stateDataRegistry = stateDataRegistry
-        self._thread = GlobusWorkflowThread(settings, authorizerRepository)
 
-    def listFlowRuns(self) -> list[WorkflowRun]:
-        flowRuns: list[WorkflowRun] = list()
-        # FIXME GlobusClient::listFlowRuns
-        return flowRuns
+    def listFlowRuns(self) -> Sequence[WorkflowRun]:
+        return self._thread.listFlowRuns()
 
     def runFlow(self, label: str) -> None:
-        settingsFileName = f'{label}.ini'
-        restartFileName = f'{label}.in.npz'
-        resultsFileName = f'{label}.out.npz'
-        inputDataPosixPath = Path(self._settings.inputDataPosixPath.value)
+        settingsFileName = 'input.ini'
+        restartFileName = 'input.npz'
+        resultsFileName = 'output.npz'
+        inputDataPosixPath = Path(self._settings.inputDataPosixPath.value) / label
 
         try:
             inputDataPosixPath.mkdir(mode=0o755, parents=True, exist_ok=True)

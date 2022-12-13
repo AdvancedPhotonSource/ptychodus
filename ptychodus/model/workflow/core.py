@@ -1,19 +1,60 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional, TypeAlias
+from typing import Optional
 from uuid import UUID
 import logging
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from ..statefulCore import StateDataRegistry
-from .api import WorkflowAuthorizerRepository, WorkflowClient, WorkflowRun
+from .api import WorkflowAuthorizer, WorkflowExecutor, WorkflowRun, WorkflowThread
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
 
-WorkflowAuthorizationPresenter: TypeAlias = WorkflowAuthorizerRepository
-WorkflowExecutionPresenter: TypeAlias = WorkflowClient
+
+class WorkflowAuthorizationPresenter(WorkflowAuthorizer):
+
+    def __init__(self, authorizer: Optional[WorkflowAuthorizer]) -> None:
+        self._authorizer = authorizer
+
+    @property
+    def isAuthorized(self) -> bool:
+        return self._authorizer.isAuthorized if self._authorizer else True
+
+    def getAuthorizeURL(self) -> str:
+        authorizeURL = 'https://aps.anl.gov'
+
+        if self._authorizer:
+            authorizeURL = self._authorizer.getAuthorizeURL()
+
+        return authorizeURL
+
+    def setCodeFromAuthorizeURL(self, code: str) -> None:
+        if self._authorizer:
+            self._authorizer.setCodeFromAuthorizeURL(code)
+        else:
+            logger.error('Cannot set auth code with null authorizer!')
+
+
+class WorkflowExecutionPresenter(WorkflowExecutor):
+
+    def __init__(self, client: Optional[WorkflowExecutor]) -> None:
+        self._client = client
+
+    def listFlowRuns(self) -> list[WorkflowRun]:
+        flowRuns: list[WorkflowRun] = list()
+
+        if self._client:
+            flowRuns.extend(self._client.listFlowRuns())
+
+        return flowRuns
+
+    def runFlow(self, label: str) -> None:
+        if self._client:
+            self._client.runFlow(label)
+        else:
+            logger.error('Cannot run flow with null executor!')
 
 
 class WorkflowParametersPresenter(Observable, Observer):
@@ -40,10 +81,10 @@ class WorkflowParametersPresenter(Observable, Observer):
     def getInputDataGlobusPath(self) -> str:
         return self._settings.inputDataGlobusPath.value
 
-    def setInputDataPosixPath(self, inputDataPosixPath: str) -> None:
+    def setInputDataPosixPath(self, inputDataPosixPath: Path) -> None:
         self._settings.inputDataPosixPath.value = inputDataPosixPath
 
-    def getInputDataPosixPath(self) -> str:
+    def getInputDataPosixPath(self) -> Path:
         return self._settings.inputDataPosixPath.value
 
     def setComputeFuncXEndpointID(self, endpointID: UUID) -> None:
@@ -104,28 +145,29 @@ class WorkflowCore:
     def __init__(self, settingsRegistry: SettingsRegistry,
                  stateDataRegistry: StateDataRegistry) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
+        self._authorizer: Optional[WorkflowAuthorizer] = None
+        self._thread: Optional[WorkflowThread] = None
+        self._executor: Optional[WorkflowExecutor] = None
 
         try:
-            from .authorizerRepository import GlobusAuthorizerRepository
-            from .client import GlobusClient
+            from .globus import (GlobusWorkflowAuthorizer, GlobusWorkflowExecutor,
+                                 GlobusWorkflowThread)
         except ModuleNotFoundError:
             logger.info('Globus not found.')
-
-            from .null import NullAuthorizerRepository, NullClient
-            self._authorizerRepository: WorkflowAuthorizerRepository = NullAuthorizerRepository()
-            self._client: WorkflowClient = NullClient()
         else:
-            globusAuthorizerRepository = GlobusAuthorizerRepository()
-            self._authorizerRepository = globusAuthorizerRepository
-            self._client = GlobusClient(self._settings, settingsRegistry, stateDataRegistry,
-                                        globusAuthorizerRepository)
+            self._authorizer = GlobusWorkflowAuthorizer()
+            self._thread = GlobusWorkflowThread(self._settings, self._authorizer)
+            self._executor = GlobusWorkflowExecutor(self._settings, self._thread, settingsRegistry,
+                                                    stateDataRegistry)
 
-        self.parametersPresenter = WorkflowParametersPresenter.createInstance(self._settings)
+        self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
+        self.executionPresenter = WorkflowExecutionPresenter(self._executor)
+        self.parametersPresenter = WorkflowParametersPresenter(self._settings)
 
-    @property
-    def authorizationPresenter(self) -> WorkflowAuthorizationPresenter:
-        return self._authorizerRepository
+    def start(self) -> None:
+        if self._thread:
+            self._thread.start()
 
-    @property
-    def executionPresenter(self) -> WorkflowExecutionPresenter:
-        return self._client
+    def stop(self) -> None:
+        if self._thread:
+            self._thread.stop()

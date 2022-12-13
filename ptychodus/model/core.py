@@ -143,6 +143,7 @@ class ModelCore:
             self.rpcMessageService.start()
 
         self._dataCore.start()
+        self._workflowCore.start()
 
         return self
 
@@ -157,6 +158,7 @@ class ModelCore:
 
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
+        self._workflowCore.stop()
         self._dataCore.stop()
 
         if self.rpcMessageService:

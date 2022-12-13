@@ -10,6 +10,7 @@ build-backend = "setuptools.build_meta"
 
 [[tool.mypy.overrides]]
 module = [
+    "fair_research_login",
     "gladier.*",
     "h5py",
     "hdf5plugin",
