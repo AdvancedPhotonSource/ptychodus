@@ -4,7 +4,7 @@ from decimal import Decimal
 import numpy
 
 from ...api.scan import ScanPoint
-from .repositoryItem import ContiguousScanIterator, ScanRepositoryItem
+from .repository import ContiguousScanIterator, ScanRepositoryItem
 from .settings import ScanSettings
 
 

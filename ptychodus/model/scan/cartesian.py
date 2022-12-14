@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from decimal import Decimal
 
 from ...api.scan import ScanPoint
-from .repositoryItem import ContiguousScanIterator, ScanRepositoryItem
+from .repository import ContiguousScanIterator, ScanRepositoryItem
 from .settings import ScanSettings
 
 

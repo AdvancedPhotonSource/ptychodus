@@ -14,8 +14,7 @@ from ...api.settings import SettingsRegistry
 from ..statefulCore import StateDataType, StatefulCore
 from .active import ActiveScan
 from .factory import ScanRepositoryItemFactory
-from .repository import ScanRepository
-from .repositoryItem import ScanRepositoryItem
+from .repository import ScanRepository, ScanRepositoryItem
 from .settings import ScanSettings
 from .streaming import StreamingScanBuilder
 from .tabular import ScanFileInfo, TabularScanRepositoryItem

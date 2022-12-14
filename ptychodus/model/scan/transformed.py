@@ -6,7 +6,7 @@ import numpy
 
 from ...api.scan import ScanPoint, ScanPointTransform
 from .settings import ScanSettings
-from .repositoryItem import ScanRepositoryItem
+from .repository import ScanRepositoryItem
 
 logger = logging.getLogger(__name__)
 

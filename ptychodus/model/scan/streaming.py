@@ -6,7 +6,7 @@ from statistics import median
 
 from ...api.scan import ScanPoint, TabularScan
 from .factory import ScanRepositoryItemFactory
-from .repositoryItem import ScanRepositoryItem
+from .repository import ScanRepositoryItem
 from .tabular import ScanFileInfo
 
 

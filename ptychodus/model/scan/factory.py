@@ -9,7 +9,7 @@ from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
 from .cartesian import CartesianScanRepositoryItem
 from .lissajous import LissajousScanRepositoryItem
-from .repositoryItem import ScanRepositoryItem
+from .repository import ScanRepositoryItem
 from .settings import ScanSettings
 from .spiral import SpiralScanRepositoryItem
 from .tabular import ScanFileInfo, TabularScanRepositoryItem

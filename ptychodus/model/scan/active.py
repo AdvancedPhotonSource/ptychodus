@@ -6,8 +6,7 @@ from ...api.observer import Observable, Observer
 from ...api.scan import Scan, ScanPoint
 from .cartesian import CartesianScanRepositoryItem
 from .factory import ScanRepositoryItemFactory
-from .repository import ScanRepository
-from .repositoryItem import ScanRepositoryItem
+from .repository import ScanRepository, ScanRepositoryItem
 from .settings import ScanSettings
 from .transformed import TransformedScanRepositoryItem
 
@@ -106,7 +105,7 @@ class ActiveScan(Scan, Observer):
         self.setActiveScan(self._settings.activeScan.value)
 
     def _syncToSettings(self) -> None:
-        self._settings.initializer.value = self._item.name
+        self._settings.initializer.value = self._item.variant
         self._item.syncToSettings(self._settings)
         self.notifyObservers()
 
