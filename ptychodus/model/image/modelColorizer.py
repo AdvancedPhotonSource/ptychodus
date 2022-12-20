@@ -11,7 +11,7 @@ from ...api.observer import Observable
 from ...api.plugins import PluginChooser, PluginEntry
 from .colorizer import Colorizer
 from .displayRange import DisplayRange
-from .visarray import ComplexArrayComponent, VisualizationArray
+from .visarray import VisualizationArray
 
 
 class CylindricalColorModel(ABC):
@@ -87,10 +87,10 @@ class HLSAlphaColorModel(CylindricalColorModel):
 
 class CylindricalColorModelColorizer(Colorizer):
 
-    def __init__(self, arrayComponent: ComplexArrayComponent, displayRange: DisplayRange,
+    def __init__(self, array: VisualizationArray, displayRange: DisplayRange,
                  transformChooser: PluginChooser[ScalarTransformation],
                  variantChooser: PluginChooser[CylindricalColorModel]) -> None:
-        super().__init__(arrayComponent, displayRange, transformChooser)
+        super().__init__(array, displayRange, transformChooser)
         self._variantChooser = variantChooser
         self._variantChooser.addObserver(self)
 
@@ -98,7 +98,6 @@ class CylindricalColorModelColorizer(Colorizer):
     def createColorizerList(
             cls, array: VisualizationArray, displayRange: DisplayRange,
             transformChooser: PluginChooser[ScalarTransformation]) -> list[Colorizer]:
-        arrayComponent = ComplexArrayComponent(array)
         modelList = [
             HSVSaturationColorModel(),
             HSVValueColorModel(),
@@ -113,7 +112,12 @@ class CylindricalColorModelColorizer(Colorizer):
                                                strategy=model) for model in modelList
         ]
         variantChooser = PluginChooser[CylindricalColorModel].createFromList(variantList)
-        return [cls(arrayComponent, displayRange, transformChooser, variantChooser)]
+        variantChooser.setFromSimpleName('HSV Value')
+        return [cls(array, displayRange, transformChooser, variantChooser)]
+
+    @property
+    def name(self) -> str:
+        return 'Complex'
 
     def getVariantNameList(self) -> list[str]:
         return self._variantChooser.getDisplayNameList()
@@ -124,27 +128,22 @@ class CylindricalColorModelColorizer(Colorizer):
     def setVariantByName(self, name: str) -> None:
         self._variantChooser.setFromDisplayName(name)
 
-    def getDataRange(self) -> Interval[Decimal]:
-        values = numpy.absolute(self._arrayComponent())
-        lower = Decimal(repr(values.min()))
-        upper = Decimal(repr(values.max()))
-        return Interval[Decimal](lower, upper)
+    def getDataArray(self) -> RealArrayType:
+        transform = self._transformChooser.getCurrentStrategy()
+        values = self._array.getAmplitude()
+        return transform(values)
 
     def __call__(self) -> RealArrayType:
         if self._displayRange.getUpper() <= self._displayRange.getLower():
-            shape = self._arrayComponent().shape
-            return numpy.zeros((*shape, 4))
+            return numpy.zeros((*self._array.shape, 4))
 
-        transform = self._transformChooser.getCurrentStrategy()
-        amplitude = numpy.absolute(self._arrayComponent())
-        phaseInRadians = numpy.angle(self._arrayComponent())
         norm = Normalize(vmin=float(self._displayRange.getLower()),
                          vmax=float(self._displayRange.getUpper()),
                          clip=False)
 
         model = numpy.vectorize(self._variantChooser.getCurrentStrategy())
-        h = (phaseInRadians + numpy.pi) / (2 * numpy.pi)
-        x = norm(transform(amplitude))
+        h = (self._array.getPhaseInRadians() + numpy.pi) / (2 * numpy.pi)
+        x = norm(self.getDataArray())
         r, g, b, a = model(h, x)
 
         return numpy.stack((r, g, b, a), axis=-1)

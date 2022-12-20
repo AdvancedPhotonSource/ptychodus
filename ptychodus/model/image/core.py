@@ -78,7 +78,10 @@ class ImagePresenter(Observable, Observer):
         self._displayRange.setUpper(value)
 
     def setDisplayRangeToDataRange(self) -> None:
-        dataRange = self._colorizer.getDataRange()
+        values = self._colorizer.getDataArray()
+        lower = Decimal(repr(values.min()))
+        upper = Decimal(repr(values.max()))
+        dataRange = Interval[Decimal](lower, upper)
 
         if dataRange.lower.is_nan() or dataRange.upper.is_nan():
             logger.debug('Visualization array component includes one or more NaNs.')
@@ -130,8 +133,8 @@ class ImageCore:
         self._displayRange = DisplayRange()
 
         colorizerArgs = (self._array, self._displayRange, transformChooser)
-        colorizerList = MappedColorizer.createColorizerList(*colorizerArgs) \
-                + CylindricalColorModelColorizer.createColorizerList(*colorizerArgs)
+        colorizerList = CylindricalColorModelColorizer.createColorizerList(*colorizerArgs) \
+                + MappedColorizer.createColorizerList(*colorizerArgs)
         self._colorizerChooser = PluginChooser[Colorizer].createFromList(
             [ImageCore._createColorizerPlugin(colorizer) for colorizer in colorizerList])
         self.presenter = ImagePresenter.createInstance(self._array, self._displayRange,

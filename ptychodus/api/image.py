@@ -6,7 +6,7 @@ from typing import Any
 import numpy
 import numpy.typing
 
-RealArrayType = numpy.typing.NDArray[numpy.floating[Any]]
+RealArrayType = numpy.typing.NDArray[numpy.float_]
 
 
 @dataclass(frozen=True)
