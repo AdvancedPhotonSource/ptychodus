@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl, QVariant
@@ -14,9 +15,9 @@ class WorkflowTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._presenter = presenter
         self._sectionHeaders = [
-            'Label', 'Start Time', 'Completion Time', 'Flow Status', 'Current Action', 'Run ID'
+            'Label', 'Start Time', 'Completion Time', 'Status', 'Action', 'Run ID'
         ]
-        self._flowRuns: list[WorkflowRun] = list()
+        self._flowRuns: Sequence[WorkflowRun] = list()
 
     def refresh(self) -> None:
         self.beginResetModel()

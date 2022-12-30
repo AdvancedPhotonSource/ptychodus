@@ -79,7 +79,7 @@ class WorkflowController(Observer):
         seconds = 1000 * self._parametersPresenter.getStatusRefreshIntervalInSeconds()
 
         if seconds > 0:
-            self._statusRefreshTimer.start(seconds)
+            self._statusRefreshTimer.start(seconds)  # FIXME status isn't working
         else:
             # FIXME can't restart
             self._statusRefreshTimer.stop()
@@ -89,7 +89,7 @@ class WorkflowController(Observer):
         self._restartStatusRefreshTimer()
 
     def _execute(self) -> None:
-        self._executionPresenter.runFlow(label='Ptychodus')  # TODO label
+        self._executionPresenter.runFlow(label='Ptychodus')  # FIXME label
 
     def _syncModelToView(self) -> None:
         intervalInSeconds = self._parametersPresenter.getStatusRefreshIntervalInSeconds()

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
@@ -7,7 +8,7 @@ import logging
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from ..statefulCore import StateDataRegistry
-from .api import WorkflowAuthorizer, WorkflowExecutor, WorkflowRun, WorkflowThread
+from .api import WorkflowAuthorizer, WorkflowExecutor, WorkflowRun
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
@@ -20,15 +21,16 @@ class WorkflowAuthorizationPresenter(WorkflowAuthorizer):
 
     @property
     def isAuthorized(self) -> bool:
-        return self._authorizer.isAuthorized if self._authorizer else True
+        if self._authorizer:
+            return self._authorizer.isAuthorized
+        else:
+            return True
 
     def getAuthorizeURL(self) -> str:
-        authorizeURL = 'https://aps.anl.gov'
-
         if self._authorizer:
-            authorizeURL = self._authorizer.getAuthorizeURL()
-
-        return authorizeURL
+            return self._authorizer.getAuthorizeURL()
+        else:
+            return 'https://aps.anl.gov'
 
     def setCodeFromAuthorizeURL(self, code: str) -> None:
         if self._authorizer:
@@ -42,19 +44,24 @@ class WorkflowExecutionPresenter(WorkflowExecutor):
     def __init__(self, client: Optional[WorkflowExecutor]) -> None:
         self._client = client
 
-    def listFlowRuns(self) -> list[WorkflowRun]:
-        flowRuns: list[WorkflowRun] = list()
-
+    def listFlowRuns(self) -> Sequence[WorkflowRun]:
         if self._client:
-            flowRuns.extend(self._client.listFlowRuns())
-
-        return flowRuns
+            return self._client.listFlowRuns()
+        else:
+            flowRuns: list[WorkflowRun] = list()
+            return flowRuns
 
     def runFlow(self, label: str) -> None:
         if self._client:
             self._client.runFlow(label)
         else:
             logger.error('Cannot run flow with null executor!')
+
+    def start(self) -> None:
+        pass
+
+    def stop(self) -> None:
+        pass
 
 
 class WorkflowParametersPresenter(Observable, Observer):
@@ -146,28 +153,26 @@ class WorkflowCore:
                  stateDataRegistry: StateDataRegistry) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
         self._authorizer: Optional[WorkflowAuthorizer] = None
-        self._thread: Optional[WorkflowThread] = None
         self._executor: Optional[WorkflowExecutor] = None
 
         try:
-            from .globus import (GlobusWorkflowAuthorizer, GlobusWorkflowExecutor,
-                                 GlobusWorkflowThread)
+            from .globus import GlobusWorkflowAuthorizer, GlobusWorkflowExecutor
         except ModuleNotFoundError:
             logger.info('Globus not found.')
         else:
-            self._authorizer = GlobusWorkflowAuthorizer()
-            self._thread = GlobusWorkflowThread(self._settings, self._authorizer)
-            self._executor = GlobusWorkflowExecutor(self._settings, self._thread, settingsRegistry,
-                                                    stateDataRegistry)
+            globusAuthorizer = GlobusWorkflowAuthorizer()
+            self._authorizer = globusAuthorizer
+            self._executor = GlobusWorkflowExecutor(self._settings, globusAuthorizer,
+                                                    settingsRegistry, stateDataRegistry)
 
         self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
         self.executionPresenter = WorkflowExecutionPresenter(self._executor)
-        self.parametersPresenter = WorkflowParametersPresenter(self._settings)
+        self.parametersPresenter = WorkflowParametersPresenter.createInstance(self._settings)
 
     def start(self) -> None:
-        if self._thread:
-            self._thread.start()
+        if self._executor:
+            self._executor.start()
 
     def stop(self) -> None:
-        if self._thread:
-            self._thread.stop()
+        if self._executor:
+            self._executor.stop()

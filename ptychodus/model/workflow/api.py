@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod, abstractproperty
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
 
 
 class WorkflowAuthorizer(ABC):
@@ -38,17 +37,6 @@ class WorkflowExecutor(ABC):
 
     @abstractmethod
     def runFlow(self, label: str) -> None:
-        pass
-
-
-class WorkflowThread(ABC):
-
-    @abstractmethod
-    def listFlowRuns(self) -> Sequence[WorkflowRun]:
-        pass
-
-    @abstractmethod
-    def runFlow(self, label: str, flowInput: Mapping[str, Any]) -> None:
         pass
 
     @abstractmethod

@@ -21,8 +21,8 @@ class WorkflowAuthorizationController:
                        dialog: WorkflowAuthorizationDialog) -> WorkflowAuthorizationController:
         controller = cls(presenter, dialog)
 
-        # TODO controller._timer.setSingleShot(True)
-        # TODO controller._timer.timeout.connect(controller._startAuthorization)
+        controller._timer.timeout.connect(controller._startAuthorization)
+        controller._timer.start(1000)  # TODO customize
         dialog.finished.connect(controller._finishAuthorization)
 
         dialog.lineEdit.textChanged.connect(controller._setDialogButtonsEnabled)
@@ -35,7 +35,7 @@ class WorkflowAuthorizationController:
         self._dialog.okButton.setEnabled(len(text) > 0)
 
     def _startAuthorization(self) -> None:
-        if self._presenter.isAuthorized:
+        if self._presenter.isAuthorized or self._dialog.isVisible():
             return
 
         authorizeURL = self._presenter.getAuthorizeURL()
