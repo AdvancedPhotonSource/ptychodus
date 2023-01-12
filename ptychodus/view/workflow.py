@@ -2,9 +2,9 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea,
-                             QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                             QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvas
@@ -94,18 +94,46 @@ class WorkflowComputeView(QGroupBox):
         return view
 
 
+class WorkflowExecutionView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Execution', parent)
+        self.labelLineEdit = QLineEdit('Ptychodus')
+        self.inputDataView = WorkflowDataView.createInstance('Input Data')
+        self.computeView = WorkflowComputeView.createInstance()
+        self.outputDataView = WorkflowDataView.createInstance('Output Data')
+        self.executeButton = QPushButton('Execute')
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowExecutionView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow('Label:', view.labelLineEdit)
+        layout.addRow(view.inputDataView)
+        layout.addRow(view.computeView)
+        layout.addRow(view.outputDataView)
+        layout.addRow(view.executeButton)
+        view.setLayout(layout)
+
+        return view
+
+
 class WorkflowStatusView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Status', parent)
-        self.refreshIntervalSpinBox = QSpinBox()
+        self.autoRefreshCheckBox = QCheckBox('Auto Refresh [sec]:')
+        self.autoRefreshSpinBox = QSpinBox()
+        self.refreshButton = QPushButton('Refresh')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowStatusView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Refresh Interval [sec]:', view.refreshIntervalSpinBox)
+        layout.addRow(view.autoRefreshCheckBox, view.autoRefreshSpinBox)
+        layout.addRow(view.refreshButton)
         view.setLayout(layout)
 
         return view
@@ -115,11 +143,8 @@ class WorkflowParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.inputDataView = WorkflowDataView.createInstance('Input Data')
-        self.computeView = WorkflowComputeView.createInstance()
-        self.outputDataView = WorkflowDataView.createInstance('Output Data')
+        self.executionView = WorkflowExecutionView.createInstance()
         self.statusView = WorkflowStatusView.createInstance()
-        self.executeButton = QPushButton('Execute')
         self.authorizationDialog = WorkflowAuthorizationDialog.createInstance(self)
 
     @classmethod
@@ -127,11 +152,8 @@ class WorkflowParametersView(QWidget):
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.inputDataView)
-        layout.addWidget(view.computeView)
-        layout.addWidget(view.outputDataView)
+        layout.addWidget(view.executionView)
         layout.addWidget(view.statusView)
-        layout.addWidget(view.executeButton)
         layout.addStretch()
         view.setLayout(layout)
 

@@ -53,7 +53,7 @@ class GlobusWorkflowAuthorizer(WorkflowAuthorizer):
         logger.info(f'Authenticate at {authorizeURL}')
         self._authorizeURL = authorizeURL
         self.isAuthorizedEvent.clear()
-        # TODO figure out how to shut down nicely
+        # FIXME make sure that we can still shut down nicely
         self.isAuthorizedEvent.wait()
         return self._authorizeCode
 
@@ -84,8 +84,7 @@ class PtychodusReconstruct(gladier.GladierBaseTool):
 class PtychodusClient(gladier.GladierBaseClient):
     client_id = GlobusWorkflowAuthorizer.CLIENT_ID
     gladier_tools = [
-        'gladier_tools.globus.transfer.Transfer:Settings',
-        'gladier_tools.globus.transfer.Transfer:State',
+        'gladier_tools.globus.transfer.Transfer:Input',
         PtychodusReconstruct,
         'gladier_tools.globus.transfer.Transfer:Results',
         # TODO 'gladier_tools.publish.Publish',
@@ -158,7 +157,7 @@ class GlobusWorkflowThread(threading.Thread):
 
         return self.__gladierClient
 
-    def getCurrentAction(self, runID: str) -> str:
+    def _getCurrentAction(self, runID: str) -> str:
         status = self._gladierClient.get_status(runID)
         action = status.get('state_name')
 
@@ -180,20 +179,26 @@ class GlobusWorkflowThread(threading.Thread):
 
         return action
 
-    def listFlowRuns(self) -> Sequence[WorkflowRun]:
-        runList: list[WorkflowRun] = list()
+    def _listFlowRuns(self) -> Sequence[Mapping[str, Any]]:
         flowsManager = self._gladierClient.flows_manager
         flowsClient = flowsManager.flows_client
+        flowID = flowsManager.get_flow_id()
+        response = flowsClient.list_flow_runs(flowID)
+        runDictList = response['runs']
 
-        response = flowsManager.flows_client.list_flow_runs(
-            flow_id=flowsManager.get_flow_id(),
-            orderings={'start_time': 'desc'},  # order by start_time (descending)
-        )
-        logger.debug(f'Flow Run List: {pformat(response)}')
+        while response['has_next_page']:
+            response = flowsClient.list_flow_runs(flowID, marker=response['marker'])
+            runDictList.extend(response['runs'])
 
-        for runDict in response['runs']:
+        return runDictList
+
+    def listFlowRuns(self) -> Sequence[WorkflowRun]:
+        runList: list[WorkflowRun] = list()
+        runDictSequence = self._listFlowRuns()
+
+        for runDict in runDictSequence:
             runID = runDict.get('run_id', '')
-            action = self.getCurrentAction(runID)
+            action = self._getCurrentAction(runID)
             run = WorkflowRun(
                 label=runDict.get('label', ''),
                 startTime=runDict.get('start_time', ''),
@@ -222,7 +227,7 @@ class GlobusWorkflowThread(threading.Thread):
     def run(self) -> None:
         while not self._stopEvent.is_set():
             try:
-                # TODO custom timeout
+                # FIXME custom timeout
                 input_ = self._inputQueue.get(block=True, timeout=1)
 
                 try:
@@ -263,6 +268,7 @@ class GlobusWorkflowExecutor(WorkflowExecutor):
         return self._thread.listFlowRuns()
 
     def runFlow(self, label: str) -> None:
+        transferSyncLevel = 3  # Copy files if checksums of the source and destination do not match.
         settingsFileName = 'input.ini'
         restartFileName = 'input.npz'
         resultsFileName = 'output.npz'
@@ -279,46 +285,26 @@ class GlobusWorkflowExecutor(WorkflowExecutor):
                                               restartable=True)
 
         flowInput = {
-            'settings_transfer_source_endpoint_id':
-            str(self._settings.inputDataEndpointID.value),
-            'settings_transfer_source_path':
-            f'{self._settings.inputDataGlobusPath.value}/{settingsFileName}',
-            'settings_transfer_destination_endpoint_id':
+            'input_transfer_source_endpoint_id': str(self._settings.inputDataEndpointID.value),
+            'input_transfer_source_path': f'{self._settings.inputDataGlobusPath.value}/{label}',
+            'input_transfer_destination_endpoint_id':
             str(self._settings.computeDataEndpointID.value),
-            'settings_transfer_destination_path':
-            str(self._settings.computeDataGlobusPath.value),
-            'settings_transfer_recursive':
-            False,
-            'state_transfer_source_endpoint_id':
-            str(self._settings.inputDataEndpointID.value),
-            'state_transfer_source_path':
-            f'{self._settings.inputDataGlobusPath.value}/{restartFileName}',
-            'state_transfer_destination_endpoint_id':
-            str(self._settings.computeDataEndpointID.value),
-            'state_transfer_destination_path':
-            str(self._settings.computeDataGlobusPath.value),
-            'state_transfer_recursive':
-            False,
-            'funcx_endpoint_compute':
-            str(self._settings.computeFuncXEndpointID.value),
+            'input_transfer_destination_path': str(self._settings.computeDataGlobusPath.value),
+            'input_transfer_recursive': True,
+            'input_transfer_sync_level': transferSyncLevel,
+            'funcx_endpoint_compute': str(self._settings.computeFuncXEndpointID.value),
             'ptychodus_restart_file':
-            f'{self._settings.computeDataPosixPath.value}/{restartFileName}',
+            f'{self._settings.computeDataPosixPath.value}/{label}/{restartFileName}',
             'ptychodus_settings_file':
-            f'{self._settings.computeDataPosixPath.value}/{settingsFileName}',
-            'results_transfer_source_endpoint_id':
-            str(self._settings.computeDataEndpointID.value),
+            f'{self._settings.computeDataPosixPath.value}/{label}/{settingsFileName}',
+            'results_transfer_source_endpoint_id': str(self._settings.computeDataEndpointID.value),
             'results_transfer_source_path':
-            f'{self._settings.computeDataGlobusPath.value}/{resultsFileName}',
+            f'{self._settings.computeDataGlobusPath.value}/{label}/{resultsFileName}',
             'results_transfer_destination_endpoint_id':
             str(self._settings.outputDataEndpointID.value),
-            'results_transfer_destination_path':
-            str(self._settings.outputDataGlobusPath.value),
-            'results_transfer_recursive':
-            False
+            'results_transfer_destination_path': str(self._settings.outputDataGlobusPath.value),
+            'results_transfer_recursive': False
         }
-
-        # FIXME 'settings_transfer_sync_level'
-        # FIXME 'state_transfer_sync_level'
 
         self._thread.enqueueFlow(label, flowInput)
 
