@@ -32,6 +32,7 @@ class GlobusWorkflowAuthorizer(WorkflowAuthorizer):
         super().__init__()
         self._authorizeCode = str()
         self._authorizeURL = str()
+        self.shutdownEvent = threading.Event()
         self.isAuthorizedEvent = threading.Event()
         self.isAuthorizedEvent.set()
 
@@ -53,8 +54,11 @@ class GlobusWorkflowAuthorizer(WorkflowAuthorizer):
         logger.info(f'Authenticate at {authorizeURL}')
         self._authorizeURL = authorizeURL
         self.isAuthorizedEvent.clear()
-        # FIXME make sure that we can still shut down nicely
-        self.isAuthorizedEvent.wait()
+
+        while not self.shutdownEvent.is_set():
+            if self.isAuthorizedEvent.wait(timeout=1.):
+                break
+
         return self._authorizeCode
 
 
@@ -119,6 +123,7 @@ class GlobusWorkflowThread(threading.Thread):
         logger.info('\tFair Research Login ' + version('fair-research-login'))
         logger.info('\tGladier ' + version('gladier'))
         self._settings = settings
+        self._authorizer = authorizer
         self._authClient = fair_research_login.NativeClient(
             client_id=GlobusWorkflowAuthorizer.CLIENT_ID,
             app_name='Ptychodus',
@@ -126,8 +131,9 @@ class GlobusWorkflowThread(threading.Thread):
         )
         self.__gladierClient: Optional[gladier.GladierBaseClient] = None
         self._inputQueue: queue.Queue[WorkflowInput] = queue.Queue()
-        self._stopEvent = threading.Event()
-        self.isAuthorizedEvent = threading.Event()
+        self._flowRunsNeedUpdatingEvent = threading.Event()
+        self._flowRunsLock = threading.Lock()
+        self._flowRunsList: list[WorkflowRun] = list()
 
     def _requestAuthorization(self, scopes: list[str]) -> ScopeAuthorizerMapping:
         logger.debug(f'Requested authorization scopes: {pformat(scopes)}')
@@ -179,7 +185,8 @@ class GlobusWorkflowThread(threading.Thread):
 
         return action
 
-    def _listFlowRuns(self) -> Sequence[Mapping[str, Any]]:
+    def _updateFlowRuns(self) -> None:
+        flowRunsList: list[WorkflowRun] = list()
         flowsManager = self._gladierClient.flows_manager
         flowsClient = flowsManager.flows_client
         flowID = flowsManager.get_flow_id()
@@ -190,15 +197,10 @@ class GlobusWorkflowThread(threading.Thread):
             response = flowsClient.list_flow_runs(flowID, marker=response['marker'])
             runDictList.extend(response['runs'])
 
-        return runDictList
-
-    def listFlowRuns(self) -> Sequence[WorkflowRun]:
-        runList: list[WorkflowRun] = list()
-        runDictSequence = self._listFlowRuns()
-
-        for runDict in runDictSequence:
+        for runDict in runDictList:
             runID = runDict.get('run_id', '')
             action = self._getCurrentAction(runID)
+
             run = WorkflowRun(
                 label=runDict.get('label', ''),
                 startTime=runDict.get('start_time', ''),
@@ -208,9 +210,20 @@ class GlobusWorkflowThread(threading.Thread):
                 runID=runID,
                 runURL=f'https://app.globus.org/runs/{runID}/logs',
             )
-            runList.append(run)
 
-        return runList
+            flowRunsList.append(run)
+
+        flowRunsList.sort(key=lambda x: x.startTime)
+
+        with self._flowRunsLock:
+            self._flowRunsList = flowRunsList
+
+    def updateFlowRuns(self) -> None:
+        self._flowRunsNeedUpdatingEvent.set()
+
+    def getFlowRuns(self) -> Sequence[WorkflowRun]:
+        with self._flowRunsLock:
+            return self._flowRunsList
 
     def enqueueFlow(self, label: str, flowInput: Mapping[str, Any]) -> None:
         input_ = WorkflowInput(label, flowInput)
@@ -225,25 +238,28 @@ class GlobusWorkflowThread(threading.Thread):
         logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
 
     def run(self) -> None:
-        while not self._stopEvent.is_set():
-            try:
-                # FIXME custom timeout
-                input_ = self._inputQueue.get(block=True, timeout=1)
+        while not self._authorizer.shutdownEvent.is_set():
+            if self._flowRunsNeedUpdatingEvent.is_set():
+                self._flowRunsNeedUpdatingEvent.clear()
+                self._updateFlowRuns()
 
-                try:
-                    self._runFlow(input_.label, input_.flowInput)
-                finally:
-                    self._inputQueue.task_done()
+            try:
+                input_ = self._inputQueue.get(block=True, timeout=1)
             except queue.Empty:
-                pass
+                continue
+
+            try:
+                self._runFlow(input_.label, input_.flowInput)
             except:
                 logger.exception('Error running flow!')
+            finally:
+                self._inputQueue.task_done()
 
     def stop(self) -> None:
         self._inputQueue.join()
 
         logger.info('Stopping workflow thread...')
-        self._stopEvent.set()
+        self._authorizer.shutdownEvent.set()
 
         self.join()
 
@@ -265,7 +281,8 @@ class GlobusWorkflowExecutor(WorkflowExecutor):
         self._thread = GlobusWorkflowThread(settings, authorizer)
 
     def listFlowRuns(self) -> Sequence[WorkflowRun]:
-        return self._thread.listFlowRuns()
+        self._thread.updateFlowRuns()  # FIXME
+        return self._thread.getFlowRuns()
 
     def runFlow(self, label: str) -> None:
         transferSyncLevel = 3  # Copy files if checksums of the source and destination do not match.
