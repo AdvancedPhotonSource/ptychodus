@@ -1,67 +1,21 @@
 from __future__ import annotations
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, overload
 from uuid import UUID
 import logging
+import threading
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from ..statefulCore import StateDataRegistry
-from .api import WorkflowAuthorizer, WorkflowExecutor, WorkflowRun
+from .authorizer import WorkflowAuthorizer
+from .executor import WorkflowExecutor
 from .settings import WorkflowSettings
+from .status import WorkflowStatus, WorkflowStatusRepository
 
 logger = logging.getLogger(__name__)
-
-
-class WorkflowAuthorizationPresenter(WorkflowAuthorizer):
-
-    def __init__(self, authorizer: Optional[WorkflowAuthorizer]) -> None:
-        self._authorizer = authorizer
-
-    @property
-    def isAuthorized(self) -> bool:
-        if self._authorizer:
-            return self._authorizer.isAuthorized
-        else:
-            return True
-
-    def getAuthorizeURL(self) -> str:
-        if self._authorizer:
-            return self._authorizer.getAuthorizeURL()
-        else:
-            return 'https://aps.anl.gov'
-
-    def setCodeFromAuthorizeURL(self, code: str) -> None:
-        if self._authorizer:
-            self._authorizer.setCodeFromAuthorizeURL(code)
-        else:
-            logger.error('Cannot set auth code with null authorizer!')
-
-
-class WorkflowExecutionPresenter(WorkflowExecutor):
-
-    def __init__(self, client: Optional[WorkflowExecutor]) -> None:
-        self._client = client
-
-    def listFlowRuns(self) -> Sequence[WorkflowRun]:
-        if self._client:
-            return self._client.listFlowRuns()
-        else:
-            flowRuns: list[WorkflowRun] = list()
-            return flowRuns
-
-    def runFlow(self, label: str) -> None:
-        if self._client:
-            self._client.runFlow(label)
-        else:
-            logger.error('Cannot run flow with null executor!')
-
-    def start(self) -> None:
-        pass
-
-    def stop(self) -> None:
-        pass
 
 
 class WorkflowParametersPresenter(Observable, Observer):
@@ -147,32 +101,96 @@ class WorkflowParametersPresenter(Observable, Observer):
             self.notifyObservers()
 
 
+class WorkflowAuthorizationPresenter:
+
+    def __init__(self, authorizer: WorkflowAuthorizer) -> None:
+        self._authorizer = authorizer
+
+    @property
+    def isAuthorized(self) -> bool:
+        return self._authorizer.isAuthorized
+
+    def getAuthorizeURL(self) -> str:
+        return self._authorizer.getAuthorizeURL()
+
+    def setCodeFromAuthorizeURL(self, code: str) -> None:
+        self._authorizer.setCodeFromAuthorizeURL(code)
+
+
+class WorkflowStatusPresenter:
+
+    def __init__(self, statusRepository: WorkflowStatusRepository) -> None:
+        self._statusRepository = statusRepository
+
+    @overload
+    def __getitem__(self, index: int) -> WorkflowStatus:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]:
+        ...
+
+    def __getitem__(self, index: Union[int, slice]) -> \
+            Union[WorkflowStatus, Sequence[WorkflowStatus]]:
+        return self._statusRepository[index]
+
+    def __len__(self) -> int:
+        return len(self._statusRepository)
+
+    def getStatusDateTime(self) -> datetime:
+        return self._statusRepository.getStatusDateTime()
+
+    def refreshStatus(self) -> None:
+        self._statusRepository.refreshStatus()
+
+
+class WorkflowExecutionPresenter:
+
+    def __init__(self, executor: WorkflowExecutor) -> None:
+        self._executor = executor
+
+    def runFlow(self, flowLabel: str) -> None:
+        self._executor.runFlow(flowLabel=flowLabel)
+
+
 class WorkflowCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry,
                  stateDataRegistry: StateDataRegistry) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
-        self._authorizer: Optional[WorkflowAuthorizer] = None
-        self._executor: Optional[WorkflowExecutor] = None
+        self._authorizer = WorkflowAuthorizer()
+        self._statusRepository = WorkflowStatusRepository()
+        self._executor = WorkflowExecutor(self._settings, settingsRegistry, stateDataRegistry)
+        self._thread: Optional[threading.Thread] = None
 
         try:
-            from .globus import GlobusWorkflowAuthorizer, GlobusWorkflowExecutor
+            from .globus import GlobusWorkflowThread
         except ModuleNotFoundError:
             logger.info('Globus not found.')
+            # FIXME hide workflow tab and don't break if globus not installed
         else:
-            globusAuthorizer = GlobusWorkflowAuthorizer()
-            self._authorizer = globusAuthorizer
-            self._executor = GlobusWorkflowExecutor(self._settings, globusAuthorizer,
-                                                    settingsRegistry, stateDataRegistry)
+            self._thread = GlobusWorkflowThread(self._authorizer, self._statusRepository,
+                                                self._executor)
 
-        self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
-        self.executionPresenter = WorkflowExecutionPresenter(self._executor)
         self.parametersPresenter = WorkflowParametersPresenter.createInstance(self._settings)
+        self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
+        self.statusPresenter = WorkflowStatusPresenter(self._statusRepository)
+        self.executionPresenter = WorkflowExecutionPresenter(self._executor)
 
     def start(self) -> None:
-        if self._executor:
-            self._executor.start()
+        logger.info('Starting workflow thread...')
+
+        if self._thread:
+            self._thread.start()
+
+        logger.info('Workflow thread started.')
 
     def stop(self) -> None:
-        if self._executor:
-            self._executor.stop()
+        logger.info('Stopping workflow thread...')
+        self._executor.jobQueue.join()
+        self._authorizer.shutdownEvent.set()
+
+        if self._thread:
+            self._thread.join()
+
+        logger.info('Workflow thread stopped.')

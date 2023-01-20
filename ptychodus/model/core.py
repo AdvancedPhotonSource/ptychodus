@@ -31,7 +31,7 @@ from .scan import ScanCore, ScanPresenter
 from .statefulCore import StateDataRegistry
 from .tike import TikeReconstructorLibrary
 from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
-                       WorkflowParametersPresenter)
+                       WorkflowParametersPresenter, WorkflowStatusPresenter)
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +249,10 @@ class ModelCore:
     @property
     def workflowAuthorizationPresenter(self) -> WorkflowAuthorizationPresenter:
         return self._workflowCore.authorizationPresenter
+
+    @property
+    def workflowStatusPresenter(self) -> WorkflowStatusPresenter:
+        return self._workflowCore.statusPresenter
 
     @property
     def workflowExecutionPresenter(self) -> WorkflowExecutionPresenter:

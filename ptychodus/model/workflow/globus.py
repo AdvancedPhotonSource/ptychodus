@@ -1,8 +1,6 @@
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping
 from importlib.metadata import version
-from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pformat
 from typing import Any, Final, Optional, Union
 import json
 import logging
@@ -14,52 +12,17 @@ import gladier
 import gladier.managers
 import globus_sdk
 
-from ...api.settings import SettingsRegistry
-from ..statefulCore import StateDataRegistry
-from .api import WorkflowAuthorizer, WorkflowExecutor, WorkflowRun
+from .authorizer import WorkflowAuthorizer
+from .executor import WorkflowExecutor
 from .settings import WorkflowSettings
+from .status import WorkflowStatus, WorkflowStatusRepository
 
 logger = logging.getLogger(__name__)
 
 AuthorizerTypes = Union[globus_sdk.AccessTokenAuthorizer, globus_sdk.RefreshTokenAuthorizer]
 ScopeAuthorizerMapping = Mapping[str, AuthorizerTypes]
 
-
-class GlobusWorkflowAuthorizer(WorkflowAuthorizer):
-    CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._authorizeCode = str()
-        self._authorizeURL = str()
-        self.shutdownEvent = threading.Event()
-        self.isAuthorizedEvent = threading.Event()
-        self.isAuthorizedEvent.set()
-
-    @property
-    def isAuthorized(self) -> bool:
-        return self.isAuthorizedEvent.is_set()
-
-    def getAuthorizeURL(self) -> str:
-        return self._authorizeURL
-
-    def setCodeFromAuthorizeURL(self, authorizeCode: str) -> None:
-        self._authorizeCode = authorizeCode
-        self.isAuthorizedEvent.set()
-
-    def getCodeFromAuthorizeURL(self) -> str:
-        return self._authorizeCode
-
-    def authenticate(self, authorizeURL: str) -> str:
-        logger.info(f'Authenticate at {authorizeURL}')
-        self._authorizeURL = authorizeURL
-        self.isAuthorizedEvent.clear()
-
-        while not self.shutdownEvent.is_set():
-            if self.isAuthorizedEvent.wait(timeout=1.):
-                break
-
-        return self._authorizeCode
+CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
 
 def ptychodus_reconstruct(**data: str) -> None:
@@ -86,54 +49,49 @@ class PtychodusReconstruct(gladier.GladierBaseTool):
 
 @gladier.generate_flow_definition
 class PtychodusClient(gladier.GladierBaseClient):
-    client_id = GlobusWorkflowAuthorizer.CLIENT_ID
+    client_id = CLIENT_ID
     gladier_tools = [
-        'gladier_tools.globus.transfer.Transfer:Input',
+        'gladier_tools.globus.transfer.Transfer:InputData',
         PtychodusReconstruct,
-        'gladier_tools.globus.transfer.Transfer:Results',
+        'gladier_tools.globus.transfer.Transfer:OutputData',
         # TODO 'gladier_tools.publish.Publish',
     ]
 
 
 class CustomCodeHandler(fair_research_login.CodeHandler):
 
-    def __init__(self, authorizer: GlobusWorkflowAuthorizer) -> None:
+    def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         super().__init__()
         self._authorizer = authorizer
         self.set_browser_enabled(False)
 
     def authenticate(self, url: str) -> str:
-        return self._authorizer.authenticate(url)
+        self._authorizer.authenticate(url)
+        return self.get_code()
 
     def get_code(self) -> str:
         return self._authorizer.getCodeFromAuthorizeURL()
 
 
-@dataclass(frozen=True)
-class WorkflowInput:
-    label: str
-    flowInput: Mapping[str, Any]
-
-
 class GlobusWorkflowThread(threading.Thread):
 
-    def __init__(self, settings: WorkflowSettings, authorizer: GlobusWorkflowAuthorizer) -> None:
+    def __init__(self, authorizer: WorkflowAuthorizer, statusRepository: WorkflowStatusRepository,
+                 executor: WorkflowExecutor) -> None:
         super().__init__()
+        self._authorizer = authorizer
+        self._statusRepository = statusRepository
+        self._executor = executor
+
         logger.info('\tGlobus SDK ' + version('globus-sdk'))
         logger.info('\tFair Research Login ' + version('fair-research-login'))
         logger.info('\tGladier ' + version('gladier'))
-        self._settings = settings
-        self._authorizer = authorizer
+
         self._authClient = fair_research_login.NativeClient(
-            client_id=GlobusWorkflowAuthorizer.CLIENT_ID,
+            client_id=CLIENT_ID,
             app_name='Ptychodus',
             code_handlers=[CustomCodeHandler(authorizer)],
         )
         self.__gladierClient: Optional[gladier.GladierBaseClient] = None
-        self._inputQueue: queue.Queue[WorkflowInput] = queue.Queue()
-        self._flowRunsNeedUpdatingEvent = threading.Event()
-        self._flowRunsLock = threading.Lock()
-        self._flowRunsList: list[WorkflowRun] = list()
 
     def _requestAuthorization(self, scopes: list[str]) -> ScopeAuthorizerMapping:
         logger.debug(f'Requested authorization scopes: {pformat(scopes)}')
@@ -185,8 +143,11 @@ class GlobusWorkflowThread(threading.Thread):
 
         return action
 
-    def _updateFlowRuns(self) -> None:
-        flowRunsList: list[WorkflowRun] = list()
+
+# vvv FIXME vvv
+
+    def _refreshStatus(self) -> None:
+        statusList: list[WorkflowStatus] = list()
         flowsManager = self._gladierClient.flows_manager
         flowsClient = flowsManager.flows_client
         flowID = flowsManager.get_flow_id()
@@ -201,7 +162,7 @@ class GlobusWorkflowThread(threading.Thread):
             runID = runDict.get('run_id', '')
             action = self._getCurrentAction(runID)
 
-            run = WorkflowRun(
+            run = WorkflowStatus(
                 label=runDict.get('label', ''),
                 startTime=runDict.get('start_time', ''),
                 completionTime=runDict.get('completion_time', ''),
@@ -211,23 +172,9 @@ class GlobusWorkflowThread(threading.Thread):
                 runURL=f'https://app.globus.org/runs/{runID}/logs',
             )
 
-            flowRunsList.append(run)
+            statusList.append(run)
 
-        flowRunsList.sort(key=lambda x: x.startTime)
-
-        with self._flowRunsLock:
-            self._flowRunsList = flowRunsList
-
-    def updateFlowRuns(self) -> None:
-        self._flowRunsNeedUpdatingEvent.set()
-
-    def getFlowRuns(self) -> Sequence[WorkflowRun]:
-        with self._flowRunsLock:
-            return self._flowRunsList
-
-    def enqueueFlow(self, label: str, flowInput: Mapping[str, Any]) -> None:
-        input_ = WorkflowInput(label, flowInput)
-        self._inputQueue.put(input_)
+        self._statusRepository.update(statusList)
 
     def _runFlow(self, label: str, flowInput: Mapping[str, Any]) -> None:
         response = self._gladierClient.run_flow(
@@ -239,94 +186,17 @@ class GlobusWorkflowThread(threading.Thread):
 
     def run(self) -> None:
         while not self._authorizer.shutdownEvent.is_set():
-            if self._flowRunsNeedUpdatingEvent.is_set():
-                self._flowRunsNeedUpdatingEvent.clear()
-                self._updateFlowRuns()
+            if self._statusRepository.refreshStatusEvent.is_set():
+                self._refreshStatus()
 
             try:
-                input_ = self._inputQueue.get(block=True, timeout=1)
+                input_ = self._executor.jobQueue.get(block=True, timeout=1)
             except queue.Empty:
                 continue
 
             try:
-                self._runFlow(input_.label, input_.flowInput)
+                self._runFlow(input_.flowLabel, input_.flowInput)
             except:
                 logger.exception('Error running flow!')
             finally:
-                self._inputQueue.task_done()
-
-    def stop(self) -> None:
-        self._inputQueue.join()
-
-        logger.info('Stopping workflow thread...')
-        self._authorizer.shutdownEvent.set()
-
-        self.join()
-
-        with self._inputQueue.mutex:
-            self._inputQueue.queue.clear()
-
-        logger.info('Workflow thread stopped.')
-
-
-class GlobusWorkflowExecutor(WorkflowExecutor):
-
-    def __init__(self, settings: WorkflowSettings, authorizer: GlobusWorkflowAuthorizer,
-                 settingsRegistry: SettingsRegistry, stateDataRegistry: StateDataRegistry) -> None:
-        super().__init__()
-        self._settings = settings
-        self._authorizer = authorizer
-        self._settingsRegistry = settingsRegistry
-        self._stateDataRegistry = stateDataRegistry
-        self._thread = GlobusWorkflowThread(settings, authorizer)
-
-    def listFlowRuns(self) -> Sequence[WorkflowRun]:
-        self._thread.updateFlowRuns()  # FIXME
-        return self._thread.getFlowRuns()
-
-    def runFlow(self, label: str) -> None:
-        transferSyncLevel = 3  # Copy files if checksums of the source and destination do not match.
-        settingsFileName = 'input.ini'
-        restartFileName = 'input.npz'
-        resultsFileName = 'output.npz'
-        inputDataPosixPath = Path(self._settings.inputDataPosixPath.value) / label
-
-        try:
-            inputDataPosixPath.mkdir(mode=0o755, parents=True, exist_ok=True)
-        except FileExistsError:
-            logger.error('Input data POSIX path must be a directory!')
-            return
-
-        self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFileName)
-        self._stateDataRegistry.saveStateData(inputDataPosixPath / restartFileName,
-                                              restartable=True)
-
-        flowInput = {
-            'input_transfer_source_endpoint_id': str(self._settings.inputDataEndpointID.value),
-            'input_transfer_source_path': f'{self._settings.inputDataGlobusPath.value}/{label}',
-            'input_transfer_destination_endpoint_id':
-            str(self._settings.computeDataEndpointID.value),
-            'input_transfer_destination_path': str(self._settings.computeDataGlobusPath.value),
-            'input_transfer_recursive': True,
-            'input_transfer_sync_level': transferSyncLevel,
-            'funcx_endpoint_compute': str(self._settings.computeFuncXEndpointID.value),
-            'ptychodus_restart_file':
-            f'{self._settings.computeDataPosixPath.value}/{label}/{restartFileName}',
-            'ptychodus_settings_file':
-            f'{self._settings.computeDataPosixPath.value}/{label}/{settingsFileName}',
-            'results_transfer_source_endpoint_id': str(self._settings.computeDataEndpointID.value),
-            'results_transfer_source_path':
-            f'{self._settings.computeDataGlobusPath.value}/{label}/{resultsFileName}',
-            'results_transfer_destination_endpoint_id':
-            str(self._settings.outputDataEndpointID.value),
-            'results_transfer_destination_path': str(self._settings.outputDataGlobusPath.value),
-            'results_transfer_recursive': False
-        }
-
-        self._thread.enqueueFlow(label, flowInput)
-
-    def start(self) -> None:
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._thread.stop()
+                self._executor.jobQueue.task_done()

@@ -7,7 +7,8 @@ from PyQt5.QtGui import QDesktopServices
 
 from ...api.observer import Observable, Observer
 from ...model.workflow import (WorkflowAuthorizationPresenter, WorkflowExecutionPresenter,
-                               WorkflowParametersPresenter, WorkflowRun)
+                               WorkflowParametersPresenter, WorkflowStatus,
+                               WorkflowStatusPresenter)
 from ...view import WorkflowParametersView
 from .authorization import WorkflowAuthorizationController
 from .compute import WorkflowComputeController
@@ -22,6 +23,7 @@ class WorkflowController:
 
     def __init__(self, parametersPresenter: WorkflowParametersPresenter,
                  authorizationPresenter: WorkflowAuthorizationPresenter,
+                 statusPresenter: WorkflowStatusPresenter,
                  executionPresenter: WorkflowExecutionPresenter,
                  parametersView: WorkflowParametersView, tableView: QTableView) -> None:
         self._parametersPresenter = parametersPresenter
@@ -37,17 +39,18 @@ class WorkflowController:
         self._outputDataController = WorkflowOutputDataController.createInstance(
             parametersPresenter, parametersView.executionView.outputDataView)
         self._tableView = tableView
-        self._tableModel = WorkflowTableModel(executionPresenter)
+        self._tableModel = WorkflowTableModel(statusPresenter)
         self._proxyModel = QSortFilterProxyModel()
 
     @classmethod
     def createInstance(cls, parametersPresenter: WorkflowParametersPresenter,
                        authorizationPresenter: WorkflowAuthorizationPresenter,
+                       statusPresenter: WorkflowStatusPresenter,
                        executionPresenter: WorkflowExecutionPresenter,
                        parametersView: WorkflowParametersView,
                        tableView: QTableView) -> WorkflowController:
-        controller = cls(parametersPresenter, authorizationPresenter, executionPresenter,
-                         parametersView, tableView)
+        controller = cls(parametersPresenter, authorizationPresenter, statusPresenter,
+                         executionPresenter, parametersView, tableView)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
         tableView.setModel(controller._proxyModel)
@@ -71,4 +74,4 @@ class WorkflowController:
 
     def _execute(self) -> None:
         label = self._parametersView.executionView.labelLineEdit.text()
-        self._executionPresenter.runFlow(label=label)
+        self._executionPresenter.runFlow(flowLabel=label)

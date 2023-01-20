@@ -4,24 +4,22 @@ from typing import Optional
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl, QVariant
 from PyQt5.QtGui import QColor, QFont
 
-from ...model.workflow import WorkflowExecutionPresenter, WorkflowRun
+from ...model.workflow import WorkflowStatusPresenter, WorkflowStatus
 
 
 class WorkflowTableModel(QAbstractTableModel):
 
     def __init__(self,
-                 presenter: WorkflowExecutionPresenter,
+                 presenter: WorkflowStatusPresenter,
                  parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._sectionHeaders = [
             'Label', 'Start Time', 'Completion Time', 'Status', 'Action', 'Run ID'
         ]
-        self._flowRuns: Sequence[WorkflowRun] = list()
 
     def refresh(self) -> None:
         self.beginResetModel()
-        self._flowRuns = self._presenter.listFlowRuns()
         self.endResetModel()
 
     def headerData(self,
@@ -42,7 +40,7 @@ class WorkflowTableModel(QAbstractTableModel):
         value = QVariant()
 
         if index.isValid():
-            flowRun = self._flowRuns[index.row()]
+            flowRun = self._presenter[index.row()]
 
             if role == Qt.DisplayRole:
                 if index.column() == 0:
@@ -73,7 +71,7 @@ class WorkflowTableModel(QAbstractTableModel):
         return value
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._flowRuns)
+        return len(self._presenter)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._sectionHeaders)
