@@ -54,5 +54,3 @@ class WorkflowStatusRepository(Sequence[WorkflowStatus]):
             self._statusDateTime = datetime.utcnow()
             self._statusList = list(statusSequence)
             self._statusList.sort(key=lambda x: x.startTime)
-
-        self.refreshStatusEvent.clear()

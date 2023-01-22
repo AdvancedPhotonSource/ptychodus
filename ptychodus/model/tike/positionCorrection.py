@@ -12,13 +12,16 @@ class TikePositionCorrectionSettings(TikeAdaptiveMomentSettings):
             'UsePositionCorrection', False)
         self.usePositionRegularization = settingsGroup.createBooleanEntry(
             'UsePositionRegularization', False)
+        # TODO transform: Global transform of positions.
+        # TODO origin: The rotation center of the transformation.
+        # TODO confidence: A rating of the confidence of position information around each position.
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikePositionCorrectionSettings:
         return cls(settingsRegistry.createGroup('TikePositionCorrection'))
 
 
-class TikePositionCorrectionPresenter(TikeAdaptiveMomentPresenter):
+class TikePositionCorrectionPresenter(TikeAdaptiveMomentPresenter[TikePositionCorrectionSettings]):
 
     def __init__(self, settings: TikePositionCorrectionSettings) -> None:
         super().__init__(settings)

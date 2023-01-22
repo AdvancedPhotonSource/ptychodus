@@ -1,6 +1,7 @@
 from decimal import Decimal
 from typing import Generic, TypeVar
 
+from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsGroup
 
@@ -36,34 +37,25 @@ class TikeAdaptiveMomentPresenter(Generic[T], Observable, Observer):
     def setAdaptiveMomentEnabled(self, enabled: bool) -> None:
         self._settings.useAdaptiveMoment.value = enabled
 
-    def getMinMDecay(self) -> Decimal:
-        return Decimal(0)
-
-    def getMaxMDecay(self) -> Decimal:
-        return Decimal(1)
+    def getMDecayLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMDecay(self) -> Decimal:
-        return self._clamp(self._settings.mdecay.value, self.getMinMDecay(), self.getMaxMDecay())
+        limits = self.getMDecayLimits()
+        return limits.clamp(self._settings.mdecay.value)
 
     def setMDecay(self, value: Decimal) -> None:
         self._settings.mdecay.value = value
 
-    def getMinVDecay(self) -> Decimal:
-        return Decimal(0)
-
-    def getMaxVDecay(self) -> Decimal:
-        return Decimal(1)
+    def getVDecayLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getVDecay(self) -> Decimal:
-        return self._clamp(self._settings.vdecay.value, self.getMinVDecay(), self.getMaxVDecay())
+        limits = self.getVDecayLimits()
+        return limits.clamp(self._settings.vdecay.value)
 
     def setVDecay(self, value: Decimal) -> None:
         self._settings.vdecay.value = value
-
-    @staticmethod
-    def _clamp(x, xmin, xmax):
-        assert xmin <= xmax
-        return max(xmin, min(x, xmax))
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

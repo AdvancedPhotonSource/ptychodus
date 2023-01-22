@@ -23,9 +23,9 @@ class WorkflowAuthorizer:
         with self._authorizeLock:
             return self._authorizeURL
 
-    def setCodeFromAuthorizeURL(self, authorizeCode: str) -> None:
+    def setCodeFromAuthorizeURL(self, code: str) -> None:
         with self._authorizeLock:
-            self._authorizeCode = authorizeCode
+            self._authorizeCode = code
             self.isAuthorizedEvent.set()
 
     def getCodeFromAuthorizeURL(self) -> str:

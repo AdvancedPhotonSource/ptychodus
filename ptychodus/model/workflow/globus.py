@@ -14,7 +14,6 @@ import globus_sdk
 
 from .authorizer import WorkflowAuthorizer
 from .executor import WorkflowExecutor
-from .settings import WorkflowSettings
 from .status import WorkflowStatus, WorkflowStatusRepository
 
 logger = logging.getLogger(__name__)
@@ -143,14 +142,11 @@ class GlobusWorkflowThread(threading.Thread):
 
         return action
 
-
-# vvv FIXME vvv
-
     def _refreshStatus(self) -> None:
         statusList: list[WorkflowStatus] = list()
         flowsManager = self._gladierClient.flows_manager
-        flowsClient = flowsManager.flows_client
         flowID = flowsManager.get_flow_id()
+        flowsClient = flowsManager.flows_client
         response = flowsClient.list_flow_runs(flowID)
         runDictList = response['runs']
 
@@ -176,18 +172,11 @@ class GlobusWorkflowThread(threading.Thread):
 
         self._statusRepository.update(statusList)
 
-    def _runFlow(self, label: str, flowInput: Mapping[str, Any]) -> None:
-        response = self._gladierClient.run_flow(
-            flow_input={'input': flowInput},
-            label=label,
-            tags=['aps', 'ptychography'],
-        )
-        logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
-
     def run(self) -> None:
         while not self._authorizer.shutdownEvent.is_set():
             if self._statusRepository.refreshStatusEvent.is_set():
                 self._refreshStatus()
+                self._statusRepository.refreshStatusEvent.clear()
 
             try:
                 input_ = self._executor.jobQueue.get(block=True, timeout=1)
@@ -195,8 +184,13 @@ class GlobusWorkflowThread(threading.Thread):
                 continue
 
             try:
-                self._runFlow(input_.flowLabel, input_.flowInput)
+                response = self._gladierClient.run_flow(
+                    flow_input={'input': input_.flowInput},
+                    label=input_.flowLabel,
+                    tags=['aps', 'ptychography'],
+                )
             except:
                 logger.exception('Error running flow!')
             finally:
+                logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
                 self._executor.jobQueue.task_done()

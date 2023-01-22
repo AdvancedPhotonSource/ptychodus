@@ -122,11 +122,9 @@ class ImageDataRangeController(Observer):
         displayRangeLimits = self._presenter.getDisplayRangeLimits()
 
         self._view.minDisplayValueSlider.setValueAndRange(self._presenter.getMinDisplayValue(),
-                                                          displayRangeLimits.lower,
-                                                          displayRangeLimits.upper)
+                                                          displayRangeLimits)
         self._view.maxDisplayValueSlider.setValueAndRange(self._presenter.getMaxDisplayValue(),
-                                                          displayRangeLimits.lower,
-                                                          displayRangeLimits.upper)
+                                                          displayRangeLimits)
         self._view.displayRangeDialog.setMinAndMaxValues(displayRangeLimits.lower,
                                                          displayRangeLimits.upper)
 
