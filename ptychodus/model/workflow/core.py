@@ -7,6 +7,7 @@ from uuid import UUID
 import logging
 import threading
 
+from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from ..statefulCore import StateDataRegistry
@@ -90,12 +91,6 @@ class WorkflowParametersPresenter(Observable, Observer):
     def getOutputDataPosixPath(self) -> str:
         return self._settings.outputDataPosixPath.value
 
-    def setStatusRefreshIntervalInSeconds(self, seconds: int) -> None:
-        self._settings.statusRefreshIntervalInSeconds.value = seconds
-
-    def getStatusRefreshIntervalInSeconds(self) -> int:
-        return self._settings.statusRefreshIntervalInSeconds.value
-
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
@@ -119,8 +114,20 @@ class WorkflowAuthorizationPresenter:
 
 class WorkflowStatusPresenter:
 
-    def __init__(self, statusRepository: WorkflowStatusRepository) -> None:
+    def __init__(self, settings: WorkflowSettings,
+                 statusRepository: WorkflowStatusRepository) -> None:
+        self._settings = settings
         self._statusRepository = statusRepository
+
+    def getRefreshIntervalLimitsInSeconds(self) -> Interval[int]:
+        return Interval[int](10, 86400)
+
+    def getRefreshIntervalInSeconds(self) -> int:
+        limits = self.getRefreshIntervalLimitsInSeconds()
+        return limits.clamp(self._settings.statusRefreshIntervalInSeconds.value)
+
+    def setRefreshIntervalInSeconds(self, seconds: int) -> None:
+        self._settings.statusRefreshIntervalInSeconds.value = seconds
 
     @overload
     def __getitem__(self, index: int) -> WorkflowStatus:
@@ -174,7 +181,7 @@ class WorkflowCore:
 
         self.parametersPresenter = WorkflowParametersPresenter.createInstance(self._settings)
         self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
-        self.statusPresenter = WorkflowStatusPresenter(self._statusRepository)
+        self.statusPresenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
         self.executionPresenter = WorkflowExecutionPresenter(self._executor)
 
     def start(self) -> None:

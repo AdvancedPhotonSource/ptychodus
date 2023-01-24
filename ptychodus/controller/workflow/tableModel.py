@@ -15,12 +15,13 @@ class WorkflowTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._presenter = presenter
         self._sectionHeaders = [
-            'Label', 'Start Time', 'Completion Time', 'Status', 'Action', 'Run ID'
+            'Label',
+            'Start Time',
+            'Completion Time',
+            'Status',
+            'Action',
+            'Run ID',
         ]
-
-    def refresh(self) -> None:
-        self.beginResetModel()
-        self.endResetModel()
 
     def headerData(self,
                    section: int,
