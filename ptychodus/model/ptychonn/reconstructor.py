@@ -44,7 +44,7 @@ class PtychoNNReconstructor(Reconstructor):
         for index in assembledIndexes:
             try:
                 point = self._scan[index]
-            except IndexError:
+            except KeyError:
                 continue
 
             scanXInMeters.append(float(point.x))

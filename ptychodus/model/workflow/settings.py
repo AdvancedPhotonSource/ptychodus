@@ -24,14 +24,14 @@ class WorkflowSettings(Observable, Observer):
                                                                    UUID(int=0))
         self.computeDataGlobusPath = settingsGroup.createStringEntry('ComputeDataGlobusPath',
                                                                      '/~/path/to/compute/data')
-        self.computeDataPosixPath = settingsGroup.createStringEntry('ComputeDataPosixPath',
-                                                                    '/path/to/compute/data')
+        self.computeDataPosixPath = settingsGroup.createPathEntry('ComputeDataPosixPath',
+                                                                  Path('/path/to/compute/data'))
         self.outputDataEndpointID = settingsGroup.createUUIDEntry('OutputDataEndpointID',
                                                                   UUID(int=0))
         self.outputDataGlobusPath = settingsGroup.createStringEntry('OutputDataGlobusPath',
                                                                     '/~/path/to/output/data')
-        self.outputDataPosixPath = settingsGroup.createStringEntry('OutputDataPosixPath',
-                                                                   '/path/to/output/data')
+        self.outputDataPosixPath = settingsGroup.createPathEntry('OutputDataPosixPath',
+                                                                 Path('/path/to/output/data'))
         self.statusRefreshIntervalInSeconds = settingsGroup.createIntegerEntry(
             'StatusRefreshIntervalInSeconds', 10)
 

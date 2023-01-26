@@ -14,7 +14,6 @@ class TikePositionCorrectionSettings(TikeAdaptiveMomentSettings):
             'UsePositionRegularization', False)
         # TODO transform: Global transform of positions.
         # TODO origin: The rotation center of the transformation.
-        # TODO confidence: A rating of the confidence of position information around each position.
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikePositionCorrectionSettings:

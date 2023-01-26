@@ -13,8 +13,6 @@ class TikeObjectCorrectionSettings(TikeAdaptiveMomentSettings):
         self.useObjectCorrection = settingsGroup.createBooleanEntry('UseObjectCorrection', True)
         self.positivityConstraint = settingsGroup.createRealEntry('PositivityConstraint', '0')
         self.smoothnessConstraint = settingsGroup.createRealEntry('SmoothnessConstraint', '0')
-        # TODO preconditioner: The magnitude of the illumination used for conditioning the object updates.
-        # TODO combined_update: Used for compact batch updates.
         self.useMagnitudeClipping = settingsGroup.createBooleanEntry('UseMagnitudeClipping', True)
 
     @classmethod

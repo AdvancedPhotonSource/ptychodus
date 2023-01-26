@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 from uuid import UUID
 
 from ...api.observer import Observable, Observer
@@ -42,7 +43,7 @@ class WorkflowComputeController(Observer):
         self._presenter.setComputeDataGlobusPath(dataPath)
 
     def _syncPosixPathToModel(self) -> None:
-        dataPath = self._view.dataPosixPathLineEdit.text()
+        dataPath = Path(self._view.dataPosixPathLineEdit.text())
         self._presenter.setComputeDataPosixPath(dataPath)
 
     def _syncModelToView(self) -> None:

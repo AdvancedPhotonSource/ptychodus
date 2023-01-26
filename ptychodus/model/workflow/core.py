@@ -67,10 +67,10 @@ class WorkflowParametersPresenter(Observable, Observer):
     def getComputeDataGlobusPath(self) -> str:
         return self._settings.computeDataGlobusPath.value
 
-    def setComputeDataPosixPath(self, computeDataPosixPath: str) -> None:
+    def setComputeDataPosixPath(self, computeDataPosixPath: Path) -> None:
         self._settings.computeDataPosixPath.value = computeDataPosixPath
 
-    def getComputeDataPosixPath(self) -> str:
+    def getComputeDataPosixPath(self) -> Path:
         return self._settings.computeDataPosixPath.value
 
     def setOutputDataEndpointID(self, endpointID: UUID) -> None:
@@ -85,10 +85,10 @@ class WorkflowParametersPresenter(Observable, Observer):
     def getOutputDataGlobusPath(self) -> str:
         return self._settings.outputDataGlobusPath.value
 
-    def setOutputDataPosixPath(self, outputDataPosixPath: str) -> None:
+    def setOutputDataPosixPath(self, outputDataPosixPath: Path) -> None:
         self._settings.outputDataPosixPath.value = outputDataPosixPath
 
-    def getOutputDataPosixPath(self) -> str:
+    def getOutputDataPosixPath(self) -> Path:
         return self._settings.outputDataPosixPath.value
 
     def update(self, observable: Observable) -> None:

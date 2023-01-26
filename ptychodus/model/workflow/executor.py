@@ -30,10 +30,18 @@ class WorkflowExecutor:
 
     def runFlow(self, flowLabel: str) -> None:
         transferSyncLevel = 3  # Copy files if checksums of the source and destination do not match.
+
+        inputDataPosixPath = self._settings.inputDataPosixPath.value / flowLabel
+        computeDataPosixPath = self._settings.computeDataPosixPath.value / flowLabel
+        outputDataPosixPath = self._settings.outputDataPosixPath.value / flowLabel
+
+        inputDataGlobusPath = f'{self._settings.inputDataGlobusPath.value}/{flowLabel}'
+        computeDataGlobusPath = f'{self._settings.computeDataGlobusPath.value}/{flowLabel}'
+        outputDataGlobusPath = f'{self._settings.outputDataGlobusPath.value}/{flowLabel}'
+
         settingsFileName = 'input.ini'
         restartFileName = 'input.npz'
         resultsFileName = 'output.npz'
-        inputDataPosixPath = Path(self._settings.inputDataPosixPath.value) / flowLabel
 
         try:
             inputDataPosixPath.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -45,15 +53,17 @@ class WorkflowExecutor:
         self._stateDataRegistry.saveStateData(inputDataPosixPath / restartFileName,
                                               restartable=True)
 
+        # TODO should override results file location
+
         flowInput = {
             'input_data_transfer_source_endpoint_id':
             str(self._settings.inputDataEndpointID.value),
             'input_data_transfer_source_path':
-            f'{self._settings.inputDataGlobusPath.value}/{flowLabel}',
+            inputDataGlobusPath,
             'input_data_transfer_destination_endpoint_id':
             str(self._settings.computeDataEndpointID.value),
             'input_data_transfer_destination_path':
-            str(self._settings.computeDataGlobusPath.value),
+            computeDataGlobusPath,
             'input_data_transfer_recursive':
             True,
             'input_data_transfer_sync_level':
@@ -61,17 +71,17 @@ class WorkflowExecutor:
             'funcx_endpoint_compute':
             str(self._settings.computeFuncXEndpointID.value),
             'ptychodus_restart_file':
-            f'{self._settings.computeDataPosixPath.value}/{flowLabel}/{restartFileName}',
+            str(computeDataPosixPath / restartFileName),
             'ptychodus_settings_file':
-            f'{self._settings.computeDataPosixPath.value}/{flowLabel}/{settingsFileName}',
+            str(computeDataPosixPath / settingsFileName),
             'output_data_transfer_source_endpoint_id':
             str(self._settings.computeDataEndpointID.value),
             'output_data_transfer_source_path':
-            f'{self._settings.computeDataGlobusPath.value}/{flowLabel}/{resultsFileName}',
+            f'{computeDataGlobusPath}/{resultsFileName}',
             'output_data_transfer_destination_endpoint_id':
             str(self._settings.outputDataEndpointID.value),
             'output_data_transfer_destination_path':
-            str(self._settings.outputDataGlobusPath.value),
+            outputDataGlobusPath,
             'output_data_transfer_recursive':
             False
         }
