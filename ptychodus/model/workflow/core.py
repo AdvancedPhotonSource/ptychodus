@@ -174,7 +174,6 @@ class WorkflowCore:
             from .globus import GlobusWorkflowThread
         except ModuleNotFoundError:
             logger.info('Globus not found.')
-            # FIXME hide workflow tab and don't break if globus not installed
         else:
             self._thread = GlobusWorkflowThread(self._authorizer, self._statusRepository,
                                                 self._executor)
@@ -183,6 +182,10 @@ class WorkflowCore:
         self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
         self.statusPresenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
         self.executionPresenter = WorkflowExecutionPresenter(self._executor)
+
+    @property
+    def areWorkflowsSupported(self) -> bool:
+        return (self._thread is not None)
 
     def start(self) -> None:
         logger.info('Starting workflow thread...')

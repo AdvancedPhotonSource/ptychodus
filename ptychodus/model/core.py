@@ -249,6 +249,10 @@ class ModelCore:
         return self._reconstructorCore.plotPresenter
 
     @property
+    def areWorkflowsSupported(self) -> bool:
+        return self._workflowCore.areWorkflowsSupported
+
+    @property
     def workflowAuthorizationPresenter(self) -> WorkflowAuthorizationPresenter:
         return self._workflowCore.authorizationPresenter
 

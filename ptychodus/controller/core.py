@@ -94,6 +94,8 @@ class ControllerCore:
         view.navigationActionGroup.triggered.connect(
             lambda action: controller.swapCentralWidgets(action))
 
+        view.workflowAction.setVisible(model.areWorkflowsSupported)
+
         controller._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
         controller._refreshDataTimer.start(1000)  # TODO make configurable
 

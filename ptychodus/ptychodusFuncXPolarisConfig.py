@@ -10,14 +10,13 @@ from funcx_endpoint.strategies import SimpleStrategy
 user_opts = {
     'polaris': {
         # Node setup: activate necessary conda environment and such.
-        'worker_init': 'export PATH="$HOME/.anaconda3/bin:$PATH"; source activate fx39;',
+        'worker_init': 'source ~/miniconda3/etc/profile.d/conda.sh; conda activate ptychodus',
         'scheduler_options': '#PBS -l filesystems=home:grand:eagle\n#PBS -k doe',
         # ALCF allocation to use
         'account': 'APSDataAnalysis',
     }
 }
 
-# FIXME update with most recent
 config = Config(executors=[
     HighThroughputExecutor(
         max_workers_per_node=1,

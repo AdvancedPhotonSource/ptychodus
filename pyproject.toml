@@ -13,6 +13,7 @@ module = [
     "fair_research_login",
     "funcx_endpoint.*",
     "gladier.*",
+    "globus_sdk",
     "h5py",
     "hdf5plugin",
     "matplotlib.*",
@@ -28,3 +29,7 @@ module = [
     "watchdog.*",
 ]
 ignore_missing_imports = true
+
+[tool.yapf]
+based_on_style = "pep8"
+column_limit = 99
