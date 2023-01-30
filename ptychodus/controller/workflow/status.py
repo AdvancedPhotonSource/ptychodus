@@ -59,7 +59,7 @@ class WorkflowStatusController:
             self._view.autoRefreshSpinBox.setEnabled(True)
             self._view.refreshButton.setEnabled(True)
 
-    def refreshTableViewIfNeeded(self) -> None:  # FIXME
+    def refreshTableViewIfChanged(self) -> None:  # FIXME only reset if changed
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 

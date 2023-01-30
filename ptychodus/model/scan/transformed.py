@@ -4,19 +4,23 @@ import logging
 
 import numpy
 
-from ...api.scan import ScanPoint, ScanPointTransform
-from .settings import ScanSettings
+from ...api.scan import ScanIndexFilter, ScanPoint, ScanPointTransform
+from .indexFilters import ScanIndexFilterFactory
 from .repository import ScanRepositoryItem
+from .settings import ScanSettings
 
 logger = logging.getLogger(__name__)
 
 
 class TransformedScanRepositoryItem(ScanRepositoryItem):
 
-    def __init__(self, rng: numpy.random.Generator, item: ScanRepositoryItem) -> None:
+    def __init__(self, rng: numpy.random.Generator, item: ScanRepositoryItem,
+                 indexFilterFactory: ScanIndexFilterFactory) -> None:
         super().__init__()
         self._rng = rng
         self._item = item
+        self._indexFilterFactory = indexFilterFactory
+        self._indexFilter = indexFilterFactory.create('All')
         self._transform = ScanPointTransform.PXPY
         self._jitterRadiusInMeters = Decimal()
         self._centroid = ScanPoint(Decimal(), Decimal())
@@ -38,6 +42,7 @@ class TransformedScanRepositoryItem(ScanRepositoryItem):
         return self._item.canActivate
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
+        self._indexFilter = self._indexFilterFactory.create(settings.indexFilter.value)
         self._transform = ScanPointTransform.fromSimpleName(settings.transform.value)
         self_jitterRadiusInMeters = settings.jitterRadiusInMeters.value
         self._centroid = ScanPoint(settings.centroidXInMeters.value,
@@ -45,6 +50,7 @@ class TransformedScanRepositoryItem(ScanRepositoryItem):
         self._item.syncFromSettings(settings)
 
     def syncToSettings(self, settings: ScanSettings) -> None:
+        settings.indexFilter.value = self._indexFilter.name
         settings.transform.value = self._transform.simpleName
         settings.jitterRadiusInMeters.value = self._jitterRadiusInMeters
         settings.centroidXInMeters.value = self._centroid.x
@@ -52,10 +58,22 @@ class TransformedScanRepositoryItem(ScanRepositoryItem):
         self._item.syncToSettings(settings)
 
     def __iter__(self) -> Iterator[int]:
-        return iter(self._item)
+        it = iter(self._item)
+
+        while True:
+            try:
+                index = next(it)
+            except StopIteration:
+                break
+
+            if self._indexFilter(index):
+                yield index
 
     def __getitem__(self, index: int) -> ScanPoint:
         '''returns the jittered and transformed scan point'''
+        if not self._indexFilter(index):
+            raise KeyError
+
         point = self._item[index]
 
         if self._jitterRadiusInMeters > Decimal():
@@ -74,7 +92,20 @@ class TransformedScanRepositoryItem(ScanRepositoryItem):
         )
 
     def __len__(self) -> int:
-        return len(self._item)
+        return sum(1 for index in iter(self))
+
+    def getIndexFilterNameList(self) -> list[str]:
+        return self._indexFilterFactory.getIndexFilterNameList()
+
+    def getIndexFilterName(self) -> str:
+        return self._indexFilter.name
+
+    def setIndexFilterByName(self, name: str) -> None:
+        indexFilter = self._indexFilterFactory.create(name)
+
+        if self._indexFilter != indexFilter:
+            self._indexFilter = indexFilter
+            self.notifyObservers()
 
     def getTransformNameList(self) -> list[str]:
         return [transform.displayName for transform in ScanPointTransform]

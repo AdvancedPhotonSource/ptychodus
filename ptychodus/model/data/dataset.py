@@ -157,6 +157,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         scratchDirectory = self._datasetSettings.scratchDirectory.value
         maximumNumberOfPatterns = self._dataset.getMetadata().numberOfPatternsTotal
         dtype = self._dataset.getMetadata().patternDataType
+        # FIXME make this work when crop is disabled
         shape = (
             maximumNumberOfPatterns,
             self._cropSizer.getExtentYInPixels(),

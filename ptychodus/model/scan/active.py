@@ -4,8 +4,8 @@ import logging
 
 from ...api.observer import Observable, Observer
 from ...api.scan import Scan, ScanPoint
-from .cartesian import CartesianScanRepositoryItem
-from .factory import ScanRepositoryItemFactory
+from .cartesian import SnakeScanRepositoryItem
+from .itemFactory import ScanRepositoryItemFactory
 from .repository import ScanRepository, ScanRepositoryItem
 from .settings import ScanSettings
 from .transformed import TransformedScanRepositoryItem
@@ -22,7 +22,7 @@ class ActiveScan(Scan, Observer):
         self._factory = factory
         self._repository = repository
         self._reinitObservable = reinitObservable
-        self._item: ScanRepositoryItem = CartesianScanRepositoryItem(snake=True)
+        self._item: ScanRepositoryItem = SnakeScanRepositoryItem()
         self._name = str()
 
     @classmethod

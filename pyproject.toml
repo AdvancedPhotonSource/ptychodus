@@ -11,10 +11,12 @@ build-backend = "setuptools.build_meta"
 [[tool.mypy.overrides]]
 module = [
     "fair_research_login",
+    "funcx_endpoint.*",
     "gladier.*",
     "h5py",
     "hdf5plugin",
     "matplotlib.*",
+    "parsl.*",
     "ptychonn.*",
     "ptychopy",
     "pvaccess",

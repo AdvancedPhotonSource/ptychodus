@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from decimal import Decimal
+from typing import Final
 
 from ...api.scan import ScanPoint
 from .repository import ContiguousScanIterator, ScanRepositoryItem
@@ -23,10 +24,6 @@ class CartesianScanRepositoryItem(ScanRepositoryItem):
     @property
     def category(self) -> str:
         return 'Cartesian'
-
-    @property
-    def variant(self) -> str:
-        return 'Snake' if self._snake else 'Raster'
 
     @property
     def canActivate(self) -> bool:
@@ -104,3 +101,25 @@ class CartesianScanRepositoryItem(ScanRepositoryItem):
             Decimal(self._numberOfPointsX - 1) / 2,
             Decimal(self._numberOfPointsY - 1) / 2,
         )
+
+
+class RasterScanRepositoryItem(CartesianScanRepositoryItem):
+    NAME: Final[str] = 'Raster'
+
+    def __init__(self) -> None:
+        super().__init__(snake=False)
+
+    @property
+    def variant(self) -> str:
+        return self.NAME
+
+
+class SnakeScanRepositoryItem(CartesianScanRepositoryItem):
+    NAME: Final[str] = 'Snake'
+
+    def __init__(self) -> None:
+        super().__init__(snake=True)
+
+    @property
+    def variant(self) -> str:
+        return self.NAME

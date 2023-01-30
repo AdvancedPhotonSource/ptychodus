@@ -47,4 +47,4 @@ class WorkflowController:
 
     def _processEvents(self) -> None:
         self._authorizationController.startAuthorizationIfNeeded()
-        self._statusController.refreshTableViewIfNeeded()
+        self._statusController.refreshTableViewIfChanged()

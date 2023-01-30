@@ -1,3 +1,4 @@
+from collections.abc import Callable, Mapping
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
@@ -7,7 +8,8 @@ import numpy
 
 from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
-from .cartesian import CartesianScanRepositoryItem
+from .cartesian import RasterScanRepositoryItem, SnakeScanRepositoryItem
+from .indexFilters import ScanIndexFilterFactory
 from .lissajous import LissajousScanRepositoryItem
 from .repository import ScanRepositoryItem
 from .settings import ScanSettings
@@ -21,15 +23,24 @@ logger = logging.getLogger(__name__)
 class ScanRepositoryItemFactory:
 
     def __init__(self, rng: numpy.random.Generator, settings: ScanSettings,
+                 indexFilterFactory: ScanIndexFilterFactory,
                  fileReaderChooser: PluginChooser[ScanFileReader]) -> None:
         self._rng = rng
         self._settings = settings
+        self._indexFilterFactory = indexFilterFactory
         self._fileReaderChooser = fileReaderChooser
+        self._variants: Mapping[str, Callable[[], ScanRepositoryItem]] = {
+            LissajousScanRepositoryItem.NAME.casefold(): LissajousScanRepositoryItem,
+            RasterScanRepositoryItem.NAME.casefold(): RasterScanRepositoryItem,
+            SnakeScanRepositoryItem.NAME.casefold(): SnakeScanRepositoryItem,
+            SpiralScanRepositoryItem.NAME.casefold(): SpiralScanRepositoryItem,
+            TabularScanRepositoryItem.NAME.casefold(): TabularScanRepositoryItem.createEmpty,
+        }
 
     def createTabularItem(self, scan: Scan,
                           fileInfo: Optional[ScanFileInfo]) -> ScanRepositoryItem:
         item = TabularScanRepositoryItem(scan, fileInfo)
-        return TransformedScanRepositoryItem(self._rng, item)
+        return TransformedScanRepositoryItem(self._rng, item, self._indexFilterFactory)
 
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -65,26 +76,20 @@ class ScanRepositoryItemFactory:
         return self._readScan(fileInfo.filePath)
 
     def getItemNameList(self) -> list[str]:
-        return ['Lissajous', 'Raster', 'Snake', 'Spiral']
+        return [name.title() for name in self._variants]
 
     def createItem(self, name: str) -> Optional[ScanRepositoryItem]:
         item: Optional[ScanRepositoryItem] = None
-        nameLower = name.casefold()
 
-        if nameLower == 'lissajous':
-            item = LissajousScanRepositoryItem()
-        elif nameLower == 'raster':
-            item = CartesianScanRepositoryItem(snake=False)
-        elif nameLower == 'snake':
-            item = CartesianScanRepositoryItem(snake=True)
-        elif nameLower == 'spiral':
-            item = SpiralScanRepositoryItem()
-        elif nameLower == 'tabular':
-            item = TabularScanRepositoryItem(
-                TabularScan('Tabular', {0: ScanPoint(Decimal(), Decimal())}), None)
+        try:
+            itemFactory = self._variants[name.casefold()]
+        except KeyError:
+            logger.error(f'Unknown scan repository item \"{name}\"!')
+        else:
+            item = itemFactory()
 
         if item is not None:
-            item = TransformedScanRepositoryItem(self._rng, item)
+            item = TransformedScanRepositoryItem(self._rng, item, self._indexFilterFactory)
             item.syncFromSettings(self._settings)
 
         return item

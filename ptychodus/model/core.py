@@ -99,7 +99,8 @@ class ModelCore:
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
-            self._scanCore.factory, self._scanCore.repository, modelArgs.isDeveloperModeEnabled)
+            self._scanCore.itemFactory, self._scanCore.repository,
+            modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
@@ -210,6 +211,7 @@ class ModelCore:
         self._stateDataRegistry.saveStateData(filePath, restartable=restartable)
 
     def openStateData(self, filePath: Path) -> None:
+        # FIXME test that this works
         self._stateDataRegistry.openStateData(filePath)
 
     def batchModeReconstruct(self) -> int:

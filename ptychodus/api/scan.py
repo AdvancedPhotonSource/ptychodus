@@ -32,6 +32,20 @@ class ScanPoint:
             return NotImplemented
 
 
+class ScanIndexFilter(ABC):
+    '''filters scan points by index'''
+
+    @abstractproperty
+    def name(self) -> str:
+        '''returns a unique name'''
+        pass
+
+    @abstractmethod
+    def __call__(self, index: int) -> bool:
+        '''include scan point if true, remove otherwise'''
+        pass
+
+
 class ScanPointTransform(Enum):
     '''transformations to negate or swap scan point coordinates'''
     PXPY = 0x0
@@ -106,6 +120,10 @@ class TabularScan(Scan):
         super().__init__()
         self._name = name
         self._data = dict(pointMap)
+
+    @classmethod
+    def createEmpty(cls) -> TabularScan:
+        return cls('Tabular', {0: ScanPoint(Decimal(), Decimal())})
 
     @classmethod
     def createFromPointSequence(cls, name: str, pointSeq: Sequence[ScanPoint]) -> TabularScan:

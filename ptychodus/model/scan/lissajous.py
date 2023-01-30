@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from decimal import Decimal
+from typing import Final
 
 import numpy
 
@@ -9,6 +10,7 @@ from .settings import ScanSettings
 
 
 class LissajousScanRepositoryItem(ScanRepositoryItem):
+    NAME: Final[str] = 'Lissajous'
 
     def __init__(self) -> None:
         super().__init__()
@@ -29,7 +31,7 @@ class LissajousScanRepositoryItem(ScanRepositoryItem):
 
     @property
     def variant(self) -> str:
-        return 'Lissajous'
+        return self.NAME
 
     @property
     def canActivate(self) -> bool:
