@@ -33,8 +33,10 @@ def ptychodus_reconstruct(**data: str) -> None:
         settingsFilePath=Path(data['ptychodus_settings_file']),
     )
 
+    resultsFilePath = Path(data['ptychodus_results_file'])
+
     with ModelCore(modelArgs) as model:
-        model.batchModeReconstruct()
+        model.batchModeReconstruct(resultsFilePath)
 
 
 @gladier.generate_flow_definition
@@ -43,6 +45,7 @@ class PtychodusReconstruct(gladier.GladierBaseTool):
     required_input = [
         'ptychodus_restart_file',
         'ptychodus_settings_file',
+        'ptychodus_results_file',
     ]
 
 

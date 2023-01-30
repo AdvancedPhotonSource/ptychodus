@@ -35,21 +35,22 @@ Standard Installation
 3. Activate the `ptychodus` conda environment to run ptychodus.
 
    .. code-block:: shell
-
        $ conda activate ptychodus
        $ ptychodus -h
-       usage: ptychodus [-h] [-b] [-d] [-f PREFIX] [-p PORT] [-s SETTINGS] [-v]
+       usage: ptychodus [-h] [-b RESULTS_FILE] [-f PREFIX] [-p PORT] [-r RESTART_FILE] [-s SETTINGS_FILE] [-v]
 
        ptychodus is a ptychography analysis application
 
-       optional arguments:
+       options:
          -h, --help            show this help message and exit
-         -b, --batch           run reconstruction non-interactively
-         -d, --dev             run in developer mode
+         -b RESULTS_FILE, --batch RESULTS_FILE
+                               run reconstruction non-interactively
          -f PREFIX, --file-prefix PREFIX
                                replace file path prefix
          -p PORT, --port PORT  remote process communication port number
-         -s SETTINGS, --settings SETTINGS
+         -r RESTART_FILE, --restart RESTART_FILE
+                               use restart data from file
+         -s SETTINGS_FILE, --settings SETTINGS_FILE
                                use settings from file
          -v, --version         show program's version number and exit
        $ ptychodus

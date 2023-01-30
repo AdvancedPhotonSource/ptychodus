@@ -11,9 +11,6 @@ class ReconstructorSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.algorithm = settingsGroup.createStringEntry('Algorithm', 'Tike/rPIE')
-        self.outputFileType = settingsGroup.createStringEntry('OutputFileType', 'NPZ')
-        self.outputFilePath = settingsGroup.createPathEntry('OutputFilePath',
-                                                            Path('ptychodus.npz'))
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ReconstructorSettings:

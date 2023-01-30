@@ -18,9 +18,11 @@ import ptychodus.model
 
 class ReconstructionThread(threading.Thread):
 
-    def __init__(self, ptychodus: ptychodus.model.ModelCore, reconstructPV: str) -> None:
+    def __init__(self, ptychodus: ptychodus.model.ModelCore, resultsFilePath: Path,
+                 reconstructPV: str) -> None:
         super().__init__()
         self._ptychodus = ptychodus
+        self._resultsFilePath = resultsFilePath
         self._channel = pvapy.Channel(reconstructPV, pvapy.CA)
         self._reconstructEvent = threading.Event()
         self._stopEvent = threading.Event()
@@ -34,7 +36,7 @@ class ReconstructionThread(threading.Thread):
                 logging.debug('ReconstructionThread: Begin assembling scan positions')
                 self._ptychodus.finalizeStreamingWorkflow()
                 logging.debug('ReconstructionThread: End assembling scan positions')
-                self._ptychodus.batchModeReconstruct()
+                self._ptychodus.batchModeReconstruct(self._resultsFilePath)
                 self._reconstructEvent.clear()
                 # reconstruction done; indicate that results are ready
                 self._channel.put(0)
@@ -70,7 +72,10 @@ class PtychodusAdImageProcessor(AdImageProcessor):
 
         self._ptychodus = ptychodus.model.ModelCore(modelArgs)
         self._reconstructionThread = ReconstructionThread(
-            self._ptychodus, configDict.get('reconstructPV', 'bdpgp:gp:bit3'))
+            self._ptychodus,
+            Path(configDict.get('resultsFilePath', 'ptychodus.npz')),
+            configDict.get('reconstructPV', 'bdpgp:gp:bit3'),
+        )
         self._posXPV = configDict.get('posXPV', 'bluesky:pos_x')
         self._posYPV = configDict.get('posYPV', 'bluesky:pos_y')
         self._nFramesProcessed = 0

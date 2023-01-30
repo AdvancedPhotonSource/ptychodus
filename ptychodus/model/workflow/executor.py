@@ -53,8 +53,6 @@ class WorkflowExecutor:
         self._stateDataRegistry.saveStateData(inputDataPosixPath / restartFileName,
                                               restartable=True)
 
-        # TODO should override results file location
-
         flowInput = {
             'input_data_transfer_source_endpoint_id':
             str(self._settings.inputDataEndpointID.value),
@@ -74,6 +72,8 @@ class WorkflowExecutor:
             str(computeDataPosixPath / restartFileName),
             'ptychodus_settings_file':
             str(computeDataPosixPath / settingsFileName),
+            'ptychodus_results_file':
+            str(computeDataPosixPath / resultsFileName),
             'output_data_transfer_source_endpoint_id':
             str(self._settings.computeDataEndpointID.value),
             'output_data_transfer_source_path':

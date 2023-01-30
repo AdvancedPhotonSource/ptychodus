@@ -214,10 +214,9 @@ class ModelCore:
         # FIXME test that this works
         self._stateDataRegistry.openStateData(filePath)
 
-    def batchModeReconstruct(self) -> int:
+    def batchModeReconstruct(self, filePath: Path) -> int:
         result = self._reconstructorCore.presenter.reconstruct()
-        self.saveStateData(self._reconstructorCore.settings.outputFilePath.value,
-                           restartable=False)
+        self.saveStateData(filePath, restartable=False)
         return result.result
 
     @property
