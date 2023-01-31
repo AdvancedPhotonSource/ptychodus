@@ -258,19 +258,19 @@ class DataCore(StatefulCore):
         state = dict()
 
         if restartable:
-            state['dataIndex'] = numpy.array(self.dataset.getAssembledIndexes())
+            state['dataIndexes'] = numpy.array(self.dataset.getAssembledIndexes())
             state['data'] = self.dataset.getAssembledData()
 
         return state
 
     def setStateData(self, state: StateDataType) -> None:
-        # FIXME use dataIndex = state['dataIndex']
         try:
+            dataIndexes = state['dataIndexes']
             data = state['data']
         except KeyError:
             logger.debug('Skipped restoring data array state.')
         else:
-            self.dataset.setAssembledData(data)
+            self.dataset.setAssembledData(data, dataIndexes)
 
     def start(self) -> None:
         self._dataDirectoryWatcher.start()

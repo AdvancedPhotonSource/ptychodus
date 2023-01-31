@@ -211,7 +211,6 @@ class ModelCore:
         self._stateDataRegistry.saveStateData(filePath, restartable=restartable)
 
     def openStateData(self, filePath: Path) -> None:
-        # FIXME test that this works
         self._stateDataRegistry.openStateData(filePath)
 
     def batchModeReconstruct(self, filePath: Path) -> int:

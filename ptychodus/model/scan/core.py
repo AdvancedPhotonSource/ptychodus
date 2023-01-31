@@ -208,6 +208,6 @@ class ScanCore(StatefulCore):
 
         name = 'Restart'
         scan = TabularScan(name, pointMap)
-        item = self.itemFactory.createTabularItem(scan, None)
+        item = self.itemFactory.createTabularItem(scan, ScanFileInfo.createNull())
         self.repository.insertItem(item)
         self.scan.setActiveScan(name)

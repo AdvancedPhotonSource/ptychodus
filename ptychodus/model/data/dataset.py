@@ -9,6 +9,7 @@ import tempfile
 import threading
 
 import numpy
+import numpy.typing
 
 from ...api.data import (DiffractionDataset, DiffractionMetadata, DiffractionPatternArray,
                          DiffractionPatternData, DiffractionPatternState, SimpleDiffractionDataset,
@@ -17,6 +18,8 @@ from ...api.observer import Observable, Observer
 from ...api.tree import SimpleTreeNode
 from .crop import CropSizer
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
+
+DiffractionPatternIndexes = numpy.typing.NDArray[numpy.integer[Any]]
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +234,9 @@ class ActiveDiffractionDataset(DiffractionDataset):
         indexes = self.getAssembledIndexes()
         return self._arrayData[indexes]
 
-    def setAssembledData(self, arrayData: DiffractionPatternData) -> None:
+    def setAssembledData(self, arrayData: DiffractionPatternData,
+                         arrayIndexes: DiffractionPatternIndexes) -> None:
+        # FIXME setAssembledData
         metadata = DiffractionMetadata(
             numberOfPatternsPerArray=arrayData.shape[0],
             numberOfPatternsTotal=arrayData.shape[0],

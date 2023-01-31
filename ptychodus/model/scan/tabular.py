@@ -17,6 +17,10 @@ class ScanFileInfo:
     filePath: Path
 
     @classmethod
+    def createNull(cls) -> ScanFileInfo:
+        return cls(fileType='', filePath=Path())
+
+    @classmethod
     def createFromSettings(cls, settings: ScanSettings) -> ScanFileInfo:
         return cls(
             fileType=settings.inputFileType.value,
