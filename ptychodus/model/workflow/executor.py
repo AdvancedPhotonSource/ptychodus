@@ -81,7 +81,7 @@ class WorkflowExecutor:
             'output_data_transfer_destination_endpoint_id':
             str(self._settings.outputDataEndpointID.value),
             'output_data_transfer_destination_path':
-            outputDataGlobusPath,
+            f'{outputDataGlobusPath}/{resultsFileName}',
             'output_data_transfer_recursive':
             False
         }
