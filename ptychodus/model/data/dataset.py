@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import overload, Union
+from typing import overload, Any, Union
 import logging
 import queue
 import tempfile
@@ -236,7 +236,11 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     def setAssembledData(self, arrayData: DiffractionPatternData,
                          arrayIndexes: DiffractionPatternIndexes) -> None:
-        # FIXME setAssembledData
+        # FIXME use arrayIndexes
+
+        if self.isAssembling:
+            self.stop(finishAssembling=False)
+
         metadata = DiffractionMetadata(
             numberOfPatternsPerArray=arrayData.shape[0],
             numberOfPatternsTotal=arrayData.shape[0],
@@ -245,19 +249,17 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
 
-        arrayList: list[DiffractionPatternArray] = [
+        self._arrayData = arrayData
+        self._arrayList = [
             SimpleDiffractionPatternArray(
                 label='Restart',
                 index=0,
-                data=arrayData,
+                data=arrayData[...],
                 state=DiffractionPatternState.LOADED,
             ),
         ]
-
-        dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
-        self.switchTo(dataset)
-        self.start()
-        self.stop(finishAssembling=True)
+        self._dataset = SimpleDiffractionDataset(metadata, contentsTree, self._arrayList)
+        self.notifyObservers()
 
     def notifyObserversIfDatasetChanged(self) -> None:
         if self._changedEvent.is_set():
