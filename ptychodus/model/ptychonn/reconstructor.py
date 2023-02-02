@@ -4,7 +4,7 @@ import logging
 import numpy
 
 import ptychonn
-from ptychonn._model import ReconSmallPhaseModel, Tester
+from ptychonn import ReconSmallPhaseModel, Tester
 
 from ...api.reconstructor import ReconstructResult, Reconstructor
 from ...api.scan import Scan
@@ -50,6 +50,7 @@ class PtychoNNReconstructor(Reconstructor):
             scanXInMeters.append(float(point.x))
             scanYInMeters.append(float(point.y))
 
+        # FIXME verify scan coordinates
         scanInMeters = numpy.column_stack((scanYInMeters, scanXInMeters)).astype('float32')
 
         logger.debug('Validating diffraction pattern data...')
@@ -79,11 +80,12 @@ class PtychoNNReconstructor(Reconstructor):
                     binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
                                                          binSize * j:binSize * (j + 1)])
 
-        stitchedPixelWidthInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
-        inferencePixelWidthInMeters = stitchedPixelWidthInMeters * binSize
+        # used when preparing data, doesn't go into stitching code (see 99-100 in dataPrep script)
+        stitchedPixelWidthInMeters = 11.176e-9 # FIXME self._apparatus.getObjectPlanePixelSizeXInMeters()
+        inferencePixelWidthInMeters = 10.e-9 # FIXME stitchedPixelWidthInMeters * binSize
 
         logger.debug('Loading model state...')
-        tester = Tester(model=ReconSmallPhaseModel(),
+        tester = Tester(model=ReconSmallPhaseModel(nconv=16, use_batch_norm=False), # FIXME make these options
                         model_params_path=self._settings.modelStateFilePath.value)
 
         logger.debug('Inferring...')

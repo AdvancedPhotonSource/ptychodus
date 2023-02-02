@@ -14,6 +14,7 @@ class PtychoNNSettings(Observable, Observer):
         self.modelOutputSize = settingsGroup.createIntegerEntry('ModelOutputSize', 128)
         self.modelStateFilePath = settingsGroup.createPathEntry('ModelStateFilePath',
                                                                 Path('/path/to/best_model.pth'))
+        self.useBatchNormalization = settingsGroup.createBooleanEntry('UseBatchNormalization', False)
         self.batchSize = settingsGroup.createIntegerEntry('BatchSize', 10)
 
     @classmethod
