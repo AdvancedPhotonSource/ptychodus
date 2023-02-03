@@ -50,7 +50,6 @@ class PtychoNNReconstructor(Reconstructor):
             scanXInMeters.append(float(point.x))
             scanYInMeters.append(float(point.y))
 
-        # FIXME verify scan coordinates
         scanInMeters = numpy.column_stack((scanYInMeters, scanXInMeters)).astype('float32')
 
         logger.debug('Validating diffraction pattern data...')
@@ -81,12 +80,16 @@ class PtychoNNReconstructor(Reconstructor):
                                                          binSize * j:binSize * (j + 1)])
 
         # used when preparing data, doesn't go into stitching code (see 99-100 in dataPrep script)
-        stitchedPixelWidthInMeters = 11.176e-9 # FIXME self._apparatus.getObjectPlanePixelSizeXInMeters()
-        inferencePixelWidthInMeters = 10.e-9 # FIXME stitchedPixelWidthInMeters * binSize
+        stitchedPixelWidthInMeters = 11.176e-9  # FIXME self._apparatus.getObjectPlanePixelSizeXInMeters()
+        inferencePixelWidthInMeters = 10.e-9  # FIXME stitchedPixelWidthInMeters * binSize
+        # FIXME verify scan coordinate transformation
 
+        model = ReconSmallPhaseModel(
+            nconv=self._settings.numberOfConvolutionChannels.value,
+            use_batch_norm=self._settings.useBatchNormalization.value,
+        )
         logger.debug('Loading model state...')
-        tester = Tester(model=ReconSmallPhaseModel(nconv=16, use_batch_norm=False), # FIXME make these options
-                        model_params_path=self._settings.modelStateFilePath.value)
+        tester = Tester(model=model, model_params_path=self._settings.modelStateFilePath.value)
 
         logger.debug('Inferring...')
         tester.setTestData(binnedData, batch_size=self._settings.batchSize.value)

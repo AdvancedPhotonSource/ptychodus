@@ -43,6 +43,17 @@ class PtychoNNPresenter(Observable, Observer):
     def setModelStateFilePath(self, directory: Path) -> None:
         self._settings.modelStateFilePath.value = directory
 
+    def getNumberOfConvolutionChannelsLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getNumberOfConvolutionChannels(self) -> int:
+        limits = self.getNumberOfConvolutionChannelsLimits()
+        return limits.clamp(self._settings.numberOfConvolutionChannels.value)
+
+    def setNumberOfConvolutionChannels(self, value: int) -> None:
+        # FIXME add to controller
+        self._settings.numberOfConvolutionChannels.value = value
+
     def getBatchSizeLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
@@ -52,6 +63,13 @@ class PtychoNNPresenter(Observable, Observer):
 
     def setBatchSize(self, value: int) -> None:
         self._settings.batchSize.value = value
+
+    def isBatchNormalizationEnabled(self) -> bool:
+        return self._settings.useBatchNormalization.value
+
+    def setBatchNormalizationEnabled(self, enabled: bool) -> None:
+        # FIXME add to controller
+        self._settings.useBatchNormalization.value = enabled
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
