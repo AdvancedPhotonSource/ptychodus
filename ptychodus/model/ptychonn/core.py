@@ -51,7 +51,6 @@ class PtychoNNPresenter(Observable, Observer):
         return limits.clamp(self._settings.numberOfConvolutionChannels.value)
 
     def setNumberOfConvolutionChannels(self, value: int) -> None:
-        # FIXME add to controller
         self._settings.numberOfConvolutionChannels.value = value
 
     def getBatchSizeLimits(self) -> Interval[int]:
@@ -68,7 +67,6 @@ class PtychoNNPresenter(Observable, Observer):
         return self._settings.useBatchNormalization.value
 
     def setBatchNormalizationEnabled(self, enabled: bool) -> None:
-        # FIXME add to controller
         self._settings.useBatchNormalization.value = enabled
 
     def update(self, observable: Observable) -> None:

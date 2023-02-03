@@ -27,7 +27,10 @@ class PtychoNNBasicParametersController(Observer):
 
         view.modelStateLineEdit.editingFinished.connect(controller._syncModelStateFilePathToModel)
         view.modelStateBrowseButton.clicked.connect(controller._openModelState)
+        view.numberOfConvolutionChannelsSpinBox.valueChanged.connect(
+            presenter.setNumberOfConvolutionChannels)
         view.batchSizeSpinBox.valueChanged.connect(presenter.setBatchSize)
+        view.useBatchNormalizationCheckBox.toggled.connect(presenter.setBatchNormalizationEnabled)
 
         controller._syncModelToView()
 
@@ -54,11 +57,22 @@ class PtychoNNBasicParametersController(Observer):
         else:
             self._view.modelStateLineEdit.clear()
 
+        self._view.numberOfConvolutionChannelsSpinBox.blockSignals(True)
+        self._view.numberOfConvolutionChannelsSpinBox.setRange(
+            self._presenter.getNumberOfConvolutionChannelsLimits().lower,
+            self._presenter.getNumberOfConvolutionChannelsLimits().upper)
+        self._view.numberOfConvolutionChannelsSpinBox.setValue(
+            self._presenter.getNumberOfConvolutionChannels())
+        self._view.numberOfConvolutionChannelsSpinBox.blockSignals(False)
+
         self._view.batchSizeSpinBox.blockSignals(True)
         self._view.batchSizeSpinBox.setRange(self._presenter.getBatchSizeLimits().lower,
                                              self._presenter.getBatchSizeLimits().upper)
         self._view.batchSizeSpinBox.setValue(self._presenter.getBatchSize())
         self._view.batchSizeSpinBox.blockSignals(False)
+
+        self._view.useBatchNormalizationCheckBox.setChecked(
+            self._presenter.isBatchNormalizationEnabled())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
