@@ -22,12 +22,13 @@ logger = logging.getLogger(__name__)
 
 class H5DiffractionPatternArray(DiffractionPatternArray):
 
-    def __init__(self, data: DiffractionPatternData) -> None:
+    def __init__(self, data: DiffractionPatternData, label: str) -> None:
         super().__init__()
         self._data = data
+        self._label = label
 
     def getLabel(self) -> str:
-        return '/entry/data/data'
+        return self._label
 
     def getIndex(self) -> int:
         return 0
@@ -118,16 +119,19 @@ class H5DiffractionFileTreeBuilder:
 
 class H5DiffractionFileReader(DiffractionFileReader):
 
-    def __init__(self) -> None:
+    def __init__(self, simpleName: str, fileFilter: str, dataPath: str) -> None:
+        self._simpleName = simpleName
+        self._fileFilter = fileFilter
+        self._dataPath = dataPath
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
     @property
     def simpleName(self) -> str:
-        return 'HDF5'
+        return self._simpleName
 
     @property
     def fileFilter(self) -> str:
-        return 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)'
+        return self._fileFilter
 
     def read(self, filePath: Path) -> DiffractionDataset:
         metadata = DiffractionMetadata(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
@@ -139,13 +143,13 @@ class H5DiffractionFileReader(DiffractionFileReader):
                 contentsTree = self._treeBuilder.build(h5File)
 
                 try:
-                    data = h5File['/entry/data/data'][()]
+                    data = h5File[self._dataPath][()]
                 except KeyError:
                     logger.debug('Unable to find data.')
                 except OSError:
                     logger.debug('Unable to read found data.')
                 else:
-                    array = H5DiffractionPatternArray(data)
+                    array = H5DiffractionPatternArray(data, self._dataPath)
                     arrayList.append(array)
 
                     metadata = DiffractionMetadata(
@@ -159,4 +163,15 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(H5DiffractionFileReader())
+    registry.registerPlugin(
+        H5DiffractionFileReader(
+            simpleName='HDF5',
+            fileFilter='Hierarchical Data Format 5 Files (*.h5 *.hdf5)',
+            dataPath='/entry/data/data',
+        ))
+    registry.registerPlugin(
+        H5DiffractionFileReader(
+            simpleName='LYNX',
+            fileFilter='LYNX Diffraction Data Files (*.h5 *.hdf5)',
+            dataPath='/entry/data/eiger_4',
+        ))
