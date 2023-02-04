@@ -79,10 +79,8 @@ class PtychoNNReconstructor(Reconstructor):
                     binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
                                                          binSize * j:binSize * (j + 1)])
 
-        # used when preparing data, doesn't go into stitching code (see 99-100 in dataPrep script)
-        stitchedPixelWidthInMeters = 11.176e-9  # FIXME self._apparatus.getObjectPlanePixelSizeXInMeters()
-        inferencePixelWidthInMeters = 10.e-9  # FIXME stitchedPixelWidthInMeters * binSize
-        # FIXME verify scan coordinate transformation
+        stitchedPixelWidthInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
+        inferencePixelWidthInMeters = stitchedPixelWidthInMeters * binSize
 
         model = ReconSmallPhaseModel(
             nconv=self._settings.numberOfConvolutionChannels.value,
