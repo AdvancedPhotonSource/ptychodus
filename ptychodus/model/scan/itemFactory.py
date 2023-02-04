@@ -7,7 +7,7 @@ import logging
 import numpy
 
 from ...api.plugins import PluginChooser
-from ...api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
+from ...api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
 from .cartesian import RasterScanRepositoryItem, SnakeScanRepositoryItem
 from .indexFilters import ScanIndexFilterFactory
 from .lissajous import LissajousScanRepositoryItem
@@ -54,13 +54,17 @@ class ScanRepositoryItemFactory:
         if filePath is not None and filePath.is_file():
             fileType = self._fileReaderChooser.getCurrentSimpleName()
             logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
-            reader = self._fileReaderChooser.getCurrentStrategy()
-            scanSequence = reader.read(filePath)
             fileInfo = ScanFileInfo(fileType, filePath)
+            reader = self._fileReaderChooser.getCurrentStrategy()
 
-            for scan in scanSequence:
-                item = self.createTabularItem(scan, fileInfo)
-                itemList.append(item)
+            try:
+                scanSequence = reader.read(filePath)
+            except ScanPointParseError as ex:
+                logger.exception(f'Failed to parse \"{filePath}\"')
+            else:
+                for scan in scanSequence:
+                    item = self.createTabularItem(scan, fileInfo)
+                    itemList.append(item)
         else:
             logger.debug(f'Refusing to read invalid file path \"{filePath}\"')
 
