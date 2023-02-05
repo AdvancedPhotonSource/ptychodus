@@ -12,7 +12,7 @@ from ...api.settings import SettingsRegistry, SettingsGroup
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus
-from .settings import PtychoNNSettings
+from .settings import PtychoNNSettings, PtychoNNTrainingSettings
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         super().__init__()
         self._settings = PtychoNNSettings.createInstance(settingsRegistry)
+        self._trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
         self.presenter = PtychoNNPresenter.createInstance(self._settings)
         self.reconstructorList: list[Reconstructor] = list()
 
@@ -101,8 +102,8 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
                 core.reconstructorList.append(NullReconstructor('PtychoNN'))
         else:
             core.reconstructorList.append(
-                PtychoNNReconstructor(core._settings, apparatus, scan, object_,
-                                      diffractionDataset))
+                PtychoNNReconstructor(core._settings, core._trainingSettings, apparatus, scan,
+                                      object_, diffractionDataset))
 
         return core
 
