@@ -1,6 +1,7 @@
-from .core import PtychoNNPresenter, PtychoNNReconstructorLibrary
+from .core import PtychoNNModelPresenter, PtychoNNReconstructorLibrary, PtychoNNTrainingPresenter
 
 __all__ = [
-    'PtychoNNPresenter',
+    'PtychoNNModelPresenter',
     'PtychoNNReconstructorLibrary',
+    'PtychoNNTrainingPresenter',
 ]

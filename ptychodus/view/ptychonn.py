@@ -8,10 +8,10 @@ from PyQt5.QtWidgets import (QCheckBox, QFormLayout, QGridLayout, QGroupBox, QLa
 from .widgets import DecimalLineEdit, DecimalSlider
 
 
-class PtychoNNBasicParametersView(QGroupBox):
+class PtychoNNModelParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('PtychoNN Parameters', parent)
+        super().__init__('Model Parameters', parent)
         self.modelStateLabel = QLabel('Model State:')
         self.modelStateLineEdit = QLineEdit()
         self.modelStateBrowseButton = QPushButton('Browse')
@@ -22,7 +22,7 @@ class PtychoNNBasicParametersView(QGroupBox):
         self.useBatchNormalizationCheckBox = QCheckBox('Use Batch Normalization')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNBasicParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNModelParametersView:
         view = cls(parent)
 
         layout = QGridLayout()
@@ -73,7 +73,7 @@ class PtychoNNOutputParametersView(QGroupBox):
 class PtychoNNTrainingParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Training', parent)
+        super().__init__('Training Parameters', parent)
         self.validationSetFractionalSizeSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.optimizationEpochsPerHalfCycleSpinBox = QSpinBox()
         self.maximumLearningRateLineEdit = DecimalLineEdit.createInstance()
@@ -106,7 +106,7 @@ class PtychoNNParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.basicParametersView = PtychoNNBasicParametersView.createInstance()
+        self.modelParametersView = PtychoNNModelParametersView.createInstance()
         self.trainingParametersView = PtychoNNTrainingParametersView.createInstance()
 
     @classmethod
@@ -114,7 +114,7 @@ class PtychoNNParametersView(QWidget):
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.basicParametersView)
+        layout.addWidget(view.modelParametersView)
         layout.addWidget(view.trainingParametersView)
         layout.addStretch()
         view.setLayout(layout)

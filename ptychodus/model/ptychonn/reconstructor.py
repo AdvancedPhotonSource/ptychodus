@@ -14,14 +14,14 @@ from ...api.scan import Scan
 from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus
-from .settings import PtychoNNSettings, PtychoNNTrainingSettings
+from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 logger = logging.getLogger(__name__)
 
 
-class PtychoNNReconstructor(Reconstructor):
+class PtychoNNPhaseOnlyReconstructor(Reconstructor):
 
-    def __init__(self, settings: PtychoNNSettings, trainingSettings: PtychoNNTrainingSettings,
+    def __init__(self, settings: PtychoNNModelSettings, trainingSettings: PtychoNNTrainingSettings,
                  apparatus: Apparatus, scan: Scan, object_: Object,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
         self._settings = settings
@@ -36,7 +36,7 @@ class PtychoNNReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return 'PtychoNN'
+        return 'PhaseOnly'
 
     def _createModel(self) -> ReconSmallPhaseModel:
         logger.debug('Building model...')
@@ -76,7 +76,7 @@ class PtychoNNReconstructor(Reconstructor):
             raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
 
         # Bin diffraction data
-        inputSize = self._settings.modelInputSize.value
+        inputSize = self._settings.inputSize.value
         binSize = dataSize // inputSize
 
         if binSize == 1:
@@ -95,7 +95,7 @@ class PtychoNNReconstructor(Reconstructor):
         logger.debug('Loading model state...')
         tester = Tester(
             model=self._createModel(),
-            model_params_path=self._settings.modelStateFilePath.value,
+            model_params_path=self._settings.stateFilePath.value,
         )
 
         logger.debug('Inferring...')
@@ -135,7 +135,7 @@ class PtychoNNReconstructor(Reconstructor):
         )
 
         logger.debug('Loading model state...')
-        trainer.initModel(model_params_path=self._settings.modelStateFilePath.value)
+        trainer.initModel(model_params_path=self._settings.stateFilePath.value)
 
         logger.debug('Training...')
         trainer.run(

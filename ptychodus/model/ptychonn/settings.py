@@ -5,15 +5,15 @@ from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry, SettingsGroup
 
 
-class PtychoNNSettings(Observable, Observer):
+class PtychoNNModelSettings(Observable, Observer):
 
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.modelInputSize = settingsGroup.createIntegerEntry('ModelInputSize', 128)
-        self.modelOutputSize = settingsGroup.createIntegerEntry('ModelOutputSize', 128)
-        self.modelStateFilePath = settingsGroup.createPathEntry('ModelStateFilePath',
-                                                                Path('/path/to/best_model.pth'))
+        self.inputSize = settingsGroup.createIntegerEntry('InputSize', 128)
+        self.outputSize = settingsGroup.createIntegerEntry('OutputSize', 128)
+        self.stateFilePath = settingsGroup.createPathEntry('StateFilePath',
+                                                           Path('/path/to/best_model.pth'))
         self.numberOfConvolutionChannels = settingsGroup.createIntegerEntry(
             'NumberOfConvolutionChannels', 16)
         self.batchSize = settingsGroup.createIntegerEntry('BatchSize', 10)
@@ -21,7 +21,7 @@ class PtychoNNSettings(Observable, Observer):
             'UseBatchNormalization', False)
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoNNSettings:
+    def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoNNModelSettings:
         settings = cls(settingsRegistry.createGroup('PtychoNN'))
         settings._settingsGroup.addObserver(settings)
         return settings
@@ -51,7 +51,7 @@ class PtychoNNTrainingSettings(Observable, Observer):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoNNTrainingSettings:
-        settings = cls(settingsRegistry.createGroup('PtychoNN'))
+        settings = cls(settingsRegistry.createGroup('PtychoNNTraining'))
         settings._settingsGroup.addObserver(settings)
         return settings
 
