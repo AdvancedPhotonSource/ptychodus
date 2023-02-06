@@ -77,3 +77,16 @@ class FileDialogFactory:
                 self._saveWorkingDirectory = filePath.parent
 
         return filePath, dialog.selectedNameFilter()
+
+    def getExistingDirectoryPath(self, parent: QWidget, caption: str) -> Optional[Path]:
+        dirPath = None
+
+        dirName = QFileDialog.getExistingDirectory(
+            parent, caption, str(self.getOpenWorkingDirectory()),
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
+
+        if dirName:
+            dirPath = Path(dirName)
+            self.setOpenWorkingDirectory(dirPath)
+
+        return dirPath

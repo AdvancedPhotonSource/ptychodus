@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Final
 import logging
 
+import numpy
+
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
@@ -81,19 +83,12 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def __init__(self, settings: PtychoNNTrainingSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
 
     @classmethod
     def createInstance(cls, settings: PtychoNNTrainingSettings) -> PtychoNNTrainingPresenter:
         presenter = cls(settings)
         settings.addObserver(presenter)
         return presenter
-
-    def getTrainingFileFilterList(self) -> list[str]:
-        return self._fileFilterList
-
-    def getTrainingFileFilter(self) -> str:
-        return self._fileFilterList[0]
 
     def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
@@ -173,8 +168,25 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def setStatusIntervalInEpochs(self, value: int) -> None:
         self._settings.statusIntervalInEpochs.value = value
 
-    def train(self, trainingFile: Path) -> None:
-        logger.debug(f'Train using data in {trainingFile}.')  # FIXME
+    def train(self, trainingDirPath: Path) -> None:
+        logger.debug(f'Train using data in {trainingDirPath}.')
+        diffractionPatternsList = list()
+        reconstructedPatchesList = list()
+
+        for trainingFilePath in trainingDirPath.glob('*.npz'):
+            logger.debug(f'Reading training data from \"{trainingFile}\"...')
+
+            try:
+                with numpy.load(trainingFilePath) as trainingFile:
+                    diffractionPatternsList.append(trainingFile['reciprocal'])
+                    reconstructedPatchesList.append(trainingFile['real'])
+            except Exception:
+                logger.exception('Failed to load training data.')
+
+        diffractionPatterns = numpy.concatenate(diffractionPatternsList, axis=0)
+        reconstructedPatches = numpy.concatenate(reconstructedPatchesList, axis=0)
+
+        # FIXME reconstructor.train(diffractionPatterns, reconstructedPatches)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

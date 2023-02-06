@@ -4,8 +4,69 @@ from pathlib import Path
 
 from ...api.observer import Observable, Observer
 from ...model.ptychonn import PtychoNNTrainingPresenter
-from ...view import PtychoNNTrainingParametersView
+from ...view import PtychoNNOutputParametersView, PtychoNNTrainingParametersView
 from ..data import FileDialogFactory
+
+
+class PtychoNNOutputParametersController(Observer):
+
+    def __init__(self, presenter: PtychoNNTrainingPresenter, view: PtychoNNOutputParametersView,
+                 fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+        self._fileDialogFactory = fileDialogFactory
+
+    @classmethod
+    def createInstance(cls, presenter: PtychoNNTrainingPresenter,
+                       view: PtychoNNOutputParametersView,
+                       fileDialogFactory: FileDialogFactory) -> PtychoNNOutputParametersController:
+        controller = cls(presenter, view, fileDialogFactory)
+        presenter.addObserver(controller)
+
+        view.setCheckable(True)
+        view.toggled.connect(presenter.setSaveTrainingArtifactsEnabled)
+
+        view.pathLineEdit.editingFinished.connect(controller._syncOutputPathToModel)
+        view.pathBrowseButton.clicked.connect(controller._browseOutputPath)
+        view.suffixLineEdit.editingFinished.connect(controller._syncOutputSuffixToModel)
+
+        controller._syncModelToView()
+
+        return controller
+
+    def _syncOutputPathToModel(self) -> None:
+        self._presenter.setOutputPath(Path(self._view.pathLineEdit.text()))
+
+    def _browseOutputPath(self) -> None:
+        dirPath = self._fileDialogFactory.getExistingDirectoryPath(
+            self._view, 'Choose Training Output Data Directory')
+
+        if dirPath:
+            self._presenter.setOutputPath(dirPath)
+
+    def _syncOutputSuffixToModel(self) -> None:
+        self._presenter.setOutputSuffix(self._view.suffixLineEdit.text())
+
+    def _syncModelToView(self) -> None:
+        self._view.setChecked(self._presenter.isSaveTrainingArtifactsEnabled())
+        outputPath = self._presenter.getOutputPath()
+
+        if outputPath:
+            self._view.pathLineEdit.setText(str(outputPath))
+        else:
+            self._view.pathLineEdit.clear()
+
+        outputSuffix = self._presenter.getOutputSuffix()
+
+        if outputSuffix:
+            self._view.suffixLineEdit.setText(str(outputSuffix))
+        else:
+            self._view.suffixLineEdit.clear()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
 
 
 class PtychoNNTrainingParametersController(Observer):
@@ -16,6 +77,8 @@ class PtychoNNTrainingParametersController(Observer):
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
+        self._outputParametersController = PtychoNNOutputParametersController.createInstance(
+            presenter, view.outputParametersView, fileDialogFactory)
 
     @classmethod
     def createInstance(
@@ -32,7 +95,6 @@ class PtychoNNTrainingParametersController(Observer):
         view.minimumLearningRateLineEdit.valueChanged.connect(presenter.setMinimumLearningRate)
         view.trainingEpochsSpinBox.valueChanged.connect(presenter.setTrainingEpochs)
         view.statusIntervalSpinBox.valueChanged.connect(presenter.setStatusIntervalInEpochs)
-        # FIXME outputParametersView = PtychoNNOutputParametersView.createInstance()
         view.trainButton.clicked.connect(controller._train)
 
         controller._syncModelToView()
@@ -40,14 +102,11 @@ class PtychoNNTrainingParametersController(Observer):
         return controller
 
     def _train(self) -> None:
-        filePath, _ = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Training Data',
-            nameFilters=self._presenter.getTrainingFileFilterList(),
-            selectedNameFilter=self._presenter.getTrainingFileFilter())
+        dirPath = self._fileDialogFactory.getExistingDirectoryPath(
+            self._view, 'Choose Training Input Data Directory')
 
-        if filePath:
-            self._presenter.train(filePath)
+        if dirPath:
+            self._presenter.train(dirPath)
 
     def _syncModelToView(self) -> None:
         self._view.validationSetFractionalSizeSlider.setValueAndRange(

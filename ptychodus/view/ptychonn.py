@@ -56,8 +56,6 @@ class PtychoNNOutputParametersView(QGroupBox):
             PtychoNNOutputParametersView:
         view = cls(parent)
 
-        view.setCheckable(True)  # FIXME to controller
-
         layout = QGridLayout()
         layout.addWidget(view.pathLabel, 0, 0)
         layout.addWidget(view.pathLineEdit, 0, 1)

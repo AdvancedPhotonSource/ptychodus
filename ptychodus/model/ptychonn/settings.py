@@ -16,7 +16,7 @@ class PtychoNNModelSettings(Observable, Observer):
                                                            Path('/path/to/best_model.pth'))
         self.numberOfConvolutionChannels = settingsGroup.createIntegerEntry(
             'NumberOfConvolutionChannels', 16)
-        self.batchSize = settingsGroup.createIntegerEntry('BatchSize', 10)
+        self.batchSize = settingsGroup.createIntegerEntry('BatchSize', 64)
         self.useBatchNormalization = settingsGroup.createBooleanEntry(
             'UseBatchNormalization', False)
 
@@ -42,7 +42,7 @@ class PtychoNNTrainingSettings(Observable, Observer):
             'OptimizationEpochsPerHalfCycle', 6)
         self.maximumLearningRate = settingsGroup.createRealEntry('MaximumLearningRate', '1e-3')
         self.minimumLearningRate = settingsGroup.createRealEntry('MinimumLearningRate', '1e-4')
-        self.trainingEpochs = settingsGroup.createIntegerEntry('TrainingEpochs', 1)
+        self.trainingEpochs = settingsGroup.createIntegerEntry('TrainingEpochs', 50)
         self.saveTrainingArtifacts = settingsGroup.createBooleanEntry(
             'SaveTrainingArtifacts', False)
         self.outputPath = settingsGroup.createPathEntry('OutputPath', Path('/path/to/output'))
