@@ -81,7 +81,7 @@ class DiffractionMetadata:
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype[numpy.integer[Any]]
     detectorDistanceInMeters: Optional[Decimal] = None
-    detectorNumberOfPixels: Optional[Vector2D[int]] = None
+    detectorNumberOfPixels: Optional[Vector2D[int]] = None  # FIXME make required
     detectorPixelSizeInMeters: Optional[Vector2D[Decimal]] = None
     cropCenterInPixels: Optional[Vector2D[int]] = None
     probeEnergyInElectronVolts: Optional[Decimal] = None

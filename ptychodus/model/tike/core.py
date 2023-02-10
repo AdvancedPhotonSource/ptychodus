@@ -134,6 +134,7 @@ class TikePresenter(Observable, Observer):
 
 
 class TikeReconstructorLibrary(ReconstructorLibrary):
+    # FIXME hide back interface-breaking tike features
 
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         super().__init__()

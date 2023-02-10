@@ -187,6 +187,7 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         reconstructedPatches = numpy.concatenate(reconstructedPatchesList, axis=0)
 
         # FIXME reconstructor.train(diffractionPatterns, reconstructedPatches)
+        # FIXME write file or return weights
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

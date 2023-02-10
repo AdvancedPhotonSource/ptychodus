@@ -12,9 +12,13 @@ class DiffractionDatasetSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.fileType = settingsGroup.createStringEntry('FileType', 'HDF5')
         self.filePath = settingsGroup.createPathEntry('FilePath', Path('/path/to/data.h5'))
+        self.memmapEnabled = settingsGroup.createBooleanEntry('MemmapEnabled', False)
         self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory',
-                                                              Path('/dev/null'))
+                                                              Path.home() / '.ptychodus')
         self.watchForFiles = settingsGroup.createBooleanEntry('WatchForFiles', False)
+        self.watchDirectory = settingsGroup.createPathEntry('WatchDirectory',
+                                                            Path('/path/to/data/'))
+        self.numberOfDataThreads = settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DiffractionDatasetSettings:
@@ -32,7 +36,6 @@ class DiffractionPatternSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.numberOfDataThreads = settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)
         self.cropEnabled = settingsGroup.createBooleanEntry('CropEnabled', True)
         self.cropCenterXInPixels = settingsGroup.createIntegerEntry('CropCenterXInPixels', 32)
         self.cropCenterYInPixels = settingsGroup.createIntegerEntry('CropCenterYInPixels', 32)
@@ -40,7 +43,8 @@ class DiffractionPatternSettings(Observable, Observer):
         self.cropExtentYInPixels = settingsGroup.createIntegerEntry('CropExtentYInPixels', 64)
         self.flipXEnabled = settingsGroup.createBooleanEntry('FlipXEnabled', False)
         self.flipYEnabled = settingsGroup.createBooleanEntry('FlipYEnabled', False)
-        self.threshold = settingsGroup.createIntegerEntry('Threshold', 0)
+        self.thresholdEnabled = settingsGroup.createBooleanEntry('ThresholdEnabled', False)
+        self.thresholdValue = settingsGroup.createIntegerEntry('ThresholdValue', 0)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DiffractionPatternSettings:

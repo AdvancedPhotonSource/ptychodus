@@ -43,7 +43,7 @@ def main() -> int:
         '--file-prefix',
         action='store',
         dest='prefix',
-        help='replace file path prefix',
+        help='replace file path prefix in settings',
     )
     parser.add_argument(
         '-p',

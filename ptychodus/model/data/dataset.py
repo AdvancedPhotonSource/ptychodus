@@ -116,8 +116,9 @@ class ActiveDiffractionDataset(DiffractionDataset):
                 sliceX = self._cropSizer.getSliceX()
                 data = data[:, sliceY, sliceX]
 
-            threshold = self._patternSettings.threshold.value
-            data[data < threshold] = threshold
+            if self._patternSettings.thresholdEnabled.value:
+                thresholdValue = self._patternSettings.thresholdValue.value
+                data[data < thresholdValue] = thresholdValue
 
             if self._patternSettings.flipXEnabled.value:
                 data = numpy.fliplr(data)
@@ -157,7 +158,6 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         logger.info('Resetting data assembler...')
 
-        scratchDirectory = self._datasetSettings.scratchDirectory.value
         maximumNumberOfPatterns = self._dataset.getMetadata().numberOfPatternsTotal
         dtype = self._dataset.getMetadata().patternDataType
         # FIXME make this work when crop is disabled
@@ -167,7 +167,9 @@ class ActiveDiffractionDataset(DiffractionDataset):
             self._cropSizer.getExtentXInPixels(),
         )
 
-        if scratchDirectory.is_dir():
+        if self._datasetSettings.memmapEnabled.value:
+            scratchDirectory = self._datasetSettings.scratchDirectory.value
+            scratchDirectory.mkdir(mode=0o755, parents=True, exist_ok=True)
             npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
             logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
             self._arrayData = numpy.memmap(npyTempFile, dtype=dtype, shape=shape)
@@ -185,7 +187,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         logger.info('Starting data assembler...')
         self._stopWorkEvent.clear()
 
-        for idx in range(self._patternSettings.numberOfDataThreads.value):
+        for idx in range(self._datasetSettings.numberOfDataThreads.value):
             thread = threading.Thread(target=self._getTaskAndAssemble)
             thread.start()
             self._workers.append(thread)

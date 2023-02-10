@@ -37,10 +37,14 @@ class ScanRepositoryItemFactory:
             TabularScanRepositoryItem.NAME.casefold(): TabularScanRepositoryItem.createEmpty,
         }
 
+    def _transformed(self, item: ScanRepositoryItem) -> ScanRepositoryItem:
+        transformedItem = TransformedScanRepositoryItem(self._rng, item, self._indexFilterFactory)
+        transformedItem.syncFromSettings(self._settings)
+        return transformedItem
+
     def createTabularItem(self, scan: Scan,
                           fileInfo: Optional[ScanFileInfo]) -> ScanRepositoryItem:
-        item = TabularScanRepositoryItem(scan, fileInfo)
-        return TransformedScanRepositoryItem(self._rng, item, self._indexFilterFactory)
+        return self._transformed(TabularScanRepositoryItem(scan, fileInfo))
 
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -92,8 +96,4 @@ class ScanRepositoryItemFactory:
         else:
             item = itemFactory()
 
-        if item is not None:
-            item = TransformedScanRepositoryItem(self._rng, item, self._indexFilterFactory)
-            item.syncFromSettings(self._settings)
-
-        return item
+        return None if item is None else self._transformed(item)

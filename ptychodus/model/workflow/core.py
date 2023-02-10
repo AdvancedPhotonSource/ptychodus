@@ -161,6 +161,7 @@ class WorkflowExecutionPresenter:
 
 
 class WorkflowCore:
+    # FIXME update docs for globus flows and existing demos
 
     def __init__(self, settingsRegistry: SettingsRegistry,
                  stateDataRegistry: StateDataRegistry) -> None:

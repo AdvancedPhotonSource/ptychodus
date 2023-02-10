@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Final
 
+from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from .crop import CropSizer
 from .settings import DiffractionPatternSettings
@@ -21,29 +22,14 @@ class DiffractionPatternPresenter(Observable, Observer):
         sizer.addObserver(presenter)
         return presenter
 
-    def setNumberOfDataThreads(self, number: int) -> None:
-        self._settings.numberOfDataThreads.value = number
-
-    def getNumberOfDataThreads(self) -> int:
-        return self._settings.numberOfDataThreads.value
-
-    def getMinNumberOfDataThreads(self) -> int:
-        return 1
-
-    def getMaxNumberOfDataThreads(self) -> int:
-        return 16
-
     def isCropEnabled(self) -> bool:
         return self._sizer.isCropEnabled()
 
     def setCropEnabled(self, value: bool) -> None:
         self._settings.cropEnabled.value = value
 
-    def getMinCropCenterXInPixels(self) -> int:
-        return self._sizer.getCenterXLimitsInPixels().lower
-
-    def getMaxCropCenterXInPixels(self) -> int:
-        return self._sizer.getCenterXLimitsInPixels().upper
+    def getCropCenterXLimitsInPixels(self) -> Interval[int]:
+        return self._sizer.getCenterXLimitsInPixels()
 
     def getCropCenterXInPixels(self) -> int:
         return self._sizer.getCenterXInPixels()
@@ -51,11 +37,8 @@ class DiffractionPatternPresenter(Observable, Observer):
     def setCropCenterXInPixels(self, value: int) -> None:
         self._settings.cropCenterXInPixels.value = value
 
-    def getMinCropCenterYInPixels(self) -> int:
-        return self._sizer.getCenterYLimitsInPixels().lower
-
-    def getMaxCropCenterYInPixels(self) -> int:
-        return self._sizer.getCenterYLimitsInPixels().upper
+    def getCropCenterYLimitsInPixels(self) -> Interval[int]:
+        return self._sizer.getCenterYLimitsInPixels()
 
     def getCropCenterYInPixels(self) -> int:
         return self._sizer.getCenterYInPixels()
@@ -63,11 +46,8 @@ class DiffractionPatternPresenter(Observable, Observer):
     def setCropCenterYInPixels(self, value: int) -> None:
         self._settings.cropCenterYInPixels.value = value
 
-    def getMinCropExtentXInPixels(self) -> int:
-        return self._sizer.getExtentXLimitsInPixels().lower
-
-    def getMaxCropExtentXInPixels(self) -> int:
-        return self._sizer.getExtentXLimitsInPixels().upper
+    def getCropExtentXLimitsInPixels(self) -> Interval[int]:
+        return self._sizer.getExtentXLimitsInPixels()
 
     def getCropExtentXInPixels(self) -> int:
         return self._sizer.getExtentXInPixels()
@@ -75,11 +55,8 @@ class DiffractionPatternPresenter(Observable, Observer):
     def setCropExtentXInPixels(self, value: int) -> None:
         self._settings.cropExtentXInPixels.value = value
 
-    def getMinCropExtentYInPixels(self) -> int:
-        return self._sizer.getExtentYLimitsInPixels().lower
-
-    def getMaxCropExtentYInPixels(self) -> int:
-        return self._sizer.getExtentYLimitsInPixels().upper
+    def getCropExtentYLimitsInPixels(self) -> Interval[int]:
+        return self._sizer.getExtentYLimitsInPixels()
 
     def getCropExtentYInPixels(self) -> int:
         return self._sizer.getExtentYInPixels()
@@ -99,17 +76,20 @@ class DiffractionPatternPresenter(Observable, Observer):
     def setFlipYEnabled(self, value: bool) -> None:
         self._settings.flipYEnabled.value = value
 
-    def getMinThreshold(self) -> int:
-        return 0
+    def isThresholdEnabled(self) -> bool:
+        return self._settings.thresholdEnabled.value
 
-    def getMaxThreshold(self) -> int:
-        return self.MAX_INT
+    def setThresholdEnabled(self, value: bool) -> None:
+        self._settings.thresholdEnabled.value = value
 
-    def getThreshold(self) -> int:
-        return self._settings.threshold.value
+    def getThresholdValueLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
 
-    def setThreshold(self, value: int) -> None:
-        self._settings.threshold.value = value
+    def getThresholdValue(self) -> int:
+        return self._settings.thresholdValue.value
+
+    def setThresholdValue(self, value: int) -> None:
+        self._settings.thresholdValue.value = value
 
     def update(self, observable: Observable) -> None:
         if observable is self._sizer:

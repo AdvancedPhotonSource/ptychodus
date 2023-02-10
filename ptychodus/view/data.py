@@ -107,7 +107,7 @@ class PatternLoadView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Load', parent)
         self.numberOfThreadsSpinBox = QSpinBox()
-        # TODO controls to assemble in-memory or use scratch directory
+        self.memmapCheckBox = QCheckBox('Memory map diffraction data')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> PatternLoadView:
@@ -115,6 +115,7 @@ class PatternLoadView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Number of Data Threads:', view.numberOfThreadsSpinBox)
+        layout.addRow(view.memmapCheckBox)
         view.setLayout(layout)
 
         return view

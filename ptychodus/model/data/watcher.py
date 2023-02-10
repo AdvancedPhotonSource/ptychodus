@@ -52,6 +52,7 @@ class DataDirectoryWatcher(Observer):
             patterns = [f'*{filePath.suffix}']
             eventHandler = DataFileEventHandler(self._dataset, patterns)
             directory = filePath.parent
+            self._settings.watchDirectory.value = directory  # FIXME make this work
 
             self._observer = watchdog.observers.Observer()
             self._observer.schedule(eventHandler, directory, recursive=False)

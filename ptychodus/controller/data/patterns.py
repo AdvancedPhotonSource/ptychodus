@@ -8,28 +8,32 @@ from ...view import (DataNavigationPage, PatternCropView, PatternLoadView, Patte
 
 class PatternLoadController(Observer):
 
-    def __init__(self, presenter: DiffractionPatternPresenter, view: PatternLoadView) -> None:
+    def __init__(self, presenter: DiffractionDatasetPresenter, view: PatternLoadView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: DiffractionPatternPresenter,
+    def createInstance(cls, presenter: DiffractionDatasetPresenter,
                        view: PatternLoadView) -> PatternLoadController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
         view.numberOfThreadsSpinBox.valueChanged.connect(presenter.setNumberOfDataThreads)
+        view.memmapCheckBox.toggled.connect(presenter.setMemmapEnabled)
 
         controller._syncModelToView()
         return controller
 
     def _syncModelToView(self) -> None:
         self._view.numberOfThreadsSpinBox.blockSignals(True)
-        self._view.numberOfThreadsSpinBox.setRange(self._presenter.getMinNumberOfDataThreads(),
-                                                   self._presenter.getMaxNumberOfDataThreads())
+        self._view.numberOfThreadsSpinBox.setRange(
+            self._presenter.getNumberOfDataThreadsLimits().lower,
+            self._presenter.getNumberOfDataThreadsLimits().upper)
         self._view.numberOfThreadsSpinBox.setValue(self._presenter.getNumberOfDataThreads())
         self._view.numberOfThreadsSpinBox.blockSignals(False)
+
+        self._view.memmapCheckBox.setChecked(self._presenter.isMemmapEnabled())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -65,26 +69,26 @@ class PatternCropController(Observer):
         self._view.setChecked(self._presenter.isCropEnabled())
 
         self._view.centerXSpinBox.blockSignals(True)
-        self._view.centerXSpinBox.setRange(self._presenter.getMinCropCenterXInPixels(),
-                                           self._presenter.getMaxCropCenterXInPixels())
+        self._view.centerXSpinBox.setRange(self._presenter.getCropCenterXLimitsInPixels().lower,
+                                           self._presenter.getCropCenterXLimitsInPixels().upper)
         self._view.centerXSpinBox.setValue(self._presenter.getCropCenterXInPixels())
         self._view.centerXSpinBox.blockSignals(False)
 
         self._view.centerYSpinBox.blockSignals(True)
-        self._view.centerYSpinBox.setRange(self._presenter.getMinCropCenterYInPixels(),
-                                           self._presenter.getMaxCropCenterYInPixels())
+        self._view.centerYSpinBox.setRange(self._presenter.getCropCenterYLimitsInPixels().lower,
+                                           self._presenter.getCropCenterYLimitsInPixels().upper)
         self._view.centerYSpinBox.setValue(self._presenter.getCropCenterYInPixels())
         self._view.centerYSpinBox.blockSignals(False)
 
         self._view.extentXSpinBox.blockSignals(True)
-        self._view.extentXSpinBox.setRange(self._presenter.getMinCropExtentXInPixels(),
-                                           self._presenter.getMaxCropExtentXInPixels())
+        self._view.extentXSpinBox.setRange(self._presenter.getCropExtentXLimitsInPixels().lower,
+                                           self._presenter.getCropExtentXLimitsInPixels().upper)
         self._view.extentXSpinBox.setValue(self._presenter.getCropExtentXInPixels())
         self._view.extentXSpinBox.blockSignals(False)
 
         self._view.extentYSpinBox.blockSignals(True)
-        self._view.extentYSpinBox.setRange(self._presenter.getMinCropExtentYInPixels(),
-                                           self._presenter.getMaxCropExtentYInPixels())
+        self._view.extentYSpinBox.setRange(self._presenter.getCropExtentYLimitsInPixels().lower,
+                                           self._presenter.getCropExtentYLimitsInPixels().upper)
         self._view.extentYSpinBox.setValue(self._presenter.getCropExtentYInPixels())
         self._view.extentYSpinBox.blockSignals(False)
 
@@ -106,7 +110,7 @@ class PatternTransformController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        view.thresholdSpinBox.valueChanged.connect(presenter.setThreshold)
+        view.thresholdSpinBox.valueChanged.connect(presenter.setThresholdValue)
         view.flipXCheckBox.toggled.connect(presenter.setFlipXEnabled)
         view.flipYCheckBox.toggled.connect(presenter.setFlipYEnabled)
 
@@ -115,9 +119,9 @@ class PatternTransformController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.thresholdSpinBox.blockSignals(True)
-        self._view.thresholdSpinBox.setRange(self._presenter.getMinThreshold(),
-                                             self._presenter.getMaxThreshold())
-        self._view.thresholdSpinBox.setValue(self._presenter.getThreshold())
+        self._view.thresholdSpinBox.setRange(self._presenter.getThresholdValueLimits().lower,
+                                             self._presenter.getThresholdValueLimits().upper)
+        self._view.thresholdSpinBox.setValue(self._presenter.getThresholdValue())
         self._view.thresholdSpinBox.blockSignals(False)
 
         self._view.flipXCheckBox.setChecked(self._presenter.isFlipXEnabled())
@@ -136,7 +140,7 @@ class PatternsController:
         self._datasetPresenter = datasetPresenter
         self._patternPresenter = patternPresenter
         self._view = view
-        self._loadController = PatternLoadController.createInstance(patternPresenter,
+        self._loadController = PatternLoadController.createInstance(datasetPresenter,
                                                                     view.contentsView.loadView)
         self._cropController = PatternCropController.createInstance(patternPresenter,
                                                                     view.contentsView.cropView)

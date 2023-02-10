@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class DiffractionDatasetPresenter(Observable, Observer):
+    # FIXME fix GUI crop controls/data loading with crop disabled
 
     def __init__(self, settings: DiffractionDatasetSettings,
                  activeDiffractionDataset: ActiveDiffractionDataset,
@@ -56,11 +57,41 @@ class DiffractionDatasetPresenter(Observable, Observer):
         activeDiffractionDataset.addObserver(presenter)
         return presenter
 
+    def isMemmapEnabled(self) -> bool:
+        return self._settings.memmapEnabled.value
+
+    def setMemmapEnabled(self, value: bool) -> None:
+        self._settings.memmapEnabled.value = value
+
     def getScratchDirectory(self) -> Path:
         return self._settings.scratchDirectory.value
 
     def setScratchDirectory(self, directory: Path) -> None:
         self._settings.scratchDirectory.value = directory
+
+    def isWatchForFilesEnabled(self) -> bool:
+        # FIXME add watchForFiles to GUI
+        return self._settings.watchForFiles.value
+
+    def setWatchForFilesEnabled(self, value: bool) -> None:
+        self._settings.watchForFiles.value = value
+
+    def getWatchDirectory(self) -> Path:
+        # FIXME add watchDirectory to GUI
+        return self._settings.watchDirectory.value
+
+    def setWatchDirectory(self, directory: Path) -> None:
+        self._settings.watchDirectory.value = directory
+
+    def getNumberOfDataThreadsLimits(self) -> Interval[int]:
+        return Interval[int](1, 64)
+
+    def getNumberOfDataThreads(self) -> int:
+        limits = self.getNumberOfDataThreadsLimits()
+        return limits.clamp(self._settings.numberOfDataThreads.value)
+
+    def setNumberOfDataThreads(self, number: int) -> None:
+        self._settings.numberOfDataThreads.value = number
 
     @property
     def isReadyToAssemble(self) -> bool:
