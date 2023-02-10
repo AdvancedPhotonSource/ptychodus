@@ -11,6 +11,8 @@ class ObjectView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
+        self.numberOfPixelsXSpinBox = QSpinBox() # FIXME add to controller
+        self.numberOfPixelsYSpinBox = QSpinBox() # FIXME add to controller
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
 
@@ -19,6 +21,8 @@ class ObjectView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
+        layout.addRow('Number of Pixels X:', view.numberOfPixelsXSpinBox)
+        layout.addRow('Number of Pixels Y:', view.numberOfPixelsYSpinBox)
         layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
         layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
         view.setLayout(layout)

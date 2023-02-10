@@ -180,7 +180,7 @@ class RegularizedPIEReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
-        self._algorithmOptions.batch_method = self._settings.batchMethod.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.alpha = float(self._settings.alpha.value)
@@ -204,7 +204,7 @@ class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
-        self._algorithmOptions.batch_method = self._settings.batchMethod.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.alpha = float(self._settings.alpha.value)
@@ -229,7 +229,7 @@ class ConjugateGradientReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
-        self._algorithmOptions.batch_method = self._settings.batchMethod.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.cg_iter = self._settings.cgIter.value
@@ -254,7 +254,7 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
-        self._algorithmOptions.batch_method = self._settings.batchMethod.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         return self._tikeReconstructor(self._algorithmOptions)
@@ -277,7 +277,7 @@ class DifferenceMapReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
-        self._algorithmOptions.batch_method = self._settings.batchMethod.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         return self._tikeReconstructor(self._algorithmOptions)

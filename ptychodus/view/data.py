@@ -154,7 +154,7 @@ class PatternTransformView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Transform', parent)
-        self.thresholdLabel = QLabel('Threshold:')
+        self.thresholdLabel = QLabel('Threshold:') # FIXME checkable
         self.thresholdSpinBox = QSpinBox()
         self.axesLabel = QLabel('Axes:')
         self.flipXCheckBox = QCheckBox('Flip X')

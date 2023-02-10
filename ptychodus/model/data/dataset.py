@@ -121,10 +121,10 @@ class ActiveDiffractionDataset(DiffractionDataset):
                 data[data < thresholdValue] = thresholdValue
 
             if self._patternSettings.flipXEnabled.value:
-                data = numpy.fliplr(data)
+                data = numpy.flip(data, axis=-1)
 
             if self._patternSettings.flipYEnabled.value:
-                data = numpy.flipud(data)
+                data = numpy.flip(data, axis=-2)
 
             sliceZ = slice(task.offset, task.offset + data.shape[0])
             dataView = self._arrayData[sliceZ, :, :]
