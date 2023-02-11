@@ -26,6 +26,8 @@ class ObjectParametersController(Observer):
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
+        view.objectView.numberOfPixelsXSpinBox.setReadOnly(True)
+        view.objectView.numberOfPixelsYSpinBox.setReadOnly(True)
         view.objectView.pixelSizeXWidget.setReadOnly(True)
         view.objectView.pixelSizeYWidget.setReadOnly(True)
 
@@ -81,6 +83,20 @@ class ObjectParametersController(Observer):
             self._presenter.saveObject(filePath, nameFilter)
 
     def _syncModelToView(self) -> None:
+        self._view.objectView.numberOfPixelsXSpinBox.blockSignals(True)
+        self._view.objectView.numberOfPixelsXSpinBox.setRange(
+            self._presenter.getNumberOfPixelsXLimits().lower,
+            self._presenter.getNumberOfPixelsXLimits().upper)
+        self._view.objectView.numberOfPixelsXSpinBox.setValue(self._presenter.getNumberOfPixelsX())
+        self._view.objectView.numberOfPixelsXSpinBox.blockSignals(False)
+
+        self._view.objectView.numberOfPixelsYSpinBox.blockSignals(True)
+        self._view.objectView.numberOfPixelsYSpinBox.setRange(
+            self._presenter.getNumberOfPixelsYLimits().lower,
+            self._presenter.getNumberOfPixelsYLimits().upper)
+        self._view.objectView.numberOfPixelsYSpinBox.setValue(self._presenter.getNumberOfPixelsY())
+        self._view.objectView.numberOfPixelsYSpinBox.blockSignals(False)
+
         self._view.objectView.pixelSizeXWidget.setLengthInMeters(
             self._presenter.getPixelSizeXInMeters())
         self._view.objectView.pixelSizeYWidget.setLengthInMeters(

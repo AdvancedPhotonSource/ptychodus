@@ -4,6 +4,7 @@ from typing import Final
 
 import numpy
 
+from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsRegistry, SettingsGroup
 
@@ -76,11 +77,8 @@ class DetectorPresenter(Observable, Observer):
         settings.addObserver(presenter)
         return presenter
 
-    def getMinNumberOfPixelsX(self) -> int:
-        return 0
-
-    def getMaxNumberOfPixelsX(self) -> int:
-        return self.MAX_INT
+    def getNumberOfPixelsXLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
 
     def getNumberOfPixelsX(self) -> int:
         return self._settings.numberOfPixelsX.value
@@ -88,11 +86,8 @@ class DetectorPresenter(Observable, Observer):
     def setNumberOfPixelsX(self, value: int) -> None:
         self._settings.numberOfPixelsX.value = value
 
-    def getMinNumberOfPixelsY(self) -> int:
-        return 0
-
-    def getMaxNumberOfPixelsY(self) -> int:
-        return self.MAX_INT
+    def getNumberOfPixelsYLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
 
     def getNumberOfPixelsY(self) -> int:
         return self._settings.numberOfPixelsY.value

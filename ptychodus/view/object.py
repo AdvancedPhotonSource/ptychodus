@@ -11,8 +11,8 @@ class ObjectView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
-        self.numberOfPixelsXSpinBox = QSpinBox() # FIXME add to controller
-        self.numberOfPixelsYSpinBox = QSpinBox() # FIXME add to controller
+        self.numberOfPixelsXSpinBox = QSpinBox()
+        self.numberOfPixelsYSpinBox = QSpinBox()
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
 

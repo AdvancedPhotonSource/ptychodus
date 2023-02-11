@@ -110,6 +110,7 @@ class PatternTransformController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        view.thresholdCheckBox.toggled.connect(presenter.setThresholdEnabled)
         view.thresholdSpinBox.valueChanged.connect(presenter.setThresholdValue)
         view.flipXCheckBox.toggled.connect(presenter.setFlipXEnabled)
         view.flipYCheckBox.toggled.connect(presenter.setFlipYEnabled)
@@ -118,6 +119,8 @@ class PatternTransformController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.thresholdCheckBox.setChecked(self._presenter.isThresholdEnabled())
+
         self._view.thresholdSpinBox.blockSignals(True)
         self._view.thresholdSpinBox.setRange(self._presenter.getThresholdValueLimits().lower,
                                              self._presenter.getThresholdValueLimits().upper)

@@ -1,10 +1,12 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
+from typing import Final
 import logging
 
 import numpy
 
+from ...api.geometry import Interval
 from ...api.object import ObjectArrayType, ObjectFileReader, ObjectFileWriter
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
@@ -26,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectPresenter(Observable, Observer):
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, apparatus: Apparatus,
                  object_: Object, initializerChooser: PluginChooser[ObjectInitializer],
@@ -98,8 +101,22 @@ class ObjectPresenter(Observable, Observer):
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer.write(filePath, self._object.getArray())
 
+    def getNumberOfPixelsXLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
+
+    def getNumberOfPixelsX(self) -> int:
+        extent = self._object.getObjectExtent()
+        return extent.width
+
     def getPixelSizeXInMeters(self) -> Decimal:
         return self._apparatus.getObjectPlanePixelSizeXInMeters()
+
+    def getNumberOfPixelsYLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
+
+    def getNumberOfPixelsY(self) -> int:
+        extent = self._object.getObjectExtent()
+        return extent.height
 
     def getPixelSizeYInMeters(self) -> Decimal:
         return self._apparatus.getObjectPlanePixelSizeYInMeters()
