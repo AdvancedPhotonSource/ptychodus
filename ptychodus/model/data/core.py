@@ -22,6 +22,7 @@ from ...api.settings import SettingsRegistry, SettingsGroup
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
 from ..statefulCore import StateDataType, StatefulCore
+from .builder import ActiveDiffractionDatasetBuilder
 from .crop import CropSizer
 from .dataset import ActiveDiffractionDataset
 from .patterns import DiffractionPatternPresenter
@@ -34,27 +35,28 @@ logger = logging.getLogger(__name__)
 class DiffractionDatasetPresenter(Observable, Observer):
     # FIXME fix GUI crop controls/data loading with crop disabled
 
-    def __init__(self, settings: DiffractionDatasetSettings,
-                 activeDiffractionDataset: ActiveDiffractionDataset,
+    def __init__(self, settings: DiffractionDatasetSettings, dataset: ActiveDiffractionDataset,
+                 builder: ActiveDiffractionDatasetBuilder,
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
         super().__init__()
         self._settings = settings
-        self._activeDiffractionDataset = activeDiffractionDataset
+        self._dataset = dataset
+        self._builder = builder
         self._fileReaderChooser = fileReaderChooser
 
     @classmethod
     def createInstance(
-            cls, settings: DiffractionDatasetSettings,
-            activeDiffractionDataset: ActiveDiffractionDataset,
+            cls, settings: DiffractionDatasetSettings, dataset: ActiveDiffractionDataset,
+            builder: ActiveDiffractionDatasetBuilder,
             fileReaderChooser: PluginChooser[DiffractionFileReader]
     ) -> DiffractionDatasetPresenter:
-        presenter = cls(settings, activeDiffractionDataset, fileReaderChooser)
+        presenter = cls(settings, dataset, builder, fileReaderChooser)
         settings.fileType.addObserver(presenter)
         fileReaderChooser.addObserver(presenter)
         presenter._syncFileReaderFromSettings()
         settings.filePath.addObserver(presenter)
         presenter._openDiffractionFileFromSettings()
-        activeDiffractionDataset.addObserver(presenter)
+        dataset.addObserver(presenter)
         return presenter
 
     def isMemmapEnabled(self) -> bool:
@@ -95,30 +97,30 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     @property
     def isReadyToAssemble(self) -> bool:
-        return self._activeDiffractionDataset.isReadyToAssemble
+        return (self._builder.getAssemblyQueueSize() > 0)
 
     @property
     def isAssembled(self) -> bool:
-        return (len(self._activeDiffractionDataset) > 0)
+        return (len(self._dataset) > 0)
 
     def getContentsTree(self) -> SimpleTreeNode:
-        return self._activeDiffractionDataset.getContentsTree()
+        return self._dataset.getContentsTree()
 
     def getArrayLabel(self, index: int) -> str:
-        return self._activeDiffractionDataset[index].getLabel()
+        return self._dataset[index].getLabel()
 
     def getPatternState(self, index: int) -> DiffractionPatternState:
-        return self._activeDiffractionDataset[index].getState()
+        return self._dataset[index].getState()
 
     def getNumberOfArrays(self) -> int:
-        return len(self._activeDiffractionDataset)
+        return len(self._dataset)
 
     def getDatasetLabel(self) -> str:
-        filePath = self._activeDiffractionDataset.getMetadata().filePath
+        filePath = self._dataset.getMetadata().filePath
         return filePath.stem if filePath else 'Unknown'
 
     def openArray(self, dataPath: str) -> Any:  # TODO generalize for other file formats
-        filePath = self._activeDiffractionDataset.getMetadata().filePath
+        filePath = self._dataset.getMetadata().filePath
         data = None
 
         if filePath and h5py.is_hdf5(filePath) and dataPath:
@@ -165,7 +167,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
             logger.debug(f'Reading {filePath}')
             fileReader = self._fileReaderChooser.getCurrentStrategy()
             dataset = fileReader.read(filePath)
-            self._activeDiffractionDataset.switchTo(dataset)
+            self._builder.switchTo(dataset)
         else:
             logger.debug(f'Refusing to read invalid file path {filePath}')
 
@@ -187,28 +189,29 @@ class DiffractionDatasetPresenter(Observable, Observer):
         return 'NumPy Binary Files (*.npy)'
 
     def saveDiffractionFile(self, filePath: Path) -> None:
+        # FIXME saveDiffractionFile should share code with state data I/O
         fileFilter = self.getSaveFileFilter()
         logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
-        array = self._activeDiffractionDataset.getAssembledData()
+        array = self._dataset.getAssembledData()
         numpy.save(filePath, array)
 
     def startProcessingDiffractionPatterns(self) -> None:
-        self._activeDiffractionDataset.start()
+        self._builder.start()
 
     def stopProcessingDiffractionPatterns(self, finishAssembling: bool) -> None:
-        self._activeDiffractionDataset.stop(finishAssembling)
+        self._builder.stop(finishAssembling)
 
     def initializeStreaming(self, metadata: DiffractionMetadata) -> None:
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
         dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
-        self._activeDiffractionDataset.switchTo(dataset)
+        self._builder.switchTo(dataset)
 
     def assemble(self, array: DiffractionPatternArray) -> None:
-        self._activeDiffractionDataset.insertArray(array)
+        self._builder.insertArray(array)
 
     def getAssemblyQueueSize(self) -> int:
-        return self._activeDiffractionDataset.getAssemblyQueueSize()
+        return self._builder.getAssemblyQueueSize()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.fileType:
@@ -217,7 +220,9 @@ class DiffractionDatasetPresenter(Observable, Observer):
             self._syncFileReaderToSettings()
         elif observable is self._settings.filePath:
             self._openDiffractionFileFromSettings()
-        elif observable is self._activeDiffractionDataset:
+        elif observable is self._dataset:
+            self.notifyObservers()
+        elif observable is self._builder:
             self.notifyObservers()
 
 
@@ -277,11 +282,12 @@ class DataCore(StatefulCore):
 
         self.dataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
                                                 self.cropSizer)
+        self._builder = ActiveDiffractionDatasetBuilder(self._datasetSettings, self.dataset)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(
             self._datasetSettings, self.dataset)
 
         self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._datasetSettings, self.dataset, fileReaderChooser)
+            self._datasetSettings, self.dataset, self._builder, fileReaderChooser)
         self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
             self.dataset)
 
@@ -301,6 +307,9 @@ class DataCore(StatefulCore):
         except KeyError:
             logger.debug('Skipped restoring data array state.')
         else:
+            if self._builder.isAssembling:
+                self._builder.stop(finishAssembling=False)
+
             self.dataset.setAssembledData(data, dataIndexes)
 
     def start(self) -> None:
@@ -308,4 +317,4 @@ class DataCore(StatefulCore):
 
     def stop(self) -> None:
         self._dataDirectoryWatcher.stop()
-        self.dataset.stop(finishAssembling=False)
+        self._builder.stop(finishAssembling=False)
