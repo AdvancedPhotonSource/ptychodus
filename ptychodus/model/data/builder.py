@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 import logging
 import queue
 import threading
@@ -24,6 +25,7 @@ class ActiveDiffractionDatasetBuilder:
         super().__init__()
         self._settings = settings
         self._dataset = dataset
+        self._unassembledDataset: Optional[DiffractionDataset] = None
         self._arrayQueue: queue.Queue[DiffractionPatternArray] = queue.Queue()
         self._workers: list[threading.Thread] = list()
         self._stopWorkEvent = threading.Event()
@@ -52,7 +54,8 @@ class ActiveDiffractionDatasetBuilder:
         try:
             data = array.getData()
         except:
-            data = numpy.zeros((0, 0, 0), dtype=numpy.uint16)
+            metadata = self._dataset.getMetadata()
+            data = numpy.zeros((0, 0, 0), dtype=metadata.patternDataType)
             state = DiffractionPatternState.MISSING
         else:
             state = DiffractionPatternState.LOADED
@@ -69,13 +72,23 @@ class ActiveDiffractionDatasetBuilder:
             self.stop(finishAssembling=False)
 
         self._dataset.reset(dataset.getMetadata(), dataset.getContentsTree())
-
-        for array in dataset:
-            self.insertArray(array)
+        self._unassembledDataset = dataset
 
     def start(self) -> None:
         if self.isAssembling:
             self.stop(finishAssembling=False)
+
+        if self._unassembledDataset is None:
+            logger.debug('Skipping data assembler reset.')
+        else:
+            logger.info('Resetting data assembler...')
+
+            self._dataset.realloc()
+
+            for array in self._unassembledDataset:
+                self.insertArray(array)
+
+            logger.info('Data assembler reset.')
 
         logger.info('Starting data assembler...')
         self._stopWorkEvent.clear()

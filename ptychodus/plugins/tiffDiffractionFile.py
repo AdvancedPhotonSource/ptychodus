@@ -61,13 +61,12 @@ class TiffDiffractionFileReader(DiffractionFileReader):
     def fileFilter(self) -> str:
         return 'Tagged Image File Format Files (*.tif *.tiff)'
 
-    def _getFilePattern(self, filePath: Path) -> str:
+    def _getFileSeries(self, filePath: Path) -> tuple[list[Path], str]:
+        filePathList: list[Path] = list()
+
         digits = re.findall(r'\d+', filePath.stem)
         longest_digits = max(digits, key=len)
-        return filePath.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
-
-    def _getFileSeries(self, filePattern: str) -> list[Path]:
-        filePathList: list[Path] = list()
+        filePattern = filePath.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
 
         for fp in filePath.parent.iterdir():
             z = re.match(filePattern, fp.name)
@@ -78,16 +77,16 @@ class TiffDiffractionFileReader(DiffractionFileReader):
 
         filePathList.sort(key=lambda fp: fp.stem)
 
-        return filePathList
+        return filePathList, filePattern
 
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
-        filePattern = self._getFilePattern(filePath)
+        filePathList, filePattern = self._getFileSeries(filePath)
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
 
-        for idx, fp in enumerate(self._getFileSeries(filePattern)):
+        for idx, fp in enumerate(filePathList):
             array = TiffDiffractionPatternArray(fp, idx)
             contentsTree.createChild([array.getLabel(), 'TIFF', str(idx)])
             arrayList.append(array)

@@ -65,61 +65,66 @@ class ActiveDiffractionDataset(DiffractionDataset):
             return len(self._arrayList)
 
     def reset(self, metadata: DiffractionMetadata, contentsTree: SimpleTreeNode) -> None:
-        shape = (
-            metadata.numberOfPatternsTotal,
-            # FIXME make this work when crop is disabled
-            self._cropSizer.getExtentYInPixels(),
-            self._cropSizer.getExtentXInPixels(),
-        )
-
         with self._arrayListLock:
-            if self._datasetSettings.memmapEnabled.value:
-                scratchDirectory = self._datasetSettings.scratchDirectory.value
-                scratchDirectory.mkdir(mode=0o755, parents=True, exist_ok=True)
-                npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
-                logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
-                self._arrayData = numpy.memmap(npyTempFile,
-                                               dtype=metadata.patternDataType,
-                                               shape=shape)
-                self._arrayData[:] = 0
-            else:
-                logger.debug(f'Scratch memory is {shape}')
-                self._arrayData = numpy.zeros(shape, dtype=metadata.patternDataType)
-
             self._metadata = metadata
             self._contentsTree = contentsTree
             self._arrayList.clear()
 
         self._changedEvent.set()
 
+    def realloc(self) -> None:
+        shape = (
+            self._metadata.numberOfPatternsTotal,
+            # FIXME make this work when crop is disabled
+            self._cropSizer.getExtentYInPixels(),
+            self._cropSizer.getExtentXInPixels(),
+        )
+
+        with self._arrayListLock:
+            self._arrayList.clear()
+
+            if self._datasetSettings.memmapEnabled.value:
+                scratchDirectory = self._datasetSettings.scratchDirectory.value
+                scratchDirectory.mkdir(mode=0o755, parents=True, exist_ok=True)
+                npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
+                logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
+                self._arrayData = numpy.memmap(npyTempFile,
+                                               dtype=self._metadata.patternDataType,
+                                               shape=shape)
+                self._arrayData[:] = 0
+            else:
+                logger.debug(f'Scratch memory is {shape}')
+                self._arrayData = numpy.zeros(shape, dtype=self._metadata.patternDataType)
+
+        self._changedEvent.set()
+
     def insertArray(self, array: DiffractionPatternArray) -> None:
-        # FIXME dataset with MISSING state
-        data = array.getData()
+        if array.getState() == DiffractionPatternState.LOADED:
+            data = array.getData()
 
-        if self._cropSizer.isCropEnabled():
-            sliceY = self._cropSizer.getSliceY()
-            sliceX = self._cropSizer.getSliceX()
-            data = data[:, sliceY, sliceX]
+            if self._cropSizer.isCropEnabled():
+                sliceY = self._cropSizer.getSliceY()
+                sliceX = self._cropSizer.getSliceX()
+                data = data[:, sliceY, sliceX]
 
-        if self._patternSettings.thresholdEnabled.value:
-            thresholdValue = self._patternSettings.thresholdValue.value
-            data[data < thresholdValue] = thresholdValue
+            if self._patternSettings.thresholdEnabled.value:
+                thresholdValue = self._patternSettings.thresholdValue.value
+                data[data < thresholdValue] = thresholdValue
 
-        if self._patternSettings.flipXEnabled.value:
-            data = numpy.flip(data, axis=-1)
+            if self._patternSettings.flipXEnabled.value:
+                data = numpy.flip(data, axis=-1)
 
-        if self._patternSettings.flipYEnabled.value:
-            data = numpy.flip(data, axis=-2)
+            if self._patternSettings.flipYEnabled.value:
+                data = numpy.flip(data, axis=-2)
 
-        offset = self._metadata.numberOfPatternsPerArray * array.getIndex()
-        sliceZ = slice(offset, offset + data.shape[0])
-        dataView = self._arrayData[sliceZ, :, :]
-        dataView[:] = data
-        dataView.flags.writeable = False
+            offset = self._metadata.numberOfPatternsPerArray * array.getIndex()
+            sliceZ = slice(offset, offset + data.shape[0])
+            dataView = self._arrayData[sliceZ, :, :]
+            dataView[:] = data
+            dataView.flags.writeable = False
 
-        # FIXME vvv new array vvv
-        array = SimpleDiffractionPatternArray(array.getLabel(), array.getIndex(), dataView,
-                                              array.getState())
+            array = SimpleDiffractionPatternArray(array.getLabel(), array.getIndex(), dataView,
+                                                  array.getState())
 
         with self._arrayListLock:
             self._arrayList.append(array)
