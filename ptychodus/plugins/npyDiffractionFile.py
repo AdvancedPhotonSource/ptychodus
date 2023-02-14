@@ -5,42 +5,13 @@ import numpy
 
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, DiffractionPatternData,
-                                DiffractionPatternState, SimpleDiffractionDataset)
+                                DiffractionPatternState, SimpleDiffractionDataset,
+                                SimpleDiffractionPatternArray)
+from ptychodus.api.geometry import Vector2D
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
-
-
-class NPYDiffractionPatternArray(DiffractionPatternArray):
-
-    def __init__(self, filePath: Path) -> None:
-        super().__init__()
-        self._filePath = filePath
-        self._state = DiffractionPatternState.UNKNOWN
-
-    def getLabel(self) -> str:
-        return self._filePath.stem
-
-    def getIndex(self) -> int:
-        return 0
-
-    def getState(self) -> DiffractionPatternState:
-        return self._state
-
-    def getData(self) -> DiffractionPatternData:
-        try:
-            data = numpy.load(self._filePath)
-        except:
-            self._state = DiffractionPatternState.MISSING
-            raise
-        else:
-            self._state = DiffractionPatternState.FOUND
-
-        if data.ndim == 2:
-            data = data[numpy.newaxis, :, :]
-
-        return data
 
 
 class NPYDiffractionFileReader(DiffractionFileReader):
@@ -54,18 +25,38 @@ class NPYDiffractionFileReader(DiffractionFileReader):
         return 'NumPy Binary Files (*.npy)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        array = NPYDiffractionPatternArray(filePath)
-        data = array.getData()
-        metadata = DiffractionMetadata(
-            filePath=filePath,
-            numberOfPatternsPerArray=data.shape[0],
-            numberOfPatternsTotal=data.shape[0],
-            patternDataType=data.dtype,
-        )
+        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
-        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
-        arrayList: list[DiffractionPatternArray] = [array]
-        return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+        try:
+            data = numpy.load(filePath)
+        except OSError:
+            logger.debug(f'Unable to read file \"{filePath}\".')
+        else:
+            if data.ndim == 2:
+                data = data[numpy.newaxis, :, :]
+
+            numberOfPatterns, detectorHeight, detectorWidth = data.shape
+
+            metadata = DiffractionMetadata(
+                numberOfPatternsPerArray=numberOfPatterns,
+                numberOfPatternsTotal=numberOfPatterns,
+                patternDataType=data.dtype,
+                detectorNumberOfPixels=Vector2D[int](detectorWidth, detectorHeight),
+                filePath=filePath,
+            )
+
+            contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+
+            array = SimpleDiffractionPatternArray(
+                label=filePath.stem,
+                index=0,
+                data=data,
+                state=DiffractionPatternState.FOUND,
+            )
+
+            dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
+
+        return dataset
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

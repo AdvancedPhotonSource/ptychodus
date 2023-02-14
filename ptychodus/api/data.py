@@ -81,15 +81,15 @@ class DiffractionMetadata:
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype[numpy.integer[Any]]
     detectorDistanceInMeters: Optional[Decimal] = None
-    detectorNumberOfPixels: Optional[Vector2D[int]] = None  # FIXME make required
+    detectorNumberOfPixels: Optional[Vector2D[int]] = None
     detectorPixelSizeInMeters: Optional[Vector2D[Decimal]] = None
     cropCenterInPixels: Optional[Vector2D[int]] = None
     probeEnergyInElectronVolts: Optional[Decimal] = None
     filePath: Optional[Path] = None
 
     @classmethod
-    def createNullInstance(cls) -> DiffractionMetadata:
-        return cls(0, 0, numpy.dtype(numpy.ubyte))
+    def createNullInstance(cls, filePath: Optional[Path] = None) -> DiffractionMetadata:
+        return cls(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
 
 
 class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):
@@ -113,8 +113,8 @@ class SimpleDiffractionDataset(DiffractionDataset):
         self._arrayList = arrayList
 
     @classmethod
-    def createNullInstance(cls) -> SimpleDiffractionDataset:
-        metadata = DiffractionMetadata.createNullInstance()
+    def createNullInstance(cls, filePath: Optional[Path] = None) -> SimpleDiffractionDataset:
+        metadata = DiffractionMetadata.createNullInstance(filePath)
         contentsTree = SimpleTreeNode.createRoot(list())
         arrayList: list[DiffractionPatternArray] = list()
         return cls(metadata, contentsTree, arrayList)

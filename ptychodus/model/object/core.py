@@ -12,7 +12,6 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from ...api.scan import Scan
 from ...api.settings import SettingsRegistry
-from ..data import CropSizer
 from ..detector import Detector
 from ..probe import Apparatus, ProbeSizer
 from ..statefulCore import StateDataType, StatefulCore

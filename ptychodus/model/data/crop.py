@@ -24,6 +24,9 @@ class CropSizer(Observable, Observer):
     def isCropEnabled(self) -> bool:
         return self._settings.cropEnabled.value
 
+    def setCropEnabled(self, value: bool) -> None:
+        self._settings.cropEnabled.value = value
+
     def getExtentXLimitsInPixels(self) -> Interval[int]:
         return Interval[int](1, self._detector.getNumberOfPixelsX())
 

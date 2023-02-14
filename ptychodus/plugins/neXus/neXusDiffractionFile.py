@@ -9,7 +9,7 @@ import logging
 import h5py
 import numpy
 
-from ..h5DiffractionFile import H5DiffractionFileTreeBuilder
+from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 from .velociprobeScanFile import VelociprobeScanFileReader
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, DiffractionPatternData,
@@ -19,45 +19,6 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
-
-
-class NeXusDiffractionPatternArray(DiffractionPatternArray):
-
-    def __init__(self, label: str, index: int, filePath: Path, dataPath: str) -> None:
-        super().__init__()
-        self._label = label
-        self._index = index
-        self._state = DiffractionPatternState.UNKNOWN
-        self._filePath = filePath
-        self._dataPath = dataPath
-
-    def getLabel(self) -> str:
-        return self._label
-
-    def getIndex(self) -> int:
-        return self._index
-
-    def getState(self) -> DiffractionPatternState:
-        return self._state
-
-    def getData(self) -> DiffractionPatternData:
-        self._state = DiffractionPatternState.MISSING
-
-        with h5py.File(self._filePath, 'r') as h5File:
-            try:
-                item = h5File[self._dataPath]
-            except KeyError:
-                raise ValueError(f'Symlink {self._filePath}:{self._dataPath} is broken!')
-            else:
-                if isinstance(item, h5py.Dataset):
-                    self._state = DiffractionPatternState.FOUND
-                else:
-                    raise ValueError(
-                        f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
-
-            data = item[()]
-
-        return data
 
 
 @dataclass(frozen=True)
@@ -76,7 +37,7 @@ class DataGroup:
                 filePath = masterFilePath.parent / h5Item.filename
                 dataPath = str(h5Item.path)
                 # TODO use entry/data/data/image_nr_{low,high}
-                array = NeXusDiffractionPatternArray(name, len(arrayList), filePath, dataPath)
+                array = H5DiffractionPatternArray(name, len(arrayList), filePath, dataPath)
                 arrayList.append(array)
 
         return cls(arrayList)
@@ -241,67 +202,52 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         return 'NeXus Master Files (*.h5 *.hdf5)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
-        contentsTree = self._treeBuilder.createRootNode()
-        arrayList: list[DiffractionPatternArray] = list()
-        dataset: DiffractionDataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+        dataset: DiffractionDataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
-        if filePath is None:
-            return dataset
+        try:
+            with h5py.File(filePath, 'r') as h5File:
+                contentsTree = self._treeBuilder.build(h5File)
 
-        with h5py.File(filePath, 'r') as h5File:
-            try:
-                entry = EntryGroup.read(h5File['entry'])
-            except KeyError:
-                logger.info(f'File {filePath} is not a NeXus data file.')
-                return dataset
-
-            detector = entry.instrument.detector
-            detectorPixelSizeInMeters = Vector2D[Decimal](
-                Decimal(repr(detector.x_pixel_size_m)),
-                Decimal(repr(detector.y_pixel_size_m)),
-            )
-            cropCenterInPixels = Vector2D[int](
-                int(round(detector.beam_center_x_px)),
-                int(round(detector.beam_center_y_px)),
-            )
-
-            detectorSpecific = detector.detectorSpecific
-            detectorNumberOfPixels = Vector2D[int](
-                int(detectorSpecific.x_pixels_in_detector),
-                int(detectorSpecific.y_pixels_in_detector),
-            )
-
-            numberOfPatternsPerArray = 0
-            patternDataType: numpy.dtype[numpy.integer[Any]] = numpy.dtype(numpy.ubyte)
-
-            for array in entry.data:
                 try:
-                    data = array.getData()
-                except OSError:
-                    logger.debug(f'Array \"{array.getLabel()}\" does not exist!')
-                    continue
+                    entry = EntryGroup.read(h5File['entry'])
+                    h5Dataset = h5File['/entry/data/data_000001']
+                except KeyError:
+                    logger.info(f'File {filePath} is not a NeXus data file.')
+                else:
+                    detector = entry.instrument.detector
+                    detectorPixelSizeInMeters = Vector2D[Decimal](
+                        Decimal(repr(detector.x_pixel_size_m)),
+                        Decimal(repr(detector.y_pixel_size_m)),
+                    )
+                    cropCenterInPixels = Vector2D[int](
+                        int(round(detector.beam_center_x_px)),
+                        int(round(detector.beam_center_y_px)),
+                    )
 
-                numberOfPatternsPerArray = data.shape[0]
-                patternDataType = data.dtype
-                break
+                    detectorSpecific = detector.detectorSpecific
+                    detectorNumberOfPixels = Vector2D[int](
+                        int(detectorSpecific.x_pixels_in_detector),
+                        int(detectorSpecific.y_pixels_in_detector),
+                    )
 
-            metadata = DiffractionMetadata(
-                filePath=filePath,
-                numberOfPatternsPerArray=numberOfPatternsPerArray,
-                numberOfPatternsTotal=detectorSpecific.nimages,
-                patternDataType=patternDataType,
-                detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
-                detectorNumberOfPixels=detectorNumberOfPixels,
-                detectorPixelSizeInMeters=detectorPixelSizeInMeters,
-                cropCenterInPixels=cropCenterInPixels,
-                probeEnergyInElectronVolts=Decimal(repr(detectorSpecific.photon_energy_eV)),
-            )
-            contentsTree = self._treeBuilder.build(h5File)
-            dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
+                    metadata = DiffractionMetadata(
+                        numberOfPatternsPerArray=h5Dataset.shape[0],
+                        numberOfPatternsTotal=detectorSpecific.nimages,
+                        patternDataType=h5Dataset.dtype,
+                        detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
+                        detectorNumberOfPixels=detectorNumberOfPixels,
+                        detectorPixelSizeInMeters=detectorPixelSizeInMeters,
+                        cropCenterInPixels=cropCenterInPixels,
+                        probeEnergyInElectronVolts=Decimal(repr(
+                            detectorSpecific.photon_energy_eV)),
+                        filePath=filePath,
+                    )
+                    dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
 
-            # vvv TODO This is a hack; remove when able! vvv
-            self._velociprobeScanFileReader.setStageRotationInDegrees(
-                entry.sample.goniometer.chi_deg)
+                    # vvv TODO This is a hack; remove when able! vvv
+                    self._velociprobeScanFileReader.setStageRotationInDegrees(
+                        entry.sample.goniometer.chi_deg)
+        except OSError:
+            logger.debug(f'Unable to read file \"{filePath}\".')
 
         return dataset

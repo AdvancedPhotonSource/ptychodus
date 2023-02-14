@@ -306,11 +306,12 @@ class DataCore(StatefulCore):
             data = state['data']
         except KeyError:
             logger.debug('Skipped restoring data array state.')
-        else:
-            if self._builder.isAssembling:
-                self._builder.stop(finishAssembling=False)
+            return
 
-            self.dataset.setAssembledData(data, dataIndexes)
+        if self._builder.isAssembling:
+            self._builder.stop(finishAssembling=False)
+
+        self.dataset.setAssembledData(data, dataIndexes)
 
     def start(self) -> None:
         self._dataDirectoryWatcher.start()

@@ -26,7 +26,7 @@ class DiffractionPatternPresenter(Observable, Observer):
         return self._sizer.isCropEnabled()
 
     def setCropEnabled(self, value: bool) -> None:
-        self._settings.cropEnabled.value = value
+        self._sizer.setCropEnabled(value)
 
     def getCropCenterXLimitsInPixels(self) -> Interval[int]:
         return self._sizer.getCenterXLimitsInPixels()

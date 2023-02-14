@@ -11,6 +11,7 @@ import numpy.typing
 from ...api.data import (DiffractionDataset, DiffractionMetadata, DiffractionPatternArray,
                          DiffractionPatternData, DiffractionPatternState,
                          SimpleDiffractionPatternArray)
+from ...api.geometry import Vector2D
 from ...api.tree import SimpleTreeNode
 from .crop import CropSizer
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
@@ -145,13 +146,18 @@ class ActiveDiffractionDataset(DiffractionDataset):
     def setAssembledData(self, arrayData: DiffractionPatternData,
                          arrayIndexes: DiffractionPatternIndexes) -> None:
         with self._arrayListLock:
-            # FIXME use arrayIndexes
+            numberOfPatterns, detectorHeight, detectorWidth = arrayData.shape
+
             self._metadata = DiffractionMetadata(
-                numberOfPatternsPerArray=arrayData.shape[0],
-                numberOfPatternsTotal=arrayData.shape[0],
+                numberOfPatternsPerArray=numberOfPatterns,
+                numberOfPatternsTotal=numberOfPatterns,
                 patternDataType=arrayData.dtype,
+                detectorNumberOfPixels=Vector2D[int](detectorWidth, detectorHeight),
             )
+
             self._contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+
+            # FIXME use arrayIndexes
             self._arrayList = [
                 SimpleDiffractionPatternArray(
                     label='Restart',

@@ -13,6 +13,7 @@ import numpy
 from ptychodus.api.data import (DiffractionPatternData, DiffractionDataset, DiffractionFileReader,
                                 DiffractionMetadata, DiffractionPatternArray,
                                 DiffractionPatternState, SimpleDiffractionDataset)
+from ptychodus.api.geometry import Vector2D
 from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -22,22 +23,41 @@ logger = logging.getLogger(__name__)
 
 class H5DiffractionPatternArray(DiffractionPatternArray):
 
-    def __init__(self, data: DiffractionPatternData, label: str) -> None:
+    def __init__(self, label: str, index: int, filePath: Path, dataPath: str) -> None:
         super().__init__()
-        self._data = data
         self._label = label
+        self._index = index
+        self._state = DiffractionPatternState.UNKNOWN
+        self._filePath = filePath
+        self._dataPath = dataPath
 
     def getLabel(self) -> str:
         return self._label
 
     def getIndex(self) -> int:
-        return 0
+        return self._index
 
     def getState(self) -> DiffractionPatternState:
-        return DiffractionPatternState.FOUND
+        return self._state
 
     def getData(self) -> DiffractionPatternData:
-        return self._data
+        self._state = DiffractionPatternState.MISSING
+
+        with h5py.File(self._filePath, 'r') as h5File:
+            try:
+                item = h5File[self._dataPath]
+            except KeyError:
+                raise ValueError(f'Symlink {self._filePath}:{self._dataPath} is broken!')
+            else:
+                if isinstance(item, h5py.Dataset):
+                    self._state = DiffractionPatternState.FOUND
+                else:
+                    raise ValueError(
+                        f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
+
+            data = item[()]
+
+        return data
 
 
 class H5DiffractionFileTreeBuilder:
@@ -134,32 +154,39 @@ class H5DiffractionFileReader(DiffractionFileReader):
         return self._fileFilter
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
-        contentsTree = self._treeBuilder.createRootNode()
-        arrayList: list[DiffractionPatternArray] = list()
+        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
-        if filePath:
+        try:
             with h5py.File(filePath, 'r') as h5File:
                 contentsTree = self._treeBuilder.build(h5File)
 
                 try:
-                    data = h5File[self._dataPath][()]
+                    data = h5File[self._dataPath]
                 except KeyError:
                     logger.debug('Unable to find data.')
-                except OSError:
-                    logger.debug('Unable to read found data.')
                 else:
-                    array = H5DiffractionPatternArray(data, self._dataPath)
-                    arrayList.append(array)
+                    numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
                     metadata = DiffractionMetadata(
-                        filePath=filePath,
-                        numberOfPatternsPerArray=data.shape[0],
-                        numberOfPatternsTotal=data.shape[0],
+                        numberOfPatternsPerArray=numberOfPatterns,
+                        numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
+                        detectorNumberOfPixels=Vector2D[int](detectorWidth, detectorHeight),
+                        filePath=filePath,
                     )
 
-        return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+                    array = H5DiffractionPatternArray(
+                        label=filePath.stem,
+                        index=0,
+                        filePath=filePath,
+                        dataPath=self._dataPath,
+                    )
+
+                    dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
+        except OSError:
+            logger.debug(f'Unable to read file \"{filePath}\".')
+
+        return dataset
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
@@ -168,10 +195,4 @@ def registerPlugins(registry: PluginRegistry) -> None:
             simpleName='HDF5',
             fileFilter='Hierarchical Data Format 5 Files (*.h5 *.hdf5)',
             dataPath='/entry/data/data',
-        ))
-    registry.registerPlugin(
-        H5DiffractionFileReader(
-            simpleName='LYNX',
-            fileFilter='LYNX Diffraction Data Files (*.h5 *.hdf5)',
-            dataPath='/entry/data/eiger_4',
         ))
