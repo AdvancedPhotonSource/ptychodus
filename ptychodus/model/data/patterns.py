@@ -3,21 +3,22 @@ from typing import Final
 
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
-from .crop import CropSizer
 from .settings import DiffractionPatternSettings
+from .sizer import DiffractionPatternSizer
 
 
 class DiffractionPatternPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, settings: DiffractionPatternSettings, sizer: CropSizer) -> None:
+    def __init__(self, settings: DiffractionPatternSettings,
+                 sizer: DiffractionPatternSizer) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
 
     @classmethod
     def createInstance(cls, settings: DiffractionPatternSettings,
-                       sizer: CropSizer) -> DiffractionPatternPresenter:
+                       sizer: DiffractionPatternSizer) -> DiffractionPatternPresenter:
         presenter = cls(settings, sizer)
         sizer.addObserver(presenter)
         return presenter

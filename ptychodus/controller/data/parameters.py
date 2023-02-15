@@ -38,7 +38,8 @@ class DataParametersController(Observer):
                                                                      view.metadataPage)
         self._patternsController = PatternsController.createInstance(datasetPresenter,
                                                                      patternPresenter,
-                                                                     view.patternsPage)
+                                                                     view.patternsPage,
+                                                                     fileDialogFactory)
         self._datasetController = DatasetController.createInstance(datasetPresenter,
                                                                    view.datasetPage,
                                                                    fileDialogFactory)

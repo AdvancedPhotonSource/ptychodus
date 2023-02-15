@@ -39,7 +39,7 @@ class DataDirectoryWatcher(Observer):
         return watcher
 
     def start(self) -> None:
-        if not self._settings.watchForFiles:
+        if not self._settings.watchdogEnabled.value:
             return
 
         if self._observer.is_alive():
@@ -52,7 +52,7 @@ class DataDirectoryWatcher(Observer):
             patterns = [f'*{filePath.suffix}']
             eventHandler = DataFileEventHandler(self._dataset, patterns)
             directory = filePath.parent
-            self._settings.watchDirectory.value = directory  # FIXME make this work
+            self._settings.watchdogDirectory.value = directory  # FIXME make this work
 
             self._observer = watchdog.observers.Observer()
             self._observer.schedule(eventHandler, directory, recursive=False)

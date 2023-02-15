@@ -13,8 +13,8 @@ from ...api.data import (DiffractionDataset, DiffractionMetadata, DiffractionPat
                          SimpleDiffractionPatternArray)
 from ...api.geometry import Vector2D
 from ...api.tree import SimpleTreeNode
-from .crop import CropSizer
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
+from .sizer import DiffractionPatternSizer
 
 __all__ = [
     'ActiveDiffractionDataset',
@@ -28,11 +28,12 @@ logger = logging.getLogger(__name__)
 class ActiveDiffractionDataset(DiffractionDataset):
 
     def __init__(self, datasetSettings: DiffractionDatasetSettings,
-                 patternSettings: DiffractionPatternSettings, cropSizer: CropSizer) -> None:
+                 patternSettings: DiffractionPatternSettings,
+                 diffractionPatternSizer: DiffractionPatternSizer) -> None:
         super().__init__()
         self._datasetSettings = datasetSettings
         self._patternSettings = patternSettings
-        self._cropSizer = cropSizer
+        self._diffractionPatternSizer = diffractionPatternSizer
 
         self._metadata = DiffractionMetadata.createNullInstance()
         self._contentsTree = SimpleTreeNode.createRoot(list())
@@ -75,9 +76,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
     def realloc(self) -> None:
         shape = (
             self._metadata.numberOfPatternsTotal,
-            # FIXME make this work when crop is disabled
-            self._cropSizer.getExtentYInPixels(),
-            self._cropSizer.getExtentXInPixels(),
+            self._diffractionPatternSizer.getExtentYInPixels(),
+            self._diffractionPatternSizer.getExtentXInPixels(),
         )
 
         with self._arrayListLock:
@@ -100,12 +100,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     def insertArray(self, array: DiffractionPatternArray) -> None:
         if array.getState() == DiffractionPatternState.LOADED:
-            data = array.getData()
-
-            if self._cropSizer.isCropEnabled():
-                sliceY = self._cropSizer.getSliceY()
-                sliceX = self._cropSizer.getSliceX()
-                data = data[:, sliceY, sliceX]
+            data = self._diffractionPatternSizer(array.getData())
 
             if self._patternSettings.thresholdEnabled.value:
                 thresholdValue = self._patternSettings.thresholdValue.value

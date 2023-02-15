@@ -23,17 +23,16 @@ from ...api.tree import SimpleTreeNode
 from ..detector import Detector
 from ..statefulCore import StateDataType, StatefulCore
 from .builder import ActiveDiffractionDatasetBuilder
-from .crop import CropSizer
 from .dataset import ActiveDiffractionDataset
 from .patterns import DiffractionPatternPresenter
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
+from .sizer import DiffractionPatternSizer
 from .watcher import DataDirectoryWatcher
 
 logger = logging.getLogger(__name__)
 
 
 class DiffractionDatasetPresenter(Observable, Observer):
-    # FIXME fix GUI crop controls/data loading with crop disabled
 
     def __init__(self, settings: DiffractionDatasetSettings, dataset: ActiveDiffractionDataset,
                  builder: ActiveDiffractionDatasetBuilder,
@@ -51,6 +50,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
             fileReaderChooser: PluginChooser[DiffractionFileReader]
     ) -> DiffractionDatasetPresenter:
         presenter = cls(settings, dataset, builder, fileReaderChooser)
+        # FIXME this isn't observing all parameters in settings (e.g. watchdog stuff)
         settings.fileType.addObserver(presenter)
         fileReaderChooser.addObserver(presenter)
         presenter._syncFileReaderFromSettings()
@@ -71,19 +71,17 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def setScratchDirectory(self, directory: Path) -> None:
         self._settings.scratchDirectory.value = directory
 
-    def isWatchForFilesEnabled(self) -> bool:
-        # FIXME add watchForFiles to GUI
-        return self._settings.watchForFiles.value
+    def isWatchdogEnabled(self) -> bool:
+        return self._settings.watchdogEnabled.value
 
-    def setWatchForFilesEnabled(self, value: bool) -> None:
-        self._settings.watchForFiles.value = value
+    def setWatchdogEnabled(self, value: bool) -> None:
+        self._settings.watchdogEnabled.value = value
 
-    def getWatchDirectory(self) -> Path:
-        # FIXME add watchDirectory to GUI
-        return self._settings.watchDirectory.value
+    def getWatchdogDirectory(self) -> Path:
+        return self._settings.watchdogDirectory.value
 
-    def setWatchDirectory(self, directory: Path) -> None:
-        self._settings.watchDirectory.value = directory
+    def setWatchdogDirectory(self, directory: Path) -> None:
+        self._settings.watchdogDirectory.value = directory
 
     def getNumberOfDataThreadsLimits(self) -> Interval[int]:
         return Interval[int](1, 64)
@@ -276,12 +274,13 @@ class DataCore(StatefulCore):
         self._datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
         self.patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
 
-        self.cropSizer = CropSizer.createInstance(self.patternSettings, detector)
+        self.diffractionPatternSizer = DiffractionPatternSizer.createInstance(
+            self.patternSettings, detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
-            self.patternSettings, self.cropSizer)
+            self.patternSettings, self.diffractionPatternSizer)
 
         self.dataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
-                                                self.cropSizer)
+                                                self.diffractionPatternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self._datasetSettings, self.dataset)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(
             self._datasetSettings, self.dataset)

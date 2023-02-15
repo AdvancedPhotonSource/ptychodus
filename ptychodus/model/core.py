@@ -81,7 +81,7 @@ class ModelCore:
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())
         self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
-                                    self._dataCore.cropSizer,
+                                    self._dataCore.diffractionPatternSizer,
                                     self._pluginRegistry.buildProbeFileReaderChooser(),
                                     self._pluginRegistry.buildProbeFileWriterChooser())
         self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())

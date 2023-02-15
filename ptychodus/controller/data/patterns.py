@@ -1,9 +1,11 @@
 from __future__ import annotations
+from pathlib import Path
 
 from ...api.observer import Observable, Observer
 from ...model.data import DiffractionDatasetPresenter, DiffractionPatternPresenter
 from ...view import (DataNavigationPage, PatternCropView, PatternLoadView, PatternTransformView,
-                     PatternsView)
+                     PatternWatchdogView, PatternsView)
+from ..data import FileDialogFactory
 
 
 class PatternLoadController(Observer):
@@ -135,11 +137,60 @@ class PatternTransformController(Observer):
             self._syncModelToView()
 
 
+class PatternWatchdogController(Observer):
+
+    def __init__(self, presenter: DiffractionDatasetPresenter, view: PatternWatchdogView,
+                 fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+        self._fileDialogFactory = fileDialogFactory
+
+    @classmethod
+    def createInstance(cls, presenter: DiffractionDatasetPresenter, view: PatternWatchdogView,
+                       fileDialogFactory: FileDialogFactory) -> PatternWatchdogController:
+        controller = cls(presenter, view, fileDialogFactory)
+        presenter.addObserver(controller)
+
+        view.setCheckable(True)
+        view.toggled.connect(presenter.setWatchdogEnabled)
+
+        view.directoryLineEdit.editingFinished.connect(controller._syncDirectoryToModel)
+        view.directoryBrowseButton.clicked.connect(controller._browseDirectory)
+
+        controller._syncModelToView()
+        return controller
+
+    def _syncDirectoryToModel(self) -> None:
+        self._presenter.setWatchdogDirectory(Path(self._view.directoryLineEdit.text()))
+
+    def _browseDirectory(self) -> None:
+        dirPath = self._fileDialogFactory.getExistingDirectoryPath(self._view,
+                                                                   'Choose Watchdog Directory')
+
+        if dirPath:
+            self._presenter.setWatchdogDirectory(dirPath)
+
+    def _syncModelToView(self) -> None:
+        self._view.setChecked(self._presenter.isWatchdogEnabled())
+        watchdogDirectory = self._presenter.getWatchdogDirectory()
+
+        if watchdogDirectory:
+            self._view.directoryLineEdit.setText(str(watchdogDirectory))
+        else:
+            self._view.directoryLineEdit.clear()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
 class PatternsController:
 
     def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
                  patternPresenter: DiffractionPatternPresenter,
-                 view: DataNavigationPage[PatternsView]) -> None:
+                 view: DataNavigationPage[PatternsView],
+                 fileDialogFactory: FileDialogFactory) -> None:
         self._datasetPresenter = datasetPresenter
         self._patternPresenter = patternPresenter
         self._view = view
@@ -149,11 +200,14 @@ class PatternsController:
                                                                     view.contentsView.cropView)
         self._transformController = PatternTransformController.createInstance(
             patternPresenter, view.contentsView.transformView)
+        self._watchdogController = PatternWatchdogController.createInstance(
+            datasetPresenter, view.contentsView.watchdogView, fileDialogFactory)
 
     @classmethod
     def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
                        patternPresenter: DiffractionPatternPresenter,
-                       view: DataNavigationPage[PatternsView]) -> PatternsController:
-        controller = cls(datasetPresenter, patternPresenter, view)
+                       view: DataNavigationPage[PatternsView],
+                       fileDialogFactory: FileDialogFactory) -> PatternsController:
+        controller = cls(datasetPresenter, patternPresenter, view, fileDialogFactory)
         view.forwardButton.clicked.connect(datasetPresenter.startProcessingDiffractionPatterns)
         return controller
