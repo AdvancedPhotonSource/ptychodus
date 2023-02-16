@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QDir, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import QFileSystemModel
 
 from ...api.observer import Observable, Observer
-from ...model.data import DiffractionDatasetPresenter
+from ...model.data import DiffractionDatasetInputOutputPresenter
 from ...view import DataNavigationPage, DatasetFileView
 from .dialogFactory import FileDialogFactory
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class DatasetFileController(Observer):
 
-    def __init__(self, presenter: DiffractionDatasetPresenter,
+    def __init__(self, presenter: DiffractionDatasetInputOutputPresenter,
                  view: DataNavigationPage[DatasetFileView]) -> None:
         super().__init__()
         self._presenter = presenter
@@ -25,7 +25,7 @@ class DatasetFileController(Observer):
         self._fileSystemProxyModel = QSortFilterProxyModel()
 
     @classmethod
-    def createInstance(cls, presenter: DiffractionDatasetPresenter,
+    def createInstance(cls, presenter: DiffractionDatasetInputOutputPresenter,
                        view: DataNavigationPage[DatasetFileView]) -> DatasetFileController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)

@@ -2,7 +2,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from ...api.observer import Observable, Observer
-from ...model.data import DiffractionDatasetPresenter, DiffractionPatternPresenter
+from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
+                           DiffractionPatternPresenter)
 from ...view import (DataNavigationPage, PatternCropView, PatternLoadView, PatternTransformView,
                      PatternWatchdogView, PatternsView)
 from ..data import FileDialogFactory
@@ -204,10 +205,12 @@ class PatternsController:
             datasetPresenter, view.contentsView.watchdogView, fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
+    def createInstance(cls, datasetInputOutputPresenter: DiffractionDatasetInputOutputPresenter,
+                       datasetPresenter: DiffractionDatasetPresenter,
                        patternPresenter: DiffractionPatternPresenter,
                        view: DataNavigationPage[PatternsView],
                        fileDialogFactory: FileDialogFactory) -> PatternsController:
         controller = cls(datasetPresenter, patternPresenter, view, fileDialogFactory)
-        view.forwardButton.clicked.connect(datasetPresenter.startProcessingDiffractionPatterns)
+        view.forwardButton.clicked.connect(
+            datasetInputOutputPresenter.startProcessingDiffractionPatterns)
         return controller

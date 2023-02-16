@@ -7,7 +7,8 @@ from PyQt5.QtWidgets import QFileDialog, QTableView, QTreeView, QWidget
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from ...model import MetadataPresenter
-from ...model.data import DiffractionDatasetPresenter, DiffractionPatternPresenter
+from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
+                           DiffractionPatternPresenter)
 from ...view import DataParametersView
 from ..tree import SimpleTreeModel
 from .dataset import DatasetController
@@ -21,38 +22,43 @@ from .tableModel import DataArrayTableModel
 class DataParametersController(Observer):
 
     def __init__(self, settingsRegistry: SettingsRegistry,
+                 datasetInputOutputPresenter: DiffractionDatasetInputOutputPresenter,
                  datasetPresenter: DiffractionDatasetPresenter,
                  metadataPresenter: MetadataPresenter,
                  patternPresenter: DiffractionPatternPresenter, view: DataParametersView,
                  tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
         self._settingsRegistry = settingsRegistry
+        self._datasetInputOutputPresenter = datasetInputOutputPresenter
         self._datasetPresenter = datasetPresenter
         self._view = view
         self._tableView = tableView
         self._fileDialogFactory = fileDialogFactory
         self._treeModel = SimpleTreeModel(datasetPresenter.getContentsTree())
         self._tableModel = DataArrayTableModel()
-        self._fileController = DatasetFileController.createInstance(datasetPresenter,
+        self._fileController = DatasetFileController.createInstance(datasetInputOutputPresenter,
                                                                     view.filePage)
         self._metadataController = MetadataController.createInstance(metadataPresenter,
                                                                      view.metadataPage)
-        self._patternsController = PatternsController.createInstance(datasetPresenter,
+        self._patternsController = PatternsController.createInstance(datasetInputOutputPresenter,
+                                                                     datasetPresenter,
                                                                      patternPresenter,
                                                                      view.patternsPage,
                                                                      fileDialogFactory)
-        self._datasetController = DatasetController.createInstance(datasetPresenter,
+        self._datasetController = DatasetController.createInstance(datasetInputOutputPresenter,
+                                                                   datasetPresenter,
                                                                    view.datasetPage,
                                                                    fileDialogFactory)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry,
+                       datasetInputOutputPresenter: DiffractionDatasetInputOutputPresenter,
                        datasetPresenter: DiffractionDatasetPresenter,
                        metadataPresenter: MetadataPresenter,
                        patternPresenter: DiffractionPatternPresenter, view: DataParametersView,
                        tableView: QTableView,
                        fileDialogFactory: FileDialogFactory) -> DataParametersController:
-        controller = cls(settingsRegistry, datasetPresenter, metadataPresenter, patternPresenter,
-                         view, tableView, fileDialogFactory)
+        controller = cls(settingsRegistry, datasetInputOutputPresenter, datasetPresenter,
+                         metadataPresenter, patternPresenter, view, tableView, fileDialogFactory)
         settingsRegistry.addObserver(controller)
         datasetPresenter.addObserver(controller)
 
@@ -92,7 +98,7 @@ class DataParametersController(Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:
-            self._datasetPresenter.startProcessingDiffractionPatterns()
+            self._datasetInputOutputPresenter.startProcessingDiffractionPatterns()
             self._switchToDatasetView()
         elif observable is self._datasetPresenter:
             self._treeModel.setRootNode(self._datasetPresenter.getContentsTree())

@@ -79,7 +79,7 @@ class MetadataPresenter(Observable, Observer):
                         self._metadata.cropCenterInPixels.x
                 self._patternSettings.cropCenterYInPixels.value = \
                         self._metadata.cropCenterInPixels.y
-            else:
+            elif self._metadata.detectorNumberOfPixels:
                 self._patternSettings.cropCenterXInPixels.value = \
                         int(self._metadata.detectorNumberOfPixels.x) // 2
                 self._patternSettings.cropCenterYInPixels.value = \

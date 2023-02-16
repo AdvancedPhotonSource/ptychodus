@@ -16,7 +16,7 @@ from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
 from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
-                   DiffractionPatternPresenter)
+                   DiffractionDatasetInputOutputPresenter, DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import ImageCore, ImagePresenter
 from .metadata import MetadataPresenter
@@ -81,7 +81,7 @@ class ModelCore:
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())
         self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
-                                    self._dataCore.diffractionPatternSizer,
+                                    self._dataCore.patternSizer,
                                     self._pluginRegistry.buildProbeFileReaderChooser(),
                                     self._pluginRegistry.buildProbeFileWriterChooser())
         self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
@@ -135,9 +135,9 @@ class ModelCore:
         if self._modelArgs.restartFilePath:
             self.openStateData(self._modelArgs.restartFilePath)
 
-        if self.diffractionDatasetPresenter.isReadyToAssemble:
-            self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
-            self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(
+        if self.diffractionDatasetInputOutputPresenter.isReadyToAssemble:
+            self.diffractionDatasetInputOutputPresenter.startProcessingDiffractionPatterns()
+            self.diffractionDatasetInputOutputPresenter.stopProcessingDiffractionPatterns(
                 finishAssembling=True)
 
         if self.rpcMessageService:
@@ -179,15 +179,19 @@ class ModelCore:
 
     @property
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
-        return self._dataCore.diffractionDatasetPresenter
+        return self._dataCore.datasetPresenter
+
+    @property
+    def diffractionDatasetInputOutputPresenter(self) -> DiffractionDatasetInputOutputPresenter:
+        return self._dataCore.datasetInputOutputPresenter
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self.diffractionDatasetPresenter.initializeStreaming(metadata)
-        self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
+        self.diffractionDatasetInputOutputPresenter.initializeStreaming(metadata)
+        self.diffractionDatasetInputOutputPresenter.startProcessingDiffractionPatterns()
         self.scanPresenter.initializeStreamingScan()
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
-        self.diffractionDatasetPresenter.assemble(array)
+        self.diffractionDatasetInputOutputPresenter.assemble(array)
         self.scanPresenter.insertArrayTimeStamp(array.getIndex(), timeStamp)
 
     def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
@@ -197,12 +201,13 @@ class ModelCore:
         self.scanPresenter.assembleScanPositionsY(valuesInMeters, timeStamps)
 
     def finalizeStreamingWorkflow(self) -> None:
-        self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(finishAssembling=True)
+        self.diffractionDatasetInputOutputPresenter.stopProcessingDiffractionPatterns(
+            finishAssembling=True)
         self.scanPresenter.finalizeStreamingScan()
         self.objectPresenter.initializeObject()
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
-        return self.diffractionDatasetPresenter.getAssemblyQueueSize()
+        return self.diffractionDatasetInputOutputPresenter.getAssemblyQueueSize()
 
     def refreshActiveDataset(self) -> None:
         self._dataCore.dataset.notifyObserversIfDatasetChanged()

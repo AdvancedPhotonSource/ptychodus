@@ -1,13 +1,8 @@
 from __future__ import annotations
-from collections.abc import Sequence
-from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import overload, Any, Optional, Union
-import concurrent.futures
-import functools
+from typing import Any
 import logging
-import tempfile
 
 import h5py
 import numpy
@@ -24,6 +19,7 @@ from ..detector import Detector
 from ..statefulCore import StateDataType, StatefulCore
 from .builder import ActiveDiffractionDatasetBuilder
 from .dataset import ActiveDiffractionDataset
+from .io import DiffractionDatasetInputOutputPresenter
 from .patterns import DiffractionPatternPresenter
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
 from .sizer import DiffractionPatternSizer
@@ -34,28 +30,17 @@ logger = logging.getLogger(__name__)
 
 class DiffractionDatasetPresenter(Observable, Observer):
 
-    def __init__(self, settings: DiffractionDatasetSettings, dataset: ActiveDiffractionDataset,
-                 builder: ActiveDiffractionDatasetBuilder,
-                 fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
+    def __init__(self, settings: DiffractionDatasetSettings,
+                 dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
         self._dataset = dataset
-        self._builder = builder
-        self._fileReaderChooser = fileReaderChooser
 
     @classmethod
-    def createInstance(
-            cls, settings: DiffractionDatasetSettings, dataset: ActiveDiffractionDataset,
-            builder: ActiveDiffractionDatasetBuilder,
-            fileReaderChooser: PluginChooser[DiffractionFileReader]
-    ) -> DiffractionDatasetPresenter:
-        presenter = cls(settings, dataset, builder, fileReaderChooser)
-        # FIXME this isn't observing all parameters in settings (e.g. watchdog stuff)
-        settings.fileType.addObserver(presenter)
-        fileReaderChooser.addObserver(presenter)
-        presenter._syncFileReaderFromSettings()
-        settings.filePath.addObserver(presenter)
-        presenter._openDiffractionFileFromSettings()
+    def createInstance(cls, settings: DiffractionDatasetSettings,
+                       dataset: ActiveDiffractionDataset) -> DiffractionDatasetPresenter:
+        presenter = cls(settings, dataset)
+        settings.addObserver(presenter)
         dataset.addObserver(presenter)
         return presenter
 
@@ -92,10 +77,6 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     def setNumberOfDataThreads(self, number: int) -> None:
         self._settings.numberOfDataThreads.value = number
-
-    @property
-    def isReadyToAssemble(self) -> bool:
-        return (self._builder.getAssemblyQueueSize() > 0)
 
     @property
     def isAssembled(self) -> bool:
@@ -148,79 +129,10 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
         return data
 
-    def getOpenFileFilterList(self) -> list[str]:
-        return self._fileReaderChooser.getDisplayNameList()
-
-    def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.getCurrentDisplayName()
-
-    def _syncFileReaderFromSettings(self) -> None:
-        self._fileReaderChooser.setFromSimpleName(self._settings.fileType.value)
-
-    def _syncFileReaderToSettings(self) -> None:
-        self._settings.fileType.value = self._fileReaderChooser.getCurrentSimpleName()
-
-    def _openDiffractionFile(self, filePath: Path) -> None:
-        if filePath is not None and filePath.is_file():
-            logger.debug(f'Reading {filePath}')
-            fileReader = self._fileReaderChooser.getCurrentStrategy()
-            dataset = fileReader.read(filePath)
-            self._builder.switchTo(dataset)
-        else:
-            logger.debug(f'Refusing to read invalid file path {filePath}')
-
-    def openDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
-        self._fileReaderChooser.setFromDisplayName(fileFilter)
-
-        if self._settings.filePath.value == filePath:
-            self._openDiffractionFile(filePath)
-
-        self._settings.filePath.value = filePath
-
-    def _openDiffractionFileFromSettings(self) -> None:
-        self._openDiffractionFile(self._settings.filePath.value)
-
-    def getSaveFileFilterList(self) -> list[str]:
-        return [self.getSaveFileFilter()]
-
-    def getSaveFileFilter(self) -> str:
-        return 'NumPy Binary Files (*.npy)'
-
-    def saveDiffractionFile(self, filePath: Path) -> None:
-        # FIXME saveDiffractionFile should share code with state data I/O
-        fileFilter = self.getSaveFileFilter()
-        logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
-        array = self._dataset.getAssembledData()
-        numpy.save(filePath, array)
-
-    def startProcessingDiffractionPatterns(self) -> None:
-        self._builder.start()
-
-    def stopProcessingDiffractionPatterns(self, finishAssembling: bool) -> None:
-        self._builder.stop(finishAssembling)
-
-    def initializeStreaming(self, metadata: DiffractionMetadata) -> None:
-        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
-        arrayList: list[DiffractionPatternArray] = list()
-        dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
-        self._builder.switchTo(dataset)
-
-    def assemble(self, array: DiffractionPatternArray) -> None:
-        self._builder.insertArray(array)
-
-    def getAssemblyQueueSize(self) -> int:
-        return self._builder.getAssemblyQueueSize()
-
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.fileType:
-            self._syncFileReaderFromSettings()
-        elif observable is self._fileReaderChooser:
-            self._syncFileReaderToSettings()
-        elif observable is self._settings.filePath:
-            self._openDiffractionFileFromSettings()
+        if observable is self._settings:
+            self.notifyObservers
         elif observable is self._dataset:
-            self.notifyObservers()
-        elif observable is self._builder:
             self.notifyObservers()
 
 
@@ -274,18 +186,19 @@ class DataCore(StatefulCore):
         self._datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
         self.patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
 
-        self.diffractionPatternSizer = DiffractionPatternSizer.createInstance(
-            self.patternSettings, detector)
+        self.patternSizer = DiffractionPatternSizer.createInstance(self.patternSettings, detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
-            self.patternSettings, self.diffractionPatternSizer)
+            self.patternSettings, self.patternSizer)
 
         self.dataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
-                                                self.diffractionPatternSizer)
+                                                self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self._datasetSettings, self.dataset)
         self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(
             self._datasetSettings, self.dataset)
 
-        self.diffractionDatasetPresenter = DiffractionDatasetPresenter.createInstance(
+        self.datasetPresenter = DiffractionDatasetPresenter.createInstance(
+            self._datasetSettings, self.dataset)
+        self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter.createInstance(
             self._datasetSettings, self.dataset, self._builder, fileReaderChooser)
         self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
             self.dataset)
