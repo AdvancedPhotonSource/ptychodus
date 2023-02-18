@@ -157,7 +157,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
             self._contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
 
-            # FIXME use arrayIndexes
+            # TODO use arrayIndexes
             self._arrayList = [
                 SimpleDiffractionPatternArray(
                     label='Restart',

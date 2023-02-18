@@ -49,10 +49,6 @@ class SettingsGroup(Observable, Observer):
         self._name = name
         self._entryList: list[SettingsEntry[Any]] = list()
 
-    @staticmethod
-    def convertFloatToDecimal(value: float) -> Decimal:
-        return Decimal(repr(value))
-
     @property
     def name(self) -> str:
         return self._name
@@ -74,8 +70,8 @@ class SettingsGroup(Observable, Observer):
 
     def createBooleanEntry(self, name: str, defaultValue: bool) -> SettingsEntry[bool]:
         trueStringList = ['1', 'true', 't', 'yes', 'y']
-        candidateEntry = SettingsEntry[bool](
-            name, defaultValue, lambda valueString: valueString.lower() in trueStringList)
+        candidateEntry = SettingsEntry[bool](name, defaultValue, \
+                lambda valueString: valueString.lower() in trueStringList)
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createIntegerEntry(self, name: str, defaultValue: int) -> SettingsEntry[int]:
@@ -205,5 +201,6 @@ class SettingsRegistry(Observable):
                 config.set(settingsGroup.name, settingsEntry.name, valueString)
 
         logger.debug(f'Writing settings to \"{filePath}\"')
+
         with filePath.open(mode='w') as configFile:
             config.write(configFile)

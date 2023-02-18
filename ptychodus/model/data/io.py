@@ -103,7 +103,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         return 'NumPy Binary Files (*.npy)'
 
     def saveDiffractionFile(self, filePath: Path) -> None:
-        # FIXME saveDiffractionFile should share code with state data I/O
+        # TODO saveDiffractionFile should share code with state data I/O
         fileFilter = self.getSaveFileFilter()
         logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
         array = self._dataset.getAssembledData()

@@ -1,5 +1,7 @@
 from __future__ import annotations
+from pathlib import Path
 import logging
+import queue
 import threading
 import watchdog.events
 import watchdog.observers
@@ -11,15 +13,18 @@ from .settings import DiffractionDatasetSettings
 logger = logging.getLogger(__name__)
 
 
-class DataFileEventHandler(watchdog.events.PatternMatchingEventHandler):
+class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
 
-    def __init__(self, dataset: ActiveDiffractionDataset, patterns: list[str]) -> None:
-        super().__init__(patterns=patterns, ignore_directories=True, case_sensitive=False)
-        self._dataset = dataset
+    def __init__(self, dataDirectoryQueue: queue.Queue[Path]) -> None:
+        super().__init__()
+        self._dataDirectoryQueue = dataDirectoryQueue
 
-    def on_any_event(self, event: watchdog.events.FileSystemEvent) -> None:
-        logger.debug(f'{event.event_type}: {event.src_path}')
-        # TODO insert array into dataset
+    def on_created(self, event: watchdog.events.FileSystemEvent) -> None:
+        srcPath = Path(event.src_path)
+
+        if srcPath.is_dir():
+            self._dataDirectoryQueue.put(srcPath)
+            logger.debug(list(self._dataDirectoryQueue.queue))
 
 
 class DataDirectoryWatcher(Observer):
@@ -29,35 +34,26 @@ class DataDirectoryWatcher(Observer):
         super().__init__()
         self._settings = settings
         self._dataset = dataset
+        self._dataDirectoryQueue: queue.Queue[Path] = queue.Queue()
         self._observer = watchdog.observers.Observer()
 
     @classmethod
     def createInstance(cls, settings: DiffractionDatasetSettings,
                        dataset: ActiveDiffractionDataset) -> DataDirectoryWatcher:
         watcher = cls(settings, dataset)
-        settings.filePath.addObserver(watcher)
+        settings.watchdogEnabled.addObserver(watcher)
+        settings.watchdogDirectory.addObserver(watcher)
+        watcher._updateWatchdogThread()
+        watcher._updateWatch()
         return watcher
 
     def start(self) -> None:
-        if not self._settings.watchdogEnabled.value:
-            return
-
         if self._observer.is_alive():
-            logger.debug('Watchdog thread is already alive!')
-            return
-
-        filePath = self._settings.filePath.value
-
-        if filePath.is_file():
-            patterns = [f'*{filePath.suffix}']
-            eventHandler = DataFileEventHandler(self._dataset, patterns)
-            directory = filePath.parent
-            self._settings.watchdogDirectory.value = directory  # FIXME make this work
-
+            logger.error('Watchdog thread already started!')
+        else:
             self._observer = watchdog.observers.Observer()
-            self._observer.schedule(eventHandler, directory, recursive=False)
             self._observer.start()
-            logger.debug(f'Watchdog thread is watching \"{directory}\" for {patterns}.')
+            logger.debug('Watchdog thread started.')
 
     def stop(self) -> None:
         if self._observer.is_alive():
@@ -65,7 +61,24 @@ class DataDirectoryWatcher(Observer):
             self._observer.join()
             logger.debug('Watchdog thread stopped.')
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._settings.filePath:
-            self.stop()
+    def _updateWatchdogThread(self) -> None:
+        if self._settings.watchdogEnabled.value:
             self.start()
+        else:
+            self.stop()
+
+    def _updateWatch(self) -> None:
+        if self._observer.is_alive():
+            self._observer.unschedule_all()
+
+        observedWatch = self._observer.schedule(
+            event_handler=DataDirectoryEventHandler(self._dataDirectoryQueue),
+            path=self._settings.watchdogDirectory.value,
+        )
+        logger.debug(observedWatch)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings.watchdogEnabled:
+            self._updateWatchdogThread()
+        elif observable is self._settings.watchdogDirectory:
+            self._updateWatch()

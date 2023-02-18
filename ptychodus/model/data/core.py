@@ -226,7 +226,7 @@ class DataCore(StatefulCore):
         self.dataset.setAssembledData(data, dataIndexes)
 
     def start(self) -> None:
-        self._dataDirectoryWatcher.start()
+        pass
 
     def stop(self) -> None:
         self._dataDirectoryWatcher.stop()
