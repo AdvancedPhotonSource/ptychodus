@@ -23,7 +23,6 @@ from .io import DiffractionDatasetInputOutputPresenter
 from .patterns import DiffractionPatternPresenter
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
 from .sizer import DiffractionPatternSizer
-from .watcher import DataDirectoryWatcher
 
 logger = logging.getLogger(__name__)
 
@@ -55,18 +54,6 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     def setScratchDirectory(self, directory: Path) -> None:
         self._settings.scratchDirectory.value = directory
-
-    def isWatchdogEnabled(self) -> bool:
-        return self._settings.watchdogEnabled.value
-
-    def setWatchdogEnabled(self, value: bool) -> None:
-        self._settings.watchdogEnabled.value = value
-
-    def getWatchdogDirectory(self) -> Path:
-        return self._settings.watchdogDirectory.value
-
-    def setWatchdogDirectory(self, directory: Path) -> None:
-        self._settings.watchdogDirectory.value = directory
 
     def getNumberOfDataThreadsLimits(self) -> Interval[int]:
         return Interval[int](1, 64)
@@ -193,8 +180,6 @@ class DataCore(StatefulCore):
         self.dataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
                                                 self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self._datasetSettings, self.dataset)
-        self._dataDirectoryWatcher = DataDirectoryWatcher.createInstance(
-            self._datasetSettings, self.dataset)
 
         self.datasetPresenter = DiffractionDatasetPresenter.createInstance(
             self._datasetSettings, self.dataset)
@@ -229,5 +214,4 @@ class DataCore(StatefulCore):
         pass
 
     def stop(self) -> None:
-        self._dataDirectoryWatcher.stop()
         self._builder.stop(finishAssembling=False)

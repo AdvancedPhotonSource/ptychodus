@@ -47,7 +47,7 @@ class DatasetFileController(Observer):
         view.contentsView.fileSystemTableView.selectionModel().currentChanged.connect(
             controller._updateEnabledNavigationButtons)
 
-        # TODO set from filePath in settings
+        # FIXME set from filePath in settings
         controller._setRootPath(Path.cwd())
         controller._syncModelToView()
 
@@ -57,9 +57,9 @@ class DatasetFileController(Observer):
             view.contentsView.fileTypeComboBox.addItem(fileFilter)
 
         view.contentsView.fileTypeComboBox.currentTextChanged.connect(
-            controller._setNameFiltersInFileSystemModel)
+            controller._setNameFiltersInFileSystemModel)  # FIXME
         controller._setNameFiltersInFileSystemModel(
-            view.contentsView.fileTypeComboBox.currentText())
+            view.contentsView.fileTypeComboBox.currentText())  # FIXME
 
         view.backwardButton.setVisible(False)
         view.forwardButton.setEnabled(False)
@@ -82,7 +82,7 @@ class DatasetFileController(Observer):
         proxyIndex = self._view.contentsView.fileSystemTableView.currentIndex()
         index = self._fileSystemProxyModel.mapToSource(proxyIndex)
         filePath = Path(self._fileSystemModel.filePath(index))
-        fileFilter = self._view.contentsView.fileTypeComboBox.currentText()
+        fileFilter = self._view.contentsView.fileTypeComboBox.currentText()  # FIXME
         self._presenter.openDiffractionFile(filePath, fileFilter)
 
     def _updateEnabledNavigationButtons(self, current: QModelIndex, previous: QModelIndex) -> None:
@@ -92,7 +92,7 @@ class DatasetFileController(Observer):
 
     def _syncModelToView(self) -> None:
         openFileFilter = self._presenter.getOpenFileFilter()
-        self._view.contentsView.fileTypeComboBox.setCurrentText(openFileFilter)
+        self._view.contentsView.fileTypeComboBox.setCurrentText(openFileFilter)  # FIXME
 
     def _setNameFiltersInFileSystemModel(self, currentText: str) -> None:
         z = re.search('\((.+)\)', currentText)

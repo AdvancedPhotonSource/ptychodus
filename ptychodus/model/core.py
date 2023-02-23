@@ -15,6 +15,7 @@ import numpy
 from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
+from .automation import AutomationCore, AutomationPresenter
 from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
                    DiffractionDatasetInputOutputPresenter, DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
@@ -118,6 +119,7 @@ class ModelCore:
         self._stateDataRegistry = StateDataRegistry(
             (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
+        self._automationCore = AutomationCore(self.settingsRegistry)
 
         self.rpcMessageService: Optional[RPCMessageService] = None
 
@@ -270,3 +272,7 @@ class ModelCore:
     @property
     def workflowParametersPresenter(self) -> WorkflowParametersPresenter:
         return self._workflowCore.parametersPresenter
+
+    @property
+    def automationPresenter(self) -> AutomationPresenter:
+        return self._automationCore.presenter

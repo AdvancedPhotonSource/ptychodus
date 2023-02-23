@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import QApplication, QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
+from .automation import AutomationController
 from .data import DataParametersController, FileDialogFactory
 from .detector import (DatasetImageController, DatasetParametersController, DetectorController)
 from .object import ObjectImageController, ObjectParametersController
@@ -78,6 +79,8 @@ class ControllerCore:
             model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
             model.workflowStatusPresenter, model.workflowExecutionPresenter,
             view.workflowParametersView, view.workflowTableView)
+        self._automationController = AutomationController.createInstance(
+            model.automationPresenter, view.automationParametersView, self._fileDialogFactory)
         self._monitorProbeController = ProbeImageController.createInstance(
             model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
             self._fileDialogFactory)

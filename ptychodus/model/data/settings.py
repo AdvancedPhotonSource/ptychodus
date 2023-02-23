@@ -15,9 +15,6 @@ class DiffractionDatasetSettings(Observable, Observer):
         self.memmapEnabled = settingsGroup.createBooleanEntry('MemmapEnabled', False)
         self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory',
                                                               Path.home() / '.ptychodus')
-        self.watchdogEnabled = settingsGroup.createBooleanEntry('WatchdogEnabled', False)
-        self.watchdogDirectory = settingsGroup.createPathEntry('WatchdogDirectory',
-                                                               Path('/path/to/data'))
         self.numberOfDataThreads = settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)
 
     @classmethod

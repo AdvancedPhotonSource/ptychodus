@@ -76,7 +76,7 @@ class DataParametersController(Observer):
         self._view.setCurrentIndex(self._view.count() - 1)
 
     def _chooseScratchDirectory(self) -> None:
-        # TODO unused
+        # FIXME unused
         scratchDir = QFileDialog.getExistingDirectory(
             self._view, 'Choose Scratch Directory',
             str(self._datasetPresenter.getScratchDirectory()))

@@ -15,7 +15,6 @@ __all__ = [
     'PatternCropView',
     'PatternLoadView',
     'PatternTransformView',
-    'PatternWatchdogView',
     'PatternsView',
 ]
 
@@ -178,28 +177,6 @@ class PatternTransformView(QGroupBox):
         return view
 
 
-class PatternWatchdogView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Watch Directory', parent)
-        self.directoryLabel = QLabel('Directory:')
-        self.directoryLineEdit = QLineEdit()
-        self.directoryBrowseButton = QPushButton('Browse')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> PatternWatchdogView:
-        view = cls(parent)
-
-        layout = QGridLayout()
-        layout.addWidget(view.directoryLabel, 0, 0)
-        layout.addWidget(view.directoryLineEdit, 0, 1)
-        layout.addWidget(view.directoryBrowseButton, 0, 2)
-        layout.setColumnStretch(1, 1)
-        view.setLayout(layout)
-
-        return view
-
-
 class PatternsView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
@@ -207,7 +184,6 @@ class PatternsView(QGroupBox):
         self.loadView = PatternLoadView.createInstance()
         self.cropView = PatternCropView.createInstance()
         self.transformView = PatternTransformView.createInstance()
-        self.watchdogView = PatternWatchdogView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> PatternsView:
@@ -217,7 +193,6 @@ class PatternsView(QGroupBox):
         layout.addWidget(view.loadView)
         layout.addWidget(view.cropView)
         layout.addWidget(view.transformView)
-        layout.addWidget(view.watchdogView)
         layout.addStretch()
         view.setLayout(layout)
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from decimal import Decimal
 from pathlib import Path
-from typing import Final
+from typing import Final, Generator
 import logging
 
 import numpy
@@ -172,9 +172,10 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         logger.debug(f'Train using data in {trainingDirPath}.')
         diffractionPatternsList = list()
         reconstructedPatchesList = list()
+        trainingFilePathGlob: Generator[Path, None, None] = trainingDirPath.glob('*.npz')
 
-        for trainingFilePath in trainingDirPath.glob('*.npz'):
-            logger.debug(f'Reading training data from \"{trainingFile}\"...')
+        for trainingFilePath in trainingFilePathGlob:
+            logger.debug(f'Reading training data from \"{trainingFilePath}\"...')
 
             try:
                 with numpy.load(trainingFilePath) as trainingFile:

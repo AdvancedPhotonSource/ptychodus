@@ -1,6 +1,7 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="icons">
+        <file alias="automate">Font-Awesome-6.2.0/svgs/solid/dumpster-fire.svg</file>
         <file alias="check">Font-Awesome-6.2.0/svgs/regular/circle-check.svg</file>
         <file alias="dataset">Font-Awesome-6.2.0/svgs/solid/database.svg</file>
         <file alias="detector">Font-Awesome-6.2.0/svgs/solid/table-cells.svg</file>
