@@ -4,8 +4,8 @@ from pathlib import Path
 from ...api.observer import Observable, Observer
 from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
                            DiffractionPatternPresenter)
-from ...view import (DataNavigationPage, PatternCropView, PatternLoadView, PatternTransformView,
-                     PatternsView)
+from ...view import (DataNavigationPage, PatternCropView, PatternLoadView, PatternMemoryMapView,
+                     PatternTransformView, PatternsView)
 from ..data import FileDialogFactory
 
 
@@ -21,10 +21,7 @@ class PatternLoadController(Observer):
                        view: PatternLoadView) -> PatternLoadController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
-
         view.numberOfThreadsSpinBox.valueChanged.connect(presenter.setNumberOfDataThreads)
-        view.memmapCheckBox.toggled.connect(presenter.setMemmapEnabled)
-
         controller._syncModelToView()
         return controller
 
@@ -36,7 +33,54 @@ class PatternLoadController(Observer):
         self._view.numberOfThreadsSpinBox.setValue(self._presenter.getNumberOfDataThreads())
         self._view.numberOfThreadsSpinBox.blockSignals(False)
 
-        self._view.memmapCheckBox.setChecked(self._presenter.isMemmapEnabled())
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
+class PatternMemoryMapController(Observer):
+
+    def __init__(self, presenter: DiffractionDatasetPresenter, view: PatternMemoryMapView,
+                 fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+        self._fileDialogFactory = fileDialogFactory
+
+    @classmethod
+    def createInstance(cls, presenter: DiffractionDatasetPresenter, view: PatternMemoryMapView,
+                       fileDialogFactory: FileDialogFactory) -> PatternMemoryMapController:
+        controller = cls(presenter, view, fileDialogFactory)
+        presenter.addObserver(controller)
+
+        view.setCheckable(True)
+        controller._syncModelToView()
+        view.toggled.connect(presenter.setMemmapEnabled)
+        view.scratchDirectoryLineEdit.editingFinished.connect(
+            controller._syncScratchDirectoryToModel)
+        view.scratchDirectoryBrowseButton.clicked.connect(controller._browseScratchDirectory)
+
+        return controller
+
+    def _syncScratchDirectoryToModel(self) -> None:
+        scratchDirectory = Path(self._view.scratchDirectoryLineEdit.text())
+        self._presenter.setScratchDirectory(scratchDirectory)
+
+    def _browseScratchDirectory(self) -> None:
+        dirPath = self._fileDialogFactory.getExistingDirectoryPath(
+            self._view, 'Choose Scratch ScratchDirectory')
+
+        if dirPath:
+            self._presenter.setScratchDirectory(dirPath)
+
+    def _syncModelToView(self) -> None:
+        self._view.setChecked(self._presenter.isMemmapEnabled())
+        scratchDirectory = self._presenter.getScratchDirectory()
+
+        if scratchDirectory:
+            self._view.scratchDirectoryLineEdit.setText(str(scratchDirectory))
+        else:
+            self._view.scratchDirectoryLineEdit.clear()
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -149,6 +193,8 @@ class PatternsController:
         self._view = view
         self._loadController = PatternLoadController.createInstance(datasetPresenter,
                                                                     view.contentsView.loadView)
+        self._memoryMapController = PatternMemoryMapController.createInstance(
+            datasetPresenter, view.contentsView.memoryMapView, fileDialogFactory)
         self._cropController = PatternCropController.createInstance(patternPresenter,
                                                                     view.contentsView.cropView)
         self._transformController = PatternTransformController.createInstance(

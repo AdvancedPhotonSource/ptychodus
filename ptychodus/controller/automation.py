@@ -3,7 +3,7 @@ from pathlib import Path
 
 from ..api.observer import Observable, Observer
 from ..model.automation import AutomationPresenter
-from ..view import AutomationParametersView, AutomationWatchdogView
+from ..view import AutomationDatasetsView, AutomationParametersView, AutomationWatchdogView
 from .data import FileDialogFactory
 
 
@@ -49,7 +49,6 @@ class AutomationWatchdogController(Observer):
             self._presenter.setWatchdogDirectory(dirPath)
 
     def _syncModelToView(self) -> None:
-
         self._view.strategyComboBox.blockSignals(True)
         self._view.strategyComboBox.setCurrentText(self._presenter.getStrategy())
         self._view.strategyComboBox.blockSignals(False)
@@ -75,12 +74,41 @@ class AutomationWatchdogController(Observer):
             self._syncModelToView()
 
 
+class AutomationDatasetsController(Observer):
+
+    def __init__(self, presenter: AutomationPresenter, view: AutomationDatasetsView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: AutomationPresenter,
+                       view: AutomationDatasetsView) -> AutomationDatasetsController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+
+        view.processButton.setCheckable(True)
+        controller._syncModelToView()
+        view.processButton.toggled.connect(presenter.setProcessingEnabled)
+
+        return controller
+
+    def _syncModelToView(self) -> None:
+        self._view.processButton.setChecked(self._presenter.isProcessingEnabled())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
 class AutomationController:
 
     def __init__(self, presenter: AutomationPresenter, view: AutomationParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
         self._watchdogController = AutomationWatchdogController.createInstance(
             presenter, view.watchdogView, fileDialogFactory)
+        self._datasetsController = AutomationDatasetsController.createInstance(
+            presenter, view.datasetsView)
 
     @classmethod
     def createInstance(cls, presenter: AutomationPresenter, view: AutomationParametersView,

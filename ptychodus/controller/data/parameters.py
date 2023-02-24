@@ -75,15 +75,6 @@ class DataParametersController(Observer):
     def _switchToDatasetView(self) -> None:
         self._view.setCurrentIndex(self._view.count() - 1)
 
-    def _chooseScratchDirectory(self) -> None:
-        # FIXME unused
-        scratchDir = QFileDialog.getExistingDirectory(
-            self._view, 'Choose Scratch Directory',
-            str(self._datasetPresenter.getScratchDirectory()))
-
-        if scratchDir:
-            self._datasetPresenter.setScratchDirectory(Path(scratchDir))
-
     def _updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
         names = list()
         nodeItem = current.internalPointer()

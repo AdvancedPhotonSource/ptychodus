@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QLabel, QLineEdit, QPushButton,
-                             QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QLabel, QLineEdit, QListView,
+                             QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
 
 class AutomationWatchdogView(QGroupBox):
@@ -37,11 +37,31 @@ class AutomationWatchdogView(QGroupBox):
         return view
 
 
+class AutomationDatasetsView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Datasets', parent)
+        self.listView = QListView()
+        self.processButton = QPushButton('Process')
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> AutomationDatasetsView:
+        view = cls(parent)
+
+        layout = QVBoxLayout()
+        layout.addWidget(view.listView)
+        layout.addWidget(view.processButton)
+        view.setLayout(layout)
+
+        return view
+
+
 class AutomationParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.watchdogView = AutomationWatchdogView.createInstance()
+        self.datasetsView = AutomationDatasetsView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> AutomationParametersView:
@@ -49,7 +69,7 @@ class AutomationParametersView(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(view.watchdogView)
-        layout.addStretch()
+        layout.addWidget(view.datasetsView)
         view.setLayout(layout)
 
         return view

@@ -14,6 +14,7 @@ __all__ = [
     'MetadataView',
     'PatternCropView',
     'PatternLoadView',
+    'PatternMemoryMapView',
     'PatternTransformView',
     'PatternsView',
 ]
@@ -107,7 +108,6 @@ class PatternLoadView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Load', parent)
         self.numberOfThreadsSpinBox = QSpinBox()
-        self.memmapCheckBox = QCheckBox('Memory map diffraction data')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> PatternLoadView:
@@ -115,7 +115,6 @@ class PatternLoadView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Number of Data Threads:', view.numberOfThreadsSpinBox)
-        layout.addRow(view.memmapCheckBox)
         view.setLayout(layout)
 
         return view
@@ -177,11 +176,34 @@ class PatternTransformView(QGroupBox):
         return view
 
 
+class PatternMemoryMapView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Memory Map Diffraction Data', parent)
+        self.scratchDirectoryLabel = QLabel('Scratch Directory:')
+        self.scratchDirectoryLineEdit = QLineEdit()
+        self.scratchDirectoryBrowseButton = QPushButton('Browse')
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PatternMemoryMapView:
+        view = cls(parent)
+
+        layout = QGridLayout()
+        layout.addWidget(view.scratchDirectoryLabel, 1, 0)
+        layout.addWidget(view.scratchDirectoryLineEdit, 1, 1)
+        layout.addWidget(view.scratchDirectoryBrowseButton, 1, 2)
+        layout.setColumnStretch(1, 1)
+        view.setLayout(layout)
+
+        return view
+
+
 class PatternsView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Patterns', parent)
         self.loadView = PatternLoadView.createInstance()
+        self.memoryMapView = PatternMemoryMapView.createInstance()
         self.cropView = PatternCropView.createInstance()
         self.transformView = PatternTransformView.createInstance()
 
@@ -191,6 +213,7 @@ class PatternsView(QGroupBox):
 
         layout = QVBoxLayout()
         layout.addWidget(view.loadView)
+        layout.addWidget(view.memoryMapView)
         layout.addWidget(view.cropView)
         layout.addWidget(view.transformView)
         layout.addStretch()

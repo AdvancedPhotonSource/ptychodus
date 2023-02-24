@@ -57,6 +57,12 @@ class AutomationPresenter(Observable, Observer):
     def setWatchdogDelayInSeconds(self, value: int) -> None:
         self._settings.watchdogDelayInSeconds.value = value
 
+    def isProcessingEnabled(self) -> bool:
+        return True  # FIXME
+
+    def setProcessingEnabled(self, enable: bool) -> None:
+        pass  # FIXME
+
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
