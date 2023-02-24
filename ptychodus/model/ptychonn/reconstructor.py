@@ -4,7 +4,6 @@ from typing import Optional
 import logging
 
 import numpy
-import numpy.typing
 
 import ptychonn
 from ptychonn import ReconSmallPhaseModel, Tester, Trainer
@@ -15,11 +14,12 @@ from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
+from .trainable import TrainableReconstructor, TrainingData
 
 logger = logging.getLogger(__name__)
 
 
-class PtychoNNPhaseOnlyReconstructor(Reconstructor):
+class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
 
     def __init__(self, settings: PtychoNNModelSettings, trainingSettings: PtychoNNTrainingSettings,
                  apparatus: Apparatus, scan: Scan, object_: Object,
@@ -113,8 +113,7 @@ class PtychoNNPhaseOnlyReconstructor(Reconstructor):
 
         return ReconstructResult(0, [[]])
 
-    def train(self, diffractionPatterns: numpy.typing.NDArray[numpy.float32],
-              reconstructedPatches: numpy.typing.NDArray[numpy.float32]) -> None:
+    def train(self, diffractionPatterns: TrainingData, reconstructedPatches: TrainingData) -> None:
         outputPath = self._trainingSettings.outputPath.value \
                 if self._trainingSettings.saveTrainingArtifacts.value else None
         trainer = Trainer(

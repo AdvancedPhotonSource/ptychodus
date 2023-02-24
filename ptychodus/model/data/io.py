@@ -118,5 +118,3 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
             self._syncFileReaderToSettings()
         elif observable is self._settings.filePath:
             self._openDiffractionFileFromSettings()
-        elif observable is self._builder:
-            self.notifyObservers()

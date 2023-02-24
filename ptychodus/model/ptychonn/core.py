@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from decimal import Decimal
 from pathlib import Path
-from typing import Final, Generator
+from typing import Final, Generator, Optional
 import logging
 
 import numpy
@@ -16,6 +16,7 @@ from ..data import ActiveDiffractionDataset
 from ..object import Object
 from ..probe import Apparatus
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
+from .trainable import TrainableReconstructor
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +84,16 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def __init__(self, settings: PtychoNNTrainingSettings) -> None:
         super().__init__()
         self._settings = settings
+        self._trainer: Optional[TrainableReconstructor] = None
 
     @classmethod
     def createInstance(cls, settings: PtychoNNTrainingSettings) -> PtychoNNTrainingPresenter:
         presenter = cls(settings)
         settings.addObserver(presenter)
         return presenter
+
+    def setTrainer(self, trainer: TrainableReconstructor) -> None:
+        self._trainer = trainer
 
     def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
@@ -187,8 +192,11 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         diffractionPatterns = numpy.concatenate(diffractionPatternsList, axis=0)
         reconstructedPatches = numpy.concatenate(reconstructedPatchesList, axis=0)
 
-        # FIXME reconstructor.train(diffractionPatterns, reconstructedPatches)
-        # FIXME write file or return weights
+        if self._trainer is None:
+            logger.error('Trainable reconstructor not found!')
+        else:
+            # NOTE PtychoNN writes training outputs using internal mechanisms
+            self._trainer.train(diffractionPatterns, reconstructedPatches)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
@@ -223,9 +231,12 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
             if isDeveloperModeEnabled:
                 core.reconstructorList.append(NullReconstructor('PhaseOnly'))
         else:
-            core.reconstructorList.append(
-                PtychoNNPhaseOnlyReconstructor(core._settings, core._trainingSettings, apparatus,
-                                               scan, object_, diffractionDataset))
+            trainableReconstructor = PtychoNNPhaseOnlyReconstructor(core._settings,
+                                                                    core._trainingSettings,
+                                                                    apparatus, scan, object_,
+                                                                    diffractionDataset)
+            core.trainingPresenter.setTrainer(trainableReconstructor)
+            core.reconstructorList.append(trainableReconstructor)
 
         return core
 
