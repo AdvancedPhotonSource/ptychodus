@@ -196,3 +196,9 @@ def registerPlugins(registry: PluginRegistry) -> None:
             fileFilter='Hierarchical Data Format 5 Files (*.h5 *.hdf5)',
             dataPath='/entry/data/data',
         ))
+    registry.registerPlugin(
+        H5DiffractionFileReader(
+            simpleName='PtychoShelves',
+            fileFilter='PtychoShelves Diffraction Data Files (*.h5 *.hdf5)',
+            dataPath='/dp',
+        ))
