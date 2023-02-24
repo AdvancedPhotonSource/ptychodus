@@ -70,8 +70,12 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.getCurrentDisplayName()
 
+    def setOpenFileFilter(self, fileFilter: str) -> None:
+        self._fileReaderChooser.setFromDisplayName(fileFilter)
+
     def _syncFileReaderFromSettings(self) -> None:
         self._fileReaderChooser.setFromSimpleName(self._settings.fileType.value)
+        self.notifyObservers()
 
     def _syncFileReaderToSettings(self) -> None:
         self._settings.fileType.value = self._fileReaderChooser.getCurrentSimpleName()
@@ -85,9 +89,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         else:
             logger.debug(f'Refusing to read invalid file path {filePath}')
 
-    def openDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
-        self._fileReaderChooser.setFromDisplayName(fileFilter)
-
+    def openDiffractionFile(self, filePath: Path) -> None:
         if self._settings.filePath.value == filePath:
             self._openDiffractionFile(filePath)
 

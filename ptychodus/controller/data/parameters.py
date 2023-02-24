@@ -36,7 +36,8 @@ class DataParametersController(Observer):
         self._treeModel = SimpleTreeModel(datasetPresenter.getContentsTree())
         self._tableModel = DataArrayTableModel()
         self._fileController = DatasetFileController.createInstance(datasetInputOutputPresenter,
-                                                                    view.filePage)
+                                                                    view.filePage,
+                                                                    fileDialogFactory)
         self._metadataController = MetadataController.createInstance(metadataPresenter,
                                                                      view.metadataPage)
         self._patternsController = PatternsController.createInstance(datasetInputOutputPresenter,
