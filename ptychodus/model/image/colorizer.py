@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from decimal import Decimal
 
 from ...api.geometry import Interval
@@ -6,24 +6,24 @@ from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from .displayRange import DisplayRange
-from .visarray import VisualizationArrayComponent
+from .visarray import VisualizationArray
 
 
 class Colorizer(Observable, Observer, ABC):
 
-    def __init__(self, arrayComponent: VisualizationArrayComponent, displayRange: DisplayRange,
+    def __init__(self, array: VisualizationArray, displayRange: DisplayRange,
                  transformChooser: PluginChooser[ScalarTransformation]) -> None:
         super().__init__()
-        self._arrayComponent = arrayComponent
-        self._arrayComponent.addObserver(self)
+        self._array = array
+        self._array.addObserver(self)
         self._displayRange = displayRange
         self._displayRange.addObserver(self)
         self._transformChooser = transformChooser
         self._transformChooser.addObserver(self)
 
-    @property
+    @abstractproperty
     def name(self) -> str:
-        return self._arrayComponent.name
+        pass
 
     def getScalarTransformationNameList(self) -> list[str]:
         return self._transformChooser.getDisplayNameList()
@@ -47,7 +47,7 @@ class Colorizer(Observable, Observer, ABC):
         pass
 
     @abstractmethod
-    def getDataRange(self) -> Interval[Decimal]:
+    def getDataArray(self) -> RealArrayType:
         pass
 
     @abstractmethod
@@ -55,7 +55,7 @@ class Colorizer(Observable, Observer, ABC):
         pass
 
     def update(self, observable: Observable) -> None:
-        if observable is self._arrayComponent:
+        if observable is self._array:
             self.notifyObservers()
         elif observable is self._displayRange:
             self.notifyObservers()

@@ -29,6 +29,7 @@ class ScanSettings(Observable, Observer):
         self.radiusScalarInMeters = settingsGroup.createRealEntry('RadiusScalarInMeters', '0.5e-6')
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')
         self.stepSizeYInMeters = settingsGroup.createRealEntry('StepSizeYInMeters', '1e-6')
+        self.indexFilter = settingsGroup.createStringEntry('IndexFilter', 'ALL')
         self.transform = settingsGroup.createStringEntry('Transform', '+X+Y')
 
     @classmethod

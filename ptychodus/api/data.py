@@ -88,8 +88,8 @@ class DiffractionMetadata:
     filePath: Optional[Path] = None
 
     @classmethod
-    def createNullInstance(cls) -> DiffractionMetadata:
-        return cls(0, 0, numpy.dtype(numpy.ubyte))
+    def createNullInstance(cls, filePath: Optional[Path] = None) -> DiffractionMetadata:
+        return cls(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
 
 
 class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):
@@ -113,8 +113,8 @@ class SimpleDiffractionDataset(DiffractionDataset):
         self._arrayList = arrayList
 
     @classmethod
-    def createNullInstance(cls) -> SimpleDiffractionDataset:
-        metadata = DiffractionMetadata.createNullInstance()
+    def createNullInstance(cls, filePath: Optional[Path] = None) -> SimpleDiffractionDataset:
+        metadata = DiffractionMetadata.createNullInstance(filePath)
         contentsTree = SimpleTreeNode.createRoot(list())
         arrayList: list[DiffractionPatternArray] = list()
         return cls(metadata, contentsTree, arrayList)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
 
+from ...api.geometry import Interval
 from ...api.settings import SettingsGroup, SettingsRegistry
 from .adaptiveMoment import TikeAdaptiveMomentPresenter, TikeAdaptiveMomentSettings
 
@@ -12,13 +13,14 @@ class TikeObjectCorrectionSettings(TikeAdaptiveMomentSettings):
         self.useObjectCorrection = settingsGroup.createBooleanEntry('UseObjectCorrection', True)
         self.positivityConstraint = settingsGroup.createRealEntry('PositivityConstraint', '0')
         self.smoothnessConstraint = settingsGroup.createRealEntry('SmoothnessConstraint', '0')
+        self.useMagnitudeClipping = settingsGroup.createBooleanEntry('UseMagnitudeClipping', True)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikeObjectCorrectionSettings:
         return cls(settingsRegistry.createGroup('TikeObjectCorrection'))
 
 
-class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
+class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter[TikeObjectCorrectionSettings]):
 
     def __init__(self, settings: TikeObjectCorrectionSettings) -> None:
         super().__init__(settings)
@@ -35,28 +37,28 @@ class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter):
     def setObjectCorrectionEnabled(self, enabled: bool) -> None:
         self._settings.useObjectCorrection.value = enabled
 
-    def getMinPositivityConstraint(self) -> Decimal:
-        return Decimal(0)
-
-    def getMaxPositivityConstraint(self) -> Decimal:
-        return Decimal(1)
+    def getPositivityConstraintLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getPositivityConstraint(self) -> Decimal:
-        return self._clamp(self._settings.positivityConstraint.value,
-                           self.getMinPositivityConstraint(), self.getMaxPositivityConstraint())
+        limits = self.getPositivityConstraintLimits()
+        return limits.clamp(self._settings.positivityConstraint.value)
 
     def setPositivityConstraint(self, value: Decimal) -> None:
         self._settings.positivityConstraint.value = value
 
-    def getMinSmoothnessConstraint(self) -> Decimal:
-        return Decimal(0)
-
-    def getMaxSmoothnessConstraint(self) -> Decimal:
-        return Decimal('0.125')
+    def getSmoothnessConstraintLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1) / 8)
 
     def getSmoothnessConstraint(self) -> Decimal:
-        return self._clamp(self._settings.smoothnessConstraint.value,
-                           self.getMinSmoothnessConstraint(), self.getMaxSmoothnessConstraint())
+        limits = self.getSmoothnessConstraintLimits()
+        return limits.clamp(self._settings.smoothnessConstraint.value)
 
     def setSmoothnessConstraint(self, value: Decimal) -> None:
         self._settings.smoothnessConstraint.value = value
+
+    def isMagnitudeClippingEnabled(self) -> bool:
+        return self._settings.useMagnitudeClipping.value
+
+    def setMagnitudeClippingEnabled(self, enabled: bool) -> None:
+        self._settings.useMagnitudeClipping.value = enabled

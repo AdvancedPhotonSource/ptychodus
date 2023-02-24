@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...model import SpiralScanRepositoryItem
+from ...model.scan import SpiralScanRepositoryItem
 from ...view import SpiralScanView
 
 

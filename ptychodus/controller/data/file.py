@@ -4,10 +4,10 @@ import logging
 import re
 
 from PyQt5.QtCore import Qt, QDir, QModelIndex, QSortFilterProxyModel
-from PyQt5.QtWidgets import QFileSystemModel
+from PyQt5.QtWidgets import QAbstractItemView, QFileSystemModel
 
 from ...api.observer import Observable, Observer
-from ...model import DiffractionDatasetPresenter
+from ...model.data import DiffractionDatasetInputOutputPresenter
 from ...view import DataNavigationPage, DatasetFileView
 from .dialogFactory import FileDialogFactory
 
@@ -16,52 +16,49 @@ logger = logging.getLogger(__name__)
 
 class DatasetFileController(Observer):
 
-    def __init__(self, presenter: DiffractionDatasetPresenter,
-                 view: DataNavigationPage[DatasetFileView]) -> None:
+    def __init__(self, presenter: DiffractionDatasetInputOutputPresenter,
+                 view: DataNavigationPage[DatasetFileView],
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
+        self._fileDialogFactory = fileDialogFactory
         self._fileSystemModel = QFileSystemModel()
         self._fileSystemProxyModel = QSortFilterProxyModel()
 
     @classmethod
-    def createInstance(cls, presenter: DiffractionDatasetPresenter,
-                       view: DataNavigationPage[DatasetFileView]) -> DatasetFileController:
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: DiffractionDatasetInputOutputPresenter,
+                       view: DataNavigationPage[DatasetFileView],
+                       fileDialogFactory: FileDialogFactory) -> DatasetFileController:
+        controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
-
-        view.contentsView.filePathLineEdit.setReadOnly(True)
 
         controller._fileSystemModel.setFilter(QDir.AllEntries | QDir.AllDirs)
         controller._fileSystemModel.setNameFilterDisables(False)
-        controller._fileSystemModel.rootPathChanged.connect(
-            view.contentsView.filePathLineEdit.setText)
         controller._fileSystemProxyModel.setSourceModel(controller._fileSystemModel)
-
         view.contentsView.fileSystemTableView.setModel(controller._fileSystemProxyModel)
         view.contentsView.fileSystemTableView.setSortingEnabled(True)
         view.contentsView.fileSystemTableView.sortByColumn(0, Qt.AscendingOrder)
         view.contentsView.fileSystemTableView.verticalHeader().hide()
-        view.contentsView.fileSystemTableView.doubleClicked.connect(
-            controller._handleFileSystemTableDoubleClicked)
-        view.contentsView.fileSystemTableView.selectionModel().currentChanged.connect(
-            controller._updateEnabledNavigationButtons)
-
-        # TODO set from filePath in settings
-        controller._setRootPath(Path.cwd())
-        controller._syncModelToView()
-
-        view.forwardButton.clicked.connect(controller._openDiffractionFile)
+        view.contentsView.fileSystemTableView.setSelectionBehavior(QAbstractItemView.SelectRows)
 
         for fileFilter in presenter.getOpenFileFilterList():
             view.contentsView.fileTypeComboBox.addItem(fileFilter)
 
-        view.contentsView.fileTypeComboBox.currentTextChanged.connect(
-            controller._setNameFiltersInFileSystemModel)
-        controller._setNameFiltersInFileSystemModel(
-            view.contentsView.fileTypeComboBox.currentText())
+        controller._syncModelToView()
+
+        controller._fileSystemModel.rootPathChanged.connect(
+            view.contentsView.filePathLineEdit.setText)
+        controller._setRootPath(fileDialogFactory.getOpenWorkingDirectory())
+
+        view.contentsView.fileSystemTableView.doubleClicked.connect(
+            controller._handleFileSystemTableDoubleClicked)
+        view.contentsView.fileSystemTableView.selectionModel().currentChanged.connect(
+            controller._updateEnabledNavigationButtons)
+        view.contentsView.fileTypeComboBox.currentTextChanged.connect(presenter.setOpenFileFilter)
 
         view.backwardButton.setVisible(False)
+        view.forwardButton.clicked.connect(controller._openDiffractionFile)
         view.forwardButton.setEnabled(False)
 
         return controller
@@ -82,17 +79,13 @@ class DatasetFileController(Observer):
         proxyIndex = self._view.contentsView.fileSystemTableView.currentIndex()
         index = self._fileSystemProxyModel.mapToSource(proxyIndex)
         filePath = Path(self._fileSystemModel.filePath(index))
-        fileFilter = self._view.contentsView.fileTypeComboBox.currentText()
-        self._presenter.openDiffractionFile(filePath, fileFilter)
+        self._fileDialogFactory.setOpenWorkingDirectory(filePath.parent)
+        self._presenter.openDiffractionFile(filePath)
 
     def _updateEnabledNavigationButtons(self, current: QModelIndex, previous: QModelIndex) -> None:
         index = self._fileSystemProxyModel.mapToSource(current)
         fileInfo = self._fileSystemModel.fileInfo(index)
         self._view.forwardButton.setEnabled(fileInfo.isFile())
-
-    def _syncModelToView(self) -> None:
-        openFileFilter = self._presenter.getOpenFileFilter()
-        self._view.contentsView.fileTypeComboBox.setCurrentText(openFileFilter)
 
     def _setNameFiltersInFileSystemModel(self, currentText: str) -> None:
         z = re.search('\((.+)\)', currentText)
@@ -101,6 +94,16 @@ class DatasetFileController(Observer):
             nameFilters = z.group(1).split()
             logger.debug(f'Dataset File Name Filters: {nameFilters}')
             self._fileSystemModel.setNameFilters(nameFilters)
+
+    def _syncModelToView(self) -> None:
+        openFileFilter = self._presenter.getOpenFileFilter()
+        self._view.contentsView.fileTypeComboBox.setCurrentText(openFileFilter)
+
+        openFileFilter = self._presenter.getOpenFileFilter()
+        self._view.contentsView.fileTypeComboBox.blockSignals(True)
+        self._view.contentsView.fileTypeComboBox.setCurrentText(openFileFilter)
+        self._view.contentsView.fileTypeComboBox.blockSignals(False)
+        self._setNameFiltersInFileSystemModel(openFileFilter)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

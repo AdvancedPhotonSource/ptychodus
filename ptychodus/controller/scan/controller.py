@@ -7,10 +7,12 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFi
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
-from ...model import (CartesianScanRepositoryItem, LissajousScanRepositoryItem, ScanPresenter,
-                      SpiralScanRepositoryItem, TransformedScanRepositoryItem)
+from ...model.scan import (CartesianScanRepositoryItem, LissajousScanRepositoryItem, ScanPresenter,
+                           SpiralScanRepositoryItem, TabularScanRepositoryItem,
+                           TransformedScanRepositoryItem)
 from ...view import (CartesianScanView, LissajousScanView, ScanEditorDialog, ScanParametersView,
-                     ScanPlotView, ScanPositionDataView, ScanTransformView, SpiralScanView)
+                     ScanPlotView, ScanPositionDataView, ScanTransformView, SpiralScanView,
+                     TabularScanView)
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
 from .lissajous import LissajousScanController
@@ -148,6 +150,13 @@ class ScanController(Observer):
                     lissajousTransformController = ScanTransformController.createInstance(
                         item, lissajousDialog.transformView)
                     lissajousDialog.open()
+                elif isinstance(item._item, TabularScanRepositoryItem):
+                    tabularDialog = ScanEditorDialog.createInstance(
+                        TabularScanView.createInstance(), self._parametersView)
+                    tabularDialog.setWindowTitle(name)
+                    tabularTransformController = ScanTransformController.createInstance(
+                        item, tabularDialog.transformView)
+                    tabularDialog.open()
                 else:
                     logger.debug(f'Unknown category \"{category}\"')
             else:

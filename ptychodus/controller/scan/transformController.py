@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...model import TransformedScanRepositoryItem
+from ...model.scan import TransformedScanRepositoryItem
 from ...view import ScanTransformView
 
 
@@ -18,6 +18,11 @@ class ScanTransformController(Observer):
         controller = cls(item, view)
         item.addObserver(controller)
 
+        for name in item.getIndexFilterNameList():
+            view.indexFilterComboBox.addItem(name)
+
+        view.indexFilterComboBox.currentTextChanged.connect(item.setIndexFilterByName)
+
         for name in item.getTransformNameList():
             view.transformComboBox.addItem(name)
 
@@ -31,6 +36,7 @@ class ScanTransformController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        self._view.indexFilterComboBox.setCurrentText(self._item.getIndexFilterName())
         self._view.transformComboBox.setCurrentText(self._item.getTransformName())
         self._view.jitterRadiusWidget.setLengthInMeters(self._item.getJitterRadiusInMeters())
         self._view.centroidXWidget.setLengthInMeters(self._item.getCentroidXInMeters())

@@ -16,7 +16,9 @@ class TikeBasicParametersView(QGroupBox):
         self.numGpusLineEdit = QLineEdit()
         self.noiseModelComboBox = QComboBox()
         self.numBatchSpinBox = QSpinBox()
+        self.batchMethodComboBox = QComboBox()
         self.numIterSpinBox = QSpinBox()
+        self.convergenceWindowSpinBox = QSpinBox()
         self.cgIterSpinBox = QSpinBox()
         self.alphaSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.stepLengthSlider = DecimalSlider.createInstance(Qt.Horizontal)
@@ -37,7 +39,11 @@ class TikeBasicParametersView(QGroupBox):
         view.numBatchSpinBox.setToolTip(
             'The dataset is divided into this number of groups where each group is processed sequentially.'
         )
+        view.batchMethodComboBox.setToolTip('The name of the batch selection method.')
         view.numIterSpinBox.setToolTip('The number of epochs to process before returning.')
+        view.convergenceWindowSpinBox.setToolTip(
+            'The number of epochs to consider for convergence monitoring. Set to any value less than 2 to disable.'
+        )
         view.cgIterSpinBox.setToolTip(
             'The number of conjugate directions to search for each update.')
         view.alphaSlider.setToolTip('RPIE becomes EPIE when this parameter is 1.')
@@ -48,8 +54,12 @@ class TikeBasicParametersView(QGroupBox):
         layout.addRow('Number of GPUs:', view.numGpusLineEdit)
         layout.addRow('Noise Model:', view.noiseModelComboBox)
         layout.addRow('Number of Batches:', view.numBatchSpinBox)
+        layout.addRow('Batch Method:', view.batchMethodComboBox)
         layout.addRow('Number of Iterations:', view.numIterSpinBox)
-        layout.addRow(view.useMpiCheckBox)
+        layout.addRow('Convergence Window:', view.convergenceWindowSpinBox)
+
+        if False:  # TODO figure if ptychodus should support this
+            layout.addRow(view.useMpiCheckBox)
 
         if showCgIter:
             layout.addRow('CG Search Directions:', view.cgIterSpinBox)
@@ -68,7 +78,7 @@ class TikeBasicParametersView(QGroupBox):
 class TikeAdaptiveMomentView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Use Adaptive Moment', parent)
+        super().__init__('Adaptive Moment', parent)
         self.mdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.vdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
 
@@ -84,6 +94,26 @@ class TikeAdaptiveMomentView(QGroupBox):
         layout = QFormLayout()
         layout.addRow('M Decay:', view.mdecaySlider)
         layout.addRow('V Decay:', view.vdecaySlider)
+        view.setLayout(layout)
+
+        return view
+
+
+class TikeMultigridView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Multigrid', parent)
+        self.numLevelsSpinBox = QSpinBox()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeMultigridView:
+        view = cls(parent)
+
+        view.numLevelsSpinBox.setToolTip(
+            'The number of times to reduce the problem by a factor of two.')
+
+        layout = QFormLayout()
+        layout.addRow('Number of Levels:', view.numLevelsSpinBox)
         view.setLayout(layout)
 
         return view
@@ -145,6 +175,7 @@ class TikeProbeCorrectionView(QGroupBox):
         self.centeredIntensityConstraintCheckBox = QCheckBox('Centered Intensity Constraint')
         self.probeSupportView = TikeProbeSupportView.createInstance()
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
+        self.additionalProbePenaltyLineEdit = DecimalLineEdit.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikeProbeCorrectionView:
@@ -156,6 +187,8 @@ class TikeProbeCorrectionView(QGroupBox):
             'Forces probes to be orthogonal each iteration.')
         view.centeredIntensityConstraintCheckBox.setToolTip(
             'Forces the probe intensity to be centered.')
+        view.additionalProbePenaltyLineEdit.setToolTip(
+            'Additional penalty applied to the last probe.')
 
         layout = QFormLayout()
         layout.addRow('Sparsity Constraint:', view.sparsityConstraintSlider)
@@ -163,6 +196,7 @@ class TikeProbeCorrectionView(QGroupBox):
         layout.addRow(view.centeredIntensityConstraintCheckBox)
         layout.addRow(view.probeSupportView)
         layout.addRow(view.adaptiveMomentView)
+        layout.addRow('Additional Probe Penalty:', view.additionalProbePenaltyLineEdit)
         view.setLayout(layout)
 
         return view
@@ -175,15 +209,19 @@ class TikeObjectCorrectionView(QGroupBox):
         self.positivityConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.smoothnessConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
+        self.useMagnitudeClippingCheckBox = QCheckBox('Magnitude Clipping')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikeObjectCorrectionView:
         view = cls(parent)
 
+        view.useMagnitudeClippingCheckBox.setToolTip('Forces the object magnitude to be <= 1.')
+
         layout = QFormLayout()
         layout.addRow('Positivity Constraint:', view.positivityConstraintSlider)
         layout.addRow('Smoothness Constraint:', view.smoothnessConstraintSlider)
         layout.addRow(view.adaptiveMomentView)
+        layout.addRow(view.useMagnitudeClippingCheckBox)
         view.setLayout(layout)
 
         return view
@@ -196,6 +234,7 @@ class TikeParametersView(QWidget):
         super().__init__(parent)
         self.basicParametersView = TikeBasicParametersView.createInstance(
             showCgIter, showAlpha, showStepLength)
+        self.multigridView = TikeMultigridView.createInstance()
         self.positionCorrectionView = TikePositionCorrectionView.createInstance()
         self.probeCorrectionView = TikeProbeCorrectionView.createInstance()
         self.objectCorrectionView = TikeObjectCorrectionView.createInstance()
@@ -210,6 +249,7 @@ class TikeParametersView(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(view.basicParametersView)
+        layout.addWidget(view.multigridView)
         layout.addWidget(view.positionCorrectionView)
         layout.addWidget(view.probeCorrectionView)
         layout.addWidget(view.objectCorrectionView)

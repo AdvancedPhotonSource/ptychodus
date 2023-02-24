@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import QApplication, QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
+from .automation import AutomationController
 from .data import DataParametersController, FileDialogFactory
 from .detector import (DatasetImageController, DatasetParametersController, DetectorController)
 from .object import ObjectImageController, ObjectParametersController
@@ -57,9 +58,9 @@ class ControllerCore:
             model.objectPresenter, model.objectImagePresenter, view.objectImageView,
             self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
-            model.settingsRegistry, model.diffractionDatasetPresenter, model.metadataPresenter,
-            model.patternPresenter, view.dataParametersView, view.dataTableView,
-            self._fileDialogFactory)
+            model.settingsRegistry, model.diffractionDatasetInputOutputPresenter,
+            model.diffractionDatasetPresenter, model.metadataPresenter, model.patternPresenter,
+            view.dataParametersView, view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter,
             model.reconstructorPlotPresenter,
@@ -74,9 +75,12 @@ class ControllerCore:
         )
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
             model.reconstructorPlotPresenter, view.reconstructorPlotView)
-        self._workflowController = WorkflowController.createInstance(model.workflowPresenter,
-                                                                     view.workflowParametersView,
-                                                                     view.workflowTableView)
+        self._workflowController = WorkflowController.createInstance(
+            model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
+            model.workflowStatusPresenter, model.workflowExecutionPresenter,
+            view.workflowParametersView, view.workflowTableView)
+        self._automationController = AutomationController.createInstance(
+            model.automationPresenter, view.automationParametersView, self._fileDialogFactory)
         self._monitorProbeController = ProbeImageController.createInstance(
             model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
             self._fileDialogFactory)
@@ -92,6 +96,8 @@ class ControllerCore:
 
         view.navigationActionGroup.triggered.connect(
             lambda action: controller.swapCentralWidgets(action))
+
+        view.workflowAction.setVisible(model.areWorkflowsSupported)
 
         controller._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
         controller._refreshDataTimer.start(1000)  # TODO make configurable

@@ -1,46 +1,35 @@
 from __future__ import annotations
+from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, overload
 from uuid import UUID
 import logging
+import threading
 
+from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
+from ..statefulCore import StateDataRegistry
+from .authorizer import WorkflowAuthorizer
+from .executor import WorkflowExecutor
 from .settings import WorkflowSettings
-from .client import WorkflowClient, WorkflowClientBuilder, WorkflowRun
+from .status import WorkflowStatus, WorkflowStatusRepository
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowPresenter(Observable, Observer):
+class WorkflowParametersPresenter(Observable, Observer):
 
     def __init__(self, settings: WorkflowSettings) -> None:
         super().__init__()
         self._settings = settings
 
-        try:
-            from .globusClient import GlobusWorkflowClientBuilder
-            self._clientBuilder: WorkflowClientBuilder = GlobusWorkflowClientBuilder(settings)
-        except ModuleNotFoundError:
-            self._clientBuilder = WorkflowClientBuilder()
-
-        self._client: Optional[WorkflowClient] = None
-
     @classmethod
-    def createInstance(cls, settings: WorkflowSettings) -> WorkflowPresenter:
+    def createInstance(cls, settings: WorkflowSettings) -> WorkflowParametersPresenter:
         presenter = cls(settings)
         settings.addObserver(presenter)
         return presenter
-
-    def isAuthorized(self) -> bool:
-        return not (self._client is None)
-
-    def setAuthorizationCode(self, authCode: str) -> None:
-        self._client = self._clientBuilder.build(authCode)
-        self.notifyObservers()
-
-    def getAuthorizeURL(self) -> str:
-        return self._clientBuilder.getAuthorizeURL()
 
     def setInputDataEndpointID(self, endpointID: UUID) -> None:
         self._settings.inputDataEndpointID.value = endpointID
@@ -48,41 +37,23 @@ class WorkflowPresenter(Observable, Observer):
     def getInputDataEndpointID(self) -> UUID:
         return self._settings.inputDataEndpointID.value
 
-    def setInputDataPath(self, inputDataPath: str) -> None:
-        self._settings.inputDataPath.value = inputDataPath
+    def setInputDataGlobusPath(self, inputDataGlobusPath: str) -> None:
+        self._settings.inputDataGlobusPath.value = inputDataGlobusPath
 
-    def getInputDataPath(self) -> str:
-        return self._settings.inputDataPath.value
+    def getInputDataGlobusPath(self) -> str:
+        return self._settings.inputDataGlobusPath.value
 
-    def setOutputDataEndpointID(self, endpointID: UUID) -> None:
-        self._settings.outputDataEndpointID.value = endpointID
+    def setInputDataPosixPath(self, inputDataPosixPath: Path) -> None:
+        self._settings.inputDataPosixPath.value = inputDataPosixPath
 
-    def getOutputDataEndpointID(self) -> UUID:
-        return self._settings.outputDataEndpointID.value
+    def getInputDataPosixPath(self) -> Path:
+        return self._settings.inputDataPosixPath.value
 
-    def setOutputDataPath(self, outputDataPath: str) -> None:
-        self._settings.outputDataPath.value = outputDataPath
+    def setComputeFuncXEndpointID(self, endpointID: UUID) -> None:
+        self._settings.computeFuncXEndpointID.value = endpointID
 
-    def getOutputDataPath(self) -> str:
-        return self._settings.outputDataPath.value
-
-    def setComputeEndpointID(self, endpointID: UUID) -> None:
-        self._settings.computeEndpointID.value = endpointID
-
-    def getComputeEndpointID(self) -> UUID:
-        return self._settings.computeEndpointID.value
-
-    def setFlowID(self, flowID: UUID) -> None:
-        self._settings.flowID.value = flowID
-
-    def getFlowID(self) -> UUID:
-        return self._settings.flowID.value
-
-    def setReconstructActionID(self, actionID: UUID) -> None:
-        self._settings.reconstructActionID.value = actionID
-
-    def getReconstructActionID(self) -> UUID:
-        return self._settings.reconstructActionID.value
+    def getComputeFuncXEndpointID(self) -> UUID:
+        return self._settings.computeFuncXEndpointID.value
 
     def setComputeDataEndpointID(self, endpointID: UUID) -> None:
         self._settings.computeDataEndpointID.value = endpointID
@@ -90,37 +61,146 @@ class WorkflowPresenter(Observable, Observer):
     def getComputeDataEndpointID(self) -> UUID:
         return self._settings.computeDataEndpointID.value
 
-    def setComputeDataPath(self, computeDataPath: str) -> None:
-        self._settings.computeDataPath.value = computeDataPath
+    def setComputeDataGlobusPath(self, computeDataGlobusPath: str) -> None:
+        self._settings.computeDataGlobusPath.value = computeDataGlobusPath
 
-    def getComputeDataPath(self) -> str:
-        return self._settings.computeDataPath.value
+    def getComputeDataGlobusPath(self) -> str:
+        return self._settings.computeDataGlobusPath.value
 
-    def setStatusRefreshIntervalInSeconds(self, seconds: int) -> None:
-        self._settings.statusRefreshIntervalInSeconds.value = seconds
+    def setComputeDataPosixPath(self, computeDataPosixPath: Path) -> None:
+        self._settings.computeDataPosixPath.value = computeDataPosixPath
 
-    def getStatusRefreshIntervalInSeconds(self) -> int:
-        return self._settings.statusRefreshIntervalInSeconds.value
+    def getComputeDataPosixPath(self) -> Path:
+        return self._settings.computeDataPosixPath.value
 
-    def listFlowRuns(self) -> list[WorkflowRun]:
-        flowRuns: list[WorkflowRun] = list()
+    def setOutputDataEndpointID(self, endpointID: UUID) -> None:
+        self._settings.outputDataEndpointID.value = endpointID
 
-        if self._client:
-            flowRuns.extend(self._client.listFlowRuns())
+    def getOutputDataEndpointID(self) -> UUID:
+        return self._settings.outputDataEndpointID.value
 
-        return flowRuns
+    def setOutputDataGlobusPath(self, outputDataGlobusPath: str) -> None:
+        self._settings.outputDataGlobusPath.value = outputDataGlobusPath
 
-    def runFlow(self) -> None:
-        if self._client:
-            self._client.runFlow()
+    def getOutputDataGlobusPath(self) -> str:
+        return self._settings.outputDataGlobusPath.value
+
+    def setOutputDataPosixPath(self, outputDataPosixPath: Path) -> None:
+        self._settings.outputDataPosixPath.value = outputDataPosixPath
+
+    def getOutputDataPosixPath(self) -> Path:
+        return self._settings.outputDataPosixPath.value
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
 
 
+class WorkflowAuthorizationPresenter:
+
+    def __init__(self, authorizer: WorkflowAuthorizer) -> None:
+        self._authorizer = authorizer
+
+    @property
+    def isAuthorized(self) -> bool:
+        return self._authorizer.isAuthorized
+
+    def getAuthorizeURL(self) -> str:
+        return self._authorizer.getAuthorizeURL()
+
+    def setCodeFromAuthorizeURL(self, code: str) -> None:
+        self._authorizer.setCodeFromAuthorizeURL(code)
+
+
+class WorkflowStatusPresenter:
+
+    def __init__(self, settings: WorkflowSettings,
+                 statusRepository: WorkflowStatusRepository) -> None:
+        self._settings = settings
+        self._statusRepository = statusRepository
+
+    def getRefreshIntervalLimitsInSeconds(self) -> Interval[int]:
+        return Interval[int](10, 86400)
+
+    def getRefreshIntervalInSeconds(self) -> int:
+        limits = self.getRefreshIntervalLimitsInSeconds()
+        return limits.clamp(self._settings.statusRefreshIntervalInSeconds.value)
+
+    def setRefreshIntervalInSeconds(self, seconds: int) -> None:
+        self._settings.statusRefreshIntervalInSeconds.value = seconds
+
+    @overload
+    def __getitem__(self, index: int) -> WorkflowStatus:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]:
+        ...
+
+    def __getitem__(self, index: Union[int, slice]) -> \
+            Union[WorkflowStatus, Sequence[WorkflowStatus]]:
+        return self._statusRepository[index]
+
+    def __len__(self) -> int:
+        return len(self._statusRepository)
+
+    def getStatusDateTime(self) -> datetime:
+        return self._statusRepository.getStatusDateTime()
+
+    def refreshStatus(self) -> None:
+        self._statusRepository.refreshStatus()
+
+
+class WorkflowExecutionPresenter:
+
+    def __init__(self, executor: WorkflowExecutor) -> None:
+        self._executor = executor
+
+    def runFlow(self, flowLabel: str) -> None:
+        self._executor.runFlow(flowLabel=flowLabel)
+
+
 class WorkflowCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry,
+                 stateDataRegistry: StateDataRegistry) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
-        self.presenter = WorkflowPresenter.createInstance(self._settings)
+        self._authorizer = WorkflowAuthorizer()
+        self._statusRepository = WorkflowStatusRepository()
+        self._executor = WorkflowExecutor(self._settings, settingsRegistry, stateDataRegistry)
+        self._thread: Optional[threading.Thread] = None
+
+        try:
+            from .globus import GlobusWorkflowThread
+        except ModuleNotFoundError:
+            logger.info('Globus not found.')
+        else:
+            self._thread = GlobusWorkflowThread(self._authorizer, self._statusRepository,
+                                                self._executor)
+
+        self.parametersPresenter = WorkflowParametersPresenter.createInstance(self._settings)
+        self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
+        self.statusPresenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
+        self.executionPresenter = WorkflowExecutionPresenter(self._executor)
+
+    @property
+    def areWorkflowsSupported(self) -> bool:
+        return (self._thread is not None)
+
+    def start(self) -> None:
+        logger.info('Starting workflow thread...')
+
+        if self._thread:
+            self._thread.start()
+
+        logger.info('Workflow thread started.')
+
+    def stop(self) -> None:
+        logger.info('Stopping workflow thread...')
+        self._executor.jobQueue.join()
+        self._authorizer.shutdownEvent.set()
+
+        if self._thread:
+            self._thread.join()
+
+        logger.info('Workflow thread stopped.')

@@ -2,12 +2,12 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Final, Optional
 
 import numpy
 
-from ...api.scan import Scan, ScanPoint
-from .repositoryItem import ScanRepositoryItem
+from ...api.scan import Scan, ScanPoint, TabularScan
+from .repository import ScanRepositoryItem
 from .settings import ScanSettings
 
 
@@ -15,6 +15,10 @@ from .settings import ScanSettings
 class ScanFileInfo:
     fileType: str
     filePath: Path
+
+    @classmethod
+    def createNull(cls) -> ScanFileInfo:
+        return cls(fileType='', filePath=Path())
 
     @classmethod
     def createFromSettings(cls, settings: ScanSettings) -> ScanFileInfo:
@@ -25,11 +29,16 @@ class ScanFileInfo:
 
 
 class TabularScanRepositoryItem(ScanRepositoryItem):
+    NAME: Final[str] = 'Tabular'
 
     def __init__(self, scan: Scan, fileInfo: Optional[ScanFileInfo]) -> None:
         super().__init__()
         self._scan = scan
         self._fileInfo = fileInfo
+
+    @classmethod
+    def createEmpty(cls) -> TabularScanRepositoryItem:
+        return cls(TabularScan.createEmpty(), None)
 
     @property
     def name(self) -> str:
@@ -37,7 +46,7 @@ class TabularScanRepositoryItem(ScanRepositoryItem):
 
     @property
     def category(self) -> str:
-        return 'Tabular'
+        return self.NAME
 
     @property
     def variant(self) -> str:

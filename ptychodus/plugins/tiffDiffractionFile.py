@@ -10,6 +10,7 @@ from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, Diffr
                                 DiffractionPatternArray, DiffractionPatternData,
                                 DiffractionPatternState, SimpleDiffractionDataset,
                                 SimpleDiffractionPatternArray)
+from ptychodus.api.geometry import Vector2D
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -60,44 +61,58 @@ class TiffDiffractionFileReader(DiffractionFileReader):
     def fileFilter(self) -> str:
         return 'Tagged Image File Format Files (*.tif *.tiff)'
 
+    def _getFileSeries(self, filePath: Path) -> tuple[list[Path], str]:
+        filePathList: list[Path] = list()
+
+        digits = re.findall(r'\d+', filePath.stem)
+        longest_digits = max(digits, key=len)
+        filePattern = filePath.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
+
+        for fp in filePath.parent.iterdir():
+            z = re.match(filePattern, fp.name)
+
+            if z:
+                index = int(z.group(1).lstrip('0'))
+                filePathList.append(fp)
+
+        filePathList.sort(key=lambda fp: fp.stem)
+
+        return filePathList, filePattern
+
     def read(self, filePath: Path) -> DiffractionDataset:
-        metadata = DiffractionMetadata(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
+        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+
+        filePathList, filePattern = self._getFileSeries(filePath)
+        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
 
-        if filePath:
-            digits = re.findall(r'\d+', filePath.stem)
-            longest_digits = max(digits, key=len)
-            pattern = filePath.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
-            filePathList: list[Path] = list()
+        for idx, fp in enumerate(filePathList):
+            array = TiffDiffractionPatternArray(fp, idx)
+            contentsTree.createChild([array.getLabel(), 'TIFF', str(idx)])
+            arrayList.append(array)
 
-            for fp in filePath.parent.iterdir():
-                z = re.match(pattern, fp.name)
-
-                if z:
-                    index = int(z.group(1).lstrip('0'))
-                    filePathList.append(fp)
-
-            filePathList.sort(key=lambda fp: fp.stem)
-
-            for fp in filePathList:
-                array: DiffractionPatternArray = TiffDiffractionPatternArray(fp, len(arrayList))
-                arrayList.append(array)
-
+        try:
             with TiffFile(filePath) as tiff:
                 data = tiff.asarray()
-                metadata = DiffractionMetadata(
-                    filePath=filePath.parent / pattern,
-                    numberOfPatternsPerArray=len(tiff.pages),
-                    numberOfPatternsTotal=len(tiff.pages) * len(arrayList),
-                    patternDataType=data.dtype,
-                )
+        except OSError:
+            logger.debug(f'Unable to read file \"{filePath}\".')
+        else:
+            if data.ndim == 2:
+                data = data[numpy.newaxis, :, :]
 
-        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+            numberOfPatternsPerArray, detectorHeight, detectorWidth = data.shape
 
-        for array in arrayList:
-            contentsTree.createChild([array.getLabel(), 'TIFF', str(array.getIndex())])
+            metadata = DiffractionMetadata(
+                numberOfPatternsPerArray=numberOfPatternsPerArray,
+                numberOfPatternsTotal=numberOfPatternsPerArray * len(arrayList),
+                patternDataType=data.dtype,
+                detectorNumberOfPixels=Vector2D[int](detectorWidth, detectorHeight),
+                filePath=filePath.parent / filePattern,
+            )
 
-        return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+            dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+
+        return dataset
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

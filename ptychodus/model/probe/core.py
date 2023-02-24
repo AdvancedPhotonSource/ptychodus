@@ -9,7 +9,7 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry
-from ..data import CropSizer
+from ..data import DiffractionPatternSizer
 from ..detector import Detector
 from ..statefulCore import StateDataType, StatefulCore
 from .apparatus import Apparatus
@@ -175,12 +175,12 @@ class ProbeCore(StatefulCore):
         return PluginChooser[ProbeInitializer].createFromList(pluginList)
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
-                 detector: Detector, cropSizer: CropSizer,
+                 detector: Detector, diffractionPatternSizer: DiffractionPatternSizer,
                  fileReaderChooser: PluginChooser[ProbeFileReader],
                  fileWriterChooser: PluginChooser[ProbeFileWriter]) -> None:
         self.settings = ProbeSettings.createInstance(settingsRegistry)
-        self.sizer = ProbeSizer.createInstance(self.settings, cropSizer)
-        self.apparatus = Apparatus.createInstance(detector, cropSizer, self.settings)
+        self.sizer = ProbeSizer.createInstance(self.settings, diffractionPatternSizer)
+        self.apparatus = Apparatus.createInstance(detector, diffractionPatternSizer, self.settings)
         self.probe = Probe(self.sizer)
 
         self._initializerChooser = ProbeCore._createInitializerChooser(

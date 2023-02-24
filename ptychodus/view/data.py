@@ -14,6 +14,7 @@ __all__ = [
     'MetadataView',
     'PatternCropView',
     'PatternLoadView',
+    'PatternMemoryMapView',
     'PatternTransformView',
     'PatternsView',
 ]
@@ -107,7 +108,6 @@ class PatternLoadView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Load', parent)
         self.numberOfThreadsSpinBox = QSpinBox()
-        # TODO controls to assemble in-memory or use scratch directory
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> PatternLoadView:
@@ -153,7 +153,7 @@ class PatternTransformView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Transform', parent)
-        self.thresholdLabel = QLabel('Threshold:')
+        self.thresholdCheckBox = QCheckBox('Threshold:')
         self.thresholdSpinBox = QSpinBox()
         self.axesLabel = QLabel('Axes:')
         self.flipXCheckBox = QCheckBox('Flip X')
@@ -164,7 +164,7 @@ class PatternTransformView(QGroupBox):
         view = cls(parent)
 
         layout = QGridLayout()
-        layout.addWidget(view.thresholdLabel, 0, 0)
+        layout.addWidget(view.thresholdCheckBox, 0, 0)
         layout.addWidget(view.thresholdSpinBox, 0, 1, 1, 2)
         layout.addWidget(view.axesLabel, 1, 0)
         layout.addWidget(view.flipXCheckBox, 1, 1, Qt.AlignHCenter)
@@ -176,11 +176,34 @@ class PatternTransformView(QGroupBox):
         return view
 
 
+class PatternMemoryMapView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Memory Map Diffraction Data', parent)
+        self.scratchDirectoryLabel = QLabel('Scratch Directory:')
+        self.scratchDirectoryLineEdit = QLineEdit()
+        self.scratchDirectoryBrowseButton = QPushButton('Browse')
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PatternMemoryMapView:
+        view = cls(parent)
+
+        layout = QGridLayout()
+        layout.addWidget(view.scratchDirectoryLabel, 1, 0)
+        layout.addWidget(view.scratchDirectoryLineEdit, 1, 1)
+        layout.addWidget(view.scratchDirectoryBrowseButton, 1, 2)
+        layout.setColumnStretch(1, 1)
+        view.setLayout(layout)
+
+        return view
+
+
 class PatternsView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Patterns', parent)
         self.loadView = PatternLoadView.createInstance()
+        self.memoryMapView = PatternMemoryMapView.createInstance()
         self.cropView = PatternCropView.createInstance()
         self.transformView = PatternTransformView.createInstance()
 
@@ -190,6 +213,7 @@ class PatternsView(QGroupBox):
 
         layout = QVBoxLayout()
         layout.addWidget(view.loadView)
+        layout.addWidget(view.memoryMapView)
         layout.addWidget(view.cropView)
         layout.addWidget(view.transformView)
         layout.addStretch()

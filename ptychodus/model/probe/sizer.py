@@ -4,28 +4,30 @@ from decimal import Decimal
 from ...api.geometry import Interval
 from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
-from ..data import CropSizer
+from ..data import DiffractionPatternSizer
 from .settings import ProbeSettings
 
 
 class ProbeSizer(Observable, Observer):
 
-    def __init__(self, settings: ProbeSettings, cropSizer: CropSizer) -> None:
+    def __init__(self, settings: ProbeSettings,
+                 diffractionPatternSizer: DiffractionPatternSizer) -> None:
         super().__init__()
         self._settings = settings
-        self._cropSizer = cropSizer
+        self._diffractionPatternSizer = diffractionPatternSizer
 
     @classmethod
-    def createInstance(cls, settings: ProbeSettings, cropSizer: CropSizer) -> ProbeSizer:
-        sizer = cls(settings, cropSizer)
+    def createInstance(cls, settings: ProbeSettings,
+                       diffractionPatternSizer: DiffractionPatternSizer) -> ProbeSizer:
+        sizer = cls(settings, diffractionPatternSizer)
         settings.addObserver(sizer)
-        cropSizer.addObserver(sizer)
+        diffractionPatternSizer.addObserver(sizer)
         return sizer
 
     @property
     def _probeSizeMax(self) -> int:
-        cropX = self._cropSizer.getExtentXInPixels()
-        cropY = self._cropSizer.getExtentYInPixels()
+        cropX = self._diffractionPatternSizer.getExtentXInPixels()
+        cropY = self._diffractionPatternSizer.getExtentYInPixels()
         return min(cropX, cropY)
 
     def getProbeSizeLimits(self) -> Interval[int]:
@@ -48,5 +50,5 @@ class ProbeSizer(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self._updateProbeSize()
-        elif observable is self._cropSizer:
+        elif observable is self._diffractionPatternSizer:
             self._updateProbeSize()

@@ -1,14 +1,16 @@
 from collections.abc import Iterator
 from decimal import Decimal
+from typing import Final
 
 import numpy
 
 from ...api.scan import ScanPoint
-from .repositoryItem import ContiguousScanIterator, ScanRepositoryItem
+from .repository import ContiguousScanIterator, ScanRepositoryItem
 from .settings import ScanSettings
 
 
 class SpiralScanRepositoryItem(ScanRepositoryItem):
+    NAME: Final[str] = 'Spiral'
 
     def __init__(self) -> None:
         super().__init__()
@@ -22,7 +24,7 @@ class SpiralScanRepositoryItem(ScanRepositoryItem):
 
     @property
     def category(self) -> str:
-        return 'Spiral'
+        return self.NAME
 
     @property
     def variant(self) -> str:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...model import LissajousScanRepositoryItem
+from ...model.scan import LissajousScanRepositoryItem
 from ...view import LissajousScanView
 
 

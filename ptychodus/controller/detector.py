@@ -9,8 +9,9 @@ from PyQt5.QtWidgets import QFileDialog
 
 from ..api.data import DiffractionPatternState
 from ..api.observer import Observable, Observer
-from ..model import (DetectorPresenter, DiffractionDatasetPresenter,
-                     ActiveDiffractionPatternPresenter, ImagePresenter)
+from ..model import DetectorPresenter
+from ..model.image import ImagePresenter
+from ..model.data import ActiveDiffractionPatternPresenter, DiffractionDatasetPresenter
 from ..view import DiffractionPatternView, DetectorView, ImageView
 from .data import FileDialogFactory
 from .image import ImageController
@@ -41,14 +42,16 @@ class DetectorController(Observer):
 
     def _syncModelToView(self) -> None:
         self._view.numberOfPixelsXSpinBox.blockSignals(True)
-        self._view.numberOfPixelsXSpinBox.setRange(self._presenter.getMinNumberOfPixelsX(),
-                                                   self._presenter.getMaxNumberOfPixelsX())
+        self._view.numberOfPixelsXSpinBox.setRange(
+            self._presenter.getNumberOfPixelsXLimits().lower,
+            self._presenter.getNumberOfPixelsXLimits().upper)
         self._view.numberOfPixelsXSpinBox.setValue(self._presenter.getNumberOfPixelsX())
         self._view.numberOfPixelsXSpinBox.blockSignals(False)
 
         self._view.numberOfPixelsYSpinBox.blockSignals(True)
-        self._view.numberOfPixelsYSpinBox.setRange(self._presenter.getMinNumberOfPixelsY(),
-                                                   self._presenter.getMaxNumberOfPixelsY())
+        self._view.numberOfPixelsYSpinBox.setRange(
+            self._presenter.getNumberOfPixelsYLimits().lower,
+            self._presenter.getNumberOfPixelsYLimits().upper)
         self._view.numberOfPixelsYSpinBox.setValue(self._presenter.getNumberOfPixelsY())
         self._view.numberOfPixelsYSpinBox.blockSignals(False)
 

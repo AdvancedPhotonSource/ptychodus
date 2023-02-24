@@ -4,7 +4,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ...model import ScanPresenter, ScanRepositoryKeyAndValue
+from ...model.scan import ScanPresenter, ScanRepositoryKeyAndValue
 
 
 class ScanTableModel(QAbstractTableModel):
@@ -82,7 +82,7 @@ class ScanTableModel(QAbstractTableModel):
         if index.isValid() and index.column() == 0 and role == Qt.CheckStateRole:
             entry = self._scanList[index.row()]
 
-            if value == Qt.Checked:
+            if value == QVariant(Qt.Checked):
                 self._checkedNames.add(entry.name)
             else:
                 self._checkedNames.discard(entry.name)

@@ -3,8 +3,8 @@ from typing import Generic, Optional, TypeVar
 
 from PyQt5.QtCore import QEvent, QObject
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QHeaderView, QHBoxLayout, QMenu, QPushButton, QSpinBox,
-                             QTableView, QVBoxLayout, QWidget)
+                             QGroupBox, QHeaderView, QHBoxLayout, QLabel, QMenu, QPushButton,
+                             QSpinBox, QTableView, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -23,6 +23,7 @@ __all__ = [
     'ScanPositionDataView',
     'ScanTransformView',
     'SpiralScanView',
+    'TabularScanView',
 ]
 
 T = TypeVar('T', bound=QGroupBox)
@@ -109,10 +110,28 @@ class LissajousScanView(QGroupBox):
         return view
 
 
+class TabularScanView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Parameters', parent)
+        self.label = QLabel('None.')
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> TabularScanView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow(view.label)
+        view.setLayout(layout)
+
+        return view
+
+
 class ScanTransformView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Transform', parent)
+        self.indexFilterComboBox = QComboBox()
         self.transformComboBox = QComboBox()
         self.jitterRadiusWidget = LengthWidget.createInstance()
         self.centroidXWidget = LengthWidget.createInstance()
@@ -123,6 +142,7 @@ class ScanTransformView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
+        layout.addRow('Index Filter:', view.indexFilterComboBox)
         layout.addRow('(x,y) \u2192', view.transformComboBox)
         layout.addRow('Jitter Radius:', view.jitterRadiusWidget)
         layout.addRow('Centroid X:', view.centroidXWidget)

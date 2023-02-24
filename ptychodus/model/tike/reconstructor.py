@@ -12,6 +12,7 @@ from ...api.reconstructor import ReconstructResult, Reconstructor
 from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
 from .arrayConverter import TikeArrays, TikeArrayConverter
+from .multigrid import TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionSettings
 from .probeCorrection import TikeProbeCorrectionSettings
@@ -22,15 +23,16 @@ logger = logging.getLogger(__name__)
 
 class TikeReconstructor:
 
-    def __init__(self, settings: TikeSettings,
-                 objectCorrectionSettings: TikeObjectCorrectionSettings,
+    def __init__(self, settings: TikeSettings, multigridSettings: TikeMultigridSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings,
+                 objectCorrectionSettings: TikeObjectCorrectionSettings,
                  arrayConverter: TikeArrayConverter) -> None:
         self._settings = settings
-        self._objectCorrectionSettings = objectCorrectionSettings
+        self._multigridSettings = multigridSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
+        self._objectCorrectionSettings = objectCorrectionSettings
         self._arrayConverter = arrayConverter
 
         tikeVersion = version('tike')
@@ -47,6 +49,7 @@ class TikeReconstructor:
                 use_adaptive_moment=settings.useAdaptiveMoment.value,
                 vdecay=float(settings.vdecay.value),
                 mdecay=float(settings.mdecay.value),
+                clip_magnitude=settings.useMagnitudeClipping.value,
             )
 
         return options
@@ -85,6 +88,7 @@ class TikeReconstructor:
                 probe_support=probeSupport,
                 probe_support_radius=float(settings.probeSupportRadius.value),
                 probe_support_degree=float(settings.probeSupportDegree.value),
+                additional_probe_penalty=float(settings.additionalProbePenalty.value),
             )
 
         return options
@@ -132,11 +136,25 @@ class TikeReconstructor:
             object_options=self.getObjectOptions(),
             position_options=self.getPositionOptions(scan))
 
-        result = tike.ptycho.reconstruct(data=data,
-                                         parameters=parameters,
-                                         model=self._settings.noiseModel.value,
-                                         num_gpu=numGpus,
-                                         use_mpi=self._settings.useMpi.value)
+        if self._multigridSettings.useMultigrid.value:
+            result = tike.ptycho.reconstruct_multigrid(
+                data=data,
+                parameters=parameters,
+                model=self._settings.noiseModel.value,
+                num_gpu=numGpus,
+                use_mpi=self._settings.useMpi.value,
+                num_levels=self._multigridSettings.numLevels.value,
+                interp=None,  # TODO does this have other options?
+            )
+        else:
+            result = tike.ptycho.reconstruct(
+                data=data,
+                parameters=parameters,
+                model=self._settings.noiseModel.value,
+                num_gpu=numGpus,
+                use_mpi=self._settings.useMpi.value,
+            )
+
         logger.debug(f'Result: {pprint.pformat(result)}')
 
         outputArrays = TikeArrays(scan=result.scan, probe=result.probe, object_=result.psi)
@@ -162,7 +180,9 @@ class RegularizedPIEReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
+        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.alpha = float(self._settings.alpha.value)
         return self._tikeReconstructor(self._algorithmOptions)
 
@@ -184,7 +204,9 @@ class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
+        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.alpha = float(self._settings.alpha.value)
         self._algorithmOptions.step_length = float(self._settings.stepLength.value)
         return self._tikeReconstructor(self._algorithmOptions)
@@ -207,7 +229,9 @@ class ConjugateGradientReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
+        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.cg_iter = self._settings.cgIter.value
         self._algorithmOptions.step_length = float(self._settings.stepLength.value)
         return self._tikeReconstructor(self._algorithmOptions)
@@ -230,7 +254,9 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
+        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         return self._tikeReconstructor(self._algorithmOptions)
 
 
@@ -251,5 +277,7 @@ class DifferenceMapReconstructor(Reconstructor):
 
     def reconstruct(self) -> ReconstructResult:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
+        # TODO self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
+        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         return self._tikeReconstructor(self._algorithmOptions)

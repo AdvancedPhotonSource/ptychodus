@@ -35,21 +35,22 @@ Standard Installation
 3. Activate the `ptychodus` conda environment to run ptychodus.
 
    .. code-block:: shell
-
        $ conda activate ptychodus
        $ ptychodus -h
-       usage: ptychodus [-h] [-b] [-d] [-f PREFIX] [-p PORT] [-s SETTINGS] [-v]
+       usage: ptychodus [-h] [-b RESULTS_FILE] [-f PREFIX] [-p PORT] [-r RESTART_FILE] [-s SETTINGS_FILE] [-v]
 
        ptychodus is a ptychography analysis application
 
-       optional arguments:
+       options:
          -h, --help            show this help message and exit
-         -b, --batch           run reconstruction non-interactively
-         -d, --dev             run in developer mode
+         -b RESULTS_FILE, --batch RESULTS_FILE
+                               run reconstruction non-interactively
          -f PREFIX, --file-prefix PREFIX
                                replace file path prefix
          -p PORT, --port PORT  remote process communication port number
-         -s SETTINGS, --settings SETTINGS
+         -r RESTART_FILE, --restart RESTART_FILE
+                               use restart data from file
+         -s SETTINGS_FILE, --settings SETTINGS_FILE
                                use settings from file
          -v, --version         show program's version number and exit
        $ ptychodus
@@ -99,75 +100,6 @@ Tips
 .. code-block:: shell
 
    $ pip install PyQt5-stubs
-
-Basic RPC Demonstration
------------------------
-
-* Generate a batch mode reconstruction result file (named `results.npz` in this example)
-
-.. code-block:: shell
-
-   $ ptychodus -b -s /path/to/settings.ini
-
-* Launch the GUI in one terminal and navigate to the "Monitor" view
-
-.. code-block:: shell
-
-   $ ptychodus -p 9999
-
-* Send a RPC message (JSON format) to instruct the GUI to display the reconstruction result
-
-.. code-block:: shell
-
-   $ ptychodus-rpc -p 9999 -m '{"procedure": "LoadResults", "filePath": "/path/to/results.npz"}'
-
-
-Streaming Demonstration
------------------------
-
-* To install the `PvaPy`_ backend:
-
-.. code-block:: shell
-
-   $ conda install -n ptychodus -c apsu pvapy
-
-* In terminal 1:
-
-.. code-block:: shell
-
-   $ pvapy-hpc-consumer \
-       --input-channel pvapy:image \
-       --control-channel consumer:*:control \
-       --status-channel consumer:*:status \
-       --output-channel consumer:*:output \
-       --processor-class ptychodus.PtychodusAdImageProcessor \
-       --processor-args '{ "settingsFilePath": "/path/to/ptychodus.ini", "reconstructFrameId": 1000 }' \
-       --report-period 10 \
-       --log-level debug
-
-* In terminal 2:
-
-.. code-block:: shell
-
-   # application status
-   $ pvget consumer:1:status
-
-   # configure application
-   $ pvput consumer:1:control '{"command" : "configure", "args" : "{\"nPatternsTotal\": 1000}"}'
-
-   # get last command status
-   $ pvget consumer:1:control
-
-   # start area detector sim server
-   $ pvapy-ad-sim-server -cn pvapy:image -if /path/to/fly001.npy -rt 120 -fps 1000
-
-* At the end of the demo,
-
-.. code-block:: shell
-
-   # shutdown consumer process
-   pvput consumer:1:control '{"command" : "stop"}'
-
 
 Reporting bugs
 -------------

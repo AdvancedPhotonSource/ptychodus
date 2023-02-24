@@ -6,6 +6,7 @@ import logging
 
 import numpy
 
+from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
 from ...api.scan import Scan
@@ -15,6 +16,7 @@ from ..object import Object
 from ..probe import Apparatus, Probe, ProbeSizer
 from ..scan import ScanRepositoryItemFactory, ScanRepository
 from .arrayConverter import TikeArrayConverter
+from .multigrid import TikeMultigridPresenter, TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionPresenter, TikePositionCorrectionSettings
 from .probeCorrection import TikeProbeCorrectionPresenter, TikeProbeCorrectionSettings
@@ -57,73 +59,74 @@ class TikePresenter(Observable, Observer):
     def setNoiseModel(self, name: str) -> None:
         self._settings.noiseModel.value = name
 
-    def getMinNumBatch(self) -> int:
-        return 1
-
-    def getMaxNumBatch(self) -> int:
-        return self.MAX_INT
+    def getNumBatchLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
 
     def getNumBatch(self) -> int:
-        return self._clamp(self._settings.numBatch.value, self.getMinNumBatch(),
-                           self.getMaxNumBatch())
+        limits = self.getNumBatchLimits()
+        return limits.clamp(self._settings.numBatch.value)
 
     def setNumBatch(self, value: int) -> None:
         self._settings.numBatch.value = value
 
-    def getMinNumIter(self) -> int:
-        return 1
+    def getBatchMethodList(self) -> list[str]:
+        return ['by_scan_grid', 'by_scan_stripes', 'wobbly_center', 'compact']
 
-    def getMaxNumIter(self) -> int:
-        return self.MAX_INT
+    def getBatchMethod(self) -> str:
+        return self._settings.batchMethod.value
+
+    def setBatchMethod(self, name: str) -> None:
+        self._settings.batchMethod.value = name
+
+    def getNumIterLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
 
     def getNumIter(self) -> int:
-        return self._clamp(self._settings.numIter.value, self.getMinNumIter(),
-                           self.getMaxNumIter())
+        limits = self.getNumIterLimits()
+        return limits.clamp(self._settings.numIter.value)
 
     def setNumIter(self, value: int) -> None:
         self._settings.numIter.value = value
 
-    def getMinCgIter(self) -> int:
-        return 1
+    def getConvergenceWindowLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
 
-    def getMaxCgIter(self) -> int:
-        return 64
+    def getConvergenceWindow(self) -> int:
+        limits = self.getConvergenceWindowLimits()
+        return limits.clamp(self._settings.convergenceWindow.value)
+
+    def setConvergenceWindow(self, value: int) -> None:
+        self._settings.convergenceWindow.value = value
+
+    def getCgIterLimits(self) -> Interval[int]:
+        return Interval[int](1, 64)
 
     def getCgIter(self) -> int:
-        return self._clamp(self._settings.cgIter.value, self.getMinCgIter(), self.getMaxCgIter())
+        limits = self.getCgIterLimits()
+        return limits.clamp(self._settings.cgIter.value)
 
     def setCgIter(self, value: int) -> None:
         self._settings.cgIter.value = value
 
-    def getMinAlpha(self) -> Decimal:
-        return Decimal(0)
-
-    def getMaxAlpha(self) -> Decimal:
-        return Decimal(1)
+    def getAlphaLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getAlpha(self) -> Decimal:
-        return self._clamp(self._settings.alpha.value, self.getMinAlpha(), self.getMaxAlpha())
+        limits = self.getAlphaLimits()
+        return limits.clamp(self._settings.alpha.value)
 
     def setAlpha(self, value: Decimal) -> None:
         self._settings.alpha.value = value
 
-    def getMinStepLength(self) -> Decimal:
-        return Decimal(0)
-
-    def getMaxStepLength(self) -> Decimal:
-        return Decimal(1)
+    def getStepLengthLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getStepLength(self) -> Decimal:
-        return self._clamp(self._settings.stepLength.value, self.getMinStepLength(),
-                           self.getMaxStepLength())
+        limits = self.getStepLengthLimits()
+        return limits.clamp(self._settings.stepLength.value)
 
     def setStepLength(self, value: Decimal) -> None:
         self._settings.stepLength.value = value
-
-    @staticmethod
-    def _clamp(x, xmin, xmax):  # TODO typing
-        assert xmin <= xmax
-        return max(xmin, min(x, xmax))
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
@@ -135,6 +138,7 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         super().__init__()
         self._settings = TikeSettings.createInstance(settingsRegistry)
+        self._multigridSettings = TikeMultigridSettings.createInstance(settingsRegistry)
         self._positionCorrectionSettings = TikePositionCorrectionSettings.createInstance(
             settingsRegistry)
         self._probeCorrectionSettings = TikeProbeCorrectionSettings.createInstance(
@@ -143,6 +147,7 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
             settingsRegistry)
 
         self.presenter = TikePresenter.createInstance(self._settings)
+        self.multigridPresenter = TikeMultigridPresenter.createInstance(self._multigridSettings)
         self.positionCorrectionPresenter = TikePositionCorrectionPresenter.createInstance(
             self._positionCorrectionSettings)
         self.probeCorrectionPresenter = TikeProbeCorrectionPresenter.createInstance(
@@ -185,9 +190,10 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
             arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_,
                                                 diffractionDataset, scanRepositoryItemFactory,
                                                 scanRepository)
-            tikeReconstructor = TikeReconstructor(core._settings, core._objectCorrectionSettings,
+            tikeReconstructor = TikeReconstructor(core._settings, core._multigridSettings,
                                                   core._positionCorrectionSettings,
-                                                  core._probeCorrectionSettings, arrayConverter)
+                                                  core._probeCorrectionSettings,
+                                                  core._objectCorrectionSettings, arrayConverter)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

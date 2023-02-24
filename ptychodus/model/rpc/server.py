@@ -13,7 +13,12 @@ class RPCStreamRequestHandler(socketserver.StreamRequestHandler):
     def handle(self) -> None:
         message = self.rfile.readline().decode('utf-8').strip()
         logger.debug(f'RECV: \"{message}\" from {self.client_address[0]}')
-        response = self.server.processMessage(message)
+
+        if isinstance(self.server, RPCSocketServer):
+            response = self.server.processMessage(message)
+        else:
+            logger.error('This should be impossible.')
+
         logger.debug(f'SEND: \"{response}\" to {self.client_address[0]}')
         self.wfile.write(response.encode('utf-8'))
 

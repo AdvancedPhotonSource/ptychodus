@@ -25,17 +25,6 @@ class SquareRootScalarTransformation(ScalarTransformation):
         return numpy.sqrt(array, out=nil, where=(array > 0))
 
 
-class LogScalarTransformation(ScalarTransformation):
-
-    @property
-    def name(self) -> str:
-        return 'Natural Logarithm'
-
-    def __call__(self, array: RealArrayType) -> RealArrayType:
-        nil = numpy.zeros_like(array)
-        return numpy.log(array, out=nil, where=(array > 0))
-
-
 class Log2ScalarTransformation(ScalarTransformation):
 
     @property
@@ -45,6 +34,17 @@ class Log2ScalarTransformation(ScalarTransformation):
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
         return numpy.log2(array, out=nil, where=(array > 0))
+
+
+class LogScalarTransformation(ScalarTransformation):
+
+    @property
+    def name(self) -> str:
+        return 'Natural Logarithm'
+
+    def __call__(self, array: RealArrayType) -> RealArrayType:
+        nil = numpy.zeros_like(array)
+        return numpy.log(array, out=nil, where=(array > 0))
 
 
 class Log10ScalarTransformation(ScalarTransformation):
@@ -61,6 +61,6 @@ class Log10ScalarTransformation(ScalarTransformation):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.registerPlugin(IdentityScalarTransformation())
     registry.registerPlugin(SquareRootScalarTransformation())
-    registry.registerPlugin(LogScalarTransformation())
     registry.registerPlugin(Log2ScalarTransformation())
+    registry.registerPlugin(LogScalarTransformation())
     registry.registerPlugin(Log10ScalarTransformation())

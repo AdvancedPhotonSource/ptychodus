@@ -1,15 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Union
 import logging
 
 from skimage.restoration import unwrap_phase
 import numpy
 import numpy.typing
 
+from ...api.image import RealArrayType
 from ...api.observer import Observable, Observer
 
-InexactArrayType = numpy.typing.NDArray[numpy.inexact[Any]]
-NumericArrayType = numpy.typing.NDArray[numpy.number[Any]]
+NumericDTypes = Union[numpy.integer[Any], numpy.floating[Any], numpy.complexfloating[Any, Any]]
+NumericArrayType = numpy.typing.NDArray[NumericDTypes]
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +19,29 @@ class VisualizationArray(Observable):
 
     def __init__(self) -> None:
         super().__init__()
-        self._array: InexactArrayType = numpy.zeros((1, 1))
+        self._array: NumericArrayType = numpy.zeros((1, 1))
+
+    def getRealPart(self) -> RealArrayType:
+        return numpy.real(self._array).astype(numpy.float_)
+
+    def getImaginaryPart(self) -> RealArrayType:
+        return numpy.imag(self._array).astype(numpy.float_)
+
+    def getAmplitude(self) -> RealArrayType:
+        return numpy.absolute(self._array).astype(numpy.float_)
+
+    def getPhaseInRadians(self) -> RealArrayType:
+        return numpy.angle(self._array).astype(numpy.float_)
+
+    def getPhaseUnwrappedInRadians(self) -> RealArrayType:
+        return unwrap_phase(self.getPhaseInRadians())
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        return self._array.shape
 
     def _reset(self) -> None:
         self._array = numpy.zeros((1, 1))
-
-    def __call__(self) -> InexactArrayType:
-        return self._array
 
     def setArray(self, array: NumericArrayType) -> None:
         if array is None:
@@ -33,90 +50,7 @@ class VisualizationArray(Observable):
         elif numpy.size(array) < 1:
             logger.error('Refusing to assign empty array!')
             self._reset()
-        elif numpy.issubdtype(array.dtype, numpy.complexfloating):
-            self._array = array.astype(numpy.complex_)
-        elif numpy.issubdtype(array.dtype, numpy.floating):
-            self._array = array.astype(numpy.float_)
-        elif numpy.issubdtype(array.dtype, numpy.integer):
-            self._array = array.astype(numpy.float_)
         else:
-            logger.error(f'Refusing to assign array with non-numeric dtype \"{array.dtype}\"!')
-            self._reset()
+            self._array = array
 
         self.notifyObservers()
-
-
-class VisualizationArrayComponent(Observable, Observer, ABC):
-
-    def __init__(self, name: str, array: VisualizationArray) -> None:
-        super().__init__()
-        self._name = name
-        self._array = array
-        self._array.addObserver(self)
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @abstractmethod
-    def __call__(self) -> InexactArrayType:
-        pass
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._array:
-            self.notifyObservers()
-
-
-class ComplexArrayComponent(VisualizationArrayComponent):
-
-    def __init__(self, array: VisualizationArray) -> None:
-        super().__init__('Complex', array)
-
-    def __call__(self) -> InexactArrayType:
-        return self._array()
-
-
-class AmplitudeArrayComponent(VisualizationArrayComponent):
-
-    def __init__(self, array: VisualizationArray) -> None:
-        super().__init__('Amplitude', array)
-
-    def __call__(self) -> InexactArrayType:
-        return numpy.absolute(self._array())
-
-
-class PhaseArrayComponent(VisualizationArrayComponent):
-
-    def __init__(self, array: VisualizationArray) -> None:
-        super().__init__('Phase', array)
-
-    def __call__(self) -> InexactArrayType:
-        return numpy.angle(self._array())
-
-
-class UnwrappedPhaseArrayComponent(VisualizationArrayComponent):
-
-    def __init__(self, array: VisualizationArray) -> None:
-        super().__init__('Phase (Unwrapped)', array)
-
-    def __call__(self) -> InexactArrayType:
-        phase = numpy.angle(self._array())
-        return unwrap_phase(phase)
-
-
-class RealArrayComponent(VisualizationArrayComponent):
-
-    def __init__(self, array: VisualizationArray) -> None:
-        super().__init__('Real', array)
-
-    def __call__(self) -> InexactArrayType:
-        return numpy.real(self._array())
-
-
-class ImaginaryArrayComponent(VisualizationArrayComponent):
-
-    def __init__(self, array: VisualizationArray) -> None:
-        super().__init__('Imaginary', array)
-
-    def __call__(self) -> InexactArrayType:
-        return numpy.imag(self._array())

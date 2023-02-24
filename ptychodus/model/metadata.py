@@ -66,17 +66,24 @@ class MetadataPresenter(Observable, Observer):
                 self._metadata.detectorDistanceInMeters
 
     def canSyncPatternCropCenter(self) -> bool:
-        return (self._metadata.cropCenterInPixels is not None)
+        return (self._metadata.cropCenterInPixels is not None \
+                or self._metadata.detectorNumberOfPixels is not None)
 
     def canSyncPatternCropExtent(self) -> bool:
         return (self._metadata.detectorNumberOfPixels is not None)
 
     def syncPatternCrop(self, syncCenter: bool, syncExtent: bool) -> None:
-        if syncCenter and self._metadata.cropCenterInPixels:
-            self._patternSettings.cropCenterXInPixels.value = \
-                    self._metadata.cropCenterInPixels.x
-            self._patternSettings.cropCenterYInPixels.value = \
-                    self._metadata.cropCenterInPixels.y
+        if syncCenter:
+            if self._metadata.cropCenterInPixels:
+                self._patternSettings.cropCenterXInPixels.value = \
+                        self._metadata.cropCenterInPixels.x
+                self._patternSettings.cropCenterYInPixels.value = \
+                        self._metadata.cropCenterInPixels.y
+            elif self._metadata.detectorNumberOfPixels:
+                self._patternSettings.cropCenterXInPixels.value = \
+                        int(self._metadata.detectorNumberOfPixels.x) // 2
+                self._patternSettings.cropCenterYInPixels.value = \
+                        int(self._metadata.detectorNumberOfPixels.y) // 2
 
         if syncExtent and self._metadata.detectorNumberOfPixels:
             centerX = self._patternSettings.cropCenterXInPixels.value

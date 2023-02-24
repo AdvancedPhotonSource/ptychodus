@@ -22,19 +22,59 @@ def verifyAllArgumentsParsed(parser: argparse.ArgumentParser, argv: list[str]) -
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog=ptychodus.__name__.lower(),
-        description=f'{ptychodus.__name__} is a ptychography analysis application')
-    parser.add_argument('-b', '--batch', action='store_true', \
-            help='run reconstruction non-interactively')
-    parser.add_argument('-d', '--dev', action='store_true', help='run in developer mode')
-    parser.add_argument('-f', '--file-prefix', action='store', dest='prefix', \
-            help='replace file path prefix')
-    parser.add_argument('-p', '--port', action='store', type=int, default=9999, \
-            help='remote process communication port number')
-    parser.add_argument('-r', '--restart', action='store', type=argparse.FileType('r'), \
-            help='use restart data from file')
-    parser.add_argument('-s', '--settings', action='store', type=argparse.FileType('r'), \
-            help='use settings from file')
-    parser.add_argument('-v', '--version', action='version', version=versionString())
+        description=f'{ptychodus.__name__} is a ptychography analysis application',
+    )
+    parser.add_argument(
+        '-b',
+        '--batch',
+        action='store',
+        type=argparse.FileType('w'),
+        metavar='RESULTS_FILE',
+        help='run reconstruction non-interactively',
+    )
+    parser.add_argument(
+        '-d',
+        '--dev',
+        action='store_true',
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        '-f',
+        '--file-prefix',
+        action='store',
+        dest='prefix',
+        help='replace file path prefix in settings',
+    )
+    parser.add_argument(
+        '-p',
+        '--port',
+        action='store',
+        default=9999,
+        help='remote process communication port number',
+        type=int,
+    )
+    parser.add_argument(
+        '-r',
+        '--restart',
+        action='store',
+        help='use restart data from file',
+        metavar='RESTART_FILE',
+        type=argparse.FileType('r'),
+    )
+    parser.add_argument(
+        '-s',
+        '--settings',
+        action='store',
+        help='use settings from file',
+        metavar='SETTINGS_FILE',
+        type=argparse.FileType('r'),
+    )
+    parser.add_argument(
+        '-v',
+        '--version',
+        action='version',
+        version=versionString(),
+    )
     parsedArgs, unparsedArgs = parser.parse_known_args()
 
     modelArgs = ModelArgs(
@@ -42,14 +82,15 @@ def main() -> int:
         settingsFilePath=Path(parsedArgs.settings.name) if parsedArgs.settings else None,
         replacementPathPrefix=parsedArgs.prefix,
         rpcPort=parsedArgs.port,
-        autoExecuteRPCs=parsedArgs.batch,
+        autoExecuteRPCs=bool(parsedArgs.batch),
         isDeveloperModeEnabled=parsedArgs.dev,
     )
 
     with ModelCore(modelArgs) as model:
-        if parsedArgs.batch:
+        if parsedArgs.batch is not None:
+            resultsFilePath = Path(parsedArgs.batch.name)
             verifyAllArgumentsParsed(parser, unparsedArgs)
-            return model.batchModeReconstruct()
+            return model.batchModeReconstruct(resultsFilePath)
 
         from PyQt5.QtWidgets import QApplication
         # QApplication expects the first argument to be the program name

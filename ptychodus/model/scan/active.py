@@ -4,11 +4,11 @@ import logging
 
 from ...api.observer import Observable, Observer
 from ...api.scan import Scan, ScanPoint
-from .cartesian import CartesianScanRepositoryItem
-from .factory import ScanRepositoryItemFactory
-from .repository import ScanRepository
-from .repositoryItem import ScanRepositoryItem
+from .cartesian import SnakeScanRepositoryItem
+from .itemFactory import ScanRepositoryItemFactory
+from .repository import ScanRepository, ScanRepositoryItem
 from .settings import ScanSettings
+from .transformed import TransformedScanRepositoryItem
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class ActiveScan(Scan, Observer):
         self._factory = factory
         self._repository = repository
         self._reinitObservable = reinitObservable
-        self._item: ScanRepositoryItem = CartesianScanRepositoryItem(snake=True)
+        self._item: ScanRepositoryItem = SnakeScanRepositoryItem()
         self._name = str()
 
     @classmethod
@@ -67,6 +67,15 @@ class ActiveScan(Scan, Observer):
         self._syncToSettings()
         self.notifyObservers()
 
+    @property
+    def untransformed(self) -> Scan:
+        item: Scan = self._item
+
+        if isinstance(self._item, TransformedScanRepositoryItem):
+            item = self._item._item  # TODO clean up
+
+        return item
+
     def __iter__(self) -> Iterator[int]:
         return iter(self._item)
 
@@ -96,7 +105,8 @@ class ActiveScan(Scan, Observer):
         self.setActiveScan(self._settings.activeScan.value)
 
     def _syncToSettings(self) -> None:
-        self._settings.initializer.value = self._item.name
+        self._settings.activeScan.value = self._item.name
+        self._settings.initializer.value = self._item.variant
         self._item.syncToSettings(self._settings)
         self.notifyObservers()
 

@@ -10,12 +10,14 @@ build-backend = "setuptools.build_meta"
 
 [[tool.mypy.overrides]]
 module = [
-    "funcx",
-    "gladier",
-    "globus_automate_client.*",
+    "fair_research_login",
+    "funcx_endpoint.*",
+    "gladier.*",
+    "globus_sdk",
     "h5py",
     "hdf5plugin",
     "matplotlib.*",
+    "parsl.*",
     "ptychonn.*",
     "ptychopy",
     "pvaccess",
@@ -27,3 +29,7 @@ module = [
     "watchdog.*",
 ]
 ignore_missing_imports = true
+
+[tool.yapf]
+based_on_style = "pep8"
+column_limit = 99

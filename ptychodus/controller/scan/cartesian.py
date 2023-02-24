@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...model import CartesianScanRepositoryItem
+from ...model.scan import CartesianScanRepositoryItem
 from ...view import CartesianScanView
 
 

@@ -5,10 +5,13 @@ from pathlib import Path
 from typing import Any, Callable, Final, Generic, Optional, TypeVar, Union
 from uuid import UUID
 import configparser
+import logging
 
 from .observer import Observable, Observer
 
 T = TypeVar('T')
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsEntry(Generic[T], Observable):
@@ -46,10 +49,6 @@ class SettingsGroup(Observable, Observer):
         self._name = name
         self._entryList: list[SettingsEntry[Any]] = list()
 
-    @staticmethod
-    def convertFloatToDecimal(value: float) -> Decimal:
-        return Decimal(repr(value))
-
     @property
     def name(self) -> str:
         return self._name
@@ -71,8 +70,8 @@ class SettingsGroup(Observable, Observer):
 
     def createBooleanEntry(self, name: str, defaultValue: bool) -> SettingsEntry[bool]:
         trueStringList = ['1', 'true', 't', 'yes', 'y']
-        candidateEntry = SettingsEntry[bool](
-            name, defaultValue, lambda valueString: valueString.lower() in trueStringList)
+        candidateEntry = SettingsEntry[bool](name, defaultValue, \
+                lambda valueString: valueString.lower() in trueStringList)
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createIntegerEntry(self, name: str, defaultValue: int) -> SettingsEntry[int]:
@@ -158,6 +157,7 @@ class SettingsRegistry(Observable):
 
     def openSettings(self, filePath: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
+        logger.debug(f'Reading settings from \"{filePath}\"')
         config.read(filePath)
 
         for settingsGroup in self._groupList:
@@ -199,6 +199,8 @@ class SettingsRegistry(Observable):
                         valueString = SettingsRegistry.PREFIX_PLACEHOLDER_TEXT \
                                 + valueString[len(self._replacementPathPrefix):]
                 config.set(settingsGroup.name, settingsEntry.name, valueString)
+
+        logger.debug(f'Writing settings to \"{filePath}\"')
 
         with filePath.open(mode='w') as configFile:
             config.write(configFile)

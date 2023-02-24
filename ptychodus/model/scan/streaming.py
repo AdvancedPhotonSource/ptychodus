@@ -5,8 +5,8 @@ from pathlib import Path
 from statistics import median
 
 from ...api.scan import ScanPoint, TabularScan
-from .factory import ScanRepositoryItemFactory
-from .repositoryItem import ScanRepositoryItem
+from .itemFactory import ScanRepositoryItemFactory
+from .repository import ScanRepositoryItem
 from .tabular import ScanFileInfo
 
 

@@ -7,6 +7,8 @@ import numpy
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QHBoxLayout, QLabel, QSlider, QWidget
 
+from ...api.geometry import Interval
+
 
 class DecimalSlider(QWidget):
     valueChanged = pyqtSignal(Decimal)
@@ -29,7 +31,7 @@ class DecimalSlider(QWidget):
         widget._slider.setTickPosition(QSlider.TicksBelow)
         widget._slider.setTickInterval(100)
         widget._slider.valueChanged.connect(lambda value: widget._setValueFromSlider())
-        widget.setValueAndRange(Decimal(1) / 2, Decimal(0), Decimal(1))
+        widget.setValueAndRange(Decimal(1) / 2, Interval[Decimal](Decimal(0), Decimal(1)))
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -48,20 +50,19 @@ class DecimalSlider(QWidget):
 
     def setValueAndRange(self,
                          value: Decimal,
-                         minimum: Decimal,
-                         maximum: Decimal,
+                         range_: Interval[Decimal],
                          blockValueChangedSignal: bool = False) -> None:
         shouldEmit = False
 
-        if maximum <= minimum:
-            raise ValueError(f'maximum <= minimum ({maximum} <= {minimum})')
+        if range_.upper <= range_.lower:
+            raise ValueError(f'maximum <= minimum ({range_.upper} <= {range_.lower})')
 
-        if minimum != self._minimum:
-            self._minimum = Decimal(minimum)
+        if range_.lower != self._minimum:
+            self._minimum = range_.lower
             shouldEmit = True
 
-        if maximum != self._maximum:
-            self._maximum = Decimal(maximum)
+        if range_.upper != self._maximum:
+            self._maximum = range_.upper
             shouldEmit = True
 
         if self._setValueToSlider(value):

@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (QActionGroup, QApplication, QHeaderView, QMainWindo
                              QToolButton, QTreeView, QWidget)
 
 from . import resources
+from .automation import *
 from .data import DataParametersView
 from .detector import *
 from .image import ImageView
@@ -72,6 +73,11 @@ class ViewCore(QMainWindow):
         self.workflowParametersView = WorkflowParametersView.createInstance()
         self.workflowTableView = QTableView()
 
+        self.automationAction = self.navigationToolBar.addAction(QIcon(':/icons/automate'),
+                                                                 'Automation')
+        self.automationParametersView = AutomationParametersView.createInstance()
+        self.automationWidget = QWidget()
+
         self.monitorAction = self.navigationToolBar.addAction(QIcon(':/icons/monitor'), 'Monitor')
         self.monitorProbeView = MonitorProbeView.createInstance()
         self.monitorObjectView = MonitorObjectView.createInstance()
@@ -109,6 +115,7 @@ class ViewCore(QMainWindow):
         view.parametersWidget.addWidget(view.objectParametersView)
         view.parametersWidget.addWidget(view.reconstructorParametersView)
         view.parametersWidget.addWidget(view.workflowParametersView)
+        view.parametersWidget.addWidget(view.automationParametersView)
         view.parametersWidget.addWidget(view.monitorProbeView)
         view.parametersWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.parametersWidget)
@@ -122,6 +129,7 @@ class ViewCore(QMainWindow):
         view.contentsWidget.addWidget(view.objectImageView)
         view.contentsWidget.addWidget(view.reconstructorPlotView)
         view.contentsWidget.addWidget(view.workflowTableView)
+        view.contentsWidget.addWidget(view.automationWidget)
         view.contentsWidget.addWidget(view.monitorObjectView)
         view.contentsWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.contentsWidget)
@@ -129,7 +137,7 @@ class ViewCore(QMainWindow):
         view.setCentralWidget(view.splitter)
 
         # TODO make visible when complete
-        view.workflowAction.setVisible(isDeveloperModeEnabled)
+        view.automationAction.setVisible(isDeveloperModeEnabled)
 
         desktopSize = QApplication.desktop().availableGeometry().size()
         preferredHeight = desktopSize.height() * 2 // 3

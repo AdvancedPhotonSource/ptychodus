@@ -15,8 +15,9 @@ import numpy
 from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
+from .automation import AutomationCore, AutomationPresenter
 from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
-                   DiffractionPatternPresenter)
+                   DiffractionDatasetInputOutputPresenter, DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import ImageCore, ImagePresenter
 from .metadata import MetadataPresenter
@@ -28,9 +29,10 @@ from .reconstructor import ReconstructorCore, ReconstructorPresenter, Reconstruc
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter
-from .statefulCore import StateDataKeyType, StateDataValueType, StatefulCore
+from .statefulCore import StateDataRegistry
 from .tike import TikeReconstructorLibrary
-from .workflow import WorkflowCore, WorkflowPresenter
+from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
+                       WorkflowParametersPresenter, WorkflowStatusPresenter)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,7 @@ def configureLogger() -> None:
 class ModelArgs:
     restartFilePath: Optional[Path]
     settingsFilePath: Optional[Path]
-    replacementPathPrefix: Optional[str]
+    replacementPathPrefix: Optional[str] = None
     rpcPort: int = -1
     autoExecuteRPCs: bool = False
     isDeveloperModeEnabled: bool = False
@@ -80,7 +82,7 @@ class ModelCore:
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())
         self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
-                                    self._dataCore.cropSizer,
+                                    self._dataCore.patternSizer,
                                     self._pluginRegistry.buildProbeFileReaderChooser(),
                                     self._pluginRegistry.buildProbeFileWriterChooser())
         self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
@@ -98,7 +100,8 @@ class ModelCore:
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
-            self._scanCore.factory, self._scanCore.repository, modelArgs.isDeveloperModeEnabled)
+            self._scanCore.itemFactory, self._scanCore.repository,
+            modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
             self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
@@ -113,7 +116,10 @@ class ModelCore:
             ],
         )
 
-        self._workflowCore = WorkflowCore(self.settingsRegistry)
+        self._stateDataRegistry = StateDataRegistry(
+            (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
+        self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
+        self._automationCore = AutomationCore(self.settingsRegistry)
 
         self.rpcMessageService: Optional[RPCMessageService] = None
 
@@ -124,29 +130,23 @@ class ModelCore:
                 LoadResultsMessage,
                 LoadResultsExecutor(self._probeCore.probe, self._objectCore.object))
 
-        self._statefulCores = [
-            self._dataCore,
-            self._scanCore,
-            self._probeCore,
-            self._objectCore,
-        ]
-
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
 
-        if self.diffractionDatasetPresenter.isReadyToAssemble:
-            self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
-            self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(
-                finishAssembling=True)
-
         if self._modelArgs.restartFilePath:
             self.openStateData(self._modelArgs.restartFilePath)
+
+        if self.diffractionDatasetInputOutputPresenter.isReadyToAssemble:
+            self.diffractionDatasetInputOutputPresenter.startProcessingDiffractionPatterns()
+            self.diffractionDatasetInputOutputPresenter.stopProcessingDiffractionPatterns(
+                finishAssembling=True)
 
         if self.rpcMessageService:
             self.rpcMessageService.start()
 
         self._dataCore.start()
+        self._workflowCore.start()
 
         return self
 
@@ -161,6 +161,7 @@ class ModelCore:
 
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
+        self._workflowCore.stop()
         self._dataCore.stop()
 
         if self.rpcMessageService:
@@ -180,15 +181,19 @@ class ModelCore:
 
     @property
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
-        return self._dataCore.diffractionDatasetPresenter
+        return self._dataCore.datasetPresenter
+
+    @property
+    def diffractionDatasetInputOutputPresenter(self) -> DiffractionDatasetInputOutputPresenter:
+        return self._dataCore.datasetInputOutputPresenter
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self.diffractionDatasetPresenter.initializeStreaming(metadata)
-        self.diffractionDatasetPresenter.startProcessingDiffractionPatterns()
+        self.diffractionDatasetInputOutputPresenter.initializeStreaming(metadata)
+        self.diffractionDatasetInputOutputPresenter.startProcessingDiffractionPatterns()
         self.scanPresenter.initializeStreamingScan()
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
-        self.diffractionDatasetPresenter.assemble(array)
+        self.diffractionDatasetInputOutputPresenter.assemble(array)
         self.scanPresenter.insertArrayTimeStamp(array.getIndex(), timeStamp)
 
     def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
@@ -198,38 +203,26 @@ class ModelCore:
         self.scanPresenter.assembleScanPositionsY(valuesInMeters, timeStamps)
 
     def finalizeStreamingWorkflow(self) -> None:
-        self.diffractionDatasetPresenter.stopProcessingDiffractionPatterns(finishAssembling=True)
+        self.diffractionDatasetInputOutputPresenter.stopProcessingDiffractionPatterns(
+            finishAssembling=True)
         self.scanPresenter.finalizeStreamingScan()
         self.objectPresenter.initializeObject()
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
-        return self.diffractionDatasetPresenter.getAssemblyQueueSize()
+        return self.diffractionDatasetInputOutputPresenter.getAssemblyQueueSize()
 
     def refreshActiveDataset(self) -> None:
         self._dataCore.dataset.notifyObserversIfDatasetChanged()
 
     def saveStateData(self, filePath: Path, *, restartable: bool) -> None:
-        # TODO document file format
-        # TODO include cost function values
-        logger.debug(f'Writing state data to \"{filePath}\" [restartable={restartable}]')
-        data: dict[StateDataKeyType, StateDataValueType] = dict()
-
-        for core in self._statefulCores:
-            data.update(core.getStateData(restartable=restartable))
-
-        numpy.savez(filePath, **data)
+        self._stateDataRegistry.saveStateData(filePath, restartable=restartable)
 
     def openStateData(self, filePath: Path) -> None:
-        logger.debug(f'Reading state data from \"{filePath}\"')
-        data = numpy.load(filePath)
+        self._stateDataRegistry.openStateData(filePath)
 
-        for core in self._statefulCores:
-            core.setStateData(data)
-
-    def batchModeReconstruct(self) -> int:
+    def batchModeReconstruct(self, filePath: Path) -> int:
         result = self._reconstructorCore.presenter.reconstruct()
-        self.saveStateData(self._reconstructorCore.settings.outputFilePath.value,
-                           restartable=False)
+        self.saveStateData(filePath, restartable=False)
         return result.result
 
     @property
@@ -261,5 +254,25 @@ class ModelCore:
         return self._reconstructorCore.plotPresenter
 
     @property
-    def workflowPresenter(self) -> WorkflowPresenter:
-        return self._workflowCore.presenter
+    def areWorkflowsSupported(self) -> bool:
+        return self._workflowCore.areWorkflowsSupported
+
+    @property
+    def workflowAuthorizationPresenter(self) -> WorkflowAuthorizationPresenter:
+        return self._workflowCore.authorizationPresenter
+
+    @property
+    def workflowStatusPresenter(self) -> WorkflowStatusPresenter:
+        return self._workflowCore.statusPresenter
+
+    @property
+    def workflowExecutionPresenter(self) -> WorkflowExecutionPresenter:
+        return self._workflowCore.executionPresenter
+
+    @property
+    def workflowParametersPresenter(self) -> WorkflowParametersPresenter:
+        return self._workflowCore.parametersPresenter
+
+    @property
+    def automationPresenter(self) -> AutomationPresenter:
+        return self._automationCore.presenter
