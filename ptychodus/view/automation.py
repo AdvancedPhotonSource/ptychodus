@@ -37,15 +37,15 @@ class AutomationWatchdogView(QGroupBox):
         return view
 
 
-class AutomationDatasetsView(QGroupBox):
+class AutomationProcessingView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Datasets', parent)
+        super().__init__('Processing', parent)
         self.listView = QListView()
         self.processButton = QPushButton('Process')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> AutomationDatasetsView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> AutomationProcessingView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -61,7 +61,7 @@ class AutomationParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.watchdogView = AutomationWatchdogView.createInstance()
-        self.datasetsView = AutomationDatasetsView.createInstance()
+        self.processingView = AutomationProcessingView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> AutomationParametersView:
@@ -69,7 +69,7 @@ class AutomationParametersView(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(view.watchdogView)
-        layout.addWidget(view.datasetsView)
+        layout.addWidget(view.processingView)
         view.setLayout(layout)
 
         return view

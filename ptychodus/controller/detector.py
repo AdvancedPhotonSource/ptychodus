@@ -5,7 +5,6 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QFileDialog
 
 from ..api.data import DiffractionPatternState
 from ..api.observer import Observable, Observer
