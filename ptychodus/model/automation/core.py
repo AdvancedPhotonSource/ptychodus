@@ -1,11 +1,11 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from enum import Enum, auto
 from pathlib import Path
 
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry, SettingsGroup
+from .buffer import AutomationDatasetBuffer
+from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
 from .watcher import DataDirectoryWatcher
 
@@ -66,48 +66,30 @@ class AutomationPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class AutomationDatasetState(Enum):
-    CREATED = auto()
-    WAITING = auto()
-    PROCESSING = auto()
-    COMPLETE = auto()
-
-
-@dataclass(frozen=True)
-class AutomationDataset:
-    label: str
-    state: AutomationDatasetState
-
-
 class AutomationProcessingPresenter(Observable, Observer):
 
-    def __init__(self, settings: AutomationSettings, watcher: DataDirectoryWatcher) -> None:
+    def __init__(self, settings: AutomationSettings,
+                 repository: AutomationDatasetRepository) -> None:
         super().__init__()
         self._settings = settings
-        self._watcher = watcher
-        self._datasetList = [
-            AutomationDataset('Created', AutomationDatasetState.CREATED),
-            AutomationDataset('Waiting', AutomationDatasetState.WAITING),
-            AutomationDataset('Processing', AutomationDatasetState.PROCESSING),
-            AutomationDataset('Complete', AutomationDatasetState.COMPLETE),
-        ]
+        self._repository = repository
 
     @classmethod
     def createInstance(cls, settings: AutomationSettings,
-                       watcher: DataDirectoryWatcher) -> AutomationProcessingPresenter:
-        presenter = cls(settings, watcher)
+                       repository: AutomationDatasetRepository) -> AutomationProcessingPresenter:
+        presenter = cls(settings, repository)
         settings.addObserver(presenter)
-        watcher.addObserver(presenter)
+        repository.addObserver(presenter)
         return presenter
 
     def getDatasetLabel(self, index: int) -> str:
-        return self._datasetList[index].label
+        return self._repository.getLabel(index)
 
     def getDatasetState(self, index: int) -> AutomationDatasetState:
-        return self._datasetList[index].state
+        return self._repository.getState(index)
 
     def getNumberOfDatasets(self) -> int:
-        return len(self._datasetList)
+        return len(self._repository)
 
     def isProcessingEnabled(self) -> bool:
         return True  # FIXME
@@ -118,7 +100,7 @@ class AutomationProcessingPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
-        elif observable is self._watcher:
+        elif observable is self._repository:
             self.notifyObservers()
 
 
@@ -126,7 +108,9 @@ class AutomationCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
-        self._watcher = DataDirectoryWatcher.createInstance(self._settings)
+        self._repository = AutomationDatasetRepository()
+        self._buffer = AutomationDatasetBuffer(self._settings, self._repository)
+        self._watcher = DataDirectoryWatcher.createInstance(self._settings, self._buffer)
         self.presenter = AutomationPresenter.createInstance(self._settings, self._watcher)
         self.processingPresenter = AutomationProcessingPresenter.createInstance(
-            self._settings, self._watcher)
+            self._settings, self._repository)

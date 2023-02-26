@@ -1,12 +1,12 @@
 from __future__ import annotations
 from pathlib import Path
 import logging
-import queue
-import threading
+
 import watchdog.events
 import watchdog.observers
 
 from ...api.observer import Observable, Observer
+from .buffer import AutomationDatasetBuffer
 from .settings import AutomationSettings
 
 logger = logging.getLogger(__name__)
@@ -14,29 +14,31 @@ logger = logging.getLogger(__name__)
 
 class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
 
-    def __init__(self, dataDirectoryQueue: queue.Queue[Path]) -> None:
+    def __init__(self, datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
-        self._dataDirectoryQueue = dataDirectoryQueue
+        self._datasetBuffer = datasetBuffer
 
     def on_created(self, event: watchdog.events.FileSystemEvent) -> None:
         srcPath = Path(event.src_path)
 
-        if srcPath.is_dir():
-            self._dataDirectoryQueue.put(srcPath)
-            logger.debug(list(self._dataDirectoryQueue.queue))
+        # TODO generalize
+        if srcPath.is_file() and srcPath.suffix.casefold() == 'mda':
+            self._datasetBuffer.put(srcPath)
 
 
 class DataDirectoryWatcher(Observable, Observer):
 
-    def __init__(self, settings: AutomationSettings) -> None:
+    def __init__(self, settings: AutomationSettings,
+                 datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
         self._settings = settings
-        self._dataDirectoryQueue: queue.Queue[Path] = queue.Queue()
+        self._datasetBuffer = datasetBuffer
         self._observer = watchdog.observers.Observer()
 
     @classmethod
-    def createInstance(cls, settings: AutomationSettings) -> DataDirectoryWatcher:
-        watcher = cls(settings)
+    def createInstance(cls, settings: AutomationSettings,
+                       datasetBuffer: AutomationDatasetBuffer) -> DataDirectoryWatcher:
+        watcher = cls(settings, datasetBuffer)
         settings.watchdogDirectory.addObserver(watcher)
         watcher._updateWatch()
         return watcher
@@ -64,7 +66,7 @@ class DataDirectoryWatcher(Observable, Observer):
             self._observer.unschedule_all()
 
         observedWatch = self._observer.schedule(
-            event_handler=DataDirectoryEventHandler(self._dataDirectoryQueue),
+            event_handler=DataDirectoryEventHandler(self._datasetBuffer),
             path=self._settings.watchdogDirectory.value,
         )
         logger.debug(observedWatch)

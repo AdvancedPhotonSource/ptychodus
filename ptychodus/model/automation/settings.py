@@ -14,7 +14,7 @@ class AutomationSettings(Observable, Observer):
         self.watchdogDirectory = settingsGroup.createPathEntry('WatchdogDirectory',
                                                                Path('/path/to/data'))
         self.watchdogDelayInSeconds = settingsGroup.createIntegerEntry(
-            'WatchdogDelayInSeconds', 30)
+            'WatchdogDelayInSeconds', 15)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> AutomationSettings:

@@ -1,5 +1,5 @@
-from .core import (AutomationCore, AutomationDatasetState, AutomationPresenter,
-                   AutomationProcessingPresenter)
+from .core import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
+from .repository import AutomationDatasetState
 
 __all__ = [
     'AutomationCore',
