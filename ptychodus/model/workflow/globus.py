@@ -108,13 +108,13 @@ class GlobusWorkflowThread(threading.Thread):
         if self.__gladierClient is None:
             try:
                 # Try to use a previous login to avoid a new login flow
-                initial_authorizers = self._authClient.get_authorizers_by_scope()
+                initialAuthorizers = self._authClient.get_authorizers_by_scope()
             except fair_research_login.LoadError:
                 # Passing in an empty dict will trigger the callback below
-                initial_authorizers = dict()
+                initialAuthorizers = dict()
 
             loginManager = gladier.managers.CallbackLoginManager(
-                authorizers=initial_authorizers,
+                authorizers=initialAuthorizers,
                 # If additional logins are needed, the callback is used.
                 callback=self._requestAuthorization,
             )

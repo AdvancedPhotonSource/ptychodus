@@ -5,6 +5,7 @@ import logging
 
 import numpy
 
+from ...api.action import Action
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
@@ -147,6 +148,19 @@ class ProbePresenter(Observable, Observer):
             self.notifyObservers()
         elif observable is self._reinitObservable:
             self.initializeProbe()
+
+
+class InitializeAndActivateProbe(Action):
+
+    def __init__(self, presenter: ProbePresenter) -> None:
+        self._presenter = presenter
+
+    @property
+    def name(self) -> str:
+        return 'Initialize And Activate Probe'
+
+    def __call__(self) -> None:
+        self._presenter.initializeProbe()
 
 
 class ProbeCore(StatefulCore):

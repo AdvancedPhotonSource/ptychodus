@@ -3,6 +3,10 @@ import logging
 import queue
 import threading
 
+from ..data import LoadDiffractionDataset
+from ..object import InitializeAndActivateObject
+from ..probe import InitializeAndActivateProbe
+from ..workflow import ExecuteWorkflow
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
 
@@ -25,6 +29,11 @@ class AutomationDatasetProcessor:
 
     def _process(self, filePath: Path) -> None:
         self._stopWorkEvent.wait(timeout=3.)  # FIXME
+        # FIXME 1. LoadDiffractionDataset(FIXME, 'TIFF')
+        # FIXME 2. LoadAndActivateScanPositions(filePath, 'MDA'), setActiveScan(activeScanName)
+        # FIXME 3. InitializeAndActivateProbe()
+        # FIXME 4. InitializeAndActivateObject()
+        # FIXME 5. execute workflow
 
     def _run(self) -> None:
         while not self._stopWorkEvent.is_set():

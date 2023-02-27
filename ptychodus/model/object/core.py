@@ -6,6 +6,7 @@ import logging
 
 import numpy
 
+from ...api.action import Action
 from ...api.geometry import Interval
 from ...api.object import ObjectArrayType, ObjectFileReader, ObjectFileWriter
 from ...api.observer import Observable, Observer
@@ -140,6 +141,19 @@ class ObjectPresenter(Observable, Observer):
             self.notifyObservers()
         elif observable is self._reinitObservable:
             self.initializeObject()
+
+
+class InitializeAndActivateObject(Action):
+
+    def __init__(self, presenter: ObjectPresenter) -> None:
+        self._presenter = presenter
+
+    @property
+    def name(self) -> str:
+        return 'Initialize And Activate Object'
+
+    def __call__(self) -> None:
+        self._presenter.initializeObject()
 
 
 class ObjectCore(StatefulCore):
