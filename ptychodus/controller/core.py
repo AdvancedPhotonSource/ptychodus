@@ -89,6 +89,7 @@ class ControllerCore:
             model.objectPresenter, model.objectImagePresenter, view.monitorObjectView.imageView,
             self._fileDialogFactory)
         self._refreshDataTimer = QTimer()
+        self._automationTimer = QTimer()
         self._processMessagesTimer = QTimer()
 
     @classmethod
@@ -102,6 +103,9 @@ class ControllerCore:
 
         controller._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
         controller._refreshDataTimer.start(1000)  # TODO make configurable
+
+        controller._automationTimer.timeout.connect(model.refreshAutomationDatasets)
+        controller._automationTimer.start(1000)  # TODO make configurable
 
         if model.rpcMessageService and model.rpcMessageService.isActive:
             controller._processMessagesTimer.timeout.connect(

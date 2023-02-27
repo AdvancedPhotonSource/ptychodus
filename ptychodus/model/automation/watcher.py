@@ -18,12 +18,19 @@ class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
         super().__init__()
         self._datasetBuffer = datasetBuffer
 
-    def on_created(self, event: watchdog.events.FileSystemEvent) -> None:
-        srcPath = Path(event.src_path)
+    def on_created_or_modified(self, event: watchdog.events.FileSystemEvent) -> None:
+        if not event.is_directory:
+            srcPath = Path(event.src_path)
 
-        # TODO generalize
-        if srcPath.is_file() and srcPath.suffix.casefold() == 'mda':
-            self._datasetBuffer.put(srcPath)
+            # TODO generalize
+            if srcPath.suffix.casefold() == '.mda':
+                self._datasetBuffer.put(srcPath)
+
+    def on_created(self, event: watchdog.events.FileSystemEvent) -> None:
+        self.on_created_or_modified(event)
+
+    def on_modified(self, event: watchdog.events.FileSystemEvent) -> None:
+        self.on_created_or_modified(event)
 
 
 class DataDirectoryWatcher(Observable, Observer):
@@ -49,27 +56,28 @@ class DataDirectoryWatcher(Observable, Observer):
 
     def start(self) -> None:
         if self.isAlive:
-            logger.error('Watchdog thread already started!')
+            logger.error('Automation watchdog thread already started!')
         else:
+            logger.info('Starting automation watchdog thread...')
             self._observer = watchdog.observers.Observer()
             self._observer.start()
-            logger.debug('Watchdog thread started.')
+            observedWatch = self._observer.schedule(
+                event_handler=DataDirectoryEventHandler(self._datasetBuffer),
+                path=self._settings.watchdogDirectory.value,
+                recursive=True,  # TODO generalize
+            )
+            logger.debug(observedWatch)
+            logger.debug('Automation watchdog thread started.')
 
     def stop(self) -> None:
         if self.isAlive:
+            logger.info('Stopping automation watchdog thread...')
             self._observer.stop()
             self._observer.join()
-            logger.debug('Watchdog thread stopped.')
+            logger.debug('Automation watchdog thread stopped.')
 
     def _updateWatch(self) -> None:
-        if self.isAlive:
-            self._observer.unschedule_all()
-
-        observedWatch = self._observer.schedule(
-            event_handler=DataDirectoryEventHandler(self._datasetBuffer),
-            path=self._settings.watchdogDirectory.value,
-        )
-        logger.debug(observedWatch)
+        logger.debug('Restart observer to update watch.')  # TODO
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.watchdogDirectory:

@@ -1,10 +1,12 @@
 from __future__ import annotations
 from pathlib import Path
+import queue
 
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry, SettingsGroup
 from .buffer import AutomationDatasetBuffer
+from .processor import AutomationDatasetProcessor
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
 from .watcher import DataDirectoryWatcher
@@ -68,16 +70,17 @@ class AutomationPresenter(Observable, Observer):
 
 class AutomationProcessingPresenter(Observable, Observer):
 
-    def __init__(self, settings: AutomationSettings,
-                 repository: AutomationDatasetRepository) -> None:
+    def __init__(self, settings: AutomationSettings, repository: AutomationDatasetRepository,
+                 processor: AutomationDatasetProcessor) -> None:
         super().__init__()
         self._settings = settings
         self._repository = repository
+        self._processor = processor
 
     @classmethod
-    def createInstance(cls, settings: AutomationSettings,
-                       repository: AutomationDatasetRepository) -> AutomationProcessingPresenter:
-        presenter = cls(settings, repository)
+    def createInstance(cls, settings: AutomationSettings, repository: AutomationDatasetRepository,
+                       processor: AutomationDatasetProcessor) -> AutomationProcessingPresenter:
+        presenter = cls(settings, repository, processor)
         settings.addObserver(presenter)
         repository.addObserver(presenter)
         return presenter
@@ -92,10 +95,13 @@ class AutomationProcessingPresenter(Observable, Observer):
         return len(self._repository)
 
     def isProcessingEnabled(self) -> bool:
-        return True  # FIXME
+        return self._processor.isAlive
 
     def setProcessingEnabled(self, enable: bool) -> None:
-        pass  # FIXME
+        if enable:
+            self._processor.start()
+        else:
+            self._processor.stop()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
@@ -108,9 +114,21 @@ class AutomationCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
-        self._repository = AutomationDatasetRepository()
-        self._buffer = AutomationDatasetBuffer(self._settings, self._repository)
+        self.repository = AutomationDatasetRepository(self._settings)
+        self._processingQueue: queue.Queue[Path] = queue.Queue()
+        self._buffer = AutomationDatasetBuffer(self._settings, self.repository,
+                                               self._processingQueue)
+        self._processor = AutomationDatasetProcessor(self._settings, self.repository,
+                                                     self._processingQueue)
         self._watcher = DataDirectoryWatcher.createInstance(self._settings, self._buffer)
         self.presenter = AutomationPresenter.createInstance(self._settings, self._watcher)
         self.processingPresenter = AutomationProcessingPresenter.createInstance(
-            self._settings, self._repository)
+            self._settings, self.repository, self._processor)
+
+    def start(self) -> None:
+        self._buffer.start()
+
+    def stop(self) -> None:
+        self._processor.stop()
+        self._watcher.stop()
+        self._buffer.stop()

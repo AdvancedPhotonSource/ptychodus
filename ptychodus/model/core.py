@@ -147,6 +147,7 @@ class ModelCore:
 
         self._dataCore.start()
         self._workflowCore.start()
+        self._automationCore.start()
 
         return self
 
@@ -161,6 +162,7 @@ class ModelCore:
 
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
+        self._automationCore.stop()
         self._workflowCore.stop()
         self._dataCore.stop()
 
@@ -213,6 +215,9 @@ class ModelCore:
 
     def refreshActiveDataset(self) -> None:
         self._dataCore.dataset.notifyObserversIfDatasetChanged()
+
+    def refreshAutomationDatasets(self) -> None:
+        self._automationCore.repository.notifyObserversIfRepositoryChanged()
 
     def saveStateData(self, filePath: Path, *, restartable: bool) -> None:
         self._stateDataRegistry.saveStateData(filePath, restartable=restartable)

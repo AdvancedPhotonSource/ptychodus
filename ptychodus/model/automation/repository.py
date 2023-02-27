@@ -4,6 +4,7 @@ import logging
 import threading
 
 from ...api.observer import Observable
+from .settings import AutomationSettings
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,9 @@ class AutomationDatasetState(Enum):
 
 class AutomationDatasetRepository(Observable):
 
-    def __init__(self) -> None:
+    def __init__(self, settings: AutomationSettings) -> None:
+        super().__init__()
+        self._settings = settings
         self._fileList: list[Path] = list()
         self._fileState: dict[Path, AutomationDatasetState] = dict()
         self._lock = threading.Lock()
@@ -42,7 +45,7 @@ class AutomationDatasetRepository(Observable):
     def getLabel(self, index: int) -> str:
         with self._lock:
             filePath = self._fileList[index]
-            return str(filePath)
+            return str(filePath.relative_to(self._settings.watchdogDirectory.value))
 
     def getState(self, index: int) -> AutomationDatasetState:
         with self._lock:
@@ -54,7 +57,6 @@ class AutomationDatasetRepository(Observable):
             return len(self._fileList)
 
     def notifyObserversIfRepositoryChanged(self) -> None:
-        # TODO call me
         if self._changedEvent.is_set():
             self._changedEvent.clear()
             self.notifyObservers()
