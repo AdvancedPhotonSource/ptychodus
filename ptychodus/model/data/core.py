@@ -188,6 +188,15 @@ class DataCore(StatefulCore):
         self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
             self.dataset)
 
+    def loadDiffractionDataset(self, filePath: Path, fileFilter: str) -> None:
+        self.datasetInputOutputPresenter.setOpenFileFilter(fileFilter)
+        self.datasetInputOutputPresenter.openDiffractionFile(filePath)
+
+        if self.datasetInputOutputPresenter.isReadyToAssemble:
+            self.datasetInputOutputPresenter.startProcessingDiffractionPatterns()
+            self.datasetInputOutputPresenter.stopProcessingDiffractionPatterns(
+                finishAssembling=True)
+
     def getStateData(self, *, restartable: bool) -> StateDataType:
         state = dict()
 

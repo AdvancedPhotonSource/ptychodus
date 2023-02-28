@@ -5,7 +5,6 @@ import logging
 
 import numpy
 
-from ...api.action import Action
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser, PluginEntry
 from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
@@ -150,19 +149,6 @@ class ProbePresenter(Observable, Observer):
             self.initializeProbe()
 
 
-class InitializeAndActivateProbe(Action):
-
-    def __init__(self, presenter: ProbePresenter) -> None:
-        self._presenter = presenter
-
-    @property
-    def name(self) -> str:
-        return 'Initialize And Activate Probe'
-
-    def __call__(self) -> None:
-        self._presenter.initializeProbe()
-
-
 class ProbeCore(StatefulCore):
 
     @staticmethod
@@ -203,6 +189,9 @@ class ProbeCore(StatefulCore):
         self.presenter = ProbePresenter.createInstance(self.settings, self.sizer, self.probe,
                                                        self.apparatus, self._initializerChooser,
                                                        fileWriterChooser, settingsRegistry)
+
+    def initializeAndActivateProbe(self) -> None:
+        self.presenter.initializeProbe()
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         pixelSizeXInMeters = float(self.apparatus.getObjectPlanePixelSizeXInMeters())

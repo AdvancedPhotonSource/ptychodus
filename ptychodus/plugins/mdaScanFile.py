@@ -371,7 +371,7 @@ class MDAScanFileReader(ScanFileReader):
 
             pointList.append(point)
 
-        return [TabularScan.createFromPointSequence(self.simpleName, pointList)]
+        return [TabularScan.createFromPointSequence(filePath.stem, pointList)]
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

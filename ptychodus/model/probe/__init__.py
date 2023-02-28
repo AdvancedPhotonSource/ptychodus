@@ -1,5 +1,5 @@
 from .apparatus import Apparatus
-from .core import InitializeAndActivateProbe, ProbeCore, ProbePresenter
+from .core import ProbeCore, ProbePresenter
 from .file import FileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
 from .probe import Probe

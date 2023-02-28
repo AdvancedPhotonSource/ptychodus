@@ -123,6 +123,39 @@ class GlobusWorkflowThread(threading.Thread):
 
         return self.__gladierClient
 
+    # FIXME
+    # CLIENT_ID = os.getenv('CLIENT_ID')
+    # CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+    #
+    # if not CLIENT_ID or not CLIENT_SECRET:
+    #     raise ValueError('Environment variables lacking: CLIENT_ID or CLIENT_SECRET')
+    #
+    # flow_id = os.getenv('FLOW_ID')
+    #
+    # if not flow_id:
+    #     # This isn't necessarily bad, but CCs like regular users only get one flow
+    #     # to play with. They probably don't need more than one, but this will ensure
+    #     # there aren't errors due to tracking mismatch in the Glaider config
+    #     print('WARNING: No flow id enforced. Please set the FLOW_ID env var.')
+    #
+    # ######
+    #
+    # def _requestAuthorization(scopes: list[str]) -> ScopeAuthorizerMapping:
+    #     authClient = ConfidentialAppAuthClient(CLIENT_ID, CLIENT_SECRET)
+    #     response = authClient.oauth2_client_credentials_tokens(requested_scopes=scopes)
+    #     return {
+    #         scope: AccessTokenAuthorizer(access_token=tokens['access_token'])
+    #         for scope, tokens in response.by_scopes.scope_map.items()
+    #     }
+    #
+    #
+    # initialAuthorizers = dict()
+    # loginManager = CallbackLoginManager(authorizers=initialAuthorizers,
+    #                                     callback=self._requestAuthorization)
+    # flowsManager = FlowsManager(flow_id=flow_id)
+    # __gladierClient = PtychodusClient(login_manager=loginManager, flows_manager=flowsManager)
+
+
     def _getCurrentAction(self, runID: str) -> str:
         status = self._gladierClient.get_status(runID)
         action = status.get('state_name')

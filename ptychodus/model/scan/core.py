@@ -8,7 +8,6 @@ import logging
 
 import numpy
 
-from ...api.action import Action
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanArrayType, ScanFileReader, ScanFileWriter, ScanPoint, TabularScan
@@ -174,6 +173,9 @@ class ScanCore(StatefulCore):
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self.presenter.openScan(filePath, fileFilter)
 
+    def setActiveScan(self, name: str) -> None:
+        self.scan.setActiveScan(name)
+
     def getStateData(self, *, restartable: bool) -> StateDataType:
         scanIndex: list[int] = list()
         scanXInMeters: list[float] = list()
@@ -208,44 +210,3 @@ class ScanCore(StatefulCore):
         item = self.itemFactory.createTabularItem(scan, ScanFileInfo.createNull())
         self.repository.insertItem(item)
         self.scan.setActiveScan(name)
-
-
-class LoadAndActivateScanPositions(Action):
-
-    def __init__(self, settings: ScanSettings, itemFactory: ScanRepositoryItemFactory,
-                 repository: ScanRepository, activeScan: ActiveScan) -> None:
-        super().__init__()
-        self._settings = settings
-        self._itemFactory = itemFactory
-        self._repository = repository
-        self._activeScan = activeScan
-        self._filePath: Optional[Path] = None
-        self._fileType: Optional[str] = None
-        self._name: Optional[str] = None
-
-    @property
-    def name(self) -> str:
-        return 'Load And Activate Scan Positions'
-
-    def setFile(self, filePath: Path, fileType: str) -> None:
-        self._filePath = filePath
-        self._fileType = fileType
-
-    def setActiveScan(self, name: str) -> None:
-        self._name = name
-
-    def __call__(self) -> None:
-        if self._filePath is None:
-            logger.error('File path is required!')
-        elif self._fileType is None:
-            logger.error('File type is required!')
-        elif self._name is None:
-            logger.error('Active scan name is required!')
-        else:
-            self._settings.inputFileType.value = self._fileType
-            self._settings.inputFilePath.value = self._filePath
-
-            for item in self._itemFactory.openScanFromSettings():
-                self._repository.insertItem(item)
-
-            self._activeScan.setActiveScan(self._name)

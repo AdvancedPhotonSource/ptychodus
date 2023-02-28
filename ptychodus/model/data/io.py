@@ -5,7 +5,6 @@ import logging
 
 import numpy
 
-from ...api.action import Action
 from ...api.data import (DiffractionFileReader, DiffractionMetadata, DiffractionPatternArray,
                          DiffractionPatternData, DiffractionPatternState, SimpleDiffractionDataset)
 from ...api.observer import Observable, Observer
@@ -120,33 +119,3 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
             self._syncFileReaderToSettings()
         elif observable is self._settings.filePath:
             self._openDiffractionFileFromSettings()
-
-
-class LoadDiffractionDataset(Action):
-
-    def __init__(self, settings: DiffractionDatasetSettings,
-                 builder: ActiveDiffractionDatasetBuilder) -> None:
-        super().__init__()
-        self._settings = settings
-        self._builder = builder
-        self._filePath: Optional[Path] = None
-        self._fileType: Optional[str] = None
-
-    @property
-    def name(self) -> str:
-        return 'Load Diffraction Dataset'
-
-    def setFile(self, filePath: Path, fileType: str) -> None:
-        self._filePath = filePath
-        self._fileType = fileType
-
-    def __call__(self) -> None:
-        if self._filePath is None:
-            logger.error('File path is required!')
-        elif self._fileType is None:
-            logger.error('File type is required!')
-        else:
-            self._settings.fileType.value = self._fileType
-            self._settings.filePath.value = self._filePath
-            self._builder.start()
-            self._builder.stop(finishAssembling=True)

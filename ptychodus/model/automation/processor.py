@@ -3,12 +3,9 @@ import logging
 import queue
 import threading
 
-from ..data import LoadDiffractionDataset
-from ..object import InitializeAndActivateObject
-from ..probe import InitializeAndActivateProbe
-from ..workflow import ExecuteWorkflow
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
+from .workflow import AutomationDatasetWorkflow
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +13,10 @@ logger = logging.getLogger(__name__)
 class AutomationDatasetProcessor:
 
     def __init__(self, settings: AutomationSettings, repository: AutomationDatasetRepository,
-                 processingQueue: queue.Queue[Path]) -> None:
+                 workflow: AutomationDatasetWorkflow, processingQueue: queue.Queue[Path]) -> None:
         self._settings = settings
         self._repository = repository
+        self._workflow = workflow
         self._processingQueue = processingQueue
         self._stopWorkEvent = threading.Event()
         self._worker = threading.Thread()
@@ -27,14 +25,6 @@ class AutomationDatasetProcessor:
     def isAlive(self) -> bool:
         return self._worker.is_alive()
 
-    def _process(self, filePath: Path) -> None:
-        self._stopWorkEvent.wait(timeout=3.)  # FIXME
-        # FIXME 1. LoadDiffractionDataset(FIXME, 'TIFF')
-        # FIXME 2. LoadAndActivateScanPositions(filePath, 'MDA'), setActiveScan(activeScanName)
-        # FIXME 3. InitializeAndActivateProbe()
-        # FIXME 4. InitializeAndActivateObject()
-        # FIXME 5. execute workflow
-
     def _run(self) -> None:
         while not self._stopWorkEvent.is_set():
             try:
@@ -42,7 +32,7 @@ class AutomationDatasetProcessor:
 
                 try:
                     self._repository.put(filePath, AutomationDatasetState.PROCESSING)
-                    self._process(filePath)
+                    self._workflow.execute(filePath)
                     self._repository.put(filePath, AutomationDatasetState.COMPLETE)
                 finally:
                     self._processingQueue.task_done()

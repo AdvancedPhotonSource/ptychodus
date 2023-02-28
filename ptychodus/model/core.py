@@ -119,7 +119,9 @@ class ModelCore:
         self._stateDataRegistry = StateDataRegistry(
             (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
-        self._automationCore = AutomationCore(self.settingsRegistry)
+        self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore,
+                                              self._scanCore, self._probeCore, self._objectCore,
+                                              self._workflowCore)
 
         self.rpcMessageService: Optional[RPCMessageService] = None
 

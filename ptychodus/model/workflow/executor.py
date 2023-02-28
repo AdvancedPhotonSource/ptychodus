@@ -5,7 +5,6 @@ from typing import Any, Optional
 import logging
 import queue
 
-from ...api.action import Action
 from ...api.settings import SettingsRegistry
 from ..statefulCore import StateDataRegistry
 from .settings import WorkflowSettings
@@ -89,23 +88,3 @@ class WorkflowExecutor:
 
         input_ = WorkflowJob(flowLabel, flowInput)
         self.jobQueue.put(input_)
-
-
-class ExecuteWorkflow(Action):
-
-    def __init__(self, executor: WorkflowExecutor) -> None:
-        self._executor = executor
-        self._flowLabel: Optional[str] = None
-
-    @property
-    def name(self) -> str:
-        return 'Execute Workflow'
-
-    def setFlowLabel(self, flowLabel: str) -> None:
-        self._flowLabel = flowLabel
-
-    def __call__(self) -> None:
-        if self._flowLabel is None:
-            logger.error('Flow label is required!')
-        else:
-            self._executor.runFlow(self._flowLabel)

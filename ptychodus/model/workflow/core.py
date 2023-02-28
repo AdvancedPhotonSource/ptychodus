@@ -183,6 +183,10 @@ class WorkflowCore:
         self.statusPresenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
         self.executionPresenter = WorkflowExecutionPresenter(self._executor)
 
+    def executeWorkflow(self, flowLabel: str) -> None:
+        print(f'Execute Workflow: {flowLabel}')
+        # FIXME self._executor.runFlow(flowLabel)
+
     @property
     def areWorkflowsSupported(self) -> bool:
         return (self._thread is not None)
