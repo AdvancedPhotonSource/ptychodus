@@ -175,8 +175,9 @@ class WorkflowCore:
         except ModuleNotFoundError:
             logger.info('Globus not found.')
         else:
-            self._thread = GlobusWorkflowThread(self._authorizer, self._statusRepository,
-                                                self._executor)
+            self._thread = GlobusWorkflowThread.createNativeInstance(self._authorizer,
+                                                                     self._statusRepository,
+                                                                     self._executor)
 
         self.parametersPresenter = WorkflowParametersPresenter.createInstance(self._settings)
         self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)

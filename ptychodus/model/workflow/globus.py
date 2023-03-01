@@ -1,9 +1,12 @@
+from __future__ import annotations
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from importlib.metadata import version
 from pprint import pformat
 from typing import Any, Final, Optional, Union
 import json
 import logging
+import os
 import queue
 import threading
 
@@ -21,7 +24,7 @@ logger = logging.getLogger(__name__)
 AuthorizerTypes = Union[globus_sdk.AccessTokenAuthorizer, globus_sdk.RefreshTokenAuthorizer]
 ScopeAuthorizerMapping = Mapping[str, AuthorizerTypes]
 
-CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
+PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
 
 def ptychodus_reconstruct(**data: str) -> None:
@@ -51,7 +54,7 @@ class PtychodusReconstruct(gladier.GladierBaseTool):
 
 @gladier.generate_flow_definition
 class PtychodusClient(gladier.GladierBaseClient):
-    client_id = CLIENT_ID
+    client_id = PTYCHODUS_CLIENT_ID
     gladier_tools = [
         'gladier_tools.globus.transfer.Transfer:InputData',
         PtychodusReconstruct,
@@ -75,25 +78,22 @@ class CustomCodeHandler(fair_research_login.CodeHandler):
         return self._authorizer.getCodeFromAuthorizeURL()
 
 
-class GlobusWorkflowThread(threading.Thread):
+class PtychodusClientBuilder(ABC):
 
-    def __init__(self, authorizer: WorkflowAuthorizer, statusRepository: WorkflowStatusRepository,
-                 executor: WorkflowExecutor) -> None:
+    @abstractmethod
+    def build(self) -> gladier.GladierBaseClient:
+        pass
+
+
+class NativePtychodusClientBuilder(PtychodusClientBuilder):
+
+    def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         super().__init__()
-        self._authorizer = authorizer
-        self._statusRepository = statusRepository
-        self._executor = executor
-
-        logger.info('\tGlobus SDK ' + version('globus-sdk'))
-        logger.info('\tFair Research Login ' + version('fair-research-login'))
-        logger.info('\tGladier ' + version('gladier'))
-
         self._authClient = fair_research_login.NativeClient(
-            client_id=CLIENT_ID,
+            client_id=PTYCHODUS_CLIENT_ID,
             app_name='Ptychodus',
             code_handlers=[CustomCodeHandler(authorizer)],
         )
-        self.__gladierClient: Optional[gladier.GladierBaseClient] = None
 
     def _requestAuthorization(self, scopes: list[str]) -> ScopeAuthorizerMapping:
         logger.debug(f'Requested authorization scopes: {pformat(scopes)}')
@@ -103,58 +103,102 @@ class GlobusWorkflowThread(threading.Thread):
         self._authClient.login(requested_scopes=scopes, force=True, refresh_tokens=True)
         return self._authClient.get_authorizers_by_scope()
 
+    def build(self) -> gladier.GladierBaseClient:
+        initialAuthorizers: dict[str, AuthorizerTypes] = dict()
+
+        try:
+            # Try to use a previous login to avoid a new login flow
+            initialAuthorizers = self._authClient.get_authorizers_by_scope()
+        except fair_research_login.LoadError:
+            pass
+
+        loginManager = gladier.managers.CallbackLoginManager(
+            authorizers=initialAuthorizers,
+            callback=self._requestAuthorization,
+        )
+
+        return PtychodusClient(login_manager=loginManager)
+
+
+class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
+
+    def __init__(self, clientID: str, clientSecret: str, flowID: Optional[str]) -> None:
+        super().__init__()
+        self._authClient = globus_sdk.ConfidentialAppAuthClient(
+            client_id=clientID,
+            client_secret=clientSecret,
+            app_name='Ptychodus',
+        )
+        self._flowID = flowID
+
+    def _requestAuthorization(self, scopes: list[str]) -> ScopeAuthorizerMapping:
+        logger.debug(f'Requested authorization scopes: {pformat(scopes)}')
+
+        response = self._authClient.oauth2_client_credentials_tokens(requested_scopes=scopes)
+        return {
+            scope: globus_sdk.AccessTokenAuthorizer(access_token=tokens['access_token'])
+            for scope, tokens in response.by_scopes.scope_map.items()
+        }
+
+    def build(self) -> gladier.GladierBaseClient:
+        initialAuthorizers: dict[str, AuthorizerTypes] = dict()
+        loginManager = gladier.managers.CallbackLoginManager(
+            authorizers=initialAuthorizers,
+            callback=self._requestAuthorization,
+        )
+        flowsManager = gladier.managers.FlowsManager(flow_id=self._flowID)
+        return PtychodusClient(login_manager=loginManager, flows_manager=flowsManager)
+
+
+class GlobusWorkflowThread(threading.Thread):
+
+    def __init__(self, authorizer: WorkflowAuthorizer, statusRepository: WorkflowStatusRepository,
+                 executor: WorkflowExecutor, clientBuilder: PtychodusClientBuilder) -> None:
+        super().__init__()
+        self._authorizer = authorizer
+        self._statusRepository = statusRepository
+        self._executor = executor
+        self._clientBuilder = clientBuilder
+
+        logger.info('\tGlobus SDK ' + version('globus-sdk'))
+        logger.info('\tFair Research Login ' + version('fair-research-login'))
+        logger.info('\tGladier ' + version('gladier'))
+
+        self.__gladierClient: Optional[gladier.GladierBaseClient] = None
+
+    @classmethod
+    def createNativeInstance(cls, authorizer: WorkflowAuthorizer,
+                             statusRepository: WorkflowStatusRepository,
+                             executor: WorkflowExecutor) -> GlobusWorkflowThread:
+        clientBuilder = NativePtychodusClientBuilder(authorizer)
+        return cls(authorizer, statusRepository, executor, clientBuilder)
+
+    @classmethod
+    def createConfidentialInstance(cls, authorizer: WorkflowAuthorizer,
+                                   statusRepository: WorkflowStatusRepository,
+                                   executor: WorkflowExecutor) -> GlobusWorkflowThread:
+        clientID = os.getenv('CLIENT_ID')
+        clientSecret = os.getenv('CLIENT_SECRET')
+        flowID = os.getenv('FLOW_ID')
+
+        if not clientID or not clientSecret:
+            raise ValueError('Required environment variables: CLIENT_ID or CLIENT_SECRET')
+
+        if not flowID:
+            # This isn't necessarily bad, but CCs like regular users only get one flow
+            # to play with. They probably don't need more than one, but this will ensure
+            # there aren't errors due to tracking mismatch in the Glaider config
+            logger.warning('No flow ID enforced. Recommend setting FLOW_ID environment variable.')
+
+        clientBuilder = ConfidentialPtychodusClientBuilder(clientID, clientSecret, flowID)
+        return cls(authorizer, statusRepository, executor, clientBuilder)
+
     @property
     def _gladierClient(self) -> gladier.GladierBaseClient:
         if self.__gladierClient is None:
-            try:
-                # Try to use a previous login to avoid a new login flow
-                initialAuthorizers = self._authClient.get_authorizers_by_scope()
-            except fair_research_login.LoadError:
-                # Passing in an empty dict will trigger the callback below
-                initialAuthorizers = dict()
-
-            loginManager = gladier.managers.CallbackLoginManager(
-                authorizers=initialAuthorizers,
-                # If additional logins are needed, the callback is used.
-                callback=self._requestAuthorization,
-            )
-
-            self.__gladierClient = PtychodusClient(login_manager=loginManager)
+            self.__gladierClient = self._clientBuilder.build()
 
         return self.__gladierClient
-
-    # FIXME
-    # CLIENT_ID = os.getenv('CLIENT_ID')
-    # CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-    #
-    # if not CLIENT_ID or not CLIENT_SECRET:
-    #     raise ValueError('Environment variables lacking: CLIENT_ID or CLIENT_SECRET')
-    #
-    # flow_id = os.getenv('FLOW_ID')
-    #
-    # if not flow_id:
-    #     # This isn't necessarily bad, but CCs like regular users only get one flow
-    #     # to play with. They probably don't need more than one, but this will ensure
-    #     # there aren't errors due to tracking mismatch in the Glaider config
-    #     print('WARNING: No flow id enforced. Please set the FLOW_ID env var.')
-    #
-    # ######
-    #
-    # def _requestAuthorization(scopes: list[str]) -> ScopeAuthorizerMapping:
-    #     authClient = ConfidentialAppAuthClient(CLIENT_ID, CLIENT_SECRET)
-    #     response = authClient.oauth2_client_credentials_tokens(requested_scopes=scopes)
-    #     return {
-    #         scope: AccessTokenAuthorizer(access_token=tokens['access_token'])
-    #         for scope, tokens in response.by_scopes.scope_map.items()
-    #     }
-    #
-    #
-    # initialAuthorizers = dict()
-    # loginManager = CallbackLoginManager(authorizers=initialAuthorizers,
-    #                                     callback=self._requestAuthorization)
-    # flowsManager = FlowsManager(flow_id=flow_id)
-    # __gladierClient = PtychodusClient(login_manager=loginManager, flows_manager=flowsManager)
-
 
     def _getCurrentAction(self, runID: str) -> str:
         status = self._gladierClient.get_status(runID)
