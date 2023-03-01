@@ -80,7 +80,7 @@ class ControllerCore:
             model.workflowStatusPresenter, model.workflowExecutionPresenter,
             view.workflowParametersView, view.workflowTableView)
         self._automationController = AutomationController.createInstance(
-            model.automationPresenter, model.automationProcessingPresenter,
+            model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
             view.automationParametersView, self._fileDialogFactory)
         self._monitorProbeController = ProbeImageController.createInstance(
             model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,

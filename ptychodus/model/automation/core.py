@@ -137,6 +137,20 @@ class AutomationCore:
     def start(self) -> None:
         self._buffer.start()
 
+    def executeWaitingTasks(self) -> None:
+        while True:
+            try:
+                filePath = self._processingQueue.get(block=False)
+
+                try:
+                    self.repository.put(filePath, AutomationDatasetState.PROCESSING)
+                    self._workflow.execute(filePath)
+                    self.repository.put(filePath, AutomationDatasetState.COMPLETE)
+                finally:
+                    self._processingQueue.task_done()
+            except queue.Empty:
+                break
+
     def stop(self) -> None:
         self._processor.stop()
         self._watcher.stop()

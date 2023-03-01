@@ -2,11 +2,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QTimer, QVariant
 from PyQt5.QtGui import QFont
 
 from ..api.observer import Observable, Observer
-from ..model.automation import (AutomationDatasetState, AutomationPresenter,
+from ..model.automation import (AutomationCore, AutomationDatasetState, AutomationPresenter,
                                 AutomationProcessingPresenter)
 from ..view import AutomationParametersView, AutomationProcessingView, AutomationWatchdogView
 from .data import FileDialogFactory
@@ -145,17 +145,26 @@ class AutomationProcessingController(Observer):
 
 class AutomationController:
 
-    def __init__(self, presenter: AutomationPresenter,
+    def __init__(self, core: AutomationCore, presenter: AutomationPresenter,
                  processingPresenter: AutomationProcessingPresenter,
                  view: AutomationParametersView, fileDialogFactory: FileDialogFactory) -> None:
+        self._core = core
         self._watchdogController = AutomationWatchdogController.createInstance(
             presenter, view.watchdogView, fileDialogFactory)
         self._processingController = AutomationProcessingController.createInstance(
             processingPresenter, view.processingView)
+        self._timer = QTimer()
 
     @classmethod
-    def createInstance(cls, presenter: AutomationPresenter,
+    def createInstance(cls, core: AutomationCore, presenter: AutomationPresenter,
                        processingPresenter: AutomationProcessingPresenter,
                        view: AutomationParametersView,
                        fileDialogFactory: FileDialogFactory) -> AutomationController:
-        return cls(presenter, processingPresenter, view, fileDialogFactory)
+        controller = cls(core, presenter, processingPresenter, view, fileDialogFactory)
+
+        controller._timer.timeout.connect(core.executeWaitingTasks)
+        controller._timer.start(1000)  # TODO customize
+
+        view.processingView.processButton.setEnabled(False)  # TODO
+
+        return controller

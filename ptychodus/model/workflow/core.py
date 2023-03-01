@@ -184,7 +184,7 @@ class WorkflowCore:
         self.executionPresenter = WorkflowExecutionPresenter(self._executor)
 
     def executeWorkflow(self, flowLabel: str) -> None:
-        print(f'Execute Workflow: {flowLabel}')
+        logger.debug(f'Execute Workflow: {flowLabel}')
         # FIXME self._executor.runFlow(flowLabel)
 
     @property
