@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 from ..data import DataCore
 from ..object import ObjectCore
@@ -18,12 +19,21 @@ class AutomationDatasetWorkflow:
         self._workflowCore = workflowCore
 
     def execute(self, filePath: Path) -> None:
-        diffractionFilePath = next(filePath.parent.glob('*.tif'))
-        diffractionFileFilter = 'Tagged Image File Format Files (*.tif *.tiff)'
+        scanName = filePath.stem
+        scanID = int(re.findall(r'\d+', scanName)[-1])
+        flowLabel = f'scan_{scanID}'
+
+        diffractionDirPath = filePath.parents[1] / 'h5'
+
+        for diffractionFilePath in diffractionDirPath.glob(f'scan_{scanID}_*.h5'):
+            digits = int(re.findall(r'\d+', diffractionFilePath.stem)[-1])
+
+            if digits != 0:
+                break
+
+        diffractionFileFilter = 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)'
         scanFilePath = filePath
         scanFileFilter = 'EPICS MDA Files (*.mda)'
-        scanName = filePath.stem
-        flowLabel = filePath.parent.name
 
         self._dataCore.loadDiffractionDataset(diffractionFilePath, diffractionFileFilter)
         self._scanCore.openScan(scanFilePath, scanFileFilter)

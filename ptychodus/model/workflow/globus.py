@@ -55,6 +55,8 @@ class PtychodusReconstruct(gladier.GladierBaseTool):
 @gladier.generate_flow_definition
 class PtychodusClient(gladier.GladierBaseClient):
     client_id = PTYCHODUS_CLIENT_ID
+    # TODO globus_group = '13e5512f-e761-11ec-8a9e-ff9dc0f99d56'
+
     gladier_tools = [
         'gladier_tools.globus.transfer.Transfer:InputData',
         PtychodusReconstruct,

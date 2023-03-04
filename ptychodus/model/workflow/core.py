@@ -178,6 +178,8 @@ class WorkflowCore:
             self._thread = GlobusWorkflowThread.createNativeInstance(self._authorizer,
                                                                      self._statusRepository,
                                                                      self._executor)
+            # TODO self._thread = GlobusWorkflowThread.createConfidentialInstance(
+            # TODO    self._authorizer, self._statusRepository, self._executor)
 
         self.parametersPresenter = WorkflowParametersPresenter.createInstance(self._settings)
         self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
@@ -186,7 +188,7 @@ class WorkflowCore:
 
     def executeWorkflow(self, flowLabel: str) -> None:
         logger.debug(f'Execute Workflow: {flowLabel}')
-        # FIXME self._executor.runFlow(flowLabel)
+        self._executor.runFlow(flowLabel)
 
     @property
     def areWorkflowsSupported(self) -> bool:

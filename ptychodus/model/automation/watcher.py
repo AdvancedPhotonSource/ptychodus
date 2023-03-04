@@ -3,6 +3,7 @@ from pathlib import Path
 import logging
 
 import watchdog.events
+from watchdog.observers.polling import PollingObserver
 import watchdog.observers
 
 from ...api.observer import Observable, Observer
@@ -59,12 +60,12 @@ class DataDirectoryWatcher(Observable, Observer):
             logger.error('Automation watchdog thread already started!')
         else:
             logger.info('Starting automation watchdog thread...')
-            self._observer = watchdog.observers.Observer()
+            self._observer = watchdog.observers.Observer()  # TODO PollingObserver()
             self._observer.start()
             observedWatch = self._observer.schedule(
                 event_handler=DataDirectoryEventHandler(self._datasetBuffer),
                 path=self._settings.watchdogDirectory.value,
-                recursive=True,  # TODO generalize
+                recursive=False,  # TODO generalize
             )
             logger.debug(observedWatch)
             logger.debug('Automation watchdog thread started.')
