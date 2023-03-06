@@ -13,6 +13,7 @@ from ...api.settings import SettingsRegistry
 from ..statefulCore import StateDataRegistry
 from .authorizer import WorkflowAuthorizer
 from .executor import WorkflowExecutor
+from .locator import DataLocator, OutputDataLocator, SimpleDataLocator
 from .settings import WorkflowSettings
 from .status import WorkflowStatus, WorkflowStatusRepository
 
@@ -21,33 +22,42 @@ logger = logging.getLogger(__name__)
 
 class WorkflowParametersPresenter(Observable, Observer):
 
-    def __init__(self, settings: WorkflowSettings) -> None:
+    def __init__(self, settings: WorkflowSettings, inputDataLocator: DataLocator,
+                 computeDataLocator: DataLocator, outputDataLocator: OutputDataLocator) -> None:
         super().__init__()
         self._settings = settings
+        self._inputDataLocator = inputDataLocator
+        self._computeDataLocator = computeDataLocator
+        self._outputDataLocator = outputDataLocator
 
     @classmethod
-    def createInstance(cls, settings: WorkflowSettings) -> WorkflowParametersPresenter:
-        presenter = cls(settings)
+    def createInstance(cls, settings: WorkflowSettings, inputDataLocator: DataLocator,
+                       computeDataLocator: DataLocator,
+                       outputDataLocator: OutputDataLocator) -> WorkflowParametersPresenter:
+        presenter = cls(settings, inputDataLocator, computeDataLocator, outputDataLocator)
         settings.addObserver(presenter)
+        inputDataLocator.addObserver(presenter)
+        computeDataLocator.addObserver(presenter)
+        outputDataLocator.addObserver(presenter)
         return presenter
 
     def setInputDataEndpointID(self, endpointID: UUID) -> None:
-        self._settings.inputDataEndpointID.value = endpointID
+        self._inputDataLocator.setEndpointID(endpointID)
 
     def getInputDataEndpointID(self) -> UUID:
-        return self._settings.inputDataEndpointID.value
+        return self._inputDataLocator.getEndpointID()
 
-    def setInputDataGlobusPath(self, inputDataGlobusPath: str) -> None:
-        self._settings.inputDataGlobusPath.value = inputDataGlobusPath
+    def setInputDataGlobusPath(self, globusPath: str) -> None:
+        self._inputDataLocator.setGlobusPath(globusPath)
 
     def getInputDataGlobusPath(self) -> str:
-        return self._settings.inputDataGlobusPath.value
+        return self._inputDataLocator.getGlobusPath()
 
-    def setInputDataPosixPath(self, inputDataPosixPath: Path) -> None:
-        self._settings.inputDataPosixPath.value = inputDataPosixPath
+    def setInputDataPosixPath(self, posixPath: Path) -> None:
+        self._inputDataLocator.setPosixPath(posixPath)
 
     def getInputDataPosixPath(self) -> Path:
-        return self._settings.inputDataPosixPath.value
+        return self._inputDataLocator.getPosixPath()
 
     def setComputeFuncXEndpointID(self, endpointID: UUID) -> None:
         self._settings.computeFuncXEndpointID.value = endpointID
@@ -56,43 +66,55 @@ class WorkflowParametersPresenter(Observable, Observer):
         return self._settings.computeFuncXEndpointID.value
 
     def setComputeDataEndpointID(self, endpointID: UUID) -> None:
-        self._settings.computeDataEndpointID.value = endpointID
+        self._computeDataLocator.setEndpointID(endpointID)
 
     def getComputeDataEndpointID(self) -> UUID:
-        return self._settings.computeDataEndpointID.value
+        return self._computeDataLocator.getEndpointID()
 
-    def setComputeDataGlobusPath(self, computeDataGlobusPath: str) -> None:
-        self._settings.computeDataGlobusPath.value = computeDataGlobusPath
+    def setComputeDataGlobusPath(self, globusPath: str) -> None:
+        self._computeDataLocator.setGlobusPath(globusPath)
 
     def getComputeDataGlobusPath(self) -> str:
-        return self._settings.computeDataGlobusPath.value
+        return self._computeDataLocator.getGlobusPath()
 
-    def setComputeDataPosixPath(self, computeDataPosixPath: Path) -> None:
-        self._settings.computeDataPosixPath.value = computeDataPosixPath
+    def setComputeDataPosixPath(self, posixPath: Path) -> None:
+        self._computeDataLocator.setPosixPath(posixPath)
 
     def getComputeDataPosixPath(self) -> Path:
-        return self._settings.computeDataPosixPath.value
+        return self._computeDataLocator.getPosixPath()
+
+    def setRoundTripEnabled(self, enable: bool) -> None:
+        self._outputDataLocator.setRoundTripEnabled(enable)
+
+    def isRoundTripEnabled(self) -> bool:
+        return self._outputDataLocator.isRoundTripEnabled()
 
     def setOutputDataEndpointID(self, endpointID: UUID) -> None:
-        self._settings.outputDataEndpointID.value = endpointID
+        self._outputDataLocator.setEndpointID(endpointID)
 
     def getOutputDataEndpointID(self) -> UUID:
-        return self._settings.outputDataEndpointID.value
+        return self._outputDataLocator.getEndpointID()
 
-    def setOutputDataGlobusPath(self, outputDataGlobusPath: str) -> None:
-        self._settings.outputDataGlobusPath.value = outputDataGlobusPath
+    def setOutputDataGlobusPath(self, globusPath: str) -> None:
+        self._outputDataLocator.setGlobusPath(globusPath)
 
     def getOutputDataGlobusPath(self) -> str:
-        return self._settings.outputDataGlobusPath.value
+        return self._outputDataLocator.getGlobusPath()
 
-    def setOutputDataPosixPath(self, outputDataPosixPath: Path) -> None:
-        self._settings.outputDataPosixPath.value = outputDataPosixPath
+    def setOutputDataPosixPath(self, posixPath: Path) -> None:
+        self._outputDataLocator.setPosixPath(posixPath)
 
     def getOutputDataPosixPath(self) -> Path:
-        return self._settings.outputDataPosixPath.value
+        return self._outputDataLocator.getPosixPath()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
+            self.notifyObservers()
+        elif observable is self._inputDataLocator:
+            self.notifyObservers()
+        elif observable is self._computeDataLocator:
+            self.notifyObservers()
+        elif observable is self._outputDataLocator:
             self.notifyObservers()
 
 
@@ -165,9 +187,16 @@ class WorkflowCore:
     def __init__(self, settingsRegistry: SettingsRegistry,
                  stateDataRegistry: StateDataRegistry) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
+        self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Input')
+        self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group,
+                                                                    'Compute')
+        self._outputDataLocator = OutputDataLocator.createInstance(self._settings.group, 'Output',
+                                                                   self._inputDataLocator)
         self._authorizer = WorkflowAuthorizer()
         self._statusRepository = WorkflowStatusRepository()
-        self._executor = WorkflowExecutor(self._settings, settingsRegistry, stateDataRegistry)
+        self._executor = WorkflowExecutor(self._settings, self._inputDataLocator,
+                                          self._computeDataLocator, self._outputDataLocator,
+                                          settingsRegistry, stateDataRegistry)
         self._thread: Optional[threading.Thread] = None
 
         try:
@@ -181,7 +210,9 @@ class WorkflowCore:
             # TODO self._thread = GlobusWorkflowThread.createConfidentialInstance(
             # TODO    self._authorizer, self._statusRepository, self._executor)
 
-        self.parametersPresenter = WorkflowParametersPresenter.createInstance(self._settings)
+        self.parametersPresenter = WorkflowParametersPresenter.createInstance(
+            self._settings, self._inputDataLocator, self._computeDataLocator,
+            self._outputDataLocator)
         self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
         self.statusPresenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
         self.executionPresenter = WorkflowExecutionPresenter(self._executor)

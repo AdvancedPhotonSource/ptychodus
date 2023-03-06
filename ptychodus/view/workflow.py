@@ -50,19 +50,42 @@ class WorkflowAuthorizationDialog(QDialog):
             self.reject()
 
 
-class WorkflowDataView(QGroupBox):
+class WorkflowInputDataView(QGroupBox):
 
-    def __init__(self, title: str, parent: Optional[QWidget]) -> None:
-        super().__init__(title, parent)
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Input Data', parent)
         self.endpointIDLineEdit = UUIDLineEdit()
         self.globusPathLineEdit = QLineEdit()
         self.posixPathLineEdit = QLineEdit()
 
     @classmethod
-    def createInstance(cls, title: str, parent: Optional[QWidget] = None) -> WorkflowDataView:
-        view = cls(title, parent)
+    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowInputDataView:
+        view = cls(parent)
 
         layout = QFormLayout()
+        layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
+        layout.addRow('Globus Path:', view.globusPathLineEdit)
+        layout.addRow('POSIX Path:', view.posixPathLineEdit)
+        view.setLayout(layout)
+
+        return view
+
+
+class WorkflowOutputDataView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Output Data', parent)
+        self.roundTripCheckBox = QCheckBox('Round Trip')
+        self.endpointIDLineEdit = UUIDLineEdit()
+        self.globusPathLineEdit = QLineEdit()
+        self.posixPathLineEdit = QLineEdit()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowOutputDataView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow(view.roundTripCheckBox)
         layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
         layout.addRow('Globus Path:', view.globusPathLineEdit)
         layout.addRow('POSIX Path:', view.posixPathLineEdit)
@@ -99,9 +122,9 @@ class WorkflowExecutionView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Execution', parent)
         self.labelLineEdit = QLineEdit('Ptychodus')
-        self.inputDataView = WorkflowDataView.createInstance('Input Data')
+        self.inputDataView = WorkflowInputDataView.createInstance()
         self.computeView = WorkflowComputeView.createInstance()
-        self.outputDataView = WorkflowDataView.createInstance('Output Data')
+        self.outputDataView = WorkflowOutputDataView.createInstance()
         self.executeButton = QPushButton('Execute')
 
     @classmethod

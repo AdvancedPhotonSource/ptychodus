@@ -866,12 +866,12 @@ else:
     qt_resource_struct = qt_resource_struct_v2
 
 
-def qInitResources():
+def qInitResources() -> None:
     QtCore.qRegisterResourceData(rcc_version, qt_resource_struct, qt_resource_name,
                                  qt_resource_data)
 
 
-def qCleanupResources():
+def qCleanupResources() -> None:
     QtCore.qUnregisterResourceData(rcc_version, qt_resource_struct, qt_resource_name,
                                    qt_resource_data)
 

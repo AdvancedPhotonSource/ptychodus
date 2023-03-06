@@ -67,6 +67,12 @@ class AutomationPresenter(Observable, Observer):
     def setWatchdogDelayInSeconds(self, value: int) -> None:
         self._settings.watchdogDelayInSeconds.value = value
 
+    def setWatchdogPollingObserverEnabled(self, enable: bool) -> None:
+        self._settings.useWatchdogPollingObserver.value = enable
+
+    def isWatchdogPollingObserverEnabled(self) -> bool:
+        return self._settings.useWatchdogPollingObserver.value
+
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()

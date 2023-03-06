@@ -38,6 +38,8 @@ class AutomationWatchdogController(Observer):
         view.directoryLineEdit.editingFinished.connect(controller._syncDirectoryToModel)
         view.directoryBrowseButton.clicked.connect(controller._browseDirectory)
         view.delaySpinBox.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
+        view.usePollingObserverCheckBox.toggled.connect(
+            presenter.setWatchdogPollingObserverEnabled)
         view.watchButton.toggled.connect(presenter.setWatchdogEnabled)
 
         return controller
@@ -72,6 +74,8 @@ class AutomationWatchdogController(Observer):
         self._view.delaySpinBox.setValue(self._presenter.getWatchdogDelayInSeconds())
         self._view.delaySpinBox.blockSignals(False)
 
+        self._view.usePollingObserverCheckBox.setChecked(
+            self._presenter.isWatchdogPollingObserverEnabled())
         self._view.watchButton.setChecked(self._presenter.isWatchdogEnabled())
 
     def update(self, observable: Observable) -> None:

@@ -125,6 +125,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
 class ActiveDiffractionPatternPresenter(Observable, Observer):
 
+    # FIXME data isn't autoloading correctly
     def __init__(self, dataset: DiffractionDataset) -> None:
         super().__init__()
         self._dataset = dataset

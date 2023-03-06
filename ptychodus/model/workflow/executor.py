@@ -7,6 +7,7 @@ import queue
 
 from ...api.settings import SettingsRegistry
 from ..statefulCore import StateDataRegistry
+from .locator import DataLocator
 from .settings import WorkflowSettings
 
 logger = logging.getLogger(__name__)
@@ -20,10 +21,14 @@ class WorkflowJob:
 
 class WorkflowExecutor:
 
-    def __init__(self, settings: WorkflowSettings, settingsRegistry: SettingsRegistry,
-                 stateDataRegistry: StateDataRegistry) -> None:
+    def __init__(self, settings: WorkflowSettings, inputDataLocator: DataLocator,
+                 computeDataLocator: DataLocator, outputDataLocator: DataLocator,
+                 settingsRegistry: SettingsRegistry, stateDataRegistry: StateDataRegistry) -> None:
         super().__init__()
         self._settings = settings
+        self._inputDataLocator = inputDataLocator
+        self._computeDataLocator = computeDataLocator
+        self._outputDataLocator = outputDataLocator
         self._settingsRegistry = settingsRegistry
         self._stateDataRegistry = stateDataRegistry
         self.jobQueue: queue.Queue[WorkflowJob] = queue.Queue()
@@ -31,13 +36,13 @@ class WorkflowExecutor:
     def runFlow(self, flowLabel: str) -> None:
         transferSyncLevel = 3  # Copy files if checksums of the source and destination do not match.
 
-        inputDataPosixPath = self._settings.inputDataPosixPath.value / flowLabel
-        computeDataPosixPath = self._settings.computeDataPosixPath.value / flowLabel
-        outputDataPosixPath = self._settings.outputDataPosixPath.value / flowLabel
+        inputDataPosixPath = self._inputDataLocator.getPosixPath() / flowLabel
+        computeDataPosixPath = self._computeDataLocator.getPosixPath() / flowLabel
+        outputDataPosixPath = self._outputDataLocator.getPosixPath() / flowLabel
 
-        inputDataGlobusPath = f'{self._settings.inputDataGlobusPath.value}/{flowLabel}'
-        computeDataGlobusPath = f'{self._settings.computeDataGlobusPath.value}/{flowLabel}'
-        outputDataGlobusPath = f'{self._settings.outputDataGlobusPath.value}/{flowLabel}'
+        inputDataGlobusPath = f'{self._inputDataLocator.getGlobusPath()}/{flowLabel}'
+        computeDataGlobusPath = f'{self._computeDataLocator.getGlobusPath()}/{flowLabel}'
+        outputDataGlobusPath = f'{self._outputDataLocator.getGlobusPath()}/{flowLabel}'
 
         settingsFileName = 'input.ini'
         restartFileName = 'input.npz'
@@ -55,11 +60,11 @@ class WorkflowExecutor:
 
         flowInput = {
             'input_data_transfer_source_endpoint_id':
-            str(self._settings.inputDataEndpointID.value),
+            str(self._inputDataLocator.getEndpointID()),
             'input_data_transfer_source_path':
             inputDataGlobusPath,
             'input_data_transfer_destination_endpoint_id':
-            str(self._settings.computeDataEndpointID.value),
+            str(self._computeDataLocator.getEndpointID()),
             'input_data_transfer_destination_path':
             computeDataGlobusPath,
             'input_data_transfer_recursive':
@@ -75,11 +80,11 @@ class WorkflowExecutor:
             'ptychodus_results_file':
             str(computeDataPosixPath / resultsFileName),
             'output_data_transfer_source_endpoint_id':
-            str(self._settings.computeDataEndpointID.value),
+            str(self._computeDataLocator.getEndpointID()),
             'output_data_transfer_source_path':
             f'{computeDataGlobusPath}/{resultsFileName}',
             'output_data_transfer_destination_endpoint_id':
-            str(self._settings.outputDataEndpointID.value),
+            str(self._outputDataLocator.getEndpointID()),
             'output_data_transfer_destination_path':
             f'{outputDataGlobusPath}/{resultsFileName}',
             'output_data_transfer_recursive':

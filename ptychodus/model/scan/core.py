@@ -171,6 +171,7 @@ class ScanCore(StatefulCore):
                                                       self._builder, fileWriterChooser)
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
+        # FIXME scans aren't saving correctly
         self.presenter.openScan(filePath, fileFilter)
 
     def setActiveScan(self, name: str) -> None:
