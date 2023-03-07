@@ -47,8 +47,33 @@ class Apparatus(Observable, Observer):
                 * self._detector.getPixelSizeYInMeters()
         return self.getLambdaZInSquareMeters() / extentYInMeters
 
+    def getFresnelNumber(self) -> Decimal:
+        extentXInMeters = self._diffractionPatternSizer.getExtentXInPixels() \
+                * self._detector.getPixelSizeXInMeters()
+        return extentXInMeters**2 / self.getLambdaZInSquareMeters()
+
     def update(self, observable: Observable) -> None:
         if observable is self._detector:
             self.notifyObservers()
         elif observable is self._diffractionPatternSizer:
+            self.notifyObservers()
+
+
+class ApparatusPresenter(Observable, Observer):
+
+    def __init__(self, apparatus: Apparatus) -> None:
+        super().__init__()
+        self._apparatus = apparatus
+
+    @classmethod
+    def createInstance(cls, apparatus: Apparatus) -> ApparatusPresenter:
+        presenter = cls(apparatus)
+        apparatus.addObserver(presenter)
+        return presenter
+
+    def getFresnelNumber(self) -> Decimal:
+        return self._apparatus.getFresnelNumber()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._apparatus:
             self.notifyObservers()

@@ -38,7 +38,8 @@ class ControllerCore:
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
-            model.detectorPresenter, view.detectorParametersView.detectorView)
+            model.detectorPresenter, model.apparatusPresenter,
+            view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
             model.diffractionDatasetPresenter, model.activeDiffractionPatternPresenter,
             view.detectorParametersView.patternView)

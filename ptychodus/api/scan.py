@@ -123,7 +123,7 @@ class TabularScan(Scan):
 
     @classmethod
     def createEmpty(cls) -> TabularScan:
-        return cls('Tabular', {0: ScanPoint(Decimal(), Decimal())})
+        return cls('Empty', {})
 
     @classmethod
     def createFromPointSequence(cls, name: str, pointSeq: Sequence[ScanPoint]) -> TabularScan:

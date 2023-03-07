@@ -9,8 +9,9 @@ from PyQt5.QtGui import QFont
 from ..api.data import DiffractionPatternState
 from ..api.observer import Observable, Observer
 from ..model import DetectorPresenter
-from ..model.image import ImagePresenter
 from ..model.data import ActiveDiffractionPatternPresenter, DiffractionDatasetPresenter
+from ..model.image import ImagePresenter
+from ..model.probe import ApparatusPresenter
 from ..view import DiffractionPatternView, DetectorView, ImageView
 from .data import FileDialogFactory
 from .image import ImageController
@@ -18,16 +19,19 @@ from .image import ImageController
 
 class DetectorController(Observer):
 
-    def __init__(self, presenter: DetectorPresenter, view: DetectorView) -> None:
+    def __init__(self, presenter: DetectorPresenter, apparatusPresenter: ApparatusPresenter,
+                 view: DetectorView) -> None:
         super().__init__()
         self._presenter = presenter
+        self._apparatusPresenter = apparatusPresenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: DetectorPresenter,
+    def createInstance(cls, presenter: DetectorPresenter, apparatusPresenter: ApparatusPresenter,
                        view: DetectorView) -> DetectorController:
-        controller = cls(presenter, view)
+        controller = cls(presenter, apparatusPresenter, view)
         presenter.addObserver(controller)
+        apparatusPresenter.addObserver(controller)
 
         view.numberOfPixelsXSpinBox.valueChanged.connect(presenter.setNumberOfPixelsX)
         view.numberOfPixelsYSpinBox.valueChanged.connect(presenter.setNumberOfPixelsY)
@@ -59,8 +63,13 @@ class DetectorController(Observer):
         self._view.detectorDistanceWidget.setLengthInMeters(
             self._presenter.getDetectorDistanceInMeters())
 
+        self._view.fresnelNumberWidget.setReadOnly(True)
+        self._view.fresnelNumberWidget.setValue(self._apparatusPresenter.getFresnelNumber())
+
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
+            self._syncModelToView()
+        elif observable is self._apparatusPresenter:
             self._syncModelToView()
 
 

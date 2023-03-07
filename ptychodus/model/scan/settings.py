@@ -11,7 +11,7 @@ class ScanSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.activeScan = settingsGroup.createStringEntry('ActiveScan', 'Tabular')
+        self.activeScan = settingsGroup.createStringEntry('ActiveScan', 'Snake')
         self.amplitudeXInMeters = settingsGroup.createRealEntry('AmplitudeXInMeters', '4.5e-6')
         self.amplitudeYInMeters = settingsGroup.createRealEntry('AmplitudeYInMeters', '4.5e-6')
         self.angularShiftInTurns = settingsGroup.createRealEntry('AngularShiftInTurns', '0.25')
@@ -19,7 +19,7 @@ class ScanSettings(Observable, Observer):
         self.angularStepYInTurns = settingsGroup.createRealEntry('AngularStepYInTurns', '0.04')
         self.centroidXInMeters = settingsGroup.createRealEntry('CentroidXInMeters', '0')
         self.centroidYInMeters = settingsGroup.createRealEntry('CentroidYInMeters', '0')
-        self.initializer = settingsGroup.createStringEntry('Initializer', 'Tabular')
+        self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/scan.csv'))
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')

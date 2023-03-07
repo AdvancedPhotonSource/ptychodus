@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QHBoxLayout, QListView, QPu
                              QSizePolicy, QSpinBox, QVBoxLayout, QWidget)
 
 from .image import ImageView
-from .widgets import LengthWidget
+from .widgets import DecimalLineEdit, LengthWidget
 
 
 class DetectorView(QGroupBox):
@@ -17,6 +17,7 @@ class DetectorView(QGroupBox):
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
         self.detectorDistanceWidget = LengthWidget.createInstance()
+        self.fresnelNumberWidget = DecimalLineEdit.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorView:
@@ -28,6 +29,7 @@ class DetectorView(QGroupBox):
         layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
         layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
         layout.addRow('Detector-Object Distance:', view.detectorDistanceWidget)
+        layout.addRow('Fresnel Number:', view.fresnelNumberWidget)
         view.setLayout(layout)
 
         return view
