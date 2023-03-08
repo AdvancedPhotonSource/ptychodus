@@ -8,39 +8,19 @@ from ...api.settings import SettingsRegistry, SettingsGroup
 
 class WorkflowSettings(Observable, Observer):
 
-    def __init__(self, settingsGroup: SettingsGroup) -> None:
+    def __init__(self, group: SettingsGroup) -> None:
         super().__init__()
-        self._settingsGroup = settingsGroup
-
-        self.inputDataEndpointID = settingsGroup.createUUIDEntry('InputDataEndpointID',
-                                                                 UUID(int=0))
-        self.inputDataGlobusPath = settingsGroup.createStringEntry('InputDataGlobusPath',
-                                                                   '/~/path/to/input/data')
-        self.inputDataPosixPath = settingsGroup.createPathEntry('InputDataPosixPath',
-                                                                Path.home() / 'ptychodus-staging')
-        self.computeFuncXEndpointID = settingsGroup.createUUIDEntry('ComputeFuncXEndpointID',
-                                                                    UUID(int=0))
-        self.computeDataEndpointID = settingsGroup.createUUIDEntry('ComputeDataEndpointID',
-                                                                   UUID(int=0))
-        self.computeDataGlobusPath = settingsGroup.createStringEntry('ComputeDataGlobusPath',
-                                                                     '/~/path/to/compute/data')
-        self.computeDataPosixPath = settingsGroup.createPathEntry('ComputeDataPosixPath',
-                                                                  Path('/path/to/compute/data'))
-        self.outputDataEndpointID = settingsGroup.createUUIDEntry('OutputDataEndpointID',
-                                                                  UUID(int=0))
-        self.outputDataGlobusPath = settingsGroup.createStringEntry('OutputDataGlobusPath',
-                                                                    '/~/path/to/output/data')
-        self.outputDataPosixPath = settingsGroup.createPathEntry('OutputDataPosixPath',
-                                                                 Path('/path/to/output/data'))
-        self.statusRefreshIntervalInSeconds = settingsGroup.createIntegerEntry(
+        self.group = group
+        self.computeFuncXEndpointID = group.createUUIDEntry('ComputeFuncXEndpointID', UUID(int=0))
+        self.statusRefreshIntervalInSeconds = group.createIntegerEntry(
             'StatusRefreshIntervalInSeconds', 10)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> WorkflowSettings:
         settings = cls(settingsRegistry.createGroup('Workflow'))
-        settings._settingsGroup.addObserver(settings)
+        settings.group.addObserver(settings)
         return settings
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
+        if observable is self.group:
             self.notifyObservers()

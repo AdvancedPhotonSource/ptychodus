@@ -4,19 +4,20 @@ from uuid import UUID
 
 from ...api.observer import Observable, Observer
 from ...model.workflow import WorkflowParametersPresenter
-from ...view import WorkflowDataView
+from ...view import WorkflowInputDataView
 
 
 class WorkflowInputDataController(Observer):
 
-    def __init__(self, presenter: WorkflowParametersPresenter, view: WorkflowDataView) -> None:
+    def __init__(self, presenter: WorkflowParametersPresenter,
+                 view: WorkflowInputDataView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
     def createInstance(cls, presenter: WorkflowParametersPresenter,
-                       view: WorkflowDataView) -> WorkflowInputDataController:
+                       view: WorkflowInputDataView) -> WorkflowInputDataController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 

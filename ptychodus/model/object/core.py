@@ -178,6 +178,9 @@ class ObjectCore(StatefulCore):
                                                         self.object, self._initializerChooser,
                                                         fileWriterChooser, settingsRegistry)
 
+    def initializeAndActivateObject(self) -> None:
+        self.presenter.initializeObject()
+
     def getStateData(self, *, restartable: bool) -> StateDataType:
         state: StateDataType = {
             'object': self.object.getArray(),

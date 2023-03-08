@@ -12,7 +12,7 @@ from ...api.settings import SettingsRegistry
 from ..data import DiffractionPatternSizer
 from ..detector import Detector
 from ..statefulCore import StateDataType, StatefulCore
-from .apparatus import Apparatus
+from .apparatus import Apparatus, ApparatusPresenter
 from .file import FileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
 from .initializer import ProbeInitializer, UnimodalProbeInitializerParameters
@@ -186,9 +186,13 @@ class ProbeCore(StatefulCore):
         self._initializerChooser = ProbeCore._createInitializerChooser(
             rng, self.settings, self.sizer, self.apparatus, fileReaderChooser)
 
+        self.apparatusPresenter = ApparatusPresenter.createInstance(self.apparatus)
         self.presenter = ProbePresenter.createInstance(self.settings, self.sizer, self.probe,
                                                        self.apparatus, self._initializerChooser,
                                                        fileWriterChooser, settingsRegistry)
+
+    def initializeAndActivateProbe(self) -> None:
+        self.presenter.initializeProbe()
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         pixelSizeXInMeters = float(self.apparatus.getObjectPlanePixelSizeXInMeters())

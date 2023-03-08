@@ -3,6 +3,7 @@ from collections.abc import ItemsView
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
+from typing import Optional
 import logging
 
 import numpy
@@ -33,23 +34,19 @@ class ScanPresenter(Observable, Observer):
 
     def __init__(self, itemFactory: ScanRepositoryItemFactory, repository: ScanRepository,
                  scan: ActiveScan, builder: StreamingScanBuilder,
-                 indexFilterFactory: ScanIndexFilterFactory,
                  fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
         super().__init__()
         self._itemFactory = itemFactory
         self._repository = repository
         self._scan = scan
         self._builder = builder
-        self._indexFilterFactory = indexFilterFactory
         self._fileWriterChooser = fileWriterChooser
 
     @classmethod
     def createInstance(cls, itemFactory: ScanRepositoryItemFactory, repository: ScanRepository,
                        scan: ActiveScan, builder: StreamingScanBuilder,
-                       indexFilterFactory: ScanIndexFilterFactory,
                        fileWriterChooser: PluginChooser[ScanFileWriter]) -> ScanPresenter:
-        presenter = cls(itemFactory, repository, scan, builder, indexFilterFactory,
-                        fileWriterChooser)
+        presenter = cls(itemFactory, repository, scan, builder, fileWriterChooser)
         repository.addObserver(presenter)
         scan.addObserver(presenter)
         return presenter
@@ -171,11 +168,13 @@ class ScanCore(StatefulCore):
         self.scan = ActiveScan.createInstance(self._settings, self.itemFactory, self.repository,
                                               settingsRegistry)
         self.presenter = ScanPresenter.createInstance(self.itemFactory, self.repository, self.scan,
-                                                      self._builder, self._indexFilterFactory,
-                                                      fileWriterChooser)
+                                                      self._builder, fileWriterChooser)
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
         self.presenter.openScan(filePath, fileFilter)
+
+    def setActiveScan(self, name: str) -> None:
+        self.scan.setActiveScan(name)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         scanIndex: list[int] = list()

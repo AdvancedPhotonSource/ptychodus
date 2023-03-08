@@ -15,14 +15,14 @@ import numpy
 from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
-from .automation import AutomationCore, AutomationPresenter
+from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
                    DiffractionDatasetInputOutputPresenter, DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import ImageCore, ImagePresenter
 from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter
-from .probe import ProbeCore, ProbePresenter
+from .probe import ApparatusPresenter, ProbeCore, ProbePresenter
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter, ReconstructorPlotPresenter
@@ -119,7 +119,9 @@ class ModelCore:
         self._stateDataRegistry = StateDataRegistry(
             (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
-        self._automationCore = AutomationCore(self.settingsRegistry)
+        self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore,
+                                              self._scanCore, self._probeCore, self._objectCore,
+                                              self._workflowCore)
 
         self.rpcMessageService: Optional[RPCMessageService] = None
 
@@ -147,6 +149,7 @@ class ModelCore:
 
         self._dataCore.start()
         self._workflowCore.start()
+        self._automationCore.start()
 
         return self
 
@@ -161,6 +164,7 @@ class ModelCore:
 
     def __exit__(self, exception_type: type[BaseException] | None,
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
+        self._automationCore.stop()
         self._workflowCore.stop()
         self._dataCore.stop()
 
@@ -170,6 +174,10 @@ class ModelCore:
     @property
     def detectorImagePresenter(self) -> ImagePresenter:
         return self._detectorImageCore.presenter
+
+    @property
+    def apparatusPresenter(self) -> ApparatusPresenter:
+        return self._probeCore.apparatusPresenter
 
     @property
     def patternPresenter(self) -> DiffractionPatternPresenter:
@@ -213,6 +221,9 @@ class ModelCore:
 
     def refreshActiveDataset(self) -> None:
         self._dataCore.dataset.notifyObserversIfDatasetChanged()
+
+    def refreshAutomationDatasets(self) -> None:
+        self._automationCore.repository.notifyObserversIfRepositoryChanged()
 
     def saveStateData(self, filePath: Path, *, restartable: bool) -> None:
         self._stateDataRegistry.saveStateData(filePath, restartable=restartable)
@@ -276,3 +287,7 @@ class ModelCore:
     @property
     def automationPresenter(self) -> AutomationPresenter:
         return self._automationCore.presenter
+
+    @property
+    def automationProcessingPresenter(self) -> AutomationProcessingPresenter:
+        return self._automationCore.processingPresenter

@@ -38,7 +38,8 @@ class ControllerCore:
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
-            model.detectorPresenter, view.detectorParametersView.detectorView)
+            model.detectorPresenter, model.apparatusPresenter,
+            view.detectorParametersView.detectorView)
         self._datasetParametersController = DatasetParametersController.createInstance(
             model.diffractionDatasetPresenter, model.activeDiffractionPatternPresenter,
             view.detectorParametersView.patternView)
@@ -80,7 +81,8 @@ class ControllerCore:
             model.workflowStatusPresenter, model.workflowExecutionPresenter,
             view.workflowParametersView, view.workflowTableView)
         self._automationController = AutomationController.createInstance(
-            model.automationPresenter, view.automationParametersView, self._fileDialogFactory)
+            model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
+            view.automationParametersView, self._fileDialogFactory)
         self._monitorProbeController = ProbeImageController.createInstance(
             model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
             self._fileDialogFactory)
@@ -88,6 +90,7 @@ class ControllerCore:
             model.objectPresenter, model.objectImagePresenter, view.monitorObjectView.imageView,
             self._fileDialogFactory)
         self._refreshDataTimer = QTimer()
+        self._automationTimer = QTimer()
         self._processMessagesTimer = QTimer()
 
     @classmethod
@@ -101,6 +104,9 @@ class ControllerCore:
 
         controller._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
         controller._refreshDataTimer.start(1000)  # TODO make configurable
+
+        controller._automationTimer.timeout.connect(model.refreshAutomationDatasets)
+        controller._automationTimer.start(1000)  # TODO make configurable
 
         if model.rpcMessageService and model.rpcMessageService.isActive:
             controller._processMessagesTimer.timeout.connect(

@@ -11,10 +11,12 @@ class AutomationSettings(Observable, Observer):
         super().__init__()
         self._settingsGroup = settingsGroup
         self.strategy = settingsGroup.createStringEntry('Strategy', 'CNM/APS Hard X-Ray Nanoprobe')
+        self.useWatchdogPollingObserver = settingsGroup.createBooleanEntry(
+            'UseWatchdogPollingObserver', False)
         self.watchdogDirectory = settingsGroup.createPathEntry('WatchdogDirectory',
                                                                Path('/path/to/data'))
         self.watchdogDelayInSeconds = settingsGroup.createIntegerEntry(
-            'WatchdogDelayInSeconds', 30)
+            'WatchdogDelayInSeconds', 15)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> AutomationSettings:

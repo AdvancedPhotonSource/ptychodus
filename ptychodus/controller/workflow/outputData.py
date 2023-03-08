@@ -4,22 +4,24 @@ from uuid import UUID
 
 from ...api.observer import Observable, Observer
 from ...model.workflow import WorkflowParametersPresenter
-from ...view import WorkflowDataView
+from ...view import WorkflowOutputDataView
 
 
 class WorkflowOutputDataController(Observer):
 
-    def __init__(self, presenter: WorkflowParametersPresenter, view: WorkflowDataView) -> None:
+    def __init__(self, presenter: WorkflowParametersPresenter,
+                 view: WorkflowOutputDataView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
     def createInstance(cls, presenter: WorkflowParametersPresenter,
-                       view: WorkflowDataView) -> WorkflowOutputDataController:
+                       view: WorkflowOutputDataView) -> WorkflowOutputDataController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
+        view.roundTripCheckBox.toggled.connect(presenter.setRoundTripEnabled)
         view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
         view.globusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
         view.posixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
@@ -41,9 +43,14 @@ class WorkflowOutputDataController(Observer):
         self._presenter.setOutputDataPosixPath(dataPath)
 
     def _syncModelToView(self) -> None:
+        isRoundTripEnabled = self._presenter.isRoundTripEnabled()
+        self._view.roundTripCheckBox.setChecked(isRoundTripEnabled)
         self._view.endpointIDLineEdit.setText(str(self._presenter.getOutputDataEndpointID()))
+        self._view.endpointIDLineEdit.setEnabled(not isRoundTripEnabled)
         self._view.globusPathLineEdit.setText(str(self._presenter.getOutputDataGlobusPath()))
+        self._view.globusPathLineEdit.setEnabled(not isRoundTripEnabled)
         self._view.posixPathLineEdit.setText(str(self._presenter.getOutputDataPosixPath()))
+        self._view.posixPathLineEdit.setEnabled(not isRoundTripEnabled)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

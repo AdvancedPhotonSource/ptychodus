@@ -57,8 +57,8 @@ class TabularScanRepositoryItem(ScanRepositoryItem):
         return (self._fileInfo is not None)
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
-        fileInfo = ScanFileInfo.createFromSettings(settings)
-        self.setFileInfo(fileInfo)
+        # NOTE do not sync file info from settings
+        pass
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         if self._fileInfo is None:

@@ -1,4 +1,4 @@
-from .apparatus import Apparatus
+from .apparatus import Apparatus, ApparatusPresenter
 from .core import ProbeCore, ProbePresenter
 from .file import FileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
@@ -9,6 +9,7 @@ from .superGaussian import SuperGaussianProbeInitializer
 
 __all__ = [
     'Apparatus',
+    'ApparatusPresenter',
     'FileProbeInitializer',
     'FresnelZonePlateProbeInitializer',
     'Probe',
