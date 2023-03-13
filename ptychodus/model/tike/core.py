@@ -12,9 +12,9 @@ from ...api.reconstructor import NullReconstructor, Reconstructor, Reconstructor
 from ...api.scan import Scan
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
-from ..object import Object
-from ..probe import Apparatus, Probe, ProbeSizer
-from ..scan import ScanRepositoryItemFactory, ScanRepository
+from ..object import ObjectAPI
+from ..probe import Probe
+from ..scan import ScanAPI
 from .arrayConverter import TikeArrayConverter
 from .multigrid import TikeMultigridPresenter, TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
@@ -162,11 +162,9 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                        settingsRegistry: SettingsRegistry,
                        diffractionDataset: ActiveDiffractionDataset,
                        scan: Scan,
+                       scanAPI: ScanAPI,
                        probe: Probe,
-                       apparatus: Apparatus,
-                       object_: Object,
-                       scanRepositoryItemFactory: ScanRepositoryItemFactory,
-                       scanRepository: ScanRepository,
+                       objectAPI: ObjectAPI,
                        isDeveloperModeEnabled: bool = False) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
 
@@ -187,9 +185,8 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                 core.reconstructorList.append(NullReconstructor('lstsq_grad'))
                 core.reconstructorList.append(NullReconstructor('dm'))
         else:
-            arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_,
-                                                diffractionDataset, scanRepositoryItemFactory,
-                                                scanRepository)
+            arrayConverter = TikeArrayConverter(scan, scanAPI, probe, objectAPI,
+                                                diffractionDataset)
             tikeReconstructor = TikeReconstructor(core._settings, core._multigridSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings,

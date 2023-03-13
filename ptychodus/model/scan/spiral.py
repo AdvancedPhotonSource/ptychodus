@@ -5,7 +5,7 @@ from typing import Final
 import numpy
 
 from ...api.scan import ScanPoint
-from .repository import ContiguousScanIterator, ScanRepositoryItem
+from .itemRepository import ScanRepositoryItem
 from .settings import ScanSettings
 
 
@@ -47,7 +47,8 @@ class SpiralScanRepositoryItem(ScanRepositoryItem):
         settings.angularStepXInTurns.value = self._angularStepInTurns
 
     def __iter__(self) -> Iterator[int]:
-        return ContiguousScanIterator(self)
+        for index in range(len(self)):
+            yield index
 
     def __getitem__(self, index: int) -> ScanPoint:
         if index >= len(self):

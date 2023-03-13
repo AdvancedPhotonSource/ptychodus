@@ -11,9 +11,9 @@ from ...api.object import ObjectArrayType
 from ...api.probe import ProbeArrayType
 from ...api.scan import Scan, ScanPoint, TabularScan
 from ..data import ActiveDiffractionDataset
-from ..object import Object
-from ..probe import Apparatus, Probe
-from ..scan import ScanRepositoryItemFactory, ScanRepository
+from ..object import ObjectAPI
+from ..probe import Probe
+from ..scan import ScanAPI
 
 logger = logging.getLogger(__name__)
 
@@ -29,17 +29,13 @@ class TikeArrays:
 
 class TikeArrayConverter:
 
-    def __init__(self, apparatus: Apparatus, scan: Scan, probe: Probe, object_: Object,
-                 diffractionDataset: ActiveDiffractionDataset,
-                 scanRepositoryItemFactory: ScanRepositoryItemFactory,
-                 scanRepository: ScanRepository) -> None:
-        self._apparatus = apparatus
+    def __init__(self, scan: Scan, scanAPI: ScanAPI, probe: Probe, objectAPI: ObjectAPI,
+                 diffractionDataset: ActiveDiffractionDataset) -> None:
         self._scan = scan
+        self._scanAPI = scanAPI
         self._probe = probe
-        self._object = object_
+        self._objectAPI = objectAPI
         self._diffractionDataset = diffractionDataset
-        self._scanRepositoryItemFactory = scanRepositoryItemFactory
-        self._scanRepository = scanRepository
 
     def getDiffractionData(self) -> DiffractionPatternData:
         data = self._diffractionDataset.getAssembledData()
@@ -47,8 +43,8 @@ class TikeArrayConverter:
 
     def exportToTike(self) -> TikeArrays:
         assembledIndexes = self._diffractionDataset.getAssembledIndexes()
-        pixelSizeXInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
-        pixelSizeYInMeters = self._apparatus.getObjectPlanePixelSizeYInMeters()
+        pixelSizeXInMeters = self._objectAPI.getPixelSizeXInMeters()
+        pixelSizeYInMeters = self._objectAPI.getPixelSizeYInMeters()
 
         scanX: list[float] = list()
         scanY: list[float] = list()
@@ -83,7 +79,7 @@ class TikeArrayConverter:
         tikeObject = numpy.ones(shape=(tikeObjectShapeY, tikeObjectShapeX), dtype='complex64')
         logger.debug(f'Tike object: {tikeObjectShapeY,tikeObjectShapeX}')
 
-        object_ = self._object.getArray()
+        object_ = self._objectAPI.getActiveObjectArray()
         logger.debug(f'Ptychodus object: {object_.shape}')
 
         tikeObject[padY:padY + object_.shape[-2], padX:padX + object_.shape[-1]] = object_
@@ -96,8 +92,8 @@ class TikeArrayConverter:
 
     def importFromTike(self, arrays: TikeArrays) -> None:
         # TODO only update scan/probe/object if correction enabled
-        pixelSizeXInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
-        pixelSizeYInMeters = self._apparatus.getObjectPlanePixelSizeYInMeters()
+        pixelSizeXInMeters = self._objectAPI.getPixelSizeXInMeters()
+        pixelSizeYInMeters = self._objectAPI.getPixelSizeYInMeters()
 
         probe = self._probe.getArray()
         padX = probe.shape[-1] // 2
@@ -108,6 +104,7 @@ class TikeArrayConverter:
 
         pointList: list[ScanPoint] = list()
 
+        # TODO use assembledIndexes
         for xy in arrays.scan:
             x_px = xy[1] - shiftX
             y_px = xy[0] - shiftY
@@ -116,12 +113,6 @@ class TikeArrayConverter:
             pointList.append(ScanPoint(x_m, y_m))
 
         tabularScan = TabularScan.createFromPointSequence('Tike', pointList)
-        tabularScanRepositoryItem = self._scanRepositoryItemFactory.createTabularItem(
-            tabularScan, None)
-        self._scanRepository.insertItem(tabularScanRepositoryItem)
-
+        self._scanAPI.insertScanIntoRepository(tabularScan, None)
         self._probe.setArray(arrays.probe[0, 0])
-
-        object_ = self._object.getArray()
-        self._object.setArray(arrays.object_[padY:padY + object_.shape[-2],
-                                             padX:padX + object_.shape[-1]])
+        self._objectAPI.insertObjectIntoRepository('Tike', arrays.object_, None)

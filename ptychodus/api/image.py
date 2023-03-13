@@ -16,8 +16,13 @@ class ImageExtent:
     height: int
 
     @property
+    def size(self) -> int:
+        '''returns the number of pixels in the image'''
+        return self.width * self.height
+
+    @property
     def shape(self) -> tuple[int, int]:
-        '''returns the shape (height, width) tuple'''
+        '''returns the image shape (height, width) tuple'''
         return self.height, self.width
 
     def __eq__(self, other: object) -> bool:

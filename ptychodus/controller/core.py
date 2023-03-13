@@ -8,7 +8,7 @@ from ..view import ViewCore
 from .automation import AutomationController
 from .data import DataParametersController, FileDialogFactory
 from .detector import (DatasetImageController, DatasetParametersController, DetectorController)
-from .object import ObjectImageController, ObjectParametersController
+from .object import ObjectImageController, ObjectController
 from .probe import ProbeImageController, ProbeParametersController
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
@@ -53,8 +53,10 @@ class ControllerCore:
                                                              view.scanParametersView,
                                                              view.scanPlotView,
                                                              self._fileDialogFactory)
-        self._objectParametersController = ObjectParametersController.createInstance(
-            model.objectPresenter, view.objectParametersView, self._fileDialogFactory)
+        self._objectController = ObjectController.createInstance(model.objectPresenter,
+                                                                 model.objectRepositoryPresenter,
+                                                                 view.objectParametersView,
+                                                                 self._fileDialogFactory)
         self._objectImageController = ObjectImageController.createInstance(
             model.objectPresenter, model.objectImagePresenter, view.objectImageView,
             self._fileDialogFactory)

@@ -6,9 +6,9 @@ from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ..data import DataCore
-from ..object import ObjectCore
+from ..object import ObjectAPI
 from ..probe import ProbeCore
-from ..scan import ScanCore
+from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 from .buffer import AutomationDatasetBuffer
 from .processor import AutomationDatasetProcessor
@@ -124,14 +124,14 @@ class AutomationProcessingPresenter(Observable, Observer):
 
 class AutomationCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry, dataCore: DataCore, scanCore: ScanCore,
-                 probeCore: ProbeCore, objectCore: ObjectCore, workflowCore: WorkflowCore) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, dataCore: DataCore, scanAPI: ScanAPI,
+                 probeCore: ProbeCore, objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._buffer = AutomationDatasetBuffer(self._settings, self.repository,
                                                self._processingQueue)
-        self._workflow = AutomationDatasetWorkflow(dataCore, scanCore, probeCore, objectCore,
+        self._workflow = AutomationDatasetWorkflow(dataCore, scanAPI, probeCore, objectAPI,
                                                    workflowCore)
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
                                                      self._workflow, self._processingQueue)

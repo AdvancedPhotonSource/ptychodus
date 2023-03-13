@@ -14,6 +14,10 @@ class ObjectSettings(Observable, Observer):
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/object.npy'))
+        self.amplitudeMean = settingsGroup.createRealEntry('AmplitudeMean', '0.5')
+        self.amplitudeStandardDeviation = settingsGroup.createRealEntry(
+            'AmplitudeStandardDeviation', '0')
+        self.randomizePhase = settingsGroup.createBooleanEntry('RandomizePhase', False)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:

@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Final
 
 from ...api.scan import ScanPoint
-from .repository import ContiguousScanIterator, ScanRepositoryItem
+from .itemRepository import ScanRepositoryItem
 from .settings import ScanSettings
 
 
@@ -43,7 +43,8 @@ class CartesianScanRepositoryItem(ScanRepositoryItem):
         settings.numberOfPointsY.value = self._numberOfPointsY
 
     def __iter__(self) -> Iterator[int]:
-        return ContiguousScanIterator(self)
+        for index in range(len(self)):
+            yield index
 
     def __getitem__(self, index: int) -> ScanPoint:
         if index >= len(self):

@@ -1,12 +1,13 @@
-from .core import ObjectCore, ObjectPresenter
-from .file import FileObjectInitializer
-from .object import Object
-from .settings import ObjectSettings
-from .sizer import ObjectSizer
+from .api import ObjectAPI
+from .core import (ObjectCore, ObjectPresenter, ObjectRepositoryItemPresenter,
+                   ObjectRepositoryPresenter)
+from .simple import ObjectFileInfo
 
 __all__ = [
-    'FileObjectInitializer',
-    'Object',
+    'ObjectAPI',
     'ObjectCore',
+    'ObjectFileInfo',
     'ObjectPresenter',
+    'ObjectRepositoryItemPresenter',
+    'ObjectRepositoryPresenter',
 ]

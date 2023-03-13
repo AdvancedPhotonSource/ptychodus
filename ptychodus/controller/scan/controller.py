@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable
+from typing import Callable, Final
 import logging
 
 from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel,
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScanController(Observer):
-    OPEN_FILE = 'Open File...'
+    OPEN_FILE: Final[str] = 'Open File...'
 
     def __init__(self, presenter: ScanPresenter, parametersView: ScanParametersView,
                  plotView: ScanPlotView, fileDialogFactory: FileDialogFactory) -> None:

@@ -11,7 +11,7 @@ from ptychonn import ReconSmallPhaseModel, Tester, Trainer
 from ...api.reconstructor import ReconstructResult, Reconstructor
 from ...api.scan import Scan
 from ..data import ActiveDiffractionDataset
-from ..object import Object
+from ..object import ObjectAPI
 from ..probe import Apparatus
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 from .trainable import TrainableReconstructor, TrainingData
@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
 
     def __init__(self, settings: PtychoNNModelSettings, trainingSettings: PtychoNNTrainingSettings,
-                 apparatus: Apparatus, scan: Scan, object_: Object,
+                 apparatus: Apparatus, scan: Scan, objectAPI: ObjectAPI,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
         self._settings = settings
         self._trainingSettings = trainingSettings
         self._apparatus = apparatus
         self._scan = scan
-        self._object = object_
+        self._objectAPI = objectAPI
         self._diffractionDataset = diffractionDataset
 
         ptychonnVersion = version('ptychonn')
@@ -109,7 +109,7 @@ class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
             stitched_pixel_width=float(stitchedPixelWidthInMeters),
             inference_pixel_width=float(inferencePixelWidthInMeters))
         stitched = numpy.exp(1j * stitchedPhase)
-        self._object.setArray(stitched)
+        self._objectAPI.insertObjectIntoRepository('PtychoNN', stitched, None)
 
         return ReconstructResult(0, [[]])
 

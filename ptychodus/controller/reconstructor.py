@@ -14,7 +14,7 @@ from ..api.reconstructor import ReconstructResult
 from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
-from ..model.scan import ScanPresenter, ScanRepositoryKeyAndValue
+from ..model.scan import ScanPresenter, ScanRepositoryItem
 from ..view import ReconstructorParametersView, ReconstructorPlotView, resources
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,12 @@ class ReconstructorViewControllerFactory(ABC):
         pass
 
 
+@dataclass(frozen=True)
+class ScanRepositoryKeyAndValue:
+    name: str
+    item: ScanRepositoryItem
+
+
 class ScanListModel(QAbstractListModel):
 
     def __init__(self, presenter: ScanPresenter, parent: Optional[QObject] = None) -> None:
@@ -41,8 +47,9 @@ class ScanListModel(QAbstractListModel):
     def refresh(self) -> None:
         self.beginResetModel()
         self._scanList = [
-            kv for kv in self._presenter.getScanRepositoryKeysAndValues()
-            if self._presenter.canActivateScan(kv.name)
+            ScanRepositoryKeyAndValue(name, item)
+            for name, item in self._presenter.getScanRepositoryContents()
+            if self._presenter.canActivateScan(name)
         ]
         self.endResetModel()
 
@@ -111,8 +118,8 @@ class ReconstructorParametersController(Observer):
         view.reconstructorView.scanComboBox.currentTextChanged.connect(scanPresenter.setActiveScan)
         view.reconstructorView.scanComboBox.setModel(controller._scanListModel)
 
-        view.reconstructorView.probeComboBox.addItem('Current Probe')  # TODO
-        view.reconstructorView.objectComboBox.addItem('Current Object')  # TODO
+        view.reconstructorView.probeComboBox.addItem('Current Probe')  # FIXME
+        view.reconstructorView.objectComboBox.addItem('Current Object')  # FIXME
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
 
         controller._refreshScanListModel()

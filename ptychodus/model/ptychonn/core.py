@@ -13,7 +13,7 @@ from ...api.reconstructor import NullReconstructor, Reconstructor, Reconstructor
 from ...api.scan import Scan
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ..data import ActiveDiffractionDataset
-from ..object import Object
+from ..object import ObjectAPI
 from ..probe import Apparatus
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 from .trainable import TrainableReconstructor
@@ -219,7 +219,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
                        diffractionDataset: ActiveDiffractionDataset,
                        scan: Scan,
                        apparatus: Apparatus,
-                       object_: Object,
+                       objectAPI: ObjectAPI,
                        isDeveloperModeEnabled: bool = False) -> PtychoNNReconstructorLibrary:
         core = cls(settingsRegistry)
 
@@ -233,7 +233,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         else:
             trainableReconstructor = PtychoNNPhaseOnlyReconstructor(core._settings,
                                                                     core._trainingSettings,
-                                                                    apparatus, scan, object_,
+                                                                    apparatus, scan, objectAPI,
                                                                     diffractionDataset)
             core.trainingPresenter.setTrainer(trainableReconstructor)
             core.reconstructorList.append(trainableReconstructor)

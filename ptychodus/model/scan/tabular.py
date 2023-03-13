@@ -7,7 +7,7 @@ from typing import Final, Optional
 import numpy
 
 from ...api.scan import Scan, ScanPoint, TabularScan
-from .repository import ScanRepositoryItem
+from .itemRepository import ScanRepositoryItem
 from .settings import ScanSettings
 
 

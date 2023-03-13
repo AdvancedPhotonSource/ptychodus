@@ -4,7 +4,13 @@ from typing import Optional
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ...model.scan import ScanPresenter, ScanRepositoryKeyAndValue
+from ...model.scan import ScanPresenter, ScanRepositoryItem
+
+
+@dataclass(frozen=True)
+class ScanRepositoryKeyAndValue:
+    name: str
+    item: ScanRepositoryItem
 
 
 class ScanTableModel(QAbstractTableModel):
@@ -17,7 +23,10 @@ class ScanTableModel(QAbstractTableModel):
 
     def refresh(self) -> None:
         self.beginResetModel()
-        self._scanList = self._presenter.getScanRepositoryKeysAndValues()
+        self._scanList = [
+            ScanRepositoryKeyAndValue(name, item)
+            for name, item in self._presenter.getScanRepositoryContents()
+        ]
         self.endResetModel()
 
     def isChecked(self, name: str) -> bool:

@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QMenu, QPushButton,
-                             QSpinBox, QVBoxLayout, QWidget)
+                             QSpinBox, QTableView, QVBoxLayout, QWidget)
 
 from .widgets import LengthWidget
 
@@ -11,8 +11,6 @@ class ObjectView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
-        self.numberOfPixelsXSpinBox = QSpinBox()
-        self.numberOfPixelsYSpinBox = QSpinBox()
         self.pixelSizeXWidget = LengthWidget.createInstance()
         self.pixelSizeYWidget = LengthWidget.createInstance()
 
@@ -21,8 +19,6 @@ class ObjectView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Number of Pixels X:', view.numberOfPixelsXSpinBox)
-        layout.addRow('Number of Pixels Y:', view.numberOfPixelsYSpinBox)
         layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
         layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
         view.setLayout(layout)
@@ -34,36 +30,42 @@ class ObjectButtonBox(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.initializeMenu = QMenu()
-        self.initializeButton = QPushButton('Initialize')
+        self.insertMenu = QMenu()
+        self.insertButton = QPushButton('Insert')
         self.saveButton = QPushButton('Save')
+        self.editButton = QPushButton('Edit')
+        self.removeButton = QPushButton('Remove')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectButtonBox:
         view = cls(parent)
 
-        view.initializeButton.setMenu(view.initializeMenu)
+        view.insertButton.setMenu(view.insertMenu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.initializeButton)
+        layout.addWidget(view.insertButton)
         layout.addWidget(view.saveButton)
+        layout.addWidget(view.editButton)
+        layout.addWidget(view.removeButton)
         view.setLayout(layout)
 
         return view
 
 
-class ObjectInitializerView(QGroupBox):
+class ObjectEstimatesView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Initializer', parent)
+        super().__init__('Object Estimates', parent)
+        self.tableView = QTableView()
         self.buttonBox = ObjectButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectInitializerView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectEstimatesView:
         view = cls(parent)
 
         layout = QVBoxLayout()
+        layout.addWidget(view.tableView)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
@@ -75,7 +77,7 @@ class ObjectParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.objectView = ObjectView.createInstance()
-        self.initializerView = ObjectInitializerView.createInstance()
+        self.estimatesView = ObjectEstimatesView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectParametersView:
@@ -83,8 +85,7 @@ class ObjectParametersView(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(view.objectView)
-        layout.addWidget(view.initializerView)
-        layout.addStretch()
+        layout.addWidget(view.estimatesView)
         view.setLayout(layout)
 
         return view

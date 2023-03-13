@@ -46,7 +46,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 
-        return [TabularScan.createFromPointSequence(self.simpleName, pointList)]
+        return [TabularScan.createFromPointSequence(filePath.stem, pointList)]
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

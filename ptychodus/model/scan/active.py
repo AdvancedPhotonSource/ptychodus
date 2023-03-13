@@ -6,7 +6,7 @@ from ...api.observer import Observable, Observer
 from ...api.scan import Scan, ScanPoint
 from .cartesian import SnakeScanRepositoryItem
 from .itemFactory import ScanRepositoryItemFactory
-from .repository import ScanRepository, ScanRepositoryItem
+from .itemRepository import ScanRepository, ScanRepositoryItem
 from .settings import ScanSettings
 from .transformed import TransformedScanRepositoryItem
 
@@ -89,7 +89,7 @@ class ActiveScan(Scan, Observer):
         itemName = self._settings.initializer.value
         name = itemName.casefold()
 
-        if name == 'fromfile':
+        if name == 'fromfile':  # TODO move 'fromfile' handling to factory
             tabularList = self._factory.openScanFromSettings()
 
             for tabular in tabularList:

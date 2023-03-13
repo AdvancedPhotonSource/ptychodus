@@ -42,7 +42,7 @@ class CSVScanFileReader(ScanFileReader):
                 )
                 pointList.append(point)
 
-        return [TabularScan.createFromPointSequence(self.simpleName, pointList)]
+        return [TabularScan.createFromPointSequence(filePath.stem, pointList)]
 
 
 class CSVScanFileWriter(ScanFileWriter):

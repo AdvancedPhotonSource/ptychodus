@@ -9,8 +9,6 @@ import numpy.typing
 import tike.ptycho
 
 from ...api.reconstructor import ReconstructResult, Reconstructor
-from ..object import Object
-from ..probe import Apparatus, Probe, ProbeSizer
 from .arrayConverter import TikeArrays, TikeArrayConverter
 from .multigrid import TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionSettings

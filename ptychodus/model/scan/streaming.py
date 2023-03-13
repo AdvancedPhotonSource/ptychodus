@@ -1,13 +1,9 @@
 from bisect import bisect
 from collections import defaultdict
 from decimal import Decimal
-from pathlib import Path
 from statistics import median
 
 from ...api.scan import ScanPoint, TabularScan
-from .itemFactory import ScanRepositoryItemFactory
-from .repository import ScanRepositoryItem
-from .tabular import ScanFileInfo
 
 
 class PositionStream:
@@ -48,8 +44,7 @@ class PositionStream:
 
 class StreamingScanBuilder:
 
-    def __init__(self, factory: ScanRepositoryItemFactory) -> None:
-        self._factory = factory
+    def __init__(self) -> None:
         self._streamX = PositionStream()
         self._streamY = PositionStream()
         self._arrayTimeStamps: dict[int, float] = dict()
@@ -68,7 +63,7 @@ class StreamingScanBuilder:
     def assembleScanPositionsY(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
         self._streamY.assemble(valuesInMeters, timeStamps)
 
-    def build(self) -> ScanRepositoryItem:
+    def build(self) -> TabularScan:
         posX = self._streamX.getMedianPositions(self._arrayTimeStamps)
         posY = self._streamY.getMedianPositions(self._arrayTimeStamps)
 
@@ -81,5 +76,4 @@ class StreamingScanBuilder:
                 y=Decimal(repr(posY[index])),
             )
 
-        scan = TabularScan('Stream', pointMap)
-        return self._factory.createTabularItem(scan, ScanFileInfo(scan.name, Path.home()))
+        return TabularScan('Stream', pointMap)
