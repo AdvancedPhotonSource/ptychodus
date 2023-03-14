@@ -28,7 +28,7 @@ from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter, ReconstructorPlotPresenter
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
-from .scan import ScanCore, ScanPresenter
+from .scan import ScanCore, ScanPresenter, ScanRepositoryPresenter
 from .statefulCore import StateDataRegistry
 from .tike import TikeReconstructorLibrary
 from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
@@ -239,6 +239,10 @@ class ModelCore:
     @property
     def scanPresenter(self) -> ScanPresenter:
         return self._scanCore.presenter
+
+    @property
+    def scanRepositoryPresenter(self) -> ScanRepositoryPresenter:
+        return self._scanCore.repositoryPresenter
 
     @property
     def probePresenter(self) -> ProbePresenter:

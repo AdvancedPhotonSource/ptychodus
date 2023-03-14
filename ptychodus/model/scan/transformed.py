@@ -30,12 +30,8 @@ class TransformedScanRepositoryItem(ScanRepositoryItem):
         return self._item.name
 
     @property
-    def category(self) -> str:
-        return self._item.category
-
-    @property
-    def variant(self) -> str:
-        return self._item.variant
+    def initializer(self) -> str:
+        return self._item.initializer
 
     @property
     def canActivate(self) -> bool:

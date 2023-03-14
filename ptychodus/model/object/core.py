@@ -1,5 +1,4 @@
 from __future__ import annotations
-from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
@@ -18,65 +17,12 @@ from ..statefulCore import StateDataType, StatefulCore
 from .active import ActiveObject
 from .api import ObjectAPI
 from .itemFactory import ObjectRepositoryItemFactory
-from .itemRepository import ObjectRepository, ObjectRepositoryItem
+from .itemRepository import ObjectRepository, ObjectRepositoryPresenter
 from .settings import ObjectSettings
 from .simple import ObjectFileInfo, SimpleObjectRepositoryItem
 from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class ObjectRepositoryItemPresenter:
-    name: str
-    initializer: str
-    dataType: str
-    extentInPixels: ImageExtent
-    sizeInBytes: int
-
-
-class ObjectRepositoryPresenter(Observable, Observer):
-
-    def __init__(self, repository: ObjectRepository) -> None:
-        super().__init__()
-        self._repository = repository
-        self._nameList: list[str] = list()
-
-    @classmethod
-    def createInstance(cls, repository: ObjectRepository) -> ObjectRepositoryPresenter:
-        presenter = cls(repository)
-        presenter._updateNameList()
-        repository.addObserver(presenter)
-        return presenter
-
-    def __getitem__(self, index: int) -> ObjectRepositoryItemPresenter:
-        name = self._nameList[index]
-        item = self._repository[name]
-        return ObjectRepositoryItemPresenter(
-            name=name,
-            initializer=item.initializer,
-            dataType=item.getDataType(),
-            extentInPixels=item.getExtent(),
-            sizeInBytes=item.getSizeInBytes(),
-        )
-
-    def __len__(self) -> int:
-        return len(self._nameList)
-
-    def canRemoveObject(self, name: str) -> bool:
-        return self._repository.canRemoveItem(name)
-
-    def removeObject(self, name: str) -> None:
-        self._repository.removeItem(name)
-
-    def _updateNameList(self) -> None:
-        self._nameList = list(self._repository.keys())
-        self._nameList.sort()
-        self.notifyObservers()
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._repository:
-            self._updateNameList()
 
 
 class ObjectPresenter(Observable, Observer):

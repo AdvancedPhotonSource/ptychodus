@@ -50,6 +50,7 @@ class ControllerCore:
             model.probePresenter, view.probeParametersView, model.probeImagePresenter,
             view.probeImageView, self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanPresenter,
+                                                             model.scanRepositoryPresenter,
                                                              view.scanParametersView,
                                                              view.scanPlotView,
                                                              self._fileDialogFactory)

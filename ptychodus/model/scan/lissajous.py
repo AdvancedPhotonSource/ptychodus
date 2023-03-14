@@ -23,14 +23,10 @@ class LissajousScanRepositoryItem(ScanRepositoryItem):
 
     @property
     def name(self) -> str:
-        return self.variant
+        return self.initializer
 
     @property
-    def category(self) -> str:
-        return 'Curve'
-
-    @property
-    def variant(self) -> str:
+    def initializer(self) -> str:
         return self.NAME
 
     @property

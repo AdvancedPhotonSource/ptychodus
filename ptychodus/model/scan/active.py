@@ -30,6 +30,7 @@ class ActiveScan(Scan, Observer):
                        repository: ScanRepository, reinitObservable: Observable) -> ActiveScan:
         scan = cls(settings, factory, repository, reinitObservable)
         scan._syncFromSettings()
+        repository.addObserver(scan)
         reinitObservable.addObserver(scan)
         return scan
 
@@ -89,7 +90,7 @@ class ActiveScan(Scan, Observer):
         itemName = self._settings.initializer.value
         name = itemName.casefold()
 
-        if name == 'fromfile':  # TODO move 'fromfile' handling to factory
+        if name == 'fromfile':  # FIXME move 'fromfile' handling to factory
             tabularList = self._factory.openScanFromSettings()
 
             for tabular in tabularList:
@@ -106,12 +107,14 @@ class ActiveScan(Scan, Observer):
 
     def _syncToSettings(self) -> None:
         self._settings.activeScan.value = self._item.name
-        self._settings.initializer.value = self._item.variant
+        self._settings.initializer.value = self._item.initializer
         self._item.syncToSettings(self._settings)
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._item:
             self._syncToSettings()
+        elif observable is self._repository:
+            pass  # FIXME do the right thing if the active scan is removed
         elif observable is self._reinitObservable:
             self._syncFromSettings()

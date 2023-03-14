@@ -2,8 +2,7 @@ from .active import ActiveScan
 from .api import ScanAPI
 from .cartesian import CartesianScanRepositoryItem
 from .core import ScanCore, ScanPresenter
-from .itemFactory import ScanRepositoryItemFactory
-from .itemRepository import ScanRepository, ScanRepositoryItem
+from .itemRepository import ScanRepositoryItem, ScanRepositoryPresenter
 from .lissajous import LissajousScanRepositoryItem
 from .spiral import SpiralScanRepositoryItem
 from .tabular import TabularScanRepositoryItem
@@ -15,9 +14,8 @@ __all__ = [
     'ScanAPI',
     'ScanCore',
     'ScanPresenter',
-    'ScanRepository',
-    'ScanRepositoryItem',
-    'ScanRepositoryItemFactory',
+    'ScanRepositoryItem',  # FIXME don't depend on this
+    'ScanRepositoryPresenter',
     'SpiralScanRepositoryItem',
     'TabularScanRepositoryItem',
     'TransformedScanRepositoryItem',

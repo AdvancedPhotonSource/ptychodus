@@ -1,33 +1,20 @@
-from dataclasses import dataclass
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ...model.scan import ScanPresenter, ScanRepositoryItem
-
-
-@dataclass(frozen=True)
-class ScanRepositoryKeyAndValue:
-    name: str
-    item: ScanRepositoryItem
+from ...model.scan import ScanRepositoryPresenter
 
 
 class ScanTableModel(QAbstractTableModel):
 
-    def __init__(self, presenter: ScanPresenter, parent: Optional[QObject] = None) -> None:
+    def __init__(self,
+                 presenter: ScanRepositoryPresenter,
+                 parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
-        self._scanList: list[ScanRepositoryKeyAndValue] = list()
+        self._header = ['Name', 'Initializer', 'Length']
         self._checkedNames: set[str] = set()
-
-    def refresh(self) -> None:
-        self.beginResetModel()
-        self._scanList = [
-            ScanRepositoryKeyAndValue(name, item)
-            for name, item in self._presenter.getScanRepositoryContents()
-        ]
-        self.endResetModel()
 
     def isChecked(self, name: str) -> bool:
         return (name in self._checkedNames)
@@ -35,11 +22,8 @@ class ScanTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid():
-            entry = self._scanList[index.row()]
-
-            if index.column() == 0:
-                value = int(value) | Qt.ItemIsUserCheckable
+        if index.isValid() and index.column() == 0:
+            value = int(value) | Qt.ItemIsUserCheckable
 
         return value
 
@@ -50,14 +34,7 @@ class ScanTableModel(QAbstractTableModel):
         result = QVariant()
 
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            if section == 0:
-                result = QVariant('Name')
-            elif section == 1:
-                result = QVariant('Category')
-            elif section == 2:
-                result = QVariant('Variant')
-            elif section == 3:
-                result = QVariant('Length')
+            result = QVariant(self._header[section])
 
         return result
 
@@ -65,36 +42,30 @@ class ScanTableModel(QAbstractTableModel):
         value = QVariant()
 
         if index.isValid():
-            entry = self._scanList[index.row()]
+            item = self._presenter[index.row()]
 
-            if role == Qt.CheckStateRole:
+            if role == Qt.DisplayRole:
                 if index.column() == 0:
-                    value = QVariant(Qt.Checked if entry.name in
-                                     self._checkedNames else Qt.Unchecked)
-            elif role == Qt.DisplayRole:
-                if index.column() == 0:
-                    value = QVariant(entry.name)
+                    value = QVariant(item.name)
                 elif index.column() == 1:
-                    value = QVariant(entry.item.category)
+                    value = QVariant(item.initializer)
                 elif index.column() == 2:
-                    value = QVariant(entry.item.variant)
-                elif index.column() == 3:
-                    value = QVariant(len(entry.item))
-            elif role == Qt.FontRole:
-                font = QFont()
-                font.setBold(entry.name == self._presenter.getActiveScan())
-                value = QVariant(font)
+                    value = QVariant(item.numberOfPoints)
+            elif role == Qt.CheckStateRole:
+                if index.column() == 0:
+                    value = QVariant(Qt.Checked if item.name in
+                                     self._checkedNames else Qt.Unchecked)
 
         return value
 
     def setData(self, index: QModelIndex, value: QVariant, role: int = Qt.EditRole) -> bool:
         if index.isValid() and index.column() == 0 and role == Qt.CheckStateRole:
-            entry = self._scanList[index.row()]
+            item = self._presenter[index.row()]
 
             if value == QVariant(Qt.Checked):
-                self._checkedNames.add(entry.name)
+                self._checkedNames.add(item.name)
             else:
-                self._checkedNames.discard(entry.name)
+                self._checkedNames.discard(item.name)
 
             self.dataChanged.emit(index, index)
 
@@ -103,7 +74,7 @@ class ScanTableModel(QAbstractTableModel):
         return False
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._scanList)
+        return len(self._presenter)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 4
+        return len(self._header)

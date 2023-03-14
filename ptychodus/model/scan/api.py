@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Optional
+import logging
 
 from ...api.scan import TabularScan
 from .active import ActiveScan
@@ -7,6 +8,8 @@ from .itemFactory import ScanRepositoryItemFactory
 from .itemRepository import ScanRepository
 from .streaming import StreamingScanBuilder
 from .tabular import ScanFileInfo
+
+logger = logging.getLogger(__name__)
 
 
 class ScanAPI:
@@ -27,6 +30,17 @@ class ScanAPI:
             itemNameList.append(itemName)
 
         return itemNameList
+
+    def insertScanIntoRepositoryFromInitializer(self, initializerName: str) -> Optional[str]:
+        itemName: Optional[str] = None
+        scan = self._factory.createItem(initializerName)
+
+        if scan is None:
+            logger.error(f'Unknown scan initializer \"{initializerName}\"!')
+        else:
+            itemName = self._repository.insertItem(scan)
+
+        return itemName
 
     def insertScanIntoRepository(self, scan: TabularScan, fileInfo: Optional[ScanFileInfo]) -> str:
         item = self._factory.createTabularItem(scan, fileInfo)

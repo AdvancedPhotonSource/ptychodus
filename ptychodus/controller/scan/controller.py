@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.scan import (CartesianScanRepositoryItem, LissajousScanRepositoryItem, ScanPresenter,
-                           SpiralScanRepositoryItem, TabularScanRepositoryItem,
-                           TransformedScanRepositoryItem)
+                           ScanRepositoryPresenter, SpiralScanRepositoryItem,
+                           TabularScanRepositoryItem, TransformedScanRepositoryItem)
 from ...view import (CartesianScanView, LissajousScanView, ScanEditorDialog, ScanParametersView,
                      ScanPlotView, ScanPositionDataView, ScanTransformView, SpiralScanView,
                      TabularScanView)
@@ -26,22 +26,26 @@ logger = logging.getLogger(__name__)
 class ScanController(Observer):
     OPEN_FILE: Final[str] = 'Open File...'
 
-    def __init__(self, presenter: ScanPresenter, parametersView: ScanParametersView,
-                 plotView: ScanPlotView, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, presenter: ScanPresenter, repositoryPresenter: ScanRepositoryPresenter,
+                 parametersView: ScanParametersView, plotView: ScanPlotView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
+        self._repositoryPresenter = repositoryPresenter
         self._parametersView = parametersView
         self._plotView = plotView
         self._fileDialogFactory = fileDialogFactory
-        self._tableModel = ScanTableModel(presenter)
+        self._tableModel = ScanTableModel(repositoryPresenter)
         self._proxyModel = QSortFilterProxyModel()
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, parametersView: ScanParametersView,
-                       plotView: ScanPlotView,
+    def createInstance(cls, presenter: ScanPresenter, repositoryPresenter: ScanRepositoryPresenter,
+                       parametersView: ScanParametersView, plotView: ScanPlotView,
                        fileDialogFactory: FileDialogFactory) -> ScanController:
-        controller = cls(presenter, parametersView, plotView, fileDialogFactory)
+        controller = cls(presenter, repositoryPresenter, parametersView, plotView,
+                         fileDialogFactory)
         presenter.addObserver(controller)
+        repositoryPresenter.addObserver(controller)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
 
@@ -51,7 +55,6 @@ class ScanController(Observer):
             QAbstractItemView.SelectRows)
         parametersView.positionDataView.tableView.setSelectionMode(
             QAbstractItemView.SingleSelection)
-        parametersView.positionDataView.tableView.activated.connect(controller._setActiveScan)
         parametersView.positionDataView.tableView.selectionModel().selectionChanged.connect(
             lambda selected, deselected: controller._setButtonsEnabled())
         parametersView.positionDataView.tableView.horizontalHeader().sectionClicked.connect(
@@ -112,7 +115,7 @@ class ScanController(Observer):
 
         if filePath:
             name = current.sibling(current.row(), 0).data()
-            self._presenter.saveScan(filePath, nameFilter, name)
+            self._presenter.saveScan(name, filePath, nameFilter)
 
     def _editSelectedScan(self) -> None:
         current = self._parametersView.positionDataView.tableView.selectionModel().currentIndex()
@@ -120,7 +123,7 @@ class ScanController(Observer):
         if current.isValid():
             name = current.sibling(current.row(), 0).data()
             category = current.sibling(current.row(), 1).data()
-            item = self._presenter.getItem(name)
+            item = self._presenter.getItem(name)  # FIXME
 
             if isinstance(item, TransformedScanRepositoryItem):
                 if isinstance(item._item, CartesianScanRepositoryItem):
@@ -169,7 +172,7 @@ class ScanController(Observer):
 
         if current.isValid():
             name = current.sibling(current.row(), 0).data()
-            self._presenter.removeScan(name)
+            self._repositoryPresenter.removeScan(name)
         else:
             logger.error('No scans are selected!')
 
@@ -182,18 +185,15 @@ class ScanController(Observer):
             if index.isValid():
                 enable = True
                 name = index.sibling(index.row(), 0).data()
-                enableRemove |= self._presenter.canRemoveScan(name)
+                enableRemove |= self._repositoryPresenter.canRemoveScan(name)
 
         self._parametersView.positionDataView.buttonBox.saveButton.setEnabled(enable)
         self._parametersView.positionDataView.buttonBox.editButton.setEnabled(enable)
         self._parametersView.positionDataView.buttonBox.removeButton.setEnabled(enableRemove)
 
-    def _setActiveScan(self, index: QModelIndex) -> None:
-        name = index.sibling(index.row(), 0).data()
-        self._presenter.setActiveScan(name)
-
     def _redrawPlot(self) -> None:
-        itemDict = {name: item for name, item in self._presenter.getScanRepositoryContents()}
+        itemDict = {name: item
+                    for name, item in self._presenter.getScanRepositoryContents()}  # FIXME
         self._plotView.axes.clear()
 
         for row in range(self._proxyModel.rowCount()):
@@ -221,12 +221,11 @@ class ScanController(Observer):
         self._plotView.figureCanvas.draw()
 
     def _syncModelToView(self) -> None:
-        for _, item in self._presenter.getScanRepositoryContents():
+        for _, item in self._presenter.getScanRepositoryContents():  # FIXME
             item.addObserver(self)
 
-        self._parametersView.positionDataView.tableView.blockSignals(True)
-        self._tableModel.refresh()
-        self._parametersView.positionDataView.tableView.blockSignals(False)
+        self._tableModel.beginResetModel()
+        self._tableModel.endResetModel()
 
         self._setButtonsEnabled()
         self._redrawPlot()
@@ -234,8 +233,10 @@ class ScanController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
+        elif observable is self._repositoryPresenter:
+            self._syncModelToView()
         else:
-            for name, item in self._presenter.getScanRepositoryContents():
+            for name, item in self._presenter.getScanRepositoryContents():  # FIXME
                 if observable is item and self._tableModel.isChecked(name):
                     self._redrawPlot()
                     break

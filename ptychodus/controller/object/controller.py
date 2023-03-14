@@ -107,7 +107,7 @@ class ObjectController(Observer):
             #category = current.sibling(current.row(), 1).data()
             #item = self._presenter.getItem(name)
 
-            # FIXME edit scan
+            # FIXME edit object
             #if isinstance(item._item, CartesianObjectRepositoryItem):
             #    cartesianDialog = ObjectEditorDialog.createInstance(
             #        CartesianObjectView.createInstance(), self._parametersView)

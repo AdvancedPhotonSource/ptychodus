@@ -29,7 +29,6 @@ class ScanFileInfo:
 
 
 class TabularScanRepositoryItem(ScanRepositoryItem):
-    NAME: Final[str] = 'Tabular'
 
     def __init__(self, scan: Scan, fileInfo: Optional[ScanFileInfo]) -> None:
         super().__init__()
@@ -45,11 +44,7 @@ class TabularScanRepositoryItem(ScanRepositoryItem):
         return self._scan.name
 
     @property
-    def category(self) -> str:
-        return self.NAME
-
-    @property
-    def variant(self) -> str:
+    def initializer(self) -> str:
         return 'FromMemory' if self._fileInfo is None else 'FromFile'
 
     @property

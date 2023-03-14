@@ -19,11 +19,7 @@ class CartesianScanRepositoryItem(ScanRepositoryItem):
 
     @property
     def name(self) -> str:
-        return self.variant
-
-    @property
-    def category(self) -> str:
-        return 'Cartesian'
+        return self.initializer
 
     @property
     def canActivate(self) -> bool:
@@ -111,7 +107,7 @@ class RasterScanRepositoryItem(CartesianScanRepositoryItem):
         super().__init__(snake=False)
 
     @property
-    def variant(self) -> str:
+    def initializer(self) -> str:
         return self.NAME
 
 
@@ -122,5 +118,5 @@ class SnakeScanRepositoryItem(CartesianScanRepositoryItem):
         super().__init__(snake=True)
 
     @property
-    def variant(self) -> str:
+    def initializer(self) -> str:
         return self.NAME

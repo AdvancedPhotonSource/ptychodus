@@ -34,7 +34,6 @@ class ScanRepositoryItemFactory:
             RasterScanRepositoryItem.NAME.casefold(): RasterScanRepositoryItem,
             SnakeScanRepositoryItem.NAME.casefold(): SnakeScanRepositoryItem,
             SpiralScanRepositoryItem.NAME.casefold(): SpiralScanRepositoryItem,
-            TabularScanRepositoryItem.NAME.casefold(): TabularScanRepositoryItem.createEmpty,
         }
 
     def _transformed(self, item: ScanRepositoryItem) -> ScanRepositoryItem:
@@ -88,6 +87,8 @@ class ScanRepositoryItemFactory:
 
     def createItem(self, name: str) -> Optional[ScanRepositoryItem]:
         item: Optional[ScanRepositoryItem] = None
+
+        # FIXME special handling for opening scan from file
 
         try:
             itemFactory = self._variants[name.casefold()]
