@@ -1,4 +1,3 @@
-from __future__ import annotations
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Optional
@@ -70,18 +69,18 @@ class ObjectRepositoryItemFactory:
     def getItemNameList(self) -> list[str]:
         return [name.title() for name in self._variants]
 
-    def createItem(self, name: str) -> Optional[ObjectRepositoryItem]:
+    def createItem(self, initializerName: str) -> Optional[ObjectRepositoryItem]:
         item: Optional[ObjectRepositoryItem] = None
 
-        if name.casefold() == 'fromfile':
+        if initializerName.casefold() == 'fromfile':
             fileInfo = ObjectFileInfo.createFromSettings(self._settings)
             self._fileReaderChooser.setFromSimpleName(fileInfo.fileType)
             item = self._readObject(fileInfo.filePath)
         else:
             try:
-                itemFactory = self._variants[name.casefold()]
+                itemFactory = self._variants[initializerName.casefold()]
             except KeyError:
-                logger.error(f'Unknown object repository item \"{name}\"!')
+                logger.error(f'Unknown object initializer \"{initializerName}\"!')
             else:
                 item = itemFactory()
 

@@ -58,6 +58,7 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
         return self._dtype.itemsize * self._sizer.getObjectExtent().size
 
     def getArray(self) -> ObjectArrayType:
+        # FIXME cache this
         size = self._sizer.getObjectExtent().shape
         amplitude = self._rng.normal(float(self._amplitudeMean),
                                      float(self._amplitudeStandardDeviation), size)

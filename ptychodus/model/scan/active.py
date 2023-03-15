@@ -87,21 +87,10 @@ class ActiveScan(Scan, Observer):
         return len(self._item)
 
     def _syncFromSettings(self) -> None:
-        itemName = self._settings.initializer.value
-        name = itemName.casefold()
+        initializerName = self._settings.initializer.value
 
-        if name == 'fromfile':  # FIXME move 'fromfile' handling to factory
-            tabularList = self._factory.openScanFromSettings()
-
-            for tabular in tabularList:
-                self._repository.insertItem(tabular)
-        else:
-            item = self._factory.createItem(name)
-
-            if item is None:
-                logger.error(f'Unknown scan initializer \"{itemName}\"!')
-            else:
-                self._repository.insertItem(item)
+        for item in self._factory.createItem(initializerName):
+            self._repository.insertItem(item)
 
         self.setActiveScan(self._settings.activeScan.value)
 

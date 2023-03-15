@@ -23,24 +23,23 @@ class ScanAPI:
 
     def insertScanIntoRepositoryFromFile(self, filePath: Path, fileFilter: str) -> list[str]:
         itemNameList: list[str] = list()
-        initializerList = self._factory.openScan(filePath, fileFilter)
+        itemList = self._factory.openScan(filePath, fileFilter)
 
-        for initializer in initializerList:
-            itemName = self._repository.insertItem(initializer)
+        for item in itemList:
+            itemName = self._repository.insertItem(item)
             itemNameList.append(itemName)
 
         return itemNameList
 
-    def insertScanIntoRepositoryFromInitializer(self, initializerName: str) -> Optional[str]:
-        itemName: Optional[str] = None
-        scan = self._factory.createItem(initializerName)
+    def insertScanIntoRepositoryFromInitializer(self, initializerName: str) -> list[str]:
+        itemNameList: list[str] = list()
+        itemList = self._factory.createItem(initializerName)
 
-        if scan is None:
-            logger.error(f'Unknown scan initializer \"{initializerName}\"!')
-        else:
-            itemName = self._repository.insertItem(scan)
+        for item in itemList:
+            itemName = self._repository.insertItem(item)
+            itemNameList.append(itemName)
 
-        return itemName
+        return itemNameList
 
     def insertScanIntoRepository(self, scan: TabularScan, fileInfo: Optional[ScanFileInfo]) -> str:
         item = self._factory.createTabularItem(scan, fileInfo)

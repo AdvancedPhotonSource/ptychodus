@@ -63,7 +63,7 @@ class ScanRepositoryItemFactory:
             try:
                 scanSequence = reader.read(filePath)
             except ScanPointParseError as ex:
-                logger.exception(f'Failed to parse \"{filePath}\"')
+                logger.exception(f'Failed to read \"{filePath}\"')
             else:
                 for scan in scanSequence:
                     item = self.createTabularItem(scan, fileInfo)
@@ -77,24 +77,22 @@ class ScanRepositoryItemFactory:
         self._fileReaderChooser.setFromDisplayName(fileFilter)
         return self._readScan(filePath)
 
-    def openScanFromSettings(self) -> list[ScanRepositoryItem]:
-        fileInfo = ScanFileInfo.createFromSettings(self._settings)
-        self._fileReaderChooser.setFromSimpleName(fileInfo.fileType)
-        return self._readScan(fileInfo.filePath)
-
     def getItemNameList(self) -> list[str]:
         return [name.title() for name in self._variants]
 
-    def createItem(self, name: str) -> Optional[ScanRepositoryItem]:
-        item: Optional[ScanRepositoryItem] = None
+    def createItem(self, initializerName: str) -> list[ScanRepositoryItem]:
+        itemList: list[ScanRepositoryItem] = list()
 
-        # FIXME special handling for opening scan from file
-
-        try:
-            itemFactory = self._variants[name.casefold()]
-        except KeyError:
-            logger.error(f'Unknown scan repository item \"{name}\"!')
+        if initializerName.casefold() == 'fromfile':
+            fileInfo = ScanFileInfo.createFromSettings(self._settings)
+            self._fileReaderChooser.setFromSimpleName(fileInfo.fileType)
+            itemList.extend(self._readScan(fileInfo.filePath))
         else:
-            item = itemFactory()
+            try:
+                itemFactory = self._variants[initializerName.casefold()]
+            except KeyError:
+                logger.error(f'Unknown scan initializer \"{initializerName}\"!')
+            else:
+                itemList.append(itemFactory())
 
-        return None if item is None else self._transformed(item)
+        return [self._transformed(item) for item in itemList]

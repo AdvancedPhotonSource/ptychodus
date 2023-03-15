@@ -10,27 +10,27 @@ from ..image import ImageController
 
 class ObjectImageController(Observer):
 
-    def __init__(self, presenter: ObjectPresenter, imagePresenter: ImagePresenter, view: ImageView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, presenter: ObjectPresenter, imagePresenter: ImagePresenter,
+                 imageView: ImageView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
         self._imagePresenter = imagePresenter
-        self._view = view
-        self._imageController = ImageController.createInstance(imagePresenter, view,
+        self._imageView = imageView
+        self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
 
     @classmethod
     def createInstance(cls, presenter: ObjectPresenter, imagePresenter: ImagePresenter,
-                       view: ImageView,
+                       imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ObjectImageController:
-        controller = cls(presenter, imagePresenter, view, fileDialogFactory)
+        controller = cls(presenter, imagePresenter, imageView, fileDialogFactory)
         presenter.addObserver(controller)
         controller._syncModelToView()
-        view.imageRibbon.indexGroupBox.setVisible(False)
+        imageView.imageRibbon.indexGroupBox.setVisible(False)
         return controller
 
     def _syncModelToView(self) -> None:
-        array = self._presenter.getObject()
+        array = self._presenter.getObjectArray()  # FIXME
         self._imagePresenter.setArray(array)
 
     def update(self, observable: Observable) -> None:

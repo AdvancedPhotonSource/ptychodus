@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
@@ -17,32 +18,135 @@ from ..statefulCore import StateDataType, StatefulCore
 from .active import ActiveObject
 from .api import ObjectAPI
 from .itemFactory import ObjectRepositoryItemFactory
-from .itemRepository import ObjectRepository, ObjectRepositoryPresenter
+from .itemRepository import ObjectRepository
 from .settings import ObjectSettings
-from .simple import ObjectFileInfo, SimpleObjectRepositoryItem
+from .simple import ObjectFileInfo
 from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
 
 
-class ObjectPresenter(Observable, Observer):
+@dataclass(frozen=True)
+class ObjectRepositoryItemPresenter:
+    name: str
+    initializer: str
+    dataType: str
+    extentInPixels: ImageExtent
+    sizeInBytes: int
 
-    def __init__(self, sizer: ObjectSizer, itemFactory: ObjectRepositoryItemFactory,
-                 repository: ObjectRepository, object_: ActiveObject, objectAPI: ObjectAPI,
-                 fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
+
+class ObjectRepositoryPresenter(Observable, Observer):
+
+    def __init__(self, repository: ObjectRepository, itemFactory: ObjectRepositoryItemFactory,
+                 objectAPI: ObjectAPI, fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
         super().__init__()
-        self._sizer = sizer
-        self._itemFactory = itemFactory
         self._repository = repository
-        self._object = object_
+        self._itemFactory = itemFactory
         self._objectAPI = objectAPI
         self._fileWriterChooser = fileWriterChooser
+        self._nameList: list[str] = list()
 
     @classmethod
-    def createInstance(cls, sizer: ObjectSizer, itemFactory: ObjectRepositoryItemFactory,
-                       repository: ObjectRepository, object_: ActiveObject, objectAPI: ObjectAPI,
-                       fileWriterChooser: PluginChooser[ObjectFileWriter]) -> ObjectPresenter:
-        presenter = cls(sizer, itemFactory, repository, object_, objectAPI, fileWriterChooser)
+    def createInstance(
+            cls, repository: ObjectRepository, itemFactory: ObjectRepositoryItemFactory,
+            objectAPI: ObjectAPI,
+            fileWriterChooser: PluginChooser[ObjectFileWriter]) -> ObjectRepositoryPresenter:
+        presenter = cls(repository, itemFactory, objectAPI, fileWriterChooser)
+        presenter._updateNameList()
+        repository.addObserver(presenter)
+        return presenter
+
+    def __getitem__(self, index: int) -> ObjectRepositoryItemPresenter:
+        name = self._nameList[index]
+        item = self._repository[name]
+        return ObjectRepositoryItemPresenter(
+            name=name,
+            initializer=item.initializer,
+            dataType=item.getDataType(),
+            extentInPixels=item.getExtent(),
+            sizeInBytes=item.getSizeInBytes(),
+        )
+
+    def __len__(self) -> int:
+        return len(self._nameList)
+
+    def getItemNameList(self) -> list[str]:
+        return self._itemFactory.getItemNameList()
+
+    def initializeObject(self, name: str) -> Optional[str]:
+        return self._objectAPI.insertObjectIntoRepositoryFromInitializer(name)
+
+    def getOpenFileFilterList(self) -> list[str]:
+        return self._itemFactory.getOpenFileFilterList()
+
+    def getOpenFileFilter(self) -> str:
+        return self._itemFactory.getOpenFileFilter()
+
+    def openObject(self, filePath: Path, fileFilter: str) -> None:
+        self._objectAPI.insertObjectIntoRepositoryFromFile(filePath, fileFilter)
+
+    def getObjectArray(self, name: str) -> ObjectArrayType:
+        return self._repository[name].getArray()
+
+    def getSaveFileFilterList(self) -> list[str]:
+        return self._fileWriterChooser.getDisplayNameList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._fileWriterChooser.getCurrentDisplayName()
+
+    def saveObject(self, name: str, filePath: Path, fileFilter: str) -> None:
+        try:
+            initializer = self._repository[name]
+        except KeyError:
+            logger.error(f'Unable to locate \"{name}\"!')
+            return
+
+        self._fileWriterChooser.setFromDisplayName(fileFilter)
+        fileType = self._fileWriterChooser.getCurrentSimpleName()
+        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        writer = self._fileWriterChooser.getCurrentStrategy()
+        writer.write(filePath, self.getObjectArray(name))
+
+        # FIXME
+        #if isinstance(initializer, SimpleObjectRepositoryItem):
+        #    if initializer.getFileInfo() is None:
+        #        fileInfo = ObjectFileInfo(fileType, filePath)
+        #        initializer.setFileInfo(fileInfo)
+
+    def canRemoveObject(self, name: str) -> bool:
+        return self._repository.canRemoveItem(name)
+
+    def removeObject(self, name: str) -> None:
+        self._repository.removeItem(name)
+
+    def getPixelSizeXInMeters(self) -> Decimal:
+        return self._objectAPI.getPixelSizeXInMeters()
+
+    def getPixelSizeYInMeters(self) -> Decimal:
+        return self._objectAPI.getPixelSizeYInMeters()
+
+    def _updateNameList(self) -> None:
+        self._nameList = list(self._repository.keys())
+        self._nameList.sort()
+        self.notifyObservers()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._repository:
+            self._updateNameList()
+
+
+class ObjectPresenter(Observable, Observer):
+
+    def __init__(self, sizer: ObjectSizer, object_: ActiveObject, objectAPI: ObjectAPI) -> None:
+        super().__init__()
+        self._sizer = sizer
+        self._object = object_
+        self._objectAPI = objectAPI
+
+    @classmethod
+    def createInstance(cls, sizer: ObjectSizer, object_: ActiveObject,
+                       objectAPI: ObjectAPI) -> ObjectPresenter:
+        presenter = cls(sizer, object_, objectAPI)
         sizer.addObserver(presenter)
         object_.addObserver(presenter)
         return presenter
@@ -64,52 +168,7 @@ class ObjectPresenter(Observable, Observer):
     def setActiveObject(self, name: str) -> None:
         self._objectAPI.setActiveObject(name)
 
-    def getItemNameList(self) -> list[str]:
-        return self._itemFactory.getItemNameList()
-
-    def initializeObject(self, name: str) -> Optional[str]:
-        return self._objectAPI.insertObjectIntoRepositoryFromInitializer(name)
-
-    def getOpenFileFilterList(self) -> list[str]:
-        return self._itemFactory.getOpenFileFilterList()
-
-    def getOpenFileFilter(self) -> str:
-        return self._itemFactory.getOpenFileFilter()
-
-    def openObject(self, filePath: Path, fileFilter: str) -> None:
-        self._objectAPI.insertObjectIntoRepositoryFromFile(filePath, fileFilter)
-
-    def getSaveFileFilterList(self) -> list[str]:
-        return self._fileWriterChooser.getDisplayNameList()
-
-    def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.getCurrentDisplayName()
-
-    def saveObject(self, name: str, filePath: Path, fileFilter: str) -> None:
-        try:
-            initializer = self._repository[name]
-        except KeyError:
-            logger.error(f'Unable to locate \"{name}\"!')
-            return
-
-        self._fileWriterChooser.setFromDisplayName(fileFilter)
-        fileType = self._fileWriterChooser.getCurrentSimpleName()
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
-        writer = self._fileWriterChooser.getCurrentStrategy()
-        writer.write(filePath, self._object.getArray())
-
-        if isinstance(initializer, SimpleObjectRepositoryItem):
-            if initializer.getFileInfo() is None:
-                fileInfo = ObjectFileInfo(fileType, filePath)
-                initializer.setFileInfo(fileInfo)
-
-    def getPixelSizeXInMeters(self) -> Decimal:
-        return self._objectAPI.getPixelSizeXInMeters()
-
-    def getPixelSizeYInMeters(self) -> Decimal:
-        return self._objectAPI.getPixelSizeYInMeters()
-
-    def getObject(self) -> ObjectArrayType:
+    def getObjectArray(self) -> ObjectArrayType:  # FIXME remove
         return self._object.getArray()
 
     def update(self, observable: Observable) -> None:
@@ -133,10 +192,9 @@ class ObjectCore(StatefulCore):
         self._object = ActiveObject.createInstance(self._settings, self._factory, self._repository,
                                                    settingsRegistry)
         self.objectAPI = ObjectAPI(apparatus, self._factory, self._repository, self._object)
-        self.repositoryPresenter = ObjectRepositoryPresenter.createInstance(self._repository)
-        self.presenter = ObjectPresenter.createInstance(self.sizer, self._factory,
-                                                        self._repository, self._object,
-                                                        self.objectAPI, fileWriterChooser)
+        self.repositoryPresenter = ObjectRepositoryPresenter.createInstance(
+            self._repository, self._factory, self.objectAPI, fileWriterChooser)
+        self.presenter = ObjectPresenter.createInstance(self.sizer, self._object, self.objectAPI)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         state: StateDataType = {

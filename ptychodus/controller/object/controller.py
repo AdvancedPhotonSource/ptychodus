@@ -6,9 +6,11 @@ from PyQt5.QtCore import QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
+from ...model.image import ImagePresenter
 from ...model.object import ObjectPresenter, ObjectRepositoryPresenter
-from ...view import ObjectParametersView
+from ...view import ObjectParametersView, ImageView
 from ..data import FileDialogFactory
+from ..image import ImageController
 from .tableModel import ObjectTableModel
 
 logger = logging.getLogger(__name__)
@@ -17,47 +19,55 @@ logger = logging.getLogger(__name__)
 class ObjectController(Observer):
     OPEN_FILE: Final[str] = 'Open File...'
 
-    def __init__(self, presenter: ObjectPresenter, repositoryPresenter: ObjectRepositoryPresenter,
-                 view: ObjectParametersView, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, repositoryPresenter: ObjectRepositoryPresenter,
+                 imagePresenter: ImagePresenter, parametersView: ObjectParametersView,
+                 imageView: ImageView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
-        self._presenter = presenter
         self._repositoryPresenter = repositoryPresenter
-        self._view = view
+        self._imagePresenter = imagePresenter
+        self._parametersView = parametersView
+        self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
         self._tableModel = ObjectTableModel(repositoryPresenter)
         self._proxyModel = QSortFilterProxyModel()
+        self._imageController = ImageController.createInstance(imagePresenter, imageView,
+                                                               fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, presenter: ObjectPresenter,
-                       repositoryPresenter: ObjectRepositoryPresenter, view: ObjectParametersView,
+    def createInstance(cls, repositoryPresenter: ObjectRepositoryPresenter,
+                       imagePresenter: ImagePresenter, parametersView: ObjectParametersView,
+                       imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
-        controller = cls(presenter, repositoryPresenter, view, fileDialogFactory)
-        presenter.addObserver(controller)
+        controller = cls(repositoryPresenter, imagePresenter, parametersView, imageView,
+                         fileDialogFactory)
         repositoryPresenter.addObserver(controller)
 
-        view.objectView.pixelSizeXWidget.setReadOnly(True)
-        view.objectView.pixelSizeYWidget.setReadOnly(True)
+        parametersView.objectView.pixelSizeXWidget.setReadOnly(True)
+        parametersView.objectView.pixelSizeYWidget.setReadOnly(True)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
-        view.estimatesView.tableView.setModel(controller._proxyModel)
-        view.estimatesView.tableView.setSortingEnabled(True)
-        view.estimatesView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        view.estimatesView.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
-        view.estimatesView.tableView.selectionModel().selectionChanged.connect(
-            lambda selected, deselected: controller._setButtonsEnabled())
+        parametersView.estimatesView.tableView.setModel(controller._proxyModel)
+        parametersView.estimatesView.tableView.setSortingEnabled(True)
+        parametersView.estimatesView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        parametersView.estimatesView.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
+        parametersView.estimatesView.tableView.selectionModel().selectionChanged.connect(
+            lambda selected, deselected: controller._updateView())
 
-        itemNameList = presenter.getItemNameList()
+        itemNameList = repositoryPresenter.getItemNameList()
         itemNameList.insert(0, ObjectController.OPEN_FILE)
 
         for name in itemNameList:
-            insertAction = view.estimatesView.buttonBox.insertMenu.addAction(name)
+            insertAction = parametersView.estimatesView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 
-        view.estimatesView.buttonBox.editButton.clicked.connect(controller._editSelectedObject)
-        view.estimatesView.buttonBox.saveButton.clicked.connect(controller._saveSelectedObject)
-        view.estimatesView.buttonBox.removeButton.clicked.connect(controller._removeSelectedObject)
+        parametersView.estimatesView.buttonBox.editButton.clicked.connect(
+            controller._editSelectedObject)
+        parametersView.estimatesView.buttonBox.saveButton.clicked.connect(
+            controller._saveSelectedObject)
+        parametersView.estimatesView.buttonBox.removeButton.clicked.connect(
+            controller._removeSelectedObject)
+        imageView.imageRibbon.indexGroupBox.setVisible(False)
 
-        # FIXME view selected object
         controller._syncModelToView()
 
         return controller
@@ -66,7 +76,7 @@ class ObjectController(Observer):
         if name == ObjectController.OPEN_FILE:
             self._openObject()
         else:
-            self._presenter.initializeObject(name)
+            self._repositoryPresenter.initializeObject(name)
 
     def _createItemLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
@@ -74,33 +84,33 @@ class ObjectController(Observer):
 
     def _openObject(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view.estimatesView,
+            self._parametersView.estimatesView,
             'Open Object',
-            nameFilters=self._presenter.getOpenFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenFileFilter())
+            nameFilters=self._repositoryPresenter.getOpenFileFilterList(),
+            selectedNameFilter=self._repositoryPresenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openObject(filePath, nameFilter)
+            self._repositoryPresenter.openObject(filePath, nameFilter)
 
     def _saveSelectedObject(self) -> None:
-        current = self._view.estimatesView.tableView.selectionModel().currentIndex()
+        current = self._parametersView.estimatesView.tableView.currentIndex()
 
         if not current.isValid():
             logger.error('No objects are selected!')
             return
 
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._view.estimatesView,
+            self._parametersView.estimatesView,
             'Save Object',
-            nameFilters=self._presenter.getSaveFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveFileFilter())
+            nameFilters=self._repositoryPresenter.getSaveFileFilterList(),
+            selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
         if filePath:
             name = current.sibling(current.row(), 0).data()
-            self._presenter.saveObject(name, filePath, nameFilter)
+            self._repositoryPresenter.saveObject(name, filePath, nameFilter)
 
     def _editSelectedObject(self) -> None:
-        current = self._view.estimatesView.tableView.selectionModel().currentIndex()
+        current = self._parametersView.estimatesView.tableView.currentIndex()
 
         if current.isValid():
             name = current.sibling(current.row(), 0).data()
@@ -123,7 +133,7 @@ class ObjectController(Observer):
             logger.error('No objects are selected!')
 
     def _removeSelectedObject(self) -> None:
-        current = self._view.estimatesView.tableView.selectionModel().currentIndex()
+        current = self._parametersView.estimatesView.tableView.currentIndex()
 
         if current.isValid():
             name = current.sibling(current.row(), 0).data()
@@ -131,8 +141,18 @@ class ObjectController(Observer):
         else:
             logger.error('No objects are selected!')
 
+    def _setCurrentImage(self) -> None:
+        current = self._parametersView.estimatesView.tableView.currentIndex()
+
+        if current.isValid():
+            name = current.sibling(current.row(), 0).data()
+            array = self._repositoryPresenter.getObjectArray(name)
+            self._imagePresenter.setArray(array)
+        else:
+            logger.error('No objects are selected!')
+
     def _setButtonsEnabled(self) -> None:
-        selectionModel = self._view.estimatesView.tableView.selectionModel()
+        selectionModel = self._parametersView.estimatesView.tableView.selectionModel()
         enable = False
         enableRemove = False
 
@@ -142,23 +162,25 @@ class ObjectController(Observer):
                 name = index.sibling(index.row(), 0).data()
                 enableRemove |= self._repositoryPresenter.canRemoveObject(name)
 
-        self._view.estimatesView.buttonBox.saveButton.setEnabled(enable)
-        self._view.estimatesView.buttonBox.editButton.setEnabled(enable)
-        self._view.estimatesView.buttonBox.removeButton.setEnabled(enableRemove)
+        self._parametersView.estimatesView.buttonBox.saveButton.setEnabled(enable)
+        self._parametersView.estimatesView.buttonBox.editButton.setEnabled(enable)
+        self._parametersView.estimatesView.buttonBox.removeButton.setEnabled(enableRemove)
+
+    def _updateView(self) -> None:
+        self._setButtonsEnabled()
+        self._setCurrentImage()
 
     def _syncModelToView(self) -> None:
-        self._view.objectView.pixelSizeXWidget.setLengthInMeters(
-            self._presenter.getPixelSizeXInMeters())
-        self._view.objectView.pixelSizeYWidget.setLengthInMeters(
-            self._presenter.getPixelSizeYInMeters())
+        self._parametersView.objectView.pixelSizeXWidget.setLengthInMeters(
+            self._repositoryPresenter.getPixelSizeXInMeters())
+        self._parametersView.objectView.pixelSizeYWidget.setLengthInMeters(
+            self._repositoryPresenter.getPixelSizeYInMeters())
 
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
-        self._setButtonsEnabled()
+        self._updateView()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
-        elif observable is self._repositoryPresenter:
+        if observable is self._repositoryPresenter:
             self._syncModelToView()

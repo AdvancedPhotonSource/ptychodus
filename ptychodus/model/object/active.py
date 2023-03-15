@@ -1,8 +1,6 @@
 from __future__ import annotations
 import logging
 
-import numpy
-
 from ...api.image import ImageExtent
 from ...api.object import ObjectArrayType
 from ...api.observer import Observable, Observer

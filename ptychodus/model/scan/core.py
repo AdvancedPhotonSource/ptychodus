@@ -69,7 +69,7 @@ class ScanPresenter(Observable, Observer):
     def getItem(self, name: str) -> ScanRepositoryItem:  # FIXME remove
         return self._repository[name]
 
-    def initializeScan(self, name: str) -> Optional[str]:
+    def initializeScan(self, name: str) -> list[str]:
         return self._scanAPI.insertScanIntoRepositoryFromInitializer(name)
 
     def getOpenFileFilterList(self) -> list[str]:

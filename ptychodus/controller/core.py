@@ -54,13 +54,11 @@ class ControllerCore:
                                                              view.scanParametersView,
                                                              view.scanPlotView,
                                                              self._fileDialogFactory)
-        self._objectController = ObjectController.createInstance(model.objectPresenter,
-                                                                 model.objectRepositoryPresenter,
+        self._objectController = ObjectController.createInstance(model.objectRepositoryPresenter,
+                                                                 model.objectImagePresenter,
                                                                  view.objectParametersView,
+                                                                 view.objectImageView,
                                                                  self._fileDialogFactory)
-        self._objectImageController = ObjectImageController.createInstance(
-            model.objectPresenter, model.objectImagePresenter, view.objectImageView,
-            self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
             model.settingsRegistry, model.diffractionDatasetInputOutputPresenter,
             model.diffractionDatasetPresenter, model.metadataPresenter, model.patternPresenter,

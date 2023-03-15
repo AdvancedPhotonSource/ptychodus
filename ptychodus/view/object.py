@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QMenu, QPushButton,
-                             QSpinBox, QTableView, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHeaderView, QHBoxLayout, QMenu,
+                             QPushButton, QSpinBox, QTableView, QVBoxLayout, QWidget)
 
 from .widgets import LengthWidget
 
@@ -63,6 +63,8 @@ class ObjectEstimatesView(QGroupBox):
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectEstimatesView:
         view = cls(parent)
+
+        view.tableView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         layout = QVBoxLayout()
         layout.addWidget(view.tableView)

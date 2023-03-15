@@ -167,7 +167,7 @@ class ImageRibbon(QWidget):
         self.imageFileGroupBox = ImageFileGroupBox.createInstance()
         self.colormapGroupBox = ImageColorizerGroupBox.createInstance()
         self.dataRangeGroupBox = ImageDataRangeGroupBox.createInstance()
-        self.indexGroupBox = IndexGroupBox.createInstance()
+        self.indexGroupBox = IndexGroupBox.createInstance()  # TODO remove when able
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageRibbon:
