@@ -28,7 +28,7 @@ class ScanRepositoryItemFactory:
         self._settings = settings
         self._indexFilterFactory = indexFilterFactory
         self._fileReaderChooser = fileReaderChooser
-        self._variants: Mapping[str, Callable[[], ScanRepositoryItem]] = {
+        self._initializers: Mapping[str, Callable[[], ScanRepositoryItem]] = {
             LissajousScanRepositoryItem.NAME.casefold(): LissajousScanRepositoryItem,
             RasterScanRepositoryItem.NAME.casefold(): RasterScanRepositoryItem,
             SnakeScanRepositoryItem.NAME.casefold(): SnakeScanRepositoryItem,
@@ -78,8 +78,8 @@ class ScanRepositoryItemFactory:
         self._fileReaderChooser.setFromDisplayName(fileFilter)
         return self._readScan(filePath)
 
-    def getItemNameList(self) -> list[str]:
-        return [name.title() for name in self._variants]
+    def getInitializerNameList(self) -> list[str]:
+        return [name.title() for name in self._initializers]
 
     def createItem(self, initializerName: str) -> list[TransformedScanRepositoryItem]:
         itemList: list[TransformedScanRepositoryItem] = list()
@@ -90,7 +90,7 @@ class ScanRepositoryItemFactory:
             itemList.extend(self._readScan(fileInfo.filePath))
         else:
             try:
-                itemFactory = self._variants[initializerName.casefold()]
+                itemFactory = self._initializers[initializerName.casefold()]
             except KeyError:
                 logger.error(f'Unknown scan initializer \"{initializerName}\"!')
             else:

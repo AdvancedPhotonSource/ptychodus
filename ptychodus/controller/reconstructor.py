@@ -160,7 +160,7 @@ class ReconstructorParametersController(Observer):
 
     def _syncProbeToView(self) -> None:
         self._view.reconstructorView.probeComboBox.blockSignals(True)
-        self._probeListModel.setStringList(['Current Probe'])  # FIXME
+        self._probeListModel.setStringList(['Current Probe'])  # TODO
         self._view.reconstructorView.probeComboBox.blockSignals(False)
 
         isValid = self._probePresenter.isActiveProbeValid()

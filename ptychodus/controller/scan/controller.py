@@ -60,10 +60,10 @@ class ScanController(Observer):
         parametersView.positionDataView.tableView.horizontalHeader().sectionClicked.connect(
             lambda logicalIndex: controller._redrawPlot())
 
-        itemNameList = repositoryPresenter.getItemNameList()
-        itemNameList.insert(0, ScanController.OPEN_FILE)
+        initializerNameList = repositoryPresenter.getInitializerNameList()
+        initializerNameList.insert(0, ScanController.OPEN_FILE)
 
-        for name in itemNameList:
+        for name in initializerNameList:
             insertAction = parametersView.positionDataView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 

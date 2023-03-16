@@ -10,8 +10,8 @@ from ...api.data import (DiffractionFileReader, DiffractionMetadata, Diffraction
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.tree import SimpleTreeNode
+from .active import ActiveDiffractionDataset
 from .builder import ActiveDiffractionDatasetBuilder
-from .dataset import ActiveDiffractionDataset
 from .settings import DiffractionDatasetSettings
 
 logger = logging.getLogger(__name__)

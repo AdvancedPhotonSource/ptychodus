@@ -11,6 +11,7 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanArrayType, ScanFileReader, ScanFileWriter, ScanPoint, TabularScan
 from ...api.settings import SettingsRegistry
+from ..data import ActiveDiffractionDataset
 from ..statefulCore import StateDataType, StatefulCore
 from .active import ActiveScan
 from .api import ScanAPI
@@ -93,8 +94,8 @@ class ScanRepositoryPresenter(Observable, Observer):
     def __len__(self) -> int:
         return len(self._itemPresenterList)
 
-    def getItemNameList(self) -> list[str]:
-        return self._itemFactory.getItemNameList()
+    def getInitializerNameList(self) -> list[str]:
+        return self._itemFactory.getInitializerNameList()
 
     def initializeScan(self, name: str) -> list[str]:
         return self._scanAPI.insertScanIntoRepositoryFromInitializer(name)
@@ -164,20 +165,25 @@ class ScanRepositoryPresenter(Observable, Observer):
 
 class ScanPresenter(Observable, Observer):
 
-    def __init__(self, scan: ActiveScan, scanAPI: ScanAPI) -> None:
+    def __init__(self, scan: ActiveScan, scanAPI: ScanAPI,
+                 dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._scan = scan
         self._scanAPI = scanAPI
+        self._dataset = dataset
 
     @classmethod
-    def createInstance(cls, scan: ActiveScan, scanAPI: ScanAPI) -> ScanPresenter:
-        presenter = cls(scan, scanAPI)
+    def createInstance(cls, scan: ActiveScan, scanAPI: ScanAPI,
+                       dataset: ActiveDiffractionDataset) -> ScanPresenter:
+        presenter = cls(scan, scanAPI, dataset)
         scan.addObserver(presenter)
+        dataset.addObserver(presenter)
         return presenter
 
     def isActiveScanValid(self) -> bool:
-        # FIXME isActiveScanValid should require more than one common index with active dataset
-        return (len(self._scan) > 1)
+        datasetIndexes = set(self._dataset.getAssembledIndexes())
+        scanIndexes = set(self._scan.keys())
+        return (not scanIndexes.isdisjoint(datasetIndexes))
 
     def setActiveScan(self, name: str) -> None:
         self._scanAPI.setActiveScan(name)
@@ -188,11 +194,14 @@ class ScanPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._scan:
             self.notifyObservers()
+        elif observable is self._dataset:
+            self.notifyObservers()
 
 
 class ScanCore(StatefulCore):
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
+                 dataset: ActiveDiffractionDataset,
                  fileReaderChooser: PluginChooser[ScanFileReader],
                  fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
         self._builder = StreamingScanBuilder()
@@ -206,7 +215,7 @@ class ScanCore(StatefulCore):
         self.scanAPI = ScanAPI(self._builder, self._itemFactory, self._repository, self.scan)
         self.repositoryPresenter = ScanRepositoryPresenter.createInstance(
             self._repository, self._itemFactory, self.scanAPI, fileWriterChooser)
-        self.presenter = ScanPresenter.createInstance(self.scan, self.scanAPI)
+        self.presenter = ScanPresenter.createInstance(self.scan, self.scanAPI, dataset)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         scanIndex: list[int] = list()

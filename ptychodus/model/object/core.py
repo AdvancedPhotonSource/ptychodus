@@ -100,8 +100,8 @@ class ObjectRepositoryPresenter(Observable, Observer):
     def __len__(self) -> int:
         return len(self._itemPresenterList)
 
-    def getItemNameList(self) -> list[str]:
-        return self._itemFactory.getItemNameList()
+    def getInitializerNameList(self) -> list[str]:
+        return self._itemFactory.getInitializerNameList()
 
     def initializeObject(self, name: str) -> Optional[str]:
         return self._objectAPI.insertObjectIntoRepositoryFromInitializer(name)
@@ -114,9 +114,6 @@ class ObjectRepositoryPresenter(Observable, Observer):
 
     def openObject(self, filePath: Path, fileFilter: str) -> None:
         self._objectAPI.insertObjectIntoRepositoryFromFile(filePath, fileFilter)
-
-    def getObjectArray(self, name: str) -> ObjectArrayType:  # FIXME remove when able
-        return self._repository[name].getArray()
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._fileWriterChooser.getDisplayNameList()

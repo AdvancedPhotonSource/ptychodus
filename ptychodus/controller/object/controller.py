@@ -53,10 +53,10 @@ class ObjectController(Observer):
         parametersView.estimatesView.tableView.selectionModel().selectionChanged.connect(
             lambda selected, deselected: controller._updateView())
 
-        itemNameList = repositoryPresenter.getItemNameList()
-        itemNameList.insert(0, ObjectController.OPEN_FILE)
+        initializerNameList = repositoryPresenter.getInitializerNameList()
+        initializerNameList.insert(0, ObjectController.OPEN_FILE)
 
-        for name in itemNameList:
+        for name in initializerNameList:
             insertAction = parametersView.estimatesView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 
@@ -142,11 +142,11 @@ class ObjectController(Observer):
             logger.error('No objects are selected!')
 
     def _setCurrentImage(self) -> None:
-        current = self._parametersView.estimatesView.tableView.currentIndex()
+        proxyIndex = self._parametersView.estimatesView.tableView.currentIndex()
 
-        if current.isValid():
-            name = current.sibling(current.row(), 0).data()
-            array = self._repositoryPresenter.getObjectArray(name)  # FIXME
+        if proxyIndex.isValid():
+            index = self._proxyModel.mapToSource(proxyIndex)
+            array = self._repositoryPresenter[index.row()].getArray()
             self._imagePresenter.setArray(array)
         else:
             logger.error('No objects are selected!')

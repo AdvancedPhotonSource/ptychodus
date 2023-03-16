@@ -24,7 +24,7 @@ class ObjectRepositoryItemFactory:
         self._settings = settings
         self._sizer = sizer
         self._fileReaderChooser = fileReaderChooser
-        self._variants: Mapping[str, Callable[[], ObjectRepositoryItem]] = {
+        self._initializers: Mapping[str, Callable[[], ObjectRepositoryItem]] = {
             RandomObjectRepositoryItem.NAME.casefold(): self.createRandomItem,
         }
 
@@ -65,8 +65,8 @@ class ObjectRepositoryItemFactory:
         self._fileReaderChooser.setFromDisplayName(fileFilter)
         return self._readObject(filePath)
 
-    def getItemNameList(self) -> list[str]:
-        return [name.title() for name in self._variants]
+    def getInitializerNameList(self) -> list[str]:
+        return [name.title() for name in self._initializers]
 
     def createItem(self, initializerName: str) -> Optional[ObjectRepositoryItem]:
         item: Optional[ObjectRepositoryItem] = None
@@ -77,7 +77,7 @@ class ObjectRepositoryItemFactory:
             item = self._readObject(fileInfo.filePath)
         else:
             try:
-                itemFactory = self._variants[initializerName.casefold()]
+                itemFactory = self._initializers[initializerName.casefold()]
             except KeyError:
                 logger.error(f'Unknown object initializer \"{initializerName}\"!')
             else:

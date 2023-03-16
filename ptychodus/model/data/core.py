@@ -17,8 +17,8 @@ from ...api.settings import SettingsRegistry, SettingsGroup
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
 from ..statefulCore import StateDataType, StatefulCore
+from .active import ActiveDiffractionDataset
 from .builder import ActiveDiffractionDatasetBuilder
-from .dataset import ActiveDiffractionDataset
 from .io import DiffractionDatasetInputOutputPresenter
 from .patterns import DiffractionPatternPresenter
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
