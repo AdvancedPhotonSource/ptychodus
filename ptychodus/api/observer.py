@@ -24,9 +24,6 @@ class Observable:
         except ValueError:
             pass
 
-    def clearObservers(self) -> None:
-        self._observerList.clear()
-
     def notifyObservers(self) -> None:
         for observer in self._observerList:
             observer.update(self)

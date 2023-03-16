@@ -62,7 +62,7 @@ class SimpleObjectRepositoryItem(ObjectRepositoryItem):
     def getDataType(self) -> str:
         return str(self._array.dtype)
 
-    def getExtent(self) -> ImageExtent:
+    def getExtentInPixels(self) -> ImageExtent:
         return ImageExtent(width=self._array.shape[1], height=self._array.shape[0])
 
     def getSizeInBytes(self) -> int:

@@ -1,4 +1,3 @@
-from __future__ import annotations
 from abc import abstractmethod, abstractproperty
 
 from ...api.image import ImageExtent
@@ -42,7 +41,7 @@ class ObjectRepositoryItem(Observable):
         pass
 
     @abstractmethod
-    def getExtent(self) -> ImageExtent:
+    def getExtentInPixels(self) -> ImageExtent:
         '''returns the array width and height'''
         pass
 

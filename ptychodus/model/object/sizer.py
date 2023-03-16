@@ -51,7 +51,7 @@ class ObjectSizer(Observable, Observer):
         return 2 * (self._probeSizer.getProbeExtent() // 2)
 
     def getObjectExtent(self) -> ImageExtent:
-        # FIXME add settings to override minimum object extent
+        # TODO add settings to override minimum object extent
         return self.getScanExtent() + self.getPaddingExtent()
 
     def update(self, observable: Observable) -> None:

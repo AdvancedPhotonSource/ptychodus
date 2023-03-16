@@ -38,11 +38,7 @@ class ActiveObject(Observable, Observer):
 
     def canActivateObject(self, name: str) -> bool:
         item = self._repository.get(name)
-
-        if item is not None:
-            return item.canActivate
-
-        return False
+        return False if item is None else item.canActivate
 
     def setActiveObject(self, name: str) -> None:
         if self._name == name:
@@ -66,11 +62,15 @@ class ActiveObject(Observable, Observer):
         self._syncToSettings()
         self.notifyObservers()
 
-    def getExtent(self) -> ImageExtent:
-        return self._item.getExtent()
+    def getExtentInPixels(self) -> ImageExtent:
+        return self._item.getExtentInPixels()
 
     def getArray(self) -> ObjectArrayType:
         return self._item.getArray()
+
+    def _recoverIfActiveObjectRemovedFromRepository(self) -> None:
+        if self._name not in self._repository:
+            self.setActiveObject(next(iter(self._repository)))
 
     def _syncFromSettings(self) -> None:
         initializerName = self._settings.initializer.value
@@ -85,12 +85,11 @@ class ActiveObject(Observable, Observer):
     def _syncToSettings(self) -> None:
         self._settings.initializer.value = self._item.initializer
         self._item.syncToSettings(self._settings)
-        self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._item:
             self._syncToSettings()
         elif observable is self._repository:
-            pass  # FIXME do the right thing if the active object is removed
+            self._recoverIfActiveObjectRemovedFromRepository()
         elif observable is self._reinitObservable:
             self._syncFromSettings()

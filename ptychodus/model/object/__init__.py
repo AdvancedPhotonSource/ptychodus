@@ -1,5 +1,5 @@
 from .api import ObjectAPI
-from .core import ObjectPresenter, ObjectCore, ObjectRepositoryPresenter
+from .core import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
 from .simple import ObjectFileInfo
 
 __all__ = [

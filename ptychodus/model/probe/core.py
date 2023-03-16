@@ -121,6 +121,9 @@ class ProbePresenter(Observable, Observer):
     def getProbeWavelengthInMeters(self) -> Decimal:
         return self._apparatus.getProbeWavelengthInMeters()
 
+    def setActiveProbe(self, name: str) -> None:
+        pass  # TODO
+
     def getNumberOfProbeModes(self) -> int:
         return self._probe.getNumberOfProbeModes()
 

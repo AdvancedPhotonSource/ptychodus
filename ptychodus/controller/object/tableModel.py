@@ -38,13 +38,13 @@ class ObjectTableModel(QAbstractTableModel):
             elif index.column() == 1:
                 value = QVariant(item.initializer)
             elif index.column() == 2:
-                value = QVariant(item.dataType)
+                value = QVariant(item.getDataType())
             elif index.column() == 3:
-                value = QVariant(item.extentInPixels.width)
+                value = QVariant(item.getExtentInPixels().width)
             elif index.column() == 4:
-                value = QVariant(item.extentInPixels.height)
+                value = QVariant(item.getExtentInPixels().height)
             elif index.column() == 5:
-                value = QVariant(f'{item.sizeInBytes / (1024 * 1024):.2f}')
+                value = QVariant(f'{item.getSizeInBytes() / (1024 * 1024):.2f}')
 
         return value
 

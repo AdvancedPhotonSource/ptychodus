@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import ItemsView
+from collections.abc import ItemsView, Iterator
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
@@ -16,7 +16,7 @@ from .active import ActiveScan
 from .api import ScanAPI
 from .indexFilters import ScanIndexFilterFactory
 from .itemFactory import ScanRepositoryItemFactory
-from .itemRepository import ScanRepository, ScanRepositoryItem, ScanRepositoryPresenter
+from .itemRepository import ScanRepository, ScanRepositoryItem
 from .settings import ScanSettings
 from .streaming import StreamingScanBuilder
 from .tabular import ScanFileInfo, TabularScanRepositoryItem
@@ -24,50 +24,77 @@ from .tabular import ScanFileInfo, TabularScanRepositoryItem
 logger = logging.getLogger(__name__)
 
 
-class ScanPresenter(Observable, Observer):
+class ScanRepositoryItemPresenter(Scan, Observer):
 
-    def __init__(self, itemFactory: ScanRepositoryItemFactory, repository: ScanRepository,
-                 scan: ActiveScan, scanAPI: ScanAPI,
-                 fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
+    def __init__(self, name: str, item: ScanRepositoryItem) -> None:
         super().__init__()
-        self._itemFactory = itemFactory
-        self._repository = repository
-        self._scan = scan
-        self._scanAPI = scanAPI
-        self._fileWriterChooser = fileWriterChooser
+        self._name = name
+        self._item = item
 
     @classmethod
-    def createInstance(cls, itemFactory: ScanRepositoryItemFactory, repository: ScanRepository,
-                       scan: ActiveScan, scanAPI: ScanAPI,
-                       fileWriterChooser: PluginChooser[ScanFileWriter]) -> ScanPresenter:
-        presenter = cls(itemFactory, repository, scan, scanAPI, fileWriterChooser)
-        scan.addObserver(presenter)
+    def createInstance(cls, name: str, item: ScanRepositoryItem) -> ScanRepositoryItemPresenter:
+        presenter = cls(name, item)
+        item.addObserver(presenter)
         return presenter
 
-    def getScanRepositoryContents(self) -> ItemsView[str, ScanRepositoryItem]:  # FIXME remove
-        return self._repository.items()
+    @property
+    def name(self) -> str:
+        return self._name
 
-    def isActiveScanValid(self) -> bool:
-        # FIXME isActiveScanValid should require more than one common index with active dataset
-        return (len(self._scan) > 1)
+    @property
+    def initializer(self) -> str:
+        return self._item.initializer
 
-    def getActiveScanPointList(self) -> list[ScanPoint]:
-        return [point for point in self._scan.values()]
+    @property
+    def canActivate(self) -> bool:
+        return self._item.canActivate
 
-    def getActiveScan(self) -> str:
-        return self._scan.name
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._item)
 
-    def canActivateScan(self, name: str) -> bool:
-        return self._scan.canActivateScan(name)
+    def __getitem__(self, index: int) -> ScanPoint:
+        return self._item[index]
 
-    def setActiveScan(self, name: str) -> None:
-        self._scanAPI.setActiveScan(name)
+    def __len__(self) -> int:
+        return len(self._item)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._item:
+            self.notifyObservers()
+
+
+class ScanRepositoryPresenter(Observable, Observer):
+
+    def __init__(self, repository: ScanRepository, itemFactory: ScanRepositoryItemFactory,
+                 scanAPI: ScanAPI, fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
+        super().__init__()
+        self._repository = repository
+        self._itemFactory = itemFactory
+        self._scanAPI = scanAPI
+        self._fileWriterChooser = fileWriterChooser
+        self._itemPresenterList: list[ScanRepositoryItemPresenter] = list()
+
+    @classmethod
+    def createInstance(
+            cls, repository: ScanRepository, itemFactory: ScanRepositoryItemFactory,
+            scanAPI: ScanAPI,
+            fileWriterChooser: PluginChooser[ScanFileWriter]) -> ScanRepositoryPresenter:
+        presenter = cls(repository, itemFactory, scanAPI, fileWriterChooser)
+        presenter._updateItemPresenterList()
+        repository.addObserver(presenter)
+        return presenter
+
+    def __iter__(self) -> Iterator[ScanRepositoryItemPresenter]:
+        return iter(self._itemPresenterList)
+
+    def __getitem__(self, index: int) -> ScanRepositoryItemPresenter:
+        return self._itemPresenterList[index]
+
+    def __len__(self) -> int:
+        return len(self._itemPresenterList)
 
     def getItemNameList(self) -> list[str]:
         return self._itemFactory.getItemNameList()
-
-    def getItem(self, name: str) -> ScanRepositoryItem:  # FIXME remove
-        return self._repository[name]
 
     def initializeScan(self, name: str) -> list[str]:
         return self._scanAPI.insertScanIntoRepositoryFromInitializer(name)
@@ -89,7 +116,7 @@ class ScanPresenter(Observable, Observer):
 
     def saveScan(self, name: str, filePath: Path, fileFilter: str) -> None:
         try:
-            initializer = self._repository[name]
+            item = self._repository[name]
         except KeyError:
             logger.error(f'Unable to locate \"{name}\"!')
             return
@@ -98,12 +125,65 @@ class ScanPresenter(Observable, Observer):
         fileType = self._fileWriterChooser.getCurrentSimpleName()
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.getCurrentStrategy()
-        writer.write(filePath, [initializer])
+        writer.write(filePath, [item])
 
-        if isinstance(initializer, TabularScanRepositoryItem):
-            if initializer.getFileInfo() is None:
+        # FIXME setFileInfo
+        if isinstance(item, TabularScanRepositoryItem):
+            if item.getFileInfo() is None:
                 fileInfo = ScanFileInfo(fileType, filePath)
-                initializer.setFileInfo(fileInfo)
+                item.setFileInfo(fileInfo)
+
+    def canRemoveScan(self, name: str) -> bool:
+        return self._repository.canRemoveItem(name)
+
+    def removeScan(self, name: str) -> None:
+        self._repository.removeItem(name)
+
+    def _updateItemPresenterList(self) -> None:
+        itemPresenterList: list[ScanRepositoryItemPresenter] = list()
+        itemPresenterNames: set[str] = set()
+
+        for itemPresenter in self._itemPresenterList:
+            if itemPresenter.name in self._repository:
+                itemPresenterList.append(itemPresenter)
+                itemPresenterNames.add(itemPresenter.name)
+
+        for name, item in self._repository.items():
+            if name not in itemPresenterNames:
+                itemPresenter = ScanRepositoryItemPresenter.createInstance(name, item)
+                itemPresenterList.append(itemPresenter)
+
+        itemPresenterList.sort(key=lambda item: item.name)
+        self._itemPresenterList = itemPresenterList
+        self.notifyObservers()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._repository:
+            self._updateItemPresenterList()
+
+
+class ScanPresenter(Observable, Observer):
+
+    def __init__(self, scan: ActiveScan, scanAPI: ScanAPI) -> None:
+        super().__init__()
+        self._scan = scan
+        self._scanAPI = scanAPI
+
+    @classmethod
+    def createInstance(cls, scan: ActiveScan, scanAPI: ScanAPI) -> ScanPresenter:
+        presenter = cls(scan, scanAPI)
+        scan.addObserver(presenter)
+        return presenter
+
+    def isActiveScanValid(self) -> bool:
+        # FIXME isActiveScanValid should require more than one common index with active dataset
+        return (len(self._scan) > 1)
+
+    def setActiveScan(self, name: str) -> None:
+        self._scanAPI.setActiveScan(name)
+
+    def getActiveScan(self) -> str:
+        return self._scan.name
 
     def update(self, observable: Observable) -> None:
         if observable is self._scan:
@@ -124,9 +204,9 @@ class ScanCore(StatefulCore):
         self.scan = ActiveScan.createInstance(self._settings, self._itemFactory, self._repository,
                                               settingsRegistry)
         self.scanAPI = ScanAPI(self._builder, self._itemFactory, self._repository, self.scan)
-        self.repositoryPresenter = ScanRepositoryPresenter.createInstance(self._repository)
-        self.presenter = ScanPresenter.createInstance(self._itemFactory, self._repository,
-                                                      self.scan, self.scanAPI, fileWriterChooser)
+        self.repositoryPresenter = ScanRepositoryPresenter.createInstance(
+            self._repository, self._itemFactory, self.scanAPI, fileWriterChooser)
+        self.presenter = ScanPresenter.createInstance(self.scan, self.scanAPI)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         scanIndex: list[int] = list()

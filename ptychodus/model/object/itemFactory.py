@@ -20,7 +20,6 @@ class ObjectRepositoryItemFactory:
 
     def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings, sizer: ObjectSizer,
                  fileReaderChooser: PluginChooser[ObjectFileReader]) -> None:
-        super().__init__()
         self._rng = rng
         self._settings = settings
         self._sizer = sizer

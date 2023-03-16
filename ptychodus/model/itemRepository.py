@@ -14,9 +14,6 @@ class RepositoryItem(Protocol):
     def name(self) -> str:
         pass
 
-    def clearObservers(self) -> None:
-        pass
-
 
 T = TypeVar('T', bound=RepositoryItem)
 
@@ -57,8 +54,6 @@ class ItemRepository(Mapping[str, T], Observable):
                 item = self._itemDict.pop(name)
             except KeyError:
                 pass
-            else:
-                item.clearObservers()
         else:
             logger.debug(f'Cannot remove item \"{name}\"')
 

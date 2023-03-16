@@ -6,9 +6,8 @@ from ...api.observer import Observable, Observer
 from ...api.scan import Scan, ScanPoint
 from .cartesian import SnakeScanRepositoryItem
 from .itemFactory import ScanRepositoryItemFactory
-from .itemRepository import ScanRepository, ScanRepositoryItem
+from .itemRepository import ScanRepository, ScanRepositoryItem, TransformedScanRepositoryItem
 from .settings import ScanSettings
-from .transformed import TransformedScanRepositoryItem
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +39,7 @@ class ActiveScan(Scan, Observer):
 
     def canActivateScan(self, name: str) -> bool:
         item = self._repository.get(name)
-
-        if item is not None:
-            return item.canActivate
-
-        return False
+        return False if item is None else item.canActivate
 
     def setActiveScan(self, name: str) -> None:
         if self._name == name:
@@ -86,6 +81,10 @@ class ActiveScan(Scan, Observer):
     def __len__(self) -> int:
         return len(self._item)
 
+    def _recoverIfActiveScanRemovedFromRepository(self) -> None:
+        if self._name not in self._repository:
+            self.setActiveScan(next(iter(self._repository)))
+
     def _syncFromSettings(self) -> None:
         initializerName = self._settings.initializer.value
 
@@ -98,12 +97,11 @@ class ActiveScan(Scan, Observer):
         self._settings.activeScan.value = self._item.name
         self._settings.initializer.value = self._item.initializer
         self._item.syncToSettings(self._settings)
-        self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._item:
             self._syncToSettings()
         elif observable is self._repository:
-            pass  # FIXME do the right thing if the active scan is removed
+            self._recoverIfActiveScanRemovedFromRepository()
         elif observable is self._reinitObservable:
             self._syncFromSettings()

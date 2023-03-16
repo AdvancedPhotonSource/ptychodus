@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Iterator
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -18,21 +19,55 @@ from ..statefulCore import StateDataType, StatefulCore
 from .active import ActiveObject
 from .api import ObjectAPI
 from .itemFactory import ObjectRepositoryItemFactory
-from .itemRepository import ObjectRepository
+from .itemRepository import ObjectRepository, ObjectRepositoryItem
 from .settings import ObjectSettings
-from .simple import ObjectFileInfo
+from .simple import ObjectFileInfo, SimpleObjectRepositoryItem
 from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class ObjectRepositoryItemPresenter:
-    name: str
-    initializer: str
-    dataType: str
-    extentInPixels: ImageExtent
-    sizeInBytes: int
+class ObjectRepositoryItemPresenter(Observable, Observer):
+
+    def __init__(self, name: str, item: ObjectRepositoryItem) -> None:
+        super().__init__()
+        self._name = name
+        self._item = item
+
+    @classmethod
+    def createInstance(cls, name: str,
+                       item: ObjectRepositoryItem) -> ObjectRepositoryItemPresenter:
+        presenter = cls(name, item)
+        item.addObserver(presenter)
+        return presenter
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def initializer(self) -> str:
+        return self._item.initializer
+
+    @property
+    def canActivate(self) -> bool:
+        return self._item.canActivate
+
+    def getDataType(self) -> str:
+        return self._item.getDataType()
+
+    def getExtentInPixels(self) -> ImageExtent:
+        return self._item.getExtentInPixels()
+
+    def getSizeInBytes(self) -> int:
+        return self._item.getSizeInBytes()
+
+    def getArray(self) -> ObjectArrayType:
+        return self._item.getArray()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._item:
+            self.notifyObservers()
 
 
 class ObjectRepositoryPresenter(Observable, Observer):
@@ -44,7 +79,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
         self._itemFactory = itemFactory
         self._objectAPI = objectAPI
         self._fileWriterChooser = fileWriterChooser
-        self._nameList: list[str] = list()
+        self._itemPresenterList: list[ObjectRepositoryItemPresenter] = list()
 
     @classmethod
     def createInstance(
@@ -52,23 +87,18 @@ class ObjectRepositoryPresenter(Observable, Observer):
             objectAPI: ObjectAPI,
             fileWriterChooser: PluginChooser[ObjectFileWriter]) -> ObjectRepositoryPresenter:
         presenter = cls(repository, itemFactory, objectAPI, fileWriterChooser)
-        presenter._updateNameList()
+        presenter._updateItemPresenterList()
         repository.addObserver(presenter)
         return presenter
 
+    def __iter__(self) -> Iterator[ObjectRepositoryItemPresenter]:
+        return iter(self._itemPresenterList)
+
     def __getitem__(self, index: int) -> ObjectRepositoryItemPresenter:
-        name = self._nameList[index]
-        item = self._repository[name]
-        return ObjectRepositoryItemPresenter(
-            name=name,
-            initializer=item.initializer,
-            dataType=item.getDataType(),
-            extentInPixels=item.getExtent(),
-            sizeInBytes=item.getSizeInBytes(),
-        )
+        return self._itemPresenterList[index]
 
     def __len__(self) -> int:
-        return len(self._nameList)
+        return len(self._itemPresenterList)
 
     def getItemNameList(self) -> list[str]:
         return self._itemFactory.getItemNameList()
@@ -85,7 +115,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
     def openObject(self, filePath: Path, fileFilter: str) -> None:
         self._objectAPI.insertObjectIntoRepositoryFromFile(filePath, fileFilter)
 
-    def getObjectArray(self, name: str) -> ObjectArrayType:
+    def getObjectArray(self, name: str) -> ObjectArrayType:  # FIXME remove when able
         return self._repository[name].getArray()
 
     def getSaveFileFilterList(self) -> list[str]:
@@ -96,7 +126,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
 
     def saveObject(self, name: str, filePath: Path, fileFilter: str) -> None:
         try:
-            initializer = self._repository[name]
+            item = self._repository[name]
         except KeyError:
             logger.error(f'Unable to locate \"{name}\"!')
             return
@@ -105,13 +135,13 @@ class ObjectRepositoryPresenter(Observable, Observer):
         fileType = self._fileWriterChooser.getCurrentSimpleName()
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.getCurrentStrategy()
-        writer.write(filePath, self.getObjectArray(name))
+        writer.write(filePath, item.getArray())
 
-        # FIXME
-        #if isinstance(initializer, SimpleObjectRepositoryItem):
-        #    if initializer.getFileInfo() is None:
-        #        fileInfo = ObjectFileInfo(fileType, filePath)
-        #        initializer.setFileInfo(fileInfo)
+        # FIXME setFileInfo
+        if isinstance(item, SimpleObjectRepositoryItem):
+            if item.getFileInfo() is None:
+                fileInfo = ObjectFileInfo(fileType, filePath)
+                item.setFileInfo(fileInfo)
 
     def canRemoveObject(self, name: str) -> bool:
         return self._repository.canRemoveItem(name)
@@ -125,14 +155,27 @@ class ObjectRepositoryPresenter(Observable, Observer):
     def getPixelSizeYInMeters(self) -> Decimal:
         return self._objectAPI.getPixelSizeYInMeters()
 
-    def _updateNameList(self) -> None:
-        self._nameList = list(self._repository.keys())
-        self._nameList.sort()
+    def _updateItemPresenterList(self) -> None:
+        itemPresenterList: list[ObjectRepositoryItemPresenter] = list()
+        itemPresenterNames: set[str] = set()
+
+        for itemPresenter in self._itemPresenterList:
+            if itemPresenter.name in self._repository:
+                itemPresenterList.append(itemPresenter)
+                itemPresenterNames.add(itemPresenter.name)
+
+        for name, item in self._repository.items():
+            if name not in itemPresenterNames:
+                itemPresenter = ObjectRepositoryItemPresenter.createInstance(name, item)
+                itemPresenterList.append(itemPresenter)
+
+        itemPresenterList.sort(key=lambda item: item.name)
+        self._itemPresenterList = itemPresenterList
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._repository:
-            self._updateNameList()
+            self._updateItemPresenterList()
 
 
 class ObjectPresenter(Observable, Observer):
@@ -152,21 +195,18 @@ class ObjectPresenter(Observable, Observer):
         return presenter
 
     def isActiveObjectValid(self) -> bool:
-        actualExtent = self._object.getExtent()
+        actualExtent = self._object.getExtentInPixels()
         expectedExtent = self._sizer.getObjectExtent()
         widthIsBigEnough = (actualExtent.width >= expectedExtent.width)
         heightIsBigEnough = (actualExtent.height >= expectedExtent.height)
         hasComplexDataType = numpy.iscomplexobj(self._object.getArray())
         return (widthIsBigEnough and heightIsBigEnough and hasComplexDataType)
 
-    def getActiveObject(self) -> str:
-        return self._object.name
-
-    def canActivateObject(self, name: str) -> bool:
-        return self._object.canActivateObject(name)
-
     def setActiveObject(self, name: str) -> None:
         self._objectAPI.setActiveObject(name)
+
+    def getActiveObject(self) -> str:
+        return self._object.name
 
     def getObjectArray(self) -> ObjectArrayType:  # FIXME remove
         return self._object.getArray()

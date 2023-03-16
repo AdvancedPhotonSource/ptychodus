@@ -10,12 +10,11 @@ from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
 from .cartesian import RasterScanRepositoryItem, SnakeScanRepositoryItem
 from .indexFilters import ScanIndexFilterFactory
-from .itemRepository import ScanRepositoryItem
+from .itemRepository import ScanRepositoryItem, TransformedScanRepositoryItem
 from .lissajous import LissajousScanRepositoryItem
 from .settings import ScanSettings
 from .spiral import SpiralScanRepositoryItem
 from .tabular import ScanFileInfo, TabularScanRepositoryItem
-from .transformed import TransformedScanRepositoryItem
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +35,13 @@ class ScanRepositoryItemFactory:
             SpiralScanRepositoryItem.NAME.casefold(): SpiralScanRepositoryItem,
         }
 
-    def _transformed(self, item: ScanRepositoryItem) -> ScanRepositoryItem:
+    def _transformed(self, item: ScanRepositoryItem) -> TransformedScanRepositoryItem:
         transformedItem = TransformedScanRepositoryItem(self._rng, item, self._indexFilterFactory)
         transformedItem.syncFromSettings(self._settings)
         return transformedItem
 
     def createTabularItem(self, scan: Scan,
-                          fileInfo: Optional[ScanFileInfo]) -> ScanRepositoryItem:
+                          fileInfo: Optional[ScanFileInfo]) -> TransformedScanRepositoryItem:
         return self._transformed(TabularScanRepositoryItem(scan, fileInfo))
 
     def getOpenFileFilterList(self) -> list[str]:
@@ -51,10 +50,10 @@ class ScanRepositoryItemFactory:
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.getCurrentDisplayName()
 
-    def _readScan(self, filePath: Path) -> list[ScanRepositoryItem]:
-        itemList: list[ScanRepositoryItem] = list()
+    def _readScan(self, filePath: Path) -> list[TransformedScanRepositoryItem]:
+        itemList: list[TransformedScanRepositoryItem] = list()
 
-        if filePath is not None and filePath.is_file():
+        if filePath.is_file():
             fileType = self._fileReaderChooser.getCurrentSimpleName()
             logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
             fileInfo = ScanFileInfo(fileType, filePath)
@@ -62,7 +61,9 @@ class ScanRepositoryItemFactory:
 
             try:
                 scanSequence = reader.read(filePath)
-            except ScanPointParseError as ex:
+            except ScanPointParseError:
+                logger.exception(f'Failed to parse \"{filePath}\"')
+            except Exception:
                 logger.exception(f'Failed to read \"{filePath}\"')
             else:
                 for scan in scanSequence:
@@ -73,15 +74,15 @@ class ScanRepositoryItemFactory:
 
         return itemList
 
-    def openScan(self, filePath: Path, fileFilter: str) -> list[ScanRepositoryItem]:
+    def openScan(self, filePath: Path, fileFilter: str) -> list[TransformedScanRepositoryItem]:
         self._fileReaderChooser.setFromDisplayName(fileFilter)
         return self._readScan(filePath)
 
     def getItemNameList(self) -> list[str]:
         return [name.title() for name in self._variants]
 
-    def createItem(self, initializerName: str) -> list[ScanRepositoryItem]:
-        itemList: list[ScanRepositoryItem] = list()
+    def createItem(self, initializerName: str) -> list[TransformedScanRepositoryItem]:
+        itemList: list[TransformedScanRepositoryItem] = list()
 
         if initializerName.casefold() == 'fromfile':
             fileInfo = ScanFileInfo.createFromSettings(self._settings)
@@ -93,6 +94,6 @@ class ScanRepositoryItemFactory:
             except KeyError:
                 logger.error(f'Unknown scan initializer \"{initializerName}\"!')
             else:
-                itemList.append(itemFactory())
+                itemList.append(self._transformed(itemFactory()))
 
-        return [self._transformed(item) for item in itemList]
+        return itemList

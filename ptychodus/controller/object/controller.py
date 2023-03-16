@@ -146,7 +146,7 @@ class ObjectController(Observer):
 
         if current.isValid():
             name = current.sibling(current.row(), 0).data()
-            array = self._repositoryPresenter.getObjectArray(name)
+            array = self._repositoryPresenter.getObjectArray(name)  # FIXME
             self._imagePresenter.setArray(array)
         else:
             logger.error('No objects are selected!')

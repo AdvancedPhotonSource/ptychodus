@@ -50,7 +50,7 @@ class ScanTableModel(QAbstractTableModel):
                 elif index.column() == 1:
                     value = QVariant(item.initializer)
                 elif index.column() == 2:
-                    value = QVariant(item.numberOfPoints)
+                    value = QVariant(len(item))
             elif role == Qt.CheckStateRole:
                 if index.column() == 0:
                     value = QVariant(Qt.Checked if item.name in

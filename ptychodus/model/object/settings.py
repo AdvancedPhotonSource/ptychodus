@@ -21,8 +21,9 @@ class ObjectSettings(Observable, Observer):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:
-        settings = cls(settingsRegistry.createGroup('Object'))
-        settings._settingsGroup.addObserver(settings)
+        settingsGroup = settingsRegistry.createGroup('Object')
+        settings = cls(settingsGroup)
+        settingsGroup.addObserver(settings)
         return settings
 
     def update(self, observable: Observable) -> None:

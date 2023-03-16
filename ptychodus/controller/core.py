@@ -66,8 +66,10 @@ class ControllerCore:
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter,
             model.reconstructorPlotPresenter,
+            model.scanRepositoryPresenter,
             model.scanPresenter,
             model.probePresenter,
+            model.objectRepositoryPresenter,
             model.objectPresenter,
             view.reconstructorParametersView,
             [

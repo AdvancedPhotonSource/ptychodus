@@ -51,7 +51,7 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
     def getDataType(self) -> str:
         return str(self._dtype)
 
-    def getExtent(self) -> ImageExtent:
+    def getExtentInPixels(self) -> ImageExtent:
         return self._sizer.getObjectExtent()
 
     def getSizeInBytes(self) -> int:

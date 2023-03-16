@@ -49,15 +49,6 @@ class ObjectAPI:
         item = self._factory.createItemFromArray(name, array, fileInfo)
         return self._repository.insertItem(item)
 
-    def getPixelSizeXInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeXInMeters()
-
-    def getPixelSizeYInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeYInMeters()
-
-    def getActiveObjectArray(self) -> ObjectArrayType:
-        return self._object.getArray()
-
     def setActiveObject(self, itemName: str) -> None:
         self._object.setActiveObject(itemName)
 
@@ -68,3 +59,12 @@ class ObjectAPI:
             logger.error('Failed to initialize \"{name}\"!')
         else:
             self.setActiveObject(itemName)
+
+    def getActiveObjectArray(self) -> ObjectArrayType:
+        return self._object.getArray()
+
+    def getPixelSizeXInMeters(self) -> Decimal:
+        return self._apparatus.getObjectPlanePixelSizeXInMeters()
+
+    def getPixelSizeYInMeters(self) -> Decimal:
+        return self._apparatus.getObjectPlanePixelSizeYInMeters()
