@@ -30,7 +30,7 @@ class ObjectImageController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        array = self._presenter.getObjectArray()  # FIXME
+        array = self._presenter.getActiveObjectArray()
         self._imagePresenter.setArray(array)
 
     def update(self, observable: Observable) -> None:

@@ -62,9 +62,9 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
         size = self._sizer.getObjectExtent().shape
         amplitude = self._rng.normal(float(self._amplitudeMean),
                                      float(self._amplitudeStandardDeviation), size)
-        phase = self._rng.uniform(0., 2. * numpy.pi, size=size) \
+        phase = self._rng.uniform(0, 2 * numpy.pi, size=size) \
                 if self._randomizePhase else numpy.zeros_like(amplitude)
-        array: ObjectArrayType = amplitude * numpy.exp(1.j * phase)
+        array: ObjectArrayType = amplitude * numpy.exp(1j * phase)
         return array
 
     def getAmplitudeMean(self) -> Decimal:

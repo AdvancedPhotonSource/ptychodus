@@ -12,7 +12,7 @@ __all__ = [
     'ScanAPI',
     'ScanCore',
     'ScanPresenter',
-    'ScanRepositoryItem',  # FIXME don't depend on this
+    'ScanRepositoryItem',
     'ScanRepositoryPresenter',
     'SpiralScanRepositoryItem',
     'TabularScanRepositoryItem',

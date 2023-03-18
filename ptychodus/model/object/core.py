@@ -134,7 +134,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
         writer = self._fileWriterChooser.getCurrentStrategy()
         writer.write(filePath, item.getArray())
 
-        # FIXME setFileInfo
+        # TODO test this
         if isinstance(item, SimpleObjectRepositoryItem):
             if item.getFileInfo() is None:
                 fileInfo = ObjectFileInfo(fileType, filePath)
@@ -205,7 +205,7 @@ class ObjectPresenter(Observable, Observer):
     def getActiveObject(self) -> str:
         return self._object.name
 
-    def getObjectArray(self) -> ObjectArrayType:  # FIXME remove
+    def getActiveObjectArray(self) -> ObjectArrayType:
         return self._object.getArray()
 
     def update(self, observable: Observable) -> None:

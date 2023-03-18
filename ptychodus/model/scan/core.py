@@ -128,11 +128,13 @@ class ScanRepositoryPresenter(Observable, Observer):
         writer = self._fileWriterChooser.getCurrentStrategy()
         writer.write(filePath, [item])
 
-        # FIXME setFileInfo
-        if isinstance(item, TabularScanRepositoryItem):
-            if item.getFileInfo() is None:
+        innerItem = item._item
+
+        # TODO test this
+        if isinstance(innerItem, TabularScanRepositoryItem):
+            if innerItem.getFileInfo() is None:
                 fileInfo = ScanFileInfo(fileType, filePath)
-                item.setFileInfo(fileInfo)
+                innerItem.setFileInfo(fileInfo)
 
     def canRemoveScan(self, name: str) -> bool:
         return self._repository.canRemoveItem(name)
