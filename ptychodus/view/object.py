@@ -1,10 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHeaderView, QHBoxLayout, QMenu,
-                             QPushButton, QSpinBox, QTableView, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QVBoxLayout, QWidget)
 
-from .widgets import LengthWidget
+from .widgets import LengthWidget, RepositoryWidget
 
 
 class ObjectView(QGroupBox):
@@ -26,60 +25,12 @@ class ObjectView(QGroupBox):
         return view
 
 
-class ObjectButtonBox(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.insertMenu = QMenu()
-        self.insertButton = QPushButton('Insert')
-        self.saveButton = QPushButton('Save')
-        self.editButton = QPushButton('Edit')
-        self.removeButton = QPushButton('Remove')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectButtonBox:
-        view = cls(parent)
-
-        view.insertButton.setMenu(view.insertMenu)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.insertButton)
-        layout.addWidget(view.saveButton)
-        layout.addWidget(view.editButton)
-        layout.addWidget(view.removeButton)
-        view.setLayout(layout)
-
-        return view
-
-
-class ObjectEstimatesView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Object Estimates', parent)
-        self.tableView = QTableView()
-        self.buttonBox = ObjectButtonBox.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectEstimatesView:
-        view = cls(parent)
-
-        view.tableView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.tableView)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-
 class ObjectParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.objectView = ObjectView.createInstance()
-        self.estimatesView = ObjectEstimatesView.createInstance()
+        self.repositoryWidget = RepositoryWidget.createInstance('Object Estimates')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectParametersView:
@@ -87,7 +38,7 @@ class ObjectParametersView(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(view.objectView)
-        layout.addWidget(view.estimatesView)
+        layout.addWidget(view.repositoryWidget)
         view.setLayout(layout)
 
         return view

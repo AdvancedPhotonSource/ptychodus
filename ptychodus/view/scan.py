@@ -1,26 +1,22 @@
 from __future__ import annotations
 from typing import Generic, Optional, TypeVar
 
-from PyQt5.QtCore import QEvent, QObject
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QHeaderView, QHBoxLayout, QLabel, QMenu, QPushButton,
-                             QSpinBox, QTableView, QVBoxLayout, QWidget)
+                             QGroupBox, QLabel, QSpinBox, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib
 
-from .widgets import AngleWidget, LengthWidget
+from .widgets import AngleWidget, LengthWidget, RepositoryWidget
 
 __all__ = [
     'CartesianScanView',
     'LissajousScanView',
-    'ScanButtonBox',
     'ScanEditorDialog',
     'ScanParametersView',
     'ScanPlotView',
-    'ScanPositionDataView',
     'ScanTransformView',
     'SpiralScanView',
     'TabularScanView',
@@ -189,66 +185,18 @@ class ScanEditorDialog(Generic[T], QDialog):
             self.reject()
 
 
-class ScanButtonBox(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.insertMenu = QMenu()
-        self.insertButton = QPushButton('Insert')
-        self.saveButton = QPushButton('Save')
-        self.editButton = QPushButton('Edit')
-        self.removeButton = QPushButton('Remove')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanButtonBox:
-        view = cls(parent)
-
-        view.insertButton.setMenu(view.insertMenu)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.insertButton)
-        layout.addWidget(view.saveButton)
-        layout.addWidget(view.editButton)
-        layout.addWidget(view.removeButton)
-        view.setLayout(layout)
-
-        return view
-
-
-class ScanPositionDataView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Position Data', parent)
-        self.tableView = QTableView()
-        self.buttonBox = ScanButtonBox.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanPositionDataView:
-        view = cls(parent)
-
-        view.tableView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.tableView)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-
 class ScanParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.positionDataView = ScanPositionDataView.createInstance()
+        self.repositoryWidget = RepositoryWidget.createInstance('Position Data')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ScanParametersView:
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.positionDataView)
+        layout.addWidget(view.repositoryWidget)
         view.setLayout(layout)
 
         return view

@@ -17,7 +17,7 @@ from .active import ActiveScan
 from .api import ScanAPI
 from .indexFilters import ScanIndexFilterFactory
 from .itemFactory import ScanRepositoryItemFactory
-from .itemRepository import ScanRepository, ScanRepositoryItem
+from .itemRepository import ScanRepository, TransformedScanRepositoryItem
 from .settings import ScanSettings
 from .streaming import StreamingScanBuilder
 from .tabular import ScanFileInfo, TabularScanRepositoryItem
@@ -27,13 +27,14 @@ logger = logging.getLogger(__name__)
 
 class ScanRepositoryItemPresenter(Scan, Observer):
 
-    def __init__(self, name: str, item: ScanRepositoryItem) -> None:
+    def __init__(self, name: str, item: TransformedScanRepositoryItem) -> None:
         super().__init__()
         self._name = name
         self._item = item
 
     @classmethod
-    def createInstance(cls, name: str, item: ScanRepositoryItem) -> ScanRepositoryItemPresenter:
+    def createInstance(cls, name: str,
+                       item: TransformedScanRepositoryItem) -> ScanRepositoryItemPresenter:
         presenter = cls(name, item)
         item.addObserver(presenter)
         return presenter
