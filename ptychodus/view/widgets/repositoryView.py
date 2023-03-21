@@ -32,7 +32,7 @@ class RepositoryButtonBox(QWidget):
         return view
 
 
-class RepositoryWidget(QGroupBox):
+class RepositoryView(QGroupBox):
 
     def __init__(self, title: str, parent: Optional[QWidget]) -> None:
         super().__init__(title, parent)
@@ -40,7 +40,7 @@ class RepositoryWidget(QGroupBox):
         self.buttonBox = RepositoryButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, title: str, parent: Optional[QWidget] = None) -> RepositoryWidget:
+    def createInstance(cls, title: str, parent: Optional[QWidget] = None) -> RepositoryView:
         view = cls(title, parent)
 
         view.tableView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)

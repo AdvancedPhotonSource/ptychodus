@@ -3,10 +3,10 @@ from typing import Optional
 
 from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QVBoxLayout, QWidget)
 
-from .widgets import LengthWidget, RepositoryWidget
+from .widgets import LengthWidget, RepositoryView
 
 
-class ObjectView(QGroupBox):
+class ObjectParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
@@ -14,7 +14,7 @@ class ObjectView(QGroupBox):
         self.pixelSizeYWidget = LengthWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectParametersView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -25,20 +25,20 @@ class ObjectView(QGroupBox):
         return view
 
 
-class ObjectParametersView(QWidget):
+class ObjectView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.objectView = ObjectView.createInstance()
-        self.repositoryWidget = RepositoryWidget.createInstance('Object Estimates')
+        self.parametersView = ObjectParametersView.createInstance()
+        self.repositoryView = RepositoryView.createInstance('Repository')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectView:
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.objectView)
-        layout.addWidget(view.repositoryWidget)
+        layout.addWidget(view.parametersView)
+        layout.addWidget(view.repositoryView)
         view.setLayout(layout)
 
         return view

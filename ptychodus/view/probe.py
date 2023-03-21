@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonB
 from .widgets import DecimalLineEdit, EnergyWidget, LengthWidget, SemiautomaticSpinBox
 
 
-class ProbeView(QGroupBox):
+class ProbeParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
@@ -17,7 +17,7 @@ class ProbeView(QGroupBox):
         self.wavelengthWidget = LengthWidget.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeParametersView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -179,19 +179,19 @@ class ProbeModesView(QGroupBox):
         return view
 
 
-class ProbeParametersView(QWidget):
+class ProbeView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.probeView = ProbeView.createInstance()
+        self.parametersView = ProbeParametersView.createInstance()
         self.modesView = ProbeModesView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeView:
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.probeView)
+        layout.addWidget(view.parametersView)
         layout.addWidget(view.modesView)
         view.setLayout(layout)
 

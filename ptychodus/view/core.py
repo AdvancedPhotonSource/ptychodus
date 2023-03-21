@@ -52,15 +52,15 @@ class ViewCore(QMainWindow):
         self.detectorImageView = ImageView.createInstance()
 
         self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
-        self.scanParametersView = ScanParametersView.createInstance()
+        self.scanView = ScanView.createInstance()
         self.scanPlotView = ScanPlotView.createInstance()
 
         self.probeAction = self.navigationToolBar.addAction(QIcon(':/icons/probe'), 'Probe')
-        self.probeParametersView = ProbeParametersView.createInstance()
+        self.probeView = ProbeView.createInstance()
         self.probeImageView = ImageView.createInstance()
 
         self.objectAction = self.navigationToolBar.addAction(QIcon(':/icons/object'), 'Object')
-        self.objectParametersView = ObjectParametersView.createInstance()
+        self.objectView = ObjectView.createInstance()
         self.objectImageView = ImageView.createInstance()
 
         self.reconstructorAction = self.navigationToolBar.addAction(QIcon(':/icons/reconstructor'),
@@ -110,9 +110,9 @@ class ViewCore(QMainWindow):
         view.parametersWidget.addWidget(view.settingsParametersView)
         view.parametersWidget.addWidget(view.dataParametersView)
         view.parametersWidget.addWidget(view.detectorParametersView)
-        view.parametersWidget.addWidget(view.scanParametersView)
-        view.parametersWidget.addWidget(view.probeParametersView)
-        view.parametersWidget.addWidget(view.objectParametersView)
+        view.parametersWidget.addWidget(view.scanView)
+        view.parametersWidget.addWidget(view.probeView)
+        view.parametersWidget.addWidget(view.objectView)
         view.parametersWidget.addWidget(view.reconstructorParametersView)
         view.parametersWidget.addWidget(view.workflowParametersView)
         view.parametersWidget.addWidget(view.automationParametersView)

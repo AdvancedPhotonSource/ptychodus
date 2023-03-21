@@ -9,15 +9,15 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 import matplotlib
 
-from .widgets import AngleWidget, LengthWidget, RepositoryWidget
+from .widgets import AngleWidget, LengthWidget, RepositoryView
 
 __all__ = [
     'CartesianScanView',
     'LissajousScanView',
     'ScanEditorDialog',
-    'ScanParametersView',
     'ScanPlotView',
     'ScanTransformView',
+    'ScanView',
     'SpiralScanView',
     'TabularScanView',
 ]
@@ -185,18 +185,18 @@ class ScanEditorDialog(Generic[T], QDialog):
             self.reject()
 
 
-class ScanParametersView(QWidget):
+class ScanView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.repositoryWidget = RepositoryWidget.createInstance('Position Data')
+        self.repositoryView = RepositoryView.createInstance('Repository')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanView:
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.repositoryWidget)
+        layout.addWidget(view.repositoryView)
         view.setLayout(layout)
 
         return view

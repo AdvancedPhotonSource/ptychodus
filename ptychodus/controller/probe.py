@@ -15,15 +15,16 @@ from .data import FileDialogFactory
 from .image import ImageController
 
 
-class ProbeController(Observer):
+class ProbeParametersController(Observer):
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeView) -> None:
+    def __init__(self, presenter: ProbePresenter, view: ProbeParametersView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ProbeView) -> ProbeController:
+    def createInstance(cls, presenter: ProbePresenter,
+                       view: ProbeParametersView) -> ProbeParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -171,26 +172,26 @@ class ProbeModesTableModel(QAbstractTableModel):
         return 2
 
 
-class ProbeParametersController(Observer):
+class ProbeController(Observer):
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeParametersView,
-                 imagePresenter: ImagePresenter, imageView: ImageView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, presenter: ProbePresenter, view: ProbeView, imagePresenter: ImagePresenter,
+                 imageView: ImageView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._imagePresenter = imagePresenter
         self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
-        self._probeController = ProbeController.createInstance(presenter, view.probeView)
+        self._parametersController = ProbeParametersController.createInstance(
+            presenter, view.parametersView)
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
         self._modesTableModel = ProbeModesTableModel(presenter)
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ProbeParametersView,
+    def createInstance(cls, presenter: ProbePresenter, view: ProbeView,
                        imagePresenter: ImagePresenter, imageView: ImageView,
-                       fileDialogFactory: FileDialogFactory) -> ProbeParametersController:
+                       fileDialogFactory: FileDialogFactory) -> ProbeController:
         controller = cls(presenter, view, imagePresenter, imageView, fileDialogFactory)
         presenter.addObserver(controller)
 

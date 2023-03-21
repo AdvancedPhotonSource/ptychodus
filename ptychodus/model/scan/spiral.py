@@ -20,11 +20,11 @@ class SpiralScanRepositoryItem(ScanRepositoryItem):
 
     @property
     def name(self) -> str:
-        return self.initializer
+        return 'Fermat'
 
     @property
     def initializer(self) -> str:
-        return 'Fermat'
+        return self.NAME
 
     @property
     def canActivate(self) -> bool:

@@ -5,7 +5,7 @@ from .decimalSlider import DecimalSlider
 from .energyWidget import EnergyWidget
 from .lengthWidget import LengthWidget
 from .progressBarItemDelegate import ProgressBarItemDelegate
-from .repositoryWidget import RepositoryWidget
+from .repositoryView import RepositoryView
 from .semiautomaticSpinBox import SemiautomaticSpinBox
 from .uuidLineEdit import UUIDLineEdit
 
@@ -17,7 +17,7 @@ __all__ = [
     'EnergyWidget',
     'LengthWidget',
     'ProgressBarItemDelegate',
-    'RepositoryWidget',
+    'RepositoryView',
     'SemiautomaticSpinBox',
     'UUIDLineEdit',
 ]

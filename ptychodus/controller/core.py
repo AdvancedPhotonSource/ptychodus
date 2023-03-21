@@ -9,7 +9,7 @@ from .automation import AutomationController
 from .data import DataParametersController, FileDialogFactory
 from .detector import (DatasetImageController, DatasetParametersController, DetectorController)
 from .object import ObjectImageController, ObjectController
-from .probe import ProbeImageController, ProbeParametersController
+from .probe import ProbeImageController, ProbeController
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import ReconstructorParametersController, ReconstructorPlotController
@@ -46,16 +46,17 @@ class ControllerCore:
         self._datasetImageController = DatasetImageController.createInstance(
             model.activeDiffractionPatternPresenter, model.detectorImagePresenter,
             view.detectorImageView, self._fileDialogFactory)
-        self._probeParametersController = ProbeParametersController.createInstance(
-            model.probePresenter, view.probeParametersView, model.probeImagePresenter,
-            view.probeImageView, self._fileDialogFactory)
+        self._probeController = ProbeController.createInstance(model.probePresenter,
+                                                               view.probeView,
+                                                               model.probeImagePresenter,
+                                                               view.probeImageView,
+                                                               self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepositoryPresenter,
-                                                             view.scanParametersView,
-                                                             view.scanPlotView,
+                                                             view.scanView, view.scanPlotView,
                                                              self._fileDialogFactory)
         self._objectController = ObjectController.createInstance(model.objectRepositoryPresenter,
                                                                  model.objectImagePresenter,
-                                                                 view.objectParametersView,
+                                                                 view.objectView,
                                                                  view.objectImageView,
                                                                  self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
