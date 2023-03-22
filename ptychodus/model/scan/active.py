@@ -21,7 +21,7 @@ class ActiveScan(Scan, Observer):
         self._factory = factory
         self._repository = repository
         self._reinitObservable = reinitObservable
-        self._item: ScanRepositoryItem = SnakeScanRepositoryItem()
+        self._item: TransformedScanRepositoryItem = factory.createItem('Snake')[0]
         self._name = str()
 
     @classmethod
@@ -65,12 +65,7 @@ class ActiveScan(Scan, Observer):
 
     @property
     def untransformed(self) -> Scan:
-        item: Scan = self._item
-
-        if isinstance(self._item, TransformedScanRepositoryItem):
-            item = self._item._item  # TODO clean up
-
-        return item
+        return self._item.untransformed
 
     def __iter__(self) -> Iterator[int]:
         return iter(self._item)

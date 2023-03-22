@@ -1,10 +1,13 @@
+from __future__ import annotations
 from abc import abstractmethod, abstractproperty
 from collections.abc import Iterator
 from decimal import Decimal
+from typing import Optional
 import logging
 
 import numpy
 
+from ...api.observer import Observable, Observer
 from ...api.scan import Scan, ScanIndexFilter, ScanPoint, ScanPointTransform
 from ..itemRepository import ItemRepository
 from .indexFilters import ScanIndexFilterFactory
@@ -37,7 +40,7 @@ class ScanRepositoryItem(Scan):
         pass
 
 
-class TransformedScanRepositoryItem(ScanRepositoryItem):
+class TransformedScanRepositoryItem(ScanRepositoryItem, Observer):
 
     def __init__(self, rng: numpy.random.Generator, item: ScanRepositoryItem,
                  indexFilterFactory: ScanIndexFilterFactory) -> None:
@@ -49,10 +52,25 @@ class TransformedScanRepositoryItem(ScanRepositoryItem):
         self._transform = ScanPointTransform.PXPY
         self._jitterRadiusInMeters = Decimal()
         self._centroid = ScanPoint(Decimal(), Decimal())
+        self._name: Optional[str] = None
+
+    @classmethod
+    def createInstance(
+            cls, rng: numpy.random.Generator, item: ScanRepositoryItem,
+            indexFilterFactory: ScanIndexFilterFactory) -> TransformedScanRepositoryItem:
+        transformedItem = cls(rng, item, indexFilterFactory)
+        item.addObserver(transformedItem)
+        return transformedItem
 
     @property
     def name(self) -> str:
-        return self._item.name
+        return self._item.name if self._name is None else self._name
+
+    @name.setter
+    def name(self, name: str) -> None:
+        if self._name != name:
+            self._name = name
+            self.notifyObservers()
 
     @property
     def initializer(self) -> str:
@@ -114,6 +132,10 @@ class TransformedScanRepositoryItem(ScanRepositoryItem):
 
     def __len__(self) -> int:
         return sum(1 for index in iter(self))
+
+    @property
+    def untransformed(self) -> ScanRepositoryItem:
+        return self._item
 
     def getIndexFilterNameList(self) -> list[str]:
         return self._indexFilterFactory.getIndexFilterNameList()
@@ -182,6 +204,10 @@ class TransformedScanRepositoryItem(ScanRepositoryItem):
         '''sets the y centroid'''
         if self._centroid.y != value:
             self._centroid = ScanPoint(self._centroid.x, value)
+            self.notifyObservers()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._item:
             self.notifyObservers()
 
 

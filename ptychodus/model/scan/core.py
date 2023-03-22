@@ -25,46 +25,6 @@ from .tabular import ScanFileInfo, TabularScanRepositoryItem
 logger = logging.getLogger(__name__)
 
 
-class ScanRepositoryItemPresenter(Scan, Observer):
-
-    def __init__(self, name: str, item: TransformedScanRepositoryItem) -> None:
-        super().__init__()
-        self._name = name
-        self._item = item
-
-    @classmethod
-    def createInstance(cls, name: str,
-                       item: TransformedScanRepositoryItem) -> ScanRepositoryItemPresenter:
-        presenter = cls(name, item)
-        item.addObserver(presenter)
-        return presenter
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def initializer(self) -> str:
-        return self._item.initializer
-
-    @property
-    def canActivate(self) -> bool:
-        return self._item.canActivate
-
-    def __iter__(self) -> Iterator[int]:
-        return iter(self._item)
-
-    def __getitem__(self, index: int) -> ScanPoint:
-        return self._item[index]
-
-    def __len__(self) -> int:
-        return len(self._item)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._item:
-            self.notifyObservers()
-
-
 class ScanRepositoryPresenter(Observable, Observer):
 
     def __init__(self, repository: ScanRepository, itemFactory: ScanRepositoryItemFactory,
@@ -74,7 +34,7 @@ class ScanRepositoryPresenter(Observable, Observer):
         self._itemFactory = itemFactory
         self._scanAPI = scanAPI
         self._fileWriterChooser = fileWriterChooser
-        self._itemPresenterList: list[ScanRepositoryItemPresenter] = list()
+        self._itemNameList: list[str] = list()
 
     @classmethod
     def createInstance(
@@ -86,14 +46,15 @@ class ScanRepositoryPresenter(Observable, Observer):
         repository.addObserver(presenter)
         return presenter
 
-    def __iter__(self) -> Iterator[ScanRepositoryItemPresenter]:
-        return iter(self._itemPresenterList)
+    def __iter__(self) -> Iterator[TransformedScanRepositoryItem]:
+        return iter(self._repository.values())
 
-    def __getitem__(self, index: int) -> ScanRepositoryItemPresenter:
-        return self._itemPresenterList[index]
+    def __getitem__(self, index: int) -> TransformedScanRepositoryItem:
+        itemName = self._itemNameList[index]
+        return self._repository[itemName]
 
     def __len__(self) -> int:
-        return len(self._itemPresenterList)
+        return len(self._itemNameList)
 
     def getInitializerNameList(self) -> list[str]:
         return self._itemFactory.getInitializerNameList()
@@ -144,21 +105,13 @@ class ScanRepositoryPresenter(Observable, Observer):
         self._repository.removeItem(name)
 
     def _updateItemPresenterList(self) -> None:
-        itemPresenterList: list[ScanRepositoryItemPresenter] = list()
-        itemPresenterNames: set[str] = set()
+        itemNameList: list[str] = list()
 
-        for itemPresenter in self._itemPresenterList:
-            if itemPresenter.name in self._repository:
-                itemPresenterList.append(itemPresenter)
-                itemPresenterNames.add(itemPresenter.name)
+        for itemName, scan in self._repository.items():
+            scan.name = itemName
+            itemNameList.append(itemName)
 
-        for name, item in self._repository.items():
-            if name not in itemPresenterNames:
-                itemPresenter = ScanRepositoryItemPresenter.createInstance(name, item)
-                itemPresenterList.append(itemPresenter)
-
-        itemPresenterList.sort(key=lambda item: item.name)
-        self._itemPresenterList = itemPresenterList
+        self._itemNameList = itemNameList
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:

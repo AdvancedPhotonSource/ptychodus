@@ -36,7 +36,8 @@ class ScanRepositoryItemFactory:
         }
 
     def _transformed(self, item: ScanRepositoryItem) -> TransformedScanRepositoryItem:
-        transformedItem = TransformedScanRepositoryItem(self._rng, item, self._indexFilterFactory)
+        transformedItem = TransformedScanRepositoryItem.createInstance(
+            self._rng, item, self._indexFilterFactory)
         transformedItem.syncFromSettings(self._settings)
         return transformedItem
 
