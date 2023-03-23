@@ -12,9 +12,9 @@ from ...api.image import ImageExtent
 from ...api.object import ObjectArrayType, ObjectFileReader, ObjectFileWriter
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
-from ...api.scan import Scan
 from ...api.settings import SettingsRegistry
 from ..probe import Apparatus, ProbeSizer
+from ..scan import ScanSizer
 from ..statefulCore import StateDataType, StatefulCore
 from .active import ActiveObject
 from .api import ObjectAPI
@@ -218,11 +218,11 @@ class ObjectPresenter(Observable, Observer):
 class ObjectCore(StatefulCore):
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
-                 apparatus: Apparatus, scan: Scan, probeSizer: ProbeSizer,
+                 apparatus: Apparatus, scanSizer: ScanSizer, probeSizer: ProbeSizer,
                  fileReaderChooser: PluginChooser[ObjectFileReader],
                  fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
         self._settings = ObjectSettings.createInstance(settingsRegistry)
-        self.sizer = ObjectSizer.createInstance(apparatus, scan, probeSizer)
+        self.sizer = ObjectSizer.createInstance(self._settings, apparatus, scanSizer, probeSizer)
         self._factory = ObjectRepositoryItemFactory(rng, self._settings, self.sizer,
                                                     fileReaderChooser)
         self._repository = ObjectRepository()

@@ -30,6 +30,15 @@ class ScanSettings(Observable, Observer):
         self.stepSizeYInMeters = settingsGroup.createRealEntry('StepSizeYInMeters', '1e-6')
         self.indexFilter = settingsGroup.createStringEntry('IndexFilter', 'ALL')
         self.transform = settingsGroup.createStringEntry('Transform', '+X+Y')
+        self.expandBoundingBox = settingsGroup.createBooleanEntry('ExpandBoundingBox', False)
+        self.boundingBoxMinimumXInMeters = settingsGroup.createRealEntry(
+            'BoundingBoxMinimumXInMeters', '0')
+        self.boundingBoxMaximumXInMeters = settingsGroup.createRealEntry(
+            'BoundingBoxMaximumXInMeters', '1e-5')
+        self.boundingBoxMinimumYInMeters = settingsGroup.createRealEntry(
+            'BoundingBoxMinimumYInMeters', '0')
+        self.boundingBoxMaximumYInMeters = settingsGroup.createRealEntry(
+            'BoundingBoxMaximumYInMeters', '1e-5')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ScanSettings:

@@ -3,6 +3,7 @@ from .cartesian import CartesianScanRepositoryItem
 from .core import ScanCore, ScanPresenter, ScanRepositoryPresenter
 from .itemRepository import ScanRepositoryItem, TransformedScanRepositoryItem
 from .lissajous import LissajousScanRepositoryItem
+from .sizer import ScanSizer
 from .spiral import SpiralScanRepositoryItem
 from .tabular import TabularScanRepositoryItem
 
@@ -14,6 +15,7 @@ __all__ = [
     'ScanPresenter',
     'ScanRepositoryItem',
     'ScanRepositoryPresenter',
+    'ScanSizer',
     'SpiralScanRepositoryItem',
     'TabularScanRepositoryItem',
     'TransformedScanRepositoryItem',

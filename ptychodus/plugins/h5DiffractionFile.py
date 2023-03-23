@@ -13,7 +13,7 @@ import numpy
 from ptychodus.api.data import (DiffractionPatternData, DiffractionDataset, DiffractionFileReader,
                                 DiffractionMetadata, DiffractionPatternArray,
                                 DiffractionPatternState, SimpleDiffractionDataset)
-from ptychodus.api.geometry import Vector2D
+from ptychodus.api.geometry import Array2D
 from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -171,7 +171,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
-                        detectorNumberOfPixels=Vector2D[int](detectorWidth, detectorHeight),
+                        detectorNumberOfPixels=Array2D[int](detectorWidth, detectorHeight),
                         filePath=filePath,
                     )
 

@@ -162,7 +162,7 @@ class ObjectController(Observer):
             #    cartesianDialog.open()
             #else:
             #    logger.debug(f'Unknown category \"{category}\"')
-            pass  # FIXME edit object
+            pass  # FIXME edit object initializer parameters
 
     def _removeSelectedObject(self) -> None:
         current = self._view.repositoryView.tableView.currentIndex()

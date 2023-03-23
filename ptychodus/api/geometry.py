@@ -1,14 +1,13 @@
 from __future__ import annotations
-from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Generic, overload, TypeVar, Union
+from typing import Generic, TypeVar
 
 T = TypeVar('T', int, float, Decimal)
 
 
 @dataclass(frozen=True)
-class Vector2D(Generic[T]):
+class Array2D(Generic[T]):
     x: T
     y: T
 
@@ -26,12 +25,8 @@ class Interval(Generic[T]):
     def clamp(self, value: T) -> T:
         return max(self.lower, min(value, self.upper))
 
-    def hull(self, value: T) -> None:
-        if value < self.lower:
-            self.lower = value
-
-        if value > self.upper:
-            self.upper = value
+    def hull(self, value: T) -> Interval[T]:
+        return Interval[T](min(self.lower, value), max(self.upper, value))
 
     @property
     def length(self) -> T:
@@ -50,24 +45,10 @@ class Interval(Generic[T]):
         return f'{type(self).__name__}({self.lower}, {self.upper})'
 
 
-class Box(Sequence[Interval[T]]):
+@dataclass(frozen=True)
+class Box2D(Generic[T]):
+    rangeX: Interval[T]
+    rangeY: Interval[T]
 
-    def __init__(self, intervals: Iterable[Interval[T]]) -> None:
-        self._intervalList: list[Interval[T]] = [x for x in intervals]
-
-    @overload
-    def __getitem__(self, index: int) -> Interval[T]:
-        ...
-
-    @overload
-    def __getitem__(self, index: slice) -> Box[T]:
-        ...
-
-    def __getitem__(self, index: Union[int, slice]) -> Union[Interval[T], Box[T]]:
-        if isinstance(index, slice):
-            return Box(self._intervalList[index])
-        else:
-            return self._intervalList[index]
-
-    def __len__(self) -> int:
-        return len(self._intervalList)
+    def hull(self, x: T, y: T) -> Box2D[T]:
+        return Box2D[T](self.rangeX.hull(x), self.rangeY.hull(y))

@@ -19,6 +19,7 @@ from .indexFilters import ScanIndexFilterFactory
 from .itemFactory import ScanRepositoryItemFactory
 from .itemRepository import ScanRepository, TransformedScanRepositoryItem
 from .settings import ScanSettings
+from .sizer import ScanSizer
 from .streaming import StreamingScanBuilder
 from .tabular import ScanFileInfo, TabularScanRepositoryItem
 
@@ -168,6 +169,7 @@ class ScanCore(StatefulCore):
                                                       self._indexFilterFactory, fileReaderChooser)
         self.scan = ActiveScan.createInstance(self._settings, self._itemFactory, self._repository,
                                               settingsRegistry)
+        self.sizer = ScanSizer.createInstance(self._settings, self.scan)
         self.scanAPI = ScanAPI(self._builder, self._itemFactory, self._repository, self.scan)
         self.repositoryPresenter = ScanRepositoryPresenter.createInstance(
             self._repository, self._itemFactory, self.scanAPI, fileWriterChooser)

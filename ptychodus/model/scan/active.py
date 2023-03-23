@@ -89,7 +89,7 @@ class ActiveScan(Scan, Observer):
         self.setActiveScan(self._settings.activeScan.value)
 
     def _syncToSettings(self) -> None:
-        self._settings.activeScan.value = self._item.name
+        self._settings.activeScan.value = self.untransformed.name
         self._settings.initializer.value = self._item.initializer
         self._item.syncToSettings(self._settings)
 

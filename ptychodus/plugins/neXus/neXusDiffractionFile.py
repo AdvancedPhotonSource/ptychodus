@@ -14,7 +14,7 @@ from .velociprobeScanFile import VelociprobeScanFileReader
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, DiffractionPatternData,
                                 DiffractionPatternState, SimpleDiffractionDataset)
-from ptychodus.api.geometry import Vector2D
+from ptychodus.api.geometry import Array2D
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -215,17 +215,17 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     logger.info(f'File {filePath} is not a NeXus data file.')
                 else:
                     detector = entry.instrument.detector
-                    detectorPixelSizeInMeters = Vector2D[Decimal](
+                    detectorPixelSizeInMeters = Array2D[Decimal](
                         Decimal(repr(detector.x_pixel_size_m)),
                         Decimal(repr(detector.y_pixel_size_m)),
                     )
-                    cropCenterInPixels = Vector2D[int](
+                    cropCenterInPixels = Array2D[int](
                         int(round(detector.beam_center_x_px)),
                         int(round(detector.beam_center_y_px)),
                     )
 
                     detectorSpecific = detector.detectorSpecific
-                    detectorNumberOfPixels = Vector2D[int](
+                    detectorNumberOfPixels = Array2D[int](
                         int(detectorSpecific.x_pixels_in_detector),
                         int(detectorSpecific.y_pixels_in_detector),
                     )

@@ -87,7 +87,7 @@ class ModelCore:
                                     self._pluginRegistry.buildProbeFileWriterChooser())
         self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
         self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
-                                      self._scanCore.scan, self._probeCore.sizer,
+                                      self._scanCore.sizer, self._probeCore.sizer,
                                       self._pluginRegistry.buildObjectFileReaderChooser(),
                                       self._pluginRegistry.buildObjectFileWriterChooser())
         self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())

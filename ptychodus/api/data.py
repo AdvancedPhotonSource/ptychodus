@@ -10,7 +10,7 @@ from typing import overload, Any, Optional, Union
 import numpy
 import numpy.typing
 
-from .geometry import Vector2D
+from .geometry import Array2D
 from .observer import Observable
 from .tree import SimpleTreeNode
 
@@ -81,9 +81,9 @@ class DiffractionMetadata:
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype[numpy.integer[Any]]
     detectorDistanceInMeters: Optional[Decimal] = None
-    detectorNumberOfPixels: Optional[Vector2D[int]] = None
-    detectorPixelSizeInMeters: Optional[Vector2D[Decimal]] = None
-    cropCenterInPixels: Optional[Vector2D[int]] = None
+    detectorNumberOfPixels: Optional[Array2D[int]] = None
+    detectorPixelSizeInMeters: Optional[Array2D[Decimal]] = None
+    cropCenterInPixels: Optional[Array2D[int]] = None
     probeEnergyInElectronVolts: Optional[Decimal] = None
     filePath: Optional[Path] = None
 
