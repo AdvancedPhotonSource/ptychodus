@@ -85,6 +85,7 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         super().__init__()
         self._settings = settings
         self._trainer: Optional[TrainableReconstructor] = None
+        self._fileFilterList: list[str] = ['NumPy Binary Files (*.npy)']
 
     @classmethod
     def createInstance(cls, settings: PtychoNNTrainingSettings) -> PtychoNNTrainingPresenter:
@@ -172,6 +173,15 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
     def setStatusIntervalInEpochs(self, value: int) -> None:
         self._settings.statusIntervalInEpochs.value = value
+
+    def getTrainingDataFileFilterList(self) -> list[str]:
+        return self._fileFilterList
+
+    def getTrainingDataFileFilter(self) -> str:
+        return self._fileFilterList[0]
+
+    def saveTrainingData(self, filePath: Path) -> None:
+        print('Save training data!')  # FIXME
 
     def train(self, trainingDirPath: Path) -> None:
         logger.debug(f'Train using data in {trainingDirPath}.')

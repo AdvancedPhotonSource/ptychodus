@@ -100,12 +100,30 @@ class PtychoNNTrainingParametersView(QGroupBox):
         return view
 
 
+class PtychoNNTrainingDataView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Training Data', parent)
+        self.exportButton = QPushButton('Export')
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNTrainingDataView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow(view.exportButton)
+        view.setLayout(layout)
+
+        return view
+
+
 class PtychoNNParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.modelParametersView = PtychoNNModelParametersView.createInstance()
         self.trainingParametersView = PtychoNNTrainingParametersView.createInstance()
+        self.trainingDataView = PtychoNNTrainingDataView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNParametersView:
@@ -114,6 +132,7 @@ class PtychoNNParametersView(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(view.modelParametersView)
         layout.addWidget(view.trainingParametersView)
+        layout.addWidget(view.trainingDataView)
         layout.addStretch()
         view.setLayout(layout)
 

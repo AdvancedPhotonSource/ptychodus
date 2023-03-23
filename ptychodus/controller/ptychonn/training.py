@@ -4,7 +4,8 @@ from pathlib import Path
 
 from ...api.observer import Observable, Observer
 from ...model.ptychonn import PtychoNNTrainingPresenter
-from ...view import PtychoNNOutputParametersView, PtychoNNTrainingParametersView
+from ...view import (PtychoNNOutputParametersView, PtychoNNTrainingDataView,
+                     PtychoNNTrainingParametersView)
 from ..data import FileDialogFactory
 
 
@@ -144,3 +145,29 @@ class PtychoNNTrainingParametersController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
+
+
+class PtychoNNTrainingDataController:
+
+    def __init__(self, presenter: PtychoNNTrainingPresenter, view: PtychoNNTrainingDataView,
+                 fileDialogFactory: FileDialogFactory) -> None:
+        self._presenter = presenter
+        self._view = view
+        self._fileDialogFactory = fileDialogFactory
+
+    @classmethod
+    def createInstance(cls, presenter: PtychoNNTrainingPresenter, view: PtychoNNTrainingDataView,
+                       fileDialogFactory: FileDialogFactory) -> PtychoNNTrainingDataController:
+        controller = cls(presenter, view, fileDialogFactory)
+        view.exportButton.clicked.connect(controller._exportTrainingData)
+        return controller
+
+    def _exportTrainingData(self) -> None:
+        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+            self._view,
+            'Export Training Data',
+            nameFilters=self._presenter.getTrainingDataFileFilterList(),
+            selectedNameFilter=self._presenter.getTrainingDataFileFilter())
+
+        if filePath:
+            self._presenter.saveTrainingData(filePath)
