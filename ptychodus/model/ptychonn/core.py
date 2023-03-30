@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import Final, Generator, Optional
 import logging
 
+from scipy.interpolate import RegularGridInterpolator
 import numpy
+import numpy.typing
 
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
@@ -14,7 +16,8 @@ from ...api.scan import Scan
 from ...api.settings import SettingsRegistry, SettingsGroup
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
-from ..probe import Apparatus
+from ..probe import Probe
+from ..scan import ScanAPI
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 from .trainable import TrainableReconstructor
 
@@ -81,15 +84,24 @@ class PtychoNNModelPresenter(Observable, Observer):
 class PtychoNNTrainingPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, settings: PtychoNNTrainingSettings) -> None:
+    def __init__(self, settings: PtychoNNTrainingSettings,
+                 diffractionDataset: ActiveDiffractionDataset, scan: Scan, scanAPI: ScanAPI,
+                 probe: Probe, objectAPI: ObjectAPI) -> None:
         super().__init__()
         self._settings = settings
+        self._diffractionDataset = diffractionDataset
+        self._scan = scan
+        self._scanAPI = scanAPI
+        self._probe = probe
+        self._objectAPI = objectAPI
         self._trainer: Optional[TrainableReconstructor] = None
-        self._fileFilterList: list[str] = ['NumPy Binary Files (*.npy)']
+        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
 
     @classmethod
-    def createInstance(cls, settings: PtychoNNTrainingSettings) -> PtychoNNTrainingPresenter:
-        presenter = cls(settings)
+    def createInstance(cls, settings: PtychoNNTrainingSettings,
+                       diffractionDataset: ActiveDiffractionDataset, scan: Scan, scanAPI: ScanAPI,
+                       probe: Probe, objectAPI: ObjectAPI) -> PtychoNNTrainingPresenter:
+        presenter = cls(settings, diffractionDataset, scan, scanAPI, probe, objectAPI)
         settings.addObserver(presenter)
         return presenter
 
@@ -180,8 +192,59 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def getTrainingDataFileFilter(self) -> str:
         return self._fileFilterList[0]
 
+    def _createAxis(self, ticks: int, tickSize: float,
+                    center: float) -> numpy.typing.NDArray[numpy.float_]:
+        axis = numpy.arange(ticks) * tickSize
+        axis += center - axis.mean()
+        return axis
+
     def saveTrainingData(self, filePath: Path) -> None:
-        print('Save training data!')  # FIXME
+        object_ = self._objectAPI.getActiveObjectArray()
+        pixelSizeXInMeters = float(self._objectAPI.getPixelSizeXInMeters())
+        pixelSizeYInMeters = float(self._objectAPI.getPixelSizeYInMeters())
+
+        scanBoundingBoxInMeters = self._scanAPI.getBoundingBoxInMeters()
+        scanCentroidInMeters = scanBoundingBoxInMeters.centroid
+        pixelPositionsXInMeters = self._createAxis(object_.shape[-1], pixelSizeXInMeters,
+                                                   float(scanCentroidInMeters.x))
+        pixelPositionsYInMeters = self._createAxis(object_.shape[-2], pixelSizeYInMeters,
+                                                   float(scanCentroidInMeters.y))
+
+        interp = RegularGridInterpolator((pixelPositionsYInMeters, pixelPositionsXInMeters),
+                                         object_,
+                                         method='pchip')
+
+        diffractionData = self._diffractionDataset.getAssembledData()
+        scanPositionsXInMeters: list[float] = list()
+        scanPositionsYInMeters: list[float] = list()
+        patches = numpy.zeros_like(diffractionData, dtype=complex)
+
+        for index in self._diffractionDataset.getAssembledIndexes():
+            try:
+                point = self._scan[index]
+            except KeyError:
+                continue
+
+            scanPositionsXInMeters.append(float(point.x))
+            scanPositionsYInMeters.append(float(point.y))
+
+            patchPositionsXInMeters = self._createAxis(patches.shape[-1], pixelSizeXInMeters,
+                                                       float(point.x))
+            patchPositionsYInMeters = self._createAxis(patches.shape[-2], pixelSizeYInMeters,
+                                                       float(point.y))
+            patches[index, ...] = interp((patchPositionsYInMeters, patchPositionsXInMeters))
+
+        scanPositionsInMeters = numpy.array((scanPositionsYInMeters, scanPositionsXInMeters)).T
+
+        data: dict[str, numpy.typing.NDArray[numpy.number]] = {
+            'real': patches,
+            'reciprocal': diffractionData,
+            'position': scanPositionsInMeters,
+            'probe': self._probe.getArray(),
+            'pixelsize': numpy.array([pixelSizeYInMeters, pixelSizeXInMeters]),
+        }
+
+        numpy.savez_compressed(filePath, **data)
 
     def train(self, trainingDirPath: Path) -> None:
         logger.debug(f'Train using data in {trainingDirPath}.')
@@ -215,23 +278,23 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
-    def __init__(self, settingsRegistry: SettingsRegistry) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry,
+                 diffractionDataset: ActiveDiffractionDataset, scan: Scan, scanAPI: ScanAPI,
+                 probe: Probe, objectAPI: ObjectAPI) -> None:
         super().__init__()
         self._settings = PtychoNNModelSettings.createInstance(settingsRegistry)
         self._trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
         self.modelPresenter = PtychoNNModelPresenter.createInstance(self._settings)
-        self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(self._trainingSettings)
+        self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(
+            self._trainingSettings, diffractionDataset, scan, scanAPI, probe, objectAPI)
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod
-    def createInstance(cls,
-                       settingsRegistry: SettingsRegistry,
-                       diffractionDataset: ActiveDiffractionDataset,
-                       scan: Scan,
-                       apparatus: Apparatus,
-                       objectAPI: ObjectAPI,
-                       isDeveloperModeEnabled: bool = False) -> PtychoNNReconstructorLibrary:
-        core = cls(settingsRegistry)
+    def createInstance(cls, settingsRegistry: SettingsRegistry,
+                       diffractionDataset: ActiveDiffractionDataset, scan: Scan, scanAPI: ScanAPI,
+                       probe: Probe, objectAPI: ObjectAPI,
+                       isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
+        core = cls(settingsRegistry, diffractionDataset, scan, scanAPI, probe, objectAPI)
 
         try:
             from .reconstructor import PtychoNNPhaseOnlyReconstructor
@@ -242,8 +305,8 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
                 core.reconstructorList.append(NullReconstructor('PhaseOnly'))
         else:
             trainableReconstructor = PtychoNNPhaseOnlyReconstructor(core._settings,
-                                                                    core._trainingSettings,
-                                                                    apparatus, scan, objectAPI,
+                                                                    core._trainingSettings, scan,
+                                                                    probe, objectAPI,
                                                                     diffractionDataset)
             core.trainingPresenter.setTrainer(trainableReconstructor)
             core.reconstructorList.append(trainableReconstructor)

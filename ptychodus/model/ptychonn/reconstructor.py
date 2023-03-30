@@ -12,7 +12,7 @@ from ...api.reconstructor import ReconstructResult, Reconstructor
 from ...api.scan import Scan
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
-from ..probe import Apparatus
+from ..probe import Probe
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 from .trainable import TrainableReconstructor, TrainingData
 
@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
 
     def __init__(self, settings: PtychoNNModelSettings, trainingSettings: PtychoNNTrainingSettings,
-                 apparatus: Apparatus, scan: Scan, objectAPI: ObjectAPI,
+                 scan: Scan, probe: Probe, objectAPI: ObjectAPI,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
         self._settings = settings
         self._trainingSettings = trainingSettings
-        self._apparatus = apparatus
         self._scan = scan
+        self._probe = probe
         self._objectAPI = objectAPI
         self._diffractionDataset = diffractionDataset
 
@@ -89,7 +89,7 @@ class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
                     binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
                                                          binSize * j:binSize * (j + 1)])
 
-        stitchedPixelWidthInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
+        stitchedPixelWidthInMeters = self._objectAPI.getPixelSizeXInMeters()
         inferencePixelWidthInMeters = stitchedPixelWidthInMeters * binSize
 
         logger.debug('Loading model state...')

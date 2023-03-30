@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
-import logging
+from typing import Any, Final
 
 import numpy
 import numpy.typing
@@ -15,8 +14,6 @@ from ..object import ObjectAPI
 from ..probe import Probe
 from ..scan import ScanAPI
 
-logger = logging.getLogger(__name__)
-
 ScanArrayType = numpy.typing.NDArray[numpy.floating[Any]]
 
 
@@ -28,6 +25,7 @@ class TikeArrays:
 
 
 class TikeArrayConverter:
+    PAD_WIDTH: Final[int] = 2
 
     def __init__(self, scan: Scan, scanAPI: ScanAPI, probe: Probe, objectAPI: ObjectAPI,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
@@ -46,6 +44,10 @@ class TikeArrayConverter:
         pixelSizeXInMeters = self._objectAPI.getPixelSizeXInMeters()
         pixelSizeYInMeters = self._objectAPI.getPixelSizeYInMeters()
 
+        scanBoundingBoxInMeters = self._scanAPI.getBoundingBoxInMeters()
+        xMinInMeters = scanBoundingBoxInMeters.rangeX.lower
+        yMinInMeters = scanBoundingBoxInMeters.rangeY.lower
+
         scanX: list[float] = list()
         scanY: list[float] = list()
 
@@ -55,62 +57,38 @@ class TikeArrayConverter:
             except KeyError:
                 continue
 
-            scanX.append(float(point.x / pixelSizeXInMeters))
-            scanY.append(float(point.y / pixelSizeYInMeters))
+            scanX.append(self.PAD_WIDTH + float((point.x - xMinInMeters) / pixelSizeXInMeters))
+            scanY.append(self.PAD_WIDTH + float((point.y - yMinInMeters) / pixelSizeYInMeters))
 
         probe = self._probe.getArray()
-        padX = probe.shape[-1] // 2
-        padY = probe.shape[-2] // 2
-
-        shiftX = padX - min(scanX)
-        shiftY = padY - min(scanY)
-
-        for n in range(len(scanX)):
-            scanX[n] += shiftX
-            scanY[n] += shiftY
-
-        logger.debug(f'Scan {min(scanX),min(scanY)} -> {max(scanX),max(scanY)}')
-
-        spanX = max(scanX)
-        spanY = max(scanY)
-
-        tikeObjectShapeX = probe.shape[-1] + int(spanX) + padX
-        tikeObjectShapeY = probe.shape[-2] + int(spanY) + padY
-        tikeObject = numpy.ones(shape=(tikeObjectShapeY, tikeObjectShapeX), dtype='complex64')
-        logger.debug(f'Tike object: {tikeObjectShapeY,tikeObjectShapeX}')
-
         object_ = self._objectAPI.getActiveObjectArray()
-        logger.debug(f'Ptychodus object: {object_.shape}')
-
-        tikeObject[padY:padY + object_.shape[-2], padX:padX + object_.shape[-1]] = object_
+        tikeObject = numpy.pad(object_, self.PAD_WIDTH, mode='constant', constant_values=0)
 
         return TikeArrays(
             scan=numpy.column_stack((scanY, scanX)).astype('float32'),
             probe=probe[numpy.newaxis, numpy.newaxis, ...].astype('complex64'),
-            object_=tikeObject,
+            object_=tikeObject.astype('complex64'),
         )
 
     def importFromTike(self, arrays: TikeArrays) -> None:
         # TODO only update scan/probe/object if correction enabled
+        assembledIndexes = self._diffractionDataset.getAssembledIndexes()
         pixelSizeXInMeters = self._objectAPI.getPixelSizeXInMeters()
         pixelSizeYInMeters = self._objectAPI.getPixelSizeYInMeters()
 
-        probe = self._probe.getArray()
-        padX = probe.shape[-1] // 2
-        padY = probe.shape[-2] // 2
-
-        shiftX = padX - min(float(point.x / pixelSizeXInMeters) for point in self._scan.values())
-        shiftY = padY - min(float(point.y / pixelSizeYInMeters) for point in self._scan.values())
+        scanBoundingBoxInMeters = self._scanAPI.getBoundingBoxInMeters()
+        xMinInMeters = scanBoundingBoxInMeters.rangeX.lower
+        yMinInMeters = scanBoundingBoxInMeters.rangeY.lower
 
         pointList: list[ScanPoint] = list()
 
         # TODO use assembledIndexes
         for xy in arrays.scan:
-            x_px = xy[1] - shiftX
-            y_px = xy[0] - shiftY
-            x_m = Decimal(repr(x_px)) * pixelSizeXInMeters
-            y_m = Decimal(repr(y_px)) * pixelSizeYInMeters
-            pointList.append(ScanPoint(x_m, y_m))
+            uxInPixels = xy[1] - self.PAD_WIDTH
+            uyInPixels = xy[0] - self.PAD_WIDTH
+            xInMeters = xMinInMeters + Decimal(repr(uxInPixels)) * pixelSizeXInMeters
+            yInMeters = yMinInMeters + Decimal(repr(uyInPixels)) * pixelSizeYInMeters
+            pointList.append(ScanPoint(xInMeters, yInMeters))
 
         tabularScan = TabularScan.createFromPointSequence('Tike', pointList)
         self._scanAPI.insertScanIntoRepository(tabularScan, None)

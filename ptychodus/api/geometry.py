@@ -12,6 +12,12 @@ class Array2D(Generic[T]):
     y: T
 
 
+@dataclass(frozen=True)
+class Point2D(Generic[T]):
+    x: T
+    y: T
+
+
 class Interval(Generic[T]):
 
     def __init__(self, lower: T, upper: T) -> None:
@@ -29,14 +35,13 @@ class Interval(Generic[T]):
         return Interval[T](min(self.lower, value), max(self.upper, value))
 
     @property
-    def length(self) -> T:
+    def width(self) -> T:
         return self.upper - self.lower
 
     @property
-    def center(self) -> T:
-        fullLength = self.length
-        halfLength = fullLength // 2 if isinstance(fullLength, int) else fullLength / 2
-        return self.lower + halfLength
+    def median(self) -> T:
+        total = self.lower + self.upper
+        return total // 2 if isinstance(total, int) else total / 2
 
     def copy(self) -> Interval[T]:
         return Interval[T](self.lower, self.upper)
@@ -49,6 +54,10 @@ class Interval(Generic[T]):
 class Box2D(Generic[T]):
     rangeX: Interval[T]
     rangeY: Interval[T]
+
+    @property
+    def centroid(self) -> Point2D[T]:
+        return Point2D[T](self.rangeX.median, self.rangeY.median)
 
     def hull(self, x: T, y: T) -> Box2D[T]:
         return Box2D[T](self.rangeX.hull(x), self.rangeY.hull(y))

@@ -93,7 +93,6 @@ class ScanRepositoryPresenter(Observable, Observer):
 
         innerItem = item._item
 
-        # TODO test this
         if isinstance(innerItem, TabularScanRepositoryItem):
             if innerItem.getFileInfo() is None:
                 fileInfo = ScanFileInfo(fileType, filePath)
@@ -170,7 +169,8 @@ class ScanCore(StatefulCore):
         self.scan = ActiveScan.createInstance(self._settings, self._itemFactory, self._repository,
                                               settingsRegistry)
         self.sizer = ScanSizer.createInstance(self._settings, self.scan)
-        self.scanAPI = ScanAPI(self._builder, self._itemFactory, self._repository, self.scan)
+        self.scanAPI = ScanAPI(self._builder, self._itemFactory, self._repository, self.scan,
+                               self.sizer)
         self.repositoryPresenter = ScanRepositoryPresenter.createInstance(
             self._repository, self._itemFactory, self.scanAPI, fileWriterChooser)
         self.presenter = ScanPresenter.createInstance(self.scan, self.scanAPI, dataset)

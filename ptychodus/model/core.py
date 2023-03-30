@@ -103,7 +103,7 @@ class ModelCore:
             modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
-            self._probeCore.apparatus, self._objectCore.objectAPI,
+            self._scanCore.scanAPI, self._probeCore.probe, self._objectCore.objectAPI,
             modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)

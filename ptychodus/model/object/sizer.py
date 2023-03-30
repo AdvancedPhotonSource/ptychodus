@@ -1,7 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal, ROUND_CEILING
 
-from ...api.geometry import Interval
 from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
 from ..probe import Apparatus, ProbeSizer
@@ -38,17 +37,17 @@ class ObjectSizer(Observable, Observer):
 
         if boundingBoxInMeters is not None:
             extentX = self._getIntegerCeilingOfQuotient(
-                boundingBoxInMeters.rangeX.length,
+                boundingBoxInMeters.rangeX.width,
                 self._apparatus.getObjectPlanePixelSizeXInMeters())
             extentY = self._getIntegerCeilingOfQuotient(
-                boundingBoxInMeters.rangeY.length,
+                boundingBoxInMeters.rangeY.width,
                 self._apparatus.getObjectPlanePixelSizeYInMeters())
             extent = ImageExtent(width=extentX, height=extentY)
 
         return extent
 
     def getProbeExtent(self) -> ImageExtent:
-        return 2 * (self._probeSizer.getProbeExtent() // 2)
+        return self._probeSizer.getProbeExtent()
 
     def getObjectExtent(self) -> ImageExtent:
         return self.getScanExtent() + self.getProbeExtent()

@@ -1,11 +1,14 @@
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 import logging
 
+from ...api.geometry import Box2D, Interval
 from ...api.scan import TabularScan
 from .active import ActiveScan
 from .itemFactory import ScanRepositoryItemFactory
 from .itemRepository import ScanRepository
+from .sizer import ScanSizer
 from .streaming import StreamingScanBuilder
 from .tabular import ScanFileInfo
 
@@ -15,11 +18,12 @@ logger = logging.getLogger(__name__)
 class ScanAPI:
 
     def __init__(self, builder: StreamingScanBuilder, factory: ScanRepositoryItemFactory,
-                 repository: ScanRepository, scan: ActiveScan) -> None:
+                 repository: ScanRepository, scan: ActiveScan, sizer: ScanSizer) -> None:
         self._builder = builder
         self._factory = factory
         self._repository = repository
         self._scan = scan
+        self._sizer = sizer
 
     def insertScanIntoRepositoryFromFile(self, filePath: Path, fileFilter: str) -> list[str]:
         itemNameList: list[str] = list()
@@ -47,6 +51,11 @@ class ScanAPI:
 
     def setActiveScan(self, name: str) -> None:
         self._scan.setActiveScan(name)
+
+    def getBoundingBoxInMeters(self) -> Box2D[Decimal]:
+        box = self._sizer.getBoundingBoxInMeters()
+        zero = Interval[Decimal](Decimal(), Decimal())
+        return box or Box2D[Decimal](zero, zero)
 
     def initializeStreamingScan(self) -> None:
         self._builder.reset()

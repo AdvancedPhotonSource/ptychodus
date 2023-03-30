@@ -158,14 +158,10 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod
-    def createInstance(cls,
-                       settingsRegistry: SettingsRegistry,
-                       diffractionDataset: ActiveDiffractionDataset,
-                       scan: Scan,
-                       scanAPI: ScanAPI,
-                       probe: Probe,
-                       objectAPI: ObjectAPI,
-                       isDeveloperModeEnabled: bool = False) -> TikeReconstructorLibrary:
+    def createInstance(cls, settingsRegistry: SettingsRegistry,
+                       diffractionDataset: ActiveDiffractionDataset, scan: Scan, scanAPI: ScanAPI,
+                       probe: Probe, objectAPI: ObjectAPI,
+                       isDeveloperModeEnabled: bool) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
 
         try:
