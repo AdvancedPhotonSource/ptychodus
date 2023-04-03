@@ -5,9 +5,9 @@ import logging
 
 from ...api.object import ObjectArrayType
 from ..probe import Apparatus
-from .active import ActiveObject
-from .itemFactory import ObjectRepositoryItemFactory
-from .itemRepository import ObjectRepository
+from .factory import ObjectRepositoryItemFactory
+from .repository import ObjectRepository
+from .selected import SelectedObject
 from .simple import ObjectFileInfo
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ObjectAPI:
 
     def __init__(self, apparatus: Apparatus, factory: ObjectRepositoryItemFactory,
-                 repository: ObjectRepository, object_: ActiveObject) -> None:
+                 repository: ObjectRepository, object_: SelectedObject) -> None:
         self._apparatus = apparatus
         self._factory = factory
         self._repository = repository
@@ -49,8 +49,8 @@ class ObjectAPI:
         item = self._factory.createItemFromArray(name, array, fileInfo)
         return self._repository.insertItem(item)
 
-    def setActiveObject(self, itemName: str) -> None:
-        self._object.setActiveObject(itemName)
+    def selectObject(self, itemName: str) -> None:
+        self._object.selectItem(itemName)
 
     def initializeAndActivateObject(self, name: str) -> None:
         itemName = self.insertObjectIntoRepositoryFromInitializer(name)
@@ -58,10 +58,10 @@ class ObjectAPI:
         if itemName is None:
             logger.error('Failed to initialize \"{name}\"!')
         else:
-            self.setActiveObject(itemName)
+            self.selectObject(itemName)
 
-    def getActiveObjectArray(self) -> ObjectArrayType:
-        return self._object.getArray()
+    def getSelectedObjectArray(self) -> ObjectArrayType:
+        return self._object.getSelectedItem().getArray()
 
     def getPixelSizeXInMeters(self) -> Decimal:
         return self._apparatus.getObjectPlanePixelSizeXInMeters()

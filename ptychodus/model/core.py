@@ -98,13 +98,11 @@ class ModelCore:
                                                                   self._scanCore.scanAPI)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
-            self._scanCore.scanAPI, self._probeCore.probe, self._objectCore.objectAPI,
-            modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scanAPI,
+            self._probeCore.probe, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
-            self._scanCore.scanAPI, self._probeCore.probe, self._objectCore.objectAPI,
-            modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scanAPI,
+            self._probeCore.probe, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(

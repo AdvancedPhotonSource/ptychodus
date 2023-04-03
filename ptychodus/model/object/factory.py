@@ -7,8 +7,8 @@ import numpy
 
 from ...api.object import ObjectArrayType, ObjectFileReader
 from ...api.plugins import PluginChooser
-from .itemRepository import ObjectRepositoryItem
 from .random import RandomObjectRepositoryItem
+from .repository import ObjectRepositoryItem
 from .settings import ObjectSettings
 from .simple import ObjectFileInfo, SimpleObjectRepositoryItem
 from .sizer import ObjectSizer

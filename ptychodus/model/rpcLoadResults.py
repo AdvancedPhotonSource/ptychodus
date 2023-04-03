@@ -55,6 +55,6 @@ class LoadResultsExecutor(RPCExecutor):
                 if objectItemName is None:
                     logger.error('Failed to load object result!')
                 else:
-                    self._objectAPI.setActiveObject(objectItemName)
+                    self._objectAPI.selectObject(objectItemName)
             else:
                 logger.debug(f'{message.filePath} is not a file.')

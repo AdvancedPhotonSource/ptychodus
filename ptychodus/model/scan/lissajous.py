@@ -5,7 +5,7 @@ from typing import Final
 import numpy
 
 from ...api.scan import ScanPoint
-from .itemRepository import ScanRepositoryItem
+from .repository import ScanRepositoryItem
 from .settings import ScanSettings
 
 
@@ -22,7 +22,7 @@ class LissajousScanRepositoryItem(ScanRepositoryItem):
         self._angularShiftInTurns = Decimal()
 
     @property
-    def name(self) -> str:
+    def nameHint(self) -> str:
         return self.initializer
 
     @property
@@ -30,7 +30,7 @@ class LissajousScanRepositoryItem(ScanRepositoryItem):
         return self.NAME
 
     @property
-    def canActivate(self) -> bool:
+    def canSelect(self) -> bool:
         return True
 
     def syncFromSettings(self, settings: ScanSettings) -> None:

@@ -10,8 +10,8 @@ from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
 from .cartesian import RasterScanRepositoryItem, SnakeScanRepositoryItem
 from .indexFilters import ScanIndexFilterFactory
-from .itemRepository import ScanRepositoryItem, TransformedScanRepositoryItem
 from .lissajous import LissajousScanRepositoryItem
+from .repository import ScanRepositoryItem, TransformedScanRepositoryItem
 from .settings import ScanSettings
 from .spiral import SpiralScanRepositoryItem
 from .tabular import ScanFileInfo, TabularScanRepositoryItem

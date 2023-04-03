@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Final
 
 from ...api.scan import ScanPoint
-from .itemRepository import ScanRepositoryItem
+from .repository import ScanRepositoryItem
 from .settings import ScanSettings
 
 
@@ -18,11 +18,11 @@ class CartesianScanRepositoryItem(ScanRepositoryItem):
         self._snake = snake
 
     @property
-    def name(self) -> str:
+    def nameHint(self) -> str:
         return self.initializer
 
     @property
-    def canActivate(self) -> bool:
+    def canSelect(self) -> bool:
         return True
 
     def syncFromSettings(self, settings: ScanSettings) -> None:

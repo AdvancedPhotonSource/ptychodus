@@ -1,5 +1,5 @@
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
@@ -40,7 +40,7 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'LYNX SoftGlueZynq Scan Files (*.dat)'
 
-    def read(self, filePath: Path) -> Sequence[Scan]:
+    def read(self, filePath: Path) -> Iterable[Scan]:
         pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
         scanName = self.simpleName
 
@@ -84,7 +84,7 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
                 )
                 pointSeqMap[detector_count].append(point)
 
-        return [TabularScan.createFromMappedPointSequence(scanName, pointSeqMap)]
+        return [TabularScan.createFromMappedPointIterable(scanName, pointSeqMap)]
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

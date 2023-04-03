@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path
 import csv
@@ -22,7 +22,7 @@ class CSVScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'Comma-Separated Values Files (*.csv)'
 
-    def read(self, filePath: Path) -> Sequence[Scan]:
+    def read(self, filePath: Path) -> Iterable[Scan]:
         pointList = list()
         minimumColumnCount = max(self._xcol, self._ycol) + 1
 
@@ -42,7 +42,7 @@ class CSVScanFileReader(ScanFileReader):
                 )
                 pointList.append(point)
 
-        return [TabularScan.createFromPointSequence(filePath.stem, pointList)]
+        return [TabularScan.createFromPointIterable(filePath.stem, pointList)]
 
 
 class CSVScanFileWriter(ScanFileWriter):
@@ -55,14 +55,14 @@ class CSVScanFileWriter(ScanFileWriter):
     def fileFilter(self) -> str:
         return 'Comma-Separated Values Files (*.csv)'
 
-    def write(self, filePath: Path, scanSeq: Sequence[Scan]) -> None:
-        if len(scanSeq) != 1:
-            className = type(self).__name__
-            raise ValueError(f'{className} only supports single sequence scan files!')
-
+    def write(self, filePath: Path, scanIterable: Iterable[Scan]) -> None:
         with filePath.open(mode='wt') as csvFile:
-            for scan in scanSeq:
-                for point in scan.values():
+            for scanNumber, scan in enumerate(scanIterable):
+                if scanNumber > 0:
+                    className = type(self).__name__
+                    raise ValueError(f'{className} only supports single sequence scan files!')
+
+                for index, point in scan.items():
                     csvFile.write(f'{point.y},{point.x}\n')
 
 

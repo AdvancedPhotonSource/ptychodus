@@ -42,18 +42,19 @@ class ScanTableModel(QAbstractTableModel):
         value = QVariant()
 
         if index.isValid():
-            item = self._presenter[index.row()]
+            itemPresenter = self._presenter[index.row()]
+            item = itemPresenter.item
 
             if role == Qt.DisplayRole:
                 if index.column() == 0:
-                    value = QVariant(item.name)
+                    value = QVariant(itemPresenter.name)
                 elif index.column() == 1:
                     value = QVariant(item.initializer)
                 elif index.column() == 2:
                     value = QVariant(len(item))
             elif role == Qt.CheckStateRole:
                 if index.column() == 0:
-                    value = QVariant(Qt.Checked if item.name in
+                    value = QVariant(Qt.Checked if itemPresenter.name in
                                      self._checkedNames else Qt.Unchecked)
 
         return value

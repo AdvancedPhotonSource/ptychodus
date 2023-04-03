@@ -19,6 +19,7 @@ ScanArrayType = numpy.typing.NDArray[numpy.floating[Any]]
 
 @dataclass(frozen=True)
 class TikeArrays:
+    indexes: tuple[int, ...]
     scan: ScanArrayType
     probe: ProbeArrayType
     object_: ObjectArrayType
@@ -27,9 +28,8 @@ class TikeArrays:
 class TikeArrayConverter:
     PAD_WIDTH: Final[int] = 2
 
-    def __init__(self, scan: Scan, scanAPI: ScanAPI, probe: Probe, objectAPI: ObjectAPI,
+    def __init__(self, scanAPI: ScanAPI, probe: Probe, objectAPI: ObjectAPI,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
-        self._scan = scan
         self._scanAPI = scanAPI
         self._probe = probe
         self._objectAPI = objectAPI
@@ -48,23 +48,27 @@ class TikeArrayConverter:
         xMinInMeters = scanBoundingBoxInMeters.rangeX.lower
         yMinInMeters = scanBoundingBoxInMeters.rangeY.lower
 
+        selectedScan = self._scanAPI.getSelectedScan()
+        indexes: list[int] = list()
         scanX: list[float] = list()
         scanY: list[float] = list()
 
         for index in assembledIndexes:
             try:
-                point = self._scan[index]
+                point = selectedScan[index]
             except KeyError:
                 continue
 
+            indexes.append(index)
             scanX.append(self.PAD_WIDTH + float((point.x - xMinInMeters) / pixelSizeXInMeters))
             scanY.append(self.PAD_WIDTH + float((point.y - yMinInMeters) / pixelSizeYInMeters))
 
         probe = self._probe.getArray()
-        object_ = self._objectAPI.getActiveObjectArray()
+        object_ = self._objectAPI.getSelectedObjectArray()
         tikeObject = numpy.pad(object_, self.PAD_WIDTH, mode='constant', constant_values=0)
 
         return TikeArrays(
+            indexes=tuple(indexes),
             scan=numpy.column_stack((scanY, scanX)).astype('float32'),
             probe=probe[numpy.newaxis, numpy.newaxis, ...].astype('complex64'),
             object_=tikeObject.astype('complex64'),
@@ -72,7 +76,6 @@ class TikeArrayConverter:
 
     def importFromTike(self, arrays: TikeArrays) -> None:
         # TODO only update scan/probe/object if correction enabled
-        assembledIndexes = self._diffractionDataset.getAssembledIndexes()
         pixelSizeXInMeters = self._objectAPI.getPixelSizeXInMeters()
         pixelSizeYInMeters = self._objectAPI.getPixelSizeYInMeters()
 
@@ -80,17 +83,16 @@ class TikeArrayConverter:
         xMinInMeters = scanBoundingBoxInMeters.rangeX.lower
         yMinInMeters = scanBoundingBoxInMeters.rangeY.lower
 
-        pointList: list[ScanPoint] = list()
+        pointDict: dict[int, ScanPoint] = dict()
 
-        # TODO use assembledIndexes
-        for xy in arrays.scan:
+        for index, xy in zip(arrays.indexes, arrays.scan):
             uxInPixels = xy[1] - self.PAD_WIDTH
             uyInPixels = xy[0] - self.PAD_WIDTH
             xInMeters = xMinInMeters + Decimal(repr(uxInPixels)) * pixelSizeXInMeters
             yInMeters = yMinInMeters + Decimal(repr(uyInPixels)) * pixelSizeYInMeters
-            pointList.append(ScanPoint(xInMeters, yInMeters))
+            pointDict[index] = ScanPoint(xInMeters, yInMeters)
 
-        tabularScan = TabularScan.createFromPointSequence('Tike', pointList)
+        tabularScan = TabularScan('Tike', pointDict)
         self._scanAPI.insertScanIntoRepository(tabularScan, None)
         self._probe.setArray(arrays.probe[0, 0])
         self._objectAPI.insertObjectIntoRepository('Tike', arrays.object_, None)

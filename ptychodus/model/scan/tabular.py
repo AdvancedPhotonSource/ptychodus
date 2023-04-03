@@ -7,7 +7,7 @@ from typing import Final, Optional
 import numpy
 
 from ...api.scan import Scan, ScanPoint, TabularScan
-from .itemRepository import ScanRepositoryItem
+from .repository import ScanRepositoryItem
 from .settings import ScanSettings
 
 
@@ -40,15 +40,15 @@ class TabularScanRepositoryItem(ScanRepositoryItem):
         return cls(TabularScan.createEmpty(), None)
 
     @property
-    def name(self) -> str:
-        return self._scan.name
+    def nameHint(self) -> str:
+        return self._scan.nameHint
 
     @property
     def initializer(self) -> str:
         return 'FromMemory' if self._fileInfo is None else 'FromFile'
 
     @property
-    def canActivate(self) -> bool:
+    def canSelect(self) -> bool:
         return (self._fileInfo is not None)
 
     def syncFromSettings(self, settings: ScanSettings) -> None:

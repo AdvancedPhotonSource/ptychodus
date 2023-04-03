@@ -8,8 +8,9 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.scan import (CartesianScanRepositoryItem, LissajousScanRepositoryItem,
-                           ScanRepositoryPresenter, SpiralScanRepositoryItem,
-                           TabularScanRepositoryItem, TransformedScanRepositoryItem)
+                           ScanRepositoryItemPresenter, ScanRepositoryPresenter,
+                           SpiralScanRepositoryItem, TabularScanRepositoryItem,
+                           TransformedScanRepositoryItem)
 from ...view import (CartesianScanView, LissajousScanView, RepositoryView, ScanEditorDialog,
                      ScanView, ScanPlotView, ScanTransformView, SpiralScanView, TabularScanView)
 from ..data import FileDialogFactory
@@ -106,26 +107,28 @@ class ScanController(Observer):
         else:
             logger.error('No items are selected!')
 
-    def _getSelectedItem(self) -> Optional[TransformedScanRepositoryItem]:
-        item: Optional[TransformedScanRepositoryItem] = None
+    def _getSelectedItemPresenter(self) -> Optional[ScanRepositoryItemPresenter]:
+        itemPresenter: Optional[ScanRepositoryItemPresenter] = None
         proxyIndex = self._view.repositoryView.tableView.currentIndex()
 
         if proxyIndex.isValid():
             index = self._proxyModel.mapToSource(proxyIndex)
-            item = self._repositoryPresenter[index.row()]
+            itemPresenter = self._repositoryPresenter[index.row()]
 
-        return item
+        return itemPresenter
 
     def _editSelectedScan(self) -> None:
-        item = self._getSelectedItem()
+        itemPresenter = self._getSelectedItemPresenter()
 
-        if item is None:
+        if itemPresenter is None:
             logger.error('No items are selected!')
         else:
+            item = itemPresenter.item
+
             if isinstance(item.untransformed, CartesianScanRepositoryItem):
                 cartesianDialog = ScanEditorDialog.createInstance(
                     CartesianScanView.createInstance(), self._view)
-                cartesianDialog.setWindowTitle(item.name)
+                cartesianDialog.setWindowTitle(itemPresenter.name)
                 cartesianController = CartesianScanController.createInstance(
                     item.untransformed, cartesianDialog.editorView)
                 cartesianTransformController = ScanTransformController.createInstance(
@@ -134,7 +137,7 @@ class ScanController(Observer):
             elif isinstance(item.untransformed, SpiralScanRepositoryItem):
                 spiralDialog = ScanEditorDialog.createInstance(SpiralScanView.createInstance(),
                                                                self._view)
-                spiralDialog.setWindowTitle(item.name)
+                spiralDialog.setWindowTitle(itemPresenter.name)
                 spiralController = SpiralScanController.createInstance(
                     item.untransformed, spiralDialog.editorView)
                 spiralTransformController = ScanTransformController.createInstance(
@@ -143,7 +146,7 @@ class ScanController(Observer):
             elif isinstance(item.untransformed, LissajousScanRepositoryItem):
                 lissajousDialog = ScanEditorDialog.createInstance(
                     LissajousScanView.createInstance(), self._view)
-                lissajousDialog.setWindowTitle(item.name)
+                lissajousDialog.setWindowTitle(itemPresenter.name)
                 lissajousController = LissajousScanController.createInstance(
                     item.untransformed, lissajousDialog.editorView)
                 lissajousTransformController = ScanTransformController.createInstance(
@@ -152,7 +155,7 @@ class ScanController(Observer):
             elif isinstance(item.untransformed, TabularScanRepositoryItem):
                 tabularDialog = ScanEditorDialog.createInstance(TabularScanView.createInstance(),
                                                                 self._view)
-                tabularDialog.setWindowTitle(item.name)
+                tabularDialog.setWindowTitle(itemPresenter.name)
                 tabularTransformController = ScanTransformController.createInstance(
                     item, tabularDialog.transformView)
                 tabularDialog.open()
@@ -169,7 +172,10 @@ class ScanController(Observer):
             logger.error('No items are selected!')
 
     def _redrawPlot(self) -> None:
-        itemDict = {item.name: item for item in self._repositoryPresenter}
+        itemDict = {
+            itemPresenter.name: itemPresenter.item
+            for itemPresenter in self._repositoryPresenter
+        }
         self._plotView.axes.clear()
 
         for row in range(self._proxyModel.rowCount()):
@@ -216,8 +222,8 @@ class ScanController(Observer):
         self._redrawPlot()
 
     def _syncModelToView(self) -> None:
-        for item in self._repositoryPresenter:
-            item.addObserver(self)
+        for itemPresenter in self._repositoryPresenter:
+            itemPresenter.item.addObserver(self)
 
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
@@ -227,7 +233,9 @@ class ScanController(Observer):
         if observable is self._repositoryPresenter:
             self._syncModelToView()
         else:
-            for item in self._repositoryPresenter:
-                if observable is item and self._tableModel.isChecked(item.name):
+            for itemPresenter in self._repositoryPresenter:
+                itemIsChecked = self._tableModel.isChecked(itemPresenter.name)
+
+                if observable is itemPresenter.item and itemIsChecked:
                     self._redrawPlot()
                     break

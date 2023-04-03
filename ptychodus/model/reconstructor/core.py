@@ -31,7 +31,7 @@ class ReconstructorPresenter(Observable, Observer):
         return self._activeReconstructor.name
 
     def setReconstructor(self, name: str) -> None:
-        self._activeReconstructor.setActiveReconstructor(name)
+        self._activeReconstructor.selectReconstructor(name)
 
     def reconstruct(self) -> ReconstructResult:
         return self._activeReconstructor.reconstruct()

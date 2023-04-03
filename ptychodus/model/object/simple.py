@@ -5,7 +5,7 @@ from typing import Final, Optional
 
 from ...api.image import ImageExtent
 from ...api.object import ObjectArrayType
-from .itemRepository import ObjectRepositoryItem
+from .repository import ObjectRepositoryItem
 from .settings import ObjectSettings
 
 
@@ -37,7 +37,7 @@ class SimpleObjectRepositoryItem(ObjectRepositoryItem):
         self._fileInfo = fileInfo
 
     @property
-    def name(self) -> str:
+    def nameHint(self) -> str:
         return self._name
 
     @property
@@ -45,7 +45,7 @@ class SimpleObjectRepositoryItem(ObjectRepositoryItem):
         return 'FromMemory' if self._fileInfo is None else 'FromFile'
 
     @property
-    def canActivate(self) -> bool:
+    def canSelect(self) -> bool:
         return (self._fileInfo is not None)
 
     def syncFromSettings(self, settings: ObjectSettings) -> None:

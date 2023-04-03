@@ -1,5 +1,5 @@
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import IntEnum
@@ -50,9 +50,9 @@ class VelociprobeScanFileReader(ScanFileReader):
                 y=(point.y - yMean),
             )
 
-        return TabularScan(scan.name, pointMap)
+        return TabularScan(scan.nameHint, pointMap)
 
-    def read(self, filePath: Path) -> Sequence[Scan]:
+    def read(self, filePath: Path) -> Iterable[Scan]:
         enPointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
         liPointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
         minimumColumnCount = max(col.value for col in VelociprobeScanFileColumn) + 1
@@ -85,11 +85,11 @@ class VelociprobeScanFileReader(ScanFileReader):
                 )
                 enPointSeqMap[trigger].append(enPoint)
 
-        liScan: Scan = TabularScan.createFromMappedPointSequence('VelociprobeLaserInterferometerY',
+        liScan: Scan = TabularScan.createFromMappedPointIterable('VelociprobeLaserInterferometerY',
                                                                  liPointSeqMap)
         liScan = self._applyTransform(liScan)
 
-        enScan: Scan = TabularScan.createFromMappedPointSequence('VelociprobeEncoderY',
+        enScan: Scan = TabularScan.createFromMappedPointIterable('VelociprobeEncoderY',
                                                                  enPointSeqMap)
         enScan = self._applyTransform(enScan)
 

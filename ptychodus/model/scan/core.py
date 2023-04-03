@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import ItemsView, Iterator
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
@@ -13,17 +14,23 @@ from ...api.scan import Scan, ScanArrayType, ScanFileReader, ScanFileWriter, Sca
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
 from ..statefulCore import StateDataType, StatefulCore
-from .active import ActiveScan
 from .api import ScanAPI
+from .factory import ScanRepositoryItemFactory
 from .indexFilters import ScanIndexFilterFactory
-from .itemFactory import ScanRepositoryItemFactory
-from .itemRepository import ScanRepository, TransformedScanRepositoryItem
+from .repository import ScanRepository, TransformedScanRepositoryItem
+from .selected import ScanRepositoryItemSettingsDelegate, SelectedScan
 from .settings import ScanSettings
 from .sizer import ScanSizer
 from .streaming import StreamingScanBuilder
 from .tabular import ScanFileInfo, TabularScanRepositoryItem
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ScanRepositoryItemPresenter:
+    name: str
+    item: TransformedScanRepositoryItem
 
 
 class ScanRepositoryPresenter(Observable, Observer):
@@ -47,15 +54,16 @@ class ScanRepositoryPresenter(Observable, Observer):
         repository.addObserver(presenter)
         return presenter
 
-    def __iter__(self) -> Iterator[TransformedScanRepositoryItem]:
-        return iter(self._repository.values())
+    def __iter__(self) -> Iterator[ScanRepositoryItemPresenter]:
+        for name, item in self._repository.items():
+            yield ScanRepositoryItemPresenter(name, item)
 
-    def __getitem__(self, index: int) -> TransformedScanRepositoryItem:
+    def __getitem__(self, index: int) -> ScanRepositoryItemPresenter:
         itemName = self._itemNameList[index]
-        return self._repository[itemName]
+        return ScanRepositoryItemPresenter(itemName, self._repository[itemName])
 
     def __len__(self) -> int:
-        return len(self._itemNameList)
+        return len(self._repository)
 
     def getInitializerNameList(self) -> list[str]:
         return self._itemFactory.getInitializerNameList()
@@ -105,13 +113,7 @@ class ScanRepositoryPresenter(Observable, Observer):
         self._repository.removeItem(name)
 
     def _updateItemPresenterList(self) -> None:
-        itemNameList: list[str] = list()
-
-        for itemName, scan in self._repository.items():
-            scan.name = itemName
-            itemNameList.append(itemName)
-
-        self._itemNameList = itemNameList
+        self._itemNameList = [name for name in self._repository]
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
@@ -121,7 +123,7 @@ class ScanRepositoryPresenter(Observable, Observer):
 
 class ScanPresenter(Observable, Observer):
 
-    def __init__(self, scan: ActiveScan, scanAPI: ScanAPI,
+    def __init__(self, scan: SelectedScan, scanAPI: ScanAPI,
                  dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._scan = scan
@@ -129,23 +131,23 @@ class ScanPresenter(Observable, Observer):
         self._dataset = dataset
 
     @classmethod
-    def createInstance(cls, scan: ActiveScan, scanAPI: ScanAPI,
+    def createInstance(cls, scan: SelectedScan, scanAPI: ScanAPI,
                        dataset: ActiveDiffractionDataset) -> ScanPresenter:
         presenter = cls(scan, scanAPI, dataset)
         scan.addObserver(presenter)
         dataset.addObserver(presenter)
         return presenter
 
-    def isActiveScanValid(self) -> bool:
+    def isSelectedScanValid(self) -> bool:
         datasetIndexes = set(self._dataset.getAssembledIndexes())
-        scanIndexes = set(self._scan.keys())
+        scanIndexes = set(self._scan.getSelectedItem().keys())
         return (not scanIndexes.isdisjoint(datasetIndexes))
 
-    def setActiveScan(self, name: str) -> None:
-        self._scanAPI.setActiveScan(name)
+    def selectScan(self, name: str) -> None:
+        self._scanAPI.selectScan(name)
 
-    def getActiveScan(self) -> str:
-        return self._scan.name
+    def getSelectedScan(self) -> str:
+        return self._scan.getSelectedName()
 
     def update(self, observable: Observable) -> None:
         if observable is self._scan:
@@ -166,21 +168,23 @@ class ScanCore(StatefulCore):
         self._indexFilterFactory = ScanIndexFilterFactory()
         self._itemFactory = ScanRepositoryItemFactory(rng, self._settings,
                                                       self._indexFilterFactory, fileReaderChooser)
-        self.scan = ActiveScan.createInstance(self._settings, self._itemFactory, self._repository,
-                                              settingsRegistry)
-        self.sizer = ScanSizer.createInstance(self._settings, self.scan)
-        self.scanAPI = ScanAPI(self._builder, self._itemFactory, self._repository, self.scan,
+        self._itemSettingsDelegate = ScanRepositoryItemSettingsDelegate(
+            self._settings, self._itemFactory, self._repository)
+        self._scan = SelectedScan.createInstance(self._repository, self._itemSettingsDelegate,
+                                                 settingsRegistry)
+        self.sizer = ScanSizer.createInstance(self._settings, self._scan)
+        self.scanAPI = ScanAPI(self._builder, self._itemFactory, self._repository, self._scan,
                                self.sizer)
         self.repositoryPresenter = ScanRepositoryPresenter.createInstance(
             self._repository, self._itemFactory, self.scanAPI, fileWriterChooser)
-        self.presenter = ScanPresenter.createInstance(self.scan, self.scanAPI, dataset)
+        self.presenter = ScanPresenter.createInstance(self._scan, self.scanAPI, dataset)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         scanIndex: list[int] = list()
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
 
-        for index, point in self.scan.untransformed.items():
+        for index, point in self._scan.getSelectedItem().untransformed.items():
             scanIndex.append(index)
             scanXInMeters.append(float(point.x))
             scanYInMeters.append(float(point.y))
@@ -207,4 +211,4 @@ class ScanCore(StatefulCore):
 
         scan = TabularScan('Restart', pointMap)
         itemName = self.scanAPI.insertScanIntoRepository(scan, ScanFileInfo.createNull())
-        self.scanAPI.setActiveScan(itemName)
+        self.scanAPI.selectScan(itemName)

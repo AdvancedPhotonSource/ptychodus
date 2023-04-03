@@ -1,4 +1,5 @@
 from abc import abstractmethod, abstractproperty
+import logging
 
 from ...api.image import ImageExtent
 from ...api.object import ObjectArrayType
@@ -6,13 +7,15 @@ from ...api.observer import Observable
 from ..itemRepository import ItemRepository
 from .settings import ObjectSettings
 
+logger = logging.getLogger(__name__)
+
 
 class ObjectRepositoryItem(Observable):
     '''ABC for items that can be stored in a object repository'''
 
     @abstractproperty
-    def name(self) -> str:
-        '''returns a unique name'''
+    def nameHint(self) -> str:
+        '''returns a name hint that is appropriate for a settings file'''
         pass
 
     @abstractproperty
@@ -21,8 +24,8 @@ class ObjectRepositoryItem(Observable):
         pass
 
     @abstractproperty
-    def canActivate(self) -> bool:
-        '''indicates whether item can be made active'''
+    def canSelect(self) -> bool:
+        '''indicates whether item can be selected'''
         pass
 
     @abstractmethod

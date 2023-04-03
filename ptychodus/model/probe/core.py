@@ -58,7 +58,7 @@ class ProbePresenter(Observable, Observer):
 
         return presenter
 
-    def isActiveProbeValid(self) -> bool:
+    def isSelectedProbeValid(self) -> bool:
         return (self._probe.getProbeExtent() == self._sizer.getProbeExtent())
 
     def initializeProbe(self) -> None:
@@ -121,7 +121,7 @@ class ProbePresenter(Observable, Observer):
     def getProbeWavelengthInMeters(self) -> Decimal:
         return self._apparatus.getProbeWavelengthInMeters()
 
-    def setActiveProbe(self, name: str) -> None:
+    def selectProbe(self, name: str) -> None:
         pass  # TODO
 
     def getNumberOfProbeModes(self) -> int:

@@ -179,7 +179,7 @@ class ObjectController(Observer):
         if itemPresenter is None:
             logger.error('No items are selected!')
         else:
-            array = itemPresenter.getArray()
+            array = itemPresenter.item.getArray()
             self._imagePresenter.setArray(array)
 
     def _setButtonsEnabled(self) -> None:

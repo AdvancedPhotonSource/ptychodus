@@ -1,5 +1,5 @@
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
@@ -48,7 +48,7 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'LYNX Orchestra Scan Files (*.dat)'
 
-    def read(self, filePath: Path) -> Sequence[Scan]:
+    def read(self, filePath: Path) -> Iterable[Scan]:
         pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
         scanName = self.simpleName
 
@@ -84,7 +84,7 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
                 )
                 pointSeqMap[data_point].append(point)
 
-        return [TabularScan.createFromMappedPointSequence(scanName, pointSeqMap)]
+        return [TabularScan.createFromMappedPointIterable(scanName, pointSeqMap)]
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

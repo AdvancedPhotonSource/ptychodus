@@ -18,6 +18,8 @@ class ObjectSettings(Observable, Observer):
         self.amplitudeStandardDeviation = settingsGroup.createRealEntry(
             'AmplitudeStandardDeviation', '0')
         self.randomizePhase = settingsGroup.createBooleanEntry('RandomizePhase', False)
+        self.extraPaddingX = settingsGroup.createIntegerEntry('ExtraPaddingX', 0)
+        self.extraPaddingY = settingsGroup.createIntegerEntry('ExtraPaddingY', 0)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:

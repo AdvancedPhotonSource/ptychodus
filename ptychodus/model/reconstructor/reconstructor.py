@@ -76,7 +76,7 @@ class ActiveReconstructor(Reconstructor, Observable, Observer):
         # remove whitespace and casefold
         return ''.join(name.split()).casefold()
 
-    def setActiveReconstructor(self, name: str) -> None:
+    def selectReconstructor(self, name: str) -> None:
         displayName = self._simplifyName(name)
 
         for rname in self._repository:
@@ -100,7 +100,7 @@ class ActiveReconstructor(Reconstructor, Observable, Observer):
         self.notifyObservers()
 
     def _syncReconstructorFromSettings(self) -> None:
-        self.setActiveReconstructor(self._settings.algorithm.value)
+        self.selectReconstructor(self._settings.algorithm.value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings.algorithm:

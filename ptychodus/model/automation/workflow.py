@@ -44,7 +44,7 @@ class AutomationDatasetWorkflow:
             scanFilePath, scanFileFilter)
 
         if len(scanItemNameList) == 1:
-            self._scanAPI.setActiveScan(scanItemNameList[0])
+            self._scanAPI.selectScan(scanItemNameList[0])
         else:
             logger.error(f'Scan file contains {len(scanItemNameList)} items!')
             return

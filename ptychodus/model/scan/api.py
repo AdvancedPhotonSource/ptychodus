@@ -4,10 +4,10 @@ from typing import Optional
 import logging
 
 from ...api.geometry import Box2D, Interval
-from ...api.scan import TabularScan
-from .active import ActiveScan
-from .itemFactory import ScanRepositoryItemFactory
-from .itemRepository import ScanRepository
+from ...api.scan import Scan, TabularScan
+from .factory import ScanRepositoryItemFactory
+from .repository import ScanRepository
+from .selected import SelectedScan
 from .sizer import ScanSizer
 from .streaming import StreamingScanBuilder
 from .tabular import ScanFileInfo
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class ScanAPI:
 
     def __init__(self, builder: StreamingScanBuilder, factory: ScanRepositoryItemFactory,
-                 repository: ScanRepository, scan: ActiveScan, sizer: ScanSizer) -> None:
+                 repository: ScanRepository, scan: SelectedScan, sizer: ScanSizer) -> None:
         self._builder = builder
         self._factory = factory
         self._repository = repository
@@ -49,8 +49,11 @@ class ScanAPI:
         item = self._factory.createTabularItem(scan, fileInfo)
         return self._repository.insertItem(item)
 
-    def setActiveScan(self, name: str) -> None:
-        self._scan.setActiveScan(name)
+    def getSelectedScan(self) -> Scan:
+        return self._scan.getSelectedItem()
+
+    def selectScan(self, name: str) -> None:
+        self._scan.selectItem(name)
 
     def getBoundingBoxInMeters(self) -> Box2D[Decimal]:
         box = self._sizer.getBoundingBoxInMeters()
@@ -72,4 +75,4 @@ class ScanAPI:
     def finalizeStreamingScan(self) -> None:
         scan = self._builder.build()
         itemName = self.insertScanIntoRepository(scan, ScanFileInfo.createNull())
-        self.setActiveScan(itemName)
+        self.selectScan(itemName)

@@ -4,19 +4,19 @@ from typing import Optional
 
 from ...api.geometry import Box2D, Interval
 from ...api.observer import Observable, Observer
-from ...api.scan import Scan
+from .selected import SelectedScan
 from .settings import ScanSettings
 
 
 class ScanSizer(Observable, Observer):
 
-    def __init__(self, settings: ScanSettings, scan: Scan) -> None:
+    def __init__(self, settings: ScanSettings, scan: SelectedScan) -> None:
         super().__init__()
         self._settings = settings
         self._scan = scan
 
     @classmethod
-    def createInstance(cls, settings: ScanSettings, scan: Scan) -> ScanSizer:
+    def createInstance(cls, settings: ScanSettings, scan: SelectedScan) -> ScanSizer:
         sizer = cls(settings, scan)
         settings.addObserver(sizer)
         scan.addObserver(sizer)
@@ -36,7 +36,7 @@ class ScanSizer(Observable, Observer):
             )
             boundingBoxInMeters = Box2D[Decimal](rangeXInMeters, rangeYInMeters)
 
-        it = iter(self._scan.values())
+        it = iter(self._scan.getSelectedItem().values())
 
         try:
             point = next(it)

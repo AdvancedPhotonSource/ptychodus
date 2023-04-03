@@ -155,7 +155,12 @@ class TikeReconstructor:
 
         logger.debug(f'Result: {pprint.pformat(result)}')
 
-        outputArrays = TikeArrays(scan=result.scan, probe=result.probe, object_=result.psi)
+        outputArrays = TikeArrays(
+            indexes=inputArrays.indexes,
+            scan=result.scan,
+            probe=result.probe,
+            object_=result.psi,
+        )
         self._arrayConverter.importFromTike(outputArrays)
 
         return ReconstructResult(0, result.algorithm_options.costs)

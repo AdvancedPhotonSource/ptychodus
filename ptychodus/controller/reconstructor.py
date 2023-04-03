@@ -92,15 +92,14 @@ class ReconstructorParametersController(Observer):
         view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex)
 
-        view.reconstructorView.scanComboBox.currentTextChanged.connect(scanPresenter.setActiveScan)
+        view.reconstructorView.scanComboBox.currentTextChanged.connect(scanPresenter.selectScan)
         view.reconstructorView.scanComboBox.setModel(controller._scanListModel)
 
-        view.reconstructorView.probeComboBox.currentTextChanged.connect(
-            probePresenter.setActiveProbe)
+        view.reconstructorView.probeComboBox.currentTextChanged.connect(probePresenter.selectProbe)
         view.reconstructorView.probeComboBox.setModel(controller._probeListModel)
 
         view.reconstructorView.objectComboBox.currentTextChanged.connect(
-            objectPresenter.setActiveObject)
+            objectPresenter.selectObject)
         view.reconstructorView.objectComboBox.setModel(controller._objectListModel)
 
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
@@ -148,13 +147,14 @@ class ReconstructorParametersController(Observer):
 
     def _syncScanToView(self) -> None:
         self._view.reconstructorView.scanComboBox.blockSignals(True)
-        self._scanListModel.setStringList(item.name for item in self._scanRepositoryPresenter
-                                          if item.canActivate)
+        self._scanListModel.setStringList(itemPresenter.name
+                                          for itemPresenter in self._scanRepositoryPresenter
+                                          if itemPresenter.item.canSelect)
         self._view.reconstructorView.scanComboBox.setCurrentText(
-            self._scanPresenter.getActiveScan())
+            self._scanPresenter.getSelectedScan())
         self._view.reconstructorView.scanComboBox.blockSignals(False)
 
-        isValid = self._scanPresenter.isActiveScanValid()
+        isValid = self._scanPresenter.isSelectedScanValid()
         validationPixmap = self._getValidationPixmap(isValid)
         self._view.reconstructorView.scanValidationLabel.setPixmap(validationPixmap)
 
@@ -163,19 +163,20 @@ class ReconstructorParametersController(Observer):
         self._probeListModel.setStringList(['Current Probe'])  # TODO
         self._view.reconstructorView.probeComboBox.blockSignals(False)
 
-        isValid = self._probePresenter.isActiveProbeValid()
+        isValid = self._probePresenter.isSelectedProbeValid()
         validationPixmap = self._getValidationPixmap(isValid)
         self._view.reconstructorView.probeValidationLabel.setPixmap(validationPixmap)
 
     def _syncObjectToView(self) -> None:
         self._view.reconstructorView.objectComboBox.blockSignals(True)
-        self._objectListModel.setStringList(item.name for item in self._objectRepositoryPresenter
-                                            if item.canActivate)
+        self._objectListModel.setStringList(itemPresenter.name
+                                            for itemPresenter in self._objectRepositoryPresenter
+                                            if itemPresenter.item.canSelect)
         self._view.reconstructorView.objectComboBox.setCurrentText(
-            self._objectPresenter.getActiveObject())
+            self._objectPresenter.getSelectedObject())
         self._view.reconstructorView.objectComboBox.blockSignals(False)
 
-        isValid = self._objectPresenter.isActiveObjectValid()
+        isValid = self._objectPresenter.isSelectedObjectValid()
         validationPixmap = self._getValidationPixmap(isValid)
         self._view.reconstructorView.objectValidationLabel.setPixmap(validationPixmap)
 

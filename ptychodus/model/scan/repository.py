@@ -2,14 +2,13 @@ from __future__ import annotations
 from abc import abstractmethod, abstractproperty
 from collections.abc import Iterator
 from decimal import Decimal
-from typing import Optional
 import logging
 
 import numpy
 
 from ...api.observer import Observable, Observer
 from ...api.scan import Scan, ScanIndexFilter, ScanPoint, ScanPointTransform
-from ..itemRepository import ItemRepository
+from ..itemRepository import ItemRepository, RepositoryItemSettingsDelegate, SelectedRepositoryItem
 from .indexFilters import ScanIndexFilterFactory
 from .settings import ScanSettings
 
@@ -25,8 +24,8 @@ class ScanRepositoryItem(Scan):
         pass
 
     @abstractproperty
-    def canActivate(self) -> bool:
-        '''indicates whether item can be made active'''
+    def canSelect(self) -> bool:
+        '''indicates whether item can be selected'''
         pass
 
     @abstractmethod
@@ -52,7 +51,6 @@ class TransformedScanRepositoryItem(ScanRepositoryItem, Observer):
         self._transform = ScanPointTransform.PXPY
         self._jitterRadiusInMeters = Decimal()
         self._centroid = ScanPoint(Decimal(), Decimal())
-        self._name: Optional[str] = None
 
     @classmethod
     def createInstance(
@@ -63,22 +61,16 @@ class TransformedScanRepositoryItem(ScanRepositoryItem, Observer):
         return transformedItem
 
     @property
-    def name(self) -> str:
-        return self._item.name if self._name is None else self._name
-
-    @name.setter
-    def name(self, name: str) -> None:
-        if self._name != name:
-            self._name = name
-            self.notifyObservers()
+    def nameHint(self) -> str:
+        return self._item.nameHint
 
     @property
     def initializer(self) -> str:
         return self._item.initializer
 
     @property
-    def canActivate(self) -> bool:
-        return self._item.canActivate
+    def canSelect(self) -> bool:
+        return self._item.canSelect
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
         self._indexFilter = self._indexFilterFactory.create(settings.indexFilter.value)

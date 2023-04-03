@@ -1,35 +1,25 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod, abstractproperty
-from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Iterator, Mapping
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
 from statistics import median
-from typing import Any
+from typing import Any, TypeAlias
 import logging
 
 import numpy
 import numpy.typing
 
+from .geometry import Point2D
 from .observer import Observable
 
 ScanArrayType = numpy.typing.NDArray[numpy.floating[Any]]
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass(frozen=True)
-class ScanPoint:
-    '''scan point coordinates are conventionally in meters'''
-    x: Decimal
-    y: Decimal
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, ScanPoint):
-            return (self.x == other.x and self.y == other.y)
-        else:
-            return NotImplemented
+# scan point coordinates are conventionally in meters
+ScanPoint: TypeAlias = Point2D[Decimal]
 
 
 class ScanIndexFilter(ABC):
@@ -109,16 +99,16 @@ class Scan(Mapping[int, ScanPoint], Observable):
     '''interface for an enumerated collection of scan points'''
 
     @abstractproperty
-    def name(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
+    def nameHint(self) -> str:
+        '''returns a name hint that is appropriate for a settings file'''
         pass
 
 
 class TabularScan(Scan):
 
-    def __init__(self, name: str, pointMap: Mapping[int, ScanPoint]) -> None:
+    def __init__(self, nameHint: str, pointMap: Mapping[int, ScanPoint]) -> None:
         super().__init__()
-        self._name = name
+        self._nameHint = nameHint
         self._data = dict(pointMap)
 
     @classmethod
@@ -126,25 +116,27 @@ class TabularScan(Scan):
         return cls('Empty', {})
 
     @classmethod
-    def createFromPointSequence(cls, name: str, pointSeq: Sequence[ScanPoint]) -> TabularScan:
-        return cls(name, {index: point for index, point in enumerate(pointSeq)})
+    def createFromPointIterable(cls, nameHint: str,
+                                pointIterable: Iterable[ScanPoint]) -> TabularScan:
+        return cls(nameHint, {index: point for index, point in enumerate(pointIterable)})
 
     @classmethod
-    def createFromMappedPointSequence(
-            cls, name: str, pointSeqMap: Mapping[int, Sequence[ScanPoint]]) -> TabularScan:
+    def createFromMappedPointIterable(
+            cls, nameHint: str, pointIterableMap: Mapping[int,
+                                                          Iterable[ScanPoint]]) -> TabularScan:
         pointMap: dict[int, ScanPoint] = dict()
 
-        for index, pointSeq in pointSeqMap.items():
+        for index, pointIterable in pointIterableMap.items():
             pointMap[index] = ScanPoint(
-                x=median(point.x for point in pointSeq),
-                y=median(point.y for point in pointSeq),
+                x=median(point.x for point in pointIterable),
+                y=median(point.y for point in pointIterable),
             )
 
-        return cls(name, pointMap)
+        return cls(nameHint, pointMap)
 
     @property
-    def name(self) -> str:
-        return self._name
+    def nameHint(self) -> str:
+        return self._nameHint
 
     def __iter__(self) -> Iterator[int]:
         return iter(self._data)
@@ -175,7 +167,7 @@ class ScanFileReader(ABC):
         pass
 
     @abstractmethod
-    def read(self, filePath: Path) -> Sequence[Scan]:
+    def read(self, filePath: Path) -> Iterable[Scan]:
         '''reads a scan dictionary from file'''
         pass
 
@@ -194,6 +186,6 @@ class ScanFileWriter(ABC):
         pass
 
     @abstractmethod
-    def write(self, filePath: Path, scanSeq: Sequence[Scan]) -> None:
+    def write(self, filePath: Path, scanIterable: Iterable[Scan]) -> None:
         '''writes a scan dictionary to file'''
         pass
