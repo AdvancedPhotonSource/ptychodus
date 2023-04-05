@@ -3,6 +3,7 @@ from typing import Any, Final
 
 import numpy
 
+from ...api.geometry import Interval
 from ...api.image import ImageExtent
 from ...api.object import ObjectArrayType
 from .repository import ObjectRepositoryItem
@@ -20,7 +21,7 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
         self._extraPaddingX = 0
         self._extraPaddingY = 0
         self._amplitudeMean = Decimal(1) / 2
-        self._amplitudeStandardDeviation = Decimal()
+        self._amplitudeDeviation = Decimal()
         self._randomizePhase = False
 
     @property
@@ -39,7 +40,7 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
         self._extraPaddingX = settings.extraPaddingX.value
         self._extraPaddingY = settings.extraPaddingY.value
         self._amplitudeMean = settings.amplitudeMean.value
-        self._amplitudeStandardDeviation = settings.amplitudeStandardDeviation.value
+        self._amplitudeDeviation = settings.amplitudeDeviation.value
         self._randomizePhase = settings.randomizePhase.value
         self.notifyObservers()
 
@@ -47,7 +48,7 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
         settings.extraPaddingX.value = self._extraPaddingX
         settings.extraPaddingY.value = self._extraPaddingY
         settings.amplitudeMean.value = self._amplitudeMean
-        settings.amplitudeStandardDeviation.value = self._amplitudeStandardDeviation
+        settings.amplitudeDeviation.value = self._amplitudeDeviation
         settings.randomizePhase.value = self._randomizePhase
 
     @property
@@ -69,8 +70,8 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
         paddedObjectExtent = self._sizer.getObjectExtent() + extraPaddingExtent
 
         size = paddedObjectExtent.shape
-        amplitude = self._rng.normal(float(self._amplitudeMean),
-                                     float(self._amplitudeStandardDeviation), size)
+        amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),
+                                     size)
         phase = self._rng.uniform(0, 2 * numpy.pi, size=size) \
                 if self._randomizePhase else numpy.zeros_like(amplitude)
         array: ObjectArrayType = amplitude * numpy.exp(1j * phase)
@@ -92,6 +93,9 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
             self._extraPaddingY = value
             self.notifyObservers()
 
+    def getAmplitudeMeanLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))
+
     def getAmplitudeMean(self) -> Decimal:
         return self._amplitudeMean
 
@@ -100,12 +104,15 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
             self._amplitudeMean = mean
             self.notifyObservers()
 
-    def getAmplitudeStandardDeviation(self) -> Decimal:
-        return self._amplitudeStandardDeviation
+    def getAmplitudeDeviationLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))
 
-    def setAmplitudeStandardDeviation(self, stddev: Decimal) -> None:
-        if self._amplitudeStandardDeviation != stddev:
-            self._amplitudeStandardDeviation = stddev
+    def getAmplitudeDeviation(self) -> Decimal:
+        return self._amplitudeDeviation
+
+    def setAmplitudeDeviation(self, stddev: Decimal) -> None:
+        if self._amplitudeDeviation != stddev:
+            self._amplitudeDeviation = stddev
             self.notifyObservers()
 
     def isRandomizePhaseEnabled(self) -> bool:

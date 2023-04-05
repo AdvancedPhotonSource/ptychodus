@@ -15,8 +15,7 @@ class ObjectSettings(Observable, Observer):
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/object.npy'))
         self.amplitudeMean = settingsGroup.createRealEntry('AmplitudeMean', '0.5')
-        self.amplitudeStandardDeviation = settingsGroup.createRealEntry(
-            'AmplitudeStandardDeviation', '0')
+        self.amplitudeDeviation = settingsGroup.createRealEntry('AmplitudeDeviation', '0')
         self.randomizePhase = settingsGroup.createBooleanEntry('RandomizePhase', False)
         self.extraPaddingX = settingsGroup.createIntegerEntry('ExtraPaddingX', 0)
         self.extraPaddingY = settingsGroup.createIntegerEntry('ExtraPaddingY', 0)

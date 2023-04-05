@@ -8,10 +8,12 @@ from PyQt5.QtWidgets import QAbstractItemView
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.object import (ObjectPresenter, ObjectRepositoryItemPresenter,
-                             ObjectRepositoryPresenter)
-from ...view import ImageView, ObjectParametersView, ObjectView
+                             ObjectRepositoryPresenter, RandomObjectRepositoryItem)
+from ...view import (ImageView, ObjectEditorDialog, ObjectParametersView, ObjectView,
+                     RandomObjectView)
 from ..data import FileDialogFactory
 from ..image import ImageController
+from .random import RandomObjectController
 from .tableModel import ObjectTableModel
 
 logger = logging.getLogger(__name__)
@@ -149,20 +151,17 @@ class ObjectController(Observer):
         if itemPresenter is None:
             logger.error('No items are selected!')
         else:
-            #item = itemPresenter._item
+            item = itemPresenter.item
 
-            #if isinstance(item, CartesianObjectRepositoryItem):
-            #    cartesianDialog = ObjectEditorDialog.createInstance(
-            #        CartesianObjectView.createInstance(), self._view)
-            #    cartesianDialog.setWindowTitle(name)
-            #    cartesianController = CartesianObjectController.createInstance(
-            #        item._item, cartesianDialog.editorView)
-            #    cartesianTransformController = ObjectTransformController.createInstance(
-            #        item, cartesianDialog.transformView)
-            #    cartesianDialog.open()
-            #else:
-            #    logger.debug(f'Unknown category \"{category}\"')
-            pass  # FIXME edit object initializer parameters
+            if isinstance(item, RandomObjectRepositoryItem):
+                randomDialog = ObjectEditorDialog.createInstance(RandomObjectView.createInstance(),
+                                                                 self._view)
+                randomDialog.setWindowTitle(itemPresenter.name)
+                randomController = RandomObjectController.createInstance(
+                    item, randomDialog.editorView)
+                randomDialog.open()
+            else:
+                logger.error('Unknown object repository item!')
 
     def _removeSelectedObject(self) -> None:
         current = self._view.repositoryView.tableView.currentIndex()
