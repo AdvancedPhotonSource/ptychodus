@@ -33,6 +33,37 @@ class AutomationPresenter(Observable, Observer):
         watcher.addObserver(presenter)
         return presenter
 
+    def getStrategyList(self) -> list[str]:
+        return [
+            'LYNX Catalyst Particle',
+            'CNM/APS Hard X-Ray Nanoprobe',
+        ]
+
+    def getStrategy(self) -> str:
+        return self._settings.strategy.value
+
+    def setStrategy(self, strategy: str) -> None:
+        self._settings.strategy.value = strategy
+
+    def getDataDirectory(self) -> Path:
+        return self._settings.dataDirectory.value
+
+    def setDataDirectory(self, directory: Path) -> None:
+        self._settings.dataDirectory.value = directory
+
+    def getProcessingIntervalLimitsInSeconds(self) -> Interval[int]:
+        return Interval[int](0, 600)
+
+    def getProcessingIntervalInSeconds(self) -> int:
+        limits = self.getProcessingIntervalLimitsInSeconds()
+        return limits.clamp(self._settings.processingIntervalInSeconds.value)
+
+    def setProcessingIntervalInSeconds(self, value: int) -> None:
+        self._settings.processingIntervalInSeconds.value = value
+
+    def execute(self) -> None:
+        pass  # FIXME
+
     def isWatchdogEnabled(self) -> bool:
         return self._watcher.isAlive
 
@@ -41,21 +72,6 @@ class AutomationPresenter(Observable, Observer):
             self._watcher.start()
         else:
             self._watcher.stop()
-
-    def getWatchdogDirectory(self) -> Path:
-        return self._settings.watchdogDirectory.value
-
-    def setWatchdogDirectory(self, directory: Path) -> None:
-        self._settings.watchdogDirectory.value = directory
-
-    def getStrategyList(self) -> list[str]:
-        return ['CNM/APS Hard X-Ray Nanoprobe']
-
-    def getStrategy(self) -> str:
-        return self._settings.strategy.value
-
-    def setStrategy(self, strategy: str) -> None:
-        self._settings.strategy.value = strategy
 
     def getWatchdogDelayLimitsInSeconds(self) -> Interval[int]:
         return Interval[int](0, 600)

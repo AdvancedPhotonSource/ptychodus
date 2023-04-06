@@ -173,6 +173,7 @@ class ObjectController(Observer):
             logger.error('No items are selected!')
 
     def _setCurrentImage(self) -> None:
+        # FIXME update while editing
         itemPresenter = self._getSelectedItemPresenter()
 
         if itemPresenter is None:

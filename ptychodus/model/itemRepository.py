@@ -95,7 +95,7 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
         self._repository = repository
         self._settingsDelegate = settingsDelegate
         self._reinitObservable = reinitObservable
-        self._name = next(iter(self._repository.keys()))
+        self._name = str()
         self._item = next(iter(self._repository.values()))
 
     @classmethod

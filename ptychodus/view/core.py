@@ -75,7 +75,7 @@ class ViewCore(QMainWindow):
 
         self.automationAction = self.navigationToolBar.addAction(QIcon(':/icons/automate'),
                                                                  'Automation')
-        self.automationParametersView = AutomationParametersView.createInstance()
+        self.automationView = AutomationView.createInstance()
         self.automationWidget = QWidget()
 
         self.monitorAction = self.navigationToolBar.addAction(QIcon(':/icons/monitor'), 'Monitor')
@@ -115,7 +115,7 @@ class ViewCore(QMainWindow):
         view.parametersWidget.addWidget(view.objectView)
         view.parametersWidget.addWidget(view.reconstructorParametersView)
         view.parametersWidget.addWidget(view.workflowParametersView)
-        view.parametersWidget.addWidget(view.automationParametersView)
+        view.parametersWidget.addWidget(view.automationView)
         view.parametersWidget.addWidget(view.monitorProbeView)
         view.parametersWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.parametersWidget)

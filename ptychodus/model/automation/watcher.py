@@ -58,7 +58,7 @@ class DataDirectoryWatcher(Observable, Observer):
         self._observer.unschedule_all()
         observedWatch = self._observer.schedule(
             event_handler=DataDirectoryEventHandler(self._datasetBuffer),
-            path=self._settings.watchdogDirectory.value,
+            path=self._settings.dataDirectory.value,
             recursive=False,  # TODO generalize
         )
         logger.debug(observedWatch)

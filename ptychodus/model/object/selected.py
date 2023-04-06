@@ -30,7 +30,6 @@ class ObjectRepositoryItemSettingsDelegate(RepositoryItemSettingsDelegate[Object
         return itemName
 
     def syncToSettings(self, item: ObjectRepositoryItem) -> None:
-        # FIXME call when editing selected
         self._settings.initializer.value = item.initializer
         item.syncToSettings(self._settings)
 

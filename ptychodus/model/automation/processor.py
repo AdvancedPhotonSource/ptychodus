@@ -2,6 +2,7 @@ from pathlib import Path
 import logging
 import queue
 import threading
+import time
 
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
@@ -20,6 +21,7 @@ class AutomationDatasetProcessor:
         self._processingQueue = processingQueue
         self._stopWorkEvent = threading.Event()
         self._worker = threading.Thread()
+        self._nextJobTime = time.time()
 
     @property
     def isAlive(self) -> bool:
@@ -29,17 +31,23 @@ class AutomationDatasetProcessor:
         while not self._stopWorkEvent.is_set():
             try:
                 filePath = self._processingQueue.get(block=True, timeout=1)
-
-                try:
-                    self._repository.put(filePath, AutomationDatasetState.PROCESSING)
-                    self._workflow.execute(filePath)
-                    self._repository.put(filePath, AutomationDatasetState.COMPLETE)
-                finally:
-                    self._processingQueue.task_done()
             except queue.Empty:
-                pass
+                continue
+
+            delayInSeconds = self._nextJobTime - time.time()
+
+            if delayInSeconds > 0. and self._stopWorkEvent.wait(timeout=delayInSeconds):
+                break
+
+            try:
+                self._repository.put(filePath, AutomationDatasetState.PROCESSING)
+                self._workflow.execute(filePath)
+                self._repository.put(filePath, AutomationDatasetState.COMPLETE)
             except:
                 logger.exception('Error while processing dataset!')
+            finally:
+                self._processingQueue.task_done()
+                self._nextJobTime = self._settings.processingIntervalInSeconds.value + time.time()
 
     def start(self) -> None:
         self.stop()

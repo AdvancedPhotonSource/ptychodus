@@ -8,13 +8,14 @@ from PyQt5.QtGui import QFont
 from ..api.observer import Observable, Observer
 from ..model.automation import (AutomationCore, AutomationDatasetState, AutomationPresenter,
                                 AutomationProcessingPresenter)
-from ..view import AutomationParametersView, AutomationProcessingView, AutomationWatchdogView
+from ..view import (AutomationView, AutomationParametersView, AutomationProcessingView,
+                    AutomationWatchdogView)
 from .data import FileDialogFactory
 
 
-class AutomationWatchdogController(Observer):
+class AutomationParametersController(Observer):
 
-    def __init__(self, presenter: AutomationPresenter, view: AutomationWatchdogView,
+    def __init__(self, presenter: AutomationPresenter, view: AutomationParametersView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
@@ -22,21 +23,74 @@ class AutomationWatchdogController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, presenter: AutomationPresenter, view: AutomationWatchdogView,
-                       fileDialogFactory: FileDialogFactory) -> AutomationWatchdogController:
+    def createInstance(cls, presenter: AutomationPresenter, view: AutomationParametersView,
+                       fileDialogFactory: FileDialogFactory) -> AutomationParametersController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
         for strategy in presenter.getStrategyList():
             view.strategyComboBox.addItem(strategy)
 
-        view.watchButton.setCheckable(True)
-
         controller._syncModelToView()
 
         view.strategyComboBox.currentTextChanged.connect(presenter.setStrategy)
         view.directoryLineEdit.editingFinished.connect(controller._syncDirectoryToModel)
         view.directoryBrowseButton.clicked.connect(controller._browseDirectory)
+        view.intervalSpinBox.valueChanged.connect(presenter.setProcessingIntervalInSeconds)
+        view.executeButton.clicked.connect(presenter.execute)
+
+        return controller
+
+    def _syncDirectoryToModel(self) -> None:
+        dataDirectory = Path(self._view.directoryLineEdit.text())
+        self._presenter.setDataDirectory(dataDirectory)
+
+    def _browseDirectory(self) -> None:
+        dirPath = self._fileDialogFactory.getExistingDirectoryPath(self._view,
+                                                                   'Choose Data Directory')
+
+        if dirPath:
+            self._presenter.setDataDirectory(dirPath)
+
+    def _syncModelToView(self) -> None:
+        self._view.strategyComboBox.blockSignals(True)
+        self._view.strategyComboBox.setCurrentText(self._presenter.getStrategy())
+        self._view.strategyComboBox.blockSignals(False)
+
+        dataDirectory = self._presenter.getDataDirectory()
+
+        if dataDirectory:
+            self._view.directoryLineEdit.setText(str(dataDirectory))
+        else:
+            self._view.directoryLineEdit.clear()
+
+        intervalLimitsInSeconds = self._presenter.getProcessingIntervalLimitsInSeconds()
+
+        self._view.intervalSpinBox.blockSignals(True)
+        self._view.intervalSpinBox.setRange(intervalLimitsInSeconds.lower,
+                                            intervalLimitsInSeconds.upper)
+        self._view.intervalSpinBox.setValue(self._presenter.getProcessingIntervalInSeconds())
+        self._view.intervalSpinBox.blockSignals(False)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()
+
+
+class AutomationWatchdogController(Observer):
+
+    def __init__(self, presenter: AutomationPresenter, view: AutomationWatchdogView) -> None:
+        super().__init__()
+        self._presenter = presenter
+        self._view = view
+
+    @classmethod
+    def createInstance(cls, presenter: AutomationPresenter,
+                       view: AutomationWatchdogView) -> AutomationWatchdogController:
+        controller = cls(presenter, view)
+        presenter.addObserver(controller)
+        controller._syncModelToView()
+
         view.delaySpinBox.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
         view.usePollingObserverCheckBox.toggled.connect(
             presenter.setWatchdogPollingObserverEnabled)
@@ -44,29 +98,7 @@ class AutomationWatchdogController(Observer):
 
         return controller
 
-    def _syncDirectoryToModel(self) -> None:
-        watchdogDirectory = Path(self._view.directoryLineEdit.text())
-        self._presenter.setWatchdogDirectory(watchdogDirectory)
-
-    def _browseDirectory(self) -> None:
-        dirPath = self._fileDialogFactory.getExistingDirectoryPath(self._view,
-                                                                   'Choose Watchdog Directory')
-
-        if dirPath:
-            self._presenter.setWatchdogDirectory(dirPath)
-
     def _syncModelToView(self) -> None:
-        self._view.strategyComboBox.blockSignals(True)
-        self._view.strategyComboBox.setCurrentText(self._presenter.getStrategy())
-        self._view.strategyComboBox.blockSignals(False)
-
-        watchdogDirectory = self._presenter.getWatchdogDirectory()
-
-        if watchdogDirectory:
-            self._view.directoryLineEdit.setText(str(watchdogDirectory))
-        else:
-            self._view.directoryLineEdit.clear()
-
         delayLimitsInSeconds = self._presenter.getWatchdogDelayLimitsInSeconds()
 
         self._view.delaySpinBox.blockSignals(True)
@@ -150,19 +182,20 @@ class AutomationProcessingController(Observer):
 class AutomationController:
 
     def __init__(self, core: AutomationCore, presenter: AutomationPresenter,
-                 processingPresenter: AutomationProcessingPresenter,
-                 view: AutomationParametersView, fileDialogFactory: FileDialogFactory) -> None:
+                 processingPresenter: AutomationProcessingPresenter, view: AutomationView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         self._core = core
+        self._parametersController = AutomationParametersController.createInstance(
+            presenter, view.parametersView, fileDialogFactory)
         self._watchdogController = AutomationWatchdogController.createInstance(
-            presenter, view.watchdogView, fileDialogFactory)
+            presenter, view.watchdogView)
         self._processingController = AutomationProcessingController.createInstance(
             processingPresenter, view.processingView)
         self._timer = QTimer()
 
     @classmethod
     def createInstance(cls, core: AutomationCore, presenter: AutomationPresenter,
-                       processingPresenter: AutomationProcessingPresenter,
-                       view: AutomationParametersView,
+                       processingPresenter: AutomationProcessingPresenter, view: AutomationView,
                        fileDialogFactory: FileDialogFactory) -> AutomationController:
         controller = cls(core, presenter, processingPresenter, view, fileDialogFactory)
 
