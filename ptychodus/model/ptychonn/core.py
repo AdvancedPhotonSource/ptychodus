@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from decimal import Decimal
 from pathlib import Path
-from typing import Final, Generator, Optional
+from typing import Any, Final, Generator, Optional
 import logging
 
 from scipy.interpolate import RegularGridInterpolator
@@ -10,7 +10,9 @@ import numpy
 import numpy.typing
 
 from ...api.geometry import Interval
+from ...api.object import ObjectPhaseCenteringStrategy
 from ...api.observer import Observable, Observer
+from ...api.plugins import PluginChooser
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
 from ...api.scan import Scan
 from ...api.settings import SettingsRegistry, SettingsGroup
@@ -85,10 +87,12 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: PtychoNNTrainingSettings,
+                 phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
                  diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI, probe: Probe,
                  objectAPI: ObjectAPI) -> None:
         super().__init__()
         self._settings = settings
+        self._phaseCenteringStrategyChooser = phaseCenteringStrategyChooser
         self._diffractionDataset = diffractionDataset
         self._scanAPI = scanAPI
         self._probe = probe
@@ -98,10 +102,14 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
     @classmethod
     def createInstance(cls, settings: PtychoNNTrainingSettings,
+                       phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
                        diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
                        probe: Probe, objectAPI: ObjectAPI) -> PtychoNNTrainingPresenter:
-        presenter = cls(settings, diffractionDataset, scanAPI, probe, objectAPI)
+        presenter = cls(settings, phaseCenteringStrategyChooser, diffractionDataset, scanAPI,
+                        probe, objectAPI)
         settings.addObserver(presenter)
+        phaseCenteringStrategyChooser.addObserver(presenter)
+        presenter._syncPhaseCenteringStrategyFromSettings()
         return presenter
 
     def setTrainer(self, trainer: TrainableReconstructor) -> None:
@@ -197,8 +205,27 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         axis += center - axis.mean()
         return axis
 
+    def getPhaseCenteringStrategyList(self) -> list[str]:
+        return self._phaseCenteringStrategyChooser.getDisplayNameList()
+
+    def getPhaseCenteringStrategy(self) -> str:
+        return self._phaseCenteringStrategyChooser.getCurrentDisplayName()
+
+    def setPhaseCenteringStrategy(self, name: str) -> None:
+        self._phaseCenteringStrategyChooser.setFromDisplayName(name)
+
+    def _syncPhaseCenteringStrategyFromSettings(self) -> None:
+        self._phaseCenteringStrategyChooser.setFromSimpleName(
+            self._settings.phaseCenteringStrategy.value)
+
+    def _syncPhaseCenteringStrategyToSettings(self) -> None:
+        self._settings.phaseCenteringStrategy.value = \
+                self._phaseCenteringStrategyChooser.getCurrentSimpleName()
+
     def saveTrainingData(self, filePath: Path) -> None:
-        object_ = self._objectAPI.getSelectedObjectArray()
+        objectPhaseCenteringStrategy = self._phaseCenteringStrategyChooser.getCurrentStrategy()
+        object_ = objectPhaseCenteringStrategy(self._objectAPI.getSelectedObjectArray())
+
         pixelSizeXInMeters = float(self._objectAPI.getPixelSizeXInMeters())
         pixelSizeYInMeters = float(self._objectAPI.getPixelSizeYInMeters())
 
@@ -237,7 +264,7 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         scanPositionsInMeters = numpy.column_stack(
             (scanPositionsYInMeters, scanPositionsXInMeters))
 
-        data: dict[str, numpy.typing.NDArray[numpy.number]] = {
+        data: dict[str, numpy.typing.NDArray[numpy.number[Any]]] = {
             'real': patches,
             'reciprocal': diffractionData,
             'position': scanPositionsInMeters,
@@ -274,12 +301,16 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
+            self._syncPhaseCenteringStrategyFromSettings()
             self.notifyObservers()
+        elif observable is self._phaseCenteringStrategyChooser:
+            self._syncPhaseCenteringStrategyToSettings()
 
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
     def __init__(self, settingsRegistry: SettingsRegistry,
+                 phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
                  diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI, probe: Probe,
                  objectAPI: ObjectAPI) -> None:
         super().__init__()
@@ -287,15 +318,18 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         self._trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
         self.modelPresenter = PtychoNNModelPresenter.createInstance(self._settings)
         self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(
-            self._trainingSettings, diffractionDataset, scanAPI, probe, objectAPI)
+            self._trainingSettings, phaseCenteringStrategyChooser, diffractionDataset, scanAPI,
+            probe, objectAPI)
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry,
+                       phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
                        diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
                        probe: Probe, objectAPI: ObjectAPI,
                        isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
-        core = cls(settingsRegistry, diffractionDataset, scanAPI, probe, objectAPI)
+        core = cls(settingsRegistry, phaseCenteringStrategyChooser, diffractionDataset, scanAPI,
+                   probe, objectAPI)
 
         try:
             from .reconstructor import PtychoNNPhaseOnlyReconstructor

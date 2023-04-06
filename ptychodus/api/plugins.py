@@ -9,10 +9,16 @@ import pkgutil
 
 from .data import DiffractionFileReader
 from .image import ScalarTransformation
-from .object import ObjectFileReader, ObjectFileWriter
+from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .probe import ProbeFileReader, ProbeFileWriter
 from .scan import ScanFileReader, ScanFileWriter
+
+__all__ = [
+    'PluginEntry',
+    'PluginChooser',
+    'PluginRegistry',
+]
 
 T = TypeVar('T')
 
@@ -103,6 +109,8 @@ class PluginRegistry:
         self.scanFileWriters: list[PluginEntry[ScanFileWriter]] = list()
         self.probeFileReaders: list[PluginEntry[ProbeFileReader]] = list()
         self.probeFileWriters: list[PluginEntry[ProbeFileWriter]] = list()
+        self.objectPhaseCenteringStrategies: list[
+            PluginEntry[ObjectPhaseCenteringStrategy]] = list()
         self.objectFileReaders: list[PluginEntry[ObjectFileReader]] = list()
         self.objectFileWriters: list[PluginEntry[ObjectFileWriter]] = list()
 
@@ -154,6 +162,10 @@ class PluginRegistry:
                                                                 displayName=plugin.fileFilter,
                                                                 strategy=plugin)
             self.probeFileWriters.append(probeFileWriterEntry)
+        elif isinstance(plugin, ObjectPhaseCenteringStrategy):
+            objectPhaseCenteringStrategyEntry = PluginEntry[ObjectPhaseCenteringStrategy](
+                simpleName=plugin.name, displayName=plugin.name, strategy=plugin)
+            self.objectPhaseCenteringStrategies.append(objectPhaseCenteringStrategyEntry)
         elif isinstance(plugin, ObjectFileReader):
             objectFileReaderEntry = PluginEntry[ObjectFileReader](simpleName=plugin.simpleName,
                                                                   displayName=plugin.fileFilter,
@@ -184,6 +196,11 @@ class PluginRegistry:
 
     def buildProbeFileWriterChooser(self) -> PluginChooser[ProbeFileWriter]:
         return PluginChooser[ProbeFileWriter].createFromList(self.probeFileWriters)
+
+    def buildObjectPhaseCenteringStrategyChooser(
+            self) -> PluginChooser[ObjectPhaseCenteringStrategy]:
+        return PluginChooser[ObjectPhaseCenteringStrategy].createFromList(
+            self.objectPhaseCenteringStrategies)
 
     def buildObjectFileReaderChooser(self) -> PluginChooser[ObjectFileReader]:
         return PluginChooser[ObjectFileReader].createFromList(self.objectFileReaders)

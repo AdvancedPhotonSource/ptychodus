@@ -8,6 +8,20 @@ import numpy.typing
 ObjectArrayType = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
 
+class ObjectPhaseCenteringStrategy(ABC):
+    '''interface for object phase centering strategies'''
+
+    @abstractproperty
+    def name(self) -> str:
+        '''returns a unique name'''
+        pass
+
+    @abstractmethod
+    def __call__(self, array: ObjectArrayType) -> ObjectArrayType:
+        '''returns the phase-centered array'''
+        pass
+
+
 class ObjectFileReader(ABC):
 
     @abstractproperty
