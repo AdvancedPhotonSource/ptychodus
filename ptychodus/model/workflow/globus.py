@@ -55,7 +55,7 @@ class PtychodusReconstruct(gladier.GladierBaseTool):
 @gladier.generate_flow_definition
 class PtychodusClient(gladier.GladierBaseClient):
     client_id = PTYCHODUS_CLIENT_ID
-    # TODO globus_group = '13e5512f-e761-11ec-8a9e-ff9dc0f99d56'
+    globus_group = '13e5512f-e761-11ec-8a9e-ff9dc0f99d56'
 
     gladier_tools = [
         'gladier_tools.globus.transfer.Transfer:InputData',
@@ -273,6 +273,7 @@ class GlobusWorkflowThread(threading.Thread):
                 )
             except:
                 logger.exception('Error running flow!')
-            finally:
+            else:
                 logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
+            finally:
                 self._executor.jobQueue.task_done()
