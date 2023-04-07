@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from pathlib import Path
 import logging
 import re
@@ -11,7 +12,15 @@ from ..workflow import WorkflowCore
 logger = logging.getLogger(__name__)
 
 
-class AutomationDatasetWorkflow:
+class AutomationDatasetWorkflow(ABC):
+
+    @abstractmethod
+    def execute(self, filePath: Path) -> None:
+        '''executes the workflow'''
+        pass
+
+
+class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
     def __init__(self, dataCore: DataCore, scanAPI: ScanAPI, probeCore: ProbeCore,
                  objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
@@ -50,5 +59,40 @@ class AutomationDatasetWorkflow:
             return
 
         self._probeCore.initializeAndActivateProbe()
-        self._objectAPI.initializeAndActivateObject('Random')
+        # TODO self._objectAPI.initializeAndActivateObject('Random')
+        self._workflowCore.executeWorkflow(flowLabel)
+
+
+class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
+
+    def __init__(self, dataCore: DataCore, scanAPI: ScanAPI, probeCore: ProbeCore,
+                 objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
+        self._dataCore = dataCore
+        self._scanAPI = scanAPI
+        self._probeCore = probeCore
+        self._objectAPI = objectAPI
+        self._workflowCore = workflowCore
+
+    def execute(self, filePath: Path) -> None:
+        scanName = filePath.stem
+        scanID = int(re.findall(r'\d+', scanName)[-1])
+        flowLabel = f'scan{scanID}'
+
+        diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
+        diffractionFileFilter = 'NeXus Master Files (*.h5 *.hdf5)'
+        self._dataCore.loadDiffractionDataset(diffractionFilePath, diffractionFileFilter)
+
+        scanFilePath = filePath
+        scanFileFilter = 'Comma-Separated Values Files (*.csv)'
+        scanItemNameList = self._scanAPI.insertScanIntoRepositoryFromFile(
+            scanFilePath, scanFileFilter)
+
+        if len(scanItemNameList) == 1:
+            self._scanAPI.selectScan(scanItemNameList[0])
+        else:
+            logger.error(f'Scan file contains {len(scanItemNameList)} items!')
+            return
+
+        self._probeCore.initializeAndActivateProbe()
+        # TODO self._objectAPI.initializeAndActivateObject('Random')
         self._workflowCore.executeWorkflow(flowLabel)

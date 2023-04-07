@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationDatasetState(Enum):
-    CREATED = auto()
+    EXISTS = auto()
     WAITING = auto()
     PROCESSING = auto()
     COMPLETE = auto()
@@ -31,7 +31,7 @@ class AutomationDatasetRepository(Observable):
             try:
                 priorState = self._fileState[filePath]
             except KeyError:
-                if state == AutomationDatasetState.CREATED:
+                if state == AutomationDatasetState.EXISTS:
                     self._fileList.append(filePath)
                     self._fileState[filePath] = state
                 else:

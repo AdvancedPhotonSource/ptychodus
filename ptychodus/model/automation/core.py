@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import Generator
 import queue
 
 from ...api.geometry import Interval
@@ -15,20 +16,22 @@ from .processor import AutomationDatasetProcessor
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
 from .watcher import DataDirectoryWatcher
-from .workflow import AutomationDatasetWorkflow
+from .workflow import S02AutomationDatasetWorkflow
 
 
 class AutomationPresenter(Observable, Observer):
 
-    def __init__(self, settings: AutomationSettings, watcher: DataDirectoryWatcher) -> None:
+    def __init__(self, settings: AutomationSettings, watcher: DataDirectoryWatcher,
+                 datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
         self._settings = settings
         self._watcher = watcher
+        self._datasetBuffer = datasetBuffer
 
     @classmethod
-    def createInstance(cls, settings: AutomationSettings,
-                       watcher: DataDirectoryWatcher) -> AutomationPresenter:
-        presenter = cls(settings, watcher)
+    def createInstance(cls, settings: AutomationSettings, watcher: DataDirectoryWatcher,
+                       datasetBuffer: AutomationDatasetBuffer) -> AutomationPresenter:
+        presenter = cls(settings, watcher, datasetBuffer)
         settings.addObserver(presenter)
         watcher.addObserver(presenter)
         return presenter
@@ -61,8 +64,12 @@ class AutomationPresenter(Observable, Observer):
     def setProcessingIntervalInSeconds(self, value: int) -> None:
         self._settings.processingIntervalInSeconds.value = value
 
-    def execute(self) -> None:
-        pass  # FIXME
+    def execute(self) -> None:  # TODO generalize
+        dataDirectory = self.getDataDirectory()
+        scanFileGlob: Generator[Path, None, None] = dataDirectory.glob('*.csv')
+
+        for scanFile in scanFileGlob:
+            self._datasetBuffer.put(scanFile)
 
     def isWatchdogEnabled(self) -> bool:
         return self._watcher.isAlive
@@ -144,36 +151,37 @@ class AutomationCore:
                  probeCore: ProbeCore, objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
+        self._workflow = S02AutomationDatasetWorkflow(dataCore, scanAPI, probeCore, objectAPI,
+                                                      workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
-        self._buffer = AutomationDatasetBuffer(self._settings, self.repository,
-                                               self._processingQueue)
-        self._workflow = AutomationDatasetWorkflow(dataCore, scanAPI, probeCore, objectAPI,
-                                                   workflowCore)
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
                                                      self._workflow, self._processingQueue)
-        self._watcher = DataDirectoryWatcher.createInstance(self._settings, self._buffer)
-        self.presenter = AutomationPresenter.createInstance(self._settings, self._watcher)
+        self._datasetBuffer = AutomationDatasetBuffer(self._settings, self.repository,
+                                                      self._processor)
+        self._watcher = DataDirectoryWatcher.createInstance(self._settings, self._datasetBuffer)
+        self.presenter = AutomationPresenter.createInstance(self._settings, self._watcher,
+                                                            self._datasetBuffer)
         self.processingPresenter = AutomationProcessingPresenter.createInstance(
             self._settings, self.repository, self._processor)
 
     def start(self) -> None:
-        self._buffer.start()
+        self._datasetBuffer.start()
 
     def executeWaitingTasks(self) -> None:
-        while True:
-            try:
-                filePath = self._processingQueue.get(block=False)
+        # FIXME this belongs in AutomationDatasetProcessor
+        try:
+            filePath = self._processingQueue.get(block=False)
 
-                try:
-                    self.repository.put(filePath, AutomationDatasetState.PROCESSING)
-                    self._workflow.execute(filePath)
-                    self.repository.put(filePath, AutomationDatasetState.COMPLETE)
-                finally:
-                    self._processingQueue.task_done()
-            except queue.Empty:
-                break
+            try:
+                self.repository.put(filePath, AutomationDatasetState.PROCESSING)
+                self._workflow.execute(filePath)
+                self.repository.put(filePath, AutomationDatasetState.COMPLETE)
+            finally:
+                self._processingQueue.task_done()
+        except queue.Empty:
+            pass
 
     def stop(self) -> None:
         self._processor.stop()
         self._watcher.stop()
-        self._buffer.stop()
+        self._datasetBuffer.stop()

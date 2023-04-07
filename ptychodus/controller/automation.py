@@ -200,7 +200,7 @@ class AutomationController:
         controller = cls(core, presenter, processingPresenter, view, fileDialogFactory)
 
         controller._timer.timeout.connect(core.executeWaitingTasks)
-        controller._timer.start(1000)  # TODO customize
+        controller._timer.start(60 * 1000)  # TODO customize (in milliseconds)
 
         view.processingView.processButton.setEnabled(False)  # TODO
 

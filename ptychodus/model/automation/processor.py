@@ -1,8 +1,8 @@
 from pathlib import Path
+from time import monotonic as time
 import logging
 import queue
 import threading
-import time
 
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
@@ -21,11 +21,15 @@ class AutomationDatasetProcessor:
         self._processingQueue = processingQueue
         self._stopWorkEvent = threading.Event()
         self._worker = threading.Thread()
-        self._nextJobTime = time.time()
+        self._nextJobTime = time()
 
     @property
     def isAlive(self) -> bool:
         return self._worker.is_alive()
+
+    def put(self, filePath: Path) -> None:
+        self._repository.put(filePath, AutomationDatasetState.WAITING)
+        self._processingQueue.put(filePath)
 
     def _run(self) -> None:
         while not self._stopWorkEvent.is_set():
@@ -34,7 +38,7 @@ class AutomationDatasetProcessor:
             except queue.Empty:
                 continue
 
-            delayInSeconds = self._nextJobTime - time.time()
+            delayInSeconds = self._nextJobTime - time()
 
             if delayInSeconds > 0. and self._stopWorkEvent.wait(timeout=delayInSeconds):
                 break
@@ -47,7 +51,7 @@ class AutomationDatasetProcessor:
                 logger.exception('Error while processing dataset!')
             finally:
                 self._processingQueue.task_done()
-                self._nextJobTime = self._settings.processingIntervalInSeconds.value + time.time()
+                self._nextJobTime = self._settings.processingIntervalInSeconds.value + time()
 
     def start(self) -> None:
         self.stop()
