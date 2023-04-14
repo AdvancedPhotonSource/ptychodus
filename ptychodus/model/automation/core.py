@@ -168,7 +168,7 @@ class AutomationCore:
         self._datasetBuffer.start()
 
     def executeWaitingTasks(self) -> None:
-        # FIXME this belongs in AutomationDatasetProcessor
+        # TODO this belongs in AutomationDatasetProcessor
         try:
             filePath = self._processingQueue.get(block=False)
 

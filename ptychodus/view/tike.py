@@ -12,7 +12,6 @@ class TikeBasicParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Tike Parameters', parent)
-        self.useMpiCheckBox = QCheckBox('Use MPI')
         self.numGpusLineEdit = QLineEdit()
         self.noiseModelComboBox = QComboBox()
         self.numBatchSpinBox = QSpinBox()
@@ -31,7 +30,6 @@ class TikeBasicParametersView(QGroupBox):
                        parent: Optional[QWidget] = None) -> TikeBasicParametersView:
         view = cls(parent)
 
-        view.useMpiCheckBox.setToolTip('Whether to use MPI or not.')
         view.numGpusLineEdit.setToolTip(
             'The number of GPUs to use. If the number of GPUs is less than the requested number, only workers for the available GPUs are allocated.'
         )
@@ -57,9 +55,6 @@ class TikeBasicParametersView(QGroupBox):
         layout.addRow('Batch Method:', view.batchMethodComboBox)
         layout.addRow('Number of Iterations:', view.numIterSpinBox)
         layout.addRow('Convergence Window:', view.convergenceWindowSpinBox)
-
-        if False:  # TODO figure if ptychodus should support this
-            layout.addRow(view.useMpiCheckBox)
 
         if showCgIter:
             layout.addRow('CG Search Directions:', view.cgIterSpinBox)

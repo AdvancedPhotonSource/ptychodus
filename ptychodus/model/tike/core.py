@@ -37,12 +37,6 @@ class TikePresenter(Observable, Observer):
         settings.addObserver(presenter)
         return presenter
 
-    def isMpiEnabled(self) -> bool:
-        return self._settings.useMpi.value
-
-    def setMpiEnabled(self, enabled: bool) -> None:
-        self._settings.useMpi.value = enabled
-
     def getNumGpus(self) -> str:
         return self._settings.numGpus.value
 

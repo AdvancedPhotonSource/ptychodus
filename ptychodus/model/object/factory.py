@@ -7,10 +7,10 @@ import numpy
 
 from ...api.object import ObjectArrayType, ObjectFileReader
 from ...api.plugins import PluginChooser
-from .random import RandomObjectRepositoryItem
-from .repository import ObjectRepositoryItem
+from .file import FromFileObjectInitializer
+from .random import RandomObjectInitializer
+from .repository import ObjectInitializer, ObjectRepositoryItem
 from .settings import ObjectSettings
-from .simple import ObjectFileInfo, SimpleObjectRepositoryItem
 from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
@@ -24,16 +24,10 @@ class ObjectRepositoryItemFactory:
         self._settings = settings
         self._sizer = sizer
         self._fileReaderChooser = fileReaderChooser
-        self._initializers: Mapping[str, Callable[[], ObjectRepositoryItem]] = {
-            RandomObjectRepositoryItem.NAME.casefold(): self.createRandomItem,
+        self._initializers: Mapping[str, Callable[[], Optional[ObjectRepositoryItem]]] = {
+            FromFileObjectInitializer.NAME: self.createItemFromFile,
+            RandomObjectInitializer.NAME: self.createRandomItem,
         }
-
-    def createRandomItem(self) -> RandomObjectRepositoryItem:
-        return RandomObjectRepositoryItem(self._rng, self._sizer)
-
-    def createItemFromArray(self, name: str, array: ObjectArrayType,
-                            fileInfo: Optional[ObjectFileInfo]) -> SimpleObjectRepositoryItem:
-        return SimpleObjectRepositoryItem(name, array, fileInfo)
 
     def getOpenFileFilterList(self) -> list[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -41,46 +35,90 @@ class ObjectRepositoryItemFactory:
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.getCurrentDisplayName()
 
-    def _readObject(self, filePath: Path) -> Optional[ObjectRepositoryItem]:
+    def createFileInitializer(self,
+                              filePath: Path,
+                              *,
+                              simpleFileType: str = '',
+                              displayFileType: str = '') -> Optional[FromFileObjectInitializer]:
+        if simpleFileType:
+            self._fileReaderChooser.setFromSimpleName(simpleFileType)
+        elif displayFileType:
+            self._fileReaderChooser.setFromDisplayName(displayFileType)
+        else:
+            logger.error('Refusing to create file initializer without file type!')
+            return None
+
+        fileReader = self._fileReaderChooser.getCurrentStrategy()
+        return FromFileObjectInitializer(filePath, fileReader)
+
+    def openItemFromFile(self,
+                         filePath: Path,
+                         *,
+                         simpleFileType: str = '',
+                         displayFileType: str = '') -> Optional[ObjectRepositoryItem]:
         item: Optional[ObjectRepositoryItem] = None
 
         if filePath.is_file():
-            fileType = self._fileReaderChooser.getCurrentSimpleName()
-            logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
-            fileInfo = ObjectFileInfo(fileType, filePath)
-            reader = self._fileReaderChooser.getCurrentStrategy()
+            initializer = self.createFileInitializer(filePath,
+                                                     simpleFileType=simpleFileType,
+                                                     displayFileType=displayFileType)
 
-            try:
-                array = reader.read(filePath)
-            except Exception:
-                logger.exception(f'Failed to read \"{filePath}\"')
+            if initializer is None:
+                logger.error('Refusing to create item without initializer!')
             else:
-                item = self.createItemFromArray(filePath.stem, array, fileInfo)
+                item = ObjectRepositoryItem(filePath.stem)
+                item.setInitializer(initializer)
         else:
-            logger.debug(f'Refusing to read invalid file path \"{filePath}\"')
+            logger.debug(f'Refusing to create item with invalid file path \"{filePath}\"')
 
         return item
 
-    def openObject(self, filePath: Path, fileFilter: str) -> Optional[ObjectRepositoryItem]:
-        self._fileReaderChooser.setFromDisplayName(fileFilter)
-        return self._readObject(filePath)
+    def createItemFromArray(self,
+                            nameHint: str,
+                            array: ObjectArrayType,
+                            *,
+                            filePath: Optional[Path] = None,
+                            simpleFileType: str = '',
+                            displayFileType: str = '') -> ObjectRepositoryItem:
+        item = ObjectRepositoryItem.createFromArray(nameHint, array)
+
+        if filePath is not None:
+            if filePath.is_file():
+                initializer = self.createFileInitializer(filePath,
+                                                         simpleFileType=simpleFileType,
+                                                         displayFileType=displayFileType)
+
+                if initializer is None:
+                    logger.error('Refusing to add null initializer!')
+                else:
+                    item.setInitializer(initializer)
+            else:
+                logger.debug(f'Refusing to add initializer with invalid file path \"{filePath}\"')
+
+        return item
+
+    def createRandomItem(self) -> ObjectRepositoryItem:
+        initializer = RandomObjectInitializer(self._rng, self._sizer)
+        item = ObjectRepositoryItem(initializer.displayName)
+        item.setInitializer(initializer)
+        return item
+
+    def createItemFromFile(self) -> Optional[ObjectRepositoryItem]:
+        filePath = self._settings.inputFilePath.value
+        fileType = self._settings.inputFileType.value
+        return self.openItemFromFile(filePath, simpleFileType=fileType)
 
     def getInitializerNameList(self) -> list[str]:
-        return [name.title() for name in self._initializers]
+        return [initializerName for initializerName in self._initializers]
 
     def createItem(self, initializerName: str) -> Optional[ObjectRepositoryItem]:
         item: Optional[ObjectRepositoryItem] = None
 
-        if initializerName.casefold() == 'fromfile':
-            fileInfo = ObjectFileInfo.createFromSettings(self._settings)
-            self._fileReaderChooser.setFromSimpleName(fileInfo.fileType)
-            item = self._readObject(fileInfo.filePath)
+        try:
+            itemFactory = self._initializers[initializerName]
+        except KeyError:
+            logger.error(f'Unknown object initializer \"{initializerName}\"!')
         else:
-            try:
-                itemFactory = self._initializers[initializerName.casefold()]
-            except KeyError:
-                logger.error(f'Unknown object initializer \"{initializerName}\"!')
-            else:
-                item = itemFactory()
+            item = itemFactory()
 
         return item

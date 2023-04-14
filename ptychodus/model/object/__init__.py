@@ -1,17 +1,17 @@
 from .api import ObjectAPI
 from .core import (ObjectCore, ObjectPresenter, ObjectRepositoryItemPresenter,
                    ObjectRepositoryPresenter)
-from .random import RandomObjectRepositoryItem
+from .file import FromFileObjectInitializer
+from .random import RandomObjectInitializer
 from .repository import ObjectRepositoryItem
-from .simple import ObjectFileInfo
 
 __all__ = [
+    'FromFileObjectInitializer',
     'ObjectAPI',
     'ObjectCore',
-    'ObjectFileInfo',
     'ObjectPresenter',
     'ObjectRepositoryItem',
     'ObjectRepositoryItemPresenter',
     'ObjectRepositoryPresenter',
-    'RandomObjectRepositoryItem',
+    'RandomObjectInitializer',
 ]

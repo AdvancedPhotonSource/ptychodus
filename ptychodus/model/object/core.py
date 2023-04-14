@@ -21,7 +21,6 @@ from .factory import ObjectRepositoryItemFactory
 from .repository import ObjectRepository, ObjectRepositoryItem
 from .selected import ObjectRepositoryItemSettingsDelegate, SelectedObject
 from .settings import ObjectSettings
-from .simple import ObjectFileInfo, SimpleObjectRepositoryItem
 from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,6 @@ class ObjectRepositoryPresenter(Observable, Observer):
         self._itemFactory = itemFactory
         self._objectAPI = objectAPI
         self._fileWriterChooser = fileWriterChooser
-        self._itemNameList: list[str] = list()
 
     @classmethod
     def createInstance(
@@ -50,7 +48,6 @@ class ObjectRepositoryPresenter(Observable, Observer):
             objectAPI: ObjectAPI,
             fileWriterChooser: PluginChooser[ObjectFileWriter]) -> ObjectRepositoryPresenter:
         presenter = cls(repository, itemFactory, objectAPI, fileWriterChooser)
-        presenter._updateItemPresenterList()
         repository.addObserver(presenter)
         return presenter
 
@@ -59,8 +56,8 @@ class ObjectRepositoryPresenter(Observable, Observer):
             yield ObjectRepositoryItemPresenter(name, item)
 
     def __getitem__(self, index: int) -> ObjectRepositoryItemPresenter:
-        itemName = self._itemNameList[index]
-        return ObjectRepositoryItemPresenter(itemName, self._repository[itemName])
+        nameItemTuple = self._repository.getNameItemTupleByIndex(index)
+        return ObjectRepositoryItemPresenter(*nameItemTuple)
 
     def __len__(self) -> int:
         return len(self._repository)
@@ -69,7 +66,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
         return self._itemFactory.getInitializerNameList()
 
     def initializeObject(self, name: str) -> Optional[str]:
-        return self._objectAPI.insertObjectIntoRepositoryFromInitializer(name)
+        return self._objectAPI.insertItemIntoRepositoryFromInitializer(name)
 
     def getOpenFileFilterList(self) -> list[str]:
         return self._itemFactory.getOpenFileFilterList()
@@ -78,7 +75,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
         return self._itemFactory.getOpenFileFilter()
 
     def openObject(self, filePath: Path, fileFilter: str) -> None:
-        self._objectAPI.insertObjectIntoRepositoryFromFile(filePath, fileFilter)
+        self._objectAPI.insertItemIntoRepositoryFromFile(filePath, displayFileType=fileFilter)
 
     def getSaveFileFilterList(self) -> list[str]:
         return self._fileWriterChooser.getDisplayNameList()
@@ -100,13 +97,12 @@ class ObjectRepositoryPresenter(Observable, Observer):
         writer.write(filePath, item.getArray())
 
         # TODO test this
-        if isinstance(item, SimpleObjectRepositoryItem):
-            if item.getFileInfo() is None:
-                fileInfo = ObjectFileInfo(fileType, filePath)
-                item.setFileInfo(fileInfo)
+        if item.getInitializer() is None:
+            initializer = self._itemFactory.createFileInitializer(filePath,
+                                                                  simpleFileType=fileType)
 
-    def canRemoveObject(self, name: str) -> bool:
-        return self._repository.canRemoveItem(name)
+            if initializer is not None:
+                item.setInitializer(initializer)
 
     def removeObject(self, name: str) -> None:
         self._repository.removeItem(name)
@@ -117,13 +113,9 @@ class ObjectRepositoryPresenter(Observable, Observer):
     def getPixelSizeYInMeters(self) -> Decimal:
         return self._objectAPI.getPixelSizeYInMeters()
 
-    def _updateItemPresenterList(self) -> None:
-        self._itemNameList = [name for name in self._repository]
-        self.notifyObservers()
-
     def update(self, observable: Observable) -> None:
         if observable is self._repository:
-            self._updateItemPresenterList()
+            self.notifyObservers()
 
 
 class ObjectPresenter(Observable, Observer):
@@ -151,7 +143,7 @@ class ObjectPresenter(Observable, Observer):
         return (widthIsBigEnough and heightIsBigEnough and hasComplexDataType)
 
     def selectObject(self, name: str) -> None:
-        self._objectAPI.selectObject(name)
+        self._objectAPI.selectItem(name)
 
     def getSelectedObject(self) -> str:
         return self._object.getSelectedName()
@@ -200,10 +192,13 @@ class ObjectCore(StatefulCore):
             return
 
         name = 'Restart'
-        itemName = self.objectAPI.insertObjectIntoRepository(name, array,
-                                                             ObjectFileInfo.createNull())
+        filePath = Path(''.join(state['restartFilePath']))
+        itemName = self.objectAPI.insertItemIntoRepositoryFromArray(name,
+                                                                    array,
+                                                                    filePath=filePath,
+                                                                    simpleFileType='NPZ')
 
         if itemName is None:
             logger.error('Failed to initialize \"{name}\"!')
         else:
-            self.objectAPI.selectObject(itemName)
+            self.objectAPI.selectItem(itemName)

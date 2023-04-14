@@ -106,9 +106,6 @@ class ScanRepositoryPresenter(Observable, Observer):
                 fileInfo = ScanFileInfo(fileType, filePath)
                 innerItem.setFileInfo(fileInfo)
 
-    def canRemoveScan(self, name: str) -> bool:
-        return self._repository.canRemoveItem(name)
-
     def removeScan(self, name: str) -> None:
         self._repository.removeItem(name)
 

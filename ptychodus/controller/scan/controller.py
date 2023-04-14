@@ -205,17 +205,14 @@ class ScanController(Observer):
     def _setButtonsEnabled(self) -> None:
         selectionModel = self._view.repositoryView.tableView.selectionModel()
         enable = False
-        enableRemove = False
 
         for index in selectionModel.selectedIndexes():
             if index.isValid():
                 enable = True
-                name = index.sibling(index.row(), 0).data()
-                enableRemove |= self._repositoryPresenter.canRemoveScan(name)
 
         self._view.repositoryView.buttonBox.saveButton.setEnabled(enable)
         self._view.repositoryView.buttonBox.editButton.setEnabled(enable)
-        self._view.repositoryView.buttonBox.removeButton.setEnabled(enableRemove)
+        self._view.repositoryView.buttonBox.removeButton.setEnabled(enable)
 
     def _updateView(self) -> None:
         self._setButtonsEnabled()

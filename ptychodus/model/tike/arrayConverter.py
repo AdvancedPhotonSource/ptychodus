@@ -95,4 +95,4 @@ class TikeArrayConverter:
         tabularScan = TabularScan('Tike', pointDict)
         self._scanAPI.insertScanIntoRepository(tabularScan, None)
         self._probe.setArray(arrays.probe[0, 0])
-        self._objectAPI.insertObjectIntoRepository('Tike', arrays.object_, None)
+        self._objectAPI.insertItemIntoRepositoryFromArray('Tike', arrays.object_)

@@ -1,17 +1,17 @@
 from decimal import Decimal
-from typing import Any, Final
+from typing import Final
 
 import numpy
 
 from ...api.geometry import Interval
 from ...api.image import ImageExtent
 from ...api.object import ObjectArrayType
-from .repository import ObjectRepositoryItem
+from .repository import ObjectInitializer
 from .settings import ObjectSettings
 from .sizer import ObjectSizer
 
 
-class RandomObjectRepositoryItem(ObjectRepositoryItem):
+class RandomObjectInitializer(ObjectInitializer):
     NAME: Final[str] = 'Random'
 
     def __init__(self, rng: numpy.random.Generator, sizer: ObjectSizer) -> None:
@@ -25,16 +25,12 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
         self._randomizePhase = False
 
     @property
-    def nameHint(self) -> str:
+    def simpleName(self) -> str:
         return self.NAME
 
     @property
-    def initializer(self) -> str:
+    def displayName(self) -> str:
         return self.NAME
-
-    @property
-    def canSelect(self) -> bool:
-        return True
 
     def syncFromSettings(self, settings: ObjectSettings) -> None:
         self._extraPaddingX = settings.extraPaddingX.value
@@ -51,31 +47,17 @@ class RandomObjectRepositoryItem(ObjectRepositoryItem):
         settings.amplitudeDeviation.value = self._amplitudeDeviation
         settings.randomizePhase.value = self._randomizePhase
 
-    @property
-    def _dtype(self) -> numpy.dtype[Any]:
-        return numpy.dtype(complex)
-
-    def getDataType(self) -> str:
-        return str(self._dtype)
-
-    def getExtentInPixels(self) -> ImageExtent:
-        return self._sizer.getObjectExtent()
-
-    def getSizeInBytes(self) -> int:
-        return self._dtype.itemsize * self._sizer.getObjectExtent().size
-
-    def getArray(self) -> ObjectArrayType:
-        # FIXME cache this
+    def __call__(self) -> ObjectArrayType:
         extraPaddingExtent = ImageExtent(self._extraPaddingX, self._extraPaddingY)
         paddedObjectExtent = self._sizer.getObjectExtent() + extraPaddingExtent
 
         size = paddedObjectExtent.shape
-        amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),
-                                     size)
+        amplitude = numpy.clip(
+            self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation), size),
+            0., 1.)
         phase = self._rng.uniform(0, 2 * numpy.pi, size=size) \
                 if self._randomizePhase else numpy.zeros_like(amplitude)
-        array: ObjectArrayType = amplitude * numpy.exp(1j * phase)
-        return array
+        return amplitude * numpy.exp(1j * phase)
 
     def getExtraPaddingX(self) -> int:
         return self._extraPaddingX

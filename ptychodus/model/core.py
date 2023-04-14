@@ -213,7 +213,7 @@ class ModelCore:
         self.diffractionDatasetInputOutputPresenter.stopProcessingDiffractionPatterns(
             finishAssembling=True)
         self._scanCore.scanAPI.finalizeStreamingScan()
-        self._objectCore.objectAPI.initializeAndActivateObject('Random')
+        self._objectCore.objectAPI.initializeAndActivateItem('Random')
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
         return self.diffractionDatasetInputOutputPresenter.getAssemblyQueueSize()

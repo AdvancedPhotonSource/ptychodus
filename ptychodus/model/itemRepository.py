@@ -38,15 +38,20 @@ class ItemRepository(Mapping[str, T], Observable):
     def __init__(self) -> None:
         super().__init__()
         self._itemDict: dict[str, T] = dict()
+        self._nameList: list[str] = list()
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._itemDict)
+        return iter(self._nameList)
 
     def __getitem__(self, name: str) -> T:
         return self._itemDict[name]
 
     def __len__(self) -> int:
-        return len(self._itemDict)
+        return len(self._nameList)
+
+    def getNameItemTupleByIndex(self, index: int) -> tuple[str, T]:
+        name = self._nameList[index]
+        return name, self._itemDict[name]
 
     def insertItem(self, item: T) -> str:
         uniqueName = item.nameHint
@@ -57,20 +62,20 @@ class ItemRepository(Mapping[str, T], Observable):
             uniqueName = f'{item.nameHint}-{index}'
 
         self._itemDict[uniqueName] = item
+        self._nameList.append(uniqueName)
         self.notifyObservers()
         return uniqueName
 
-    def canRemoveItem(self, name: str) -> bool:
-        return len(self._itemDict) > 1
-
     def removeItem(self, name: str) -> None:
-        if self.canRemoveItem(name):
-            try:
-                item = self._itemDict.pop(name)
-            except KeyError:
-                pass
-        else:
-            logger.debug(f'Cannot remove item \"{name}\"')
+        try:
+            item = self._itemDict.pop(name)
+        except KeyError:
+            pass
+
+        try:
+            self._nameList.remove(name)
+        except ValueError:
+            pass
 
         self.notifyObservers()
 

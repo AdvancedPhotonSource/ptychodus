@@ -110,7 +110,7 @@ class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
             stitched_pixel_width=float(stitchedPixelWidthInMeters),
             inference_pixel_width=float(inferencePixelWidthInMeters))
         stitched = numpy.exp(1j * stitchedPhase)
-        self._objectAPI.insertObjectIntoRepository('PtychoNN', stitched, None)
+        self._objectAPI.insertItemIntoRepositoryFromArray('PtychoNN', stitched)
 
         return ReconstructResult(0, [[]])
 

@@ -8,12 +8,12 @@ from PyQt5.QtWidgets import QAbstractItemView
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.object import (ObjectPresenter, ObjectRepositoryItemPresenter,
-                             ObjectRepositoryPresenter, RandomObjectRepositoryItem)
+                             ObjectRepositoryPresenter)
 from ...view import (ImageView, ObjectEditorDialog, ObjectParametersView, ObjectView,
                      RandomObjectView)
 from ..data import FileDialogFactory
 from ..image import ImageController
-from .random import RandomObjectController
+from .random import RandomObjectViewController
 from .tableModel import ObjectTableModel
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class ObjectParametersController(Observer):
 
 
 class ObjectController(Observer):
-    OPEN_FILE: Final[str] = 'Open File...'
+    OPEN_FILE: Final[str] = 'Open File...'  # TODO clean up
 
     def __init__(self, repositoryPresenter: ObjectRepositoryPresenter,
                  imagePresenter: ImagePresenter, view: ObjectView, imageView: ImageView,
@@ -82,10 +82,7 @@ class ObjectController(Observer):
         view.repositoryView.tableView.selectionModel().selectionChanged.connect(
             lambda selected, deselected: controller._updateView())
 
-        initializerNameList = repositoryPresenter.getInitializerNameList()
-        initializerNameList.insert(0, ObjectController.OPEN_FILE)
-
-        for name in initializerNameList:
+        for name in repositoryPresenter.getInitializerNameList():
             insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 
@@ -152,14 +149,12 @@ class ObjectController(Observer):
             logger.error('No items are selected!')
         else:
             item = itemPresenter.item
+            initializerName = item.getInitializerSimpleName()
 
-            if isinstance(item, RandomObjectRepositoryItem):
-                randomDialog = ObjectEditorDialog.createInstance(RandomObjectView.createInstance(),
-                                                                 self._view)
-                randomDialog.setWindowTitle(itemPresenter.name)
-                randomController = RandomObjectController.createInstance(
-                    item, randomDialog.editorView)
-                randomDialog.open()
+            if initializerName == 'Random':
+                randomController = RandomObjectViewController.createInstance(
+                    itemPresenter, self._view)
+                randomController.openDialog()
             else:
                 logger.error('Unknown object repository item!')
 
@@ -185,17 +180,14 @@ class ObjectController(Observer):
     def _setButtonsEnabled(self) -> None:
         selectionModel = self._view.repositoryView.tableView.selectionModel()
         enable = False
-        enableRemove = False
 
         for index in selectionModel.selectedIndexes():
             if index.isValid():
                 enable = True
-                name = index.sibling(index.row(), 0).data()
-                enableRemove |= self._repositoryPresenter.canRemoveObject(name)
 
         self._view.repositoryView.buttonBox.saveButton.setEnabled(enable)
         self._view.repositoryView.buttonBox.editButton.setEnabled(enable)
-        self._view.repositoryView.buttonBox.removeButton.setEnabled(enableRemove)
+        self._view.repositoryView.buttonBox.removeButton.setEnabled(enable)
 
     def _updateView(self) -> None:
         self._setButtonsEnabled()
