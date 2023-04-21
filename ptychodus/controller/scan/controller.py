@@ -7,12 +7,8 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFi
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
-from ...model.scan import (CartesianScanRepositoryItem, LissajousScanRepositoryItem,
-                           ScanRepositoryItemPresenter, ScanRepositoryPresenter,
-                           SpiralScanRepositoryItem, TabularScanRepositoryItem,
-                           TransformedScanRepositoryItem)
-from ...view import (CartesianScanView, LissajousScanView, RepositoryView, ScanEditorDialog,
-                     ScanView, ScanPlotView, ScanTransformView, SpiralScanView, TabularScanView)
+from ...model.scan import ScanRepositoryItemPresenter, ScanRepositoryPresenter
+from ...view import RepositoryView, ScanView, ScanPlotView
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
 from .lissajous import LissajousScanController
@@ -24,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScanController(Observer):
-    OPEN_FILE: Final[str] = 'Open File...'
+    OPEN_FILE: Final[str] = 'Open File...'  # TODO clean up
 
     def __init__(self, repositoryPresenter: ScanRepositoryPresenter, view: ScanView,
                  plotView: ScanPlotView, fileDialogFactory: FileDialogFactory) -> None:
@@ -54,10 +50,7 @@ class ScanController(Observer):
         view.repositoryView.tableView.horizontalHeader().sectionClicked.connect(
             lambda logicalIndex: controller._redrawPlot())
 
-        initializerNameList = repositoryPresenter.getInitializerNameList()
-        initializerNameList.insert(0, ScanController.OPEN_FILE)
-
-        for name in initializerNameList:
+        for name in repositoryPresenter.getInitializerNameList():
             insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 
@@ -124,42 +117,22 @@ class ScanController(Observer):
             logger.error('No items are selected!')
         else:
             item = itemPresenter.item
+            initializerName = item.getInitializerSimpleName()
 
-            if isinstance(item.untransformed, CartesianScanRepositoryItem):
-                cartesianDialog = ScanEditorDialog.createInstance(
-                    CartesianScanView.createInstance(), self._view)
-                cartesianDialog.setWindowTitle(itemPresenter.name)
+            if initializerName in ('Snake', 'Raster', 'CenteredSnake', 'CenteredRaster'):
                 cartesianController = CartesianScanController.createInstance(
-                    item.untransformed, cartesianDialog.editorView)
-                cartesianTransformController = ScanTransformController.createInstance(
-                    item, cartesianDialog.transformView)
-                cartesianDialog.open()
-            elif isinstance(item.untransformed, SpiralScanRepositoryItem):
-                spiralDialog = ScanEditorDialog.createInstance(SpiralScanView.createInstance(),
-                                                               self._view)
-                spiralDialog.setWindowTitle(itemPresenter.name)
-                spiralController = SpiralScanController.createInstance(
-                    item.untransformed, spiralDialog.editorView)
-                spiralTransformController = ScanTransformController.createInstance(
-                    item, spiralDialog.transformView)
-                spiralDialog.open()
-            elif isinstance(item.untransformed, LissajousScanRepositoryItem):
-                lissajousDialog = ScanEditorDialog.createInstance(
-                    LissajousScanView.createInstance(), self._view)
-                lissajousDialog.setWindowTitle(itemPresenter.name)
+                    itemPresenter, self._view)
+                cartesianController.openDialog()
+            elif initializerName == 'Spiral':
+                spiralController = SpiralScanController.createInstance(itemPresenter, self._view)
+                spiralController.openDialog()
+            elif initializerName == 'Lissajous':
                 lissajousController = LissajousScanController.createInstance(
-                    item.untransformed, lissajousDialog.editorView)
-                lissajousTransformController = ScanTransformController.createInstance(
-                    item, lissajousDialog.transformView)
-                lissajousDialog.open()
-            elif isinstance(item.untransformed, TabularScanRepositoryItem):
-                tabularDialog = ScanEditorDialog.createInstance(TabularScanView.createInstance(),
-                                                                self._view)
-                tabularDialog.setWindowTitle(itemPresenter.name)
-                tabularTransformController = ScanTransformController.createInstance(
-                    item, tabularDialog.transformView)
-                tabularDialog.open()
+                    itemPresenter, self._view)
+                lissajousController.openDialog()
             else:
+                # FIXME tabularController = TabularScanController.createInstance(itemPresenter, self._view)
+                # FIXME tabularController.openDialog()
                 logger.error('Unknown scan repository item!')
 
     def _removeSelectedScan(self) -> None:

@@ -36,7 +36,12 @@ class ScanSizer(Observable, Observer):
             )
             boundingBoxInMeters = Box2D[Decimal](rangeXInMeters, rangeYInMeters)
 
-        it = iter(self._scan.getSelectedItem().values())
+        selectedScan = self._scan.getSelectedItem()
+
+        if selectedScan is None:
+            return boundingBoxInMeters
+
+        it = iter(selectedScan.values())
 
         try:
             point = next(it)

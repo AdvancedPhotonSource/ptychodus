@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Iterator, Mapping
-from typing import Generic, Protocol, TypeVar
+from collections.abc import Iterator, Mapping, Sequence
+from typing import Generic, Optional, Protocol, TypeVar
 import logging
 
 from ..api.observer import Observable, Observer
@@ -101,7 +101,7 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
         self._settingsDelegate = settingsDelegate
         self._reinitObservable = reinitObservable
         self._name = str()
-        self._item = next(iter(self._repository.values()))
+        self._item: Optional[T] = None
 
     @classmethod
     def createInstance(cls, repository: ItemRepository[T],
@@ -114,10 +114,13 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
         reinitObservable.addObserver(item)
         return item
 
+    def getSelectableNames(self) -> Sequence[str]:
+        return [name for name, item in self._repository.items() if item.canSelect]
+
     def getSelectedName(self) -> str:
         return self._name
 
-    def getSelectedItem(self) -> T:
+    def getSelectedItem(self) -> Optional[T]:
         return self._item
 
     def canSelectItem(self, name: str) -> bool:
@@ -127,6 +130,11 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
             return False
         else:
             return item.canSelect
+
+    def deselectItem(self) -> None:
+        if self._item is not None:
+            self._item.removeObserver(self)
+            self._item = None
 
     def selectItem(self, name: str) -> None:
         if self._name == name:
@@ -138,28 +146,38 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
             logger.error(f'Failed to select \"{name}\"!')
             return
 
-        if not item.canSelect:
+        if item.canSelect:
+            if self._item is not None:
+                self._item.removeObserver(self)
+
+            self._item = item
+            self._name = name
+            self._item.addObserver(self)
+
+            self._syncToSettings()
+        else:
             logger.error(f'Failed to select \"{name}\"!')
-            return
 
-        self._item.removeObserver(self)
-        self._item = item
-        self._name = name
-        self._item.addObserver(self)
-
-        self._syncToSettings()
         self.notifyObservers()
 
     def _recoverIfSelectedItemRemovedFromRepository(self) -> None:
         if self._name not in self._repository:
-            self.selectItem(next(iter(self._repository)))
+            try:
+                name = next(iter(self._repository))
+            except StopIteration:
+                pass
+            else:
+                self.selectItem(name)
 
     def _syncFromSettings(self) -> None:
         name = self._settingsDelegate.syncFromSettings()
         self.selectItem(name)
 
     def _syncToSettings(self) -> None:
-        self._settingsDelegate.syncToSettings(self._item)
+        if self._item is not None:
+            self._settingsDelegate.syncToSettings(self._item)
+        else:
+            logger.error('Failed to sync null item to settings!')
 
     def update(self, observable: Observable) -> None:
         if observable is self._item:

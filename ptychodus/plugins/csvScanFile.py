@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path
 import csv
@@ -22,7 +21,7 @@ class CSVScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'Comma-Separated Values Files (*.csv)'
 
-    def read(self, filePath: Path) -> Iterable[Scan]:
+    def read(self, filePath: Path) -> Scan:
         pointList = list()
         minimumColumnCount = max(self._xcol, self._ycol) + 1
 
@@ -42,7 +41,7 @@ class CSVScanFileReader(ScanFileReader):
                 )
                 pointList.append(point)
 
-        return [TabularScan.createFromPointIterable(filePath.stem, pointList)]
+        return TabularScan.createFromPointIterable(pointList)
 
 
 class CSVScanFileWriter(ScanFileWriter):
@@ -55,15 +54,10 @@ class CSVScanFileWriter(ScanFileWriter):
     def fileFilter(self) -> str:
         return 'Comma-Separated Values Files (*.csv)'
 
-    def write(self, filePath: Path, scanIterable: Iterable[Scan]) -> None:
+    def write(self, filePath: Path, scan: Scan) -> None:
         with filePath.open(mode='wt') as csvFile:
-            for scanNumber, scan in enumerate(scanIterable):
-                if scanNumber > 0:
-                    className = type(self).__name__
-                    raise ValueError(f'{className} only supports single sequence scan files!')
-
-                for index, point in scan.items():
-                    csvFile.write(f'{point.y},{point.x}\n')
+            for index, point in scan.items():
+                csvFile.write(f'{point.y},{point.x}\n')
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

@@ -54,28 +54,29 @@ class ObjectAPI:
 
     def insertItemIntoRepositoryFromInitializer(self, initializerName: str) -> Optional[str]:
         itemName: Optional[str] = None
-        object_ = self._factory.createItem(initializerName)
+        item = self._factory.createItem(initializerName)
 
-        if object_ is None:
+        if item is None:
             logger.error(f'Unknown object initializer \"{initializerName}\"!')
         else:
-            itemName = self._repository.insertItem(object_)
+            itemName = self._repository.insertItem(item)
 
         return itemName
 
     def selectItem(self, itemName: str) -> None:
         self._object.selectItem(itemName)
 
-    def initializeAndActivateItem(self, name: str) -> None:
-        itemName = self.insertItemIntoRepositoryFromInitializer(name)
+    def initializeAndActivateItem(self, initializerName: str) -> None:
+        itemName = self.insertItemIntoRepositoryFromInitializer(initializerName)
 
         if itemName is None:
-            logger.error('Failed to initialize \"{name}\"!')
+            logger.error('Failed to initialize \"{initializerName}\"!')
         else:
             self.selectItem(itemName)
 
-    def getSelectedObjectArray(self) -> ObjectArrayType:
-        return self._object.getSelectedItem().getArray()
+    def getSelectedObjectArray(self) -> Optional[ObjectArrayType]:
+        selectedItem = self._object.getSelectedItem()
+        return None if selectedItem is None else selectedItem.getArray()
 
     def getPixelSizeXInMeters(self) -> Decimal:
         return self._apparatus.getObjectPlanePixelSizeXInMeters()

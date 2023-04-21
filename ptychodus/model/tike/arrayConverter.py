@@ -49,6 +49,10 @@ class TikeArrayConverter:
         yMinInMeters = scanBoundingBoxInMeters.rangeY.lower
 
         selectedScan = self._scanAPI.getSelectedScan()
+
+        if selectedScan is None:
+            raise ValueError('No scan is selected!')
+
         indexes: list[int] = list()
         scanX: list[float] = list()
         scanY: list[float] = list()
@@ -64,8 +68,12 @@ class TikeArrayConverter:
             scanY.append(self.PAD_WIDTH + float((point.y - yMinInMeters) / pixelSizeYInMeters))
 
         probe = self._probe.getArray()
-        object_ = self._objectAPI.getSelectedObjectArray()
-        tikeObject = numpy.pad(object_, self.PAD_WIDTH, mode='constant', constant_values=0)
+        selectedObject = self._objectAPI.getSelectedObjectArray()
+
+        if selectedObject is None:
+            raise ValueError('No object is selected!')
+
+        tikeObject = numpy.pad(selectedObject, self.PAD_WIDTH, mode='constant', constant_values=0)
 
         return TikeArrays(
             indexes=tuple(indexes),
@@ -92,7 +100,7 @@ class TikeArrayConverter:
             yInMeters = yMinInMeters + Decimal(repr(uyInPixels)) * pixelSizeYInMeters
             pointDict[index] = ScanPoint(xInMeters, yInMeters)
 
-        tabularScan = TabularScan('Tike', pointDict)
-        self._scanAPI.insertScanIntoRepository(tabularScan, None)
+        tabularScan = TabularScan(pointDict)
+        self._scanAPI.insertItemIntoRepositoryFromScan('Tike', tabularScan)
         self._probe.setArray(arrays.probe[0, 0])
         self._objectAPI.insertItemIntoRepositoryFromArray('Tike', arrays.object_)

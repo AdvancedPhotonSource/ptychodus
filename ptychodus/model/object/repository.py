@@ -44,18 +44,11 @@ class ObjectInitializer(ABC, Observable):
 class ObjectRepositoryItem(Observable, Observer):
     '''container for items that can be stored in a object repository'''
 
-    def __init__(self, nameHint: str) -> None:
+    def __init__(self, nameHint: str, array: Optional[ObjectArrayType] = None) -> None:
         super().__init__()
         self._nameHint = nameHint
-        self._array: ObjectArrayType = numpy.zeros((0, 0), dtype=complex)
+        self._array = array or numpy.zeros((0, 0), dtype=complex)
         self._initializer: Optional[ObjectInitializer] = None
-
-    @classmethod
-    def createFromArray(cls, nameHint: str, array: ObjectArrayType) -> ObjectRepositoryItem:
-        '''creates an item from an existing array'''
-        item = cls(nameHint)
-        item._array = array
-        return item
 
     @property
     def nameHint(self) -> str:

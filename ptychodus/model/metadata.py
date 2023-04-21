@@ -119,8 +119,7 @@ class MetadataPresenter(Observable, Observer):
 
         fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
         filePath = filePathMaster.parents[2] / 'positions' / fileName
-        fileFilter = 'Comma-Separated Values Files (*.csv)'  # TODO refactor; get from somewhere
-        self._scanAPI.insertScanIntoRepositoryFromFile(filePath, fileFilter)
+        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, simpleFileType='CSV')
 
     def update(self, observable: Observable) -> None:
         if observable is self._diffractionDataset:

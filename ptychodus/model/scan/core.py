@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import ItemsView, Iterator
+from collections.abc import ItemsView, Iterator, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -16,13 +16,11 @@ from ..data import ActiveDiffractionDataset
 from ..statefulCore import StateDataType, StatefulCore
 from .api import ScanAPI
 from .factory import ScanRepositoryItemFactory
-from .indexFilters import ScanIndexFilterFactory
-from .repository import ScanRepository, TransformedScanRepositoryItem
+from .repository import ScanRepository, ScanRepositoryItem
 from .selected import ScanRepositoryItemSettingsDelegate, SelectedScan
 from .settings import ScanSettings
 from .sizer import ScanSizer
 from .streaming import StreamingScanBuilder
-from .tabular import ScanFileInfo, TabularScanRepositoryItem
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ScanRepositoryItemPresenter:
     name: str
-    item: TransformedScanRepositoryItem
+    item: ScanRepositoryItem
 
 
 class ScanRepositoryPresenter(Observable, Observer):
@@ -42,7 +40,6 @@ class ScanRepositoryPresenter(Observable, Observer):
         self._itemFactory = itemFactory
         self._scanAPI = scanAPI
         self._fileWriterChooser = fileWriterChooser
-        self._itemNameList: list[str] = list()
 
     @classmethod
     def createInstance(
@@ -50,7 +47,6 @@ class ScanRepositoryPresenter(Observable, Observer):
             scanAPI: ScanAPI,
             fileWriterChooser: PluginChooser[ScanFileWriter]) -> ScanRepositoryPresenter:
         presenter = cls(repository, itemFactory, scanAPI, fileWriterChooser)
-        presenter._updateItemPresenterList()
         repository.addObserver(presenter)
         return presenter
 
@@ -59,28 +55,28 @@ class ScanRepositoryPresenter(Observable, Observer):
             yield ScanRepositoryItemPresenter(name, item)
 
     def __getitem__(self, index: int) -> ScanRepositoryItemPresenter:
-        itemName = self._itemNameList[index]
-        return ScanRepositoryItemPresenter(itemName, self._repository[itemName])
+        nameItemTuple = self._repository.getNameItemTupleByIndex(index)
+        return ScanRepositoryItemPresenter(*nameItemTuple)
 
     def __len__(self) -> int:
         return len(self._repository)
 
-    def getInitializerNameList(self) -> list[str]:
+    def getInitializerNameList(self) -> Sequence[str]:
         return self._itemFactory.getInitializerNameList()
 
-    def initializeScan(self, name: str) -> list[str]:
-        return self._scanAPI.insertScanIntoRepositoryFromInitializer(name)
+    def initializeScan(self, name: str) -> Optional[str]:
+        return self._scanAPI.insertItemIntoRepositoryFromInitializer(name)
 
-    def getOpenFileFilterList(self) -> list[str]:
+    def getOpenFileFilterList(self) -> Sequence[str]:
         return self._itemFactory.getOpenFileFilterList()
 
     def getOpenFileFilter(self) -> str:
         return self._itemFactory.getOpenFileFilter()
 
     def openScan(self, filePath: Path, fileFilter: str) -> None:
-        self._scanAPI.insertScanIntoRepositoryFromFile(filePath, fileFilter)
+        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, displayFileType=fileFilter)
 
-    def getSaveFileFilterList(self) -> list[str]:
+    def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()
 
     def getSaveFileFilter(self) -> str:
@@ -97,25 +93,22 @@ class ScanRepositoryPresenter(Observable, Observer):
         fileType = self._fileWriterChooser.getCurrentSimpleName()
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.getCurrentStrategy()
-        writer.write(filePath, [item])
+        writer.write(filePath, item)
 
-        innerItem = item._item
+        # TODO test this
+        if item.getInitializer() is None:
+            initializer = self._itemFactory.createFileInitializer(filePath,
+                                                                  simpleFileType=fileType)
 
-        if isinstance(innerItem, TabularScanRepositoryItem):
-            if innerItem.getFileInfo() is None:
-                fileInfo = ScanFileInfo(fileType, filePath)
-                innerItem.setFileInfo(fileInfo)
+            if initializer is not None:
+                item.setInitializer(initializer)
 
     def removeScan(self, name: str) -> None:
         self._repository.removeItem(name)
 
-    def _updateItemPresenterList(self) -> None:
-        self._itemNameList = [name for name in self._repository]
-        self.notifyObservers()
-
     def update(self, observable: Observable) -> None:
         if observable is self._repository:
-            self._updateItemPresenterList()
+            self.notifyObservers()
 
 
 class ScanPresenter(Observable, Observer):
@@ -136,15 +129,23 @@ class ScanPresenter(Observable, Observer):
         return presenter
 
     def isSelectedScanValid(self) -> bool:
+        selectedScan = self._scan.getSelectedItem()
+
+        if selectedScan is None:
+            return False
+
         datasetIndexes = set(self._dataset.getAssembledIndexes())
-        scanIndexes = set(self._scan.getSelectedItem().keys())
+        scanIndexes = set(selectedScan.keys())
         return (not scanIndexes.isdisjoint(datasetIndexes))
 
     def selectScan(self, name: str) -> None:
-        self._scanAPI.selectScan(name)
+        self._scanAPI.selectItem(name)
 
     def getSelectedScan(self) -> str:
         return self._scan.getSelectedName()
+
+    def getSelectableNames(self) -> Sequence[str]:
+        return self._scan.getSelectableNames()
 
     def update(self, observable: Observable) -> None:
         if observable is self._scan:
@@ -162,9 +163,7 @@ class ScanCore(StatefulCore):
         self._builder = StreamingScanBuilder()
         self._repository = ScanRepository()
         self._settings = ScanSettings.createInstance(settingsRegistry)
-        self._indexFilterFactory = ScanIndexFilterFactory()
-        self._itemFactory = ScanRepositoryItemFactory(rng, self._settings,
-                                                      self._indexFilterFactory, fileReaderChooser)
+        self._itemFactory = ScanRepositoryItemFactory(rng, self._settings, fileReaderChooser)
         self._itemSettingsDelegate = ScanRepositoryItemSettingsDelegate(
             self._settings, self._itemFactory, self._repository)
         self._scan = SelectedScan.createInstance(self._repository, self._itemSettingsDelegate,
@@ -180,11 +179,13 @@ class ScanCore(StatefulCore):
         scanIndex: list[int] = list()
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
+        selectedScan = self._scan.getSelectedItem()
 
-        for index, point in self._scan.getSelectedItem().untransformed.items():
-            scanIndex.append(index)
-            scanXInMeters.append(float(point.x))
-            scanYInMeters.append(float(point.y))
+        if selectedScan is not None:
+            for index, point in selectedScan.untransformed.items():
+                scanIndex.append(index)
+                scanXInMeters.append(float(point.x))
+                scanYInMeters.append(float(point.y))
 
         state: StateDataType = {
             'scanIndex': numpy.array(scanIndex),
@@ -206,6 +207,13 @@ class ScanCore(StatefulCore):
                 y=Decimal(repr(y)),
             )
 
-        scan = TabularScan('Restart', pointMap)
-        itemName = self.scanAPI.insertScanIntoRepository(scan, ScanFileInfo.createNull())
-        self.scanAPI.selectScan(itemName)
+        filePath = Path(''.join(state['restartFilePath']))
+        itemName = self.scanAPI.insertItemIntoRepositoryFromScan(nameHint='Restart',
+                                                                 scan=TabularScan(pointMap),
+                                                                 filePath=filePath,
+                                                                 simpleFileType='NPZ')
+
+        if itemName is None:
+            logger.error('Failed to initialize \"{name}\"!')
+        else:
+            self.scanAPI.selectItem(itemName)

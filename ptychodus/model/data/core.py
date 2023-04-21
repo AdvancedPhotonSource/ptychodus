@@ -170,6 +170,7 @@ class DataCore(StatefulCore):
 
     def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
+        # FIXME bug with opening diffraction files on startup
         self._datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
         self.patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
 

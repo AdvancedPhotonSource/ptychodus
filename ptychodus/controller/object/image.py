@@ -30,8 +30,11 @@ class ObjectImageController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
+        # FIXME what to do with monitor screen?
         array = self._presenter.getSelectedObjectArray()
-        self._imagePresenter.setArray(array)
+
+        if array is not None:
+            self._imagePresenter.setArray(array)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

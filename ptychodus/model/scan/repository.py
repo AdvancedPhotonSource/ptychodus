@@ -1,31 +1,32 @@
 from __future__ import annotations
-from abc import abstractmethod, abstractproperty
-from collections.abc import Iterator
+from abc import ABC, abstractmethod, abstractproperty
+from collections.abc import Iterator, Sequence
 from decimal import Decimal
+from typing import Optional
 import logging
 
 import numpy
 
 from ...api.observer import Observable, Observer
-from ...api.scan import Scan, ScanIndexFilter, ScanPoint, ScanPointTransform
-from ..itemRepository import ItemRepository, RepositoryItemSettingsDelegate, SelectedRepositoryItem
-from .indexFilters import ScanIndexFilterFactory
+from ...api.scan import Scan, ScanPoint, TabularScan
+from ..itemRepository import ItemRepository
+from .indexFilter import SelectableScanIndexFilter
 from .settings import ScanSettings
+from .transform import SelectableScanPointTransform
 
 logger = logging.getLogger(__name__)
 
 
-class ScanRepositoryItem(Scan):
-    '''ABC for items that can be stored in a scan repository'''
+class ScanInitializer(ABC, Observable):
 
     @abstractproperty
-    def initializer(self) -> str:
-        '''returns a unique initializer name'''
+    def simpleName(self) -> str:
+        '''returns a unique name that is appropriate for a settings file'''
         pass
 
     @abstractproperty
-    def canSelect(self) -> bool:
-        '''indicates whether item can be selected'''
+    def displayName(self) -> str:
+        '''returns a unique name that is prettified for visual display'''
         pass
 
     @abstractmethod
@@ -38,58 +39,86 @@ class ScanRepositoryItem(Scan):
         '''synchronizes item state to settings'''
         pass
 
+    @abstractmethod
+    def __call__(self) -> Scan:
+        pass
 
-class TransformedScanRepositoryItem(ScanRepositoryItem, Observer):
 
-    def __init__(self, rng: numpy.random.Generator, item: ScanRepositoryItem,
-                 indexFilterFactory: ScanIndexFilterFactory) -> None:
+class ScanRepositoryItem(Scan, Observable, Observer):
+    '''container for items that can be stored in a scan repository'''
+
+    def __init__(self,
+                 rng: numpy.random.Generator,
+                 nameHint: str,
+                 scan: Optional[Scan] = None) -> None:
         super().__init__()
         self._rng = rng
-        self._item = item
-        self._indexFilterFactory = indexFilterFactory
-        self._indexFilter = indexFilterFactory.create('All')
-        self._transform = ScanPointTransform.PXPY
+        self._nameHint = nameHint
+        self._scan = scan or TabularScan({})
+        self._initializer: Optional[ScanInitializer] = None
+        self._transform = SelectableScanPointTransform()
+        self._transform.addObserver(self)
+        self._indexFilter = SelectableScanIndexFilter()
+        self._indexFilter.addObserver(self)
         self._jitterRadiusInMeters = Decimal()
         self._centroid = ScanPoint(Decimal(), Decimal())
 
-    @classmethod
-    def createInstance(
-            cls, rng: numpy.random.Generator, item: ScanRepositoryItem,
-            indexFilterFactory: ScanIndexFilterFactory) -> TransformedScanRepositoryItem:
-        transformedItem = cls(rng, item, indexFilterFactory)
-        item.addObserver(transformedItem)
-        return transformedItem
-
     @property
     def nameHint(self) -> str:
-        return self._item.nameHint
-
-    @property
-    def initializer(self) -> str:
-        return self._item.initializer
+        '''returns a name hint that is appropriate for a settings file'''
+        return self._nameHint
 
     @property
     def canSelect(self) -> bool:
-        return self._item.canSelect
+        '''indicates whether item can be selected'''
+        return (self._initializer is not None)
+
+    def reinitialize(self) -> None:
+        '''reinitializes the scan point sequence'''
+        if self._initializer is None:
+            logger.error('Missing scan initializer!')
+            return
+
+        try:
+            self._scan = self._initializer()
+        except:
+            logger.exception('Failed to reinitialize scan!')
+        else:
+            self.notifyObservers()
+
+    def getInitializerSimpleName(self) -> str:
+        return 'FromMemory' if self._initializer is None else self._initializer.simpleName
+
+    def getInitializer(self) -> Optional[ScanInitializer]:
+        '''returns the initializer'''
+        return self._initializer
+
+    def setInitializer(self, initializer: ScanInitializer) -> None:
+        '''sets the initializer'''
+        if self._initializer is not None:
+            self._initializer.removeObserver(self)
+
+        self._initializer = initializer
+        initializer.addObserver(self)
+        self.reinitialize()
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
-        self._indexFilter = self._indexFilterFactory.create(settings.indexFilter.value)
-        self._transform = ScanPointTransform.fromSimpleName(settings.transform.value)
+        self._indexFilter.selectFilterFromSimpleName(settings.indexFilter.value)
+        self._transform.selectTransformFromSimpleName(settings.transform.value)
         self_jitterRadiusInMeters = settings.jitterRadiusInMeters.value
         self._centroid = ScanPoint(settings.centroidXInMeters.value,
                                    settings.centroidYInMeters.value)
-        self._item.syncFromSettings(settings)
+        self.notifyObservers()
 
     def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.indexFilter.value = self._indexFilter.name
+        settings.indexFilter.value = self._indexFilter.simpleName
         settings.transform.value = self._transform.simpleName
         settings.jitterRadiusInMeters.value = self._jitterRadiusInMeters
         settings.centroidXInMeters.value = self._centroid.x
         settings.centroidYInMeters.value = self._centroid.y
-        self._item.syncToSettings(settings)
 
     def __iter__(self) -> Iterator[int]:
-        it = iter(self._item)
+        it = iter(self._scan)
 
         while True:
             try:
@@ -105,7 +134,7 @@ class TransformedScanRepositoryItem(ScanRepositoryItem, Observer):
         if not self._indexFilter(index):
             raise KeyError
 
-        point = self._item[index]
+        point = self._transform(self._scan[index])
 
         if self._jitterRadiusInMeters > Decimal():
             rad = Decimal(repr(self._rng.uniform()))
@@ -114,8 +143,6 @@ class TransformedScanRepositoryItem(ScanRepositoryItem, Observer):
 
             scalar = self._jitterRadiusInMeters * (rad / (dirX**2 + dirY**2)).sqrt()
             point = ScanPoint(point.x + scalar * dirX, point.y + scalar * dirY)
-
-        point = self._transform(point)
 
         return ScanPoint(
             self._centroid.x + point.x,
@@ -126,47 +153,26 @@ class TransformedScanRepositoryItem(ScanRepositoryItem, Observer):
         return sum(1 for index in iter(self))
 
     @property
-    def untransformed(self) -> ScanRepositoryItem:
-        return self._item
+    def untransformed(self) -> Scan:
+        return self._scan
 
-    def getIndexFilterNameList(self) -> list[str]:
-        return self._indexFilterFactory.getIndexFilterNameList()
+    def getIndexFilterNameList(self) -> Sequence[str]:
+        return self._indexFilter.getSelectableFilters()
 
     def getIndexFilterName(self) -> str:
-        return self._indexFilter.name
+        return self._indexFilter.displayName
 
     def setIndexFilterByName(self, name: str) -> None:
-        indexFilter = self._indexFilterFactory.create(name)
+        self._indexFilter.selectFilterFromDisplayName(name)
 
-        if self._indexFilter != indexFilter:
-            self._indexFilter = indexFilter
-            self.notifyObservers()
-
-    def getTransformNameList(self) -> list[str]:
-        return [transform.displayName for transform in ScanPointTransform]
+    def getTransformNameList(self) -> Sequence[str]:
+        return self._transform.getSelectableTransforms()
 
     def getTransformName(self) -> str:
         return self._transform.displayName
 
     def setTransformByName(self, name: str) -> None:
-        nameLower = name.casefold()
-
-        for transform in ScanPointTransform:
-            if nameLower == transform.displayName.casefold():
-                self.setTransform(transform)
-                return
-
-        logger.error(f'Unknown scan point transform \"{name}\"!')
-
-    def getTransform(self) -> ScanPointTransform:
-        '''gets the scan point transform'''
-        return self._transform
-
-    def setTransform(self, transform: ScanPointTransform) -> None:
-        '''sets the scan point transform'''
-        if self._transform != transform:
-            self._transform = transform
-            self.notifyObservers()
+        self._transform.selectTransformFromDisplayName(name)
 
     def getJitterRadiusInMeters(self) -> Decimal:
         '''gets the jitter radius'''
@@ -199,8 +205,8 @@ class TransformedScanRepositoryItem(ScanRepositoryItem, Observer):
             self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._item:
-            self.notifyObservers()
+        if observable in (self._initializer, self._transform, self._indexFilter):
+            self.reinitialize()
 
 
-ScanRepository = ItemRepository[TransformedScanRepositoryItem]
+ScanRepository = ItemRepository[ScanRepositoryItem]

@@ -9,8 +9,7 @@ from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.object import (ObjectPresenter, ObjectRepositoryItemPresenter,
                              ObjectRepositoryPresenter)
-from ...view import (ImageView, ObjectEditorDialog, ObjectParametersView, ObjectView,
-                     RandomObjectView)
+from ...view import ImageView, ObjectEditorDialog, ObjectParametersView, ObjectView
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .random import RandomObjectViewController
@@ -158,6 +157,8 @@ class ObjectController(Observer):
             else:
                 logger.error('Unknown object repository item!')
 
+        self._setCurrentImage()  # TODO update while editing
+
     def _removeSelectedObject(self) -> None:
         current = self._view.repositoryView.tableView.currentIndex()
 
@@ -168,7 +169,6 @@ class ObjectController(Observer):
             logger.error('No items are selected!')
 
     def _setCurrentImage(self) -> None:
-        # FIXME update while editing
         itemPresenter = self._getSelectedItemPresenter()
 
         if itemPresenter is None:

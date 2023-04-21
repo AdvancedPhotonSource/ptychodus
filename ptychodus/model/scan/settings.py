@@ -14,7 +14,6 @@ class ScanSettings(Observable, Observer):
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/scan.csv'))
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
-        self.activeScan = settingsGroup.createStringEntry('ActiveScan', 'Snake')
         self.amplitudeXInMeters = settingsGroup.createRealEntry('AmplitudeXInMeters', '4.5e-6')
         self.amplitudeYInMeters = settingsGroup.createRealEntry('AmplitudeYInMeters', '4.5e-6')
         self.angularShiftInTurns = settingsGroup.createRealEntry('AngularShiftInTurns', '0.25')

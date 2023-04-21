@@ -44,22 +44,16 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
                 break
 
         diffractionFileFilter = 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)'
-        scanFilePath = filePath
-        scanFileFilter = 'EPICS MDA Files (*.mda)'
-
         self._dataCore.loadDiffractionDataset(diffractionFilePath, diffractionFileFilter)
 
-        scanItemNameList = self._scanAPI.insertScanIntoRepositoryFromFile(
-            scanFilePath, scanFileFilter)
+        scanItemName = self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
+                                                                      simpleFileType='MDA')
 
-        if len(scanItemNameList) == 1:
-            self._scanAPI.selectScan(scanItemNameList[0])
-        else:
-            logger.error(f'Scan file contains {len(scanItemNameList)} items!')
-            return
+        if scanItemName is not None:
+            self._scanAPI.selectItem(scanItemName)
 
         self._probeCore.initializeAndActivateProbe()
-        # TODO self._objectAPI.initializeAndActivateObject('Random')
+        self._objectAPI.initializeAndActivateItem('Random')
         self._workflowCore.executeWorkflow(flowLabel)
 
 
@@ -82,17 +76,12 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         diffractionFileFilter = 'NeXus Master Files (*.h5 *.hdf5)'
         self._dataCore.loadDiffractionDataset(diffractionFilePath, diffractionFileFilter)
 
-        scanFilePath = filePath
-        scanFileFilter = 'Comma-Separated Values Files (*.csv)'
-        scanItemNameList = self._scanAPI.insertScanIntoRepositoryFromFile(
-            scanFilePath, scanFileFilter)
+        scanItemName = self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
+                                                                      simpleFileType='CSV')
 
-        if len(scanItemNameList) == 1:
-            self._scanAPI.selectScan(scanItemNameList[0])
-        else:
-            logger.error(f'Scan file contains {len(scanItemNameList)} items!')
-            return
+        if scanItemName is not None:
+            self._scanAPI.selectItem(scanItemName)
 
         self._probeCore.initializeAndActivateProbe()
-        # TODO self._objectAPI.initializeAndActivateObject('Random')
+        self._objectAPI.initializeAndActivateItem('Random')
         self._workflowCore.executeWorkflow(flowLabel)

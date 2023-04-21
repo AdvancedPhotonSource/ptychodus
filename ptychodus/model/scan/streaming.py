@@ -1,5 +1,6 @@
 from bisect import bisect
 from collections import defaultdict
+from collections.abc import Sequence
 from decimal import Decimal
 from statistics import median
 
@@ -16,7 +17,7 @@ class PositionStream:
         self.valuesInMeters.clear()
         self.timeStamps.clear()
 
-    def assemble(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assemble(self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]) -> None:
         self.valuesInMeters.extend(valuesInMeters)
         self.timeStamps.extend(timeStamps)
 
@@ -57,10 +58,12 @@ class StreamingScanBuilder:
     def insertArrayTimeStamp(self, arrayIndex: int, timeStamp: float) -> None:
         self._arrayTimeStamps[arrayIndex] = timeStamp
 
-    def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._streamX.assemble(valuesInMeters, timeStamps)
 
-    def assembleScanPositionsY(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assembleScanPositionsY(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._streamY.assemble(valuesInMeters, timeStamps)
 
     def build(self) -> TabularScan:
@@ -76,4 +79,4 @@ class StreamingScanBuilder:
                 y=Decimal(repr(posY[index])),
             )
 
-        return TabularScan('Stream', pointMap)
+        return TabularScan(pointMap)

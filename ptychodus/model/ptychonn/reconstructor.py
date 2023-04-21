@@ -51,6 +51,10 @@ class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
         logger.debug('Preparing scan data...')
 
         selectedScan = self._scanAPI.getSelectedScan()
+
+        if selectedScan is None:
+            raise ValueError('No scan is selected!')
+
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
 

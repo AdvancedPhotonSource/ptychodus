@@ -1,5 +1,4 @@
 from collections import defaultdict
-from collections.abc import Iterable
 from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
@@ -48,7 +47,7 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'LYNX Orchestra Scan Files (*.dat)'
 
-    def read(self, filePath: Path) -> Iterable[Scan]:
+    def read(self, filePath: Path) -> Scan:
         pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
         scanName = self.simpleName
 
@@ -66,7 +65,7 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
             columnHeaderRow = next(csvIterator)
 
             if columnHeaderRow == LYNXOrchestraScanFileReader.EXPECTED_HEADER:
-                logger.debug(f'Reading scan positions from \"{scanName}\"...')
+                logger.debug(f'Reading scan positions for \"{scanName}\"...')
             else:
                 raise ScanPointParseError('Bad header!')
 
@@ -84,7 +83,7 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
                 )
                 pointSeqMap[data_point].append(point)
 
-        return [TabularScan.createFromMappedPointIterable(scanName, pointSeqMap)]
+        return TabularScan.createFromMappedPointIterable(pointSeqMap)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
@@ -10,7 +11,6 @@ from .repository import ScanRepository
 from .selected import SelectedScan
 from .sizer import ScanSizer
 from .streaming import StreamingScanBuilder
-from .tabular import ScanFileInfo
 
 logger = logging.getLogger(__name__)
 
@@ -25,35 +25,61 @@ class ScanAPI:
         self._scan = scan
         self._sizer = sizer
 
-    def insertScanIntoRepositoryFromFile(self, filePath: Path, fileFilter: str) -> list[str]:
-        itemNameList: list[str] = list()
-        itemList = self._factory.openScan(filePath, fileFilter)
+    def insertItemIntoRepositoryFromFile(self,
+                                         filePath: Path,
+                                         *,
+                                         simpleFileType: str = '',
+                                         displayFileType: str = '') -> Optional[str]:
+        itemName: Optional[str] = None
+        item = self._factory.openItemFromFile(filePath,
+                                              simpleFileType=simpleFileType,
+                                              displayFileType=displayFileType)
 
-        for item in itemList:
+        if item is None:
+            logger.error(f'Unable to open scan from \"{filePath}\"!')
+        else:
             itemName = self._repository.insertItem(item)
-            itemNameList.append(itemName)
 
-        return itemNameList
+        return itemName
 
-    def insertScanIntoRepositoryFromInitializer(self, initializerName: str) -> list[str]:
-        itemNameList: list[str] = list()
-        itemList = self._factory.createItem(initializerName)
-
-        for item in itemList:
-            itemName = self._repository.insertItem(item)
-            itemNameList.append(itemName)
-
-        return itemNameList
-
-    def insertScanIntoRepository(self, scan: TabularScan, fileInfo: Optional[ScanFileInfo]) -> str:
-        item = self._factory.createTabularItem(scan, fileInfo)
+    def insertItemIntoRepositoryFromScan(self,
+                                         nameHint: str,
+                                         scan: Scan,
+                                         *,
+                                         filePath: Optional[Path] = None,
+                                         simpleFileType: str = '',
+                                         displayFileType: str = '') -> Optional[str]:
+        item = self._factory.createItemFromScan(nameHint,
+                                                scan,
+                                                filePath=filePath,
+                                                simpleFileType=simpleFileType,
+                                                displayFileType=displayFileType)
         return self._repository.insertItem(item)
 
-    def getSelectedScan(self) -> Scan:
-        return self._scan.getSelectedItem()
+    def insertItemIntoRepositoryFromInitializer(self, initializerName: str) -> Optional[str]:
+        itemName: Optional[str] = None
+        item = self._factory.createItem(initializerName)
 
-    def selectScan(self, name: str) -> None:
-        self._scan.selectItem(name)
+        if item is None:
+            logger.error(f'Unknown scan initailizer \"{initializerName}\"!')
+        else:
+            itemName = self._repository.insertItem(item)
+
+        return itemName
+
+    def selectItem(self, itemName: str) -> None:
+        self._scan.selectItem(itemName)
+
+    def initializeAndActivateItem(self, initializerName: str) -> None:
+        itemName = self.insertItemIntoRepositoryFromInitializer(initializerName)
+
+        if itemName is None:
+            logger.error('Failed to initialize \"{initializerName}\"!')
+        else:
+            self.selectItem(itemName)
+
+    def getSelectedScan(self) -> Optional[Scan]:
+        return self._scan.getSelectedItem()
 
     def getBoundingBoxInMeters(self) -> Box2D[Decimal]:
         box = self._sizer.getBoundingBoxInMeters()
@@ -66,13 +92,19 @@ class ScanAPI:
     def insertArrayTimeStamp(self, arrayIndex: int, timeStamp: float) -> None:
         self._builder.insertArrayTimeStamp(arrayIndex, timeStamp)
 
-    def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._builder.assembleScanPositionsX(valuesInMeters, timeStamps)
 
-    def assembleScanPositionsY(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assembleScanPositionsY(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._builder.assembleScanPositionsY(valuesInMeters, timeStamps)
 
     def finalizeStreamingScan(self) -> None:
         scan = self._builder.build()
-        itemName = self.insertScanIntoRepository(scan, ScanFileInfo.createNull())
-        self.selectScan(itemName)
+        itemName = self.insertItemIntoRepositoryFromScan('Stream', scan)
+
+        if itemName is None:
+            logger.error('Failed to initialize \"{name}\"!')
+        else:
+            self.selectItem(itemName)

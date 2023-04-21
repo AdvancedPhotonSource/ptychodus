@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import IntEnum
@@ -355,7 +354,7 @@ class MDAScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'EPICS MDA Files (*.mda)'
 
-    def read(self, filePath: Path) -> Iterable[Scan]:
+    def read(self, filePath: Path) -> Scan:
         pointList = list()
 
         micronsToMeters = Decimal('1e-6')
@@ -371,7 +370,7 @@ class MDAScanFileReader(ScanFileReader):
 
             pointList.append(point)
 
-        return [TabularScan.createFromPointIterable(filePath.stem, pointList)]
+        return TabularScan.createFromPointIterable(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

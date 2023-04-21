@@ -10,7 +10,6 @@ import h5py
 import numpy
 
 from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
-from .velociprobeScanFile import VelociprobeScanFileReader
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, DiffractionPatternData,
                                 DiffractionPatternState, SimpleDiffractionDataset)
@@ -188,10 +187,10 @@ class NeXusDiffractionDataset(DiffractionDataset):
 
 class NeXusDiffractionFileReader(DiffractionFileReader):
 
-    def __init__(self, velociprobeScanFileReader: VelociprobeScanFileReader) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._velociprobeScanFileReader = velociprobeScanFileReader
         self._treeBuilder = H5DiffractionFileTreeBuilder()
+        self.stageRotationInDegrees = 0.  # TODO This is a hack; remove when able!
 
     @property
     def simpleName(self) -> str:
@@ -245,8 +244,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
 
                     # vvv TODO This is a hack; remove when able! vvv
-                    self._velociprobeScanFileReader.setStageRotationInDegrees(
-                        entry.sample.goniometer.chi_deg)
+                    self.stageRotationInDegrees = entry.sample.goniometer.chi_deg
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 

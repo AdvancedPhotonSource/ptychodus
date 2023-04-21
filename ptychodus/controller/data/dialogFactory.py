@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Optional
 
@@ -19,8 +20,8 @@ class FileDialogFactory:
     def getOpenFilePath(self,
                         parent: QWidget,
                         caption: str,
-                        nameFilters: Optional[list[str]] = None,
-                        mimeTypeFilters: Optional[list[str]] = None,
+                        nameFilters: Optional[Sequence[str]] = None,
+                        mimeTypeFilters: Optional[Sequence[str]] = None,
                         selectedNameFilter: Optional[str] = None) -> tuple[Optional[Path], str]:
         filePath = None
 
@@ -50,8 +51,8 @@ class FileDialogFactory:
     def getSaveFilePath(self,
                         parent: QWidget,
                         caption: str,
-                        nameFilters: Optional[list[str]] = None,
-                        mimeTypeFilters: Optional[list[str]] = None,
+                        nameFilters: Optional[Sequence[str]] = None,
+                        mimeTypeFilters: Optional[Sequence[str]] = None,
                         selectedNameFilter: Optional[str] = None) -> tuple[Optional[Path], str]:
         filePath = None
 

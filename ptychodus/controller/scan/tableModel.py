@@ -49,7 +49,7 @@ class ScanTableModel(QAbstractTableModel):
                 if index.column() == 0:
                     value = QVariant(itemPresenter.name)
                 elif index.column() == 1:
-                    value = QVariant(item.initializer)
+                    value = QVariant(item.getInitializerSimpleName())
                 elif index.column() == 2:
                     value = QVariant(len(item))
             elif role == Qt.CheckStateRole:

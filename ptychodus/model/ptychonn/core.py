@@ -223,8 +223,13 @@ class PtychoNNTrainingPresenter(Observable, Observer):
                 self._phaseCenteringStrategyChooser.getCurrentSimpleName()
 
     def saveTrainingData(self, filePath: Path) -> None:
+        selectedObjectArray = self._objectAPI.getSelectedObjectArray()
+
+        if selectedObjectArray is None:
+            raise ValueError('No object is selected!')
+
         objectPhaseCenteringStrategy = self._phaseCenteringStrategyChooser.getCurrentStrategy()
-        object_ = objectPhaseCenteringStrategy(self._objectAPI.getSelectedObjectArray())
+        object_ = objectPhaseCenteringStrategy(selectedObjectArray)
 
         pixelSizeXInMeters = float(self._objectAPI.getPixelSizeXInMeters())
         pixelSizeYInMeters = float(self._objectAPI.getPixelSizeYInMeters())
@@ -242,6 +247,10 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
         diffractionData = self._diffractionDataset.getAssembledData()
         selectedScan = self._scanAPI.getSelectedScan()
+
+        if selectedScan is None:
+            raise ValueError('No scan is selected!')
+
         scanPositionsXInMeters: list[float] = list()
         scanPositionsYInMeters: list[float] = list()
         patches = numpy.zeros_like(diffractionData, dtype=complex)

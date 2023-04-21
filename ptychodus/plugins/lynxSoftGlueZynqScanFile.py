@@ -1,7 +1,5 @@
 from collections import defaultdict
-from collections.abc import Iterable
 from decimal import Decimal
-from enum import IntEnum
 from pathlib import Path
 from typing import Final
 import csv
@@ -40,7 +38,7 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'LYNX SoftGlueZynq Scan Files (*.dat)'
 
-    def read(self, filePath: Path) -> Iterable[Scan]:
+    def read(self, filePath: Path) -> Scan:
         pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
         scanName = self.simpleName
 
@@ -58,12 +56,12 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
             columnHeaderRow = next(csvIterator)
 
             if columnHeaderRow == LYNXSoftGlueZynqScanFileReader.EXPECTED_HEADER_RAW:
-                logger.debug(f'Reading raw scan positions from \"{scanName}\"...')
+                logger.debug(f'Reading raw scan positions for \"{scanName}\"...')
                 X = 1
                 Y = 2
                 DETECTOR_COUNT = 4
             elif columnHeaderRow == LYNXSoftGlueZynqScanFileReader.EXPECTED_HEADER_PROCESSED:
-                logger.debug(f'Reading processed scan positions from \"{scanName}\"...')
+                logger.debug(f'Reading processed scan positions for \"{scanName}\"...')
                 DETECTOR_COUNT = 0
                 X = 1
                 Y = 3
@@ -84,7 +82,7 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
                 )
                 pointSeqMap[detector_count].append(point)
 
-        return [TabularScan.createFromMappedPointIterable(scanName, pointSeqMap)]
+        return TabularScan.createFromMappedPointIterable(pointSeqMap)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

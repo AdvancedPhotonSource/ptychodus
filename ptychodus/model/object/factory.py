@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Optional
 import logging
@@ -29,7 +29,7 @@ class ObjectRepositoryItemFactory:
             RandomObjectInitializer.NAME: self.createRandomItem,
         }
 
-    def getOpenFileFilterList(self) -> list[str]:
+    def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
     def getOpenFileFilter(self) -> str:
@@ -80,7 +80,7 @@ class ObjectRepositoryItemFactory:
                             filePath: Optional[Path] = None,
                             simpleFileType: str = '',
                             displayFileType: str = '') -> ObjectRepositoryItem:
-        item = ObjectRepositoryItem.createFromArray(nameHint, array)
+        item = ObjectRepositoryItem(nameHint, array)
 
         if filePath is not None:
             if filePath.is_file():
@@ -97,18 +97,18 @@ class ObjectRepositoryItemFactory:
 
         return item
 
-    def createRandomItem(self) -> ObjectRepositoryItem:
-        initializer = RandomObjectInitializer(self._rng, self._sizer)
-        item = ObjectRepositoryItem(initializer.displayName)
-        item.setInitializer(initializer)
-        return item
-
     def createItemFromFile(self) -> Optional[ObjectRepositoryItem]:
         filePath = self._settings.inputFilePath.value
         fileType = self._settings.inputFileType.value
         return self.openItemFromFile(filePath, simpleFileType=fileType)
 
-    def getInitializerNameList(self) -> list[str]:
+    def createRandomItem(self) -> ObjectRepositoryItem:
+        initializer = RandomObjectInitializer(self._rng, self._sizer)
+        item = ObjectRepositoryItem(initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def getInitializerNameList(self) -> Sequence[str]:
         return [initializerName for initializerName in self._initializers]
 
     def createItem(self, initializerName: str) -> Optional[ObjectRepositoryItem]:

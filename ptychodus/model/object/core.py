@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -62,13 +62,13 @@ class ObjectRepositoryPresenter(Observable, Observer):
     def __len__(self) -> int:
         return len(self._repository)
 
-    def getInitializerNameList(self) -> list[str]:
+    def getInitializerNameList(self) -> Sequence[str]:
         return self._itemFactory.getInitializerNameList()
 
     def initializeObject(self, name: str) -> Optional[str]:
         return self._objectAPI.insertItemIntoRepositoryFromInitializer(name)
 
-    def getOpenFileFilterList(self) -> list[str]:
+    def getOpenFileFilterList(self) -> Sequence[str]:
         return self._itemFactory.getOpenFileFilterList()
 
     def getOpenFileFilter(self) -> str:
@@ -77,7 +77,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
     def openObject(self, filePath: Path, fileFilter: str) -> None:
         self._objectAPI.insertItemIntoRepositoryFromFile(filePath, displayFileType=fileFilter)
 
-    def getSaveFileFilterList(self) -> list[str]:
+    def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()
 
     def getSaveFileFilter(self) -> str:
@@ -135,11 +135,16 @@ class ObjectPresenter(Observable, Observer):
         return presenter
 
     def isSelectedObjectValid(self) -> bool:
-        actualExtent = self._object.getSelectedItem().getExtentInPixels()
+        selectedObject = self._object.getSelectedItem()
+
+        if selectedObject is None:
+            return False
+
+        actualExtent = selectedObject.getExtentInPixels()
         expectedExtent = self._sizer.getObjectExtent()
         widthIsBigEnough = (actualExtent.width >= expectedExtent.width)
         heightIsBigEnough = (actualExtent.height >= expectedExtent.height)
-        hasComplexDataType = numpy.iscomplexobj(self._object.getSelectedItem().getArray())
+        hasComplexDataType = numpy.iscomplexobj(selectedObject.getArray())
         return (widthIsBigEnough and heightIsBigEnough and hasComplexDataType)
 
     def selectObject(self, name: str) -> None:
@@ -148,8 +153,12 @@ class ObjectPresenter(Observable, Observer):
     def getSelectedObject(self) -> str:
         return self._object.getSelectedName()
 
-    def getSelectedObjectArray(self) -> ObjectArrayType:
-        return self._object.getSelectedItem().getArray()
+    def getSelectedObjectArray(self) -> Optional[ObjectArrayType]:
+        selectedObject = self._object.getSelectedItem()
+        return None if selectedObject is None else selectedObject.getArray()
+
+    def getSelectableNames(self) -> Sequence[str]:
+        return self._object.getSelectableNames()
 
     def update(self, observable: Observable) -> None:
         if observable is self._sizer:
@@ -179,9 +188,13 @@ class ObjectCore(StatefulCore):
         self.presenter = ObjectPresenter.createInstance(self.sizer, self._object, self.objectAPI)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
-        state: StateDataType = {
-            'object': self.objectAPI.getSelectedObjectArray(),
-        }
+        selectedObjectArray = self.objectAPI.getSelectedObjectArray()
+
+        if selectedObjectArray is not None:
+            state: StateDataType = {
+                'object': selectedObjectArray,
+            }
+
         return state
 
     def setStateData(self, state: StateDataType) -> None:
@@ -191,10 +204,9 @@ class ObjectCore(StatefulCore):
             logger.debug('Failed to restore object array state!')
             return
 
-        name = 'Restart'
         filePath = Path(''.join(state['restartFilePath']))
-        itemName = self.objectAPI.insertItemIntoRepositoryFromArray(name,
-                                                                    array,
+        itemName = self.objectAPI.insertItemIntoRepositoryFromArray(nameHint='Restart',
+                                                                    array=array,
                                                                     filePath=filePath,
                                                                     simpleFileType='NPZ')
 

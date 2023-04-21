@@ -12,10 +12,10 @@ from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
 from ..api.observer import Observable, Observer
 from ..api.reconstructor import ReconstructResult
-from ..model.object import ObjectPresenter, ObjectRepositoryPresenter
+from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
-from ..model.scan import ScanPresenter, ScanRepositoryPresenter
+from ..model.scan import ScanPresenter
 from ..view import ReconstructorParametersView, ReconstructorPlotView, resources
 
 logger = logging.getLogger(__name__)
@@ -38,10 +38,8 @@ class ReconstructorParametersController(Observer):
         self,
         presenter: ReconstructorPresenter,
         plotPresenter: ReconstructorPlotPresenter,
-        scanRepositoryPresenter: ScanRepositoryPresenter,
         scanPresenter: ScanPresenter,
         probePresenter: ProbePresenter,
-        objectRepositoryPresenter: ObjectRepositoryPresenter,
         objectPresenter: ObjectPresenter,
         view: ReconstructorParametersView,
         viewControllerFactoryList: list[ReconstructorViewControllerFactory],
@@ -49,10 +47,8 @@ class ReconstructorParametersController(Observer):
         super().__init__()
         self._presenter = presenter
         self._plotPresenter = plotPresenter
-        self._scanRepositoryPresenter = scanRepositoryPresenter
         self._scanPresenter = scanPresenter
         self._probePresenter = probePresenter
-        self._objectRepositoryPresenter = objectRepositoryPresenter
         self._objectPresenter = objectPresenter
         self._view = view
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = \
@@ -66,22 +62,17 @@ class ReconstructorParametersController(Observer):
         cls,
         presenter: ReconstructorPresenter,
         plotPresenter: ReconstructorPlotPresenter,
-        scanRepositoryPresenter: ScanRepositoryPresenter,
         scanPresenter: ScanPresenter,
         probePresenter: ProbePresenter,
-        objectRepositoryPresenter: ObjectRepositoryPresenter,
         objectPresenter: ObjectPresenter,
         view: ReconstructorParametersView,
         viewControllerFactoryList: list[ReconstructorViewControllerFactory],
     ) -> ReconstructorParametersController:
-        controller = cls(presenter, plotPresenter, scanRepositoryPresenter, scanPresenter,
-                         probePresenter, objectRepositoryPresenter, objectPresenter, view,
-                         viewControllerFactoryList)
+        controller = cls(presenter, plotPresenter, scanPresenter, probePresenter, objectPresenter,
+                         view, viewControllerFactoryList)
         presenter.addObserver(controller)
-        scanRepositoryPresenter.addObserver(controller)
         scanPresenter.addObserver(controller)
         probePresenter.addObserver(controller)
-        objectRepositoryPresenter.addObserver(controller)
         objectPresenter.addObserver(controller)
 
         for name in presenter.getReconstructorList():
@@ -147,9 +138,7 @@ class ReconstructorParametersController(Observer):
 
     def _syncScanToView(self) -> None:
         self._view.reconstructorView.scanComboBox.blockSignals(True)
-        self._scanListModel.setStringList(itemPresenter.name
-                                          for itemPresenter in self._scanRepositoryPresenter
-                                          if itemPresenter.item.canSelect)
+        self._scanListModel.setStringList(self._scanPresenter.getSelectableNames())
         self._view.reconstructorView.scanComboBox.setCurrentText(
             self._scanPresenter.getSelectedScan())
         self._view.reconstructorView.scanComboBox.blockSignals(False)
@@ -169,9 +158,7 @@ class ReconstructorParametersController(Observer):
 
     def _syncObjectToView(self) -> None:
         self._view.reconstructorView.objectComboBox.blockSignals(True)
-        self._objectListModel.setStringList(itemPresenter.name
-                                            for itemPresenter in self._objectRepositoryPresenter
-                                            if itemPresenter.item.canSelect)
+        self._objectListModel.setStringList(self._objectPresenter.getSelectableNames())
         self._view.reconstructorView.objectComboBox.setCurrentText(
             self._objectPresenter.getSelectedObject())
         self._view.reconstructorView.objectComboBox.blockSignals(False)
@@ -191,11 +178,11 @@ class ReconstructorParametersController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncAlgorithmToView()
-        elif observable in (self._scanRepositoryPresenter, self._scanPresenter):
+        elif observable is self._scanPresenter:
             self._syncScanToView()
         elif observable is self._probePresenter:
             self._syncProbeToView()
-        elif observable in (self._objectRepositoryPresenter, self._objectPresenter):
+        elif observable is self._objectPresenter:
             self._syncObjectToView()
 
 

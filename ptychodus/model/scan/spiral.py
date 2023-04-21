@@ -4,43 +4,24 @@ from typing import Final
 
 import numpy
 
-from ...api.scan import ScanPoint
-from .repository import ScanRepositoryItem
+from ...api.scan import Scan, ScanPoint
+from .repository import ScanInitializer
 from .settings import ScanSettings
 
+__all__ = [
+    'SpiralScanInitializer',
+]
 
-class SpiralScanRepositoryItem(ScanRepositoryItem):
-    NAME: Final[str] = 'Spiral'
+
+class SpiralScan(Scan):
 
     def __init__(self) -> None:
-        super().__init__()
-        self._numberOfPoints = 0
-        self._radiusScalarInMeters = Decimal()
-        self._angularStepInTurns = Decimal()
+        self.numberOfPoints = 100
+        self.radiusScalarInMeters = Decimal('5e-7')
 
     @property
     def nameHint(self) -> str:
         return 'Fermat'
-
-    @property
-    def initializer(self) -> str:
-        return self.NAME
-
-    @property
-    def canSelect(self) -> bool:
-        return True
-
-    def syncFromSettings(self, settings: ScanSettings) -> None:
-        self._numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value
-        self._radiusScalarInMeters = settings.radiusScalarInMeters.value
-        self._angularStepInTurns = settings.angularStepXInTurns.value
-        self.notifyObservers()
-
-    def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.numberOfPointsX.value = self._numberOfPoints
-        settings.numberOfPointsY.value = 1
-        settings.radiusScalarInMeters.value = self._radiusScalarInMeters
-        settings.angularStepXInTurns.value = self._angularStepInTurns
 
     def __iter__(self) -> Iterator[int]:
         for index in range(len(self)):
@@ -50,37 +31,59 @@ class SpiralScanRepositoryItem(ScanRepositoryItem):
         if index >= len(self):
             raise IndexError(f'Index {index} is out of range')
 
-        radius = self._radiusScalarInMeters * Decimal(index).sqrt()
-        theta = 2 * numpy.pi * index * float(self._angularStepInTurns)
+        radiusInMeters = self.radiusScalarInMeters * Decimal(index).sqrt()
+        divergenceAngleInRadians = (3. - numpy.sqrt(5)) * numpy.pi
+        thetaInRadians = divergenceAngleInRadians * index
 
         return ScanPoint(
-            radius * Decimal(numpy.cos(theta)),
-            radius * Decimal(numpy.sin(theta)),
+            radiusInMeters * Decimal(numpy.cos(thetaInRadians)),
+            radiusInMeters * Decimal(numpy.sin(thetaInRadians)),
         )
 
     def __len__(self) -> int:
-        return self._numberOfPoints
+        return self.numberOfPoints
+
+
+class SpiralScanInitializer(ScanInitializer):
+    NAME: Final[str] = 'Spiral'
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._scan = SpiralScan()
+
+    @property
+    def simpleName(self) -> str:
+        return self.NAME
+
+    @property
+    def displayName(self) -> str:
+        return self.NAME
+
+    def syncFromSettings(self, settings: ScanSettings) -> None:
+        self._scan.numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value
+        self._scan.radiusScalarInMeters = settings.radiusScalarInMeters.value
+        self.notifyObservers()
+
+    def syncToSettings(self, settings: ScanSettings) -> None:
+        settings.numberOfPointsX.value = self._scan.numberOfPoints
+        settings.numberOfPointsY.value = 1
+        settings.radiusScalarInMeters.value = self._scan.radiusScalarInMeters
+
+    def __call__(self) -> Scan:
+        return self._scan
 
     def getNumberOfPoints(self) -> int:
-        return self._numberOfPoints
+        return self._scan.numberOfPoints
 
     def setNumberOfPoints(self, numberOfPoints: int) -> None:
-        if self._numberOfPoints != numberOfPoints:
-            self._numberOfPoints = numberOfPoints
+        if self._scan.numberOfPoints != numberOfPoints:
+            self._scan.numberOfPoints = numberOfPoints
             self.notifyObservers()
 
     def getRadiusScalarInMeters(self) -> Decimal:
-        return self._radiusScalarInMeters
+        return self._scan.radiusScalarInMeters
 
     def setRadiusScalarInMeters(self, radiusScalarInMeters: Decimal) -> None:
-        if self._radiusScalarInMeters != radiusScalarInMeters:
-            self._radiusScalarInMeters = radiusScalarInMeters
-            self.notifyObservers()
-
-    def getAngularStepInTurns(self) -> Decimal:
-        return self._angularStepInTurns
-
-    def setAngularStepInTurns(self, angularStepInTurns: Decimal) -> None:
-        if self._angularStepInTurns != angularStepInTurns:
-            self._angularStepInTurns = angularStepInTurns
+        if self._scan.radiusScalarInMeters != radiusScalarInMeters:
+            self._scan.radiusScalarInMeters = radiusScalarInMeters
             self.notifyObservers()

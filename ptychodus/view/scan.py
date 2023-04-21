@@ -58,7 +58,6 @@ class SpiralScanView(QGroupBox):
         super().__init__('Parameters', parent)
         self.numberOfPointsSpinBox = QSpinBox()
         self.radiusScalarWidget = LengthWidget.createInstance()
-        self.angularStepWidget = AngleWidget.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> SpiralScanView:
@@ -70,7 +69,6 @@ class SpiralScanView(QGroupBox):
         layout = QFormLayout()
         layout.addRow('Number Of Points:', view.numberOfPointsSpinBox)
         layout.addRow('Radius Scalar:', view.radiusScalarWidget)
-        layout.addRow('Angular Step:', view.angularStepWidget)
         view.setLayout(layout)
 
         return view

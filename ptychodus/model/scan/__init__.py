@@ -1,15 +1,16 @@
 from .api import ScanAPI
-from .cartesian import CartesianScanRepositoryItem
+from .cartesian import CartesianScanInitializer
 from .core import ScanCore, ScanPresenter, ScanRepositoryItemPresenter, ScanRepositoryPresenter
-from .lissajous import LissajousScanRepositoryItem
-from .repository import ScanRepositoryItem, TransformedScanRepositoryItem
+from .file import FromFileScanInitializer
+from .lissajous import LissajousScanInitializer
+from .repository import ScanRepositoryItem
 from .sizer import ScanSizer
-from .spiral import SpiralScanRepositoryItem
-from .tabular import TabularScanRepositoryItem
+from .spiral import SpiralScanInitializer
 
 __all__ = [
-    'CartesianScanRepositoryItem',
-    'LissajousScanRepositoryItem',
+    'CartesianScanInitializer',
+    'FromFileScanInitializer',
+    'LissajousScanInitializer',
     'ScanAPI',
     'ScanCore',
     'ScanPresenter',
@@ -17,7 +18,5 @@ __all__ = [
     'ScanRepositoryItemPresenter',
     'ScanRepositoryPresenter',
     'ScanSizer',
-    'SpiralScanRepositoryItem',
-    'TabularScanRepositoryItem',
-    'TransformedScanRepositoryItem',
+    'SpiralScanInitializer',
 ]

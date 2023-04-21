@@ -1,5 +1,4 @@
-from collections.abc import Callable, Mapping
-from decimal import Decimal
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Optional
 import logging
@@ -8,13 +7,12 @@ import numpy
 
 from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
-from .cartesian import RasterScanRepositoryItem, SnakeScanRepositoryItem
-from .indexFilters import ScanIndexFilterFactory
-from .lissajous import LissajousScanRepositoryItem
-from .repository import ScanRepositoryItem, TransformedScanRepositoryItem
+from .cartesian import CartesianScanInitializer
+from .file import FromFileScanInitializer
+from .lissajous import LissajousScanInitializer
+from .repository import ScanRepositoryItem
 from .settings import ScanSettings
-from .spiral import SpiralScanRepositoryItem
-from .tabular import ScanFileInfo, TabularScanRepositoryItem
+from .spiral import SpiralScanInitializer
 
 logger = logging.getLogger(__name__)
 
@@ -22,79 +20,140 @@ logger = logging.getLogger(__name__)
 class ScanRepositoryItemFactory:
 
     def __init__(self, rng: numpy.random.Generator, settings: ScanSettings,
-                 indexFilterFactory: ScanIndexFilterFactory,
                  fileReaderChooser: PluginChooser[ScanFileReader]) -> None:
         self._rng = rng
         self._settings = settings
-        self._indexFilterFactory = indexFilterFactory
         self._fileReaderChooser = fileReaderChooser
-        self._initializers: Mapping[str, Callable[[], ScanRepositoryItem]] = {
-            LissajousScanRepositoryItem.NAME.casefold(): LissajousScanRepositoryItem,
-            RasterScanRepositoryItem.NAME.casefold(): RasterScanRepositoryItem,
-            SnakeScanRepositoryItem.NAME.casefold(): SnakeScanRepositoryItem,
-            SpiralScanRepositoryItem.NAME.casefold(): SpiralScanRepositoryItem,
+        self._initializers: Mapping[str, Callable[[], Optional[ScanRepositoryItem]]] = {
+            FromFileScanInitializer.NAME: self.createItemFromFile,
+            'Raster': self.createRasterItem,
+            'Snake': self.createSnakeItem,
+            'CenteredRaster': self.createCenteredRasterItem,
+            'CenteredSnake': self.createCenteredSnakeItem,
+            SpiralScanInitializer.NAME: self.createSpiralItem,
+            LissajousScanInitializer.NAME: self.createLissajousItem,
         }
 
-    def _transformed(self, item: ScanRepositoryItem) -> TransformedScanRepositoryItem:
-        transformedItem = TransformedScanRepositoryItem.createInstance(
-            self._rng, item, self._indexFilterFactory)
-        transformedItem.syncFromSettings(self._settings)
-        return transformedItem
-
-    def createTabularItem(self, scan: Scan,
-                          fileInfo: Optional[ScanFileInfo]) -> TransformedScanRepositoryItem:
-        return self._transformed(TabularScanRepositoryItem(scan, fileInfo))
-
-    def getOpenFileFilterList(self) -> list[str]:
+    def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.getCurrentDisplayName()
 
-    def _readScan(self, filePath: Path) -> list[TransformedScanRepositoryItem]:
-        itemList: list[TransformedScanRepositoryItem] = list()
+    def createFileInitializer(self,
+                              filePath: Path,
+                              *,
+                              simpleFileType: str = '',
+                              displayFileType: str = '') -> Optional[FromFileScanInitializer]:
+        if simpleFileType:
+            self._fileReaderChooser.setFromSimpleName(simpleFileType)
+        elif displayFileType:
+            self._fileReaderChooser.setFromDisplayName(displayFileType)
+        else:
+            logger.error('Refusing to create file initializer without file type!')
+            return None
+
+        fileReader = self._fileReaderChooser.getCurrentStrategy()
+        return FromFileScanInitializer(filePath, fileReader)
+
+    def openItemFromFile(self,
+                         filePath: Path,
+                         *,
+                         simpleFileType: str = '',
+                         displayFileType: str = '') -> Optional[ScanRepositoryItem]:
+        item: Optional[ScanRepositoryItem] = None
 
         if filePath.is_file():
-            fileType = self._fileReaderChooser.getCurrentSimpleName()
-            logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
-            fileInfo = ScanFileInfo(fileType, filePath)
-            reader = self._fileReaderChooser.getCurrentStrategy()
+            initializer = self.createFileInitializer(filePath,
+                                                     simpleFileType=simpleFileType,
+                                                     displayFileType=displayFileType)
 
-            try:
-                scanSequence = reader.read(filePath)
-            except ScanPointParseError:
-                logger.exception(f'Failed to parse \"{filePath}\"')
-            except Exception:
-                logger.exception(f'Failed to read \"{filePath}\"')
+            if initializer is None:
+                logger.error('Refusing to create item without initializer!')
             else:
-                for scan in scanSequence:
-                    item = self.createTabularItem(scan, fileInfo)
-                    itemList.append(item)
+                item = ScanRepositoryItem(self._rng, filePath.stem)
+                item.setInitializer(initializer)
         else:
-            logger.debug(f'Refusing to read invalid file path \"{filePath}\"')
+            logger.debug(f'Refusing to create item with invalid file path \"{filePath}\"')
 
-        return itemList
+        return item
 
-    def openScan(self, filePath: Path, fileFilter: str) -> list[TransformedScanRepositoryItem]:
-        self._fileReaderChooser.setFromDisplayName(fileFilter)
-        return self._readScan(filePath)
+    def createItemFromScan(self,
+                           nameHint: str,
+                           scan: Scan,
+                           *,
+                           filePath: Optional[Path] = None,
+                           simpleFileType: str = '',
+                           displayFileType: str = '') -> ScanRepositoryItem:
+        item = ScanRepositoryItem(self._rng, nameHint, scan)
 
-    def getInitializerNameList(self) -> list[str]:
-        return [name.title() for name in self._initializers]
+        if filePath is not None:
+            if filePath.is_file():
+                initializer = self.createFileInitializer(filePath,
+                                                         simpleFileType=simpleFileType,
+                                                         displayFileType=displayFileType)
 
-    def createItem(self, initializerName: str) -> list[TransformedScanRepositoryItem]:
-        itemList: list[TransformedScanRepositoryItem] = list()
-
-        if initializerName.casefold() == 'fromfile':
-            fileInfo = ScanFileInfo.createFromSettings(self._settings)
-            self._fileReaderChooser.setFromSimpleName(fileInfo.fileType)
-            itemList.extend(self._readScan(fileInfo.filePath))
-        else:
-            try:
-                itemFactory = self._initializers[initializerName.casefold()]
-            except KeyError:
-                logger.error(f'Unknown scan initializer \"{initializerName}\"!')
+                if initializer is None:
+                    logger.error('Refusing to add null initializer!')
+                else:
+                    item.setInitializer(initializer)
             else:
-                itemList.append(self._transformed(itemFactory()))
+                logger.debug(f'Refusing to add initializer with invalid file path \"{filePath}\"')
 
-        return itemList
+        return item
+
+    def createItemFromFile(self) -> Optional[ScanRepositoryItem]:
+        filePath = self._settings.inputFilePath.value
+        fileType = self._settings.inputFileType.value
+        return self.openItemFromFile(filePath, simpleFileType=fileType)
+
+    def createRasterItem(self) -> ScanRepositoryItem:
+        initializer = CartesianScanInitializer(snake=False, centered=False)
+        item = ScanRepositoryItem(self._rng, initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def createSnakeItem(self) -> ScanRepositoryItem:
+        initializer = CartesianScanInitializer(snake=True, centered=False)
+        item = ScanRepositoryItem(self._rng, initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def createCenteredRasterItem(self) -> ScanRepositoryItem:
+        initializer = CartesianScanInitializer(snake=False, centered=True)
+        item = ScanRepositoryItem(self._rng, initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def createCenteredSnakeItem(self) -> ScanRepositoryItem:
+        initializer = CartesianScanInitializer(snake=True, centered=True)
+        item = ScanRepositoryItem(self._rng, initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def createSpiralItem(self) -> ScanRepositoryItem:
+        initializer = SpiralScanInitializer()
+        item = ScanRepositoryItem(self._rng, initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def createLissajousItem(self) -> ScanRepositoryItem:
+        initializer = LissajousScanInitializer()
+        item = ScanRepositoryItem(self._rng, initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def getInitializerNameList(self) -> Sequence[str]:
+        return [initializerName for initializerName in self._initializers]
+
+    def createItem(self, initializerName: str) -> Optional[ScanRepositoryItem]:
+        item: Optional[ScanRepositoryItem] = None
+
+        try:
+            itemFactory = self._initializers[initializerName]
+        except KeyError:
+            logger.error(f'Unknown scan initializer \"{initializerName}\"!')
+        else:
+            item = itemFactory()
+
+        return item
