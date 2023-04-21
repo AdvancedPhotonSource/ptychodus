@@ -22,7 +22,7 @@ class CartesianScanController(Observer):
         self._dialog.setWindowTitle(presenter.name)
         self._transformController = ScanTransformController.createInstance(
             presenter.item, self._dialog.transformView)
-        self._initailizer: Optional[CartesianScanInitializer] = None
+        self._initializer: Optional[CartesianScanInitializer] = None
 
     @classmethod
     def createInstance(cls, presenter: ScanRepositoryItemPresenter,

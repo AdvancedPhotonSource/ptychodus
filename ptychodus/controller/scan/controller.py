@@ -14,6 +14,7 @@ from .cartesian import CartesianScanController
 from .lissajous import LissajousScanController
 from .spiral import SpiralScanController
 from .tableModel import ScanTableModel
+from .tabular import TabularScanController
 from .transformController import ScanTransformController
 
 logger = logging.getLogger(__name__)
@@ -131,9 +132,8 @@ class ScanController(Observer):
                     itemPresenter, self._view)
                 lissajousController.openDialog()
             else:
-                # FIXME tabularController = TabularScanController.createInstance(itemPresenter, self._view)
-                # FIXME tabularController.openDialog()
-                logger.error('Unknown scan repository item!')
+                tabularController = TabularScanController.createInstance(itemPresenter, self._view)
+                tabularController.openDialog()
 
     def _removeSelectedScan(self) -> None:
         current = self._view.repositoryView.tableView.currentIndex()

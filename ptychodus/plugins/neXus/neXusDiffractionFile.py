@@ -65,6 +65,7 @@ class DataGroup:
 @dataclass(frozen=True)
 class DetectorSpecificGroup:
     nimages: int
+    ntrigger: int
     photon_energy_eV: float
     x_pixels_in_detector: int
     y_pixels_in_detector: int
@@ -72,11 +73,13 @@ class DetectorSpecificGroup:
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorSpecificGroup:
         nimages = group['nimages']
+        ntrigger = group['ntrigger']
         photonEnergy = group['photon_energy']
         assert photonEnergy.attrs['units'] == b'eV'
         xPixelsInDetector = group['x_pixels_in_detector']
         yPixelsInDetector = group['y_pixels_in_detector']
-        return cls(nimages[()], photonEnergy[()], xPixelsInDetector[()], yPixelsInDetector[()])
+        return cls(nimages[()], ntrigger[()], photonEnergy[()], xPixelsInDetector[()],
+                   yPixelsInDetector[()])
 
 
 @dataclass(frozen=True)
@@ -232,6 +235,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],
                         numberOfPatternsTotal=detectorSpecific.nimages,
+                        # NOTE for catalyst particle numberOfPatternsTotal=detectorSpecific.ntrigger,
                         patternDataType=h5Dataset.dtype,
                         detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
                         detectorNumberOfPixels=detectorNumberOfPixels,

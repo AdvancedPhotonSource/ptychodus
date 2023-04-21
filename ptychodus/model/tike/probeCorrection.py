@@ -11,16 +11,15 @@ class TikeProbeCorrectionSettings(TikeAdaptiveMomentSettings):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__(settingsGroup)
         self.useProbeCorrection = settingsGroup.createBooleanEntry('UseProbeCorrection', True)
-        self.orthogonalityConstraint = settingsGroup.createBooleanEntry(
-            'OrthogonalityConstraint', True)
-        self.centeredIntensityConstraint = settingsGroup.createBooleanEntry(
-            'CenteredIntensityConstraint', False)
-        self.sparsityConstraint = settingsGroup.createRealEntry('SparsityConstraint', '1')
+        self.forceOrthogonality = settingsGroup.createBooleanEntry('ForceOrthogonality', False)
+        self.forceCenteredIntensity = settingsGroup.createBooleanEntry(
+            'ForceCenteredIntensity', False)
+        self.forceSparsity = settingsGroup.createRealEntry('ForceSparsity', '0')
         self.useFiniteProbeSupport = settingsGroup.createBooleanEntry(
-            'UseFiniteProbeSupport', True)
+            'UseFiniteProbeSupport', False)
         self.probeSupportWeight = settingsGroup.createRealEntry('ProbeSupportWeight', '10')
-        self.probeSupportRadius = settingsGroup.createRealEntry('ProbeSupportRadius', '0.3')
-        self.probeSupportDegree = settingsGroup.createRealEntry('ProbeSupportDegree', '5')
+        self.probeSupportRadius = settingsGroup.createRealEntry('ProbeSupportRadius', '0.35')
+        self.probeSupportDegree = settingsGroup.createRealEntry('ProbeSupportDegree', '2.5')
         self.additionalProbePenalty = settingsGroup.createRealEntry('AdditionalProbePenalty', '0')
 
     @classmethod
@@ -44,27 +43,27 @@ class TikeProbeCorrectionPresenter(TikeAdaptiveMomentPresenter[TikeProbeCorrecti
     def setProbeCorrectionEnabled(self, enabled: bool) -> None:
         self._settings.useProbeCorrection.value = enabled
 
-    def isOrthogonalityConstraintEnabled(self) -> bool:
-        return self._settings.orthogonalityConstraint.value
+    def isForceOrthogonalityEnabled(self) -> bool:
+        return self._settings.forceOrthogonality.value
 
-    def setOrthogonalityConstraintEnabled(self, enabled: bool) -> None:
-        self._settings.orthogonalityConstraint.value = enabled
+    def setForceOrthogonalityEnabled(self, enabled: bool) -> None:
+        self._settings.forceOrthogonality.value = enabled
 
-    def isCenteredIntensityConstraintEnabled(self) -> bool:
-        return self._settings.centeredIntensityConstraint.value
+    def isForceCenteredIntensityEnabled(self) -> bool:
+        return self._settings.forceCenteredIntensity.value
 
-    def setCenteredIntensityConstraintEnabled(self, enabled: bool) -> None:
-        self._settings.centeredIntensityConstraint.value = enabled
+    def setForceCenteredIntensityEnabled(self, enabled: bool) -> None:
+        self._settings.forceCenteredIntensity.value = enabled
 
-    def getSparsityConstraintLimits(self) -> Interval[Decimal]:
+    def getForceSparsityLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
-    def getSparsityConstraint(self) -> Decimal:
-        limits = self.getSparsityConstraintLimits()
-        return limits.clamp(self._settings.sparsityConstraint.value)
+    def getForceSparsity(self) -> Decimal:
+        limits = self.getForceSparsityLimits()
+        return limits.clamp(self._settings.forceSparsity.value)
 
-    def setSparsityConstraint(self, value: Decimal) -> None:
-        self._settings.sparsityConstraint.value = value
+    def setForceSparsity(self, value: Decimal) -> None:
+        self._settings.forceSparsity.value = value
 
     def isFiniteProbeSupportEnabled(self) -> bool:
         return self._settings.useFiniteProbeSupport.value

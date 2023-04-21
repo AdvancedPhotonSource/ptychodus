@@ -184,5 +184,6 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
             self._syncToSettings()
         elif observable is self._repository:
             self._recoverIfSelectedItemRemovedFromRepository()
+            self.notifyObservers()
         elif observable is self._reinitObservable:
             self._syncFromSettings()

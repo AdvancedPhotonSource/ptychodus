@@ -165,9 +165,9 @@ class TikeProbeCorrectionView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Probe Correction', parent)
-        self.sparsityConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.orthogonalityConstraintCheckBox = QCheckBox('Orthogonality Constraint')
-        self.centeredIntensityConstraintCheckBox = QCheckBox('Centered Intensity Constraint')
+        self.forceSparsitySlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.forceOrthogonalityCheckBox = QCheckBox('Force Orthogonality')
+        self.forceCenteredIntensityCheckBox = QCheckBox('Force Centered Intensity')
         self.probeSupportView = TikeProbeSupportView.createInstance()
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
         self.additionalProbePenaltyLineEdit = DecimalLineEdit.createInstance()
@@ -176,19 +176,18 @@ class TikeProbeCorrectionView(QGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikeProbeCorrectionView:
         view = cls(parent)
 
-        view.sparsityConstraintSlider.setToolTip(
-            'Forces a maximum proportion of non-zero elements.')
-        view.orthogonalityConstraintCheckBox.setToolTip(
+        view.forceSparsitySlider.setToolTip('Forces this proportion of zero elements.')
+        view.forceOrthogonalityCheckBox.setToolTip(
             'Forces probes to be orthogonal each iteration.')
-        view.centeredIntensityConstraintCheckBox.setToolTip(
+        view.forceCenteredIntensityCheckBox.setToolTip(
             'Forces the probe intensity to be centered.')
         view.additionalProbePenaltyLineEdit.setToolTip(
-            'Additional penalty applied to the last probe.')
+            'Penalty applied to the last probe for existing.')
 
         layout = QFormLayout()
-        layout.addRow('Sparsity Constraint:', view.sparsityConstraintSlider)
-        layout.addRow(view.orthogonalityConstraintCheckBox)
-        layout.addRow(view.centeredIntensityConstraintCheckBox)
+        layout.addRow('Force Sparsity:', view.forceSparsitySlider)
+        layout.addRow(view.forceOrthogonalityCheckBox)
+        layout.addRow(view.forceCenteredIntensityCheckBox)
         layout.addRow(view.probeSupportView)
         layout.addRow(view.adaptiveMomentView)
         layout.addRow('Additional Probe Penalty:', view.additionalProbePenaltyLineEdit)

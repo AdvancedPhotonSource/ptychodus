@@ -22,7 +22,7 @@ class LissajousScanController(Observer):
         self._dialog.setWindowTitle(presenter.name)
         self._transformController = ScanTransformController.createInstance(
             presenter.item, self._dialog.transformView)
-        self._initailizer: Optional[LissajousScanInitializer] = None
+        self._initializer: Optional[LissajousScanInitializer] = None
 
     @classmethod
     def createInstance(cls, presenter: ScanRepositoryItemPresenter,

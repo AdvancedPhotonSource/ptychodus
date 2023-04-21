@@ -54,7 +54,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         super().__init__()
         self._rng = rng
         self._nameHint = nameHint
-        self._scan = scan or TabularScan({})
+        self._scan: Scan = TabularScan({}) if scan is None else scan
         self._initializer: Optional[ScanInitializer] = None
         self._transform = SelectableScanPointTransform()
         self._transform.addObserver(self)

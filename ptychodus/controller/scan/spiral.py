@@ -22,7 +22,7 @@ class SpiralScanController(Observer):
         self._dialog.setWindowTitle(presenter.name)
         self._transformController = ScanTransformController.createInstance(
             presenter.item, self._dialog.transformView)
-        self._initailizer: Optional[SpiralScanInitializer] = None
+        self._initializer: Optional[SpiralScanInitializer] = None
 
     @classmethod
     def createInstance(cls, presenter: ScanRepositoryItemPresenter,

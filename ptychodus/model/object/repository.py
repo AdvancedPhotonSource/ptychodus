@@ -47,7 +47,7 @@ class ObjectRepositoryItem(Observable, Observer):
     def __init__(self, nameHint: str, array: Optional[ObjectArrayType] = None) -> None:
         super().__init__()
         self._nameHint = nameHint
-        self._array = array or numpy.zeros((0, 0), dtype=complex)
+        self._array = numpy.zeros((0, 0), dtype=complex) if array is None else array
         self._initializer: Optional[ObjectInitializer] = None
 
     @property

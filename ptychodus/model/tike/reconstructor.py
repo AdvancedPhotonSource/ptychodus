@@ -77,9 +77,9 @@ class TikeReconstructor:
                     if settings.useFiniteProbeSupport.value else 0.
 
             options = tike.ptycho.ProbeOptions(
-                orthogonality_constraint=settings.orthogonalityConstraint.value,
-                centered_intensity_constraint=settings.centeredIntensityConstraint.value,
-                sparsity_constraint=float(settings.sparsityConstraint.value),
+                force_orthogonality=settings.forceOrthogonality.value,
+                force_centered_intensity=settings.forceCenteredIntensity.value,
+                force_sparsity=float(settings.forceSparsity.value),
                 use_adaptive_moment=settings.useAdaptiveMoment.value,
                 vdecay=float(settings.vdecay.value),
                 mdecay=float(settings.mdecay.value),
