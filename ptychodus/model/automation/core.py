@@ -6,7 +6,7 @@ import queue
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry, SettingsGroup
-from ..data import DataCore
+from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
 from ..probe import ProbeCore
 from ..scan import ScanAPI
@@ -147,11 +147,12 @@ class AutomationProcessingPresenter(Observable, Observer):
 
 class AutomationCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry, dataCore: DataCore, scanAPI: ScanAPI,
-                 probeCore: ProbeCore, objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, dataAPI: DiffractionDataAPI,
+                 scanAPI: ScanAPI, probeCore: ProbeCore, objectAPI: ObjectAPI,
+                 workflowCore: WorkflowCore) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
-        self._workflow = S02AutomationDatasetWorkflow(dataCore, scanAPI, probeCore, objectAPI,
+        self._workflow = S02AutomationDatasetWorkflow(dataAPI, scanAPI, probeCore, objectAPI,
                                                       workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,

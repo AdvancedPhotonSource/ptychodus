@@ -90,7 +90,7 @@ class DataParametersController(Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:
-            self._datasetInputOutputPresenter.startProcessingDiffractionPatterns()
+            self._datasetInputOutputPresenter.startAssemblingDiffractionPatterns()
             self._switchToDatasetView()
         elif observable is self._datasetPresenter:
             self._treeModel.setRootNode(self._datasetPresenter.getContentsTree())

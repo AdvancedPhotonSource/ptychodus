@@ -208,5 +208,5 @@ class PatternsController:
                        fileDialogFactory: FileDialogFactory) -> PatternsController:
         controller = cls(datasetPresenter, patternPresenter, view, fileDialogFactory)
         view.forwardButton.clicked.connect(
-            datasetInputOutputPresenter.startProcessingDiffractionPatterns)
+            datasetInputOutputPresenter.startAssemblingDiffractionPatterns)
         return controller

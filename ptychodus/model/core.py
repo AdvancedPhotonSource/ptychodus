@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterable
+from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
@@ -118,7 +118,7 @@ class ModelCore:
         self._stateDataRegistry = StateDataRegistry(
             (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
-        self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore,
+        self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore.dataAPI,
                                               self._scanCore.scanAPI, self._probeCore,
                                               self._objectCore.objectAPI, self._workflowCore)
 
@@ -138,10 +138,9 @@ class ModelCore:
         if self._modelArgs.restartFilePath:
             self.openStateData(self._modelArgs.restartFilePath)
 
-        if self.diffractionDatasetInputOutputPresenter.isReadyToAssemble:
-            self.diffractionDatasetInputOutputPresenter.startProcessingDiffractionPatterns()
-            self.diffractionDatasetInputOutputPresenter.stopProcessingDiffractionPatterns(
-                finishAssembling=True)
+        if self._dataCore.dataAPI.getAssemblyQueueSize() > 0:
+            self._dataCore.dataAPI.startAssemblingDiffractionPatterns()
+            self._dataCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
 
         if self.rpcMessageService:
             self.rpcMessageService.start()
@@ -195,28 +194,29 @@ class ModelCore:
         return self._dataCore.datasetInputOutputPresenter
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self.diffractionDatasetInputOutputPresenter.initializeStreaming(metadata)
-        self.diffractionDatasetInputOutputPresenter.startProcessingDiffractionPatterns()
+        self._dataCore.dataAPI.initializeStreaming(metadata)
+        self._dataCore.dataAPI.startAssemblingDiffractionPatterns()
         self._scanCore.scanAPI.initializeStreamingScan()
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
-        self.diffractionDatasetInputOutputPresenter.assemble(array)
+        self._dataCore.dataAPI.assemble(array)
         self._scanCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)
 
-    def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._scanCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)
 
-    def assembleScanPositionsY(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assembleScanPositionsY(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._scanCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)
 
     def finalizeStreamingWorkflow(self) -> None:
-        self.diffractionDatasetInputOutputPresenter.stopProcessingDiffractionPatterns(
-            finishAssembling=True)
         self._scanCore.scanAPI.finalizeStreamingScan()
+        self._dataCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
         self._objectCore.objectAPI.initializeAndActivateItem('Random')
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
-        return self.diffractionDatasetInputOutputPresenter.getAssemblyQueueSize()
+        return self._dataCore.dataAPI.getAssemblyQueueSize()
 
     def refreshActiveDataset(self) -> None:
         self._dataCore.dataset.notifyObserversIfDatasetChanged()

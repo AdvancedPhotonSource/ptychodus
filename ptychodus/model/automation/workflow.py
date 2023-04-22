@@ -3,7 +3,7 @@ from pathlib import Path
 import logging
 import re
 
-from ..data import DataCore
+from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
 from ..probe import ProbeCore
 from ..scan import ScanAPI
@@ -22,9 +22,9 @@ class AutomationDatasetWorkflow(ABC):
 
 class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, dataCore: DataCore, scanAPI: ScanAPI, probeCore: ProbeCore,
+    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeCore: ProbeCore,
                  objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
-        self._dataCore = dataCore
+        self._dataAPI = dataAPI
         self._scanAPI = scanAPI
         self._probeCore = probeCore
         self._objectAPI = objectAPI
@@ -43,9 +43,7 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
             if digits != 0:
                 break
 
-        diffractionFileFilter = 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)'
-        self._dataCore.loadDiffractionDataset(diffractionFilePath, diffractionFileFilter)
-
+        self._dataAPI.loadDiffractionDataset(diffractionFilePath, simpleFileType='HDF5')
         scanItemName = self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
                                                                       simpleFileType='MDA')
 
@@ -59,9 +57,9 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
 class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, dataCore: DataCore, scanAPI: ScanAPI, probeCore: ProbeCore,
+    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeCore: ProbeCore,
                  objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
-        self._dataCore = dataCore
+        self._dataAPI = dataAPI
         self._scanAPI = scanAPI
         self._probeCore = probeCore
         self._objectAPI = objectAPI
@@ -73,9 +71,7 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         flowLabel = f'scan{scanID}'
 
         diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
-        diffractionFileFilter = 'NeXus Master Files (*.h5 *.hdf5)'
-        self._dataCore.loadDiffractionDataset(diffractionFilePath, diffractionFileFilter)
-
+        self._dataAPI.loadDiffractionDataset(diffractionFilePath, simpleFileType='NeXus')
         scanItemName = self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
                                                                       simpleFileType='CSV')
 

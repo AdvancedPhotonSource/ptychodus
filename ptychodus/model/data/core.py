@@ -18,6 +18,7 @@ from ...api.tree import SimpleTreeNode
 from ..detector import Detector
 from ..statefulCore import StateDataType, StatefulCore
 from .active import ActiveDiffractionDataset
+from .api import DiffractionDataAPI
 from .builder import ActiveDiffractionDatasetBuilder
 from .io import DiffractionDatasetInputOutputPresenter
 from .patterns import DiffractionPatternPresenter
@@ -170,7 +171,6 @@ class DataCore(StatefulCore):
 
     def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
-        # FIXME bug with opening diffraction files on startup
         self._datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
         self.patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
 
@@ -181,19 +181,14 @@ class DataCore(StatefulCore):
         self.dataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
                                                 self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self._datasetSettings, self.dataset)
+        self.dataAPI = DiffractionDataAPI(self._builder, fileReaderChooser)
 
         self.datasetPresenter = DiffractionDatasetPresenter.createInstance(
             self._datasetSettings, self.dataset)
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter.createInstance(
-            self._datasetSettings, self.dataset, self._builder, fileReaderChooser)
+            self._datasetSettings, self.dataset, self.dataAPI, settingsRegistry)
         self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
             self.dataset)
-
-    def loadDiffractionDataset(self, filePath: Path, fileFilter: str) -> None:
-        self.datasetInputOutputPresenter.setOpenFileFilter(fileFilter)
-        self.datasetInputOutputPresenter.openDiffractionFile(filePath)
-        self.datasetInputOutputPresenter.startProcessingDiffractionPatterns()
-        self.datasetInputOutputPresenter.stopProcessingDiffractionPatterns(finishAssembling=True)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         state = dict()

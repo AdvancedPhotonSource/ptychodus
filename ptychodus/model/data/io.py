@@ -1,17 +1,12 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional
 import logging
 
 import numpy
 
-from ...api.data import (DiffractionFileReader, DiffractionMetadata, DiffractionPatternArray,
-                         DiffractionPatternData, DiffractionPatternState, SimpleDiffractionDataset)
 from ...api.observer import Observable, Observer
-from ...api.plugins import PluginChooser
-from ...api.tree import SimpleTreeNode
 from .active import ActiveDiffractionDataset
-from .builder import ActiveDiffractionDatasetBuilder
+from .api import DiffractionDataAPI
 from .settings import DiffractionDatasetSettings
 
 logger = logging.getLogger(__name__)
@@ -20,84 +15,54 @@ logger = logging.getLogger(__name__)
 class DiffractionDatasetInputOutputPresenter(Observable, Observer):
 
     def __init__(self, settings: DiffractionDatasetSettings, dataset: ActiveDiffractionDataset,
-                 builder: ActiveDiffractionDatasetBuilder,
-                 fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
+                 dataAPI: DiffractionDataAPI, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._dataset = dataset
-        self._builder = builder
-        self._fileReaderChooser = fileReaderChooser
+        self._dataAPI = dataAPI
+        self._reinitObservable = reinitObservable
 
     @classmethod
-    def createInstance(
-        cls, settings: DiffractionDatasetSettings, dataset: ActiveDiffractionDataset,
-        builder: ActiveDiffractionDatasetBuilder,
-        fileReaderChooser: PluginChooser[DiffractionFileReader]
-    ) -> DiffractionDatasetInputOutputPresenter:
-        presenter = cls(settings, dataset, builder, fileReaderChooser)
-        settings.fileType.addObserver(presenter)
-        fileReaderChooser.addObserver(presenter)
-        presenter._syncFileReaderFromSettings()
-        settings.filePath.addObserver(presenter)
-        presenter._openDiffractionFileFromSettings()
-        dataset.addObserver(presenter)
+    def createInstance(cls, settings: DiffractionDatasetSettings,
+                       dataset: ActiveDiffractionDataset, dataAPI: DiffractionDataAPI,
+                       reinitObservable: Observable) -> DiffractionDatasetInputOutputPresenter:
+        presenter = cls(settings, dataset, dataAPI, reinitObservable)
+        reinitObservable.addObserver(presenter)
         return presenter
 
-    @property
-    def isReadyToAssemble(self) -> bool:
-        return (self._builder.getAssemblyQueueSize() > 0)
-
-    def assemble(self, array: DiffractionPatternArray) -> None:
-        self._builder.insertArray(array)
-
-    def startProcessingDiffractionPatterns(self) -> None:
-        self._builder.start()
-
-    def stopProcessingDiffractionPatterns(self, finishAssembling: bool) -> None:
-        self._builder.stop(finishAssembling)
-
-    def getAssemblyQueueSize(self) -> int:
-        return self._builder.getAssemblyQueueSize()
-
-    def initializeStreaming(self, metadata: DiffractionMetadata) -> None:
-        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
-        arrayList: list[DiffractionPatternArray] = list()
-        dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
-        self._builder.switchTo(dataset)
-
     def getOpenFileFilterList(self) -> list[str]:
-        return self._fileReaderChooser.getDisplayNameList()
+        return self._dataAPI.getOpenFileFilterList()
 
     def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.getCurrentDisplayName()
+        return self._dataAPI.getOpenFileFilter()
 
-    def setOpenFileFilter(self, fileFilter: str) -> None:
-        self._fileReaderChooser.setFromDisplayName(fileFilter)
+    def openDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
+        try:
+            fileType = self._dataAPI.loadDiffractionDataset(filePath=filePath,
+                                                            displayFileType=fileFilter,
+                                                            assemble=False)
+        except Exception:
+            logger.exception('Failed to load diffraction dataset.')
+            return
 
-    def _syncFileReaderFromSettings(self) -> None:
-        self._fileReaderChooser.setFromSimpleName(self._settings.fileType.value)
+        if fileType is None:
+            logger.error('Failed to load diffraction dataset.')
+        else:
+            self._settings.fileType.value = fileType
+            self._settings.filePath.value = filePath
+
         self.notifyObservers()
 
-    def _syncFileReaderToSettings(self) -> None:
-        self._settings.fileType.value = self._fileReaderChooser.getCurrentSimpleName()
-
-    def _openDiffractionFile(self, filePath: Path) -> None:
-        if filePath is not None and filePath.is_file():
-            logger.debug(f'Reading {filePath}')
-            fileReader = self._fileReaderChooser.getCurrentStrategy()
-            dataset = fileReader.read(filePath)
-            self._builder.switchTo(dataset)
-        else:
-            logger.debug(f'Refusing to read invalid file path {filePath}')
-
-    def openDiffractionFile(self, filePath: Path) -> None:
-        if self._settings.filePath.value == filePath:
-            self._openDiffractionFile(filePath)
-
-        self._settings.filePath.value = filePath
-
     def _openDiffractionFileFromSettings(self) -> None:
-        self._openDiffractionFile(self._settings.filePath.value)
+        self._dataAPI.loadDiffractionDataset(filePath=self._settings.filePath.value,
+                                             simpleFileType=self._settings.fileType.value,
+                                             assemble=True)
+
+    def startAssemblingDiffractionPatterns(self) -> None:
+        self._dataAPI.startAssemblingDiffractionPatterns()
+
+    def stopAssemblingDiffractionPatterns(self, finishAssembling: bool) -> None:
+        self._dataAPI.stopAssemblingDiffractionPatterns(finishAssembling)
 
     def getSaveFileFilterList(self) -> list[str]:
         return [self.getSaveFileFilter()]
@@ -113,9 +78,5 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         numpy.save(filePath, array)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.fileType:
-            self._syncFileReaderFromSettings()
-        elif observable is self._fileReaderChooser:
-            self._syncFileReaderToSettings()
-        elif observable is self._settings.filePath:
+        if observable is self._reinitObservable:
             self._openDiffractionFileFromSettings()

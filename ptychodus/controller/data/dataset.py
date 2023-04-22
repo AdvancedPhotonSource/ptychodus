@@ -26,7 +26,7 @@ class DatasetController(Observer):
         controller = cls(inputOutputPresenter, presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
-        view.backwardButton.clicked.connect(inputOutputPresenter.stopProcessingDiffractionPatterns)
+        view.backwardButton.clicked.connect(inputOutputPresenter.stopAssemblingDiffractionPatterns)
         view.forwardButton.clicked.connect(controller._saveDiffractionFile)
 
         controller._syncModelToView()

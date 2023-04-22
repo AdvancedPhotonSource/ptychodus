@@ -62,6 +62,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self._indexFilter.addObserver(self)
         self._jitterRadiusInMeters = Decimal()
         self._centroid = ScanPoint(Decimal(), Decimal())
+        # FIXME scan distance and size in bytes
 
     @property
     def nameHint(self) -> str:
