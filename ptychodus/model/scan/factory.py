@@ -8,6 +8,7 @@ import numpy
 from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
 from .cartesian import CartesianScanInitializer
+from .concentric import ConcentricScanInitializer
 from .file import FromFileScanInitializer
 from .lissajous import LissajousScanInitializer
 from .repository import ScanRepositoryItem
@@ -30,6 +31,7 @@ class ScanRepositoryItemFactory:
             'Snake': self.createSnakeItem,
             'CenteredRaster': self.createCenteredRasterItem,
             'CenteredSnake': self.createCenteredSnakeItem,
+            ConcentricScanInitializer.NAME: self.createConcentricItem,
             SpiralScanInitializer.NAME: self.createSpiralItem,
             LissajousScanInitializer.NAME: self.createLissajousItem,
         }
@@ -127,6 +129,12 @@ class ScanRepositoryItemFactory:
 
     def createCenteredSnakeItem(self) -> ScanRepositoryItem:
         initializer = CartesianScanInitializer(snake=True, centered=True)
+        item = ScanRepositoryItem(self._rng, initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def createConcentricItem(self) -> ScanRepositoryItem:
+        initializer = ConcentricScanInitializer()
         item = ScanRepositoryItem(self._rng, initializer.simpleName)
         item.setInitializer(initializer)
         return item

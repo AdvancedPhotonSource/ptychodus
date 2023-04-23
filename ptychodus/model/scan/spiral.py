@@ -14,6 +14,7 @@ __all__ = [
 
 
 class SpiralScan(Scan):
+    '''https://doi.org/10.1364/OE.22.012634'''
 
     def __init__(self) -> None:
         self.numberOfPoints = 100

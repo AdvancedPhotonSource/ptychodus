@@ -1,5 +1,6 @@
 from .api import ScanAPI
 from .cartesian import CartesianScanInitializer
+from .concentric import ConcentricScanInitializer
 from .core import ScanCore, ScanPresenter, ScanRepositoryItemPresenter, ScanRepositoryPresenter
 from .file import FromFileScanInitializer
 from .lissajous import LissajousScanInitializer
@@ -9,6 +10,7 @@ from .spiral import SpiralScanInitializer
 
 __all__ = [
     'CartesianScanInitializer',
+    'ConcentricScanInitializer',
     'FromFileScanInitializer',
     'LissajousScanInitializer',
     'ScanAPI',

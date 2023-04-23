@@ -27,6 +27,11 @@ class ScanSettings(Observable, Observer):
         self.radiusScalarInMeters = settingsGroup.createRealEntry('RadiusScalarInMeters', '0.5e-6')
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')
         self.stepSizeYInMeters = settingsGroup.createRealEntry('StepSizeYInMeters', '1e-6')
+        self.radialStepSizeInMeters = settingsGroup.createRealEntry('RadialStepSizeInMeters',
+                                                                    '1e-6')
+        self.numberOfShells = settingsGroup.createIntegerEntry('NumberOfShells', 5)
+        self.numberOfPointsInFirstShell = settingsGroup.createIntegerEntry(
+            'NumberOfPointsInFirstShell', 10)
         self.indexFilter = settingsGroup.createStringEntry('IndexFilter', 'ALL')
         self.transform = settingsGroup.createStringEntry('Transform', '+X+Y')
         self.expandBoundingBox = settingsGroup.createBooleanEntry('ExpandBoundingBox', False)

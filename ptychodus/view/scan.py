@@ -13,6 +13,7 @@ from .widgets import AngleWidget, LengthWidget, RepositoryView
 
 __all__ = [
     'CartesianScanView',
+    'ConcentricScanView',
     'LissajousScanView',
     'ScanEditorDialog',
     'ScanPlotView',
@@ -47,6 +48,31 @@ class CartesianScanView(QGroupBox):
         layout.addRow('Number Of Points Y:', view.numberOfPointsYSpinBox)
         layout.addRow('Step Size X:', view.stepSizeXWidget)
         layout.addRow('Step Size Y:', view.stepSizeYWidget)
+        view.setLayout(layout)
+
+        return view
+
+
+class ConcentricScanView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Parameters', parent)
+        self.numberOfShellsSpinBox = QSpinBox()
+        self.numberOfPointsInFirstShellSpinBox = QSpinBox()
+        self.radialStepSizeWidget = LengthWidget.createInstance()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ConcentricScanView:
+        view = cls(parent)
+
+        MAX_INT = 0x7FFFFFFF
+        view.numberOfShellsSpinBox.setRange(0, MAX_INT)
+        view.numberOfPointsInFirstShellSpinBox.setRange(0, MAX_INT)
+
+        layout = QFormLayout()
+        layout.addRow('Number Of Shells:', view.numberOfShellsSpinBox)
+        layout.addRow('Number Of Points In First Shell:', view.numberOfPointsInFirstShellSpinBox)
+        layout.addRow('Radial Step Size:', view.radialStepSizeWidget)
         view.setLayout(layout)
 
         return view

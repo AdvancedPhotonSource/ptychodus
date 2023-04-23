@@ -11,6 +11,7 @@ from ...model.scan import ScanRepositoryItemPresenter, ScanRepositoryPresenter
 from ...view import RepositoryView, ScanView, ScanPlotView
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
+from .concentric import ConcentricScanController
 from .lissajous import LissajousScanController
 from .spiral import SpiralScanController
 from .tableModel import ScanTableModel
@@ -124,6 +125,10 @@ class ScanController(Observer):
                 cartesianController = CartesianScanController.createInstance(
                     itemPresenter, self._view)
                 cartesianController.openDialog()
+            elif initializerName == 'Concentric':
+                concentricController = ConcentricScanController.createInstance(
+                    itemPresenter, self._view)
+                concentricController.openDialog()
             elif initializerName == 'Spiral':
                 spiralController = SpiralScanController.createInstance(itemPresenter, self._view)
                 spiralController.openDialog()
