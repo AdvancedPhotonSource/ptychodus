@@ -62,6 +62,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                         detectorDistanceInMeters=detectorDistanceInMeters,
                         detectorNumberOfPixels=detectorNumberOfPixels,
                         detectorPixelSizeInMeters=detectorPixelSizeInMeters,
+                        probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
                     )
 
