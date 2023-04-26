@@ -112,15 +112,19 @@ class H5DiffractionFileTreeBuilder:
 
                         if spaceId.get_simple_extent_type() == h5py.h5s.SCALAR:
                             value = h5Item[()]
-                            stringInfo = h5py.check_string_dtype(value.dtype)
 
-                            if stringInfo:
-                                valueStr = f'STRING = "{value.decode(stringInfo.encoding)}"'
-                            elif numpy.ndim(value) == 0:
-                                valueStr = f'SCALAR {value.dtype} = {value}'
+                            if isinstance(value, bytes):
+                                valueStr = value.decode()
                             else:
-                                logger.debug(f'UNKNOWN: {value} {type(value)}')
-                                valueStr = 'UNKNOWN'
+                                stringInfo = h5py.check_string_dtype(value.dtype)
+
+                                if stringInfo:
+                                    valueStr = f'STRING = "{value.decode(stringInfo.encoding)}"'
+                                elif numpy.ndim(value) == 0:
+                                    valueStr = f'SCALAR {value.dtype} = {value}'
+                                else:
+                                    logger.debug(f'UNKNOWN: {value} {type(value)}')
+                                    valueStr = 'UNKNOWN'
                         else:
                             itemDetails = f'{h5Item.shape} {h5Item.dtype}'
                 elif isinstance(h5Item, h5py.SoftLink):

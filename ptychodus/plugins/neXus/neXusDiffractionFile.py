@@ -231,6 +231,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         int(detectorSpecific.x_pixels_in_detector),
                         int(detectorSpecific.y_pixels_in_detector),
                     )
+                    probeEnergyInElectronVolts = Decimal(repr(detectorSpecific.photon_energy_eV))
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],
@@ -241,8 +242,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         detectorNumberOfPixels=detectorNumberOfPixels,
                         detectorPixelSizeInMeters=detectorPixelSizeInMeters,
                         cropCenterInPixels=cropCenterInPixels,
-                        probeEnergyInElectronVolts=Decimal(repr(
-                            detectorSpecific.photon_energy_eV)),
+                        probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
                     )
                     dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
