@@ -26,7 +26,8 @@ class ScanRepositoryItemFactory:
         self._settings = settings
         self._fileReaderChooser = fileReaderChooser
         self._initializers: Mapping[str, Callable[[], Optional[ScanRepositoryItem]]] = {
-            FromFileScanInitializer.NAME: self.createItemFromFile,
+            FromFileScanInitializer.SIMPLE_NAME: self.createItemFromFile,
+            FromFileScanInitializer.DISPLAY_NAME: self.createItemFromFile,
             'Raster': self.createRasterItem,
             'Snake': self.createSnakeItem,
             'CenteredRaster': self.createCenteredRasterItem,

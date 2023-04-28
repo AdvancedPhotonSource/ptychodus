@@ -25,7 +25,8 @@ class ObjectRepositoryItemFactory:
         self._sizer = sizer
         self._fileReaderChooser = fileReaderChooser
         self._initializers: Mapping[str, Callable[[], Optional[ObjectRepositoryItem]]] = {
-            FromFileObjectInitializer.NAME: self.createItemFromFile,
+            FromFileObjectInitializer.SIMPLE_NAME: self.createItemFromFile,
+            FromFileObjectInitializer.DISPLAY_NAME: self.createItemFromFile,
             RandomObjectInitializer.NAME: self.createRandomItem,
         }
 

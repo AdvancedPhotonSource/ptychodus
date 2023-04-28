@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QHeaderView, QHBoxLayout, QMenu, QPushButton, QSizePolicy,
-                             QSpinBox, QStackedWidget, QTableView, QVBoxLayout, QWidget)
+                             QGroupBox, QHBoxLayout, QMenu, QPushButton, QSizePolicy, QSpinBox,
+                             QStackedWidget, QTableView, QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, EnergyWidget, LengthWidget, SemiautomaticSpinBox
 
@@ -168,8 +168,6 @@ class ProbeModesView(QGroupBox):
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeModesView:
         view = cls(parent)
-
-        view.tableView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         layout = QVBoxLayout()
         layout.addWidget(view.tableView)

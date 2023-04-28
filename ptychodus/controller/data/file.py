@@ -45,6 +45,8 @@ class DatasetFileController(Observer):
         for fileFilter in presenter.getOpenFileFilterList():
             view.contentsView.fileTypeComboBox.addItem(fileFilter)
 
+        view.contentsView.fileTypeComboBox.currentTextChanged.connect(
+            controller._setNameFiltersInFileSystemModel)
         controller._syncModelToView()
 
         controller._fileSystemModel.rootPathChanged.connect(
@@ -97,11 +99,8 @@ class DatasetFileController(Observer):
             self._fileSystemModel.setNameFilters(nameFilters)
 
     def _syncModelToView(self) -> None:
-        openFileFilter = self._presenter.getOpenFileFilter()
-        self._view.contentsView.fileTypeComboBox.blockSignals(True)
-        self._view.contentsView.fileTypeComboBox.setCurrentText(openFileFilter)
-        self._view.contentsView.fileTypeComboBox.blockSignals(False)
-        self._setNameFiltersInFileSystemModel(openFileFilter)
+        self._view.contentsView.fileTypeComboBox.setCurrentText(
+            self._presenter.getOpenFileFilter())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

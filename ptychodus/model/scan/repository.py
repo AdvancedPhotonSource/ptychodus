@@ -62,7 +62,6 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self._indexFilter.addObserver(self)
         self._jitterRadiusInMeters = Decimal()
         self._centroid = ScanPoint(Decimal(), Decimal())
-        # FIXME scan distance and size in bytes
 
     @property
     def nameHint(self) -> str:
@@ -156,6 +155,20 @@ class ScanRepositoryItem(Scan, Observable, Observer):
     @property
     def untransformed(self) -> Scan:
         return self._scan
+
+    def getLengthInMeters(self) -> Decimal:
+        pointList = [point for point in self._scan.values()]
+        lengthInMeters = Decimal()
+
+        for pointA, pointB in zip(pointList[:-1], pointList[1:]):
+            dx = pointB.x - pointA.x
+            dy = pointB.y - pointA.y
+            lengthInMeters += (dx * dx + dy * dy).sqrt()
+
+        return lengthInMeters
+
+    def getSizeInBytes(self) -> int:
+        return 0  # FIXME size in bytes
 
     def getIndexFilterNameList(self) -> Sequence[str]:
         return self._indexFilter.getSelectableFilters()

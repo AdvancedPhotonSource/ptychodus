@@ -107,9 +107,7 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
     def createInstance(cls, repository: ItemRepository[T],
                        settingsDelegate: RepositoryItemSettingsDelegate[T],
                        reinitObservable: Observable) -> SelectedRepositoryItem[T]:
-        name = settingsDelegate.syncFromSettings()
         item = cls(repository, settingsDelegate, reinitObservable)
-        item.selectItem(name)
         repository.addObserver(item)
         reinitObservable.addObserver(item)
         return item
@@ -165,7 +163,7 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
             try:
                 name = next(iter(self._repository))
             except StopIteration:
-                pass
+                self.deselectItem()
             else:
                 self.selectItem(name)
 

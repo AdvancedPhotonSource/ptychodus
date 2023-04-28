@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QGroupBox, QHeaderView, QHBoxLayout, QMenu, QPushButton, QTableView,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QGroupBox, QHBoxLayout, QMenu, QPushButton, QTableView, QVBoxLayout,
+                             QWidget)
 
 
 class RepositoryButtonBox(QWidget):
@@ -42,8 +42,6 @@ class RepositoryView(QGroupBox):
     @classmethod
     def createInstance(cls, title: str, parent: Optional[QWidget] = None) -> RepositoryView:
         view = cls(title, parent)
-
-        view.tableView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         layout = QVBoxLayout()
         layout.addWidget(view.tableView)

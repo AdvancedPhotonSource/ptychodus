@@ -5,9 +5,9 @@ import logging
 
 from PyQt5.QtCore import PYQT_VERSION_STR, QSize, QT_VERSION_STR, Qt
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu,
-                             QSizePolicy, QSplitter, QStackedWidget, QTableView, QToolBar,
-                             QToolButton, QTreeView, QWidget)
+from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QMenu, QSizePolicy,
+                             QSplitter, QStackedWidget, QTableView, QToolBar, QToolButton,
+                             QTreeView, QWidget)
 
 from . import resources
 from .automation import *
@@ -101,10 +101,6 @@ class ViewCore(QMainWindow):
             view.navigationActionGroup.addAction(action)
 
         view.settingsAction.setChecked(True)
-
-        view.settingsEntryView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        view.workflowTableView.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeToContents)
 
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsParametersView)

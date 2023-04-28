@@ -12,8 +12,6 @@ from .settings import ProbeSettings
 class ProbeInitializer(Observable, ABC):
     '''ABC for plugins that can initialize probes'''
 
-    # FIXME gaussian, disk, etc.
-
     @abstractmethod
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes initializer state from settings'''

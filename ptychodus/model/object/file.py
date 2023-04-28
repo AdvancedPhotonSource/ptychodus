@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class FromFileObjectInitializer(ObjectInitializer):
-    NAME: Final[str] = 'Open File...'
+    SIMPLE_NAME: Final[str] = 'FromFile'
+    DISPLAY_NAME: Final[str] = 'Open File...'
 
     def __init__(self, filePath: Path, fileReader: ObjectFileReader) -> None:
         super().__init__()
@@ -19,11 +20,11 @@ class FromFileObjectInitializer(ObjectInitializer):
 
     @property
     def simpleName(self) -> str:
-        return 'FromFile'
+        return self.SIMPLE_NAME
 
     @property
     def displayName(self) -> str:
-        return self.NAME
+        return self.DISPLAY_NAME
 
     def syncFromSettings(self, settings: ObjectSettings) -> None:
         # NOTE do not sync file info from settings
