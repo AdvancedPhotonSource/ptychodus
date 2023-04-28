@@ -18,12 +18,12 @@ class ObjectRepositoryItemSettingsDelegate(RepositoryItemSettingsDelegate[Object
         self._repository = repository
 
     def syncFromSettings(self) -> str:
-        initializerName = self._settings.initializer.value
-        item = self._factory.createItem(initializerName)
+        initializerSimpleName = self._settings.initializer.value
+        item = self._factory.createItem(initializerSimpleName=initializerSimpleName)
         itemName = str()
 
         if item is None:
-            logger.error(f'Unknown object initializer \"{initializerName}\"!')
+            logger.error(f'Unknown object initializer \"{initializerSimpleName}\"!')
         else:
             itemName = self._repository.insertItem(item)
 

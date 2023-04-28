@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from decimal import Decimal
 import colorsys
 
@@ -16,7 +16,8 @@ from .visarray import VisualizationArray
 
 class CylindricalColorModel(ABC):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def name(self) -> str:
         pass
 

@@ -52,12 +52,16 @@ class ObjectAPI:
                                                  displayFileType=displayFileType)
         return self._repository.insertItem(item)
 
-    def insertItemIntoRepositoryFromInitializer(self, initializerName: str) -> Optional[str]:
+    def insertItemIntoRepositoryFromInitializer(self,
+                                                *,
+                                                initializerSimpleName: str = '',
+                                                initializerDisplayName: str = '') -> Optional[str]:
         itemName: Optional[str] = None
-        item = self._factory.createItem(initializerName)
+        item = self._factory.createItem(initializerSimpleName=initializerSimpleName,
+                                        initializerDisplayName=initializerDisplayName)
 
         if item is None:
-            logger.error(f'Unknown object initializer \"{initializerName}\"!')
+            logger.error('Refusing to add null item to repository!')
         else:
             itemName = self._repository.insertItem(item)
 
@@ -66,11 +70,16 @@ class ObjectAPI:
     def selectItem(self, itemName: str) -> None:
         self._object.selectItem(itemName)
 
-    def initializeAndActivateItem(self, initializerName: str) -> None:
-        itemName = self.insertItemIntoRepositoryFromInitializer(initializerName)
+    def initializeAndSelectItem(self,
+                                *,
+                                initializerSimpleName: str = '',
+                                initializerDisplayName: str = '') -> None:
+        itemName = self.insertItemIntoRepositoryFromInitializer(
+            initializerSimpleName=initializerSimpleName,
+            initializerDisplayName=initializerDisplayName)
 
         if itemName is None:
-            logger.error('Failed to initialize \"{initializerName}\"!')
+            logger.error('Refusing to select null item!')
         else:
             self.selectItem(itemName)
 

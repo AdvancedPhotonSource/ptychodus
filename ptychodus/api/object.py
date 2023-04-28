@@ -1,17 +1,18 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 import numpy
 import numpy.typing
 
-ObjectArrayType = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
 
 class ObjectPhaseCenteringStrategy(ABC):
     '''interface for object phase centering strategies'''
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def name(self) -> str:
         '''returns a unique name'''
         pass
@@ -24,12 +25,14 @@ class ObjectPhaseCenteringStrategy(ABC):
 
 class ObjectFileReader(ABC):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fileFilter(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass
@@ -42,12 +45,14 @@ class ObjectFileReader(ABC):
 
 class ObjectFileWriter(ABC):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fileFilter(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass

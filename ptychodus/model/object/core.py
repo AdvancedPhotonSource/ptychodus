@@ -62,11 +62,12 @@ class ObjectRepositoryPresenter(Observable, Observer):
     def __len__(self) -> int:
         return len(self._repository)
 
-    def getInitializerNameList(self) -> Sequence[str]:
-        return self._itemFactory.getInitializerNameList()
+    def getInitializerDisplayNameList(self) -> Sequence[str]:
+        return self._itemFactory.getInitializerDisplayNameList()
 
-    def initializeObject(self, name: str) -> Optional[str]:
-        return self._objectAPI.insertItemIntoRepositoryFromInitializer(name)
+    def initializeObject(self, displayName: str) -> Optional[str]:
+        return self._objectAPI.insertItemIntoRepositoryFromInitializer(
+            initializerDisplayName=displayName)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._itemFactory.getOpenFileFilterList()

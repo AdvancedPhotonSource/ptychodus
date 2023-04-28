@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from decimal import Decimal
 
 from ...api.geometry import Interval
@@ -21,7 +21,8 @@ class Colorizer(Observable, Observer, ABC):
         self._transformChooser = transformChooser
         self._transformChooser.addObserver(self)
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def name(self) -> str:
         pass
 

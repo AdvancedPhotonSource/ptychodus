@@ -194,7 +194,7 @@ class ProbeCore(StatefulCore):
                                                        self.apparatus, self._initializerChooser,
                                                        fileWriterChooser, settingsRegistry)
 
-    def initializeAndActivateProbe(self) -> None:
+    def initializeAndSelectProbe(self) -> None:
         self.presenter.initializeProbe()
 
     def getStateData(self, *, restartable: bool) -> StateDataType:

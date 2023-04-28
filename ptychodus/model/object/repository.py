@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from typing import Optional
 import logging
 
@@ -16,12 +16,14 @@ logger = logging.getLogger(__name__)
 
 class ObjectInitializer(ABC, Observable):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def displayName(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass

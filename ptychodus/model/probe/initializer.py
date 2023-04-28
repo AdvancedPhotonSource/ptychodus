@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy
@@ -22,12 +22,14 @@ class ProbeInitializer(Observable, ABC):
         '''synchronizes initializer state to settings'''
         settings.initializer.value = self.simpleName
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def displayName(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         return ''.join(self.displayName.split())

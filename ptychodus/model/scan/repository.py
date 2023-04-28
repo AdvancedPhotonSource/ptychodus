@@ -1,9 +1,10 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from typing import Optional
 import logging
+import sys
 
 import numpy
 
@@ -19,12 +20,14 @@ logger = logging.getLogger(__name__)
 
 class ScanInitializer(ABC, Observable):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def displayName(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass
@@ -168,7 +171,14 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         return lengthInMeters
 
     def getSizeInBytes(self) -> int:
-        return 0  # FIXME size in bytes
+        # TODO verify getSizeInBytes; implement __sizeof__ operator in scan class
+        sizeInBytes = sys.getsizeof(self._scan)
+
+        for index, point in self._scan.items():
+            sizeInBytes += sys.getsizeof(index)
+            sizeInBytes += sys.getsizeof(point)
+
+        return sizeInBytes
 
     def getIndexFilterNameList(self) -> Sequence[str]:
         return self._indexFilter.getSelectableFilters()

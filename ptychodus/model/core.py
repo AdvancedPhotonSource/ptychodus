@@ -213,7 +213,7 @@ class ModelCore:
     def finalizeStreamingWorkflow(self) -> None:
         self._scanCore.scanAPI.finalizeStreamingScan()
         self._dataCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
-        self._objectCore.objectAPI.initializeAndActivateItem('Random')
+        self._objectCore.objectAPI.initializeAndSelectItem(initializerSimpleName='Random')
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
         return self._dataCore.dataAPI.getAssemblyQueueSize()

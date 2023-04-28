@@ -70,7 +70,7 @@ class ScanAPI:
     def selectItem(self, itemName: str) -> None:
         self._scan.selectItem(itemName)
 
-    def initializeAndActivateItem(self, initializerName: str) -> None:
+    def initializeAndSelectItem(self, initializerName: str) -> None:
         itemName = self.insertItemIntoRepositoryFromInitializer(initializerName)
 
         if itemName is None:

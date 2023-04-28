@@ -1,6 +1,6 @@
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypeAlias
 import logging
 
 import numpy
@@ -24,11 +24,20 @@ class ObjectRepositoryItemFactory:
         self._settings = settings
         self._sizer = sizer
         self._fileReaderChooser = fileReaderChooser
-        self._initializers: Mapping[str, Callable[[], Optional[ObjectRepositoryItem]]] = {
-            FromFileObjectInitializer.SIMPLE_NAME: self.createItemFromFile,
-            FromFileObjectInitializer.DISPLAY_NAME: self.createItemFromFile,
-            RandomObjectInitializer.NAME: self.createRandomItem,
-        }
+        self._initializersBySimpleName: Mapping[str,
+                                                Callable[[], Optional[ObjectRepositoryItem]]] = {
+                                                    FromFileObjectInitializer.SIMPLE_NAME:
+                                                    self.createItemFromFile,
+                                                    RandomObjectInitializer.SIMPLE_NAME:
+                                                    self.createRandomItem,
+                                                }
+        self._initializersByDisplayName: Mapping[str,
+                                                 Callable[[], Optional[ObjectRepositoryItem]]] = {
+                                                     FromFileObjectInitializer.DISPLAY_NAME:
+                                                     self.createItemFromFile,
+                                                     RandomObjectInitializer.DISPLAY_NAME:
+                                                     self.createRandomItem,
+                                                 }
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -109,17 +118,30 @@ class ObjectRepositoryItemFactory:
         item.setInitializer(initializer)
         return item
 
-    def getInitializerNameList(self) -> Sequence[str]:
-        return [initializerName for initializerName in self._initializers]
+    def getInitializerDisplayNameList(self) -> Sequence[str]:
+        return [initializerName for initializerName in self._initializersByDisplayName]
 
-    def createItem(self, initializerName: str) -> Optional[ObjectRepositoryItem]:
+    def createItem(self,
+                   *,
+                   initializerSimpleName: str = '',
+                   initializerDisplayName: str = '') -> Optional[ObjectRepositoryItem]:
         item: Optional[ObjectRepositoryItem] = None
 
-        try:
-            itemFactory = self._initializers[initializerName]
-        except KeyError:
-            logger.error(f'Unknown object initializer \"{initializerName}\"!')
+        if initializerSimpleName:
+            try:
+                itemFactory = self._initializersBySimpleName[initializerSimpleName]
+            except KeyError:
+                logger.error(f'Unknown object initializer \"{initializerSimpleName}\"!')
+            else:
+                item = itemFactory()
+        elif initializerDisplayName:
+            try:
+                itemFactory = self._initializersByDisplayName[initializerDisplayName]
+            except KeyError:
+                logger.error(f'Unknown object initializer \"{initializerDisplayName}\"!')
+            else:
+                item = itemFactory()
         else:
-            item = itemFactory()
+            logger.error('Missing initializer name!')
 
         return item

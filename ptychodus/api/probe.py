@@ -1,21 +1,23 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 import numpy
 import numpy.typing
 
-ProbeArrayType = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+ProbeArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
 
 class ProbeFileReader(ABC):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fileFilter(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass
@@ -28,12 +30,14 @@ class ProbeFileReader(ABC):
 
 class ProbeFileWriter(ABC):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fileFilter(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass

@@ -1,12 +1,12 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeAlias
 
 import numpy
 import numpy.typing
 
-RealArrayType = numpy.typing.NDArray[numpy.float_]
+RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.float_]
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,8 @@ class ImageExtent:
 class ScalarTransformation(ABC):
     '''interface for real-valued transformations of a real array'''
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def name(self) -> str:
         '''returns a unique name'''
         pass

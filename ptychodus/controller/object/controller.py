@@ -81,7 +81,7 @@ class ObjectController(Observer):
         view.repositoryView.tableView.selectionModel().selectionChanged.connect(
             lambda selected, deselected: controller._updateView())
 
-        for name in repositoryPresenter.getInitializerNameList():
+        for name in repositoryPresenter.getInitializerDisplayNameList():
             insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 

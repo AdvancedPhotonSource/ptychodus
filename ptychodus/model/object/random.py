@@ -12,7 +12,8 @@ from .sizer import ObjectSizer
 
 
 class RandomObjectInitializer(ObjectInitializer):
-    NAME: Final[str] = 'Random'
+    SIMPLE_NAME: Final[str] = 'Random'
+    DISPLAY_NAME: Final[str] = 'Random'
 
     def __init__(self, rng: numpy.random.Generator, sizer: ObjectSizer) -> None:
         super().__init__()
@@ -26,11 +27,11 @@ class RandomObjectInitializer(ObjectInitializer):
 
     @property
     def simpleName(self) -> str:
-        return self.NAME
+        return self.SIMPLE_NAME
 
     @property
     def displayName(self) -> str:
-        return self.NAME
+        return self.DISPLAY_NAME
 
     def syncFromSettings(self, settings: ObjectSettings) -> None:
         self._extraPaddingX = settings.extraPaddingX.value

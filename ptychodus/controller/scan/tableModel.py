@@ -13,7 +13,7 @@ class ScanTableModel(QAbstractTableModel):
                  parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
-        self._header = ['Name', 'Initializer', 'Points', 'Length [m]']
+        self._header = ['Name', 'Initializer', 'Points', 'Length [m]', 'Size [MB]']
         self._checkedNames: set[str] = set()
 
     def isChecked(self, name: str) -> bool:
@@ -54,6 +54,8 @@ class ScanTableModel(QAbstractTableModel):
                     value = QVariant(len(item))
                 elif index.column() == 3:
                     value = QVariant(f'{item.getLengthInMeters():.6f}')
+                elif index.column() == 4:
+                    value = QVariant(f'{item.getSizeInBytes() / (1024 * 1024):.2f}')
             elif role == Qt.CheckStateRole:
                 if index.column() == 0:
                     value = QVariant(Qt.Checked if itemPresenter.name in

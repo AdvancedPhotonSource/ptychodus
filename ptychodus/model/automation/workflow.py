@@ -50,8 +50,8 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         if scanItemName is not None:
             self._scanAPI.selectItem(scanItemName)
 
-        self._probeCore.initializeAndActivateProbe()
-        self._objectAPI.initializeAndActivateItem('Random')
+        self._probeCore.initializeAndSelectProbe()
+        self._objectAPI.initializeAndSelectItem(initializerSimpleName='Random')
         self._workflowCore.executeWorkflow(flowLabel)
 
 
@@ -78,6 +78,6 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         if scanItemName is not None:
             self._scanAPI.selectItem(scanItemName)
 
-        self._probeCore.initializeAndActivateProbe()
-        self._objectAPI.initializeAndActivateItem('Random')
+        self._probeCore.initializeAndSelectProbe()
+        self._objectAPI.initializeAndSelectItem(initializerSimpleName='Random')
         self._workflowCore.executeWorkflow(flowLabel)

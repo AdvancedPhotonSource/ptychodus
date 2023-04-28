@@ -25,31 +25,41 @@ class VelociprobeScanFileColumn(IntEnum):
 
 class VelociprobeScanFileReader(ScanFileReader):
 
-    def __init__(self, neXusReader: NeXusDiffractionFileReader, yColumn: int,
-                 simpleName: str) -> None:
+    def __init__(self, neXusReader: NeXusDiffractionFileReader, yColumn: int) -> None:
         self._neXusReader = neXusReader
         self._yColumn = yColumn
-        self._simpleName = simpleName
 
     @classmethod
     def createLaserInterferometerInstance(
             cls, neXusReader: NeXusDiffractionFileReader) -> VelociprobeScanFileReader:
-        return cls(neXusReader, VelociprobeScanFileColumn.LASER_INTERFEROMETER_Y,
-                   'VelociprobeLaserInterferometer')
+        return cls(neXusReader, VelociprobeScanFileColumn.LASER_INTERFEROMETER_Y)
 
     @classmethod
     def createPositionEncoderInstance(
             cls, neXusReader: NeXusDiffractionFileReader) -> VelociprobeScanFileReader:
-        return cls(neXusReader, VelociprobeScanFileColumn.POSITION_ENCODER_Y,
-                   'VelociprobePositionEncoder')
+        return cls(neXusReader, VelociprobeScanFileColumn.POSITION_ENCODER_Y)
 
     @property
     def simpleName(self) -> str:
-        return self._simpleName
+        name = 'VelociprobeUnknown'
+
+        if self._yColumn == VelociprobeScanFileColumn.LASER_INTERFEROMETER_Y:
+            name = 'VelociprobeLaserInterferometer'
+        elif self._yColumn == VelociprobeScanFileColumn.POSITION_ENCODER_Y:
+            name = 'VelociprobePositionEncoder'
+
+        return name
 
     @property
     def fileFilter(self) -> str:
-        return 'Velociprobe Scan Files (*.txt)'
+        ySource = 'Unknown'
+
+        if self._yColumn == VelociprobeScanFileColumn.LASER_INTERFEROMETER_Y:
+            ySource = 'Laser Interferometer'
+        elif self._yColumn == VelociprobeScanFileColumn.POSITION_ENCODER_Y:
+            ySource = 'Position Encoder'
+
+        return f'Velociprobe Scan Files - {ySource} (*.txt)'
 
     def _applyTransform(self, scan: Scan) -> Scan:
         stageRotationInRadians = numpy.deg2rad(self._neXusReader.stageRotationInDegrees)

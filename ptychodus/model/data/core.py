@@ -174,7 +174,7 @@ class DataCore(StatefulCore):
         self._datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
         self.patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
 
-        fileReaderChooser.setFromSimpleName(self._datasetSettings.fileType.value) # TODO refactor
+        fileReaderChooser.setFromSimpleName(self._datasetSettings.fileType.value)  # TODO refactor
 
         self.patternSizer = DiffractionPatternSizer.createInstance(self.patternSettings, detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(

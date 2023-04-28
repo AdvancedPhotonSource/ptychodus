@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping
 from decimal import Decimal
 from pathlib import Path
@@ -59,12 +59,14 @@ class ScanPointParseError(Exception):
 class ScanFileReader(ABC):
     '''interface for plugins that read scan files'''
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fileFilter(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass
@@ -78,12 +80,14 @@ class ScanFileReader(ABC):
 class ScanFileWriter(ABC):
     '''interface for plugins that write scan files'''
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fileFilter(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass

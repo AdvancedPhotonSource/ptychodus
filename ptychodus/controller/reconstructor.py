@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 import logging
@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 
 class ReconstructorViewControllerFactory(ABC):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def backendName(self) -> str:
         pass
 
