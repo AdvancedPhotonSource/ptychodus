@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProbePresenter(Observable, Observer):
+    # FIXME gaussian, disk, etc.
 
     def __init__(self, settings: ProbeSettings, sizer: ProbeSizer, probe: Probe,
                  apparatus: Apparatus, initializerChooser: PluginChooser[ProbeInitializer],

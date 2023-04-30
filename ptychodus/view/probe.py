@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
-                             QHBoxLayout, QMenu, QPushButton, QSpinBox, QTableView, QVBoxLayout,
+                             QHBoxLayout, QMenu, QPushButton, QSpinBox, QTreeView, QVBoxLayout,
                              QWidget)
 
 from .widgets import DecimalLineEdit, EnergyWidget, LengthWidget, SemiautomaticSpinBox
@@ -162,7 +162,7 @@ class ProbeModesView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Modes', parent)
-        self.tableView = QTableView()
+        self.treeView = QTreeView()
         self.buttonBox = ProbeModesButtonBox.createInstance()
 
     @classmethod
@@ -170,7 +170,7 @@ class ProbeModesView(QGroupBox):
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.tableView)
+        layout.addWidget(view.treeView)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 

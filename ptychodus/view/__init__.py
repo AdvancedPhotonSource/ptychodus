@@ -1,5 +1,5 @@
-from . import resources
-from .core import *
+from .automation import *
+from .core import ViewCore
 from .data import *
 from .detector import *
 from .image import *
@@ -13,3 +13,4 @@ from .scan import *
 from .settings import *
 from .tike import *
 from .widgets import *
+from .workflow import *

@@ -20,6 +20,11 @@ class ObjectRepositoryItemSettingsDelegate(RepositoryItemSettingsDelegate[Object
     def syncFromSettings(self) -> str | None:
         name = self._settings.initializer.value
         item = self._factory.createItemFromSimpleName(name)
+
+        if item is None:
+            logger.error('Failed to create item!')
+            return None
+
         itemInitializer = item.getInitializer()
 
         if itemInitializer is None:

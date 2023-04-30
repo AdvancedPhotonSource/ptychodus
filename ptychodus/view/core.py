@@ -7,17 +7,18 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QSizePolicy, QSplitter,
                              QStackedWidget, QTableView, QToolBar, QWidget)
 
-from .automation import *
+from . import resources
+from .automation import AutomationView
 from .data import DataParametersView
-from .detector import *
+from .detector import DetectorParametersView
 from .image import ImageView
-from .monitor import *
-from .object import *
-from .probe import *
-from .reconstructor import *
-from .scan import *
-from .settings import *
-from .workflow import *
+from .monitor import MonitorObjectView, MonitorProbeView
+from .object import ObjectView
+from .probe import ProbeView
+from .reconstructor import ReconstructorParametersView, ReconstructorPlotView
+from .scan import ScanView, ScanPlotView
+from .settings import SettingsParametersView
+from .workflow import WorkflowParametersView
 
 logger = logging.getLogger(__name__)
 
