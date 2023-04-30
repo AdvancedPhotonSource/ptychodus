@@ -1,15 +1,12 @@
 from __future__ import annotations
-from pathlib import Path
 from typing import Optional
 import logging
 
 from PyQt5.QtCore import PYQT_VERSION_STR, QSize, QT_VERSION_STR, Qt
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QMenu, QSizePolicy,
-                             QSplitter, QStackedWidget, QTableView, QToolBar, QToolButton,
-                             QTreeView, QWidget)
+from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QSizePolicy, QSplitter,
+                             QStackedWidget, QTableView, QToolBar, QWidget)
 
-from . import resources
 from .automation import *
 from .data import DataParametersView
 from .detector import *

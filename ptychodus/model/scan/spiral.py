@@ -14,6 +14,7 @@ __all__ = [
 
 
 class SpiralScan(Scan):
+    NAME: Final[str] = 'Spiral'
     '''https://doi.org/10.1364/OE.22.012634'''
 
     def __init__(self) -> None:
@@ -46,7 +47,8 @@ class SpiralScan(Scan):
 
 
 class SpiralScanInitializer(ScanInitializer):
-    NAME: Final[str] = 'Spiral'
+    SIMPLE_NAME: Final[str] = SpiralScan.NAME
+    DISPLAY_NAME: Final[str] = SpiralScan.NAME
 
     def __init__(self) -> None:
         super().__init__()
@@ -54,11 +56,11 @@ class SpiralScanInitializer(ScanInitializer):
 
     @property
     def simpleName(self) -> str:
-        return self.NAME
+        return self.SIMPLE_NAME
 
     @property
     def displayName(self) -> str:
-        return self.NAME
+        return self.DISPLAY_NAME
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
         self._scan.numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value

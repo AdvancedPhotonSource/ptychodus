@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from importlib.metadata import version
 from pprint import pformat
-from typing import Any, Final, Optional, Union
+from typing import Final, Optional, Union
 import json
 import logging
 import os

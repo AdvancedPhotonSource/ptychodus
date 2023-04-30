@@ -4,7 +4,6 @@ import logging
 import numpy
 
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, DiffractionPatternData,
                                 DiffractionPatternState, SimpleDiffractionDataset,
                                 SimpleDiffractionPatternArray)
 from ptychodus.api.geometry import Array2D

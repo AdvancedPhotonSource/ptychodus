@@ -14,6 +14,7 @@ __all__ = [
 
 
 class LissajousScan(Scan):
+    NAME: Final[str] = 'Lissajous'
 
     def __init__(self) -> None:
         super().__init__()
@@ -50,7 +51,8 @@ class LissajousScan(Scan):
 
 
 class LissajousScanInitializer(ScanInitializer):
-    NAME: Final[str] = 'Lissajous'
+    SIMPLE_NAME: Final[str] = LissajousScan.NAME
+    DISPLAY_NAME: Final[str] = LissajousScan.NAME
 
     def __init__(self) -> None:
         super().__init__()
@@ -58,11 +60,11 @@ class LissajousScanInitializer(ScanInitializer):
 
     @property
     def simpleName(self) -> str:
-        return self._scan.nameHint
+        return self.SIMPLE_NAME
 
     @property
     def displayName(self) -> str:
-        return self.NAME
+        return self.DISPLAY_NAME
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
         self._scan.numberOfPoints = settings.numberOfPointsX.value * settings.numberOfPointsY.value

@@ -17,16 +17,18 @@ class ScanRepositoryItemSettingsDelegate(RepositoryItemSettingsDelegate[ScanRepo
         self._factory = factory
         self._repository = repository
 
-    def syncFromSettings(self) -> str:
-        initializerName = self._settings.initializer.value
-        item = self._factory.createItem(initializerName)
+    def syncFromSettings(self) -> str | None:
+        name = self._settings.initializer.value
+        item = self._factory.createItemFromSimpleName(name)
+        itemInitializer = item.getInitializer()
 
-        if item is None:
-            logger.error(f'Unknown scan initializer \"{initializerName}\"!')
-        else:
-            itemName = self._repository.insertItem(item)
+        if itemInitializer is None:
+            raise RuntimeError('Unable to sync item from settings without initializer!')
 
-        return itemName
+        itemInitializer.syncFromSettings(self._settings)
+        item.syncFromSettings(self._settings)
+
+        return self._repository.insertItem(item)
 
     def syncToSettings(self, item: ScanRepositoryItem) -> None:
         itemInitializer = item.getInitializer()

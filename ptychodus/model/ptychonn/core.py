@@ -14,8 +14,7 @@ from ...api.object import ObjectPhaseCenteringStrategy
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
-from ...api.scan import Scan
-from ...api.settings import SettingsRegistry, SettingsGroup
+from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
 from ..probe import Probe

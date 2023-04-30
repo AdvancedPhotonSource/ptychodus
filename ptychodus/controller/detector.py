@@ -1,6 +1,4 @@
 from __future__ import annotations
-from decimal import Decimal
-from pathlib import Path
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant

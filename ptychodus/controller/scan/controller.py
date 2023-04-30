@@ -2,13 +2,12 @@ from __future__ import annotations
 from typing import Callable, Final, Optional
 import logging
 
-from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel,
-                          QVariant)
+from PyQt5.QtCore import Qt, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.scan import ScanRepositoryItemPresenter, ScanRepositoryPresenter
-from ...view import RepositoryView, ScanView, ScanPlotView
+from ...view import ScanView, ScanPlotView
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
 from .concentric import ConcentricScanController
@@ -16,7 +15,6 @@ from .lissajous import LissajousScanController
 from .spiral import SpiralScanController
 from .tableModel import ScanTableModel
 from .tabular import TabularScanController
-from .transformController import ScanTransformController
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +50,7 @@ class ScanController(Observer):
         view.repositoryView.tableView.horizontalHeader().sectionClicked.connect(
             lambda logicalIndex: controller._redrawPlot())
 
-        for name in repositoryPresenter.getInitializerNameList():
+        for name in repositoryPresenter.getInitializerDisplayNameList():
             insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 

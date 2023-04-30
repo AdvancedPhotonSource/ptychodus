@@ -17,6 +17,7 @@ __all__ = [
 
 
 class ConcentricScan(Scan):
+    NAME: Final[str] = 'Concentric'
     '''https://doi.org/10.1088/1367-2630/12/3/035017'''
 
     def __init__(self) -> None:
@@ -57,7 +58,8 @@ class ConcentricScan(Scan):
 
 
 class ConcentricScanInitializer(ScanInitializer):
-    NAME: Final[str] = 'Concentric'
+    SIMPLE_NAME: Final[str] = ConcentricScan.NAME
+    DISPLAY_NAME: Final[str] = ConcentricScan.NAME
 
     def __init__(self) -> None:
         super().__init__()
@@ -65,11 +67,11 @@ class ConcentricScanInitializer(ScanInitializer):
 
     @property
     def simpleName(self) -> str:
-        return self.NAME
+        return self.SIMPLE_NAME
 
     @property
     def displayName(self) -> str:
-        return self.NAME
+        return self.DISPLAY_NAME
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
         self._scan.radialStepSizeInMeters = settings.radialStepSizeInMeters.value

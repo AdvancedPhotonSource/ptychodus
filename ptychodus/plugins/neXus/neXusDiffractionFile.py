@@ -3,18 +3,15 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import overload, Any, Optional, Union
+from typing import overload, Union
 import logging
 
 import h5py
-import numpy
 
 from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, DiffractionPatternData,
-                                DiffractionPatternState, SimpleDiffractionDataset)
+                                DiffractionPatternArray, SimpleDiffractionDataset)
 from ptychodus.api.geometry import Array2D
-from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)

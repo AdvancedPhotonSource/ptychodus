@@ -2,12 +2,12 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
-from PyQt5.QtWidgets import QAbstractItemView, QDialog, QWidget
+from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ..api.observer import Observable, Observer
 from ..model.image import ImagePresenter
-from ..model.probe import (FileProbeInitializer, FresnelZonePlateProbeInitializer, Probe,
-                           ProbePresenter, SuperGaussianProbeInitializer)
+from ..model.probe import (FileProbeInitializer, FresnelZonePlateProbeInitializer, ProbePresenter,
+                           SuperGaussianProbeInitializer)
 from ..view import (FresnelZonePlateProbeDialog, FresnelZonePlateProbeView, ImageView,
                     ProbeParametersView, ProbeView, ProgressBarItemDelegate,
                     SuperGaussianProbeDialog, SuperGaussianProbeView)

@@ -8,7 +8,6 @@ import logging
 
 import numpy
 
-from ...api.image import ImageExtent
 from ...api.object import ObjectArrayType, ObjectFileReader, ObjectFileWriter
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
@@ -66,8 +65,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
         return self._itemFactory.getInitializerDisplayNameList()
 
     def initializeObject(self, displayName: str) -> Optional[str]:
-        return self._objectAPI.insertItemIntoRepositoryFromInitializer(
-            initializerDisplayName=displayName)
+        return self._objectAPI.insertItemIntoRepositoryFromInitializerDisplayName(displayName)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._itemFactory.getOpenFileFilterList()

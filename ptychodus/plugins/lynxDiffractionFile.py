@@ -9,15 +9,11 @@ except ModuleNotFoundError:
     pass
 
 import h5py
-import numpy
 
-from ptychodus.api.data import (DiffractionPatternData, DiffractionDataset, DiffractionFileReader,
-                                DiffractionMetadata, DiffractionPatternArray,
-                                DiffractionPatternState, SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                SimpleDiffractionDataset)
 from ptychodus.api.geometry import Array2D
-from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.tree import SimpleTreeNode
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)

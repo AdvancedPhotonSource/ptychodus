@@ -4,13 +4,11 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QPixmap, QWheelEvent
-from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                             QFormLayout, QGraphicsPixmapItem, QGraphicsScene,
-                             QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
-                             QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSpinBox, QToolButton,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent,
+                             QGraphicsSceneMouseEvent, QGraphicsView, QHBoxLayout, QPushButton,
+                             QSizePolicy, QSpinBox, QToolButton, QVBoxLayout, QWidget)
 
-from . import resources
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from ...model.ptychonn import (PtychoNNModelPresenter, PtychoNNReconstructorLibrary,
-                               PtychoNNTrainingPresenter)
+from ...model.ptychonn import PtychoNNModelPresenter, PtychoNNTrainingPresenter
 from ...view import PtychoNNParametersView
 from ..data import FileDialogFactory
 from .model import PtychoNNModelParametersController

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import ItemsView, Iterator, Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -10,7 +10,7 @@ import numpy
 
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
-from ...api.scan import Scan, ScanArrayType, ScanFileReader, ScanFileWriter, ScanPoint, TabularScan
+from ...api.scan import ScanFileReader, ScanFileWriter, ScanPoint, TabularScan
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
 from ..statefulCore import StateDataType, StatefulCore
@@ -61,11 +61,11 @@ class ScanRepositoryPresenter(Observable, Observer):
     def __len__(self) -> int:
         return len(self._repository)
 
-    def getInitializerNameList(self) -> Sequence[str]:
-        return self._itemFactory.getInitializerNameList()
+    def getInitializerDisplayNameList(self) -> Sequence[str]:
+        return self._itemFactory.getInitializerDisplayNameList()
 
-    def initializeScan(self, name: str) -> Optional[str]:
-        return self._scanAPI.insertItemIntoRepositoryFromInitializer(name)
+    def initializeScan(self, displayName: str) -> Optional[str]:
+        return self._scanAPI.insertItemIntoRepositoryFromInitializerDisplayName(displayName)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._itemFactory.getOpenFileFilterList()

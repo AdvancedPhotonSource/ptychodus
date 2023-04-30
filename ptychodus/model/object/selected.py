@@ -17,17 +17,17 @@ class ObjectRepositoryItemSettingsDelegate(RepositoryItemSettingsDelegate[Object
         self._factory = factory
         self._repository = repository
 
-    def syncFromSettings(self) -> str:
-        initializerSimpleName = self._settings.initializer.value
-        item = self._factory.createItem(initializerSimpleName=initializerSimpleName)
-        itemName = str()
+    def syncFromSettings(self) -> str | None:
+        name = self._settings.initializer.value
+        item = self._factory.createItemFromSimpleName(name)
+        itemInitializer = item.getInitializer()
 
-        if item is None:
-            logger.error(f'Unknown object initializer \"{initializerSimpleName}\"!')
-        else:
-            itemName = self._repository.insertItem(item)
+        if itemInitializer is None:
+            raise RuntimeError('Unable to sync item from settings without initializer!')
 
-        return itemName
+        itemInitializer.syncFromSettings(self._settings)
+
+        return self._repository.insertItem(item)
 
     def syncToSettings(self, item: ObjectRepositoryItem) -> None:
         itemInitializer = item.getInitializer()

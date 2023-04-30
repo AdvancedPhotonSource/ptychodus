@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QApplication, QAction
+from PyQt5.QtWidgets import QAction
 
 from ..model import ModelCore
 from ..view import ViewCore

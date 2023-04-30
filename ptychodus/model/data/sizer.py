@@ -3,7 +3,6 @@ from __future__ import annotations
 from ...api.data import DiffractionPatternData
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry, SettingsGroup
 from ..detector import Detector
 from .settings import DiffractionPatternSettings
 

@@ -1,9 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QHBoxLayout, QMenu, QPushButton, QSizePolicy, QSpinBox,
-                             QStackedWidget, QTableView, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
+                             QHBoxLayout, QMenu, QPushButton, QSpinBox, QTableView, QVBoxLayout,
+                             QWidget)
 
 from .widgets import DecimalLineEdit, EnergyWidget, LengthWidget, SemiautomaticSpinBox
 

@@ -14,7 +14,6 @@ from ptychodus.api.data import (DiffractionPatternData, DiffractionDataset, Diff
                                 DiffractionMetadata, DiffractionPatternArray,
                                 DiffractionPatternState, SimpleDiffractionDataset)
 from ptychodus.api.geometry import Array2D
-from ptychodus.api.observer import Observable
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -125,6 +124,8 @@ class H5DiffractionFileTreeBuilder:
                                 else:
                                     logger.debug(f'UNKNOWN: {value} {type(value)}')
                                     valueStr = 'UNKNOWN'
+
+                            # TODO valueStr: use it or lose it
                         else:
                             itemDetails = f'{h5Item.shape} {h5Item.dtype}'
                 elif isinstance(h5Item, h5py.SoftLink):

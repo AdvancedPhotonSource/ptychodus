@@ -1,6 +1,5 @@
 from collections import defaultdict
 from decimal import Decimal
-from enum import IntEnum
 from pathlib import Path
 from typing import Final
 import csv

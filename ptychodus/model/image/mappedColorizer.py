@@ -1,14 +1,11 @@
 from __future__ import annotations
 from collections.abc import Callable
-from dataclasses import dataclass
-from decimal import Decimal
 
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Colormap, Normalize
 import matplotlib
 import numpy
 
-from ...api.geometry import Interval
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable
 from ...api.plugins import PluginChooser, PluginEntry

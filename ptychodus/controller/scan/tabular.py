@@ -1,10 +1,8 @@
 from __future__ import annotations
-from typing import Optional
 import logging
 
 from PyQt5.QtWidgets import QWidget
 
-from ...api.observer import Observable, Observer
 from ...model.scan import ScanRepositoryItemPresenter
 from ...view import TabularScanView, ScanEditorDialog
 from .transformController import ScanTransformController

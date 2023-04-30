@@ -3,7 +3,7 @@ from typing import Any, Optional
 import numpy
 import numpy.typing
 
-from PyQt5.QtCore import Qt, QAbstractTableModel, QDir, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 
 
 class DataArrayTableModel(QAbstractTableModel):

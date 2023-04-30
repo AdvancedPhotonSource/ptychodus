@@ -53,7 +53,7 @@ class FileProbeInitializer(ProbeInitializer, Observer):
         array = numpy.zeros(self._sizer.getProbeExtent().shape, dtype=complex)
 
         if self._filePath is None:
-            logger.error(f'Path is None!')
+            logger.error('Path is None!')
         elif self._filePath.is_file():
             fileType = self._fileReaderChooser.getCurrentSimpleName()
             logger.debug(f'Reading \"{self._filePath}\" as \"{fileType}\"')

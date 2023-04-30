@@ -7,7 +7,6 @@ import csv
 
 import numpy
 
-from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
 from .neXusDiffractionFile import NeXusDiffractionFileReader
 

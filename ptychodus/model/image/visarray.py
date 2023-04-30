@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from typing import Any, Union
 import logging
 
@@ -7,7 +6,7 @@ import numpy
 import numpy.typing
 
 from ...api.image import RealArrayType
-from ...api.observer import Observable, Observer
+from ...api.observer import Observable
 
 NumericDTypes = Union[numpy.integer[Any], numpy.floating[Any], numpy.complexfloating[Any, Any]]
 NumericArrayType = numpy.typing.NDArray[NumericDTypes]

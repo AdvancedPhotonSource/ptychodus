@@ -1,7 +1,6 @@
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
-from PyQt5.QtGui import QFont
 
 from ...model.scan import ScanRepositoryPresenter
 

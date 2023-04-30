@@ -7,9 +7,8 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
-from ...model.object import (ObjectPresenter, ObjectRepositoryItemPresenter,
-                             ObjectRepositoryPresenter)
-from ...view import ImageView, ObjectEditorDialog, ObjectParametersView, ObjectView
+from ...model.object import ObjectRepositoryItemPresenter, ObjectRepositoryPresenter
+from ...view import ImageView, ObjectParametersView, ObjectView
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .random import RandomObjectViewController

@@ -6,11 +6,6 @@ from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonB
                              QGroupBox, QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout,
                              QWidget)
 
-import matplotlib
-from matplotlib.backends.backend_qt5agg import FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
-
 from .widgets import UUIDLineEdit
 
 

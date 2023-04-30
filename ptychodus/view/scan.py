@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonB
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-import matplotlib
 
 from .widgets import AngleWidget, LengthWidget, RepositoryView
 

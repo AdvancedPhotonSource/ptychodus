@@ -9,11 +9,13 @@ from ...api.object import ObjectArrayType, ObjectFileReader
 from ...api.plugins import PluginChooser
 from .file import FromFileObjectInitializer
 from .random import RandomObjectInitializer
-from .repository import ObjectInitializer, ObjectRepositoryItem
+from .repository import ObjectRepositoryItem
 from .settings import ObjectSettings
 from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
+
+InitializerFactory: TypeAlias = Callable[[], Optional[ObjectRepositoryItem]]
 
 
 class ObjectRepositoryItemFactory:
@@ -24,20 +26,14 @@ class ObjectRepositoryItemFactory:
         self._settings = settings
         self._sizer = sizer
         self._fileReaderChooser = fileReaderChooser
-        self._initializersBySimpleName: Mapping[str,
-                                                Callable[[], Optional[ObjectRepositoryItem]]] = {
-                                                    FromFileObjectInitializer.SIMPLE_NAME:
-                                                    self.createItemFromFile,
-                                                    RandomObjectInitializer.SIMPLE_NAME:
-                                                    self.createRandomItem,
-                                                }
-        self._initializersByDisplayName: Mapping[str,
-                                                 Callable[[], Optional[ObjectRepositoryItem]]] = {
-                                                     FromFileObjectInitializer.DISPLAY_NAME:
-                                                     self.createItemFromFile,
-                                                     RandomObjectInitializer.DISPLAY_NAME:
-                                                     self.createRandomItem,
-                                                 }
+        self._initializersBySimpleName: Mapping[str, InitializerFactory] = {
+            FromFileObjectInitializer.SIMPLE_NAME: self.createItemFromFile,
+            RandomObjectInitializer.SIMPLE_NAME: self.createRandomItem,
+        }
+        self._initializersByDisplayName: Mapping[str, InitializerFactory] = {
+            FromFileObjectInitializer.DISPLAY_NAME: self.createItemFromFile,
+            RandomObjectInitializer.DISPLAY_NAME: self.createRandomItem,
+        }
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -121,27 +117,26 @@ class ObjectRepositoryItemFactory:
     def getInitializerDisplayNameList(self) -> Sequence[str]:
         return [initializerName for initializerName in self._initializersByDisplayName]
 
-    def createItem(self,
-                   *,
-                   initializerSimpleName: str = '',
-                   initializerDisplayName: str = '') -> Optional[ObjectRepositoryItem]:
+    def createItemFromSimpleName(self, name: str) -> Optional[ObjectRepositoryItem]:
         item: Optional[ObjectRepositoryItem] = None
 
-        if initializerSimpleName:
-            try:
-                itemFactory = self._initializersBySimpleName[initializerSimpleName]
-            except KeyError:
-                logger.error(f'Unknown object initializer \"{initializerSimpleName}\"!')
-            else:
-                item = itemFactory()
-        elif initializerDisplayName:
-            try:
-                itemFactory = self._initializersByDisplayName[initializerDisplayName]
-            except KeyError:
-                logger.error(f'Unknown object initializer \"{initializerDisplayName}\"!')
-            else:
-                item = itemFactory()
+        try:
+            itemFactory = self._initializersBySimpleName[name]
+        except KeyError:
+            logger.error(f'Unknown object initializer \"{name}\"!')
         else:
-            logger.error('Missing initializer name!')
+            item = itemFactory()
+
+        return item
+
+    def createItemFromDisplayName(self, name: str) -> Optional[ObjectRepositoryItem]:
+        item: Optional[ObjectRepositoryItem] = None
+
+        try:
+            itemFactory = self._initializersByDisplayName[name]
+        except KeyError:
+            logger.error(f'Unknown object initializer \"{name}\"!')
+        else:
+            item = itemFactory()
 
         return item

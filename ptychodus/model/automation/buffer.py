@@ -2,7 +2,6 @@ from collections import OrderedDict
 from pathlib import Path
 from time import monotonic as time
 import logging
-import queue
 import threading
 
 from .processor import AutomationDatasetProcessor

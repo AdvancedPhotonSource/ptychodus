@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from decimal import Decimal
 
-from ...api.geometry import Interval
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser

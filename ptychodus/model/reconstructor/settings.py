@@ -1,5 +1,4 @@
 from __future__ import annotations
-from pathlib import Path
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsGroup, SettingsRegistry

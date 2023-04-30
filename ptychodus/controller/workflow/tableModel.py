@@ -1,10 +1,9 @@
-from collections.abc import Sequence
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl, QVariant
 from PyQt5.QtGui import QColor, QFont
 
-from ...model.workflow import WorkflowStatusPresenter, WorkflowStatus
+from ...model.workflow import WorkflowStatusPresenter
 
 
 class WorkflowTableModel(QAbstractTableModel):

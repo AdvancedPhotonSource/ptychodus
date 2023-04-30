@@ -1,12 +1,12 @@
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypeAlias
 import logging
 
 import numpy
 
 from ...api.plugins import PluginChooser
-from ...api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
+from ...api.scan import Scan, ScanFileReader
 from .cartesian import CartesianScanInitializer
 from .concentric import ConcentricScanInitializer
 from .file import FromFileScanInitializer
@@ -17,6 +17,8 @@ from .spiral import SpiralScanInitializer
 
 logger = logging.getLogger(__name__)
 
+InitializerFactory: TypeAlias = Callable[[], Optional[ScanRepositoryItem]]
+
 
 class ScanRepositoryItemFactory:
 
@@ -25,16 +27,25 @@ class ScanRepositoryItemFactory:
         self._rng = rng
         self._settings = settings
         self._fileReaderChooser = fileReaderChooser
-        self._initializers: Mapping[str, Callable[[], Optional[ScanRepositoryItem]]] = {
+        self._initializersBySimpleName: Mapping[str, InitializerFactory] = {
             FromFileScanInitializer.SIMPLE_NAME: self.createItemFromFile,
-            FromFileScanInitializer.DISPLAY_NAME: self.createItemFromFile,
             'Raster': self.createRasterItem,
             'Snake': self.createSnakeItem,
             'CenteredRaster': self.createCenteredRasterItem,
             'CenteredSnake': self.createCenteredSnakeItem,
-            ConcentricScanInitializer.NAME: self.createConcentricItem,
-            SpiralScanInitializer.NAME: self.createSpiralItem,
-            LissajousScanInitializer.NAME: self.createLissajousItem,
+            ConcentricScanInitializer.SIMPLE_NAME: self.createConcentricItem,
+            SpiralScanInitializer.SIMPLE_NAME: self.createSpiralItem,
+            LissajousScanInitializer.SIMPLE_NAME: self.createLissajousItem,
+        }
+        self._initializersByDisplayName: Mapping[str, InitializerFactory] = {
+            FromFileScanInitializer.DISPLAY_NAME: self.createItemFromFile,
+            'Raster': self.createRasterItem,
+            'Snake': self.createSnakeItem,
+            'Centered Raster': self.createCenteredRasterItem,
+            'Centered Snake': self.createCenteredSnakeItem,
+            ConcentricScanInitializer.DISPLAY_NAME: self.createConcentricItem,
+            SpiralScanInitializer.DISPLAY_NAME: self.createSpiralItem,
+            LissajousScanInitializer.DISPLAY_NAME: self.createLissajousItem,
         }
 
     def getOpenFileFilterList(self) -> Sequence[str]:
@@ -152,16 +163,28 @@ class ScanRepositoryItemFactory:
         item.setInitializer(initializer)
         return item
 
-    def getInitializerNameList(self) -> Sequence[str]:
-        return [initializerName for initializerName in self._initializers]
+    def getInitializerDisplayNameList(self) -> Sequence[str]:
+        return [initializerName for initializerName in self._initializersByDisplayName]
 
-    def createItem(self, initializerName: str) -> Optional[ScanRepositoryItem]:
+    def createItemFromSimpleName(self, name: str) -> Optional[ScanRepositoryItem]:
         item: Optional[ScanRepositoryItem] = None
 
         try:
-            itemFactory = self._initializers[initializerName]
+            itemFactory = self._initializersBySimpleName[name]
         except KeyError:
-            logger.error(f'Unknown scan initializer \"{initializerName}\"!')
+            logger.error(f'Unknown scan initializer \"{name}\"!')
+        else:
+            item = itemFactory()
+
+        return item
+
+    def createItemFromDisplayName(self, name: str) -> Optional[ScanRepositoryItem]:
+        item: Optional[ScanRepositoryItem] = None
+
+        try:
+            itemFactory = self._initializersByDisplayName[name]
+        except KeyError:
+            logger.error(f'Unknown scan initializer \"{name}\"!')
         else:
             item = itemFactory()
 

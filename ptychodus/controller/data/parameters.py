@@ -1,8 +1,7 @@
 from __future__ import annotations
-from pathlib import Path
 
 from PyQt5.QtCore import QModelIndex
-from PyQt5.QtWidgets import QFileDialog, QTableView, QTreeView, QWidget
+from PyQt5.QtWidgets import QTableView
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry

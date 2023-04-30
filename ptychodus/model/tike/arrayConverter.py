@@ -8,7 +8,7 @@ import numpy.typing
 from ...api.data import DiffractionPatternData
 from ...api.object import ObjectArrayType
 from ...api.probe import ProbeArrayType
-from ...api.scan import Scan, ScanPoint, TabularScan
+from ...api.scan import ScanPoint, TabularScan
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
 from ..probe import Probe

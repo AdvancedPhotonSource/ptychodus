@@ -5,7 +5,7 @@ from typing import Optional
 import logging
 
 from ...api.geometry import Box2D, Interval
-from ...api.scan import Scan, TabularScan
+from ...api.scan import Scan
 from .factory import ScanRepositoryItemFactory
 from .repository import ScanRepository
 from .selected import SelectedScan
@@ -30,17 +30,14 @@ class ScanAPI:
                                          *,
                                          simpleFileType: str = '',
                                          displayFileType: str = '') -> Optional[str]:
-        itemName: Optional[str] = None
         item = self._factory.openItemFromFile(filePath,
                                               simpleFileType=simpleFileType,
                                               displayFileType=displayFileType)
 
         if item is None:
             logger.error(f'Unable to open scan from \"{filePath}\"!')
-        else:
-            itemName = self._repository.insertItem(item)
 
-        return itemName
+        return self._repository.insertItem(item)
 
     def insertItemIntoRepositoryFromScan(self,
                                          nameHint: str,
@@ -56,27 +53,16 @@ class ScanAPI:
                                                 displayFileType=displayFileType)
         return self._repository.insertItem(item)
 
-    def insertItemIntoRepositoryFromInitializer(self, initializerName: str) -> Optional[str]:
-        itemName: Optional[str] = None
-        item = self._factory.createItem(initializerName)
+    def insertItemIntoRepositoryFromInitializerSimpleName(self, name: str) -> Optional[str]:
+        item = self._factory.createItemFromSimpleName(name)
+        return self._repository.insertItem(item)
 
-        if item is None:
-            logger.error(f'Unknown scan initailizer \"{initializerName}\"!')
-        else:
-            itemName = self._repository.insertItem(item)
-
-        return itemName
+    def insertItemIntoRepositoryFromInitializerDisplayName(self, name: str) -> Optional[str]:
+        item = self._factory.createItemFromDisplayName(name)
+        return self._repository.insertItem(item)
 
     def selectItem(self, itemName: str) -> None:
         self._scan.selectItem(itemName)
-
-    def initializeAndSelectItem(self, initializerName: str) -> None:
-        itemName = self.insertItemIntoRepositoryFromInitializer(initializerName)
-
-        if itemName is None:
-            logger.error('Failed to initialize \"{initializerName}\"!')
-        else:
-            self.selectItem(itemName)
 
     def getSelectedScan(self) -> Optional[Scan]:
         return self._scan.getSelectedItem()

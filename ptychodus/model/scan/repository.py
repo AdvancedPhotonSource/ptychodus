@@ -108,7 +108,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
     def syncFromSettings(self, settings: ScanSettings) -> None:
         self._indexFilter.selectFilterFromSimpleName(settings.indexFilter.value)
         self._transform.selectTransformFromSimpleName(settings.transform.value)
-        self_jitterRadiusInMeters = settings.jitterRadiusInMeters.value
+        self._jitterRadiusInMeters = settings.jitterRadiusInMeters.value
         self._centroid = ScanPoint(settings.centroidXInMeters.value,
                                    settings.centroidYInMeters.value)
         self.notifyObservers()

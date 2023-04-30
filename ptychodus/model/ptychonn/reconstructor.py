@@ -1,6 +1,4 @@
 from importlib.metadata import version
-from pathlib import Path
-from typing import Optional
 import logging
 
 import numpy
@@ -8,7 +6,7 @@ import numpy
 import ptychonn
 from ptychonn import ReconSmallPhaseModel, Tester, Trainer
 
-from ...api.reconstructor import ReconstructResult, Reconstructor
+from ...api.reconstructor import ReconstructResult
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
 from ..probe import Probe

@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 
 from pathlib import Path
-from typing import Optional
 import argparse
-import logging
 import sys
 
 from ptychodus.model import ModelArgs, ModelCore

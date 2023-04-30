@@ -5,7 +5,7 @@ import queue
 
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry, SettingsGroup
+from ...api.settings import SettingsRegistry
 from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
 from ..probe import ProbeCore

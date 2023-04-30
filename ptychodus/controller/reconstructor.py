@@ -1,7 +1,5 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Optional
 import logging
 import traceback
 
@@ -16,7 +14,7 @@ from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
 from ..model.scan import ScanPresenter
-from ..view import ReconstructorParametersView, ReconstructorPlotView, resources
+from ..view import ReconstructorParametersView, ReconstructorPlotView
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +129,7 @@ class ReconstructorParametersController(Observer):
             msgBox.setText(f'The reconstructor raised a {err.__class__.__name__}!')
             msgBox.setInformativeText(str(err))
             msgBox.setDetailedText(traceback.format_exc())
-            retval = msgBox.exec_()
+            _ = msgBox.exec_()
         else:
             self._plotPresenter.setEnumeratedYValues(result.objective)
 

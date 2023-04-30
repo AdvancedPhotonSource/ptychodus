@@ -4,8 +4,6 @@ from decimal import Decimal
 from typing import Final
 import logging
 
-import numpy
-
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary

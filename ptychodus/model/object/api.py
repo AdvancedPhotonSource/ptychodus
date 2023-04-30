@@ -26,17 +26,14 @@ class ObjectAPI:
                                          *,
                                          simpleFileType: str = '',
                                          displayFileType: str = '') -> Optional[str]:
-        itemName: Optional[str] = None
         item = self._factory.openItemFromFile(filePath,
                                               simpleFileType=simpleFileType,
                                               displayFileType=displayFileType)
 
         if item is None:
             logger.error(f'Unable to open object from \"{filePath}\"!')
-        else:
-            itemName = self._repository.insertItem(item)
 
-        return itemName
+        return self._repository.insertItem(item)
 
     def insertItemIntoRepositoryFromArray(self,
                                           nameHint: str,
@@ -52,31 +49,19 @@ class ObjectAPI:
                                                  displayFileType=displayFileType)
         return self._repository.insertItem(item)
 
-    def insertItemIntoRepositoryFromInitializer(self,
-                                                *,
-                                                initializerSimpleName: str = '',
-                                                initializerDisplayName: str = '') -> Optional[str]:
-        itemName: Optional[str] = None
-        item = self._factory.createItem(initializerSimpleName=initializerSimpleName,
-                                        initializerDisplayName=initializerDisplayName)
+    def insertItemIntoRepositoryFromInitializerSimpleName(self, name: str) -> Optional[str]:
+        item = self._factory.createItemFromSimpleName(name)
+        return self._repository.insertItem(item)
 
-        if item is None:
-            logger.error('Refusing to add null item to repository!')
-        else:
-            itemName = self._repository.insertItem(item)
-
-        return itemName
+    def insertItemIntoRepositoryFromInitializerDisplayName(self, name: str) -> Optional[str]:
+        item = self._factory.createItemFromDisplayName(name)
+        return self._repository.insertItem(item)
 
     def selectItem(self, itemName: str) -> None:
         self._object.selectItem(itemName)
 
-    def initializeAndSelectItem(self,
-                                *,
-                                initializerSimpleName: str = '',
-                                initializerDisplayName: str = '') -> None:
-        itemName = self.insertItemIntoRepositoryFromInitializer(
-            initializerSimpleName=initializerSimpleName,
-            initializerDisplayName=initializerDisplayName)
+    def selectNewItemFromInitializerSimpleName(self, name: str) -> None:  # TODO improve name
+        itemName = self.insertItemIntoRepositoryFromInitializerSimpleName(name)
 
         if itemName is None:
             logger.error('Refusing to select null item!')

@@ -7,7 +7,7 @@ from ...api.observer import Observable
 from ...api.scan import ScanPoint
 
 __all__ = [
-    'SelectableScanPointTranform',
+    'SelectableScanPointTransform',
 ]
 
 logger = logging.getLogger(__name__)

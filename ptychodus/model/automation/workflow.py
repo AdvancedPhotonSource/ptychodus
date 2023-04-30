@@ -51,7 +51,7 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
             self._scanAPI.selectItem(scanItemName)
 
         self._probeCore.initializeAndSelectProbe()
-        self._objectAPI.initializeAndSelectItem(initializerSimpleName='Random')
+        self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)
 
 
@@ -79,5 +79,5 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
             self._scanAPI.selectItem(scanItemName)
 
         self._probeCore.initializeAndSelectProbe()
-        self._objectAPI.initializeAndSelectItem(initializerSimpleName='Random')
+        self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)

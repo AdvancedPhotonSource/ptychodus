@@ -1,5 +1,4 @@
 from __future__ import annotations
-from decimal import Decimal
 
 from ...api.geometry import Interval
 from ...api.image import ImageExtent

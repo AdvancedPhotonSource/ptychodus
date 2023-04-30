@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
-from typing import Generic, Optional, Protocol, TypeVar
+from typing import Generic, Protocol, TypeVar
 import logging
 
 from ..api.observer import Observable, Observer
@@ -53,7 +53,11 @@ class ItemRepository(Mapping[str, T], Observable):
         name = self._nameList[index]
         return name, self._itemDict[name]
 
-    def insertItem(self, item: T) -> str:
+    def insertItem(self, item: T | None) -> str | None:
+        if item is None:
+            logger.error('Refusing to add null item to repository!')
+            return None
+
         uniqueName = item.nameHint
         index = 0
 
@@ -68,7 +72,7 @@ class ItemRepository(Mapping[str, T], Observable):
 
     def removeItem(self, name: str) -> None:
         try:
-            item = self._itemDict.pop(name)
+            self._itemDict.pop(name)
         except KeyError:
             pass
 
@@ -80,10 +84,10 @@ class ItemRepository(Mapping[str, T], Observable):
         self.notifyObservers()
 
 
-class RepositoryItemSettingsDelegate(Generic[T]):
+class RepositoryItemSettingsDelegate(ABC, Generic[T]):
 
     @abstractmethod
-    def syncFromSettings(self) -> str:
+    def syncFromSettings(self) -> str | None:
         pass
 
     @abstractmethod
@@ -101,7 +105,7 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
         self._settingsDelegate = settingsDelegate
         self._reinitObservable = reinitObservable
         self._name = str()
-        self._item: Optional[T] = None
+        self._item: T | None = None
 
     @classmethod
     def createInstance(cls, repository: ItemRepository[T],
@@ -118,7 +122,7 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
     def getSelectedName(self) -> str:
         return self._name
 
-    def getSelectedItem(self) -> Optional[T]:
+    def getSelectedItem(self) -> T | None:
         return self._item
 
     def canSelectItem(self, name: str) -> bool:
@@ -169,7 +173,9 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
 
     def _syncFromSettings(self) -> None:
         name = self._settingsDelegate.syncFromSettings()
-        self.selectItem(name)
+
+        if name is not None:
+            self.selectItem(name)
 
     def _syncToSettings(self) -> None:
         if self._item is not None:

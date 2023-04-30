@@ -1,5 +1,4 @@
 from __future__ import annotations
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 import logging
@@ -7,13 +6,13 @@ import logging
 import h5py
 import numpy
 
-from ...api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                         DiffractionPatternArray, DiffractionPatternData, DiffractionPatternState,
-                         SimpleDiffractionDataset, SimpleDiffractionPatternArray)
+from ...api.data import (DiffractionDataset, DiffractionFileReader, DiffractionPatternArray,
+                         DiffractionPatternData, DiffractionPatternState,
+                         SimpleDiffractionPatternArray)
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
-from ...api.settings import SettingsRegistry, SettingsGroup
+from ...api.settings import SettingsRegistry
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
 from ..statefulCore import StateDataType, StatefulCore

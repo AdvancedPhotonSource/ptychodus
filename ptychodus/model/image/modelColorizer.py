@@ -1,11 +1,9 @@
 from abc import ABC, abstractmethod
-from decimal import Decimal
 import colorsys
 
 from matplotlib.colors import Normalize
 import numpy
 
-from ...api.geometry import Interval
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable
 from ...api.plugins import PluginChooser, PluginEntry
