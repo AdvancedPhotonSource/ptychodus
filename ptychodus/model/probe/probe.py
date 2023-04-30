@@ -18,7 +18,7 @@ class Probe(Observable):
         self._array = numpy.zeros((1, *sizer.getProbeExtent().shape), dtype=complex)
 
     def getProbeExtent(self) -> ImageExtent:
-        return ImageExtent(width=self._array.shape[2], height=self._array.shape[1])
+        return ImageExtent(width=self._array.shape[-1], height=self._array.shape[-2])
 
     def getNumberOfProbeModes(self) -> int:
         return self._array.shape[0]

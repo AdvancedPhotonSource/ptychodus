@@ -14,11 +14,17 @@ class ObjectSettings(Observable, Observer):
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/object.npy'))
+        self.amplitudeMean = settingsGroup.createRealEntry('AmplitudeMean', '0.5')
+        self.amplitudeDeviation = settingsGroup.createRealEntry('AmplitudeDeviation', '0')
+        self.randomizePhase = settingsGroup.createBooleanEntry('RandomizePhase', False)
+        self.extraPaddingX = settingsGroup.createIntegerEntry('ExtraPaddingX', 0)
+        self.extraPaddingY = settingsGroup.createIntegerEntry('ExtraPaddingY', 0)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:
-        settings = cls(settingsRegistry.createGroup('Object'))
-        settings._settingsGroup.addObserver(settings)
+        settingsGroup = settingsRegistry.createGroup('Object')
+        settings = cls(settingsGroup)
+        settingsGroup.addObserver(settings)
         return settings
 
     def update(self, observable: Observable) -> None:

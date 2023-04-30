@@ -8,9 +8,8 @@ import numpy
 
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, DiffractionPatternData,
-                                DiffractionPatternState, SimpleDiffractionDataset,
-                                SimpleDiffractionPatternArray)
-from ptychodus.api.geometry import Vector2D
+                                DiffractionPatternState, SimpleDiffractionDataset)
+from ptychodus.api.geometry import Array2D
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -72,7 +71,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             z = re.match(filePattern, fp.name)
 
             if z:
-                index = int(z.group(1).lstrip('0'))
+                index = int(z.group(1).lstrip('0'))  # TODO use it or lose it
                 filePathList.append(fp)
 
         filePathList.sort(key=lambda fp: fp.stem)
@@ -106,7 +105,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                 numberOfPatternsPerArray=numberOfPatternsPerArray,
                 numberOfPatternsTotal=numberOfPatternsPerArray * len(arrayList),
                 patternDataType=data.dtype,
-                detectorNumberOfPixels=Vector2D[int](detectorWidth, detectorHeight),
+                detectorNumberOfPixels=Array2D[int](detectorWidth, detectorHeight),
                 filePath=filePath.parent / filePattern,
             )
 

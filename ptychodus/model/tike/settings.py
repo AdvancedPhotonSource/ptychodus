@@ -9,7 +9,6 @@ class TikeSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.useMpi = settingsGroup.createBooleanEntry('UseMpi', False)
         self.numGpus = settingsGroup.createStringEntry('NumGpus', '1')
         self.noiseModel = settingsGroup.createStringEntry('NoiseModel', 'gaussian')
         self.numBatch = settingsGroup.createIntegerEntry('NumBatch', 10)

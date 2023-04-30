@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QApplication, QAction
+from PyQt5.QtWidgets import QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
 from .automation import AutomationController
 from .data import DataParametersController, FileDialogFactory
 from .detector import (DatasetImageController, DatasetParametersController, DetectorController)
-from .object import ObjectImageController, ObjectParametersController
-from .probe import ProbeImageController, ProbeParametersController
+from .object import ObjectImageController, ObjectController
+from .probe import ProbeImageController, ProbeController
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import ReconstructorParametersController, ReconstructorPlotController
@@ -46,18 +46,19 @@ class ControllerCore:
         self._datasetImageController = DatasetImageController.createInstance(
             model.activeDiffractionPatternPresenter, model.detectorImagePresenter,
             view.detectorImageView, self._fileDialogFactory)
-        self._probeParametersController = ProbeParametersController.createInstance(
-            model.probePresenter, view.probeParametersView, model.probeImagePresenter,
-            view.probeImageView, self._fileDialogFactory)
-        self._scanController = ScanController.createInstance(model.scanPresenter,
-                                                             view.scanParametersView,
-                                                             view.scanPlotView,
+        self._probeController = ProbeController.createInstance(model.probePresenter,
+                                                               view.probeView,
+                                                               model.probeImagePresenter,
+                                                               view.probeImageView,
+                                                               self._fileDialogFactory)
+        self._scanController = ScanController.createInstance(model.scanRepositoryPresenter,
+                                                             view.scanView, view.scanPlotView,
                                                              self._fileDialogFactory)
-        self._objectParametersController = ObjectParametersController.createInstance(
-            model.objectPresenter, view.objectParametersView, self._fileDialogFactory)
-        self._objectImageController = ObjectImageController.createInstance(
-            model.objectPresenter, model.objectImagePresenter, view.objectImageView,
-            self._fileDialogFactory)
+        self._objectController = ObjectController.createInstance(model.objectRepositoryPresenter,
+                                                                 model.objectImagePresenter,
+                                                                 view.objectView,
+                                                                 view.objectImageView,
+                                                                 self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
             model.settingsRegistry, model.diffractionDatasetInputOutputPresenter,
             model.diffractionDatasetPresenter, model.metadataPresenter, model.patternPresenter,
@@ -82,7 +83,7 @@ class ControllerCore:
             view.workflowParametersView, view.workflowTableView)
         self._automationController = AutomationController.createInstance(
             model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
-            view.automationParametersView, self._fileDialogFactory)
+            view.automationView, self._fileDialogFactory)
         self._monitorProbeController = ProbeImageController.createInstance(
             model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
             self._fileDialogFactory)

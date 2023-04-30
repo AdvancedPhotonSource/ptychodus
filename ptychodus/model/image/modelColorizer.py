@@ -1,11 +1,9 @@
-from abc import ABC, abstractmethod, abstractproperty
-from decimal import Decimal
+from abc import ABC, abstractmethod
 import colorsys
 
 from matplotlib.colors import Normalize
 import numpy
 
-from ...api.geometry import Interval
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable
 from ...api.plugins import PluginChooser, PluginEntry
@@ -16,7 +14,8 @@ from .visarray import VisualizationArray
 
 class CylindricalColorModel(ABC):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def name(self) -> str:
         pass
 

@@ -3,19 +3,15 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import overload, Any, Optional, Union
+from typing import overload, Union
 import logging
 
 import h5py
-import numpy
 
 from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
-from .velociprobeScanFile import VelociprobeScanFileReader
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, DiffractionPatternData,
-                                DiffractionPatternState, SimpleDiffractionDataset)
-from ptychodus.api.geometry import Vector2D
-from ptychodus.api.plugins import PluginRegistry
+                                DiffractionPatternArray, SimpleDiffractionDataset)
+from ptychodus.api.geometry import Array2D
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
@@ -66,6 +62,7 @@ class DataGroup:
 @dataclass(frozen=True)
 class DetectorSpecificGroup:
     nimages: int
+    ntrigger: int
     photon_energy_eV: float
     x_pixels_in_detector: int
     y_pixels_in_detector: int
@@ -73,11 +70,13 @@ class DetectorSpecificGroup:
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorSpecificGroup:
         nimages = group['nimages']
+        ntrigger = group['ntrigger']
         photonEnergy = group['photon_energy']
         assert photonEnergy.attrs['units'] == b'eV'
         xPixelsInDetector = group['x_pixels_in_detector']
         yPixelsInDetector = group['y_pixels_in_detector']
-        return cls(nimages[()], photonEnergy[()], xPixelsInDetector[()], yPixelsInDetector[()])
+        return cls(nimages[()], ntrigger[()], photonEnergy[()], xPixelsInDetector[()],
+                   yPixelsInDetector[()])
 
 
 @dataclass(frozen=True)
@@ -188,10 +187,10 @@ class NeXusDiffractionDataset(DiffractionDataset):
 
 class NeXusDiffractionFileReader(DiffractionFileReader):
 
-    def __init__(self, velociprobeScanFileReader: VelociprobeScanFileReader) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._velociprobeScanFileReader = velociprobeScanFileReader
         self._treeBuilder = H5DiffractionFileTreeBuilder()
+        self.stageRotationInDegrees = 0.  # TODO This is a hack; remove when able!
 
     @property
     def simpleName(self) -> str:
@@ -215,38 +214,38 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     logger.info(f'File {filePath} is not a NeXus data file.')
                 else:
                     detector = entry.instrument.detector
-                    detectorPixelSizeInMeters = Vector2D[Decimal](
+                    detectorPixelSizeInMeters = Array2D[Decimal](
                         Decimal(repr(detector.x_pixel_size_m)),
                         Decimal(repr(detector.y_pixel_size_m)),
                     )
-                    cropCenterInPixels = Vector2D[int](
+                    cropCenterInPixels = Array2D[int](
                         int(round(detector.beam_center_x_px)),
                         int(round(detector.beam_center_y_px)),
                     )
 
                     detectorSpecific = detector.detectorSpecific
-                    detectorNumberOfPixels = Vector2D[int](
+                    detectorNumberOfPixels = Array2D[int](
                         int(detectorSpecific.x_pixels_in_detector),
                         int(detectorSpecific.y_pixels_in_detector),
                     )
+                    probeEnergyInElectronVolts = Decimal(repr(detectorSpecific.photon_energy_eV))
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],
                         numberOfPatternsTotal=detectorSpecific.nimages,
+                        # NOTE for catalyst particle numberOfPatternsTotal=detectorSpecific.ntrigger,
                         patternDataType=h5Dataset.dtype,
                         detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
                         detectorNumberOfPixels=detectorNumberOfPixels,
                         detectorPixelSizeInMeters=detectorPixelSizeInMeters,
                         cropCenterInPixels=cropCenterInPixels,
-                        probeEnergyInElectronVolts=Decimal(repr(
-                            detectorSpecific.photon_energy_eV)),
+                        probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
                     )
                     dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
 
                     # vvv TODO This is a hack; remove when able! vvv
-                    self._velociprobeScanFileReader.setStageRotationInDegrees(
-                        entry.sample.goniometer.chi_deg)
+                    self.stageRotationInDegrees = entry.sample.goniometer.chi_deg
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 

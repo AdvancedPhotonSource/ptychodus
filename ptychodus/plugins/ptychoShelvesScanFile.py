@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 import logging
@@ -21,7 +20,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
     def fileFilter(self) -> str:
         return 'PtychoShelves Scan Position Files (*.h5 *.hdf5)'
 
-    def read(self, filePath: Path) -> Sequence[Scan]:
+    def read(self, filePath: Path) -> Scan:
         pointList = list()
 
         try:
@@ -46,7 +45,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 
-        return [TabularScan.createFromPointSequence(self.simpleName, pointList)]
+        return TabularScan.createFromPointIterable(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

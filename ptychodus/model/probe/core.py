@@ -58,7 +58,7 @@ class ProbePresenter(Observable, Observer):
 
         return presenter
 
-    def isActiveProbeValid(self) -> bool:
+    def isSelectedProbeValid(self) -> bool:
         return (self._probe.getProbeExtent() == self._sizer.getProbeExtent())
 
     def initializeProbe(self) -> None:
@@ -120,6 +120,9 @@ class ProbePresenter(Observable, Observer):
 
     def getProbeWavelengthInMeters(self) -> Decimal:
         return self._apparatus.getProbeWavelengthInMeters()
+
+    def selectProbe(self, name: str) -> None:
+        pass  # TODO
 
     def getNumberOfProbeModes(self) -> int:
         return self._probe.getNumberOfProbeModes()
@@ -191,7 +194,7 @@ class ProbeCore(StatefulCore):
                                                        self.apparatus, self._initializerChooser,
                                                        fileWriterChooser, settingsRegistry)
 
-    def initializeAndActivateProbe(self) -> None:
+    def initializeAndSelectProbe(self) -> None:
         self.presenter.initializeProbe()
 
     def getStateData(self, *, restartable: bool) -> StateDataType:

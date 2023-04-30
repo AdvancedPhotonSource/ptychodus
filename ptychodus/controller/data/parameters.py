@@ -1,8 +1,7 @@
 from __future__ import annotations
-from pathlib import Path
 
 from PyQt5.QtCore import QModelIndex
-from PyQt5.QtWidgets import QFileDialog, QTableView, QTreeView, QWidget
+from PyQt5.QtWidgets import QTableView
 
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
@@ -90,7 +89,7 @@ class DataParametersController(Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:
-            self._datasetInputOutputPresenter.startProcessingDiffractionPatterns()
+            self._datasetInputOutputPresenter.startAssemblingDiffractionPatterns()
             self._switchToDatasetView()
         elif observable is self._datasetPresenter:
             self._treeModel.setRootNode(self._datasetPresenter.getContentsTree())

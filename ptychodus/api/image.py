@@ -1,12 +1,12 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeAlias
 
 import numpy
 import numpy.typing
 
-RealArrayType = numpy.typing.NDArray[numpy.float_]
+RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 
 
 @dataclass(frozen=True)
@@ -16,8 +16,13 @@ class ImageExtent:
     height: int
 
     @property
+    def size(self) -> int:
+        '''returns the number of pixels in the image'''
+        return self.width * self.height
+
+    @property
     def shape(self) -> tuple[int, int]:
-        '''returns the shape (height, width) tuple'''
+        '''returns the image shape (height, width) tuple'''
         return self.height, self.width
 
     def __eq__(self, other: object) -> bool:
@@ -63,7 +68,8 @@ class ImageExtent:
 class ScalarTransformation(ABC):
     '''interface for real-valued transformations of a real array'''
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def name(self) -> str:
         '''returns a unique name'''
         pass

@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, Final, Generic, Optional, TypeVar, Union
+from typing import Any, Callable, Final, Generic, TypeVar, Union
 from uuid import UUID
 import configparser
 import logging
@@ -118,7 +118,7 @@ class SettingsGroup(Observable, Observer):
 class SettingsRegistry(Observable):
     PREFIX_PLACEHOLDER_TEXT: Final[str] = 'PREFIX'
 
-    def __init__(self, replacementPathPrefix: Optional[str]) -> None:
+    def __init__(self, replacementPathPrefix: str | None) -> None:
         super().__init__()
         self._replacementPathPrefix = replacementPathPrefix
         self._groupList: list[SettingsGroup] = list()
@@ -143,7 +143,7 @@ class SettingsRegistry(Observable):
     def __len__(self) -> int:
         return len(self._groupList)
 
-    def getReplacementPathPrefix(self) -> Optional[str]:
+    def getReplacementPathPrefix(self) -> str | None:
         return self._replacementPathPrefix
 
     def setReplacementPathPrefix(self, replacementPathPrefix: str) -> None:

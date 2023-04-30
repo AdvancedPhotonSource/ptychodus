@@ -4,17 +4,14 @@ from decimal import Decimal
 from typing import Final
 import logging
 
-import numpy
-
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
-from ...api.scan import Scan
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
-from ..object import Object
-from ..probe import Apparatus, Probe, ProbeSizer
-from ..scan import ScanRepositoryItemFactory, ScanRepository
+from ..object import ObjectAPI
+from ..probe import Probe
+from ..scan import ScanAPI
 from .arrayConverter import TikeArrayConverter
 from .multigrid import TikeMultigridPresenter, TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
@@ -37,12 +34,6 @@ class TikePresenter(Observable, Observer):
         presenter = cls(settings)
         settings.addObserver(presenter)
         return presenter
-
-    def isMpiEnabled(self) -> bool:
-        return self._settings.useMpi.value
-
-    def setMpiEnabled(self, enabled: bool) -> None:
-        self._settings.useMpi.value = enabled
 
     def getNumGpus(self) -> str:
         return self._settings.numGpus.value
@@ -158,16 +149,10 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod
-    def createInstance(cls,
-                       settingsRegistry: SettingsRegistry,
-                       diffractionDataset: ActiveDiffractionDataset,
-                       scan: Scan,
-                       probe: Probe,
-                       apparatus: Apparatus,
-                       object_: Object,
-                       scanRepositoryItemFactory: ScanRepositoryItemFactory,
-                       scanRepository: ScanRepository,
-                       isDeveloperModeEnabled: bool = False) -> TikeReconstructorLibrary:
+    def createInstance(cls, settingsRegistry: SettingsRegistry,
+                       diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
+                       probe: Probe, objectAPI: ObjectAPI,
+                       isDeveloperModeEnabled: bool) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
 
         try:
@@ -187,9 +172,7 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                 core.reconstructorList.append(NullReconstructor('lstsq_grad'))
                 core.reconstructorList.append(NullReconstructor('dm'))
         else:
-            arrayConverter = TikeArrayConverter(apparatus, scan, probe, object_,
-                                                diffractionDataset, scanRepositoryItemFactory,
-                                                scanRepository)
+            arrayConverter = TikeArrayConverter(scanAPI, probe, objectAPI, diffractionDataset)
             tikeReconstructor = TikeReconstructor(core._settings, core._multigridSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings,

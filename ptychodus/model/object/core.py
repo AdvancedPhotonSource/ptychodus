@@ -1,190 +1,199 @@
 from __future__ import annotations
+from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Final
+from typing import Optional
 import logging
 
 import numpy
 
-from ...api.geometry import Interval
 from ...api.object import ObjectArrayType, ObjectFileReader, ObjectFileWriter
 from ...api.observer import Observable, Observer
-from ...api.plugins import PluginChooser, PluginEntry
-from ...api.scan import Scan
+from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry
-from ..detector import Detector
 from ..probe import Apparatus, ProbeSizer
+from ..scan import ScanSizer
 from ..statefulCore import StateDataType, StatefulCore
-from .file import FileObjectInitializer
-from .initializer import ObjectInitializer
-from .object import Object
+from .api import ObjectAPI
+from .factory import ObjectRepositoryItemFactory
+from .repository import ObjectRepository, ObjectRepositoryItem
+from .selected import ObjectRepositoryItemSettingsDelegate, SelectedObject
 from .settings import ObjectSettings
 from .sizer import ObjectSizer
-from .uniform import UniformObjectInitializer
-from .urand import UniformRandomObjectInitializer
 
 logger = logging.getLogger(__name__)
 
 
-class ObjectPresenter(Observable, Observer):
-    MAX_INT: Final[int] = 0x7FFFFFFF
+@dataclass(frozen=True)
+class ObjectRepositoryItemPresenter:
+    name: str
+    item: ObjectRepositoryItem
 
-    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer, apparatus: Apparatus,
-                 object_: Object, initializerChooser: PluginChooser[ObjectInitializer],
-                 fileWriterChooser: PluginChooser[ObjectFileWriter],
-                 reinitObservable: Observable) -> None:
+
+class ObjectRepositoryPresenter(Observable, Observer):
+
+    def __init__(self, repository: ObjectRepository, itemFactory: ObjectRepositoryItemFactory,
+                 objectAPI: ObjectAPI, fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
         super().__init__()
-        self._settings = settings
-        self._sizer = sizer
-        self._apparatus = apparatus
-        self._object = object_
-        self._initializerChooser = initializerChooser
+        self._repository = repository
+        self._itemFactory = itemFactory
+        self._objectAPI = objectAPI
         self._fileWriterChooser = fileWriterChooser
-        self._reinitObservable = reinitObservable
 
     @classmethod
-    def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer, apparatus: Apparatus,
-                       object_: Object, initializerChooser: PluginChooser[ObjectInitializer],
-                       fileWriterChooser: PluginChooser[ObjectFileWriter],
-                       reinitObservable: Observable) -> ObjectPresenter:
-        presenter = cls(settings, sizer, apparatus, object_, initializerChooser, fileWriterChooser,
-                        reinitObservable)
-
-        settings.addObserver(presenter)
-        sizer.addObserver(presenter)
-        apparatus.addObserver(presenter)
-        object_.addObserver(presenter)
-        reinitObservable.addObserver(presenter)
-
-        presenter._syncFromSettings()
-
+    def createInstance(
+            cls, repository: ObjectRepository, itemFactory: ObjectRepositoryItemFactory,
+            objectAPI: ObjectAPI,
+            fileWriterChooser: PluginChooser[ObjectFileWriter]) -> ObjectRepositoryPresenter:
+        presenter = cls(repository, itemFactory, objectAPI, fileWriterChooser)
+        repository.addObserver(presenter)
         return presenter
 
-    def isActiveObjectValid(self) -> bool:
-        actualExtent = self._object.getObjectExtent()
-        expectedExtent = self._sizer.getObjectExtent()
-        widthIsBigEnough = (actualExtent.width >= expectedExtent.width)
-        heightIsBigEnough = (actualExtent.height >= expectedExtent.height)
-        return (widthIsBigEnough and heightIsBigEnough)
+    def __iter__(self) -> Iterator[ObjectRepositoryItemPresenter]:
+        for name, item in self._repository.items():
+            yield ObjectRepositoryItemPresenter(name, item)
 
-    def initializeObject(self) -> None:
-        initializer = self._initializerChooser.getCurrentStrategy()
-        simpleName = self._initializerChooser.getCurrentSimpleName()
-        logger.debug(f'Initializing {simpleName} Object')
-        initializer.syncToSettings(self._settings)
-        self._object.setArray(initializer())
+    def __getitem__(self, index: int) -> ObjectRepositoryItemPresenter:
+        nameItemTuple = self._repository.getNameItemTupleByIndex(index)
+        return ObjectRepositoryItemPresenter(*nameItemTuple)
 
-    def getInitializerNameList(self) -> list[str]:
-        return self._initializerChooser.getDisplayNameList()
+    def __len__(self) -> int:
+        return len(self._repository)
 
-    def getInitializerName(self) -> str:
-        return self._initializerChooser.getCurrentDisplayName()
+    def getInitializerDisplayNameList(self) -> Sequence[str]:
+        return self._itemFactory.getInitializerDisplayNameList()
 
-    def setInitializerByName(self, name: str) -> None:
-        self._initializerChooser.setFromDisplayName(name)
+    def initializeObject(self, displayName: str) -> Optional[str]:
+        return self._objectAPI.insertItemIntoRepositoryFromInitializerDisplayName(displayName)
 
-    def getInitializer(self) -> ObjectInitializer:
-        return self._initializerChooser.getCurrentStrategy()
+    def getOpenFileFilterList(self) -> Sequence[str]:
+        return self._itemFactory.getOpenFileFilterList()
 
-    def getSaveFileFilterList(self) -> list[str]:
+    def getOpenFileFilter(self) -> str:
+        return self._itemFactory.getOpenFileFilter()
+
+    def openObject(self, filePath: Path, fileFilter: str) -> None:
+        self._objectAPI.insertItemIntoRepositoryFromFile(filePath, displayFileType=fileFilter)
+
+    def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()
 
     def getSaveFileFilter(self) -> str:
         return self._fileWriterChooser.getCurrentDisplayName()
 
-    def saveObject(self, filePath: Path, fileFilter: str) -> None:
+    def saveObject(self, name: str, filePath: Path, fileFilter: str) -> None:
+        try:
+            item = self._repository[name]
+        except KeyError:
+            logger.error(f'Unable to locate \"{name}\"!')
+            return
+
         self._fileWriterChooser.setFromDisplayName(fileFilter)
         fileType = self._fileWriterChooser.getCurrentSimpleName()
-        writer = self._fileWriterChooser.getCurrentStrategy()
-
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
-        writer.write(filePath, self._object.getArray())
+        writer = self._fileWriterChooser.getCurrentStrategy()
+        writer.write(filePath, item.getArray())
 
-    def getNumberOfPixelsXLimits(self) -> Interval[int]:
-        return Interval[int](0, self.MAX_INT)
+        # TODO test this
+        if item.getInitializer() is None:
+            initializer = self._itemFactory.createFileInitializer(filePath,
+                                                                  simpleFileType=fileType)
 
-    def getNumberOfPixelsX(self) -> int:
-        extent = self._object.getObjectExtent()
-        return extent.width
+            if initializer is not None:
+                item.setInitializer(initializer)
+
+    def removeObject(self, name: str) -> None:
+        self._repository.removeItem(name)
 
     def getPixelSizeXInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeXInMeters()
-
-    def getNumberOfPixelsYLimits(self) -> Interval[int]:
-        return Interval[int](0, self.MAX_INT)
-
-    def getNumberOfPixelsY(self) -> int:
-        extent = self._object.getObjectExtent()
-        return extent.height
+        return self._objectAPI.getPixelSizeXInMeters()
 
     def getPixelSizeYInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeYInMeters()
-
-    def getObject(self) -> ObjectArrayType:
-        return self._object.getArray()
-
-    def _syncFromSettings(self) -> None:
-        self._initializerChooser.setFromSimpleName(self._settings.initializer.value)
-        initializer = self._initializerChooser.getCurrentStrategy()
-        initializer.syncFromSettings(self._settings)
-        self.notifyObservers()
+        return self._objectAPI.getPixelSizeYInMeters()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings:
-            self._syncFromSettings()
-        elif observable is self._sizer:
+        if observable is self._repository:
             self.notifyObservers()
-        elif observable is self._apparatus:
+
+
+class ObjectPresenter(Observable, Observer):
+
+    def __init__(self, sizer: ObjectSizer, object_: SelectedObject, objectAPI: ObjectAPI) -> None:
+        super().__init__()
+        self._sizer = sizer
+        self._object = object_
+        self._objectAPI = objectAPI
+
+    @classmethod
+    def createInstance(cls, sizer: ObjectSizer, object_: SelectedObject,
+                       objectAPI: ObjectAPI) -> ObjectPresenter:
+        presenter = cls(sizer, object_, objectAPI)
+        sizer.addObserver(presenter)
+        object_.addObserver(presenter)
+        return presenter
+
+    def isSelectedObjectValid(self) -> bool:
+        selectedObject = self._object.getSelectedItem()
+
+        if selectedObject is None:
+            return False
+
+        actualExtent = selectedObject.getExtentInPixels()
+        expectedExtent = self._sizer.getObjectExtent()
+        widthIsBigEnough = (actualExtent.width >= expectedExtent.width)
+        heightIsBigEnough = (actualExtent.height >= expectedExtent.height)
+        hasComplexDataType = numpy.iscomplexobj(selectedObject.getArray())
+        return (widthIsBigEnough and heightIsBigEnough and hasComplexDataType)
+
+    def selectObject(self, name: str) -> None:
+        self._objectAPI.selectItem(name)
+
+    def getSelectedObject(self) -> str:
+        return self._object.getSelectedName()
+
+    def getSelectedObjectArray(self) -> Optional[ObjectArrayType]:
+        selectedObject = self._object.getSelectedItem()
+        return None if selectedObject is None else selectedObject.getArray()
+
+    def getSelectableNames(self) -> Sequence[str]:
+        return self._object.getSelectableNames()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._sizer:
             self.notifyObservers()
         elif observable is self._object:
             self.notifyObservers()
-        elif observable is self._reinitObservable:
-            self.initializeObject()
 
 
 class ObjectCore(StatefulCore):
 
-    @staticmethod
-    def _createInitializerChooser(
-            rng: numpy.random.Generator, settings: ObjectSettings, sizer: ObjectSizer,
-            fileReaderChooser: PluginChooser[ObjectFileReader]
-    ) -> PluginChooser[ObjectInitializer]:
-        initializerList = [
-            FileObjectInitializer.createInstance(settings, sizer, fileReaderChooser),
-            UniformObjectInitializer.createInstance(settings, sizer),
-            UniformRandomObjectInitializer(rng, sizer),
-        ]
-
-        pluginList = [
-            PluginEntry[ObjectInitializer](simpleName=ini.simpleName,
-                                           displayName=ini.displayName,
-                                           strategy=ini) for ini in initializerList
-        ]
-
-        return PluginChooser[ObjectInitializer].createFromList(pluginList)
-
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
-                 apparatus: Apparatus, scan: Scan, probeSizer: ProbeSizer,
+                 apparatus: Apparatus, scanSizer: ScanSizer, probeSizer: ProbeSizer,
                  fileReaderChooser: PluginChooser[ObjectFileReader],
                  fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
-        self.settings = ObjectSettings.createInstance(settingsRegistry)
-        self.sizer = ObjectSizer.createInstance(apparatus, scan, probeSizer)
-        self.object = Object(self.sizer)
-
-        self._initializerChooser = ObjectCore._createInitializerChooser(
-            rng, self.settings, self.sizer, fileReaderChooser)
-
-        self.presenter = ObjectPresenter.createInstance(self.settings, self.sizer, apparatus,
-                                                        self.object, self._initializerChooser,
-                                                        fileWriterChooser, settingsRegistry)
-
-    def initializeAndActivateObject(self) -> None:
-        self.presenter.initializeObject()
+        self._settings = ObjectSettings.createInstance(settingsRegistry)
+        self.sizer = ObjectSizer.createInstance(self._settings, apparatus, scanSizer, probeSizer)
+        self._factory = ObjectRepositoryItemFactory(rng, self._settings, self.sizer,
+                                                    fileReaderChooser)
+        self._repository = ObjectRepository()
+        self._itemSettingsDelegate = ObjectRepositoryItemSettingsDelegate(
+            self._settings, self._factory, self._repository)
+        self._object = SelectedObject.createInstance(self._repository, self._itemSettingsDelegate,
+                                                     settingsRegistry)
+        self.objectAPI = ObjectAPI(apparatus, self._factory, self._repository, self._object)
+        self.repositoryPresenter = ObjectRepositoryPresenter.createInstance(
+            self._repository, self._factory, self.objectAPI, fileWriterChooser)
+        self.presenter = ObjectPresenter.createInstance(self.sizer, self._object, self.objectAPI)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
-        state: StateDataType = {
-            'object': self.object.getArray(),
-        }
+        selectedObjectArray = self.objectAPI.getSelectedObjectArray()
+
+        if selectedObjectArray is not None:
+            state: StateDataType = {
+                'object': selectedObjectArray,
+            }
+
         return state
 
     def setStateData(self, state: StateDataType) -> None:
@@ -192,5 +201,15 @@ class ObjectCore(StatefulCore):
             array = state['object']
         except KeyError:
             logger.debug('Failed to restore object array state!')
+            return
+
+        filePath = Path(''.join(state['restartFilePath']))
+        itemName = self.objectAPI.insertItemIntoRepositoryFromArray(nameHint='Restart',
+                                                                    array=array,
+                                                                    filePath=filePath,
+                                                                    simpleFileType='NPZ')
+
+        if itemName is None:
+            logger.error('Failed to initialize \"{name}\"!')
         else:
-            self.object.setArray(array)
+            self.objectAPI.selectItem(itemName)

@@ -1,6 +1,4 @@
 from importlib.metadata import version
-from pathlib import Path
-from typing import Optional
 import logging
 
 import numpy
@@ -8,11 +6,11 @@ import numpy
 import ptychonn
 from ptychonn import ReconSmallPhaseModel, Tester, Trainer
 
-from ...api.reconstructor import ReconstructResult, Reconstructor
-from ...api.scan import Scan
+from ...api.reconstructor import ReconstructResult
 from ..data import ActiveDiffractionDataset
-from ..object import Object
-from ..probe import Apparatus
+from ..object import ObjectAPI
+from ..probe import Probe
+from ..scan import ScanAPI
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 from .trainable import TrainableReconstructor, TrainingData
 
@@ -22,13 +20,13 @@ logger = logging.getLogger(__name__)
 class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
 
     def __init__(self, settings: PtychoNNModelSettings, trainingSettings: PtychoNNTrainingSettings,
-                 apparatus: Apparatus, scan: Scan, object_: Object,
+                 scanAPI: ScanAPI, probe: Probe, objectAPI: ObjectAPI,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
         self._settings = settings
         self._trainingSettings = trainingSettings
-        self._apparatus = apparatus
-        self._scan = scan
-        self._object = object_
+        self._scanAPI = scanAPI
+        self._probe = probe
+        self._objectAPI = objectAPI
         self._diffractionDataset = diffractionDataset
 
         ptychonnVersion = version('ptychonn')
@@ -50,12 +48,17 @@ class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
 
         logger.debug('Preparing scan data...')
 
+        selectedScan = self._scanAPI.getSelectedScan()
+
+        if selectedScan is None:
+            raise ValueError('No scan is selected!')
+
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
 
         for index in assembledIndexes:
             try:
-                point = self._scan[index]
+                point = selectedScan[index]
             except KeyError:
                 continue
 
@@ -89,7 +92,7 @@ class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
                     binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
                                                          binSize * j:binSize * (j + 1)])
 
-        stitchedPixelWidthInMeters = self._apparatus.getObjectPlanePixelSizeXInMeters()
+        stitchedPixelWidthInMeters = self._objectAPI.getPixelSizeXInMeters()
         inferencePixelWidthInMeters = stitchedPixelWidthInMeters * binSize
 
         logger.debug('Loading model state...')
@@ -109,7 +112,7 @@ class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
             stitched_pixel_width=float(stitchedPixelWidthInMeters),
             inference_pixel_width=float(inferencePixelWidthInMeters))
         stitched = numpy.exp(1j * stitchedPhase)
-        self._object.setArray(stitched)
+        self._objectAPI.insertItemIntoRepositoryFromArray('PtychoNN', stitched)
 
         return ReconstructResult(0, [[]])
 

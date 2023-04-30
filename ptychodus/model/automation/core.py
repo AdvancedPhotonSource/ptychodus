@@ -1,37 +1,75 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import Generator
 import queue
 
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry, SettingsGroup
-from ..data import DataCore
-from ..object import ObjectCore
+from ...api.settings import SettingsRegistry
+from ..data import DiffractionDataAPI
+from ..object import ObjectAPI
 from ..probe import ProbeCore
-from ..scan import ScanCore
+from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 from .buffer import AutomationDatasetBuffer
 from .processor import AutomationDatasetProcessor
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
 from .watcher import DataDirectoryWatcher
-from .workflow import AutomationDatasetWorkflow
+from .workflow import S02AutomationDatasetWorkflow
 
 
 class AutomationPresenter(Observable, Observer):
 
-    def __init__(self, settings: AutomationSettings, watcher: DataDirectoryWatcher) -> None:
+    def __init__(self, settings: AutomationSettings, watcher: DataDirectoryWatcher,
+                 datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
         self._settings = settings
         self._watcher = watcher
+        self._datasetBuffer = datasetBuffer
 
     @classmethod
-    def createInstance(cls, settings: AutomationSettings,
-                       watcher: DataDirectoryWatcher) -> AutomationPresenter:
-        presenter = cls(settings, watcher)
+    def createInstance(cls, settings: AutomationSettings, watcher: DataDirectoryWatcher,
+                       datasetBuffer: AutomationDatasetBuffer) -> AutomationPresenter:
+        presenter = cls(settings, watcher, datasetBuffer)
         settings.addObserver(presenter)
         watcher.addObserver(presenter)
         return presenter
+
+    def getStrategyList(self) -> list[str]:
+        return [
+            'LYNX Catalyst Particle',
+            'CNM/APS Hard X-Ray Nanoprobe',
+        ]
+
+    def getStrategy(self) -> str:
+        return self._settings.strategy.value
+
+    def setStrategy(self, strategy: str) -> None:
+        self._settings.strategy.value = strategy
+
+    def getDataDirectory(self) -> Path:
+        return self._settings.dataDirectory.value
+
+    def setDataDirectory(self, directory: Path) -> None:
+        self._settings.dataDirectory.value = directory
+
+    def getProcessingIntervalLimitsInSeconds(self) -> Interval[int]:
+        return Interval[int](0, 600)
+
+    def getProcessingIntervalInSeconds(self) -> int:
+        limits = self.getProcessingIntervalLimitsInSeconds()
+        return limits.clamp(self._settings.processingIntervalInSeconds.value)
+
+    def setProcessingIntervalInSeconds(self, value: int) -> None:
+        self._settings.processingIntervalInSeconds.value = value
+
+    def execute(self) -> None:  # TODO generalize
+        dataDirectory = self.getDataDirectory()
+        scanFileGlob: Generator[Path, None, None] = dataDirectory.glob('*.csv')
+
+        for scanFile in scanFileGlob:
+            self._datasetBuffer.put(scanFile)
 
     def isWatchdogEnabled(self) -> bool:
         return self._watcher.isAlive
@@ -41,21 +79,6 @@ class AutomationPresenter(Observable, Observer):
             self._watcher.start()
         else:
             self._watcher.stop()
-
-    def getWatchdogDirectory(self) -> Path:
-        return self._settings.watchdogDirectory.value
-
-    def setWatchdogDirectory(self, directory: Path) -> None:
-        self._settings.watchdogDirectory.value = directory
-
-    def getStrategyList(self) -> list[str]:
-        return ['CNM/APS Hard X-Ray Nanoprobe']
-
-    def getStrategy(self) -> str:
-        return self._settings.strategy.value
-
-    def setStrategy(self, strategy: str) -> None:
-        self._settings.strategy.value = strategy
 
     def getWatchdogDelayLimitsInSeconds(self) -> Interval[int]:
         return Interval[int](0, 600)
@@ -124,40 +147,42 @@ class AutomationProcessingPresenter(Observable, Observer):
 
 class AutomationCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry, dataCore: DataCore, scanCore: ScanCore,
-                 probeCore: ProbeCore, objectCore: ObjectCore, workflowCore: WorkflowCore) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, dataAPI: DiffractionDataAPI,
+                 scanAPI: ScanAPI, probeCore: ProbeCore, objectAPI: ObjectAPI,
+                 workflowCore: WorkflowCore) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
+        self._workflow = S02AutomationDatasetWorkflow(dataAPI, scanAPI, probeCore, objectAPI,
+                                                      workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
-        self._buffer = AutomationDatasetBuffer(self._settings, self.repository,
-                                               self._processingQueue)
-        self._workflow = AutomationDatasetWorkflow(dataCore, scanCore, probeCore, objectCore,
-                                                   workflowCore)
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
                                                      self._workflow, self._processingQueue)
-        self._watcher = DataDirectoryWatcher.createInstance(self._settings, self._buffer)
-        self.presenter = AutomationPresenter.createInstance(self._settings, self._watcher)
+        self._datasetBuffer = AutomationDatasetBuffer(self._settings, self.repository,
+                                                      self._processor)
+        self._watcher = DataDirectoryWatcher.createInstance(self._settings, self._datasetBuffer)
+        self.presenter = AutomationPresenter.createInstance(self._settings, self._watcher,
+                                                            self._datasetBuffer)
         self.processingPresenter = AutomationProcessingPresenter.createInstance(
             self._settings, self.repository, self._processor)
 
     def start(self) -> None:
-        self._buffer.start()
+        self._datasetBuffer.start()
 
     def executeWaitingTasks(self) -> None:
-        while True:
-            try:
-                filePath = self._processingQueue.get(block=False)
+        # TODO this belongs in AutomationDatasetProcessor
+        try:
+            filePath = self._processingQueue.get(block=False)
 
-                try:
-                    self.repository.put(filePath, AutomationDatasetState.PROCESSING)
-                    self._workflow.execute(filePath)
-                    self.repository.put(filePath, AutomationDatasetState.COMPLETE)
-                finally:
-                    self._processingQueue.task_done()
-            except queue.Empty:
-                break
+            try:
+                self.repository.put(filePath, AutomationDatasetState.PROCESSING)
+                self._workflow.execute(filePath)
+                self.repository.put(filePath, AutomationDatasetState.COMPLETE)
+            finally:
+                self._processingQueue.task_done()
+        except queue.Empty:
+            pass
 
     def stop(self) -> None:
         self._processor.stop()
         self._watcher.stop()
-        self._buffer.stop()
+        self._datasetBuffer.stop()

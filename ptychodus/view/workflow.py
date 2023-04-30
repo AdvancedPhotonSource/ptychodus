@@ -2,14 +2,9 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                             QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                             QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
-
-import matplotlib
-from matplotlib.backends.backend_qt5agg import FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGroupBox, QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout,
+                             QWidget)
 
 from .widgets import UUIDLineEdit
 

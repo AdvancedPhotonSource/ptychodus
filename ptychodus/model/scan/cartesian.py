@@ -1,125 +1,123 @@
 from collections.abc import Iterator
 from decimal import Decimal
-from typing import Final
 
-from ...api.scan import ScanPoint
-from .repository import ContiguousScanIterator, ScanRepositoryItem
+from ...api.scan import Scan, ScanPoint
+from .repository import ScanInitializer
 from .settings import ScanSettings
 
+__all__ = [
+    'CartesianScanInitializer',
+]
 
-class CartesianScanRepositoryItem(ScanRepositoryItem):
 
-    def __init__(self, snake: bool) -> None:
-        super().__init__()
-        self._stepSizeXInMeters = Decimal()
-        self._stepSizeYInMeters = Decimal()
-        self._numberOfPointsX = 0
-        self._numberOfPointsY = 0
+class CartesianScan(Scan):
+
+    def __init__(self, *, snake: bool, centered: bool) -> None:
+        self.stepSizeXInMeters = Decimal('1e-6')
+        self.stepSizeYInMeters = Decimal('1e-6')
+        self.numberOfPointsX = 10
+        self.numberOfPointsY = 10
         self._snake = snake
+        self._centered = centered
+        self._nameHint = ' '.join((
+            'Centered' if centered else '',
+            'Snake' if snake else 'Raster',
+        ))
 
     @property
-    def name(self) -> str:
-        return self.variant
-
-    @property
-    def category(self) -> str:
-        return 'Cartesian'
-
-    @property
-    def canActivate(self) -> bool:
-        return True
-
-    def syncFromSettings(self, settings: ScanSettings) -> None:
-        self._stepSizeXInMeters = settings.stepSizeXInMeters.value
-        self._stepSizeYInMeters = settings.stepSizeYInMeters.value
-        self._numberOfPointsX = settings.numberOfPointsX.value
-        self._numberOfPointsY = settings.numberOfPointsY.value
-        self.notifyObservers()
-
-    def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.stepSizeXInMeters.value = self._stepSizeXInMeters
-        settings.stepSizeYInMeters.value = self._stepSizeYInMeters
-        settings.numberOfPointsX.value = self._numberOfPointsX
-        settings.numberOfPointsY.value = self._numberOfPointsY
+    def nameHint(self) -> str:
+        return self._nameHint
 
     def __iter__(self) -> Iterator[int]:
-        return ContiguousScanIterator(self)
+        for index in range(len(self)):
+            yield index
 
     def __getitem__(self, index: int) -> ScanPoint:
         if index >= len(self):
             raise IndexError(f'Index {index} is out of range')
 
-        y, x = divmod(index, self._numberOfPointsX)
+        y, x = divmod(index, self.numberOfPointsX)
 
-        if self._snake and y & 1:
-            x = self._numberOfPointsX - 1 - x
+        if self._snake:
+            if y & 1:
+                x = self.numberOfPointsX - 1 - x
 
-        center = self._getIndexCenter()
+        cx = Decimal(self.numberOfPointsX - 1) / 2
+        cy = Decimal(self.numberOfPointsY - 1) / 2
 
-        xf = (x - center.x) * self._stepSizeXInMeters
-        yf = (y - center.y) * self._stepSizeYInMeters
+        xf = (x - cx) * self.stepSizeXInMeters
+        yf = (y - cy) * self.stepSizeYInMeters
+
+        if self._centered:
+            if y & 1:
+                xf += self.stepSizeXInMeters / 4
+            else:
+                xf -= self.stepSizeXInMeters / 4
 
         return ScanPoint(xf, yf)
 
     def __len__(self) -> int:
-        return self._numberOfPointsX * self._numberOfPointsY
+        return self.numberOfPointsX * self.numberOfPointsY
+
+
+class CartesianScanInitializer(ScanInitializer):
+
+    def __init__(self, *, snake: bool, centered: bool) -> None:
+        super().__init__()
+        self._scan = CartesianScan(snake=snake, centered=centered)
+
+    @property
+    def simpleName(self) -> str:
+        return ''.join(self.displayName.split())
+
+    @property
+    def displayName(self) -> str:
+        return self._scan.nameHint
+
+    def syncFromSettings(self, settings: ScanSettings) -> None:
+        self._scan.stepSizeXInMeters = settings.stepSizeXInMeters.value
+        self._scan.stepSizeYInMeters = settings.stepSizeYInMeters.value
+        self._scan.numberOfPointsX = settings.numberOfPointsX.value
+        self._scan.numberOfPointsY = settings.numberOfPointsY.value
+        self.notifyObservers()
+
+    def syncToSettings(self, settings: ScanSettings) -> None:
+        settings.stepSizeXInMeters.value = self._scan.stepSizeXInMeters
+        settings.stepSizeYInMeters.value = self._scan.stepSizeYInMeters
+        settings.numberOfPointsX.value = self._scan.numberOfPointsX
+        settings.numberOfPointsY.value = self._scan.numberOfPointsY
+
+    def __call__(self) -> Scan:
+        return self._scan
 
     def getStepSizeXInMeters(self) -> Decimal:
-        return self._stepSizeXInMeters
+        return self._scan.stepSizeXInMeters
 
     def setStepSizeXInMeters(self, stepSizeXInMeters: Decimal) -> None:
-        if self._stepSizeXInMeters != stepSizeXInMeters:
-            self._stepSizeXInMeters = stepSizeXInMeters
+        if self._scan.stepSizeXInMeters != stepSizeXInMeters:
+            self._scan.stepSizeXInMeters = stepSizeXInMeters
             self.notifyObservers()
 
     def getStepSizeYInMeters(self) -> Decimal:
-        return self._stepSizeYInMeters
+        return self._scan.stepSizeYInMeters
 
     def setStepSizeYInMeters(self, stepSizeYInMeters: Decimal) -> None:
-        if self._stepSizeYInMeters != stepSizeYInMeters:
-            self._stepSizeYInMeters = stepSizeYInMeters
+        if self._scan.stepSizeYInMeters != stepSizeYInMeters:
+            self._scan.stepSizeYInMeters = stepSizeYInMeters
             self.notifyObservers()
 
     def getNumberOfPointsX(self) -> int:
-        return self._numberOfPointsX
+        return self._scan.numberOfPointsX
 
     def setNumberOfPointsX(self, numberOfPointsX: int) -> None:
-        if self._numberOfPointsX != numberOfPointsX:
-            self._numberOfPointsX = numberOfPointsX
+        if self._scan.numberOfPointsX != numberOfPointsX:
+            self._scan.numberOfPointsX = numberOfPointsX
             self.notifyObservers()
 
     def getNumberOfPointsY(self) -> int:
-        return self._numberOfPointsY
+        return self._scan.numberOfPointsY
 
     def setNumberOfPointsY(self, numberOfPointsY: int) -> None:
-        if self._numberOfPointsY != numberOfPointsY:
-            self._numberOfPointsY = numberOfPointsY
+        if self._scan.numberOfPointsY != numberOfPointsY:
+            self._scan.numberOfPointsY = numberOfPointsY
             self.notifyObservers()
-
-    def _getIndexCenter(self) -> ScanPoint:
-        return ScanPoint(
-            Decimal(self._numberOfPointsX - 1) / 2,
-            Decimal(self._numberOfPointsY - 1) / 2,
-        )
-
-
-class RasterScanRepositoryItem(CartesianScanRepositoryItem):
-    NAME: Final[str] = 'Raster'
-
-    def __init__(self) -> None:
-        super().__init__(snake=False)
-
-    @property
-    def variant(self) -> str:
-        return self.NAME
-
-
-class SnakeScanRepositoryItem(CartesianScanRepositoryItem):
-    NAME: Final[str] = 'Snake'
-
-    def __init__(self) -> None:
-        super().__init__(snake=True)
-
-    @property
-    def variant(self) -> str:
-        return self.NAME

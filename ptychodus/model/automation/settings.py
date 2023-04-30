@@ -10,11 +10,12 @@ class AutomationSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.strategy = settingsGroup.createStringEntry('Strategy', 'CNM/APS Hard X-Ray Nanoprobe')
+        self.strategy = settingsGroup.createStringEntry('Strategy', 'LYNX Catalyst Particle')
+        self.dataDirectory = settingsGroup.createPathEntry('DataDirectory', Path('/path/to/data'))
+        self.processingIntervalInSeconds = settingsGroup.createIntegerEntry(
+            'ProcessingIntervalInSeconds', 0)
         self.useWatchdogPollingObserver = settingsGroup.createBooleanEntry(
             'UseWatchdogPollingObserver', False)
-        self.watchdogDirectory = settingsGroup.createPathEntry('WatchdogDirectory',
-                                                               Path('/path/to/data'))
         self.watchdogDelayInSeconds = settingsGroup.createIntegerEntry(
             'WatchdogDelayInSeconds', 15)
 

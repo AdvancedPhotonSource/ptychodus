@@ -1,5 +1,6 @@
+from .active import ActiveDiffractionDataset
+from .api import DiffractionDataAPI
 from .core import DataCore, DiffractionDatasetPresenter, ActiveDiffractionPatternPresenter
-from .dataset import ActiveDiffractionDataset
 from .io import DiffractionDatasetInputOutputPresenter
 from .patterns import DiffractionPatternPresenter
 from .settings import DiffractionPatternSettings
@@ -9,6 +10,7 @@ __all__ = [
     'ActiveDiffractionDataset',
     'ActiveDiffractionPatternPresenter',
     'DataCore',
+    'DiffractionDataAPI',
     'DiffractionDatasetInputOutputPresenter',
     'DiffractionDatasetPresenter',
     'DiffractionPatternPresenter',

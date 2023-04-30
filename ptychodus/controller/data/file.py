@@ -45,6 +45,8 @@ class DatasetFileController(Observer):
         for fileFilter in presenter.getOpenFileFilterList():
             view.contentsView.fileTypeComboBox.addItem(fileFilter)
 
+        view.contentsView.fileTypeComboBox.currentTextChanged.connect(
+            controller._setNameFiltersInFileSystemModel)
         controller._syncModelToView()
 
         controller._fileSystemModel.rootPathChanged.connect(
@@ -55,7 +57,6 @@ class DatasetFileController(Observer):
             controller._handleFileSystemTableDoubleClicked)
         view.contentsView.fileSystemTableView.selectionModel().currentChanged.connect(
             controller._updateEnabledNavigationButtons)
-        view.contentsView.fileTypeComboBox.currentTextChanged.connect(presenter.setOpenFileFilter)
 
         view.backwardButton.setVisible(False)
         view.forwardButton.clicked.connect(controller._openDiffractionFile)
@@ -80,7 +81,9 @@ class DatasetFileController(Observer):
         index = self._fileSystemProxyModel.mapToSource(proxyIndex)
         filePath = Path(self._fileSystemModel.filePath(index))
         self._fileDialogFactory.setOpenWorkingDirectory(filePath.parent)
-        self._presenter.openDiffractionFile(filePath)
+
+        fileFilter = self._view.contentsView.fileTypeComboBox.currentText()
+        self._presenter.openDiffractionFile(filePath, fileFilter)
 
     def _updateEnabledNavigationButtons(self, current: QModelIndex, previous: QModelIndex) -> None:
         index = self._fileSystemProxyModel.mapToSource(current)
@@ -96,14 +99,8 @@ class DatasetFileController(Observer):
             self._fileSystemModel.setNameFilters(nameFilters)
 
     def _syncModelToView(self) -> None:
-        openFileFilter = self._presenter.getOpenFileFilter()
-        self._view.contentsView.fileTypeComboBox.setCurrentText(openFileFilter)
-
-        openFileFilter = self._presenter.getOpenFileFilter()
-        self._view.contentsView.fileTypeComboBox.blockSignals(True)
-        self._view.contentsView.fileTypeComboBox.setCurrentText(openFileFilter)
-        self._view.contentsView.fileTypeComboBox.blockSignals(False)
-        self._setNameFiltersInFileSystemModel(openFileFilter)
+        self._view.contentsView.fileTypeComboBox.setCurrentText(
+            self._presenter.getOpenFileFilter())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

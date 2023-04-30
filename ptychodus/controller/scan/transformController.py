@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...model.scan import TransformedScanRepositoryItem
+from ...model.scan import ScanRepositoryItem
 from ...view import ScanTransformView
 
 
 class ScanTransformController(Observer):
 
-    def __init__(self, item: TransformedScanRepositoryItem, view: ScanTransformView) -> None:
+    def __init__(self, item: ScanRepositoryItem, view: ScanTransformView) -> None:
         super().__init__()
         self._item = item
         self._view = view
 
     @classmethod
-    def createInstance(cls, item: TransformedScanRepositoryItem,
+    def createInstance(cls, item: ScanRepositoryItem,
                        view: ScanTransformView) -> ScanTransformController:
         controller = cls(item, view)
         item.addObserver(controller)

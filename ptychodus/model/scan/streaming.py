@@ -1,13 +1,10 @@
 from bisect import bisect
 from collections import defaultdict
+from collections.abc import Sequence
 from decimal import Decimal
-from pathlib import Path
 from statistics import median
 
 from ...api.scan import ScanPoint, TabularScan
-from .itemFactory import ScanRepositoryItemFactory
-from .repository import ScanRepositoryItem
-from .tabular import ScanFileInfo
 
 
 class PositionStream:
@@ -20,7 +17,7 @@ class PositionStream:
         self.valuesInMeters.clear()
         self.timeStamps.clear()
 
-    def assemble(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assemble(self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]) -> None:
         self.valuesInMeters.extend(valuesInMeters)
         self.timeStamps.extend(timeStamps)
 
@@ -48,8 +45,7 @@ class PositionStream:
 
 class StreamingScanBuilder:
 
-    def __init__(self, factory: ScanRepositoryItemFactory) -> None:
-        self._factory = factory
+    def __init__(self) -> None:
         self._streamX = PositionStream()
         self._streamY = PositionStream()
         self._arrayTimeStamps: dict[int, float] = dict()
@@ -62,13 +58,15 @@ class StreamingScanBuilder:
     def insertArrayTimeStamp(self, arrayIndex: int, timeStamp: float) -> None:
         self._arrayTimeStamps[arrayIndex] = timeStamp
 
-    def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._streamX.assemble(valuesInMeters, timeStamps)
 
-    def assembleScanPositionsY(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
+    def assembleScanPositionsY(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._streamY.assemble(valuesInMeters, timeStamps)
 
-    def build(self) -> ScanRepositoryItem:
+    def build(self) -> TabularScan:
         posX = self._streamX.getMedianPositions(self._arrayTimeStamps)
         posY = self._streamY.getMedianPositions(self._arrayTimeStamps)
 
@@ -81,5 +79,4 @@ class StreamingScanBuilder:
                 y=Decimal(repr(posY[index])),
             )
 
-        scan = TabularScan('Stream', pointMap)
-        return self._factory.createTabularItem(scan, ScanFileInfo(scan.name, Path.home()))
+        return TabularScan(pointMap)

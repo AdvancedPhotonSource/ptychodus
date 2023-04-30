@@ -28,11 +28,10 @@ class TikeProbeCorrectionController(Observer):
         view.setCheckable(True)
         view.toggled.connect(presenter.setProbeCorrectionEnabled)
 
-        view.sparsityConstraintSlider.valueChanged.connect(presenter.setSparsityConstraint)
-        view.orthogonalityConstraintCheckBox.toggled.connect(
-            presenter.setOrthogonalityConstraintEnabled)
-        view.centeredIntensityConstraintCheckBox.toggled.connect(
-            presenter.setCenteredIntensityConstraintEnabled)
+        view.forceSparsitySlider.valueChanged.connect(presenter.setForceSparsity)
+        view.forceOrthogonalityCheckBox.toggled.connect(presenter.setForceOrthogonalityEnabled)
+        view.forceCenteredIntensityCheckBox.toggled.connect(
+            presenter.setForceCenteredIntensityEnabled)
         view.additionalProbePenaltyLineEdit.valueChanged.connect(
             presenter.setAdditionalProbePenalty)
 
@@ -43,14 +42,13 @@ class TikeProbeCorrectionController(Observer):
     def _syncModelToView(self) -> None:
         self._view.setChecked(self._presenter.isProbeCorrectionEnabled())
 
-        self._view.sparsityConstraintSlider.setValueAndRange(
-            self._presenter.getSparsityConstraint(),
-            self._presenter.getSparsityConstraintLimits(),
-            blockValueChangedSignal=True)
-        self._view.orthogonalityConstraintCheckBox.setChecked(
-            self._presenter.isOrthogonalityConstraintEnabled())
-        self._view.centeredIntensityConstraintCheckBox.setChecked(
-            self._presenter.isCenteredIntensityConstraintEnabled())
+        self._view.forceSparsitySlider.setValueAndRange(self._presenter.getForceSparsity(),
+                                                        self._presenter.getForceSparsityLimits(),
+                                                        blockValueChangedSignal=True)
+        self._view.forceOrthogonalityCheckBox.setChecked(
+            self._presenter.isForceOrthogonalityEnabled())
+        self._view.forceCenteredIntensityCheckBox.setChecked(
+            self._presenter.isForceCenteredIntensityEnabled())
         self._view.additionalProbePenaltyLineEdit.setMinimum(
             self._presenter.getAdditionalProbePenaltyMinimum())
         self._view.additionalProbePenaltyLineEdit.setValue(

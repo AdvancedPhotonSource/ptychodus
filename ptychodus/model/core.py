@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterable
+from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
@@ -21,14 +21,14 @@ from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatas
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import ImageCore, ImagePresenter
 from .metadata import MetadataPresenter
-from .object import ObjectCore, ObjectPresenter
+from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
 from .probe import ApparatusPresenter, ProbeCore, ProbePresenter
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter, ReconstructorPlotPresenter
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
-from .scan import ScanCore, ScanPresenter
+from .scan import ScanCore, ScanPresenter, ScanRepositoryPresenter
 from .statefulCore import StateDataRegistry
 from .tike import TikeReconstructorLibrary
 from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
@@ -78,7 +78,7 @@ class ModelCore:
 
         self._dataCore = DataCore(self.settingsRegistry, self._detector,
                                   self._pluginRegistry.buildDiffractionFileReaderChooser())
-        self._scanCore = ScanCore(self.rng, self.settingsRegistry,
+        self._scanCore = ScanCore(self.rng, self.settingsRegistry, self._dataCore.dataset,
                                   self._pluginRegistry.buildScanFileReaderChooser(),
                                   self._pluginRegistry.buildScanFileWriterChooser())
         self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
@@ -87,7 +87,7 @@ class ModelCore:
                                     self._pluginRegistry.buildProbeFileWriterChooser())
         self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
         self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
-                                      self._scanCore.scan, self._probeCore.sizer,
+                                      self._scanCore.sizer, self._probeCore.sizer,
                                       self._pluginRegistry.buildObjectFileReaderChooser(),
                                       self._pluginRegistry.buildObjectFileWriterChooser())
         self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
@@ -95,16 +95,15 @@ class ModelCore:
                                                                   self._detectorSettings,
                                                                   self._dataCore.patternSettings,
                                                                   self._probeCore.settings,
-                                                                  self._scanCore)
+                                                                  self._scanCore.scanAPI)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
-            self._probeCore.probe, self._probeCore.apparatus, self._objectCore.object,
-            self._scanCore.itemFactory, self._scanCore.repository,
-            modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scanAPI,
+            self._probeCore.probe, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scan,
-            self._probeCore.apparatus, self._objectCore.object, modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, self._pluginRegistry.buildObjectPhaseCenteringStrategyChooser(),
+            self._dataCore.dataset, self._scanCore.scanAPI, self._probeCore.probe,
+            self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
@@ -119,9 +118,9 @@ class ModelCore:
         self._stateDataRegistry = StateDataRegistry(
             (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
-        self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore,
-                                              self._scanCore, self._probeCore, self._objectCore,
-                                              self._workflowCore)
+        self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore.dataAPI,
+                                              self._scanCore.scanAPI, self._probeCore,
+                                              self._objectCore.objectAPI, self._workflowCore)
 
         self.rpcMessageService: Optional[RPCMessageService] = None
 
@@ -130,7 +129,7 @@ class ModelCore:
                                                        modelArgs.autoExecuteRPCs)
             self.rpcMessageService.registerProcedure(
                 LoadResultsMessage,
-                LoadResultsExecutor(self._probeCore.probe, self._objectCore.object))
+                LoadResultsExecutor(self._probeCore.probe, self._objectCore.objectAPI))
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
@@ -139,10 +138,9 @@ class ModelCore:
         if self._modelArgs.restartFilePath:
             self.openStateData(self._modelArgs.restartFilePath)
 
-        if self.diffractionDatasetInputOutputPresenter.isReadyToAssemble:
-            self.diffractionDatasetInputOutputPresenter.startProcessingDiffractionPatterns()
-            self.diffractionDatasetInputOutputPresenter.stopProcessingDiffractionPatterns(
-                finishAssembling=True)
+        if self._dataCore.dataAPI.getAssemblyQueueSize() > 0:
+            self._dataCore.dataAPI.startAssemblingDiffractionPatterns()
+            self._dataCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
 
         if self.rpcMessageService:
             self.rpcMessageService.start()
@@ -196,28 +194,29 @@ class ModelCore:
         return self._dataCore.datasetInputOutputPresenter
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self.diffractionDatasetInputOutputPresenter.initializeStreaming(metadata)
-        self.diffractionDatasetInputOutputPresenter.startProcessingDiffractionPatterns()
-        self.scanPresenter.initializeStreamingScan()
+        self._dataCore.dataAPI.initializeStreaming(metadata)
+        self._dataCore.dataAPI.startAssemblingDiffractionPatterns()
+        self._scanCore.scanAPI.initializeStreamingScan()
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
-        self.diffractionDatasetInputOutputPresenter.assemble(array)
-        self.scanPresenter.insertArrayTimeStamp(array.getIndex(), timeStamp)
+        self._dataCore.dataAPI.assemble(array)
+        self._scanCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)
 
-    def assembleScanPositionsX(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
-        self.scanPresenter.assembleScanPositionsX(valuesInMeters, timeStamps)
+    def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
+        self._scanCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)
 
-    def assembleScanPositionsY(self, valuesInMeters: list[float], timeStamps: list[float]) -> None:
-        self.scanPresenter.assembleScanPositionsY(valuesInMeters, timeStamps)
+    def assembleScanPositionsY(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
+        self._scanCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)
 
     def finalizeStreamingWorkflow(self) -> None:
-        self.diffractionDatasetInputOutputPresenter.stopProcessingDiffractionPatterns(
-            finishAssembling=True)
-        self.scanPresenter.finalizeStreamingScan()
-        self.objectPresenter.initializeObject()
+        self._scanCore.scanAPI.finalizeStreamingScan()
+        self._dataCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
+        self._objectCore.objectAPI.selectNewItemFromInitializerSimpleName('Random')
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
-        return self.diffractionDatasetInputOutputPresenter.getAssemblyQueueSize()
+        return self._dataCore.dataAPI.getAssemblyQueueSize()
 
     def refreshActiveDataset(self) -> None:
         self._dataCore.dataset.notifyObserversIfDatasetChanged()
@@ -241,6 +240,10 @@ class ModelCore:
         return self._scanCore.presenter
 
     @property
+    def scanRepositoryPresenter(self) -> ScanRepositoryPresenter:
+        return self._scanCore.repositoryPresenter
+
+    @property
     def probePresenter(self) -> ProbePresenter:
         return self._probeCore.presenter
 
@@ -251,6 +254,10 @@ class ModelCore:
     @property
     def objectPresenter(self) -> ObjectPresenter:
         return self._objectCore.presenter
+
+    @property
+    def objectRepositoryPresenter(self) -> ObjectRepositoryPresenter:
+        return self._objectCore.repositoryPresenter
 
     @property
     def objectImagePresenter(self) -> ImagePresenter:

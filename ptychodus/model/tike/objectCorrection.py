@@ -13,7 +13,7 @@ class TikeObjectCorrectionSettings(TikeAdaptiveMomentSettings):
         self.useObjectCorrection = settingsGroup.createBooleanEntry('UseObjectCorrection', True)
         self.positivityConstraint = settingsGroup.createRealEntry('PositivityConstraint', '0')
         self.smoothnessConstraint = settingsGroup.createRealEntry('SmoothnessConstraint', '0')
-        self.useMagnitudeClipping = settingsGroup.createBooleanEntry('UseMagnitudeClipping', True)
+        self.useMagnitudeClipping = settingsGroup.createBooleanEntry('UseMagnitudeClipping', False)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> TikeObjectCorrectionSettings:

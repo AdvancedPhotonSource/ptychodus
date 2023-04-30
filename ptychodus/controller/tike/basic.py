@@ -21,8 +21,6 @@ class TikeBasicParametersController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        view.useMpiCheckBox.toggled.connect(presenter.setMpiEnabled)
-
         view.numGpusLineEdit.editingFinished.connect(controller._syncNumGpusToModel)
         view.numGpusLineEdit.setValidator(
             QRegularExpressionValidator(QRegularExpression('[\\d,]+')))
@@ -54,7 +52,6 @@ class TikeBasicParametersController(Observer):
         self._presenter.setNumGpus(self._view.numGpusLineEdit.text())
 
     def _syncModelToView(self) -> None:
-        self._view.useMpiCheckBox.setChecked(self._presenter.isMpiEnabled())
         self._view.numGpusLineEdit.setText(self._presenter.getNumGpus())
         self._view.noiseModelComboBox.setCurrentText(self._presenter.getNoiseModel())
 

@@ -1,21 +1,33 @@
+from abc import ABC, abstractmethod
 from pathlib import Path
+import logging
 import re
 
-from ..data import DataCore
-from ..object import ObjectCore
+from ..data import DiffractionDataAPI
+from ..object import ObjectAPI
 from ..probe import ProbeCore
-from ..scan import ScanCore
+from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 
+logger = logging.getLogger(__name__)
 
-class AutomationDatasetWorkflow:
 
-    def __init__(self, dataCore: DataCore, scanCore: ScanCore, probeCore: ProbeCore,
-                 objectCore: ObjectCore, workflowCore: WorkflowCore) -> None:
-        self._dataCore = dataCore
-        self._scanCore = scanCore
+class AutomationDatasetWorkflow(ABC):
+
+    @abstractmethod
+    def execute(self, filePath: Path) -> None:
+        '''executes the workflow'''
+        pass
+
+
+class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
+
+    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeCore: ProbeCore,
+                 objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
+        self._dataAPI = dataAPI
+        self._scanAPI = scanAPI
         self._probeCore = probeCore
-        self._objectCore = objectCore
+        self._objectAPI = objectAPI
         self._workflowCore = workflowCore
 
     def execute(self, filePath: Path) -> None:
@@ -31,13 +43,41 @@ class AutomationDatasetWorkflow:
             if digits != 0:
                 break
 
-        diffractionFileFilter = 'Hierarchical Data Format 5 Files (*.h5 *.hdf5)'
-        scanFilePath = filePath
-        scanFileFilter = 'EPICS MDA Files (*.mda)'
+        self._dataAPI.loadDiffractionDataset(diffractionFilePath, simpleFileType='HDF5')
+        scanItemName = self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
+                                                                      simpleFileType='MDA')
 
-        self._dataCore.loadDiffractionDataset(diffractionFilePath, diffractionFileFilter)
-        self._scanCore.openScan(scanFilePath, scanFileFilter)
-        self._scanCore.setActiveScan(scanName)
-        self._probeCore.initializeAndActivateProbe()
-        self._objectCore.initializeAndActivateObject()
+        if scanItemName is not None:
+            self._scanAPI.selectItem(scanItemName)
+
+        self._probeCore.initializeAndSelectProbe()
+        self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
+        self._workflowCore.executeWorkflow(flowLabel)
+
+
+class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
+
+    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeCore: ProbeCore,
+                 objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
+        self._dataAPI = dataAPI
+        self._scanAPI = scanAPI
+        self._probeCore = probeCore
+        self._objectAPI = objectAPI
+        self._workflowCore = workflowCore
+
+    def execute(self, filePath: Path) -> None:
+        scanName = filePath.stem
+        scanID = int(re.findall(r'\d+', scanName)[-1])
+        flowLabel = f'scan{scanID}'
+
+        diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
+        self._dataAPI.loadDiffractionDataset(diffractionFilePath, simpleFileType='NeXus')
+        scanItemName = self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
+                                                                      simpleFileType='CSV')
+
+        if scanItemName is not None:
+            self._scanAPI.selectItem(scanItemName)
+
+        self._probeCore.initializeAndSelectProbe()
+        self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)

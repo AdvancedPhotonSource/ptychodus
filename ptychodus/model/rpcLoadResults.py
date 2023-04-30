@@ -6,7 +6,7 @@ import logging
 import numpy
 
 from ..api.rpc import RPCMessage, RPCExecutor
-from .object import Object
+from .object import ObjectAPI
 from .probe import Probe
 
 logger = logging.getLogger(__name__)
@@ -38,9 +38,9 @@ class LoadResultsMessage(RPCMessage):
 
 class LoadResultsExecutor(RPCExecutor):
 
-    def __init__(self, probe: Probe, object_: Object) -> None:
+    def __init__(self, probe: Probe, objectAPI: ObjectAPI) -> None:
         self._probe = probe
-        self._object = object_
+        self._objectAPI = objectAPI
 
     def submit(self, message: RPCMessage) -> None:
         if isinstance(message, LoadResultsMessage):
@@ -48,6 +48,15 @@ class LoadResultsExecutor(RPCExecutor):
                 logger.debug(f'Loading results from {message.filePath}')
                 results = numpy.load(message.filePath)
                 self._probe.setArray(results['probe'])
-                self._object.setArray(results['object'])
+                objectItem = self._objectAPI.insertItemIntoRepositoryFromArray(
+                    message.filePath.stem,
+                    results['object'],
+                    filePath=message.filePath,
+                    simpleFileType='NPZ')
+
+                if objectItem is None:
+                    logger.error('Failed to load object result!')
+                else:
+                    self._objectAPI.selectItem(objectItem)
             else:
                 logger.debug(f'{message.filePath} is not a file.')

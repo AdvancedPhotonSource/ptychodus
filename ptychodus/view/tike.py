@@ -12,7 +12,6 @@ class TikeBasicParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Tike Parameters', parent)
-        self.useMpiCheckBox = QCheckBox('Use MPI')
         self.numGpusLineEdit = QLineEdit()
         self.noiseModelComboBox = QComboBox()
         self.numBatchSpinBox = QSpinBox()
@@ -31,7 +30,6 @@ class TikeBasicParametersView(QGroupBox):
                        parent: Optional[QWidget] = None) -> TikeBasicParametersView:
         view = cls(parent)
 
-        view.useMpiCheckBox.setToolTip('Whether to use MPI or not.')
         view.numGpusLineEdit.setToolTip(
             'The number of GPUs to use. If the number of GPUs is less than the requested number, only workers for the available GPUs are allocated.'
         )
@@ -57,9 +55,6 @@ class TikeBasicParametersView(QGroupBox):
         layout.addRow('Batch Method:', view.batchMethodComboBox)
         layout.addRow('Number of Iterations:', view.numIterSpinBox)
         layout.addRow('Convergence Window:', view.convergenceWindowSpinBox)
-
-        if False:  # TODO figure if ptychodus should support this
-            layout.addRow(view.useMpiCheckBox)
 
         if showCgIter:
             layout.addRow('CG Search Directions:', view.cgIterSpinBox)
@@ -170,9 +165,9 @@ class TikeProbeCorrectionView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Probe Correction', parent)
-        self.sparsityConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.orthogonalityConstraintCheckBox = QCheckBox('Orthogonality Constraint')
-        self.centeredIntensityConstraintCheckBox = QCheckBox('Centered Intensity Constraint')
+        self.forceSparsitySlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.forceOrthogonalityCheckBox = QCheckBox('Force Orthogonality')
+        self.forceCenteredIntensityCheckBox = QCheckBox('Force Centered Intensity')
         self.probeSupportView = TikeProbeSupportView.createInstance()
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
         self.additionalProbePenaltyLineEdit = DecimalLineEdit.createInstance()
@@ -181,19 +176,18 @@ class TikeProbeCorrectionView(QGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikeProbeCorrectionView:
         view = cls(parent)
 
-        view.sparsityConstraintSlider.setToolTip(
-            'Forces a maximum proportion of non-zero elements.')
-        view.orthogonalityConstraintCheckBox.setToolTip(
+        view.forceSparsitySlider.setToolTip('Forces this proportion of zero elements.')
+        view.forceOrthogonalityCheckBox.setToolTip(
             'Forces probes to be orthogonal each iteration.')
-        view.centeredIntensityConstraintCheckBox.setToolTip(
+        view.forceCenteredIntensityCheckBox.setToolTip(
             'Forces the probe intensity to be centered.')
         view.additionalProbePenaltyLineEdit.setToolTip(
-            'Additional penalty applied to the last probe.')
+            'Penalty applied to the last probe for existing.')
 
         layout = QFormLayout()
-        layout.addRow('Sparsity Constraint:', view.sparsityConstraintSlider)
-        layout.addRow(view.orthogonalityConstraintCheckBox)
-        layout.addRow(view.centeredIntensityConstraintCheckBox)
+        layout.addRow('Force Sparsity:', view.forceSparsitySlider)
+        layout.addRow(view.forceOrthogonalityCheckBox)
+        layout.addRow(view.forceCenteredIntensityCheckBox)
         layout.addRow(view.probeSupportView)
         layout.addRow(view.adaptiveMomentView)
         layout.addRow('Additional Probe Penalty:', view.additionalProbePenaltyLineEdit)

@@ -1,20 +1,20 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum, auto
 from pathlib import Path
-from typing import overload, Any, Optional, Union
+from typing import overload, Any, Optional, TypeAlias, Union
 
 import numpy
 import numpy.typing
 
-from .geometry import Vector2D
+from .geometry import Array2D
 from .observer import Observable
 from .tree import SimpleTreeNode
 
-DiffractionPatternData = numpy.typing.NDArray[numpy.integer[Any]]
+DiffractionPatternData: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 
 
 class DiffractionPatternState(Enum):
@@ -81,9 +81,9 @@ class DiffractionMetadata:
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype[numpy.integer[Any]]
     detectorDistanceInMeters: Optional[Decimal] = None
-    detectorNumberOfPixels: Optional[Vector2D[int]] = None
-    detectorPixelSizeInMeters: Optional[Vector2D[Decimal]] = None
-    cropCenterInPixels: Optional[Vector2D[int]] = None
+    detectorNumberOfPixels: Optional[Array2D[int]] = None
+    detectorPixelSizeInMeters: Optional[Array2D[Decimal]] = None
+    cropCenterInPixels: Optional[Array2D[int]] = None
     probeEnergyInElectronVolts: Optional[Decimal] = None
     filePath: Optional[Path] = None
 
@@ -144,12 +144,14 @@ class SimpleDiffractionDataset(DiffractionDataset):
 class DiffractionFileReader(ABC):
     '''interface for plugins that read diffraction files'''
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fileFilter(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass

@@ -9,15 +9,11 @@ except ModuleNotFoundError:
     pass
 
 import h5py
-import numpy
 
-from ptychodus.api.data import (DiffractionPatternData, DiffractionDataset, DiffractionFileReader,
-                                DiffractionMetadata, DiffractionPatternArray,
-                                DiffractionPatternState, SimpleDiffractionDataset)
-from ptychodus.api.geometry import Vector2D
-from ptychodus.api.observer import Observable
+from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                SimpleDiffractionDataset)
+from ptychodus.api.geometry import Array2D
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.tree import SimpleTreeNode
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)
@@ -56,8 +52,8 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
-                        detectorNumberOfPixels=Vector2D[int](detectorWidth, detectorHeight),
-                        detectorPixelSizeInMeters=Vector2D[Decimal](pixelSize, pixelSize),
+                        detectorNumberOfPixels=Array2D[int](detectorWidth, detectorHeight),
+                        detectorPixelSizeInMeters=Array2D[Decimal](pixelSize, pixelSize),
                         filePath=filePath,
                     )
 

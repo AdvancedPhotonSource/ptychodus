@@ -35,7 +35,7 @@ class MATProbeFileWriter(ProbeFileWriter):
 
     def write(self, filePath: Path, array: ProbeArrayType) -> None:
         probes = numpy.moveaxis(array, 0, -1)
-        matDict = {'probe': array}
+        matDict = {'probe': probes}
         scipy.io.savemat(filePath, matDict)
 
 

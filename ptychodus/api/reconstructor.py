@@ -1,5 +1,5 @@
-from abc import ABC, abstractmethod, abstractproperty
-from collections.abc import Iterable, Iterator, Sequence
+from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 
@@ -11,7 +11,8 @@ class ReconstructResult:
 
 class Reconstructor(ABC):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def name(self) -> str:
         pass
 
@@ -35,6 +36,7 @@ class NullReconstructor(Reconstructor):
 
 class ReconstructorLibrary(Iterable[Reconstructor]):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def name(self) -> str:
         pass

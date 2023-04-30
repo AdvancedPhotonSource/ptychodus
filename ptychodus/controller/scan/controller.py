@@ -1,75 +1,62 @@
 from __future__ import annotations
-from typing import Callable
+from typing import Callable, Final, Optional
 import logging
 
-from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel,
-                          QVariant)
+from PyQt5.QtCore import Qt, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
-from ...model.scan import (CartesianScanRepositoryItem, LissajousScanRepositoryItem, ScanPresenter,
-                           SpiralScanRepositoryItem, TabularScanRepositoryItem,
-                           TransformedScanRepositoryItem)
-from ...view import (CartesianScanView, LissajousScanView, ScanEditorDialog, ScanParametersView,
-                     ScanPlotView, ScanPositionDataView, ScanTransformView, SpiralScanView,
-                     TabularScanView)
+from ...model.scan import ScanRepositoryItemPresenter, ScanRepositoryPresenter
+from ...view import ScanView, ScanPlotView
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
+from .concentric import ConcentricScanController
 from .lissajous import LissajousScanController
 from .spiral import SpiralScanController
 from .tableModel import ScanTableModel
-from .transformController import ScanTransformController
+from .tabular import TabularScanController
 
 logger = logging.getLogger(__name__)
 
 
 class ScanController(Observer):
-    OPEN_FILE = 'Open File...'
+    OPEN_FILE: Final[str] = 'Open File...'  # TODO clean up
 
-    def __init__(self, presenter: ScanPresenter, parametersView: ScanParametersView,
+    def __init__(self, repositoryPresenter: ScanRepositoryPresenter, view: ScanView,
                  plotView: ScanPlotView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
-        self._presenter = presenter
-        self._parametersView = parametersView
+        self._repositoryPresenter = repositoryPresenter
+        self._view = view
         self._plotView = plotView
         self._fileDialogFactory = fileDialogFactory
-        self._tableModel = ScanTableModel(presenter)
+        self._tableModel = ScanTableModel(repositoryPresenter)
         self._proxyModel = QSortFilterProxyModel()
 
     @classmethod
-    def createInstance(cls, presenter: ScanPresenter, parametersView: ScanParametersView,
+    def createInstance(cls, repositoryPresenter: ScanRepositoryPresenter, view: ScanView,
                        plotView: ScanPlotView,
                        fileDialogFactory: FileDialogFactory) -> ScanController:
-        controller = cls(presenter, parametersView, plotView, fileDialogFactory)
-        presenter.addObserver(controller)
+        controller = cls(repositoryPresenter, view, plotView, fileDialogFactory)
+        repositoryPresenter.addObserver(controller)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
 
-        parametersView.positionDataView.tableView.setModel(controller._proxyModel)
-        parametersView.positionDataView.tableView.setSortingEnabled(True)
-        parametersView.positionDataView.tableView.setSelectionBehavior(
-            QAbstractItemView.SelectRows)
-        parametersView.positionDataView.tableView.setSelectionMode(
-            QAbstractItemView.SingleSelection)
-        parametersView.positionDataView.tableView.activated.connect(controller._setActiveScan)
-        parametersView.positionDataView.tableView.selectionModel().selectionChanged.connect(
-            lambda selected, deselected: controller._setButtonsEnabled())
-        parametersView.positionDataView.tableView.horizontalHeader().sectionClicked.connect(
+        view.repositoryView.tableView.setModel(controller._proxyModel)
+        view.repositoryView.tableView.setSortingEnabled(True)
+        view.repositoryView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.repositoryView.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
+        view.repositoryView.tableView.selectionModel().selectionChanged.connect(
+            lambda selected, deselected: controller._updateView())
+        view.repositoryView.tableView.horizontalHeader().sectionClicked.connect(
             lambda logicalIndex: controller._redrawPlot())
 
-        itemNameList = presenter.getItemNameList()
-        itemNameList.insert(0, ScanController.OPEN_FILE)
-
-        for name in itemNameList:
-            insertAction = parametersView.positionDataView.buttonBox.insertMenu.addAction(name)
+        for name in repositoryPresenter.getInitializerDisplayNameList():
+            insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 
-        parametersView.positionDataView.buttonBox.editButton.clicked.connect(
-            controller._editSelectedScan)
-        parametersView.positionDataView.buttonBox.saveButton.clicked.connect(
-            controller._saveSelectedScan)
-        parametersView.positionDataView.buttonBox.removeButton.clicked.connect(
-            controller._removeSelectedScan)
+        view.repositoryView.buttonBox.editButton.clicked.connect(controller._editSelectedScan)
+        view.repositoryView.buttonBox.saveButton.clicked.connect(controller._saveSelectedScan)
+        view.repositoryView.buttonBox.removeButton.clicked.connect(controller._removeSelectedScan)
 
         controller._proxyModel.dataChanged.connect(
             lambda topLeft, bottomRight, roles: controller._redrawPlot())
@@ -81,7 +68,7 @@ class ScanController(Observer):
         if name == ScanController.OPEN_FILE:
             self._openScan()
         else:
-            self._presenter.initializeScan(name)
+            self._repositoryPresenter.initializeScan(name)
 
     def _createItemLambda(self, name: str) -> Callable[[bool], None]:
         # NOTE additional defining scope for lambda forces a new instance for each use
@@ -89,111 +76,82 @@ class ScanController(Observer):
 
     def _openScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._parametersView.positionDataView,
+            self._view.repositoryView,
             'Open Scan',
-            nameFilters=self._presenter.getOpenFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenFileFilter())
+            nameFilters=self._repositoryPresenter.getOpenFileFilterList(),
+            selectedNameFilter=self._repositoryPresenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openScan(filePath, nameFilter)
+            self._repositoryPresenter.openScan(filePath, nameFilter)
 
     def _saveSelectedScan(self) -> None:
-        current = self._parametersView.positionDataView.tableView.selectionModel().currentIndex()
+        current = self._view.repositoryView.tableView.currentIndex()
 
-        if not current.isValid():
-            logger.error('No scans are selected!')
-            return
+        if current.isValid():
+            filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+                self._view.repositoryView,
+                'Save Scan',
+                nameFilters=self._repositoryPresenter.getSaveFileFilterList(),
+                selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._parametersView.positionDataView,
-            'Save Scan',
-            nameFilters=self._presenter.getSaveFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveFileFilter())
+            if filePath:
+                name = current.sibling(current.row(), 0).data()
+                self._repositoryPresenter.saveScan(name, filePath, nameFilter)
+        else:
+            logger.error('No items are selected!')
 
-        if filePath:
-            name = current.sibling(current.row(), 0).data()
-            self._presenter.saveScan(filePath, nameFilter, name)
+    def _getSelectedItemPresenter(self) -> Optional[ScanRepositoryItemPresenter]:
+        itemPresenter: Optional[ScanRepositoryItemPresenter] = None
+        proxyIndex = self._view.repositoryView.tableView.currentIndex()
+
+        if proxyIndex.isValid():
+            index = self._proxyModel.mapToSource(proxyIndex)
+            itemPresenter = self._repositoryPresenter[index.row()]
+
+        return itemPresenter
 
     def _editSelectedScan(self) -> None:
-        current = self._parametersView.positionDataView.tableView.selectionModel().currentIndex()
+        itemPresenter = self._getSelectedItemPresenter()
 
-        if current.isValid():
-            name = current.sibling(current.row(), 0).data()
-            category = current.sibling(current.row(), 1).data()
-            item = self._presenter.getItem(name)
-
-            if isinstance(item, TransformedScanRepositoryItem):
-                if isinstance(item._item, CartesianScanRepositoryItem):
-                    cartesianDialog = ScanEditorDialog.createInstance(
-                        CartesianScanView.createInstance(), self._parametersView)
-                    cartesianDialog.setWindowTitle(name)
-                    cartesianController = CartesianScanController.createInstance(
-                        item._item, cartesianDialog.editorView)
-                    cartesianTransformController = ScanTransformController.createInstance(
-                        item, cartesianDialog.transformView)
-                    cartesianDialog.open()
-                elif isinstance(item._item, SpiralScanRepositoryItem):
-                    spiralDialog = ScanEditorDialog.createInstance(SpiralScanView.createInstance(),
-                                                                   self._parametersView)
-                    spiralDialog.setWindowTitle(name)
-                    spiralController = SpiralScanController.createInstance(
-                        item._item, spiralDialog.editorView)
-                    spiralTransformController = ScanTransformController.createInstance(
-                        item, spiralDialog.transformView)
-                    spiralDialog.open()
-                elif isinstance(item._item, LissajousScanRepositoryItem):
-                    lissajousDialog = ScanEditorDialog.createInstance(
-                        LissajousScanView.createInstance(), self._parametersView)
-                    lissajousDialog.setWindowTitle(name)
-                    lissajousController = LissajousScanController.createInstance(
-                        item._item, lissajousDialog.editorView)
-                    lissajousTransformController = ScanTransformController.createInstance(
-                        item, lissajousDialog.transformView)
-                    lissajousDialog.open()
-                elif isinstance(item._item, TabularScanRepositoryItem):
-                    tabularDialog = ScanEditorDialog.createInstance(
-                        TabularScanView.createInstance(), self._parametersView)
-                    tabularDialog.setWindowTitle(name)
-                    tabularTransformController = ScanTransformController.createInstance(
-                        item, tabularDialog.transformView)
-                    tabularDialog.open()
-                else:
-                    logger.debug(f'Unknown category \"{category}\"')
-            else:
-                logger.debug(f'Repository item is not a transformed scan!')
+        if itemPresenter is None:
+            logger.error('No items are selected!')
         else:
-            logger.error('No scans are selected!')
+            item = itemPresenter.item
+            initializerName = item.getInitializerSimpleName()
+
+            if initializerName in ('Snake', 'Raster', 'CenteredSnake', 'CenteredRaster'):
+                cartesianController = CartesianScanController.createInstance(
+                    itemPresenter, self._view)
+                cartesianController.openDialog()
+            elif initializerName == 'Concentric':
+                concentricController = ConcentricScanController.createInstance(
+                    itemPresenter, self._view)
+                concentricController.openDialog()
+            elif initializerName == 'Spiral':
+                spiralController = SpiralScanController.createInstance(itemPresenter, self._view)
+                spiralController.openDialog()
+            elif initializerName == 'Lissajous':
+                lissajousController = LissajousScanController.createInstance(
+                    itemPresenter, self._view)
+                lissajousController.openDialog()
+            else:
+                tabularController = TabularScanController.createInstance(itemPresenter, self._view)
+                tabularController.openDialog()
 
     def _removeSelectedScan(self) -> None:
-        current = self._parametersView.positionDataView.tableView.selectionModel().currentIndex()
+        current = self._view.repositoryView.tableView.currentIndex()
 
         if current.isValid():
             name = current.sibling(current.row(), 0).data()
-            self._presenter.removeScan(name)
+            self._repositoryPresenter.removeScan(name)
         else:
-            logger.error('No scans are selected!')
-
-    def _setButtonsEnabled(self) -> None:
-        selectionModel = self._parametersView.positionDataView.tableView.selectionModel()
-        enable = False
-        enableRemove = False
-
-        for index in selectionModel.selectedIndexes():
-            if index.isValid():
-                enable = True
-                name = index.sibling(index.row(), 0).data()
-                enableRemove |= self._presenter.canRemoveScan(name)
-
-        self._parametersView.positionDataView.buttonBox.saveButton.setEnabled(enable)
-        self._parametersView.positionDataView.buttonBox.editButton.setEnabled(enable)
-        self._parametersView.positionDataView.buttonBox.removeButton.setEnabled(enableRemove)
-
-    def _setActiveScan(self, index: QModelIndex) -> None:
-        name = index.sibling(index.row(), 0).data()
-        self._presenter.setActiveScan(name)
+            logger.error('No items are selected!')
 
     def _redrawPlot(self) -> None:
-        itemDict = {name: item for name, item in self._presenter.getScanRepositoryContents()}
+        itemDict = {
+            itemPresenter.name: itemPresenter.item
+            for itemPresenter in self._repositoryPresenter
+        }
         self._plotView.axes.clear()
 
         for row in range(self._proxyModel.rowCount()):
@@ -220,22 +178,37 @@ class ScanController(Observer):
 
         self._plotView.figureCanvas.draw()
 
-    def _syncModelToView(self) -> None:
-        for _, item in self._presenter.getScanRepositoryContents():
-            item.addObserver(self)
+    def _setButtonsEnabled(self) -> None:
+        selectionModel = self._view.repositoryView.tableView.selectionModel()
+        enable = False
 
-        self._parametersView.positionDataView.tableView.blockSignals(True)
-        self._tableModel.refresh()
-        self._parametersView.positionDataView.tableView.blockSignals(False)
+        for index in selectionModel.selectedIndexes():
+            if index.isValid():
+                enable = True
 
+        self._view.repositoryView.buttonBox.saveButton.setEnabled(enable)
+        self._view.repositoryView.buttonBox.editButton.setEnabled(enable)
+        self._view.repositoryView.buttonBox.removeButton.setEnabled(enable)
+
+    def _updateView(self) -> None:
         self._setButtonsEnabled()
         self._redrawPlot()
 
+    def _syncModelToView(self) -> None:
+        for itemPresenter in self._repositoryPresenter:
+            itemPresenter.item.addObserver(self)
+
+        self._tableModel.beginResetModel()
+        self._tableModel.endResetModel()
+        self._updateView()
+
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._repositoryPresenter:
             self._syncModelToView()
         else:
-            for name, item in self._presenter.getScanRepositoryContents():
-                if observable is item and self._tableModel.isChecked(name):
+            for itemPresenter in self._repositoryPresenter:
+                itemIsChecked = self._tableModel.isChecked(itemPresenter.name)
+
+                if observable is itemPresenter.item and itemIsChecked:
                     self._redrawPlot()
                     break

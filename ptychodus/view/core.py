@@ -1,15 +1,12 @@
 from __future__ import annotations
-from pathlib import Path
 from typing import Optional
 import logging
 
 from PyQt5.QtCore import PYQT_VERSION_STR, QSize, QT_VERSION_STR, Qt
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QActionGroup, QApplication, QHeaderView, QMainWindow, QMenu,
-                             QSizePolicy, QSplitter, QStackedWidget, QTableView, QToolBar,
-                             QToolButton, QTreeView, QWidget)
+from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QSizePolicy, QSplitter,
+                             QStackedWidget, QTableView, QToolBar, QWidget)
 
-from . import resources
 from .automation import *
 from .data import DataParametersView
 from .detector import *
@@ -52,15 +49,15 @@ class ViewCore(QMainWindow):
         self.detectorImageView = ImageView.createInstance()
 
         self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
-        self.scanParametersView = ScanParametersView.createInstance()
+        self.scanView = ScanView.createInstance()
         self.scanPlotView = ScanPlotView.createInstance()
 
         self.probeAction = self.navigationToolBar.addAction(QIcon(':/icons/probe'), 'Probe')
-        self.probeParametersView = ProbeParametersView.createInstance()
+        self.probeView = ProbeView.createInstance()
         self.probeImageView = ImageView.createInstance()
 
         self.objectAction = self.navigationToolBar.addAction(QIcon(':/icons/object'), 'Object')
-        self.objectParametersView = ObjectParametersView.createInstance()
+        self.objectView = ObjectView.createInstance()
         self.objectImageView = ImageView.createInstance()
 
         self.reconstructorAction = self.navigationToolBar.addAction(QIcon(':/icons/reconstructor'),
@@ -75,7 +72,7 @@ class ViewCore(QMainWindow):
 
         self.automationAction = self.navigationToolBar.addAction(QIcon(':/icons/automate'),
                                                                  'Automation')
-        self.automationParametersView = AutomationParametersView.createInstance()
+        self.automationView = AutomationView.createInstance()
         self.automationWidget = QWidget()
 
         self.monitorAction = self.navigationToolBar.addAction(QIcon(':/icons/monitor'), 'Monitor')
@@ -102,20 +99,16 @@ class ViewCore(QMainWindow):
 
         view.settingsAction.setChecked(True)
 
-        view.settingsEntryView.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        view.workflowTableView.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeToContents)
-
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsParametersView)
         view.parametersWidget.addWidget(view.dataParametersView)
         view.parametersWidget.addWidget(view.detectorParametersView)
-        view.parametersWidget.addWidget(view.scanParametersView)
-        view.parametersWidget.addWidget(view.probeParametersView)
-        view.parametersWidget.addWidget(view.objectParametersView)
+        view.parametersWidget.addWidget(view.scanView)
+        view.parametersWidget.addWidget(view.probeView)
+        view.parametersWidget.addWidget(view.objectView)
         view.parametersWidget.addWidget(view.reconstructorParametersView)
         view.parametersWidget.addWidget(view.workflowParametersView)
-        view.parametersWidget.addWidget(view.automationParametersView)
+        view.parametersWidget.addWidget(view.automationView)
         view.parametersWidget.addWidget(view.monitorProbeView)
         view.parametersWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         view.splitter.addWidget(view.parametersWidget)

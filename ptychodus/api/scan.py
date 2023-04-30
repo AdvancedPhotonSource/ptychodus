@@ -1,150 +1,45 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
-from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator, Mapping
 from decimal import Decimal
-from enum import Enum
 from pathlib import Path
 from statistics import median
-from typing import Any
-import logging
+from typing import Any, TypeAlias
 
 import numpy
 import numpy.typing
 
-from .observer import Observable
+from .geometry import Point2D
 
-ScanArrayType = numpy.typing.NDArray[numpy.floating[Any]]
+ScanArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class ScanPoint:
-    '''scan point coordinates are conventionally in meters'''
-    x: Decimal
-    y: Decimal
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, ScanPoint):
-            return (self.x == other.x and self.y == other.y)
-        else:
-            return NotImplemented
-
-
-class ScanIndexFilter(ABC):
-    '''filters scan points by index'''
-
-    @abstractproperty
-    def name(self) -> str:
-        '''returns a unique name'''
-        pass
-
-    @abstractmethod
-    def __call__(self, index: int) -> bool:
-        '''include scan point if true, remove otherwise'''
-        pass
-
-
-class ScanPointTransform(Enum):
-    '''transformations to negate or swap scan point coordinates'''
-    PXPY = 0x0
-    MXPY = 0x1
-    PXMY = 0x2
-    MXMY = 0x3
-    PYPX = 0x4
-    PYMX = 0x5
-    MYPX = 0x6
-    MYMX = 0x7
-
-    @classmethod
-    def fromSimpleName(self, name: str) -> ScanPointTransform:
-        transform = ScanPointTransform.PXPY
-
-        try:
-            transform = next(xform for xform in ScanPointTransform
-                             if name.casefold() == xform.simpleName.casefold())
-        except StopIteration:
-            logger.debug(f'Invalid ScanPointTransform \"{name}\"')
-
-        return transform
-
-    @property
-    def negateX(self) -> bool:
-        '''indicates whether the x coordinate is negated'''
-        return self.value & 1 != 0
-
-    @property
-    def negateY(self) -> bool:
-        '''indicates whether the y coordinate is negated'''
-        return self.value & 2 != 0
-
-    @property
-    def swapXY(self) -> bool:
-        '''indicates whether the x and y coordinates are swapped'''
-        return self.value & 4 != 0
-
-    @property
-    def simpleName(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
-        xp = '-x' if self.negateX else '+x'
-        yp = '-y' if self.negateY else '+y'
-        return f'{yp}{xp}' if self.swapXY else f'{xp}{yp}'
-
-    @property
-    def displayName(self) -> str:
-        '''returns a unique name that is prettified for visual display'''
-        xp = '\u2212x' if self.negateX else '\u002Bx'
-        yp = '\u2212y' if self.negateY else '\u002By'
-        return f'({yp}, {xp})' if self.swapXY else f'({xp}, {yp})'
-
-    def __call__(self, point: ScanPoint) -> ScanPoint:
-        '''transforms a scan point'''
-        xp = -point.x if self.negateX else point.x
-        yp = -point.y if self.negateY else point.y
-        return ScanPoint(yp, xp) if self.swapXY else ScanPoint(xp, yp)
-
-
-class Scan(Mapping[int, ScanPoint], Observable):
-    '''interface for an enumerated collection of scan points'''
-
-    @abstractproperty
-    def name(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
-        pass
+# scan point coordinates are conventionally in meters
+ScanPoint: TypeAlias = Point2D[Decimal]
+Scan: TypeAlias = Mapping[int, ScanPoint]
 
 
 class TabularScan(Scan):
 
-    def __init__(self, name: str, pointMap: Mapping[int, ScanPoint]) -> None:
+    def __init__(self, pointMap: Mapping[int, ScanPoint]) -> None:
         super().__init__()
-        self._name = name
         self._data = dict(pointMap)
 
     @classmethod
-    def createEmpty(cls) -> TabularScan:
-        return cls('Empty', {})
+    def createFromPointIterable(cls, pointIterable: Iterable[ScanPoint]) -> TabularScan:
+        return cls({index: point for index, point in enumerate(pointIterable)})
 
     @classmethod
-    def createFromPointSequence(cls, name: str, pointSeq: Sequence[ScanPoint]) -> TabularScan:
-        return cls(name, {index: point for index, point in enumerate(pointSeq)})
-
-    @classmethod
-    def createFromMappedPointSequence(
-            cls, name: str, pointSeqMap: Mapping[int, Sequence[ScanPoint]]) -> TabularScan:
+    def createFromMappedPointIterable(
+            cls, pointIterableMap: Mapping[int, Iterable[ScanPoint]]) -> TabularScan:
         pointMap: dict[int, ScanPoint] = dict()
 
-        for index, pointSeq in pointSeqMap.items():
+        for index, pointIterable in pointIterableMap.items():
             pointMap[index] = ScanPoint(
-                x=median(point.x for point in pointSeq),
-                y=median(point.y for point in pointSeq),
+                x=median(point.x for point in pointIterable),
+                y=median(point.y for point in pointIterable),
             )
 
-        return cls(name, pointMap)
-
-    @property
-    def name(self) -> str:
-        return self._name
+        return cls(pointMap)
 
     def __iter__(self) -> Iterator[int]:
         return iter(self._data)
@@ -164,18 +59,20 @@ class ScanPointParseError(Exception):
 class ScanFileReader(ABC):
     '''interface for plugins that read scan files'''
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fileFilter(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass
 
     @abstractmethod
-    def read(self, filePath: Path) -> Sequence[Scan]:
+    def read(self, filePath: Path) -> Scan:
         '''reads a scan dictionary from file'''
         pass
 
@@ -183,17 +80,19 @@ class ScanFileReader(ABC):
 class ScanFileWriter(ABC):
     '''interface for plugins that write scan files'''
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def simpleName(self) -> str:
         '''returns a unique name that is appropriate for a settings file'''
         pass
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fileFilter(self) -> str:
         '''returns a unique name that is prettified for visual display'''
         pass
 
     @abstractmethod
-    def write(self, filePath: Path, scanSeq: Sequence[Scan]) -> None:
+    def write(self, filePath: Path, scan: Scan) -> None:
         '''writes a scan dictionary to file'''
         pass

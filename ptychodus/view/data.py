@@ -3,8 +3,8 @@ from typing import Any, Callable, Generic, Optional, TypeVar
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGridLayout, QGroupBox,
-                             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton, QSpinBox,
-                             QStackedWidget, QTableView, QTreeView, QVBoxLayout, QWidget)
+                             QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QStackedWidget,
+                             QTableView, QTreeView, QVBoxLayout, QWidget)
 
 __all__ = [
     'DataNavigationPage',
@@ -62,9 +62,6 @@ class DatasetFileView(QGroupBox):
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetFileView:
         view = cls(parent)
-
-        view.fileSystemTableView.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeToContents)
 
         layout = QVBoxLayout()
         layout.addWidget(view.filePathLineEdit)
@@ -231,8 +228,6 @@ class DatasetView(QGroupBox):
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DatasetView:
         view = cls(parent)
-
-        view.treeView.header().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         layout = QVBoxLayout()
         layout.addWidget(view.treeView)

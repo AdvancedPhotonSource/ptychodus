@@ -8,7 +8,7 @@ import numpy
 
 from ...api.data import (DiffractionDataset, DiffractionPatternArray, DiffractionPatternState,
                          SimpleDiffractionPatternArray)
-from .dataset import ActiveDiffractionDataset
+from .active import ActiveDiffractionDataset
 from .settings import DiffractionDatasetSettings
 
 __all__ = [

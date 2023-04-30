@@ -2,9 +2,9 @@ from collections import OrderedDict
 from pathlib import Path
 from time import monotonic as time
 import logging
-import queue
 import threading
 
+from .processor import AutomationDatasetProcessor
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
 
@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 class AutomationDatasetBuffer:
 
     def __init__(self, settings: AutomationSettings, repository: AutomationDatasetRepository,
-                 processingQueue: queue.Queue[Path]) -> None:
+                 processor: AutomationDatasetProcessor) -> None:
         self._settings = settings
         self._repository = repository
-        self._processingQueue = processingQueue
+        self._processor = processor
         self._eventTimes: OrderedDict[Path, float] = OrderedDict()
         self._eventTimesLock = threading.Lock()
         self._stopWorkEvent = threading.Event()
@@ -28,7 +28,7 @@ class AutomationDatasetBuffer:
             self._eventTimes[filePath] = time()
             self._eventTimes.move_to_end(filePath)
 
-        self._repository.put(filePath, AutomationDatasetState.CREATED)
+        self._repository.put(filePath, AutomationDatasetState.EXISTS)
 
     def _process(self) -> None:
         while not self._stopWorkEvent.is_set():
@@ -47,8 +47,7 @@ class AutomationDatasetBuffer:
                         self._eventTimes.popitem(last=False)
 
             if isFileReadyForProcessing:
-                self._repository.put(filePath, AutomationDatasetState.WAITING)
-                self._processingQueue.put(filePath)
+                self._processor.put(filePath)
             else:
                 self._stopWorkEvent.wait(timeout=5.)  # TODO make configurable
 

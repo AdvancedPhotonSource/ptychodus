@@ -1,5 +1,4 @@
 from __future__ import annotations
-from decimal import Decimal
 from pathlib import Path
 
 from ...api.observer import Observable, Observer
@@ -11,7 +10,10 @@ class ScanSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.activeScan = settingsGroup.createStringEntry('ActiveScan', 'Snake')
+        self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
+        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
+                                                           Path('/path/to/scan.csv'))
+        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
         self.amplitudeXInMeters = settingsGroup.createRealEntry('AmplitudeXInMeters', '4.5e-6')
         self.amplitudeYInMeters = settingsGroup.createRealEntry('AmplitudeYInMeters', '4.5e-6')
         self.angularShiftInTurns = settingsGroup.createRealEntry('AngularShiftInTurns', '0.25')
@@ -19,23 +21,34 @@ class ScanSettings(Observable, Observer):
         self.angularStepYInTurns = settingsGroup.createRealEntry('AngularStepYInTurns', '0.04')
         self.centroidXInMeters = settingsGroup.createRealEntry('CentroidXInMeters', '0')
         self.centroidYInMeters = settingsGroup.createRealEntry('CentroidYInMeters', '0')
-        self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
-        self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
-                                                           Path('/path/to/scan.csv'))
-        self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
         self.jitterRadiusInMeters = settingsGroup.createRealEntry('JitterRadiusInMeters', '0')
         self.numberOfPointsX = settingsGroup.createIntegerEntry('NumberOfPointsX', 10)
         self.numberOfPointsY = settingsGroup.createIntegerEntry('NumberOfPointsY', 10)
         self.radiusScalarInMeters = settingsGroup.createRealEntry('RadiusScalarInMeters', '0.5e-6')
         self.stepSizeXInMeters = settingsGroup.createRealEntry('StepSizeXInMeters', '1e-6')
         self.stepSizeYInMeters = settingsGroup.createRealEntry('StepSizeYInMeters', '1e-6')
+        self.radialStepSizeInMeters = settingsGroup.createRealEntry('RadialStepSizeInMeters',
+                                                                    '1e-6')
+        self.numberOfShells = settingsGroup.createIntegerEntry('NumberOfShells', 5)
+        self.numberOfPointsInFirstShell = settingsGroup.createIntegerEntry(
+            'NumberOfPointsInFirstShell', 10)
         self.indexFilter = settingsGroup.createStringEntry('IndexFilter', 'ALL')
         self.transform = settingsGroup.createStringEntry('Transform', '+X+Y')
+        self.expandBoundingBox = settingsGroup.createBooleanEntry('ExpandBoundingBox', False)
+        self.boundingBoxMinimumXInMeters = settingsGroup.createRealEntry(
+            'BoundingBoxMinimumXInMeters', '0')
+        self.boundingBoxMaximumXInMeters = settingsGroup.createRealEntry(
+            'BoundingBoxMaximumXInMeters', '1e-5')
+        self.boundingBoxMinimumYInMeters = settingsGroup.createRealEntry(
+            'BoundingBoxMinimumYInMeters', '0')
+        self.boundingBoxMaximumYInMeters = settingsGroup.createRealEntry(
+            'BoundingBoxMaximumYInMeters', '1e-5')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ScanSettings:
-        settings = cls(settingsRegistry.createGroup('Scan'))
-        settings._settingsGroup.addObserver(settings)
+        settingsGroup = settingsRegistry.createGroup('Scan')
+        settings = cls(settingsGroup)
+        settingsGroup.addObserver(settings)
         return settings
 
     def update(self, observable: Observable) -> None:

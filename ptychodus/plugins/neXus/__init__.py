@@ -5,8 +5,10 @@ from .velociprobeScanFile import VelociprobeScanFileReader
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    velociprobeFileReader = VelociprobeScanFileReader()
-    neXusFileReader = NeXusDiffractionFileReader(velociprobeFileReader)
+    neXusFileReader = NeXusDiffractionFileReader()
 
     registry.registerPlugin(neXusFileReader)
-    registry.registerPlugin(velociprobeFileReader)
+    registry.registerPlugin(
+        VelociprobeScanFileReader.createLaserInterferometerInstance(neXusFileReader))
+    registry.registerPlugin(
+        VelociprobeScanFileReader.createPositionEncoderInstance(neXusFileReader))

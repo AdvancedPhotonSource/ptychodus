@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import QDialog, QListView
-
 from ...api.observer import Observable, Observer
 from ...model import MetadataPresenter
 from ...view import DataNavigationPage, MetadataView

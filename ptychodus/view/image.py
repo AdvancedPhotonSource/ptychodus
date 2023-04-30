@@ -4,13 +4,11 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QPixmap, QWheelEvent
-from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                             QFormLayout, QGraphicsPixmapItem, QGraphicsScene,
-                             QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
-                             QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSpinBox, QToolButton,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent,
+                             QGraphicsSceneMouseEvent, QGraphicsView, QHBoxLayout, QPushButton,
+                             QSizePolicy, QSpinBox, QToolButton, QVBoxLayout, QWidget)
 
-from . import resources
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
@@ -167,7 +165,7 @@ class ImageRibbon(QWidget):
         self.imageFileGroupBox = ImageFileGroupBox.createInstance()
         self.colormapGroupBox = ImageColorizerGroupBox.createInstance()
         self.dataRangeGroupBox = ImageDataRangeGroupBox.createInstance()
-        self.indexGroupBox = IndexGroupBox.createInstance()
+        self.indexGroupBox = IndexGroupBox.createInstance()  # TODO remove when able
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageRibbon:

@@ -1,5 +1,4 @@
 from __future__ import annotations
-from PyQt5.QtWidgets import QDialog, QListView
 
 from ...api.observer import Observable, Observer
 from ...model.data import DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter
@@ -26,7 +25,7 @@ class DatasetController(Observer):
         controller = cls(inputOutputPresenter, presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
-        view.backwardButton.clicked.connect(inputOutputPresenter.stopProcessingDiffractionPatterns)
+        view.backwardButton.clicked.connect(inputOutputPresenter.stopAssemblingDiffractionPatterns)
         view.forwardButton.clicked.connect(controller._saveDiffractionFile)
 
         controller._syncModelToView()

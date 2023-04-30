@@ -1,5 +1,5 @@
 from __future__ import annotations
-from decimal import Decimal, ROUND_FLOOR
+from decimal import Decimal
 from typing import Optional
 
 from PyQt5.QtCore import pyqtSignal

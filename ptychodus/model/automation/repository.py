@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationDatasetState(Enum):
-    CREATED = auto()
+    EXISTS = auto()
     WAITING = auto()
     PROCESSING = auto()
     COMPLETE = auto()
@@ -31,7 +31,7 @@ class AutomationDatasetRepository(Observable):
             try:
                 priorState = self._fileState[filePath]
             except KeyError:
-                if state == AutomationDatasetState.CREATED:
+                if state == AutomationDatasetState.EXISTS:
                     self._fileList.append(filePath)
                     self._fileState[filePath] = state
                 else:
@@ -45,7 +45,7 @@ class AutomationDatasetRepository(Observable):
     def getLabel(self, index: int) -> str:
         with self._lock:
             filePath = self._fileList[index]
-            return str(filePath.relative_to(self._settings.watchdogDirectory.value))
+            return str(filePath.relative_to(self._settings.dataDirectory.value))
 
     def getState(self, index: int) -> AutomationDatasetState:
         with self._lock:

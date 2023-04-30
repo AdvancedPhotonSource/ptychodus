@@ -1,10 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QHBoxLayout, QListView, QPushButton,
-                             QSizePolicy, QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import QFormLayout, QGroupBox, QListView, QSpinBox, QVBoxLayout, QWidget
 
-from .image import ImageView
 from .widgets import DecimalLineEdit, LengthWidget
 
 

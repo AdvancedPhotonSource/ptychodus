@@ -1,35 +1,61 @@
 from __future__ import annotations
+from typing import Optional
+import logging
+
+from PyQt5.QtWidgets import QWidget
 
 from ...api.observer import Observable, Observer
-from ...model.scan import SpiralScanRepositoryItem
-from ...view import SpiralScanView
+from ...model.scan import ScanRepositoryItemPresenter, SpiralScanInitializer
+from ...view import SpiralScanView, ScanEditorDialog
+from .transformController import ScanTransformController
+
+logger = logging.getLogger(__name__)
 
 
 class SpiralScanController(Observer):
 
-    def __init__(self, item: SpiralScanRepositoryItem, view: SpiralScanView) -> None:
+    def __init__(self, presenter: ScanRepositoryItemPresenter, parent: QWidget) -> None:
         super().__init__()
-        self._item = item
-        self._view = view
+        self._item = presenter.item
+        self._view = SpiralScanView.createInstance()
+        self._dialog = ScanEditorDialog.createInstance(self._view, parent)
+        self._dialog.setWindowTitle(presenter.name)
+        self._transformController = ScanTransformController.createInstance(
+            presenter.item, self._dialog.transformView)
+        self._initializer: Optional[SpiralScanInitializer] = None
 
     @classmethod
-    def createInstance(cls, item: SpiralScanRepositoryItem,
-                       view: SpiralScanView) -> SpiralScanController:
-        controller = cls(item, view)
-        item.addObserver(controller)
-
-        view.numberOfPointsSpinBox.valueChanged.connect(item.setNumberOfPoints)
-        view.radiusScalarWidget.lengthChanged.connect(item.setRadiusScalarInMeters)
-        view.angularStepWidget.angleChanged.connect(item.setAngularStepInTurns)
-
+    def createInstance(cls, presenter: ScanRepositoryItemPresenter,
+                       parent: QWidget) -> SpiralScanController:
+        controller = cls(presenter, parent)
+        controller._updateInitializer()
         controller._syncModelToView()
-
+        presenter.item.addObserver(controller)
         return controller
 
+    def openDialog(self) -> None:
+        self._dialog.open()
+
+    def _updateInitializer(self) -> None:
+        initializer = self._item.getInitializer()
+
+        if isinstance(initializer, SpiralScanInitializer):
+            self._initializer = initializer
+        else:
+            logger.error('Null initializer!')
+            return
+
+        self._view.numberOfPointsSpinBox.valueChanged.connect(self._initializer.setNumberOfPoints)
+        self._view.radiusScalarWidget.lengthChanged.connect(
+            self._initializer.setRadiusScalarInMeters)
+
     def _syncModelToView(self) -> None:
-        self._view.numberOfPointsSpinBox.setValue(self._item.getNumberOfPoints())
-        self._view.radiusScalarWidget.setLengthInMeters(self._item.getRadiusScalarInMeters())
-        self._view.angularStepWidget.setAngleInTurns(self._item.getAngularStepInTurns())
+        if self._initializer is None:
+            logger.error('Null initializer!')
+        else:
+            self._view.numberOfPointsSpinBox.setValue(self._initializer.getNumberOfPoints())
+            self._view.radiusScalarWidget.setLengthInMeters(
+                self._initializer.getRadiusScalarInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._item:

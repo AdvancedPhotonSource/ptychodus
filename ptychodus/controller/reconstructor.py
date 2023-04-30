@@ -1,11 +1,10 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractproperty
-from dataclasses import dataclass
-from typing import Optional
+from abc import ABC, abstractmethod
 import logging
 import traceback
 
-from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import QStringListModel
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
@@ -14,49 +13,22 @@ from ..api.reconstructor import ReconstructResult
 from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
-from ..model.scan import ScanPresenter, ScanRepositoryKeyAndValue
-from ..view import ReconstructorParametersView, ReconstructorPlotView, resources
+from ..model.scan import ScanPresenter
+from ..view import ReconstructorParametersView, ReconstructorPlotView
 
 logger = logging.getLogger(__name__)
 
 
 class ReconstructorViewControllerFactory(ABC):
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def backendName(self) -> str:
         pass
 
     @abstractmethod
     def createViewController(self, reconstructorName: str) -> QWidget:
         pass
-
-
-class ScanListModel(QAbstractListModel):
-
-    def __init__(self, presenter: ScanPresenter, parent: Optional[QObject] = None) -> None:
-        super().__init__(parent)
-        self._presenter = presenter
-        self._scanList: list[ScanRepositoryKeyAndValue] = list()
-
-    def refresh(self) -> None:
-        self.beginResetModel()
-        self._scanList = [
-            kv for kv in self._presenter.getScanRepositoryKeysAndValues()
-            if self._presenter.canActivateScan(kv.name)
-        ]
-        self.endResetModel()
-
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
-        value = QVariant()
-
-        if index.isValid() and role == Qt.DisplayRole:
-            entry = self._scanList[index.row()]
-            value = QVariant(entry.name)
-
-        return value
-
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._scanList)
 
 
 class ReconstructorParametersController(Observer):
@@ -80,7 +52,9 @@ class ReconstructorParametersController(Observer):
         self._view = view
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = \
                 { vcf.backendName: vcf for vcf in viewControllerFactoryList }
-        self._scanListModel = ScanListModel(scanPresenter)
+        self._scanListModel = QStringListModel()
+        self._probeListModel = QStringListModel()
+        self._objectListModel = QStringListModel()
 
     @classmethod
     def createInstance(
@@ -108,15 +82,22 @@ class ReconstructorParametersController(Observer):
         view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex)
 
-        view.reconstructorView.scanComboBox.currentTextChanged.connect(scanPresenter.setActiveScan)
+        view.reconstructorView.scanComboBox.currentTextChanged.connect(scanPresenter.selectScan)
         view.reconstructorView.scanComboBox.setModel(controller._scanListModel)
 
-        view.reconstructorView.probeComboBox.addItem('Current Probe')  # TODO
-        view.reconstructorView.objectComboBox.addItem('Current Object')  # TODO
+        view.reconstructorView.probeComboBox.currentTextChanged.connect(probePresenter.selectProbe)
+        view.reconstructorView.probeComboBox.setModel(controller._probeListModel)
+
+        view.reconstructorView.objectComboBox.currentTextChanged.connect(
+            objectPresenter.selectObject)
+        view.reconstructorView.objectComboBox.setModel(controller._objectListModel)
+
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
 
-        controller._refreshScanListModel()
-        controller._syncModelToView()
+        controller._syncAlgorithmToView()
+        controller._syncScanToView()
+        controller._syncProbeToView()
+        controller._syncObjectToView()
 
         return controller
 
@@ -148,48 +129,60 @@ class ReconstructorParametersController(Observer):
             msgBox.setText(f'The reconstructor raised a {err.__class__.__name__}!')
             msgBox.setInformativeText(str(err))
             msgBox.setDetailedText(traceback.format_exc())
-            retval = msgBox.exec_()
+            _ = msgBox.exec_()
         else:
             self._plotPresenter.setEnumeratedYValues(result.objective)
 
         print(result.result)  # TODO
 
-    def _refreshScanListModel(self) -> None:
+    def _syncScanToView(self) -> None:
         self._view.reconstructorView.scanComboBox.blockSignals(True)
-        self._scanListModel.refresh()
+        self._scanListModel.setStringList(self._scanPresenter.getSelectableNames())
         self._view.reconstructorView.scanComboBox.setCurrentText(
-            self._scanPresenter.getActiveScan())
+            self._scanPresenter.getSelectedScan())
         self._view.reconstructorView.scanComboBox.blockSignals(False)
+
+        isValid = self._scanPresenter.isSelectedScanValid()
+        validationPixmap = self._getValidationPixmap(isValid)
+        self._view.reconstructorView.scanValidationLabel.setPixmap(validationPixmap)
+
+    def _syncProbeToView(self) -> None:
+        self._view.reconstructorView.probeComboBox.blockSignals(True)
+        self._probeListModel.setStringList(['Current Probe'])  # TODO
+        self._view.reconstructorView.probeComboBox.blockSignals(False)
+
+        isValid = self._probePresenter.isSelectedProbeValid()
+        validationPixmap = self._getValidationPixmap(isValid)
+        self._view.reconstructorView.probeValidationLabel.setPixmap(validationPixmap)
+
+    def _syncObjectToView(self) -> None:
+        self._view.reconstructorView.objectComboBox.blockSignals(True)
+        self._objectListModel.setStringList(self._objectPresenter.getSelectableNames())
+        self._view.reconstructorView.objectComboBox.setCurrentText(
+            self._objectPresenter.getSelectedObject())
+        self._view.reconstructorView.objectComboBox.blockSignals(False)
+
+        isValid = self._objectPresenter.isSelectedObjectValid()
+        validationPixmap = self._getValidationPixmap(isValid)
+        self._view.reconstructorView.objectValidationLabel.setPixmap(validationPixmap)
 
     def _getValidationPixmap(self, isValid: bool) -> QPixmap:
         pixmap = QPixmap(':/icons/check' if isValid else ':/icons/xmark')
         return pixmap.scaledToHeight(24)
 
-    def _syncModelToView(self) -> None:
+    def _syncAlgorithmToView(self) -> None:
         self._view.reconstructorView.algorithmComboBox.setCurrentText(
             self._presenter.getReconstructor())
 
-        isScanValid = self._scanPresenter.isActiveScanValid()
-        isProbeValid = self._probePresenter.isActiveProbeValid()
-        isObjectValid = self._objectPresenter.isActiveObjectValid()
-
-        self._view.reconstructorView.scanValidationLabel.setPixmap(
-            self._getValidationPixmap(isScanValid))
-        self._view.reconstructorView.probeValidationLabel.setPixmap(
-            self._getValidationPixmap(isProbeValid))
-        self._view.reconstructorView.objectValidationLabel.setPixmap(
-            self._getValidationPixmap(isObjectValid))
-
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._syncAlgorithmToView()
         elif observable is self._scanPresenter:
-            self._refreshScanListModel()
-            self._syncModelToView()
+            self._syncScanToView()
         elif observable is self._probePresenter:
-            self._syncModelToView()
+            self._syncProbeToView()
         elif observable is self._objectPresenter:
-            self._syncModelToView()
+            self._syncObjectToView()
 
 
 class ReconstructorPlotController(Observer):

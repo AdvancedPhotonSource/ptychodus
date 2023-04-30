@@ -1,35 +1,32 @@
 from __future__ import annotations
-from pathlib import Path
-
-import numpy
 
 from ..api.data import DiffractionDataset, DiffractionMetadata
 from ..api.observer import Observable, Observer
 from .data import DiffractionPatternSettings
 from .detector import DetectorSettings
 from .probe import ProbeSettings
-from .scan import ScanCore
+from .scan import ScanAPI
 
 
 class MetadataPresenter(Observable, Observer):
 
     def __init__(self, diffractionDataset: DiffractionDataset, detectorSettings: DetectorSettings,
                  patternSettings: DiffractionPatternSettings, probeSettings: ProbeSettings,
-                 scanCore: ScanCore) -> None:
+                 scanAPI: ScanAPI) -> None:
         super().__init__()
         self._diffractionDataset = diffractionDataset
         self._detectorSettings = detectorSettings
         self._patternSettings = patternSettings
         self._probeSettings = probeSettings
-        self._scanCore = scanCore
+        self._scanAPI = scanAPI
 
     @classmethod
     def createInstance(cls, diffractionDataset: DiffractionDataset,
                        detectorSettings: DetectorSettings,
                        patternSettings: DiffractionPatternSettings, probeSettings: ProbeSettings,
-                       scanCore: ScanCore) -> MetadataPresenter:
+                       scanAPI: ScanAPI) -> MetadataPresenter:
         presenter = cls(diffractionDataset, detectorSettings, patternSettings, probeSettings,
-                        scanCore)
+                        scanAPI)
         diffractionDataset.addObserver(presenter)
         return presenter
 
@@ -119,8 +116,7 @@ class MetadataPresenter(Observable, Observer):
 
         fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
         filePath = filePathMaster.parents[2] / 'positions' / fileName
-        fileFilter = 'Comma-Separated Values Files (*.csv)'  # TODO refactor; get from somewhere
-        self._scanCore.openScan(filePath, fileFilter)
+        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, simpleFileType='CSV')
 
     def update(self, observable: Observable) -> None:
         if observable is self._diffractionDataset:

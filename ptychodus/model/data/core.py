@@ -1,5 +1,4 @@
 from __future__ import annotations
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 import logging
@@ -7,18 +6,19 @@ import logging
 import h5py
 import numpy
 
-from ...api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                         DiffractionPatternArray, DiffractionPatternData, DiffractionPatternState,
-                         SimpleDiffractionDataset, SimpleDiffractionPatternArray)
+from ...api.data import (DiffractionDataset, DiffractionFileReader, DiffractionPatternArray,
+                         DiffractionPatternData, DiffractionPatternState,
+                         SimpleDiffractionPatternArray)
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
-from ...api.settings import SettingsRegistry, SettingsGroup
+from ...api.settings import SettingsRegistry
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
 from ..statefulCore import StateDataType, StatefulCore
+from .active import ActiveDiffractionDataset
+from .api import DiffractionDataAPI
 from .builder import ActiveDiffractionDatasetBuilder
-from .dataset import ActiveDiffractionDataset
 from .io import DiffractionDatasetInputOutputPresenter
 from .patterns import DiffractionPatternPresenter
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
@@ -173,6 +173,8 @@ class DataCore(StatefulCore):
         self._datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
         self.patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
 
+        fileReaderChooser.setFromSimpleName(self._datasetSettings.fileType.value)  # TODO refactor
+
         self.patternSizer = DiffractionPatternSizer.createInstance(self.patternSettings, detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
             self.patternSettings, self.patternSizer)
@@ -180,19 +182,14 @@ class DataCore(StatefulCore):
         self.dataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
                                                 self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self._datasetSettings, self.dataset)
+        self.dataAPI = DiffractionDataAPI(self._builder, fileReaderChooser)
 
         self.datasetPresenter = DiffractionDatasetPresenter.createInstance(
             self._datasetSettings, self.dataset)
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter.createInstance(
-            self._datasetSettings, self.dataset, self._builder, fileReaderChooser)
+            self._datasetSettings, self.dataset, self.dataAPI, settingsRegistry)
         self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
             self.dataset)
-
-    def loadDiffractionDataset(self, filePath: Path, fileFilter: str) -> None:
-        self.datasetInputOutputPresenter.setOpenFileFilter(fileFilter)
-        self.datasetInputOutputPresenter.openDiffractionFile(filePath)
-        self.datasetInputOutputPresenter.startProcessingDiffractionPatterns()
-        self.datasetInputOutputPresenter.stopProcessingDiffractionPatterns(finishAssembling=True)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         state = dict()
