@@ -1,17 +1,56 @@
+from __future__ import annotations
+from collections.abc import Sequence
 from typing import overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
 
-from ..api.tree import SimpleTreeNode
+from ...model.probe import ProbePresenter
 
 
-class SimpleTreeModel(QAbstractItemModel):
+class ProbeTreeNode:
 
-    def __init__(self, rootNode: SimpleTreeNode, parent: QObject | None = None) -> None:
+    def __init__(self, parentItem: ProbeTreeNode | None, name: str,
+                 relativePowerPercent: int) -> None:
+        self.parentItem = parentItem
+        self._name = name
+        self._relativePowerPercent = relativePowerPercent
+        self.childItems: list[ProbeTreeNode] = list()
+
+    @classmethod
+    def createRoot(cls) -> ProbeTreeNode:
+        return cls(None, str(), 0)
+
+    def createChild(self, name: str, relativePowerPercent: int) -> ProbeTreeNode:
+        childItem = ProbeTreeNode(self, name, relativePowerPercent)
+        self.childItems.append(childItem)
+        return childItem
+
+    @property
+    def isLeaf(self) -> bool:
+        return (not self.childItems)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def relativePowerPercent(self) -> int:
+        return self._relativePowerPercent
+
+    def row(self) -> int:
+        if self.parentItem:
+            return self.parentItem.childItems.index(self)
+
+        return 0
+
+
+class ProbeTreeModel(QAbstractItemModel):
+
+    def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._rootNode = rootNode
+        self._rootNode = ProbeTreeNode.createRoot()
 
-    def setRootNode(self, rootNode: SimpleTreeNode) -> None:
+    def setRootNode(self, rootNode: ProbeTreeNode) -> None:
         self.beginResetModel()
         self._rootNode = rootNode
         self.endResetModel()
@@ -48,7 +87,10 @@ class SimpleTreeModel(QAbstractItemModel):
         value = None
 
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            value = self._rootNode.data(section)
+            if section == 0:
+                value = QVariant('Mode')
+            elif section == 1:
+                value = QVariant('Relative Power')
 
         return QVariant(value)
 
@@ -75,9 +117,13 @@ class SimpleTreeModel(QAbstractItemModel):
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
         value = QVariant()
 
-        if index.isValid() and role == Qt.DisplayRole:
+        if index.isValid():
             node = index.internalPointer()
-            value = node.data(index.column())
+
+            if role == Qt.DisplayRole and index.column() == 0:
+                value = QVariant(node.name)
+            elif role == Qt.UserRole and index.column() == 1:
+                value = QVariant(node.relativePowerPercent)
 
         return value
 
@@ -93,9 +139,4 @@ class SimpleTreeModel(QAbstractItemModel):
         return len(node.childItems)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        node = self._rootNode
-
-        if parent.isValid():
-            node = parent.internalPointer()
-
-        return len(node.itemData)
+        return 2

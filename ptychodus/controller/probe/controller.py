@@ -14,7 +14,7 @@ from ..data import FileDialogFactory
 from ..image import ImageController
 from .fzp import FresnelZonePlateProbeController
 from .superGaussian import SuperGaussianProbeController
-from .tableModel import ProbeModesTableModel
+from .treeModel import ProbeTreeModel, ProbeTreeNode
 
 
 class ProbeParametersController(Observer):
@@ -67,7 +67,7 @@ class ProbeController(Observer):
             presenter, view.parametersView)
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
-        self._modesTableModel = ProbeModesTableModel(presenter)
+        self._treeModel = ProbeTreeModel()
 
     @classmethod
     def createInstance(cls, presenter: ProbePresenter, view: ProbeView,
@@ -78,7 +78,7 @@ class ProbeController(Observer):
 
         delegate = ProgressBarItemDelegate(view.modesView.treeView)
         view.modesView.treeView.setItemDelegateForColumn(1, delegate)
-        view.modesView.treeView.setModel(controller._modesTableModel)
+        view.modesView.treeView.setModel(controller._treeModel)
         view.modesView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.modesView.treeView.selectionModel().currentChanged.connect(
             controller._displayProbeMode)
@@ -141,6 +141,7 @@ class ProbeController(Observer):
         return lambda checked: self._startInitialization(name)
 
     def _renderImageData(self, index: int) -> None:
+        # FIXME crashes if probe index exceeds num probe modes; clear if no selection
         array = self._presenter.getProbeMode(index)
         self._imagePresenter.setArray(array)
 
@@ -158,7 +159,15 @@ class ProbeController(Observer):
             self._presenter.saveProbe(filePath, nameFilter)
 
     def _syncModelToView(self) -> None:
-        self._modesTableModel.refresh()
+        rootNode = ProbeTreeNode.createRoot()
+        probeNode = rootNode.createChild('Current Probe', -1)
+
+        for index in range(self._presenter.getNumberOfProbeModes()):
+            power = self._presenter.getProbeModeRelativePower(index)
+            powerPct = int((100 * power).to_integral_value())
+            probeNode.createChild(f'Mode {index+1}', powerPct)
+
+        self._treeModel.setRootNode(rootNode)
 
         current = self._view.modesView.treeView.currentIndex()
         self._renderImageData(current.row())

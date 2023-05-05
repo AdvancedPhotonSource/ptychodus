@@ -171,6 +171,7 @@ class ObjectController(Observer):
         itemPresenter = self._getSelectedItemPresenter()
 
         if itemPresenter is None:
+            # FIXME clear if no selection
             logger.error('No items are selected!')
         else:
             array = itemPresenter.item.getArray()
