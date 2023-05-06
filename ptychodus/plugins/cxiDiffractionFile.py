@@ -48,8 +48,10 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                         Decimal(repr(h5File['/entry_1/instrument_1/detector_1/x_pixel_size'][()])),
                         Decimal(repr(h5File['/entry_1/instrument_1/detector_1/y_pixel_size'][()])),
                     )
-                    probeEnergyInElectronVolts = Decimal(
+                    probeEnergyInJoules = Decimal(
                         repr(h5File['/entry_1/instrument_1/source_1/energy'][()]))
+                    oneJouleInElectronVolts = Decimal('6.241509074e18')
+                    probeEnergyInElectronVolts = probeEnergyInJoules * oneJouleInElectronVolts
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=numberOfPatterns,
