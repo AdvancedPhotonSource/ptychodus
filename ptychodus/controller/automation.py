@@ -1,6 +1,5 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QTimer, QVariant
 from PyQt5.QtGui import QFont
@@ -119,7 +118,7 @@ class AutomationProcessingListModel(QAbstractListModel):
 
     def __init__(self,
                  presenter: AutomationProcessingPresenter,
-                 parent: Optional[QObject] = None) -> None:
+                 parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
 

@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 import logging
 
 from PyQt5.QtWidgets import QWidget
@@ -22,7 +21,7 @@ class LissajousScanController(Observer):
         self._dialog.setWindowTitle(presenter.name)
         self._transformController = ScanTransformController.createInstance(
             presenter.item, self._dialog.transformView)
-        self._initializer: Optional[LissajousScanInitializer] = None
+        self._initializer: LissajousScanInitializer | None = None
 
     @classmethod
     def createInstance(cls, presenter: ScanRepositoryItemPresenter,

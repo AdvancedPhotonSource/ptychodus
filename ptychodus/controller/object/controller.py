@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Final, Optional
+from typing import Callable, Final
 import logging
 
 from PyQt5.QtCore import QSortFilterProxyModel
@@ -78,7 +78,7 @@ class ObjectController(Observer):
         view.repositoryView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.repositoryView.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
         view.repositoryView.tableView.selectionModel().selectionChanged.connect(
-            lambda selected, deselected: controller._updateView())
+            lambda selected, deselected: controller._updateView())  # FIXME improve
 
         for name in repositoryPresenter.getInitializerDisplayNameList():
             insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
@@ -130,8 +130,8 @@ class ObjectController(Observer):
         else:
             logger.error('No items are selected!')
 
-    def _getSelectedItemPresenter(self) -> Optional[ObjectRepositoryItemPresenter]:
-        itemPresenter: Optional[ObjectRepositoryItemPresenter] = None
+    def _getSelectedItemPresenter(self) -> ObjectRepositoryItemPresenter | None:
+        itemPresenter: ObjectRepositoryItemPresenter | None = None
         proxyIndex = self._view.repositoryView.tableView.currentIndex()
 
         if proxyIndex.isValid():

@@ -1,16 +1,14 @@
 from __future__ import annotations
-from collections.abc import Sequence
 from typing import overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
-
-from ...model.probe import ProbePresenter
 
 
 class ProbeTreeNode:
 
     def __init__(self, parentItem: ProbeTreeNode | None, name: str,
                  relativePowerPercent: int) -> None:
+        # FIXME sizeInBytes
         self.parentItem = parentItem
         self._name = name
         self._relativePowerPercent = relativePowerPercent
@@ -24,10 +22,6 @@ class ProbeTreeNode:
         childItem = ProbeTreeNode(self, name, relativePowerPercent)
         self.childItems.append(childItem)
         return childItem
-
-    @property
-    def isLeaf(self) -> bool:
-        return (not self.childItems)
 
     @property
     def name(self) -> str:

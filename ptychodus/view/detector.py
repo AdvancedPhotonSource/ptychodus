@@ -1,12 +1,13 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import QFormLayout, QGroupBox, QListView, QSpinBox, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QLabel, QSpinBox, QTreeView, QVBoxLayout,
+                             QWidget)
 
 from .widgets import DecimalLineEdit, LengthWidget
 
 
-class DetectorView(QGroupBox):
+class DetectorParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
@@ -18,7 +19,7 @@ class DetectorView(QGroupBox):
         self.fresnelNumberWidget = DecimalLineEdit.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorParametersView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -33,37 +34,39 @@ class DetectorView(QGroupBox):
         return view
 
 
-class DiffractionPatternView(QGroupBox):
+class DetectorDataViewView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Patterns', parent)
-        self.listView = QListView()
+        self.treeView = QTreeView()
+        self.infoLabel = QLabel()  # FIXME
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> DiffractionPatternView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorDataViewView:
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.listView)
+        layout.addWidget(view.treeView)
+        layout.addWidget(view.infoLabel)
         view.setLayout(layout)
 
         return view
 
 
-class DetectorParametersView(QWidget):
+class DetectorView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.detectorView = DetectorView.createInstance()
-        self.patternView = DiffractionPatternView.createInstance()
+        self.parametersView = DetectorParametersView.createInstance()
+        self.dataView = DetectorDataViewView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorView:
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.detectorView)
-        layout.addWidget(view.patternView)
+        layout.addWidget(view.parametersView)
+        layout.addWidget(view.dataView)
         view.setLayout(layout)
 
         return view

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Final, Optional
+from typing import Callable, Final
 import logging
 
 from PyQt5.QtCore import Qt, QSortFilterProxyModel
@@ -100,8 +100,8 @@ class ScanController(Observer):
         else:
             logger.error('No items are selected!')
 
-    def _getSelectedItemPresenter(self) -> Optional[ScanRepositoryItemPresenter]:
-        itemPresenter: Optional[ScanRepositoryItemPresenter] = None
+    def _getSelectedItemPresenter(self) -> ScanRepositoryItemPresenter | None:
+        itemPresenter: ScanRepositoryItemPresenter | None = None
         proxyIndex = self._view.repositoryView.tableView.currentIndex()
 
         if proxyIndex.isValid():

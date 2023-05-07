@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QSizePolic
 from . import resources
 from .automation import AutomationView
 from .data import DataParametersView
-from .detector import DetectorParametersView
+from .detector import DetectorView
 from .image import ImageView
 from .monitor import MonitorObjectView, MonitorProbeView
 from .object import ObjectView
@@ -46,7 +46,7 @@ class ViewCore(QMainWindow):
 
         self.detectorAction = self.navigationToolBar.addAction(QIcon(':/icons/detector'),
                                                                'Detector')
-        self.detectorParametersView = DetectorParametersView.createInstance()
+        self.detectorView = DetectorView.createInstance()
         self.detectorImageView = ImageView.createInstance()
 
         self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
@@ -103,7 +103,7 @@ class ViewCore(QMainWindow):
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsParametersView)
         view.parametersWidget.addWidget(view.dataParametersView)
-        view.parametersWidget.addWidget(view.detectorParametersView)
+        view.parametersWidget.addWidget(view.detectorView)
         view.parametersWidget.addWidget(view.scanView)
         view.parametersWidget.addWidget(view.probeView)
         view.parametersWidget.addWidget(view.objectView)

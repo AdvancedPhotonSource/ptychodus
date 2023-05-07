@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 
 from ...model.object import ObjectRepositoryPresenter
@@ -9,7 +7,7 @@ class ObjectTableModel(QAbstractTableModel):
 
     def __init__(self,
                  presenter: ObjectRepositoryPresenter,
-                 parent: Optional[QObject] = None) -> None:
+                 parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._header = [

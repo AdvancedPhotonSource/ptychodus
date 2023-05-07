@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl, QVariant
 from PyQt5.QtGui import QColor, QFont
 
@@ -8,9 +6,7 @@ from ...model.workflow import WorkflowStatusPresenter
 
 class WorkflowTableModel(QAbstractTableModel):
 
-    def __init__(self,
-                 presenter: WorkflowStatusPresenter,
-                 parent: Optional[QObject] = None) -> None:
+    def __init__(self, presenter: WorkflowStatusPresenter, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._sectionHeaders = [

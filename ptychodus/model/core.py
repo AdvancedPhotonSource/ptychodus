@@ -16,8 +16,8 @@ from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
-from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
-                   DiffractionDatasetInputOutputPresenter, DiffractionPatternPresenter)
+from .data import (DataCore, DiffractionDatasetPresenter, DiffractionDatasetInputOutputPresenter,
+                   DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import ImageCore, ImagePresenter
 from .metadata import MetadataPresenter
@@ -180,10 +180,6 @@ class ModelCore:
     @property
     def patternPresenter(self) -> DiffractionPatternPresenter:
         return self._dataCore.patternPresenter
-
-    @property
-    def activeDiffractionPatternPresenter(self) -> ActiveDiffractionPatternPresenter:
-        return self._dataCore.activePatternPresenter
 
     @property
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:

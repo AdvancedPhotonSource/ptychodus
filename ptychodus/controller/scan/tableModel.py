@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 
 from ...model.scan import ScanRepositoryPresenter
@@ -7,9 +5,7 @@ from ...model.scan import ScanRepositoryPresenter
 
 class ScanTableModel(QAbstractTableModel):
 
-    def __init__(self,
-                 presenter: ScanRepositoryPresenter,
-                 parent: Optional[QObject] = None) -> None:
+    def __init__(self, presenter: ScanRepositoryPresenter, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._header = ['Name', 'Initializer', 'Points', 'Length [m]', 'Size [MB]']

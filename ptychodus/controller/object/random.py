@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 import logging
 
 from PyQt5.QtWidgets import QWidget
@@ -19,7 +18,7 @@ class RandomObjectViewController(Observer):
         self._view = RandomObjectView.createInstance()
         self._dialog = ObjectEditorDialog.createInstance(self._view, parent)
         self._dialog.setWindowTitle(presenter.name)
-        self._initializer: Optional[RandomObjectInitializer] = None
+        self._initializer: RandomObjectInitializer | None = None
 
     @classmethod
     def createInstance(cls, presenter: ObjectRepositoryItemPresenter,
