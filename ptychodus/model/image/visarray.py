@@ -39,16 +39,16 @@ class VisualizationArray(Observable):
     def shape(self) -> tuple[int, ...]:
         return self._array.shape
 
-    def _reset(self) -> None:
+    def clearArray(self) -> None:
         self._array = numpy.zeros((1, 1))
 
     def setArray(self, array: NumericArrayType) -> None:
         if array is None:
             logger.error('Refusing to assign null array!')
-            self._reset()
+            self.clearArray()
         elif numpy.size(array) < 1:
             logger.error('Refusing to assign empty array!')
-            self._reset()
+            self.clearArray()
         else:
             self._array = array
 

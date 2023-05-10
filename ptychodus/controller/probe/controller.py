@@ -1,15 +1,17 @@
 from __future__ import annotations
 from typing import Callable
 
-from PyQt5.QtCore import QModelIndex
+from PyQt5.QtCore import QItemSelection
 from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.probe import (FileProbeInitializer, FresnelZonePlateProbeInitializer, ProbePresenter,
                             SuperGaussianProbeInitializer)
-from ...view import (FresnelZonePlateProbeDialog, ImageView, ProbeParametersView, ProbeView,
-                     ProgressBarItemDelegate, SuperGaussianProbeDialog)
+from ...view.image import ImageView
+from ...view.widgets import ProgressBarItemDelegate
+from ...view.probe import (FresnelZonePlateProbeDialog, ProbeParametersView, ProbeView,
+                           SuperGaussianProbeDialog)
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .fzp import FresnelZonePlateProbeController
@@ -80,8 +82,8 @@ class ProbeController(Observer):
         view.modesView.treeView.setItemDelegateForColumn(1, delegate)
         view.modesView.treeView.setModel(controller._treeModel)
         view.modesView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        view.modesView.treeView.selectionModel().currentChanged.connect(
-            controller._displayProbeMode)
+        view.modesView.treeView.selectionModel().selectionChanged.connect(
+            controller._updateImageView)
 
         imageView.imageRibbon.indexGroupBox.setVisible(False)
 
@@ -140,13 +142,16 @@ class ProbeController(Observer):
         # NOTE additional defining scope for lambda forces a new instance for each use
         return lambda checked: self._startInitialization(name)
 
-    def _renderImageData(self, index: int) -> None:
-        # FIXME crashes if probe index exceeds num probe modes; clear if no selection
-        array = self._presenter.getProbeMode(index)
-        self._imagePresenter.setArray(array)
+    def _updateImageView(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        for index in deselected.indexes():
+            self._imagePresenter.clearArray()
+            break
 
-    def _displayProbeMode(self, current: QModelIndex, previous: QModelIndex) -> None:
-        self._renderImageData(current.row())
+        for index in selected.indexes():
+            # FIXME crashes if probe index exceeds num probe modes; what if top-level probe selected?
+            array = self._presenter.getProbeMode(index.row())
+            self._imagePresenter.setArray(array)
+            break
 
     def _saveProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
@@ -168,9 +173,6 @@ class ProbeController(Observer):
             probeNode.createChild(f'Mode {index+1}', powerPct)
 
         self._treeModel.setRootNode(rootNode)
-
-        current = self._view.modesView.treeView.currentIndex()
-        self._renderImageData(current.row())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

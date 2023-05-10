@@ -3,7 +3,7 @@ from __future__ import annotations
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.probe import ProbePresenter
-from ...view import ImageView
+from ...view.image import ImageView
 from ..data import FileDialogFactory
 from ..image import ImageController
 

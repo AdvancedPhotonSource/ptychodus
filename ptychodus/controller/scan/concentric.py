@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ...api.observer import Observable, Observer
 from ...model.scan import ScanRepositoryItemPresenter, ConcentricScanInitializer
-from ...view import ConcentricScanView, ScanEditorDialog
+from ...view.scan import ConcentricScanView, ScanEditorDialog
 from .transformController import ScanTransformController
 
 logger = logging.getLogger(__name__)

@@ -5,7 +5,7 @@ from PyQt5.QtGui import QRegularExpressionValidator
 
 from ...api.observer import Observable, Observer
 from ...model.tike import TikePresenter
-from ...view import TikeBasicParametersView
+from ...view.tike import TikeBasicParametersView
 
 
 class TikeBasicParametersController(Observer):

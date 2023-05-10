@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QTableView
 from PyQt5.QtGui import QDesktopServices
 
 from ...model.workflow import WorkflowStatusPresenter
-from ...view import WorkflowStatusView
+from ...view.workflow import WorkflowStatusView
 from .tableModel import WorkflowTableModel
 
 logger = logging.getLogger(__name__)

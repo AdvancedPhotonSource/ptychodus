@@ -4,7 +4,7 @@ from uuid import UUID
 
 from ...api.observer import Observable, Observer
 from ...model.workflow import WorkflowParametersPresenter
-from ...view import WorkflowOutputDataView
+from ...view.workflow import WorkflowOutputDataView
 
 
 class WorkflowOutputDataController(Observer):

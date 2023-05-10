@@ -65,6 +65,9 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def __len__(self) -> int:
         return len(self._dataset)
 
+    def getInfoText(self) -> str:
+        return self._dataset.getInfoText()
+
     def isMemmapEnabled(self) -> bool:
         return self._settings.memmapEnabled.value
 

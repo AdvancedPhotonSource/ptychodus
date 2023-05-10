@@ -3,7 +3,7 @@ from ..reconstructor import ReconstructorViewControllerFactory
 from PyQt5.QtWidgets import QWidget
 
 from ...model.ptychonn import PtychoNNReconstructorLibrary
-from ...view import PtychoNNParametersView
+from ...view.ptychonn import PtychoNNParametersView
 from ..data import FileDialogFactory
 from .controller import PtychoNNParametersController
 

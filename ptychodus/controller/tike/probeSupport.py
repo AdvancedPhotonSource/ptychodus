@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ...api.observer import Observable, Observer
 from ...model.tike import TikeProbeCorrectionPresenter
-from ...view import TikeProbeSupportView
+from ...view.tike import TikeProbeSupportView
 
 
 class TikeProbeSupportController(Observer):

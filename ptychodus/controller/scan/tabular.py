@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtWidgets import QWidget
 
 from ...model.scan import ScanRepositoryItemPresenter
-from ...view import TabularScanView, ScanEditorDialog
+from ...view.scan import TabularScanView, ScanEditorDialog
 from .transformController import ScanTransformController
 
 logger = logging.getLogger(__name__)

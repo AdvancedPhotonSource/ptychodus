@@ -3,7 +3,7 @@ from typing import Any
 
 from ...api.observer import Observable, Observer
 from ...model.tike import TikeAdaptiveMomentPresenter
-from ...view import TikeAdaptiveMomentView
+from ...view.tike import TikeAdaptiveMomentView
 
 
 class TikeAdaptiveMomentController(Observer):

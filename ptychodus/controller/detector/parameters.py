@@ -3,7 +3,7 @@ from __future__ import annotations
 from ...api.observer import Observable, Observer
 from ...model import DetectorPresenter
 from ...model.probe import ApparatusPresenter
-from ...view import DetectorParametersView
+from ...view.detector import DetectorParametersView
 
 
 class DetectorParametersController(Observer):

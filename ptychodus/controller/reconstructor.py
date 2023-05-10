@@ -14,7 +14,7 @@ from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
 from ..model.scan import ScanPresenter
-from ..view import ReconstructorParametersView, ReconstructorPlotView
+from ..view.reconstructor import ReconstructorParametersView, ReconstructorPlotView
 
 logger = logging.getLogger(__name__)
 

@@ -39,7 +39,7 @@ class DetectorDataViewView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Patterns', parent)
         self.treeView = QTreeView()
-        self.infoLabel = QLabel()  # FIXME
+        self.infoLabel = QLabel()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DetectorDataViewView:

@@ -1,10 +1,14 @@
 from __future__ import annotations
 import logging
 
+from PyQt5.QtCore import QItemSelection
+from PyQt5.QtWidgets import QAbstractItemView
+
 from ...api.observer import Observable, Observer
 from ...model.data import DiffractionDatasetPresenter
 from ...model.image import ImagePresenter
-from ...view import DetectorView, ImageView
+from ...view.detector import DetectorView
+from ...view.image import ImageView
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .treeModel import DatasetTreeModel, DatasetTreeNode
@@ -34,69 +38,35 @@ class DetectorController(Observer):
 
         imageView.imageRibbon.indexGroupBox.setVisible(False)
         view.dataView.treeView.setModel(controller._treeModel)
+        view.dataView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.dataView.treeView.selectionModel().selectionChanged.connect(controller._updateView)
         datasetPresenter.addObserver(controller)
 
-        #view.treeView.selectionModel().currentChanged.connect(
-        #    controller._updateCurrentPatternIndex)  # FIXME do same for object/probe controllers
-
-        #controller._syncModelToView()
+        controller._syncModelToView()
 
         return controller
 
-    #def _updateCurrentPatternIndex(self, index: QModelIndex) -> None:
-    #    self._activePatternPresenter.setCurrentPatternIndex(index.row())
+    def _updateView(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        for index in deselected.indexes():
+            self._imagePresenter.clearArray()
+            break
 
-    #def _updateSelection(self) -> None:
-    #    row = self._activePatternPresenter.getCurrentPatternIndex()
-    #    index = self._treeModel.index(row, 0)
-    #    self._view.treeView.setCurrentIndex(index)
-
-    #def setCurrentPatternIndex(self, index: int) -> None:
-    #    try:
-    #        data = self._dataset[index]
-    #    except IndexError:
-    #        logger.exception('Invalid data index!')
-    #        return
-
-    #    self._array.removeObserver(self)
-    #    self._array = data
-    #    self._array.addObserver(self)
-    #    self.notifyObservers()
-
-    #def getCurrentPatternIndex(self) -> int:
-    #    return self._array.getIndex()
-
-    #def getNumberOfImages(self) -> int:
-    #    return self._array.getData().shape[0]
-
-    #def getImage(self, index: int) -> DiffractionPatternData:
-    #    return self._array.getData()[index]
-
-    #def _renderImageData(self, index: int) -> None:
-    #    array = self._activePatternPresenter.getImage(index)
-    #    self._imagePresenter.setArray(array)
+        for index in selected.indexes():
+            node = index.internalPointer()
+            self._imagePresenter.setArray(node.data)
+            break
 
     def _syncModelToView(self) -> None:
         rootNode = DatasetTreeNode.createRoot()
 
         for arrayPresenter in self._datasetPresenter:
-            arrayNode = rootNode.createChild(arrayPresenter)
+            rootNode.createChild(arrayPresenter)
 
         self._treeModel.setRootNode(rootNode)
 
-        # FIXME self._renderImageData(index)
+        infoText = self._datasetPresenter.getInfoText()
+        self._view.dataView.infoLabel.setText(infoText)
 
     def update(self, observable: Observable) -> None:
         if observable is self._datasetPresenter:
             self._syncModelToView()
-
-        #if observable is self._activePatternPresenter:
-        #    self._syncModelToView()
-        #elif observable is self._activePatternPresenter:
-        #    self._updateSelection()
-        #elif observable is self._dataset:
-        #    self._array.removeObserver(self)
-        #    self._array = SimpleDiffractionPatternArray.createNullInstance()
-        #    self.notifyObservers()
-        #elif observable is self._array:
-        #    self.notifyObservers()

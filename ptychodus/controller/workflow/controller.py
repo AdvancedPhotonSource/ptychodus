@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QTableView
 
 from ...model.workflow import (WorkflowAuthorizationPresenter, WorkflowExecutionPresenter,
                                WorkflowParametersPresenter, WorkflowStatusPresenter)
-from ...view import WorkflowParametersView
+from ...view.workflow import WorkflowParametersView
 from .authorization import WorkflowAuthorizationController
 from .execution import WorkflowExecutionController
 from .status import WorkflowStatusController

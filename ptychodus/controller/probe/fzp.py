@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ...api.observer import Observable, Observer
 from ...model.probe import FresnelZonePlateProbeInitializer
-from ...view import FresnelZonePlateProbeView
+from ...view.probe import FresnelZonePlateProbeView
 
 
 class FresnelZonePlateProbeController(Observer):

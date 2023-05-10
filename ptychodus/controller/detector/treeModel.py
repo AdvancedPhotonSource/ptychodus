@@ -4,7 +4,7 @@ from typing import overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ...api.data import DiffractionPatternState
+from ...api.data import DiffractionPatternData, DiffractionPatternState
 from ...model.data import DiffractionPatternArrayPresenter
 
 
@@ -55,7 +55,7 @@ class DatasetTreeNode:
     @property
     def numberOfFrames(self) -> int:
         if self._frameIndex < 0:
-            return len(self._childItems)
+            return len(self.childItems)
 
         return 1
 

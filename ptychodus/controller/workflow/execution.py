@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ...model.workflow import WorkflowExecutionPresenter, WorkflowParametersPresenter
-from ...view import WorkflowExecutionView
+from ...view.workflow import WorkflowExecutionView
 from .compute import WorkflowComputeController
 from .inputData import WorkflowInputDataController
 from .outputData import WorkflowOutputDataController

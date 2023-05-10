@@ -7,8 +7,8 @@ from PyQt5.QtGui import QFont
 from ..api.observer import Observable, Observer
 from ..model.automation import (AutomationCore, AutomationDatasetState, AutomationPresenter,
                                 AutomationProcessingPresenter)
-from ..view import (AutomationView, AutomationParametersView, AutomationProcessingView,
-                    AutomationWatchdogView)
+from ..view.automation import (AutomationView, AutomationParametersView, AutomationProcessingView,
+                               AutomationWatchdogView)
 from .data import FileDialogFactory
 
 

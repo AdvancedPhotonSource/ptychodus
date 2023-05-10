@@ -8,7 +8,7 @@ from ...api.settings import SettingsRegistry
 from ...model import MetadataPresenter
 from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
                            DiffractionPatternPresenter)
-from ...view import DataParametersView
+from ...view.data import DataParametersView
 from ..tree import SimpleTreeModel
 from .dataset import DatasetController
 from .dialogFactory import FileDialogFactory

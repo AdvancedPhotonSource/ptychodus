@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.scan import ScanRepositoryItemPresenter, ScanRepositoryPresenter
-from ...view import ScanView, ScanPlotView
+from ...view.scan import ScanView, ScanPlotView
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
 from .concentric import ConcentricScanController

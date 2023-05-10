@@ -7,8 +7,8 @@ import numpy
 
 from ..api.observer import Observable, Observer
 from ..model.image import ImagePresenter
-from ..view import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageFileGroupBox, ImageView,
-                    ImageWidget)
+from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageFileGroupBox,
+                          ImageView, ImageWidget)
 from .data import FileDialogFactory
 
 

@@ -48,6 +48,14 @@ class ActiveDiffractionDataset(DiffractionDataset):
     def getContentsTree(self) -> SimpleTreeNode:
         return self._contentsTree
 
+    def getInfoText(self) -> str:
+        number, height, width = self._arrayData.shape
+        dtype = str(self._arrayData.dtype)
+        sizeInMB = self._arrayData.nbytes / (1024 * 1024)
+
+        return ''.join(
+            (f'Totals: {number} {width}Wx{height}H {dtype} frames', f' ({sizeInMB:.2f}MB)'))
+
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray:
         ...

@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ..api.observer import Observable, Observer
 from ..model.ptychopy import PtychoPyReconstructorLibrary, PtychoPyPresenter
-from ..view import PtychoPyParametersView, PtychoPyBasicView, PtychoPyAdvancedView
+from ..view.ptychopy import PtychoPyParametersView, PtychoPyBasicView, PtychoPyAdvancedView
 from .reconstructor import ReconstructorViewControllerFactory
 
 

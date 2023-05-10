@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ...api.observer import Observable, Observer
 from ...model.probe import SuperGaussianProbeInitializer
-from ...view import SuperGaussianProbeView
+from ...view.probe import SuperGaussianProbeView
 
 
 class SuperGaussianProbeController(Observer):

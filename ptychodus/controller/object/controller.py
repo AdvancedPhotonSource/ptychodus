@@ -2,13 +2,14 @@ from __future__ import annotations
 from typing import Callable, Final
 import logging
 
-from PyQt5.QtCore import QSortFilterProxyModel
+from PyQt5.QtCore import QItemSelection, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.object import ObjectRepositoryItemPresenter, ObjectRepositoryPresenter
-from ...view import ImageView, ObjectParametersView, ObjectView
+from ...view.image import ImageView
+from ...view.object import ObjectParametersView, ObjectView
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .random import RandomObjectViewController
@@ -78,7 +79,7 @@ class ObjectController(Observer):
         view.repositoryView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.repositoryView.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
         view.repositoryView.tableView.selectionModel().selectionChanged.connect(
-            lambda selected, deselected: controller._updateView())  # FIXME improve
+            controller._updateView)
 
         for name in repositoryPresenter.getInitializerDisplayNameList():
             insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
@@ -143,6 +144,7 @@ class ObjectController(Observer):
     def _editSelectedObject(self) -> None:
         itemPresenter = self._getSelectedItemPresenter()
 
+        # TODO update while editing
         if itemPresenter is None:
             logger.error('No items are selected!')
         else:
@@ -156,8 +158,6 @@ class ObjectController(Observer):
             else:
                 logger.error('Unknown object repository item!')
 
-        self._setCurrentImage()  # TODO update while editing
-
     def _removeSelectedObject(self) -> None:
         current = self._view.repositoryView.tableView.currentIndex()
 
@@ -167,36 +167,29 @@ class ObjectController(Observer):
         else:
             logger.error('No items are selected!')
 
-    def _setCurrentImage(self) -> None:
-        itemPresenter = self._getSelectedItemPresenter()
+    def _updateView(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        for index in deselected.indexes():
+            self._view.repositoryView.buttonBox.saveButton.setEnabled(False)
+            self._view.repositoryView.buttonBox.editButton.setEnabled(False)
+            self._view.repositoryView.buttonBox.removeButton.setEnabled(False)
 
-        if itemPresenter is None:
-            # FIXME clear if no selection
-            logger.error('No items are selected!')
-        else:
+            self._imagePresenter.clearArray()
+            break
+
+        for index in selected.indexes():
+            self._view.repositoryView.buttonBox.saveButton.setEnabled(True)
+            self._view.repositoryView.buttonBox.editButton.setEnabled(True)
+            self._view.repositoryView.buttonBox.removeButton.setEnabled(True)
+
+            sourceIndex = self._proxyModel.mapToSource(index)
+            itemPresenter = self._repositoryPresenter[sourceIndex.row()]
             array = itemPresenter.item.getArray()
             self._imagePresenter.setArray(array)
-
-    def _setButtonsEnabled(self) -> None:
-        selectionModel = self._view.repositoryView.tableView.selectionModel()
-        enable = False
-
-        for index in selectionModel.selectedIndexes():
-            if index.isValid():
-                enable = True
-
-        self._view.repositoryView.buttonBox.saveButton.setEnabled(enable)
-        self._view.repositoryView.buttonBox.editButton.setEnabled(enable)
-        self._view.repositoryView.buttonBox.removeButton.setEnabled(enable)
-
-    def _updateView(self) -> None:
-        self._setButtonsEnabled()
-        self._setCurrentImage()
+            break
 
     def _syncModelToView(self) -> None:
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
-        self._updateView()
 
     def update(self, observable: Observable) -> None:
         if observable is self._repositoryPresenter:

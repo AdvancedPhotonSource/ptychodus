@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QTableView
 
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup, SettingsRegistry
-from ..view import SettingsParametersView
+from ..view.settings import SettingsParametersView
 from .data import FileDialogFactory
 
 

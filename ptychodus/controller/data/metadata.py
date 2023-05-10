@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ...api.observer import Observable, Observer
 from ...model import MetadataPresenter
-from ...view import DataNavigationPage, MetadataView
+from ...view.data import DataNavigationPage, MetadataView
 
 
 class MetadataController(Observer):

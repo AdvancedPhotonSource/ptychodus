@@ -38,6 +38,9 @@ class ImagePresenter(Observable, Observer):
     def setArray(self, array: NumericArrayType) -> None:
         self._array.setArray(array)
 
+    def clearArray(self) -> None:
+        self._array.clearArray()
+
     @property
     def _colorizer(self) -> Colorizer:
         return self._colorizerChooser.getCurrentStrategy()
