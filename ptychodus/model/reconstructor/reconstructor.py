@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 import logging
+import time
 
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginEntry
@@ -69,7 +70,11 @@ class ActiveReconstructor(Reconstructor, Observable, Observer):
         return self._reconstructorPlugin.displayName
 
     def reconstruct(self) -> ReconstructResult:
-        return self._reconstructorPlugin.strategy.reconstruct()
+        tic = time.perf_counter()
+        result = self._reconstructorPlugin.strategy.reconstruct()
+        toc = time.perf_counter()
+        logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')
+        return result
 
     @staticmethod
     def _simplifyName(name: str) -> str:

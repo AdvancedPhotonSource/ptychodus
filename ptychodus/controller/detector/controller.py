@@ -5,12 +5,15 @@ from PyQt5.QtCore import QItemSelection
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
+from ...model import DetectorPresenter
 from ...model.data import DiffractionDatasetPresenter
 from ...model.image import ImagePresenter
+from ...model.probe import ApparatusPresenter
 from ...view.detector import DetectorView
 from ...view.image import ImageView
 from ..data import FileDialogFactory
 from ..image import ImageController
+from .parameters import DetectorParametersController
 from .treeModel import DatasetTreeModel, DatasetTreeNode
 
 logger = logging.getLogger(__name__)
@@ -18,8 +21,10 @@ logger = logging.getLogger(__name__)
 
 class DetectorController(Observer):
 
-    def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
-                 imagePresenter: ImagePresenter, view: DetectorView, imageView: ImageView,
+    def __init__(self, detectorPresenter: DetectorPresenter,
+                 apparatusPresenter: ApparatusPresenter,
+                 datasetPresenter: DiffractionDatasetPresenter, imagePresenter: ImagePresenter,
+                 view: DetectorView, imageView: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._datasetPresenter = datasetPresenter
@@ -28,13 +33,18 @@ class DetectorController(Observer):
         self._imageView = imageView
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
+        self._parametersController = DetectorParametersController.createInstance(
+            detectorPresenter, apparatusPresenter, view.parametersView)
         self._treeModel = DatasetTreeModel()
 
     @classmethod
-    def createInstance(cls, datasetPresenter: DiffractionDatasetPresenter,
+    def createInstance(cls, detectorPresenter: DetectorPresenter,
+                       apparatusPresenter: ApparatusPresenter,
+                       datasetPresenter: DiffractionDatasetPresenter,
                        imagePresenter: ImagePresenter, view: DetectorView, imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> DetectorController:
-        controller = cls(datasetPresenter, imagePresenter, view, imageView, fileDialogFactory)
+        controller = cls(detectorPresenter, apparatusPresenter, datasetPresenter, imagePresenter,
+                         view, imageView, fileDialogFactory)
 
         imageView.imageRibbon.indexGroupBox.setVisible(False)
         view.dataView.treeView.setModel(controller._treeModel)

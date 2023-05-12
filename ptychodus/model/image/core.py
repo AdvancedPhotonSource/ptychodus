@@ -113,7 +113,13 @@ class ImagePresenter(Observable, Observer):
         return self._image
 
     def _updateImage(self) -> None:
-        self._image = self._colorizer()
+        try:
+            image = self._colorizer()
+        except:
+            logger.exception('Failed to render image!')
+            return
+
+        self._image = image
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
