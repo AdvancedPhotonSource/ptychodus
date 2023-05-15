@@ -51,7 +51,7 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
         scanName = self.simpleName
 
         with filePath.open(newline='') as csvFile:
-            csvReader = csv.reader(csvFile, delimiter=' ')
+            csvReader = csv.reader(csvFile, delimiter=' ', skipinitialspace=True)
             csvIterator = iter(csvReader)
 
             titleRow = next(csvIterator)
@@ -66,7 +66,11 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
             if columnHeaderRow == LYNXOrchestraScanFileReader.EXPECTED_HEADER:
                 logger.debug(f'Reading scan positions for \"{scanName}\"...')
             else:
-                raise ScanPointParseError('Bad header!')
+                raise ScanPointParseError(
+                    'Bad LYNX Orchestra header!\n'
+                    f'Expected: {LYNXOrchestraScanFileReader.EXPECTED_HEADER}\n'
+                    f'Found:    {columnHeaderRow}\n'
+                )
 
             for row in csvIterator:
                 if row[0].startswith('#'):
