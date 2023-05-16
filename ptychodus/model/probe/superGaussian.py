@@ -1,60 +1,57 @@
 from __future__ import annotations
 from decimal import Decimal
+from typing import Final
 
 import numpy
 
 from ...api.probe import ProbeArrayType
 from .apparatus import Apparatus
-from .initializer import UnimodalProbeInitializer, UnimodalProbeInitializerParameters
+from .repository import ProbeInitializer
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
 
 
-class SuperGaussianProbeInitializer(UnimodalProbeInitializer):
+class SuperGaussianProbeInitializer(ProbeInitializer):
+    SIMPLE_NAME: Final[str] = 'SuperGaussian'
+    DISPLAY_NAME: Final[str] = 'Super Gaussian'
 
-    def __init__(self, parameters: UnimodalProbeInitializerParameters, sizer: ProbeSizer,
-                 apparatus: Apparatus) -> None:
-        super().__init__(parameters)
+    def __init__(self, sizer: ProbeSizer, apparatus: Apparatus) -> None:
+        super().__init__()
         self._sizer = sizer
         self._apparatus = apparatus
         self._annularRadiusInMeters = Decimal()
         self._probeWidthInMeters = Decimal()
         self._orderParameter = Decimal()
 
-    @classmethod
-    def createInstance(cls, parameters: UnimodalProbeInitializerParameters,
-                       settings: ProbeSettings, sizer: ProbeSizer,
-                       apparatus: Apparatus) -> SuperGaussianProbeInitializer:
-        initializer = cls(parameters, sizer, apparatus)
-        initializer.syncFromSettings(settings)
-        return initializer
+    @property
+    def simpleName(self) -> str:
+        return self.SIMPLE_NAME
+
+    @property
+    def displayName(self) -> str:
+        return self.DISPLAY_NAME
 
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         self._annularRadiusInMeters = settings.sgAnnularRadiusInMeters.value
         self._probeWidthInMeters = settings.sgProbeWidthInMeters.value
         self._orderParameter = settings.sgOrderParameter.value
-        super().syncFromSettings(settings)
+        self.notifyObservers()
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
         settings.sgAnnularRadiusInMeters.value = self._annularRadiusInMeters
         settings.sgProbeWidthInMeters.value = self._probeWidthInMeters
         settings.sgOrderParameter.value = self._orderParameter
-        super().syncToSettings(settings)
 
-    @property
-    def displayName(self) -> str:
-        return 'Super Gaussian'
+    def __call__(self) -> ProbeArrayType:
+        extent = self._sizer.getProbeExtent()
 
-    @property
-    def simpleName(self) -> str:
-        return super().simpleName
+        gridCenterX = extent.width / 2
+        cellCentersX = (numpy.arange(extent.width) + 0.5 - gridCenterX) / gridCenterX
 
-    def _createPrimaryMode(self) -> ProbeArrayType:
-        probeSize_px = self._sizer.getProbeSize()
-        gridCenter_px = probeSize_px / 2
-        cellCenters_px = numpy.arange(probeSize_px) + 0.5 - gridCenter_px
+        gridCenterY = extent.height / 2
+        cellCentersY = (numpy.arange(extent.height) + 0.5 - gridCenterY) / gridCenterY
 
-        Y_px, X_px = numpy.meshgrid(cellCenters_px, cellCenters_px)
+        Y_px, X_px = numpy.meshgrid(cellCentersY, cellCentersX)
         X_m = X_px * float(self._apparatus.getObjectPlanePixelSizeXInMeters())
         Y_m = Y_px * float(self._apparatus.getObjectPlanePixelSizeYInMeters())
         R_m = numpy.hypot(X_m, Y_m)
@@ -64,26 +61,26 @@ class SuperGaussianProbeInitializer(UnimodalProbeInitializer):
 
         return numpy.exp(-ZP / 2) + 0j
 
+    def getAnnularRadiusInMeters(self) -> Decimal:
+        return self._annularRadiusInMeters
+
     def setAnnularRadiusInMeters(self, value: Decimal) -> None:
         if self._annularRadiusInMeters != value:
             self._annularRadiusInMeters = value
             self.notifyObservers()
 
-    def getAnnularRadiusInMeters(self) -> Decimal:
-        return self._annularRadiusInMeters
+    def getProbeWidthInMeters(self) -> Decimal:
+        return self._probeWidthInMeters
 
     def setProbeWidthInMeters(self, value: Decimal) -> None:
         if self._probeWidthInMeters != value:
             self._probeWidthInMeters = value
             self.notifyObservers()
 
-    def getProbeWidthInMeters(self) -> Decimal:
-        return self._probeWidthInMeters
+    def getOrderParameter(self) -> Decimal:
+        return max(self._orderParameter, Decimal(1))
 
     def setOrderParameter(self, value: Decimal) -> None:
         if self._orderParameter != value:
             self._orderParameter = value
             self.notifyObservers()
-
-    def getOrderParameter(self) -> Decimal:
-        return max(self._orderParameter, Decimal(1))

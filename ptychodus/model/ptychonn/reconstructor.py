@@ -9,7 +9,7 @@ from ptychonn import ReconSmallPhaseModel, Tester, Trainer
 from ...api.reconstructor import ReconstructResult
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
-from ..probe import Probe
+from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 from .trainable import TrainableReconstructor, TrainingData
@@ -20,12 +20,12 @@ logger = logging.getLogger(__name__)
 class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
 
     def __init__(self, settings: PtychoNNModelSettings, trainingSettings: PtychoNNTrainingSettings,
-                 scanAPI: ScanAPI, probe: Probe, objectAPI: ObjectAPI,
+                 scanAPI: ScanAPI, probeAPI: ProbeAPI, objectAPI: ObjectAPI,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
         self._settings = settings
         self._trainingSettings = trainingSettings
         self._scanAPI = scanAPI
-        self._probe = probe
+        self._probeAPI = probeAPI
         self._objectAPI = objectAPI
         self._diffractionDataset = diffractionDataset
 

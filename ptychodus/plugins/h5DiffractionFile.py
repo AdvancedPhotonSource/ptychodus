@@ -8,7 +8,6 @@ except ModuleNotFoundError:
     pass
 
 import h5py
-import numpy
 
 from ptychodus.api.data import (DiffractionPatternData, DiffractionDataset, DiffractionFileReader,
                                 DiffractionMetadata, DiffractionPatternArray,
@@ -65,19 +64,10 @@ class H5DiffractionFileTreeBuilder:
                        attributeManager: h5py.AttributeManager) -> None:
         for name, value in attributeManager.items():
             stringInfo = h5py.check_string_dtype(value.dtype)
-            valueStr = None
+            itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"' if stringInfo \
+                    else f'SCALAR {value.dtype} = {value}'
 
-            if stringInfo:
-                valueStr = f'STRING = "{value.decode(stringInfo.encoding)}"'
-            elif numpy.ndim(value) == 0:
-                valueStr = f'SCALAR {value.dtype} = {value}'
-            elif isinstance(value, numpy.ndarray):
-                valueStr = f'{value.shape} {value.dtype}'
-            else:
-                logger.debug(f'UNKNOWN: {value} {type(value)}')
-                valueStr = 'UNKNOWN'
-
-            treeNode.createChild([str(name), 'Attribute', valueStr])
+            treeNode.createChild([str(name), 'Attribute', itemDetails])
 
     def createRootNode(self) -> SimpleTreeNode:
         return SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
@@ -113,19 +103,11 @@ class H5DiffractionFileTreeBuilder:
                             value = h5Item[()]
 
                             if isinstance(value, bytes):
-                                valueStr = value.decode()
+                                itemDetails = value.decode()
                             else:
                                 stringInfo = h5py.check_string_dtype(value.dtype)
-
-                                if stringInfo:
-                                    valueStr = f'STRING = "{value.decode(stringInfo.encoding)}"'
-                                elif numpy.ndim(value) == 0:
-                                    valueStr = f'SCALAR {value.dtype} = {value}'
-                                else:
-                                    logger.debug(f'UNKNOWN: {value} {type(value)}')
-                                    valueStr = 'UNKNOWN'
-
-                            # TODO valueStr: use it or lose it
+                                itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"' if stringInfo \
+                                        else f'SCALAR {value.dtype} = {value}'
                         else:
                             itemDetails = f'{h5Item.shape} {h5Item.dtype}'
                 elif isinstance(h5Item, h5py.SoftLink):

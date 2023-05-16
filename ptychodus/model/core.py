@@ -99,10 +99,10 @@ class ModelCore:
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scanAPI,
-            self._probeCore.probe, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
+            self._probeCore.probeAPI, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._pluginRegistry.buildObjectPhaseCenteringStrategyChooser(),
-            self._dataCore.dataset, self._scanCore.scanAPI, self._probeCore.probe,
+            self._dataCore.dataset, self._scanCore.scanAPI, self._probeCore.probeAPI,
             self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
@@ -119,7 +119,7 @@ class ModelCore:
             (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
         self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore.dataAPI,
-                                              self._scanCore.scanAPI, self._probeCore,
+                                              self._scanCore.scanAPI, self._probeCore.probeAPI,
                                               self._objectCore.objectAPI, self._workflowCore)
 
         self.rpcMessageService: Optional[RPCMessageService] = None
@@ -129,7 +129,7 @@ class ModelCore:
                                                        modelArgs.autoExecuteRPCs)
             self.rpcMessageService.registerProcedure(
                 LoadResultsMessage,
-                LoadResultsExecutor(self._probeCore.probe, self._objectCore.objectAPI))
+                LoadResultsExecutor(self._probeCore.probeAPI, self._objectCore.objectAPI))
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:

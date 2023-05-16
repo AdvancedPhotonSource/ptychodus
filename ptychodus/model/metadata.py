@@ -103,7 +103,7 @@ class MetadataPresenter(Observable, Observer):
     def canSyncProbeEnergy(self) -> bool:
         return (self._metadata.probeEnergyInElectronVolts is not None)
 
-    def syncProbeEnergy(self) -> None:
+    def syncProbeEnergy(self) -> None:  # TODO to apparatusAPI or probeAPI
         if self._metadata.probeEnergyInElectronVolts:
             self._probeSettings.probeEnergyInElectronVolts.value = \
                     self._metadata.probeEnergyInElectronVolts

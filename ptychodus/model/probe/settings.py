@@ -14,9 +14,6 @@ class ProbeSettings(Observable, Observer):
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/probe.npy'))
-        self.automaticProbeSizeEnabled = settingsGroup.createBooleanEntry(
-            'AutomaticProbeSizeEnabled', True)
-        self.probeSize = settingsGroup.createIntegerEntry('ProbeSize', 64)
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
             'ProbeEnergyInElectronVolts', '10000')
         self.numberOfProbeModes = settingsGroup.createIntegerEntry('NumberOfProbeModes', 1)
@@ -38,8 +35,9 @@ class ProbeSettings(Observable, Observer):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ProbeSettings:
-        settings = cls(settingsRegistry.createGroup('Probe'))
-        settings._settingsGroup.addObserver(settings)
+        settingsGroup = settingsRegistry.createGroup('Probe')
+        settings = cls(settingsGroup)
+        settingsGroup.addObserver(settings)
         return settings
 
     def update(self, observable: Observable) -> None:

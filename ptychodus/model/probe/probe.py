@@ -11,7 +11,7 @@ from .sizer import ProbeSizer
 logger = logging.getLogger(__name__)
 
 
-class Probe(Observable):
+class Probe(Observable):  # FIXME
 
     def __init__(self, sizer: ProbeSizer) -> None:
         super().__init__()

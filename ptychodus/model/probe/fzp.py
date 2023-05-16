@@ -1,14 +1,14 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, Final
 
 import numpy
 import numpy.typing
 
 from ...api.probe import ProbeArrayType
 from .apparatus import Apparatus
-from .initializer import UnimodalProbeInitializer, UnimodalProbeInitializerParameters
+from .repository import ProbeInitializer
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
 
@@ -103,23 +103,16 @@ def fresnel_propagation(input: numpy.typing.NDArray[Any], dxy: float, z: float,
     return OUT
 
 
-class FresnelZonePlateProbeInitializer(UnimodalProbeInitializer):
+class FresnelZonePlateProbeInitializer(ProbeInitializer):
+    SIMPLE_NAME: Final[str] = 'FresnelZonePlate'
+    DISPLAY_NAME: Final[str] = 'Fresnel Zone Plate'
 
-    def __init__(self, parameters: UnimodalProbeInitializerParameters, sizer: ProbeSizer,
-                 apparatus: Apparatus) -> None:
-        super().__init__(parameters)
+    def __init__(self, sizer: ProbeSizer, apparatus: Apparatus) -> None:
+        super().__init__()
         self._sizer = sizer
         self._apparatus = apparatus
         self._zonePlate = FresnelZonePlate(Decimal(), Decimal(), Decimal())
         self._defocusDistanceInMeters = Decimal()  # from sample to the focal plane
-
-    @classmethod
-    def createInstance(cls, parameters: UnimodalProbeInitializerParameters,
-                       settings: ProbeSettings, sizer: ProbeSizer,
-                       apparatus: Apparatus) -> FresnelZonePlateProbeInitializer:
-        initializer = cls(parameters, sizer, apparatus)
-        initializer.syncFromSettings(settings)
-        return initializer
 
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         self._zonePlate.zonePlateRadiusInMeters = settings.zonePlateRadiusInMeters.value
@@ -138,14 +131,14 @@ class FresnelZonePlateProbeInitializer(UnimodalProbeInitializer):
         super().syncToSettings(settings)
 
     @property
-    def displayName(self) -> str:
-        return 'Fresnel Zone Plate'
+    def simpleName(self) -> str:
+        return self.SIMPLE_NAME
 
     @property
-    def simpleName(self) -> str:
-        return super().simpleName
+    def displayName(self) -> str:
+        return self.DISPLAY_NAME
 
-    def _createPrimaryMode(self) -> ProbeArrayType:
+    def __call__(self) -> ProbeArrayType:
         # velo = FresnelZonePlate(
         #         zonePlateRadiusInMeters = 90e-6,
         #         outermostZoneWidthInMeters = 50e-9,
@@ -159,8 +152,8 @@ class FresnelZonePlateProbeInitializer(UnimodalProbeInitializer):
         #         outermostZoneWidthInMeters = 60e-9,
         #         centralBeamstopDiameterInMeters = 40e-6)
 
-        probeSize = self._sizer.getProbeSize()
-        probe = numpy.zeros((probeSize, probeSize), dtype=complex)
+        probeExtent = self._sizer.getProbeExtent()
+        probe = numpy.zeros(probeExtent.shape, dtype=complex)
 
         # central wavelength
         lambda0 = self._apparatus.getProbeWavelengthInMeters()
@@ -168,8 +161,8 @@ class FresnelZonePlateProbeInitializer(UnimodalProbeInitializer):
         # pixel size on sample plane (TODO non-square pixels are unsupported)
         dx = self._apparatus.getObjectPlanePixelSizeXInMeters()
 
-        T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters, probeSize, dx,
-                                       self._zonePlate)
+        T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters, probeExtent.width,
+                                       dx, self._zonePlate)
 
         nprobe = fresnel_propagation(T, float(dx_fzp),
                                      (float(FL0) + float(self._defocusDistanceInMeters)),
