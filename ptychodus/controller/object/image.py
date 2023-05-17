@@ -33,7 +33,9 @@ class ObjectImageController(Observer):
         # FIXME what to do with monitor screen?
         array = self._presenter.getSelectedObjectArray()
 
-        if array is not None:
+        if array is None:
+            self._imagePresenter.clearArray()
+        else:
             self._imagePresenter.setArray(array)
 
     def update(self, observable: Observable) -> None:

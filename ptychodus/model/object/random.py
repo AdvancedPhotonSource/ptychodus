@@ -78,7 +78,8 @@ class RandomObjectInitializer(ObjectInitializer):
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getAmplitudeMean(self) -> Decimal:
-        return self._amplitudeMean
+        limits = self.getAmplitudeMeanLimits()
+        return limits.clamp(self._amplitudeMean)
 
     def setAmplitudeMean(self, mean: Decimal) -> None:
         if self._amplitudeMean != mean:
@@ -89,12 +90,20 @@ class RandomObjectInitializer(ObjectInitializer):
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getAmplitudeDeviation(self) -> Decimal:
-        return self._amplitudeDeviation
+        limits = self.getAmplitudeDeviationLimits()
+        return limits.clamp(self._amplitudeDeviation)
 
     def setAmplitudeDeviation(self, stddev: Decimal) -> None:
         if self._amplitudeDeviation != stddev:
             self._amplitudeDeviation = stddev
             self.notifyObservers()
+
+    def getPhaseDeviationLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))  # FIXME
+
+    def getPhaseDeviation(self) -> Decimal:
+        limits = self.getPhaseDeviationLimits()
+        return limits.clamp(self._phaseDeviation)
 
     def setPhaseDeviation(self, stddev: Decimal) -> None:
         if self._phaseDeviation != stddev:

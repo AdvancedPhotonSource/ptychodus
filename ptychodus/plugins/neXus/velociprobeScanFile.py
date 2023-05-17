@@ -62,7 +62,7 @@ class VelociprobeScanFileReader(ScanFileReader):
 
     def _applyTransform(self, scan: Scan) -> Scan:
         stageRotationInRadians = numpy.deg2rad(self._neXusReader.stageRotationInDegrees)
-        stageRotationCosine = Decimal(repr(numpy.cos(stageRotationInRadians)))
+        stageRotationCosine = Decimal.from_float(numpy.cos(stageRotationInRadians))
 
         zero = Decimal()
         xMean = sum((p.x for p in scan.values()), start=zero) / len(scan)

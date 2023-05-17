@@ -32,8 +32,12 @@ class ProbeImageController(Observer):
         return controller
 
     def _renderImageData(self, index: int) -> None:
-        array = self._presenter.getProbeMode(index)
-        self._imagePresenter.setArray(array)
+        array = self._presenter.getSelectedProbeModeArray(index)
+
+        if array is None:
+            self._imagePresenter.clearArray()
+        else:
+            self._imagePresenter.setArray(array)
 
     def _syncModelToView(self) -> None:
         # FIXME what to do with monitor screen?

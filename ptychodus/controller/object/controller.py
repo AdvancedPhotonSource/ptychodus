@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QAbstractItemView
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.object import ObjectRepositoryItemPresenter, ObjectRepositoryPresenter
+from ...model.probe import ApparatusPresenter
 from ...view.image import ImageView
 from ...view.object import ObjectParametersView, ObjectView
 from ..data import FileDialogFactory
@@ -20,13 +21,13 @@ logger = logging.getLogger(__name__)
 
 class ObjectParametersController(Observer):
 
-    def __init__(self, presenter: ObjectRepositoryPresenter, view: ObjectParametersView) -> None:
+    def __init__(self, presenter: ApparatusPresenter, view: ObjectParametersView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ObjectRepositoryPresenter,
+    def createInstance(cls, presenter: ApparatusPresenter,
                        view: ObjectParametersView) -> ObjectParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
@@ -39,8 +40,10 @@ class ObjectParametersController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.pixelSizeXWidget.setLengthInMeters(self._presenter.getPixelSizeXInMeters())
-        self._view.pixelSizeYWidget.setLengthInMeters(self._presenter.getPixelSizeYInMeters())
+        self._view.pixelSizeXWidget.setLengthInMeters(
+            self._presenter.getObjectPlanePixelSizeXInMeters())
+        self._view.pixelSizeYWidget.setLengthInMeters(
+            self._presenter.getObjectPlanePixelSizeYInMeters())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -50,8 +53,9 @@ class ObjectParametersController(Observer):
 class ObjectController(Observer):
     OPEN_FILE: Final[str] = 'Open File...'  # TODO clean up
 
-    def __init__(self, repositoryPresenter: ObjectRepositoryPresenter,
-                 imagePresenter: ImagePresenter, view: ObjectView, imageView: ImageView,
+    def __init__(self, apparatusPresenter: ApparatusPresenter,
+                 repositoryPresenter: ObjectRepositoryPresenter, imagePresenter: ImagePresenter,
+                 view: ObjectView, imageView: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._repositoryPresenter = repositoryPresenter
@@ -60,17 +64,19 @@ class ObjectController(Observer):
         self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
         self._parametersController = ObjectParametersController.createInstance(
-            repositoryPresenter, view.parametersView)
+            apparatusPresenter, view.parametersView)
         self._tableModel = ObjectTableModel(repositoryPresenter)
         self._proxyModel = QSortFilterProxyModel()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, repositoryPresenter: ObjectRepositoryPresenter,
+    def createInstance(cls, apparatusPresenter: ApparatusPresenter,
+                       repositoryPresenter: ObjectRepositoryPresenter,
                        imagePresenter: ImagePresenter, view: ObjectView, imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
-        controller = cls(repositoryPresenter, imagePresenter, view, imageView, fileDialogFactory)
+        controller = cls(apparatusPresenter, repositoryPresenter, imagePresenter, view, imageView,
+                         fileDialogFactory)
         repositoryPresenter.addObserver(controller)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
@@ -156,6 +162,7 @@ class ObjectController(Observer):
                     itemPresenter, self._view)
                 randomController.openDialog()
             else:
+                # FIXME FromFile
                 logger.error('Unknown object repository item!')
 
     def _removeSelectedObject(self) -> None:

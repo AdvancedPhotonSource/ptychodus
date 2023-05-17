@@ -100,8 +100,8 @@ class TikeArrayConverter:
         for index, xy in zip(arrays.indexes, arrays.scan):
             uxInPixels = xy[1] - self.PAD_WIDTH
             uyInPixels = xy[0] - self.PAD_WIDTH
-            xInMeters = xMinInMeters + Decimal(repr(uxInPixels)) * pixelSizeXInMeters
-            yInMeters = yMinInMeters + Decimal(repr(uyInPixels)) * pixelSizeYInMeters
+            xInMeters = xMinInMeters + Decimal.from_float(uxInPixels) * pixelSizeXInMeters
+            yInMeters = yMinInMeters + Decimal.from_float(uyInPixels) * pixelSizeYInMeters
             pointDict[index] = ScanPoint(xInMeters, yInMeters)
 
         tabularScan = TabularScan(pointDict)

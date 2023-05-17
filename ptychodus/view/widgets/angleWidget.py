@@ -26,7 +26,7 @@ class AngleWidget(QWidget):
 
         widget.unitsComboBox.addItem('turn', Decimal(1))
         widget.unitsComboBox.addItem('deg', Decimal(360))
-        widget.unitsComboBox.addItem('rad', 2 * Decimal(repr(numpy.pi)))
+        widget.unitsComboBox.addItem('rad', 2 * Decimal.from_float(numpy.pi))
         widget.unitsComboBox.activated.connect(widget._updateDisplay)
 
         layout = QHBoxLayout()

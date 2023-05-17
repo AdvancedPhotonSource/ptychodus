@@ -82,8 +82,8 @@ class ImagePresenter(Observable, Observer):
 
     def setDisplayRangeToDataRange(self) -> None:
         values = self._colorizer.getDataArray()
-        lower = Decimal(repr(values.min()))
-        upper = Decimal(repr(values.max()))
+        lower = Decimal.from_float(values.min())
+        upper = Decimal.from_float(values.max())
         dataRange = Interval[Decimal](lower, upper)
 
         if dataRange.lower.is_nan() or dataRange.upper.is_nan():

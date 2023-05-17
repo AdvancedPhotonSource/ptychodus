@@ -38,8 +38,8 @@ class PtychoShelvesScanFileReader(ScanFileReader):
 
                     for xf, yf in zip(ppX[:, 0], ppY[:, 0]):
                         point = ScanPoint(
-                            x=Decimal(repr(xf)),
-                            y=Decimal(repr(yf)),
+                            x=Decimal.from_float(xf),
+                            y=Decimal.from_float(yf),
                         )
                         pointList.append(point)
         except OSError:

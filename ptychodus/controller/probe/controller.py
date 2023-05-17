@@ -1,39 +1,40 @@
 from __future__ import annotations
-from typing import Callable
+from typing import Callable, Final
+import logging
 
 from PyQt5.QtCore import QItemSelection
-from PyQt5.QtWidgets import QAbstractItemView, QDialog
+from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
-from ...model.probe import (FileProbeInitializer, FresnelZonePlateProbeInitializer, ProbePresenter,
-                            SuperGaussianProbeInitializer)
+from ...model.probe import (ApparatusPresenter, ProbeRepositoryItemPresenter,
+                            ProbeRepositoryPresenter)
 from ...view.image import ImageView
+from ...view.probe import ProbeParametersView, ProbeView
 from ...view.widgets import ProgressBarItemDelegate
-from ...view.probe import (FresnelZonePlateProbeDialog, ProbeParametersView, ProbeView,
-                           SuperGaussianProbeDialog)
 from ..data import FileDialogFactory
 from ..image import ImageController
-from .fzp import FresnelZonePlateProbeController
-from .superGaussian import SuperGaussianProbeController
+from .disk import DiskProbeViewController
+from .fzp import FresnelZonePlateProbeViewController
+from .superGaussian import SuperGaussianProbeViewController
 from .treeModel import ProbeTreeModel, ProbeTreeNode
+
+logger = logging.getLogger(__name__)
 
 
 class ProbeParametersController(Observer):
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeParametersView) -> None:
+    def __init__(self, presenter: ApparatusPresenter, view: ProbeParametersView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter,
+    def createInstance(cls, presenter: ApparatusPresenter,
                        view: ProbeParametersView) -> ProbeParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        view.sizeSpinBox.valueChanged.connect(presenter.setProbeSize)
-        view.sizeSpinBox.autoToggled.connect(presenter.setAutomaticProbeSizeEnabled)
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setReadOnly(True)
 
@@ -42,10 +43,6 @@ class ProbeParametersController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.sizeSpinBox.setAutomatic(self._presenter.isAutomaticProbeSizeEnabled())
-        self._view.sizeSpinBox.setValueAndRange(self._presenter.getProbeSize(),
-                                                self._presenter.getProbeMinSize(),
-                                                self._presenter.getProbeMaxSize())
         self._view.energyWidget.setEnergyInElectronVolts(
             self._presenter.getProbeEnergyInElectronVolts())
         self._view.wavelengthWidget.setLengthInMeters(self._presenter.getProbeWavelengthInMeters())
@@ -56,27 +53,32 @@ class ProbeParametersController(Observer):
 
 
 class ProbeController(Observer):
+    OPEN_FILE: Final[str] = 'Open File...'  # TODO clean up
 
-    def __init__(self, presenter: ProbePresenter, view: ProbeView, imagePresenter: ImagePresenter,
-                 imageView: ImageView, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, apparatusPresenter: ApparatusPresenter,
+                 repositoryPresenter: ProbeRepositoryPresenter, imagePresenter: ImagePresenter,
+                 view: ProbeView, imageView: ImageView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
-        self._presenter = presenter
-        self._view = view
+        self._repositoryPresenter = repositoryPresenter
         self._imagePresenter = imagePresenter
+        self._view = view
         self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
         self._parametersController = ProbeParametersController.createInstance(
-            presenter, view.parametersView)
+            apparatusPresenter, view.parametersView)
+        self._treeModel = ProbeTreeModel()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
-        self._treeModel = ProbeTreeModel()
 
     @classmethod
-    def createInstance(cls, presenter: ProbePresenter, view: ProbeView,
-                       imagePresenter: ImagePresenter, imageView: ImageView,
+    def createInstance(cls, apparatusPresenter: ApparatusPresenter,
+                       repositoryPresenter: ProbeRepositoryPresenter,
+                       imagePresenter: ImagePresenter, view: ProbeView, imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ProbeController:
-        controller = cls(presenter, view, imagePresenter, imageView, fileDialogFactory)
-        presenter.addObserver(controller)
+        controller = cls(apparatusPresenter, repositoryPresenter, imagePresenter, view, imageView,
+                         fileDialogFactory)
+        repositoryPresenter.addObserver(controller)
 
         delegate = ProgressBarItemDelegate(view.modesView.treeView)
         view.modesView.treeView.setItemDelegateForColumn(1, delegate)
@@ -85,83 +87,117 @@ class ProbeController(Observer):
         view.modesView.treeView.selectionModel().selectionChanged.connect(
             controller._updateImageView)
 
+        for name in repositoryPresenter.getInitializerDisplayNameList():
+            insertAction = view.modesView.buttonBox.insertMenu.addAction(name)
+            insertAction.triggered.connect(controller._createItemLambda(name))
+
+        view.modesView.buttonBox.editButton.clicked.connect(controller._editSelectedProbe)
+        view.modesView.buttonBox.saveButton.clicked.connect(controller._saveSelectedProbe)
+        view.modesView.buttonBox.removeButton.clicked.connect(controller._removeSelectedProbe)
         imageView.imageRibbon.indexGroupBox.setVisible(False)
-
-        for name in presenter.getInitializerNameList():
-            initAction = view.modesView.buttonBox.initializeMenu.addAction(name)
-            initAction.triggered.connect(controller._createInitializerLambda(name))
-
-        view.modesView.buttonBox.saveButton.clicked.connect(controller._saveProbe)
 
         controller._syncModelToView()
 
         return controller
 
-    def _editProbe(self) -> None:
-        initializerName = self._presenter.getInitializerName()
-        initializer = self._presenter.getInitializer()
+    def _initializeProbe(self, name: str) -> None:
+        if name == ProbeController.OPEN_FILE:
+            self._openProbe()
+        else:
+            self._repositoryPresenter.initializeProbe(name)
 
-        # TODO show live update while editing
-        if isinstance(initializer, FileProbeInitializer):
-            filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-                self._view,
-                'Open Probe',
-                nameFilters=initializer.getOpenFileFilterList(),
-                selectedNameFilter=initializer.getOpenFileFilter())
+    def _createItemLambda(self, name: str) -> Callable[[bool], None]:
+        # NOTE additional defining scope for lambda forces a new instance for each use
+        return lambda checked: self._initializeProbe(name)
+
+    def _openProbe(self) -> None:
+        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+            self._view.modesView,
+            'Open Probe',
+            nameFilters=self._repositoryPresenter.getOpenFileFilterList(),
+            selectedNameFilter=self._repositoryPresenter.getOpenFileFilter())
+
+        if filePath:
+            self._repositoryPresenter.openProbe(filePath, nameFilter)
+
+    def _saveSelectedProbe(self) -> None:
+        current = self._view.modesView.treeView.currentIndex()
+
+        if current.isValid():
+            filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+                self._view.modesView,
+                'Save Probe',
+                nameFilters=self._repositoryPresenter.getSaveFileFilterList(),
+                selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
             if filePath:
-                initializer.setOpenFilePath(filePath)
-                initializer.setOpenFileFilter(nameFilter)
-                self._presenter.initializeProbe()
-        elif isinstance(initializer, SuperGaussianProbeInitializer):
-            sgDialog = SuperGaussianProbeDialog.createInstance(self._view)
-            sgDialog.setWindowTitle(initializerName)
-            sgDialog.finished.connect(self._finishInitialization)
-            sgController = SuperGaussianProbeController.createInstance(
-                initializer, sgDialog.editorView)
-            sgDialog.open()
-        elif isinstance(initializer, FresnelZonePlateProbeInitializer):
-            fzpDialog = FresnelZonePlateProbeDialog.createInstance(self._view)
-            fzpDialog.setWindowTitle(initializerName)
-            fzpDialog.finished.connect(self._finishInitialization)
-            fzpController = FresnelZonePlateProbeController.createInstance(
-                initializer, fzpDialog.editorView)
-            fzpDialog.open()
+                name = current.sibling(current.row(), 0).data()
+                self._repositoryPresenter.saveProbe(name, filePath, nameFilter)
         else:
-            self._finishInitialization(QDialog.Accepted)
+            logger.error('No items are selected!')
 
-    def _startInitialization(self, name: str) -> None:
-        self._presenter.setInitializerByName(name)
-        self._editProbe()
+    def _getSelectedItemPresenter(self) -> ProbeRepositoryItemPresenter | None:
+        itemPresenter: ProbeRepositoryItemPresenter | None = None
+        proxyIndex = self._view.modesView.treeView.currentIndex()
 
-    def _finishInitialization(self, result: int) -> None:
-        if result == QDialog.Accepted:
-            self._presenter.initializeProbe()
+        if proxyIndex.isValid():
+            index = self._proxyModel.mapToSource(proxyIndex)
+            itemPresenter = self._repositoryPresenter[index.row()]
 
-    def _createInitializerLambda(self, name: str) -> Callable[[bool], None]:
-        # NOTE additional defining scope for lambda forces a new instance for each use
-        return lambda checked: self._startInitialization(name)
+        return itemPresenter
 
-    def _updateImageView(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+    def _editSelectedProbe(self) -> None:
+        itemPresenter = self._getSelectedItemPresenter()
+
+        # TODO update while editing
+        if itemPresenter is None:
+            logger.error('No items are selected!')
+        else:
+            item = itemPresenter.item
+            initializerName = item.getInitializerSimpleName()
+
+            if initializerName == 'Disk':
+                diskController = DiskProbeViewController.createInstance(itemPresenter, self._view)
+                diskController.openDialog()
+            elif initializerName == 'FresnelZonePlate':
+                fzpController = FresnelZonePlateProbeViewController.createInstance(
+                    itemPresenter, self._view)
+                fzpController.openDialog()
+            elif initializerName == 'SuperGaussian':
+                sgController = SuperGaussianProbeViewController.createInstance(
+                    itemPresenter, self._view)
+                sgController.openDialog()
+            else:
+                # FIXME FromFile
+                logger.error('Unknown probe repository item!')
+
+    def _removeSelectedProbe(self) -> None:
+        current = self._view.modesView.treeView.currentIndex()
+
+        if current.isValid():
+            name = current.sibling(current.row(), 0).data()
+            self._repositoryPresenter.removeProbe(name)
+        else:
+            logger.error('No items are selected!')
+
+    def _updateView(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         for index in deselected.indexes():
+            self._view.modesView.buttonBox.saveButton.setEnabled(False)
+            self._view.modesView.buttonBox.editButton.setEnabled(False)
+            self._view.modesView.buttonBox.removeButton.setEnabled(False)
             self._imagePresenter.clearArray()
             break
 
         for index in selected.indexes():
-            # FIXME crashes if probe index exceeds num probe modes; what if top-level probe selected?
-            array = self._presenter.getProbeMode(index.row())
+            self._view.modesView.buttonBox.saveButton.setEnabled(True)
+            self._view.modesView.buttonBox.editButton.setEnabled(True)
+            self._view.modesView.buttonBox.removeButton.setEnabled(True)
+
+            sourceIndex = self._proxyModel.mapToSource(index)
+            itemPresenter = self._repositoryPresenter[sourceIndex.row()]
+            array = itemPresenter.item.getProbeMode(index.row())  # FIXME
             self._imagePresenter.setArray(array)
             break
-
-    def _saveProbe(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._view,
-            'Save Probe',
-            nameFilters=self._presenter.getSaveFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveFileFilter())
-
-        if filePath:
-            self._presenter.saveProbe(filePath, nameFilter)
 
     def _syncModelToView(self) -> None:
         rootNode = ProbeTreeNode.createRoot()
@@ -175,5 +211,5 @@ class ProbeController(Observer):
         self._treeModel.setRootNode(rootNode)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._repositoryPresenter:
             self._syncModelToView()

@@ -36,8 +36,8 @@ class CXIScanFileReader(ScanFileReader):
                         logger.exception('Unable to load scan.')
                     else:
                         point = ScanPoint(
-                            x=Decimal(repr(x)),
-                            y=Decimal(repr(y)),
+                            x=Decimal.from_float(x),
+                            y=Decimal.from_float(y),
                         )
                         pointList.append(point)
 

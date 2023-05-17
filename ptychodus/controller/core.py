@@ -44,16 +44,14 @@ class ControllerCore:
         self._scanController = ScanController.createInstance(model.scanRepositoryPresenter,
                                                              view.scanView, view.scanPlotView,
                                                              self._fileDialogFactory)
-        self._probeController = ProbeController.createInstance(model.probePresenter,
-                                                               view.probeView,
+        self._probeController = ProbeController.createInstance(model.apparatusPresenter,
+                                                               model.probeRepositoryPresenter,
                                                                model.probeImagePresenter,
-                                                               view.probeImageView,
+                                                               view.probeView, view.probeImageView,
                                                                self._fileDialogFactory)
-        self._objectController = ObjectController.createInstance(model.objectRepositoryPresenter,
-                                                                 model.objectImagePresenter,
-                                                                 view.objectView,
-                                                                 view.objectImageView,
-                                                                 self._fileDialogFactory)
+        self._objectController = ObjectController.createInstance(
+            model.apparatusPresenter, model.objectRepositoryPresenter, model.objectImagePresenter,
+            view.objectView, view.objectImageView, self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
             model.settingsRegistry, model.diffractionDatasetInputOutputPresenter,
             model.diffractionDatasetPresenter, model.metadataPresenter, model.patternPresenter,

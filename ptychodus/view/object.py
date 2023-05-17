@@ -2,10 +2,10 @@ from __future__ import annotations
 from typing import Generic, Optional, TypeVar
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
+                             QSpinBox, QVBoxLayout, QWidget)
 
-from .widgets import DecimalSlider, LengthWidget, RepositoryView
+from .widgets import DecimalSlider, LengthWidget, RepositoryTableView
 
 __all__ = [
     'ObjectEditorDialog',
@@ -25,7 +25,7 @@ class RandomObjectView(QGroupBox):
         self.extraPaddingYSpinBox = QSpinBox()
         self.amplitudeMeanSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.amplitudeDeviationSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.randomizePhaseCheckBox = QCheckBox('Randomize Phase')
+        self.phaseDeviationSlider = DecimalSlider.createInstance(Qt.Horizontal)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> RandomObjectView:
@@ -40,7 +40,7 @@ class RandomObjectView(QGroupBox):
         layout.addRow('Extra Padding Y:', view.extraPaddingYSpinBox)
         layout.addRow('Amplitude Mean:', view.amplitudeMeanSlider)
         layout.addRow('Amplitude Deviation:', view.amplitudeDeviationSlider)
-        layout.addRow(view.randomizePhaseCheckBox)
+        layout.addRow('Phase Deviation:', view.phaseDeviationSlider)
         view.setLayout(layout)
 
         return view
@@ -70,7 +70,6 @@ class ObjectEditorDialog(Generic[T], QDialog):
     def __init__(self, editorView: T, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.editorView = editorView
-        self.centerWidget = QWidget()
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
@@ -79,15 +78,11 @@ class ObjectEditorDialog(Generic[T], QDialog):
                        parent: Optional[QWidget] = None) -> ObjectEditorDialog[T]:
         view = cls(editorView, parent)
 
-        centerLayout = QVBoxLayout()
-        centerLayout.addWidget(editorView)
-        view.centerWidget.setLayout(centerLayout)
-
         view.buttonBox.addButton(QDialogButtonBox.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.centerWidget)
+        layout.addWidget(editorView)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
@@ -105,7 +100,7 @@ class ObjectView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.parametersView = ObjectParametersView.createInstance()
-        self.repositoryView = RepositoryView.createInstance('Repository')
+        self.repositoryView = RepositoryTableView.createInstance('Repository')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectView:

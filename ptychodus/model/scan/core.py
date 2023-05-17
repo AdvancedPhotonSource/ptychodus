@@ -203,8 +203,8 @@ class ScanCore(StatefulCore):
 
         for index, x, y in zip(scanIndex, scanXInMeters, scanYInMeters):
             pointMap[index] = ScanPoint(
-                x=Decimal(repr(x)),
-                y=Decimal(repr(y)),
+                x=Decimal.from_float(x),
+                y=Decimal.from_float(y),
             )
 
         filePath = Path(''.join(state['restartFilePath']))

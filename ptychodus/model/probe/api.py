@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 class ProbeAPI:
 
     def __init__(self, factory: ProbeRepositoryItemFactory, repository: ProbeRepository,
-                 probe_: SelectedProbe) -> None:
+                 probe: SelectedProbe) -> None:
         self._factory = factory
         self._repository = repository
-        self._probe = probe_
+        self._probe = probe
 
     def insertItemIntoRepositoryFromFile(self,
                                          filePath: Path,
@@ -56,14 +56,6 @@ class ProbeAPI:
 
     def selectItem(self, itemName: str) -> None:
         self._probe.selectItem(itemName)
-
-    def selectNewItemFromInitializerSimpleName(self, name: str) -> None:  # TODO improve name
-        itemName = self.insertItemIntoRepositoryFromInitializerSimpleName(name)
-
-        if itemName is None:
-            logger.error('Refusing to select null item!')
-        else:
-            self.selectItem(itemName)
 
     def getSelectedProbeArray(self) -> Optional[ProbeArrayType]:
         selectedItem = self._probe.getSelectedItem()

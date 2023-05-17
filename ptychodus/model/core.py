@@ -22,7 +22,7 @@ from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import ImageCore, ImagePresenter
 from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
-from .probe import ApparatusPresenter, ProbeCore, ProbePresenter
+from .probe import ApparatusPresenter, ProbeCore, ProbePresenter, ProbeRepositoryPresenter
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter, ReconstructorPlotPresenter
@@ -242,6 +242,10 @@ class ModelCore:
     @property
     def probePresenter(self) -> ProbePresenter:
         return self._probeCore.presenter
+
+    @property
+    def probeRepositoryPresenter(self) -> ProbeRepositoryPresenter:
+        return self._probeCore.repositoryPresenter
 
     @property
     def probeImagePresenter(self) -> ImagePresenter:

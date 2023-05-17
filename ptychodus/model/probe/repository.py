@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from typing import Optional
 import logging
 
@@ -99,6 +100,20 @@ class ProbeRepositoryItem(Observable, Observer):
 
         self.notifyObservers()
 
+
+# FIXME def setArray(self, array: ProbeArrayType) -> None:
+#           if not numpy.iscomplexobj(array):
+#               raise TypeError('Probe must be a complex-valued ndarray')
+#
+#           if array.ndim == 2:
+#               self._array = array[numpy.newaxis, ...]
+#           elif array.ndim == 3:
+#               self._array = array
+#           else:
+#               raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
+#
+#           self.notifyObservers()
+
     def getInitializerSimpleName(self) -> str:
         return 'FromMemory' if self._initializer is None else self._initializer.simpleName
 
@@ -118,7 +133,7 @@ class ProbeRepositoryItem(Observable, Observer):
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state from settings'''
         self._numberOfProbeModes = settings.numberOfProbeModes.value
-        self.notifyObservers()
+        self.reinitialize()
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state to settings'''
@@ -146,11 +161,27 @@ class ProbeRepositoryItem(Observable, Observer):
             self.reinitialize()
 
     def getNumberOfProbeModes(self) -> int:
-        return max(self._numberOfProbeModes, 1)
+        return self._array.shape[0]
+
+    def getProbeMode(self, mode: int) -> ProbeArrayType:
+        return self._array[mode, :, :]
+
+    def getProbeModeRelativePower(self, mode: int) -> Decimal:
+        if numpy.isnan(self._array).any():
+            logger.error('Probe contains NaN value(s)!')
+            return Decimal()
+
+        probe = self._array
+        power = numpy.sum((probe * probe.conj()).real, axis=(-2, -1))
+        powersum = power.sum()
+
+        if powersum > 0.:
+            power /= powersum
+
+        return Decimal.from_float(power[mode])
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:
             self.reinitialize()
-
 
 ProbeRepository = ItemRepository[ProbeRepositoryItem]
