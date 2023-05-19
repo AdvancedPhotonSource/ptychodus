@@ -35,7 +35,7 @@ class ObjectTableModel(QAbstractTableModel):
             if index.column() == 0:
                 value = QVariant(itemPresenter.name)
             elif index.column() == 1:
-                value = QVariant(item.getInitializerSimpleName())
+                value = QVariant(item.getInitializerDisplayName())
             elif index.column() == 2:
                 value = QVariant(item.getDataType())
             elif index.column() == 3:

@@ -79,21 +79,20 @@ class ProbeController(Observer):
         controller = cls(apparatusPresenter, repositoryPresenter, imagePresenter, view, imageView,
                          fileDialogFactory)
         repositoryPresenter.addObserver(controller)
-
-        delegate = ProgressBarItemDelegate(view.modesView.treeView)
-        view.modesView.treeView.setItemDelegateForColumn(1, delegate)
-        view.modesView.treeView.setModel(controller._treeModel)
-        view.modesView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        view.modesView.treeView.selectionModel().selectionChanged.connect(
-            controller._updateImageView)
+        delegate = ProgressBarItemDelegate(view.repositoryView.treeView)
+        view.repositoryView.treeView.setItemDelegateForColumn(1, delegate)
+        view.repositoryView.treeView.setModel(controller._treeModel)
+        view.repositoryView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.repositoryView.treeView.selectionModel().selectionChanged.connect(
+            controller._updateView)
 
         for name in repositoryPresenter.getInitializerDisplayNameList():
-            insertAction = view.modesView.buttonBox.insertMenu.addAction(name)
+            insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 
-        view.modesView.buttonBox.editButton.clicked.connect(controller._editSelectedProbe)
-        view.modesView.buttonBox.saveButton.clicked.connect(controller._saveSelectedProbe)
-        view.modesView.buttonBox.removeButton.clicked.connect(controller._removeSelectedProbe)
+        view.repositoryView.buttonBox.editButton.clicked.connect(controller._editSelectedProbe)
+        view.repositoryView.buttonBox.saveButton.clicked.connect(controller._saveSelectedProbe)
+        view.repositoryView.buttonBox.removeButton.clicked.connect(controller._removeSelectedProbe)
         imageView.imageRibbon.indexGroupBox.setVisible(False)
 
         controller._syncModelToView()
@@ -112,7 +111,7 @@ class ProbeController(Observer):
 
     def _openProbe(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view.modesView,
+            self._view.repositoryView,
             'Open Probe',
             nameFilters=self._repositoryPresenter.getOpenFileFilterList(),
             selectedNameFilter=self._repositoryPresenter.getOpenFileFilter())
@@ -121,38 +120,27 @@ class ProbeController(Observer):
             self._repositoryPresenter.openProbe(filePath, nameFilter)
 
     def _saveSelectedProbe(self) -> None:
-        current = self._view.modesView.treeView.currentIndex()
+        current = self._view.repositoryView.treeView.currentIndex()
 
         if current.isValid():
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-                self._view.modesView,
+                self._view.repositoryView,
                 'Save Probe',
                 nameFilters=self._repositoryPresenter.getSaveFileFilterList(),
                 selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
             if filePath:
-                name = current.sibling(current.row(), 0).data()
+                name = current.internalPointer().getProbeName()
                 self._repositoryPresenter.saveProbe(name, filePath, nameFilter)
         else:
             logger.error('No items are selected!')
 
-    def _getSelectedItemPresenter(self) -> ProbeRepositoryItemPresenter | None:
-        itemPresenter: ProbeRepositoryItemPresenter | None = None
-        proxyIndex = self._view.modesView.treeView.currentIndex()
-
-        if proxyIndex.isValid():
-            index = self._proxyModel.mapToSource(proxyIndex)
-            itemPresenter = self._repositoryPresenter[index.row()]
-
-        return itemPresenter
-
     def _editSelectedProbe(self) -> None:
-        itemPresenter = self._getSelectedItemPresenter()
+        current = self._view.repositoryView.treeView.currentIndex()
 
         # TODO update while editing
-        if itemPresenter is None:
-            logger.error('No items are selected!')
-        else:
+        if current.isValid():
+            itemPresenter = current.internalPointer()._presenter  # FIXME
             item = itemPresenter.item
             initializerName = item.getInitializerSimpleName()
 
@@ -170,43 +158,40 @@ class ProbeController(Observer):
             else:
                 # FIXME FromFile
                 logger.error('Unknown probe repository item!')
+        else:
+            logger.error('No items are selected!')
 
     def _removeSelectedProbe(self) -> None:
-        current = self._view.modesView.treeView.currentIndex()
+        current = self._view.repositoryView.treeView.currentIndex()
 
         if current.isValid():
-            name = current.sibling(current.row(), 0).data()
+            name = current.internalPointer().getProbeName()
             self._repositoryPresenter.removeProbe(name)
         else:
             logger.error('No items are selected!')
 
     def _updateView(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         for index in deselected.indexes():
-            self._view.modesView.buttonBox.saveButton.setEnabled(False)
-            self._view.modesView.buttonBox.editButton.setEnabled(False)
-            self._view.modesView.buttonBox.removeButton.setEnabled(False)
+            self._view.repositoryView.buttonBox.saveButton.setEnabled(False)
+            self._view.repositoryView.buttonBox.editButton.setEnabled(False)
+            self._view.repositoryView.buttonBox.removeButton.setEnabled(False)
             self._imagePresenter.clearArray()
             break
 
         for index in selected.indexes():
-            self._view.modesView.buttonBox.saveButton.setEnabled(True)
-            self._view.modesView.buttonBox.editButton.setEnabled(True)
-            self._view.modesView.buttonBox.removeButton.setEnabled(True)
+            self._view.repositoryView.buttonBox.saveButton.setEnabled(True)
+            self._view.repositoryView.buttonBox.editButton.setEnabled(True)
+            self._view.repositoryView.buttonBox.removeButton.setEnabled(True)
 
-            sourceIndex = self._proxyModel.mapToSource(index)
-            itemPresenter = self._repositoryPresenter[sourceIndex.row()]
-            array = itemPresenter.item.getProbeMode(index.row())  # FIXME
-            self._imagePresenter.setArray(array)
+            node = index.internalPointer()
+            self._imagePresenter.setArray(node.getArray())
             break
 
     def _syncModelToView(self) -> None:
         rootNode = ProbeTreeNode.createRoot()
-        probeNode = rootNode.createChild('Current Probe', -1)
 
-        for index in range(self._presenter.getNumberOfProbeModes()):
-            power = self._presenter.getProbeModeRelativePower(index)
-            powerPct = int((100 * power).to_integral_value())
-            probeNode.createChild(f'Mode {index+1}', powerPct)
+        for itemPresenter in self._repositoryPresenter:
+            rootNode.createChild(itemPresenter)
 
         self._treeModel.setRootNode(rootNode)
 

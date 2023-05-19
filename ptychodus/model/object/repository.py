@@ -78,6 +78,9 @@ class ObjectRepositoryItem(Observable, Observer):
     def getInitializerSimpleName(self) -> str:
         return 'FromMemory' if self._initializer is None else self._initializer.simpleName
 
+    def getInitializerDisplayName(self) -> str:
+        return 'From Memory' if self._initializer is None else self._initializer.displayName
+
     def getInitializer(self) -> Optional[ObjectInitializer]:
         '''returns the initializer'''
         return self._initializer

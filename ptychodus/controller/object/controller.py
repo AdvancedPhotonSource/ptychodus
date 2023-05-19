@@ -148,7 +148,7 @@ class ObjectController(Observer):
         return itemPresenter
 
     def _editSelectedObject(self) -> None:
-        itemPresenter = self._getSelectedItemPresenter()
+        itemPresenter = self._getSelectedItemPresenter()  # FIXME do this differently
 
         # TODO update while editing
         if itemPresenter is None:

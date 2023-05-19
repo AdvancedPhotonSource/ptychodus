@@ -56,6 +56,7 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
         Y_m = Y_px * float(self._apparatus.getObjectPlanePixelSizeYInMeters())
         R_m = numpy.hypot(X_m, Y_m)
 
+        # FIXME FWHM
         Z = (R_m - float(self._annularRadiusInMeters)) / float(self._probeWidthInMeters)
         ZP = numpy.power(Z, 2 * float(self._orderParameter))
 

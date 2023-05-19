@@ -31,15 +31,15 @@ class ProbeRepositoryItemFactory:
         self._sizer = sizer
         self._fileReaderChooser = fileReaderChooser
         self._initializersBySimpleName: Mapping[str, InitializerFactory] = {
+            FromFileProbeInitializer.SIMPLE_NAME: self.createItemFromFile,
             DiskProbeInitializer.SIMPLE_NAME: self.createDiskItem,
             FresnelZonePlateProbeInitializer.SIMPLE_NAME: self.createFZPItem,
-            FromFileProbeInitializer.SIMPLE_NAME: self.createItemFromFile,
             SuperGaussianProbeInitializer.SIMPLE_NAME: self.createSuperGaussianItem,
         }
         self._initializersByDisplayName: Mapping[str, InitializerFactory] = {
+            FromFileProbeInitializer.DISPLAY_NAME: self.createItemFromFile,
             DiskProbeInitializer.DISPLAY_NAME: self.createDiskItem,
             FresnelZonePlateProbeInitializer.DISPLAY_NAME: self.createFZPItem,
-            FromFileProbeInitializer.DISPLAY_NAME: self.createItemFromFile,
             SuperGaussianProbeInitializer.DISPLAY_NAME: self.createSuperGaussianItem,
         }
 

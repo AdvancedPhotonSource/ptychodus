@@ -34,7 +34,7 @@ class DiffractionPatternArrayPresenter:
     data: DiffractionPatternData | None
 
     @classmethod
-    def createNull(cls):
+    def createNull(cls) -> DiffractionPatternArrayPresenter:
         return cls(str(), DiffractionPatternState.UNKNOWN, None)
 
 

@@ -1,35 +1,94 @@
 from __future__ import annotations
 from typing import overload
 
+import numpy
+
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
+
+from ...api.probe import ProbeArrayType
+from ...model.probe import ProbeRepositoryItemPresenter
 
 
 class ProbeTreeNode:
 
-    def __init__(self, parentItem: ProbeTreeNode | None, name: str,
-                 relativePowerPercent: int) -> None:
-        # FIXME sizeInBytes
+    def __init__(self, parentItem: ProbeTreeNode | None,
+                 presenter: ProbeRepositoryItemPresenter | None, modeIndex: int) -> None:
         self.parentItem = parentItem
-        self._name = name
-        self._relativePowerPercent = relativePowerPercent
+        self._presenter = presenter
+        self._modeIndex = modeIndex
         self.childItems: list[ProbeTreeNode] = list()
 
     @classmethod
     def createRoot(cls) -> ProbeTreeNode:
-        return cls(None, str(), 0)
+        return cls(None, None, -1)
 
-    def createChild(self, name: str, relativePowerPercent: int) -> ProbeTreeNode:
-        childItem = ProbeTreeNode(self, name, relativePowerPercent)
+    def createChild(self, presenter: ProbeRepositoryItemPresenter) -> ProbeTreeNode:
+        childItem = ProbeTreeNode(self, presenter, -1)
+
+        for modeIndex in range(presenter.item.getNumberOfProbeModes()):
+            grandChildItem = ProbeTreeNode(childItem, presenter, modeIndex)
+            childItem.childItems.append(grandChildItem)
+
         self.childItems.append(childItem)
         return childItem
 
-    @property
-    def name(self) -> str:
-        return self._name
+    def getProbeName(self) -> str:
+        if self._presenter is None:
+            return str()
 
-    @property
-    def relativePowerPercent(self) -> int:
-        return self._relativePowerPercent
+        return self._presenter.name
+
+    def getName(self) -> str:
+        if self._modeIndex < 0:
+            return self.getProbeName()
+
+        return f'Mode {self._modeIndex}'
+
+    def getInitializer(self) -> str:
+        if self._presenter is None:
+            return str()
+
+        return self._presenter.item.getInitializerDisplayName()
+
+    def getDataType(self) -> str:
+        if self._presenter is None:
+            return str()
+
+        return self._presenter.item.getDataType()
+
+    def getWidthInPixels(self) -> int:
+        if self._presenter is None:
+            return 0
+
+        return self._presenter.item.getExtentInPixels().width
+
+    def getHeightInPixels(self) -> int:
+        if self._presenter is None:
+            return 0
+
+        return self._presenter.item.getExtentInPixels().height
+
+    def getSizeInBytes(self) -> float:
+        if self._presenter is None:
+            return 0
+
+        return self._presenter.item.getSizeInBytes()
+
+    def getArray(self) -> ProbeArrayType:
+        if self._presenter is None:
+            return numpy.zeros((0, 0, 0), dtype=complex)
+
+        if self._modeIndex < 0:
+            return self._presenter.item.getProbeModesFlattened()
+
+        return self._presenter.item.getProbeMode(self._modeIndex)
+
+    def getRelativePowerPercent(self) -> int:
+        if self._presenter is None or self._modeIndex < 0:
+            return 100
+
+        relativePower = self._presenter.item.getProbeModeRelativePower(self._modeIndex)
+        return int((100 * relativePower).to_integral_value())
 
     def row(self) -> int:
         if self.parentItem:
@@ -115,9 +174,9 @@ class ProbeTreeModel(QAbstractItemModel):
             node = index.internalPointer()
 
             if role == Qt.DisplayRole and index.column() == 0:
-                value = QVariant(node.name)
+                value = QVariant(node.getName())
             elif role == Qt.UserRole and index.column() == 1:
-                value = QVariant(node.relativePowerPercent)
+                value = QVariant(node.getRelativePowerPercent())
 
         return value
 

@@ -56,7 +56,7 @@ class ProbeRepositoryItem(Observable, Observer):
         super().__init__()
         self._rng = rng
         self._nameHint = nameHint
-        self._array = numpy.zeros((0, 0, 0), dtype=complex) if array is None else array
+        self._array = numpy.zeros((1, 0, 0), dtype=complex) if array is None else array
         self._initializer: Optional[ProbeInitializer] = None
         self._numberOfProbeModes: int = 0
 
@@ -82,6 +82,9 @@ class ProbeRepositoryItem(Observable, Observer):
             logger.exception('Failed to reinitialize probe!')
             return
 
+        if not numpy.iscomplexobj(primaryMode):
+            raise TypeError('Probe must be a complex-valued ndarray')
+
         modeList = [primaryMode]
 
         while len(modeList) < self.getNumberOfProbeModes():
@@ -96,26 +99,22 @@ class ProbeRepositoryItem(Observable, Observer):
             mode = primaryMode * phaseShift[0][numpy.newaxis] * phaseShift[1][:, numpy.newaxis]
             modeList.append(mode)
 
-        self._array = numpy.stack(modeList)
+        array = numpy.stack(modeList)
+
+        if array.ndim == 2:
+            self._array = array[numpy.newaxis, ...]
+        elif array.ndim == 3:
+            self._array = array
+        else:
+            raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
 
         self.notifyObservers()
 
-
-# FIXME def setArray(self, array: ProbeArrayType) -> None:
-#           if not numpy.iscomplexobj(array):
-#               raise TypeError('Probe must be a complex-valued ndarray')
-#
-#           if array.ndim == 2:
-#               self._array = array[numpy.newaxis, ...]
-#           elif array.ndim == 3:
-#               self._array = array
-#           else:
-#               raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
-#
-#           self.notifyObservers()
-
     def getInitializerSimpleName(self) -> str:
         return 'FromMemory' if self._initializer is None else self._initializer.simpleName
+
+    def getInitializerDisplayName(self) -> str:
+        return 'From Memory' if self._initializer is None else self._initializer.displayName
 
     def getInitializer(self) -> Optional[ProbeInitializer]:
         '''returns the initializer'''
@@ -166,6 +165,9 @@ class ProbeRepositoryItem(Observable, Observer):
     def getProbeMode(self, mode: int) -> ProbeArrayType:
         return self._array[mode, :, :]
 
+    def getProbeModesFlattened(self) -> ProbeArrayType:
+        return self._array.transpose((1, 0, 2)).reshape(self._array.shape[1], -1)
+
     def getProbeModeRelativePower(self, mode: int) -> Decimal:
         if numpy.isnan(self._array).any():
             logger.error('Probe contains NaN value(s)!')
@@ -183,5 +185,6 @@ class ProbeRepositoryItem(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:
             self.reinitialize()
+
 
 ProbeRepository = ItemRepository[ProbeRepositoryItem]

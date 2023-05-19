@@ -111,7 +111,7 @@ class ScanController(Observer):
         return itemPresenter
 
     def _editSelectedScan(self) -> None:
-        itemPresenter = self._getSelectedItemPresenter()
+        itemPresenter = self._getSelectedItemPresenter()  # FIXME do this differently
 
         if itemPresenter is None:
             logger.error('No items are selected!')
