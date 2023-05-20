@@ -16,11 +16,6 @@ class RepositoryItem(Protocol):
         '''returns a name hint that is appropriate for a settings file'''
         pass
 
-    @property
-    def canSelect(self) -> bool:
-        '''indicates whether item can be selected'''
-        pass
-
     def addObserver(self, observer: Observer) -> None:
         '''adds an observer'''
         pass
@@ -117,21 +112,13 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
         return item
 
     def getSelectableNames(self) -> Sequence[str]:
-        return [name for name, item in self._repository.items() if item.canSelect]
+        return list(self._repository.keys())
 
     def getSelectedName(self) -> str:
         return self._name
 
     def getSelectedItem(self) -> T | None:
         return self._item
-
-    def canSelectItem(self, name: str) -> bool:
-        try:
-            item = self._repository[name]
-        except KeyError:
-            return False
-        else:
-            return item.canSelect
 
     def deselectItem(self) -> None:
         if self._item is not None:
@@ -148,18 +135,14 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
             logger.error(f'Failed to select \"{name}\"!')
             return
 
-        if item.canSelect:
-            if self._item is not None:
-                self._item.removeObserver(self)
+        if self._item is not None:
+            self._item.removeObserver(self)
 
-            self._item = item
-            self._name = name
-            self._item.addObserver(self)
+        self._item = item
+        self._name = name
+        self._item.addObserver(self)
 
-            self._syncToSettings()
-        else:
-            logger.error(f'Failed to select \"{name}\"!')
-
+        self._syncToSettings()
         self.notifyObservers()
 
     def _recoverIfSelectedItemRemovedFromRepository(self) -> None:

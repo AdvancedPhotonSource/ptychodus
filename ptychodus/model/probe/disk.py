@@ -44,6 +44,15 @@ class DiskProbeInitializer(ProbeInitializer):
         gridCentersR = numpy.hypot(X, Y)
 
         # FIXME regular disk vs test pattern
+        # % Function diskProbe - Constructs a disk probe.
+        # function probe = diskProbe(X,Y,probeFWHM,probeCenter)
+        #
+        #     R = sqrt((X-probeCenter(1)).^2 + (Y-probeCenter(2)).^2);
+        #
+        #     probe = double(R < probeFWHM/2);
+        #     probe = probe./sqrt(sum(abs(probe(:)).^2));
+        #
+        # end
         NIL = (gridCentersR > 1)
         X[NIL] = 0
         Y[NIL] = 0

@@ -46,7 +46,6 @@ class DetectorController(Observer):
         controller = cls(detectorPresenter, apparatusPresenter, datasetPresenter, imagePresenter,
                          view, imageView, fileDialogFactory)
 
-        imageView.imageRibbon.indexGroupBox.setVisible(False)
         view.dataView.treeView.setModel(controller._treeModel)
         view.dataView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.dataView.treeView.selectionModel().selectionChanged.connect(controller._updateView)

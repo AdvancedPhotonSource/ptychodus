@@ -15,7 +15,7 @@ class ProbeTreeNode:
                  presenter: ProbeRepositoryItemPresenter | None, modeIndex: int) -> None:
         self.parentItem = parentItem
         self._presenter = presenter
-        self._modeIndex = modeIndex
+        self.modeIndex = modeIndex
         self.childItems: list[ProbeTreeNode] = list()
 
     @classmethod
@@ -32,23 +32,11 @@ class ProbeTreeNode:
         self.childItems.append(childItem)
         return childItem
 
-    def getProbeName(self) -> str:
+    def getName(self) -> str:
         if self._presenter is None:
             return str()
 
         return self._presenter.name
-
-    def getName(self) -> str:
-        if self._modeIndex < 0:
-            return self.getProbeName()
-
-        return f'Mode {self._modeIndex}'
-
-    def getInitializer(self) -> str:
-        if self._presenter is None:
-            return str()
-
-        return self._presenter.item.getInitializerDisplayName()
 
     def getDataType(self) -> str:
         if self._presenter is None:
@@ -78,16 +66,16 @@ class ProbeTreeNode:
         if self._presenter is None:
             return numpy.zeros((0, 0, 0), dtype=complex)
 
-        if self._modeIndex < 0:
+        if self.modeIndex < 0:
             return self._presenter.item.getProbeModesFlattened()
 
-        return self._presenter.item.getProbeMode(self._modeIndex)
+        return self._presenter.item.getProbeMode(self.modeIndex)
 
     def getRelativePowerPercent(self) -> int:
-        if self._presenter is None or self._modeIndex < 0:
-            return 100
+        if self._presenter is None or self.modeIndex < 0:
+            return -1
 
-        relativePower = self._presenter.item.getProbeModeRelativePower(self._modeIndex)
+        relativePower = self._presenter.item.getProbeModeRelativePower(self.modeIndex)
         return int((100 * relativePower).to_integral_value())
 
     def row(self) -> int:
@@ -102,6 +90,9 @@ class ProbeTreeModel(QAbstractItemModel):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rootNode = ProbeTreeNode.createRoot()
+        self._header = [
+            'Name', 'Relative Power', 'Data Type', 'Width [px]', 'Height [px]', 'Size [MB]'
+        ]
 
     def setRootNode(self, rootNode: ProbeTreeNode) -> None:
         self.beginResetModel()
@@ -140,10 +131,7 @@ class ProbeTreeModel(QAbstractItemModel):
         value = None
 
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            if section == 0:
-                value = QVariant('Mode')
-            elif section == 1:
-                value = QVariant('Relative Power')
+            value = QVariant(self._header[section])
 
         return QVariant(value)
 
@@ -173,8 +161,20 @@ class ProbeTreeModel(QAbstractItemModel):
         if index.isValid():
             node = index.internalPointer()
 
-            if role == Qt.DisplayRole and index.column() == 0:
-                value = QVariant(node.getName())
+            if role == Qt.DisplayRole:
+                if node.modeIndex < 0:
+                    if index.column() == 0:
+                        value = QVariant(node.getName())
+                    elif index.column() == 2:
+                        value = QVariant(node.getDataType())
+                    elif index.column() == 3:
+                        value = QVariant(node.getWidthInPixels())
+                    elif index.column() == 4:
+                        value = QVariant(node.getHeightInPixels())
+                    elif index.column() == 5:
+                        value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
+                elif index.column() == 0:
+                    value = QVariant(f'Mode {node.modeIndex}')
             elif role == Qt.UserRole and index.column() == 1:
                 value = QVariant(node.getRelativePowerPercent())
 
@@ -192,4 +192,4 @@ class ProbeTreeModel(QAbstractItemModel):
         return len(node.childItems)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 2
+        return len(self._header)

@@ -99,7 +99,8 @@ class RandomObjectInitializer(ObjectInitializer):
             self.notifyObservers()
 
     def getPhaseDeviationLimits(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))  # FIXME
+        pi = Decimal.from_float(numpy.pi)
+        return Interval[Decimal](Decimal(0), pi)
 
     def getPhaseDeviation(self) -> Decimal:
         limits = self.getPhaseDeviationLimits()

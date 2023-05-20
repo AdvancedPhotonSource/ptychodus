@@ -71,11 +71,6 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         '''returns a name hint that is appropriate for a settings file'''
         return self._nameHint
 
-    @property
-    def canSelect(self) -> bool:
-        '''indicates whether item can be selected'''
-        return (self._initializer is not None)
-
     def reinitialize(self) -> None:
         '''reinitializes the scan point sequence'''
         if self._initializer is None:

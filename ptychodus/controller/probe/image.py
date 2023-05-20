@@ -26,27 +26,16 @@ class ProbeImageController(Observer):
         controller = cls(presenter, imagePresenter, imageView, fileDialogFactory)
         presenter.addObserver(controller)
         controller._syncModelToView()
-        imageView.imageRibbon.indexGroupBox.setTitle('Probe Mode')
-        imageView.imageRibbon.indexGroupBox.indexSpinBox.valueChanged.connect(
-            controller._renderImageData)
         return controller
 
-    def _renderImageData(self, index: int) -> None:
-        array = self._presenter.getSelectedProbeModeArray(index)
+    def _syncModelToView(self) -> None:
+        # FIXME what to do with monitor screen?
+        array = self._presenter.getSelectedProbeFlattenedArray()
 
         if array is None:
             self._imagePresenter.clearArray()
         else:
             self._imagePresenter.setArray(array)
-
-    def _syncModelToView(self) -> None:
-        # FIXME what to do with monitor screen?
-        numberOfProbeModes = self._presenter.getNumberOfProbeModes()
-        self._imageView.imageRibbon.indexGroupBox.indexSpinBox.setEnabled(numberOfProbeModes > 0)
-        self._imageView.imageRibbon.indexGroupBox.indexSpinBox.setRange(0, numberOfProbeModes - 1)
-
-        index = self._imageView.imageRibbon.indexGroupBox.indexSpinBox.value()
-        self._renderImageData(index)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

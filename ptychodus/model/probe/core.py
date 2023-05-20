@@ -148,9 +148,9 @@ class ProbePresenter(Observable, Observer):
         selectedProbe = self._probe.getSelectedItem()
         return 0 if selectedProbe is None else selectedProbe.getNumberOfProbeModes()
 
-    def getSelectedProbeModeArray(self, mode: int) -> Optional[ProbeArrayType]:
+    def getSelectedProbeFlattenedArray(self) -> Optional[ProbeArrayType]:
         selectedProbe = self._probe.getSelectedItem()
-        return None if selectedProbe is None else selectedProbe.getProbeMode(mode)
+        return None if selectedProbe is None else selectedProbe.getProbeModesFlattened()
 
     def getSelectableNames(self) -> Sequence[str]:
         return self._probe.getSelectableNames()

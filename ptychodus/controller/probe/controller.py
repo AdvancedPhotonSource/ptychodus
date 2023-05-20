@@ -7,8 +7,7 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
-from ...model.probe import (ApparatusPresenter, ProbeRepositoryItemPresenter,
-                            ProbeRepositoryPresenter)
+from ...model.probe import ApparatusPresenter, ProbeRepositoryPresenter
 from ...view.image import ImageView
 from ...view.probe import ProbeParametersView, ProbeView
 from ...view.widgets import ProgressBarItemDelegate
@@ -34,6 +33,11 @@ class ProbeParametersController(Observer):
                        view: ProbeParametersView) -> ProbeParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
+
+        # FIXME remove active probe then cannot make valid again
+        # FIXME save probe without suffix then get exception because something adds the suffix during save
+        # FIXME save/load from restart file
+        # FIXME need to switch current scan/probe/object for reconstruction
 
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setReadOnly(True)
@@ -93,7 +97,6 @@ class ProbeController(Observer):
         view.repositoryView.buttonBox.editButton.clicked.connect(controller._editSelectedProbe)
         view.repositoryView.buttonBox.saveButton.clicked.connect(controller._saveSelectedProbe)
         view.repositoryView.buttonBox.removeButton.clicked.connect(controller._removeSelectedProbe)
-        imageView.imageRibbon.indexGroupBox.setVisible(False)
 
         controller._syncModelToView()
 
@@ -130,7 +133,7 @@ class ProbeController(Observer):
                 selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
             if filePath:
-                name = current.internalPointer().getProbeName()
+                name = current.internalPointer().getName()
                 self._repositoryPresenter.saveProbe(name, filePath, nameFilter)
         else:
             logger.error('No items are selected!')
@@ -138,7 +141,7 @@ class ProbeController(Observer):
     def _editSelectedProbe(self) -> None:
         current = self._view.repositoryView.treeView.currentIndex()
 
-        # TODO update while editing
+        # FIXME update while editing
         if current.isValid():
             itemPresenter = current.internalPointer()._presenter  # FIXME
             item = itemPresenter.item
@@ -165,7 +168,7 @@ class ProbeController(Observer):
         current = self._view.repositoryView.treeView.currentIndex()
 
         if current.isValid():
-            name = current.internalPointer().getProbeName()
+            name = current.internalPointer().getName()
             self._repositoryPresenter.removeProbe(name)
         else:
             logger.error('No items are selected!')

@@ -79,6 +79,11 @@ class ObjectController(Observer):
                          fileDialogFactory)
         repositoryPresenter.addObserver(controller)
 
+        # FIXME remove active probe then cannot make valid again
+        # FIXME save probe without suffix then get exception because something adds the suffix during save
+        # FIXME save/load from restart file
+        # FIXME need to switch current scan/probe/object for reconstruction
+
         controller._proxyModel.setSourceModel(controller._tableModel)
         view.repositoryView.tableView.setModel(controller._proxyModel)
         view.repositoryView.tableView.setSortingEnabled(True)
@@ -95,7 +100,6 @@ class ObjectController(Observer):
         view.repositoryView.buttonBox.saveButton.clicked.connect(controller._saveSelectedObject)
         view.repositoryView.buttonBox.removeButton.clicked.connect(
             controller._removeSelectedObject)
-        imageView.imageRibbon.indexGroupBox.setVisible(False)
 
         controller._syncModelToView()
 
@@ -150,7 +154,7 @@ class ObjectController(Observer):
     def _editSelectedObject(self) -> None:
         itemPresenter = self._getSelectedItemPresenter()  # FIXME do this differently
 
-        # TODO update while editing
+        # FIXME update while editing
         if itemPresenter is None:
             logger.error('No items are selected!')
         else:

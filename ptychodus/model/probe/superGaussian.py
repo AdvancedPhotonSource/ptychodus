@@ -57,6 +57,17 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
         R_m = numpy.hypot(X_m, Y_m)
 
         # FIXME FWHM
+        # % Function gaussianProbe - Constructs a Gaussian probe.
+        # function probe = gaussianProbe(X,Y,probeFWHM,probeCenter)
+        #
+        #     R = sqrt((X-probeCenter(1)).^2 + (Y-probeCenter(2)).^2);
+        #     % Calculate sigma such that 2*sqrt(2*log(2))*sigma = probeFWHM
+        #     % so that the diameter corresponds to the FWHM of the Gaussian.
+        #     sigma = probeFWHM/(2*sqrt(2*log(2)));
+        #     probe = exp(-(R.^2)/(2*sigma^2));
+        #     probe = probe./sqrt(sum(abs(probe(:)).^2));
+        #
+        # end
         Z = (R_m - float(self._annularRadiusInMeters)) / float(self._probeWidthInMeters)
         ZP = numpy.power(Z, 2 * float(self._orderParameter))
 
