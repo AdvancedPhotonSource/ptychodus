@@ -29,7 +29,6 @@ class ProbeImageController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        # FIXME what to do with monitor screen?
         array = self._presenter.getSelectedProbeFlattenedArray()
 
         if array is None:

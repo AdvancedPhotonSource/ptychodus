@@ -2,12 +2,11 @@ from __future__ import annotations
 from typing import Callable, Final
 import logging
 
-from PyQt5.QtCore import QItemSelection
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
-from ...model.probe import ApparatusPresenter, ProbeRepositoryPresenter
+from ...model.probe import (ApparatusPresenter, ProbeRepositoryItem, ProbeRepositoryPresenter)
 from ...view.image import ImageView
 from ...view.probe import ProbeParametersView, ProbeView
 from ...view.widgets import ProgressBarItemDelegate
@@ -38,6 +37,7 @@ class ProbeParametersController(Observer):
         # FIXME save probe without suffix then get exception because something adds the suffix during save
         # FIXME save/load from restart file
         # FIXME need to switch current scan/probe/object for reconstruction
+        # FIXME this will ensure that the correct probe is shown on the monitor screen
 
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setReadOnly(True)
@@ -141,9 +141,8 @@ class ProbeController(Observer):
     def _editSelectedProbe(self) -> None:
         current = self._view.repositoryView.treeView.currentIndex()
 
-        # FIXME update while editing
         if current.isValid():
-            itemPresenter = current.internalPointer()._presenter  # FIXME
+            itemPresenter = current.internalPointer().presenter  # TODO do this cleaner
             item = itemPresenter.item
             initializerName = item.getInitializerSimpleName()
 
@@ -160,7 +159,7 @@ class ProbeController(Observer):
                 sgController.openDialog()
             else:
                 # FIXME FromFile
-                logger.error('Unknown probe repository item!')
+                logger.error('Unknown repository item!')
         else:
             logger.error('No items are selected!')
 
@@ -173,24 +172,25 @@ class ProbeController(Observer):
         else:
             logger.error('No items are selected!')
 
-    def _updateView(self, selected: QItemSelection, deselected: QItemSelection) -> None:
-        for index in deselected.indexes():
-            self._view.repositoryView.buttonBox.saveButton.setEnabled(False)
-            self._view.repositoryView.buttonBox.editButton.setEnabled(False)
-            self._view.repositoryView.buttonBox.removeButton.setEnabled(False)
-            self._imagePresenter.clearArray()
-            break
+    def _updateView(self) -> None:
+        selectionModel = self._view.repositoryView.treeView.selectionModel()
+        hasSelection = selectionModel.hasSelection()
 
-        for index in selected.indexes():
-            self._view.repositoryView.buttonBox.saveButton.setEnabled(True)
-            self._view.repositoryView.buttonBox.editButton.setEnabled(True)
-            self._view.repositoryView.buttonBox.removeButton.setEnabled(True)
+        self._view.repositoryView.buttonBox.saveButton.setEnabled(hasSelection)
+        self._view.repositoryView.buttonBox.editButton.setEnabled(hasSelection)
+        self._view.repositoryView.buttonBox.removeButton.setEnabled(hasSelection)
 
+        for index in selectionModel.selectedIndexes():
             node = index.internalPointer()
             self._imagePresenter.setArray(node.getArray())
-            break
+            return
+
+        self._imagePresenter.clearArray()
 
     def _syncModelToView(self) -> None:
+        for itemPresenter in self._repositoryPresenter:
+            itemPresenter.item.addObserver(self)
+
         rootNode = ProbeTreeNode.createRoot()
 
         for itemPresenter in self._repositoryPresenter:
@@ -201,3 +201,9 @@ class ProbeController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._repositoryPresenter:
             self._syncModelToView()
+        elif isinstance(observable, ProbeRepositoryItem):
+            for row, itemPresenter in enumerate(self._repositoryPresenter):
+                if observable is itemPresenter.item:
+                    self._treeModel.refreshProbe(row)
+                    self._updateView()
+                    break

@@ -5,6 +5,7 @@ from .core import (ProbeCore, ProbePresenter, ProbeRepositoryItemPresenter,
 from .disk import DiskProbeInitializer
 from .file import FromFileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
+from .repository import ProbeRepositoryItem
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
 from .superGaussian import SuperGaussianProbeInitializer
@@ -18,6 +19,7 @@ __all__ = [
     'ProbeAPI',
     'ProbeCore',
     'ProbePresenter',
+    'ProbeRepositoryItem',
     'ProbeRepositoryItemPresenter',
     'ProbeRepositoryPresenter',
     'ProbeSettings',

@@ -1,11 +1,12 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Optional
+from typing import Final, Optional
 import logging
 
 import numpy
 
+from ...api.geometry import Interval
 from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
 from ...api.probe import ProbeArrayType
@@ -48,6 +49,7 @@ class ProbeInitializer(ABC, Observable):
 
 class ProbeRepositoryItem(Observable, Observer):
     '''container for items that can be stored in a probe repository'''
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self,
                  rng: numpy.random.Generator,
@@ -82,7 +84,7 @@ class ProbeRepositoryItem(Observable, Observer):
 
         modeList = [primaryMode]
 
-        while len(modeList) < self.getNumberOfProbeModes():
+        while len(modeList) < self._numberOfProbeModes:
             # randomly shift the first mode
             pw = primaryMode.shape[-1]
 
@@ -149,13 +151,18 @@ class ProbeRepositoryItem(Observable, Observer):
         '''returns the array data'''
         return self._array
 
-    def setNumberOfProbeModes(self, number: int) -> None:
-        if self._numberOfProbeModes != number:
-            self._numberOfProbeModes = number
-            self.reinitialize()
+    def getNumberOfProbeModesLimits(self) -> Interval[int]:
+        # FIXME update controller to view spinbox limits
+        return Interval[int](1, self.MAX_INT)
 
     def getNumberOfProbeModes(self) -> int:
         return self._array.shape[0]
+
+    def setNumberOfProbeModes(self, number: int) -> None:
+        if self._numberOfProbeModes != number:
+            self._numberOfProbeModes = number
+            # TODO only reinitialize as needed
+            self.reinitialize()
 
     def getProbeMode(self, mode: int) -> ProbeArrayType:
         return self._array[mode, :, :]

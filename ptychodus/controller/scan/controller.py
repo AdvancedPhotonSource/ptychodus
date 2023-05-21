@@ -6,7 +6,8 @@ from PyQt5.QtCore import Qt, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
-from ...model.scan import ScanRepositoryItemPresenter, ScanRepositoryPresenter
+from ...model.scan import (ScanRepositoryItem, ScanRepositoryItemPresenter,
+                           ScanRepositoryPresenter)
 from ...view.scan import ScanView, ScanPlotView
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
@@ -40,13 +41,12 @@ class ScanController(Observer):
         repositoryPresenter.addObserver(controller)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
-
         view.repositoryView.tableView.setModel(controller._proxyModel)
         view.repositoryView.tableView.setSortingEnabled(True)
         view.repositoryView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.repositoryView.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
         view.repositoryView.tableView.selectionModel().selectionChanged.connect(
-            lambda selected, deselected: controller._updateView())
+            controller._updateView)
         view.repositoryView.tableView.horizontalHeader().sectionClicked.connect(
             lambda logicalIndex: controller._redrawPlot())
 
@@ -84,10 +84,22 @@ class ScanController(Observer):
         if filePath:
             self._repositoryPresenter.openScan(filePath, nameFilter)
 
-    def _saveSelectedScan(self) -> None:
-        current = self._view.repositoryView.tableView.currentIndex()
+    def _getCurrentItemPresenter(self) -> ScanRepositoryItemPresenter | None:
+        itemPresenter: ScanRepositoryItemPresenter | None = None
+        proxyIndex = self._view.repositoryView.tableView.currentIndex()
 
-        if current.isValid():
+        if proxyIndex.isValid():
+            index = self._proxyModel.mapToSource(proxyIndex)
+            itemPresenter = self._repositoryPresenter[index.row()]
+        else:
+            logger.error('No items are selected!')
+
+        return itemPresenter
+
+    def _saveSelectedScan(self) -> None:
+        itemPresenter = self._getCurrentItemPresenter()
+
+        if itemPresenter is not None:
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
                 self._view.repositoryView,
                 'Save Scan',
@@ -95,27 +107,12 @@ class ScanController(Observer):
                 selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
             if filePath:
-                name = current.sibling(current.row(), 0).data()
-                self._repositoryPresenter.saveScan(name, filePath, nameFilter)
-        else:
-            logger.error('No items are selected!')
-
-    def _getSelectedItemPresenter(self) -> ScanRepositoryItemPresenter | None:
-        itemPresenter: ScanRepositoryItemPresenter | None = None
-        proxyIndex = self._view.repositoryView.tableView.currentIndex()
-
-        if proxyIndex.isValid():
-            index = self._proxyModel.mapToSource(proxyIndex)
-            itemPresenter = self._repositoryPresenter[index.row()]
-
-        return itemPresenter
+                self._repositoryPresenter.saveScan(itemPresenter.name, filePath, nameFilter)
 
     def _editSelectedScan(self) -> None:
-        itemPresenter = self._getSelectedItemPresenter()  # FIXME do this differently
+        itemPresenter = self._getCurrentItemPresenter()
 
-        if itemPresenter is None:
-            logger.error('No items are selected!')
-        else:
+        if itemPresenter is not None:
             item = itemPresenter.item
             initializerName = item.getInitializerSimpleName()
 
@@ -139,13 +136,10 @@ class ScanController(Observer):
                 tabularController.openDialog()
 
     def _removeSelectedScan(self) -> None:
-        current = self._view.repositoryView.tableView.currentIndex()
+        itemPresenter = self._getCurrentItemPresenter()
 
-        if current.isValid():
-            name = current.sibling(current.row(), 0).data()
-            self._repositoryPresenter.removeScan(name)
-        else:
-            logger.error('No items are selected!')
+        if itemPresenter is not None:
+            self._repositoryPresenter.removeScan(itemPresenter.name)
 
     def _redrawPlot(self) -> None:
         itemDict = {
@@ -180,15 +174,11 @@ class ScanController(Observer):
 
     def _setButtonsEnabled(self) -> None:
         selectionModel = self._view.repositoryView.tableView.selectionModel()
-        enable = False
+        hasSelection = selectionModel.hasSelection()
 
-        for index in selectionModel.selectedIndexes():
-            if index.isValid():
-                enable = True
-
-        self._view.repositoryView.buttonBox.saveButton.setEnabled(enable)
-        self._view.repositoryView.buttonBox.editButton.setEnabled(enable)
-        self._view.repositoryView.buttonBox.removeButton.setEnabled(enable)
+        self._view.repositoryView.buttonBox.saveButton.setEnabled(hasSelection)
+        self._view.repositoryView.buttonBox.editButton.setEnabled(hasSelection)
+        self._view.repositoryView.buttonBox.removeButton.setEnabled(hasSelection)
 
     def _updateView(self) -> None:
         self._setButtonsEnabled()
@@ -200,15 +190,14 @@ class ScanController(Observer):
 
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
-        self._updateView()
 
     def update(self, observable: Observable) -> None:
         if observable is self._repositoryPresenter:
             self._syncModelToView()
-        else:
+        elif isinstance(observable, ScanRepositoryItem):
             for itemPresenter in self._repositoryPresenter:
-                itemIsChecked = self._tableModel.isChecked(itemPresenter.name)
+                if observable is itemPresenter.item:
+                    if self._tableModel.isChecked(itemPresenter.name):
+                        self._redrawPlot()
 
-                if observable is itemPresenter.item and itemIsChecked:
-                    self._redrawPlot()
                     break

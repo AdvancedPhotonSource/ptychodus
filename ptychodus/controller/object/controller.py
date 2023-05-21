@@ -2,12 +2,13 @@ from __future__ import annotations
 from typing import Callable, Final
 import logging
 
-from PyQt5.QtCore import QItemSelection, QSortFilterProxyModel
+from PyQt5.QtCore import QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
-from ...model.object import ObjectRepositoryItemPresenter, ObjectRepositoryPresenter
+from ...model.object import (ObjectRepositoryItem, ObjectRepositoryItemPresenter,
+                             ObjectRepositoryPresenter)
 from ...model.probe import ApparatusPresenter
 from ...view.image import ImageView
 from ...view.object import ObjectParametersView, ObjectView
@@ -83,6 +84,7 @@ class ObjectController(Observer):
         # FIXME save probe without suffix then get exception because something adds the suffix during save
         # FIXME save/load from restart file
         # FIXME need to switch current scan/probe/object for reconstruction
+        # FIXME this will ensure that the correct object is shown on the monitor screen
 
         controller._proxyModel.setSourceModel(controller._tableModel)
         view.repositoryView.tableView.setModel(controller._proxyModel)
@@ -125,10 +127,22 @@ class ObjectController(Observer):
         if filePath:
             self._repositoryPresenter.openObject(filePath, nameFilter)
 
-    def _saveSelectedObject(self) -> None:
-        current = self._view.repositoryView.tableView.currentIndex()
+    def _getCurrentItemPresenter(self) -> ObjectRepositoryItemPresenter | None:
+        itemPresenter: ObjectRepositoryItemPresenter | None = None
+        proxyIndex = self._view.repositoryView.tableView.currentIndex()
 
-        if current.isValid():
+        if proxyIndex.isValid():
+            index = self._proxyModel.mapToSource(proxyIndex)
+            itemPresenter = self._repositoryPresenter[index.row()]
+        else:
+            logger.error('No items are selected!')
+
+        return itemPresenter
+
+    def _saveSelectedObject(self) -> None:
+        itemPresenter = self._getCurrentItemPresenter()
+
+        if itemPresenter is not None:
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
                 self._view.repositoryView,
                 'Save Object',
@@ -136,28 +150,12 @@ class ObjectController(Observer):
                 selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
             if filePath:
-                name = current.sibling(current.row(), 0).data()
-                self._repositoryPresenter.saveObject(name, filePath, nameFilter)
-        else:
-            logger.error('No items are selected!')
-
-    def _getSelectedItemPresenter(self) -> ObjectRepositoryItemPresenter | None:
-        itemPresenter: ObjectRepositoryItemPresenter | None = None
-        proxyIndex = self._view.repositoryView.tableView.currentIndex()
-
-        if proxyIndex.isValid():
-            index = self._proxyModel.mapToSource(proxyIndex)
-            itemPresenter = self._repositoryPresenter[index.row()]
-
-        return itemPresenter
+                self._repositoryPresenter.saveObject(itemPresenter.name, filePath, nameFilter)
 
     def _editSelectedObject(self) -> None:
-        itemPresenter = self._getSelectedItemPresenter()  # FIXME do this differently
+        itemPresenter = self._getCurrentItemPresenter()
 
-        # FIXME update while editing
-        if itemPresenter is None:
-            logger.error('No items are selected!')
-        else:
+        if itemPresenter is not None:
             item = itemPresenter.item
             initializerName = item.getInitializerSimpleName()
 
@@ -167,41 +165,48 @@ class ObjectController(Observer):
                 randomController.openDialog()
             else:
                 # FIXME FromFile
-                logger.error('Unknown object repository item!')
+                logger.error('Unknown repository item!')
 
     def _removeSelectedObject(self) -> None:
-        current = self._view.repositoryView.tableView.currentIndex()
+        itemPresenter = self._getCurrentItemPresenter()
 
-        if current.isValid():
-            name = current.sibling(current.row(), 0).data()
-            self._repositoryPresenter.removeObject(name)
-        else:
-            logger.error('No items are selected!')
+        if itemPresenter is not None:
+            self._repositoryPresenter.removeObject(itemPresenter.name)
 
-    def _updateView(self, selected: QItemSelection, deselected: QItemSelection) -> None:
-        for index in deselected.indexes():
-            self._view.repositoryView.buttonBox.saveButton.setEnabled(False)
-            self._view.repositoryView.buttonBox.editButton.setEnabled(False)
-            self._view.repositoryView.buttonBox.removeButton.setEnabled(False)
+    def _updateView(self) -> None:
+        selectionModel = self._view.repositoryView.tableView.selectionModel()
+        hasSelection = selectionModel.hasSelection()
 
-            self._imagePresenter.clearArray()
-            break
+        self._view.repositoryView.buttonBox.saveButton.setEnabled(hasSelection)
+        self._view.repositoryView.buttonBox.editButton.setEnabled(hasSelection)
+        self._view.repositoryView.buttonBox.removeButton.setEnabled(hasSelection)
 
-        for index in selected.indexes():
-            self._view.repositoryView.buttonBox.saveButton.setEnabled(True)
-            self._view.repositoryView.buttonBox.editButton.setEnabled(True)
-            self._view.repositoryView.buttonBox.removeButton.setEnabled(True)
+        for proxyIndex in selectionModel.selectedIndexes():
+            index = self._proxyModel.mapToSource(proxyIndex)
+            itemPresenter = self._repositoryPresenter[index.row()]
 
-            sourceIndex = self._proxyModel.mapToSource(index)
-            itemPresenter = self._repositoryPresenter[sourceIndex.row()]
-            array = itemPresenter.item.getArray()
-            self._imagePresenter.setArray(array)
-            break
+            if itemPresenter is None:
+                logger.error('Bad item!')
+            else:
+                item = itemPresenter.item
+                self._imagePresenter.setArray(item.getArray())
+
+            return
+
+        self._imagePresenter.clearArray()
 
     def _syncModelToView(self) -> None:
+        for itemPresenter in self._repositoryPresenter:
+            itemPresenter.item.addObserver(self)
+
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
     def update(self, observable: Observable) -> None:
         if observable is self._repositoryPresenter:
             self._syncModelToView()
+        elif isinstance(observable, ObjectRepositoryItem):
+            for itemPresenter in self._repositoryPresenter:
+                if observable is itemPresenter.item:
+                    self._updateView()
+                    break
