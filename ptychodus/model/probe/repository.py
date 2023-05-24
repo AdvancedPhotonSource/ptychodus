@@ -98,30 +98,36 @@ class ProbeRepositoryItem(Observable, Observer):
             return
 
         try:
-            primaryMode = self._initializer()
+            initialProbe = self._initializer()
         except:
             logger.exception('Failed to reinitialize probe!')
             return
 
-        if not numpy.iscomplexobj(primaryMode):
-            raise TypeError('Probe must be a complex-valued ndarray')
+        modeList: list[ProbeArrayType] = list()
 
-        # FIXME probe = probe./sqrt(sum(abs(probe(:)).^2));
-        modeList = [primaryMode]
+        if initialProbe.ndim == 2:
+            modeList.append(initialProbe)
+        elif initialProbe.ndim == 3:
+            for mode in initialProbe:
+                modeList.append(mode)
+        else:
+            raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
 
         while len(modeList) < self._numberOfModes:
             # randomly shift the first mode
-            pw = primaryMode.shape[-1]
+            pw = initialProbe.shape[-1]
 
             variate1 = self._rng.uniform(size=(2, 1)) - 0.5
             variate2 = (numpy.arange(0, pw) + 0.5) / pw - 0.5
             variate = variate1 * variate2
             phaseShift = numpy.exp(-2j * numpy.pi * variate)
 
-            mode = primaryMode * phaseShift[0][numpy.newaxis] * phaseShift[1][:, numpy.newaxis]
+            mode = modeList[0] * phaseShift[0][numpy.newaxis] * phaseShift[1][:, numpy.newaxis]
             modeList.append(mode)
 
         array = numpy.stack(modeList)
+        # TODO array /= numpy.sqrt(numpy.sum(numpy.abs(array)**2))
+
         self._setArray(array)
 
     def getInitializerSimpleName(self) -> str:

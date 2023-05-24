@@ -208,6 +208,7 @@ class ScanCore(StatefulCore):
             )
 
         filePath = Path(''.join(state['restartFilePath']))
+        # FIXME need NPZ scan file plugin
         itemName = self.scanAPI.insertItemIntoRepositoryFromScan(nameHint='Restart',
                                                                  scan=TabularScan(pointMap),
                                                                  filePath=filePath,

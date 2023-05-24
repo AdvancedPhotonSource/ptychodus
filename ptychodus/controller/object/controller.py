@@ -82,7 +82,6 @@ class ObjectController(Observer):
 
         # FIXME remove active probe then cannot make valid again
         # FIXME save probe without suffix then get exception because something adds the suffix during save
-        # FIXME save/load from restart file
 
         controller._proxyModel.setSourceModel(controller._tableModel)
         view.repositoryView.tableView.setModel(controller._proxyModel)

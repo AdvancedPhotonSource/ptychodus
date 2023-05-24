@@ -22,7 +22,8 @@ class ProbeSettings(Observable, Observer):
 
         self.sgAnnularRadiusInMeters = settingsGroup.createRealEntry(
             'SuperGaussianAnnularRadiusInMeters', '0')
-        self.sgFWHMInMeters = settingsGroup.createRealEntry('SuperGaussianFWHMInMeters', '400e-6')
+        self.sgProbeWidthInMeters = settingsGroup.createRealEntry(
+            'SuperGaussianProbeWidthInMeters', '400e-6')
         self.sgOrderParameter = settingsGroup.createRealEntry('SuperGaussianOrderParameter', '1')
 
         self.zonePlateRadiusInMeters = settingsGroup.createRealEntry('ZonePlateRadiusInMeters',

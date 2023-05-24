@@ -35,7 +35,6 @@ class ProbeParametersController(Observer):
 
         # FIXME remove active probe then cannot make valid again
         # FIXME save probe without suffix then get exception because something adds the suffix during save
-        # FIXME save/load from restart file
 
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setReadOnly(True)

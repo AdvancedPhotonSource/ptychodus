@@ -20,7 +20,7 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
         self._sizer = sizer
         self._apparatus = apparatus
         self._annularRadiusInMeters = Decimal()
-        self._fwhmInMeters = Decimal('1.5e-6')
+        self._probeWidthInMeters = Decimal('1.5e-6')
         self._orderParameter = Decimal(1)
 
     @property
@@ -33,13 +33,13 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
 
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         self._annularRadiusInMeters = settings.sgAnnularRadiusInMeters.value
-        self._fwhmInMeters = settings.sgFWHMInMeters.value
+        self._probeWidthInMeters = settings.sgProbeWidthInMeters.value
         self._orderParameter = settings.sgOrderParameter.value
         self.notifyObservers()
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
         settings.sgAnnularRadiusInMeters.value = self._annularRadiusInMeters
-        settings.sgFWHMInMeters.value = self._fwhmInMeters
+        settings.sgProbeWidthInMeters.value = self._probeWidthInMeters
         settings.sgOrderParameter.value = self._orderParameter
 
     def __call__(self) -> ProbeArrayType:
@@ -52,7 +52,7 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
         Y_m = Y_px * float(self._apparatus.getObjectPlanePixelSizeYInMeters())
         R_m = numpy.hypot(X_m, Y_m)
 
-        Z = (R_m - float(self._annularRadiusInMeters)) / float(self._fwhmInMeters)
+        Z = (R_m - float(self._annularRadiusInMeters)) / float(self._probeWidthInMeters)
         ZP = numpy.power(2 * Z, 2 * float(self._orderParameter))
 
         return numpy.exp(-numpy.log(2) * ZP) + 0j
@@ -66,11 +66,11 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
             self.notifyObservers()
 
     def getFullWidthAtHalfMaximumInMeters(self) -> Decimal:
-        return self._fwhmInMeters
+        return self._probeWidthInMeters
 
     def setFullWidthAtHalfMaximumInMeters(self, value: Decimal) -> None:
-        if self._fwhmInMeters != value:
-            self._fwhmInMeters = value
+        if self._probeWidthInMeters != value:
+            self._probeWidthInMeters = value
             self.notifyObservers()
 
     def getOrderParameter(self) -> Decimal:
