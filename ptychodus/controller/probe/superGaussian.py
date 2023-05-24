@@ -41,9 +41,9 @@ class SuperGaussianProbeViewController(Observer):
             return
 
         self._view.annularRadiusWidget.lengthChanged.connect(initializer.setAnnularRadiusInMeters)
-        self._view.probeWidthWidget.lengthChanged.connect(initializer.setProbeWidthInMeters)
+        self._view.fwhmWidget.lengthChanged.connect(initializer.setFullWidthAtHalfMaximumInMeters)
         self._view.orderParameterWidget.valueChanged.connect(initializer.setOrderParameter)
-        self._view.numberOfModesSpinBox.valueChanged.connect(self._item.setNumberOfProbeModes)
+        self._view.numberOfModesSpinBox.valueChanged.connect(self._item.setNumberOfModes)
 
     def _syncModelToView(self) -> None:
         if self._initializer is None:
@@ -51,10 +51,15 @@ class SuperGaussianProbeViewController(Observer):
         else:
             self._view.annularRadiusWidget.setLengthInMeters(
                 self._initializer.getAnnularRadiusInMeters())
-            self._view.probeWidthWidget.setLengthInMeters(
-                self._initializer.getProbeWidthInMeters())
+            self._view.fwhmWidget.setLengthInMeters(
+                self._initializer.getFullWidthAtHalfMaximumInMeters())
             self._view.orderParameterWidget.setValue(self._initializer.getOrderParameter())
-            self._view.numberOfModesSpinBox.setValue(self._item.getNumberOfProbeModes())
+
+            self._view.numberOfModesSpinBox.blockSignals(True)
+            self._view.numberOfModesSpinBox.setRange(self._item.getNumberOfModesLimits().lower,
+                                                     self._item.getNumberOfModesLimits().upper)
+            self._view.numberOfModesSpinBox.setValue(self._item.getNumberOfModes())
+            self._view.numberOfModesSpinBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

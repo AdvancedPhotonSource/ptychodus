@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectInitializer(ABC, Observable):
+    '''ABC for plugins that can initialize objects'''
 
     @property
     @abstractmethod
@@ -30,12 +31,12 @@ class ObjectInitializer(ABC, Observable):
 
     @abstractmethod
     def syncFromSettings(self, settings: ObjectSettings) -> None:
-        '''synchronizes item state from settings'''
+        '''synchronizes initializer state from settings'''
         pass
 
     @abstractmethod
     def syncToSettings(self, settings: ObjectSettings) -> None:
-        '''synchronizes item state to settings'''
+        '''synchronizes initializer state to settings'''
         pass
 
     @abstractmethod
@@ -49,13 +50,35 @@ class ObjectRepositoryItem(Observable, Observer):
     def __init__(self, nameHint: str, array: Optional[ObjectArrayType] = None) -> None:
         super().__init__()
         self._nameHint = nameHint
-        self._array = numpy.zeros((0, 0), dtype=complex) if array is None else array
+        self._array = numpy.zeros((0, 0), dtype=complex)
         self._initializer: Optional[ObjectInitializer] = None
+
+        if array is not None:
+            self._setArray(array)
 
     @property
     def nameHint(self) -> str:
         '''returns a name hint that is appropriate for a settings file'''
         return self._nameHint
+
+    def getArray(self) -> ObjectArrayType:
+        '''returns the array data'''
+        return self._array
+
+    def _setArray(self, array: ObjectArrayType) -> None:
+        if not numpy.iscomplexobj(array):
+            raise TypeError('Object must be a complex-valued ndarray')
+
+        if array.ndim == 2:
+            self._array = array
+        else:
+            raise ValueError('Object must be 2-dimensional ndarray.')
+
+        self.notifyObservers()
+
+    def setArray(self, array: ObjectArrayType) -> None:
+        self._initializer = None
+        self._setArray(array)
 
     def reinitialize(self) -> None:
         '''reinitializes the object array'''
@@ -100,10 +123,6 @@ class ObjectRepositoryItem(Observable, Observer):
     def getSizeInBytes(self) -> int:
         '''returns the array size in bytes'''
         return self._array.nbytes
-
-    def getArray(self) -> ObjectArrayType:
-        '''returns the array data'''
-        return self._array
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

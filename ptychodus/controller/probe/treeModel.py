@@ -22,19 +22,19 @@ class ProbeTreeNode:
     def createRoot(cls) -> ProbeTreeNode:
         return cls(None, None, -1)
 
-    def populateProbeModes(self) -> None:
+    def populateModes(self) -> None:
         if self.presenter is None:
             return
 
         self.children.clear()
 
-        for probeMode in range(self.presenter.item.getNumberOfProbeModes()):
+        for probeMode in range(self.presenter.item.getNumberOfModes()):
             childNode = ProbeTreeNode(self, self.presenter, probeMode)
             self.children.append(childNode)
 
     def createChild(self, presenter: ProbeRepositoryItemPresenter) -> ProbeTreeNode:
         childNode = ProbeTreeNode(self, presenter, -1)
-        childNode.populateProbeModes()
+        childNode.populateModes()
         self.children.append(childNode)
         return childNode
 
@@ -50,11 +50,11 @@ class ProbeTreeNode:
 
         return self.presenter.item.getDataType()
 
-    def getNumberOfProbeModes(self) -> int:
+    def getNumberOfModes(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getNumberOfProbeModes()
+        return self.presenter.item.getNumberOfModes()
 
     def getWidthInPixels(self) -> int:
         if self.presenter is None:
@@ -78,15 +78,15 @@ class ProbeTreeNode:
         if self.presenter is None:
             return numpy.zeros((0, 0, 0), dtype=complex)
         elif self.probeMode < 0:
-            return self.presenter.item.getProbeModesFlattened()
+            return self.presenter.item.getModesFlattened()
 
-        return self.presenter.item.getProbeMode(self.probeMode)
+        return self.presenter.item.getMode(self.probeMode)
 
     def getRelativePowerPercent(self) -> int:
         if self.presenter is None or self.probeMode < 0:
             return -1
 
-        relativePower = self.presenter.item.getProbeModeRelativePower(self.probeMode)
+        relativePower = self.presenter.item.getModeRelativePower(self.probeMode)
         return int((100 * relativePower).to_integral_value())
 
     def row(self) -> int:
@@ -117,15 +117,15 @@ class ProbeTreeModel(QAbstractItemModel):
 
         node = self._rootNode.children[row]
         numModesOld = len(node.children)
-        numModesNew = node.getNumberOfProbeModes()
+        numModesNew = node.getNumberOfModes()
 
         if numModesOld < numModesNew:
             self.beginInsertRows(topLeft, numModesOld, numModesNew)
-            node.populateProbeModes()
+            node.populateModes()
             self.endInsertRows()
         else:
             self.beginRemoveRows(topLeft, numModesNew, numModesOld)
-            node.populateProbeModes()
+            node.populateModes()
             self.endRemoveRows()
 
         childTopLeft = self.index(0, 0, topLeft)

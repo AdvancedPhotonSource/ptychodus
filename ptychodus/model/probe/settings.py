@@ -16,12 +16,13 @@ class ProbeSettings(Observable, Observer):
                                                            Path('/path/to/probe.npy'))
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
             'ProbeEnergyInElectronVolts', '10000')
-        self.numberOfProbeModes = settingsGroup.createIntegerEntry('NumberOfProbeModes', 1)
+        self.numberOfModes = settingsGroup.createIntegerEntry('NumberOfModes', 1)
+
+        self.diskDiameterInMeters = settingsGroup.createRealEntry('DiskDiameterInMeters', '400e-6')
 
         self.sgAnnularRadiusInMeters = settingsGroup.createRealEntry(
             'SuperGaussianAnnularRadiusInMeters', '0')
-        self.sgProbeWidthInMeters = settingsGroup.createRealEntry(
-            'SuperGaussianProbeWidthInMeters', '400e-6')
+        self.sgFWHMInMeters = settingsGroup.createRealEntry('SuperGaussianFWHMInMeters', '400e-6')
         self.sgOrderParameter = settingsGroup.createRealEntry('SuperGaussianOrderParameter', '1')
 
         self.zonePlateRadiusInMeters = settingsGroup.createRealEntry('ZonePlateRadiusInMeters',

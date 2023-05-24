@@ -48,7 +48,7 @@ class FresnelZonePlateProbeViewController(Observer):
             initializer.setCentralBeamstopDiameterInMeters)
         self._view.defocusDistanceWidget.lengthChanged.connect(
             initializer.setDefocusDistanceInMeters)
-        self._view.numberOfModesSpinBox.valueChanged.connect(self._item.setNumberOfProbeModes)
+        self._view.numberOfModesSpinBox.valueChanged.connect(self._item.setNumberOfModes)
 
     def _syncModelToView(self) -> None:
         if self._initializer is None:
@@ -62,7 +62,12 @@ class FresnelZonePlateProbeViewController(Observer):
                 self._initializer.getCentralBeamstopDiameterInMeters())
             self._view.defocusDistanceWidget.setLengthInMeters(
                 self._initializer.getDefocusDistanceInMeters())
-            self._view.numberOfModesSpinBox.setValue(self._item.getNumberOfProbeModes())
+
+            self._view.numberOfModesSpinBox.blockSignals(True)
+            self._view.numberOfModesSpinBox.setRange(self._item.getNumberOfModesLimits().lower,
+                                                     self._item.getNumberOfModesLimits().upper)
+            self._view.numberOfModesSpinBox.setValue(self._item.getNumberOfModes())
+            self._view.numberOfModesSpinBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

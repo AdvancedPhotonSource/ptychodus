@@ -58,14 +58,38 @@ class ProbeRepositoryItem(Observable, Observer):
         super().__init__()
         self._rng = rng
         self._nameHint = nameHint
-        self._array = numpy.zeros((1, 0, 0), dtype=complex) if array is None else array
+        self._array = numpy.zeros((1, 0, 0), dtype=complex)
         self._initializer: Optional[ProbeInitializer] = None
-        self._numberOfProbeModes: int = 0
+        self._numberOfModes: int = 0
+
+        if array is not None:
+            self._setArray(array)
 
     @property
     def nameHint(self) -> str:
         '''returns a name hint that is appropriate for a settings file'''
         return self._nameHint
+
+    def getArray(self) -> ProbeArrayType:
+        '''returns the array data'''
+        return self._array
+
+    def _setArray(self, array: ProbeArrayType) -> None:
+        if not numpy.iscomplexobj(array):
+            raise TypeError('Probe must be a complex-valued ndarray')
+
+        if array.ndim == 2:
+            self._array = array[numpy.newaxis, ...]
+        elif array.ndim == 3:
+            self._array = array
+        else:
+            raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
+
+        self.notifyObservers()
+
+    def setArray(self, array: ProbeArrayType) -> None:
+        self._initializer = None
+        self._setArray(array)
 
     def reinitialize(self) -> None:
         '''reinitializes the probe array'''
@@ -82,9 +106,10 @@ class ProbeRepositoryItem(Observable, Observer):
         if not numpy.iscomplexobj(primaryMode):
             raise TypeError('Probe must be a complex-valued ndarray')
 
+        # FIXME probe = probe./sqrt(sum(abs(probe(:)).^2));
         modeList = [primaryMode]
 
-        while len(modeList) < self._numberOfProbeModes:
+        while len(modeList) < self._numberOfModes:
             # randomly shift the first mode
             pw = primaryMode.shape[-1]
 
@@ -97,15 +122,7 @@ class ProbeRepositoryItem(Observable, Observer):
             modeList.append(mode)
 
         array = numpy.stack(modeList)
-
-        if array.ndim == 2:
-            self._array = array[numpy.newaxis, ...]
-        elif array.ndim == 3:
-            self._array = array
-        else:
-            raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
-
-        self.notifyObservers()
+        self._setArray(array)
 
     def getInitializerSimpleName(self) -> str:
         return 'FromMemory' if self._initializer is None else self._initializer.simpleName
@@ -128,12 +145,12 @@ class ProbeRepositoryItem(Observable, Observer):
 
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state from settings'''
-        self._numberOfProbeModes = settings.numberOfProbeModes.value
+        self._numberOfModes = settings.numberOfModes.value
         self.reinitialize()
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state to settings'''
-        settings.numberOfProbeModes.value = self.getNumberOfProbeModes()
+        settings.numberOfModes.value = self.getNumberOfModes()
 
     def getDataType(self) -> str:
         '''returns the array data type'''
@@ -147,30 +164,25 @@ class ProbeRepositoryItem(Observable, Observer):
         '''returns the array size in bytes'''
         return self._array.nbytes
 
-    def getArray(self) -> ProbeArrayType:
-        '''returns the array data'''
-        return self._array
-
-    def getNumberOfProbeModesLimits(self) -> Interval[int]:
-        # FIXME update controller to view spinbox limits
+    def getNumberOfModesLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
-    def getNumberOfProbeModes(self) -> int:
+    def getNumberOfModes(self) -> int:
         return self._array.shape[0]
 
-    def setNumberOfProbeModes(self, number: int) -> None:
-        if self._numberOfProbeModes != number:
-            self._numberOfProbeModes = number
+    def setNumberOfModes(self, number: int) -> None:
+        if self._numberOfModes != number:
+            self._numberOfModes = number
             # TODO only reinitialize as needed
             self.reinitialize()
 
-    def getProbeMode(self, mode: int) -> ProbeArrayType:
+    def getMode(self, mode: int) -> ProbeArrayType:
         return self._array[mode, :, :]
 
-    def getProbeModesFlattened(self) -> ProbeArrayType:
+    def getModesFlattened(self) -> ProbeArrayType:
         return self._array.transpose((1, 0, 2)).reshape(self._array.shape[1], -1)
 
-    def getProbeModeRelativePower(self, mode: int) -> Decimal:
+    def getModeRelativePower(self, mode: int) -> Decimal:
         if numpy.isnan(self._array).any():
             logger.error('Probe contains NaN value(s)!')
             return Decimal()

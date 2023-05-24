@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Generic, Optional, TypeVar
 
-from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
-                             QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, EnergyWidget, LengthWidget, RepositoryTreeView
 
@@ -38,14 +38,18 @@ class DiskProbeView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
+        self.diameterWidget = LengthWidget.createInstance()
         self.numberOfModesSpinBox = QSpinBox()
+        self.testPatternCheckBox = QCheckBox('Test Pattern')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> DiskProbeView:
         view = cls(parent)
 
         layout = QFormLayout()
+        layout.addRow('Diameter:', view.diameterWidget)
         layout.addRow('Number of Modes:', view.numberOfModesSpinBox)
+        layout.addWidget(view.testPatternCheckBox)
         view.setLayout(layout)
 
         return view
@@ -56,7 +60,7 @@ class SuperGaussianProbeView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.annularRadiusWidget = LengthWidget.createInstance()
-        self.probeWidthWidget = LengthWidget.createInstance()
+        self.fwhmWidget = LengthWidget.createInstance()
         self.orderParameterWidget = DecimalLineEdit.createInstance()
         self.numberOfModesSpinBox = QSpinBox()
 
@@ -66,7 +70,7 @@ class SuperGaussianProbeView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Annular Radius:', view.annularRadiusWidget)
-        layout.addRow('Probe Width:', view.probeWidthWidget)
+        layout.addRow('Full Width at Half Maximum:', view.fwhmWidget)
         layout.addRow('Order Parameter:', view.orderParameterWidget)
         layout.addRow('Number of Modes:', view.numberOfModesSpinBox)
         view.setLayout(layout)

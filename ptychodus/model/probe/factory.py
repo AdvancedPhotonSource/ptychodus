@@ -117,7 +117,7 @@ class ProbeRepositoryItemFactory:
         return self.openItemFromFile(filePath, simpleFileType=fileType)
 
     def createDiskItem(self) -> ProbeRepositoryItem:
-        initializer = DiskProbeInitializer(self._sizer)
+        initializer = DiskProbeInitializer(self._sizer, self._apparatus)
         item = ProbeRepositoryItem(self._rng, initializer.simpleName)
         item.setInitializer(initializer)
         return item
