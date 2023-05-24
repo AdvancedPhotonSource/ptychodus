@@ -104,7 +104,20 @@ class TikeArrayConverter:
             yInMeters = yMinInMeters + Decimal.from_float(uyInPixels) * pixelSizeYInMeters
             pointDict[index] = ScanPoint(xInMeters, yInMeters)
 
+        # FIXME extract to reconstructor module: pass in copy of selected scan/probe/object
+        # to reconstructor so correct items are in restart file and on the monitor screen
         tabularScan = TabularScan(pointDict)
-        self._scanAPI.insertItemIntoRepositoryFromScan('Tike', tabularScan)
-        self._probeAPI.insertItemIntoRepositoryFromArray('Tike', arrays.probe[0, 0])
-        self._objectAPI.insertItemIntoRepositoryFromArray('Tike', arrays.object_)
+        scanName = self._scanAPI.insertItemIntoRepositoryFromScan('Tike', tabularScan)
+
+        if scanName:
+            self._scanAPI.selectItem(scanName)
+
+        probeName = self._probeAPI.insertItemIntoRepositoryFromArray('Tike', arrays.probe[0, 0])
+
+        if probeName:
+            self._probeAPI.selectItem(probeName)
+
+        objectName = self._objectAPI.insertItemIntoRepositoryFromArray('Tike', arrays.object_)
+
+        if objectName:
+            self._objectAPI.selectItem(objectName)

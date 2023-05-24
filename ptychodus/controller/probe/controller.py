@@ -36,8 +36,6 @@ class ProbeParametersController(Observer):
         # FIXME remove active probe then cannot make valid again
         # FIXME save probe without suffix then get exception because something adds the suffix during save
         # FIXME save/load from restart file
-        # FIXME need to switch current scan/probe/object for reconstruction
-        # FIXME this will ensure that the correct probe is shown on the monitor screen
 
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setReadOnly(True)
