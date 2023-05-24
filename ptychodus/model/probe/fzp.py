@@ -111,8 +111,12 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         super().__init__()
         self._sizer = sizer
         self._apparatus = apparatus
-        self._zonePlate = FresnelZonePlate(Decimal(), Decimal(), Decimal())
-        self._defocusDistanceInMeters = Decimal()  # from sample to the focal plane
+        self._zonePlate = FresnelZonePlate(
+            Decimal('90e-6'),
+            Decimal('50e-9'),
+            Decimal('60e-6'),
+        )
+        self._defocusDistanceInMeters = Decimal('800e-6')  # from sample to the focal plane
 
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         self._zonePlate.zonePlateRadiusInMeters = settings.zonePlateRadiusInMeters.value

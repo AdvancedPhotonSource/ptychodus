@@ -38,10 +38,10 @@ class ObjectRepositoryItemSettingsDelegate(RepositoryItemSettingsDelegate[Object
         itemInitializer = item.getInitializer()
 
         if itemInitializer is None:
-            raise RuntimeError('Unable to sync item to settings without initializer!')
-
-        self._settings.initializer.value = itemInitializer.simpleName
-        itemInitializer.syncToSettings(self._settings)
+            logger.warn('Unable to sync item to settings without initializer!')
+        else:
+            self._settings.initializer.value = itemInitializer.simpleName
+            itemInitializer.syncToSettings(self._settings)
 
 
 SelectedObject = SelectedRepositoryItem[ObjectRepositoryItem]
