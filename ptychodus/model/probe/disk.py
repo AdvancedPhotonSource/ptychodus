@@ -52,7 +52,10 @@ class DiskProbeInitializer(ProbeInitializer):
         X_m = X_px * float(self._apparatus.getObjectPlanePixelSizeXInMeters())
         Y_m = Y_px * float(self._apparatus.getObjectPlanePixelSizeYInMeters())
         R_m = numpy.hypot(X_m, Y_m)
-        return numpy.where(R_m < Rmax_m, 1 + 0j, 0j)
+
+        array = numpy.where(R_m < Rmax_m, 1 + 0j, 0j)
+        array /= numpy.sqrt(numpy.sum(numpy.abs(array)**2))
+        return array
 
     def getDiameterInMeters(self) -> Decimal:
         return self._diameterInMeters

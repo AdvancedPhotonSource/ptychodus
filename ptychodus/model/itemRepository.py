@@ -124,6 +124,7 @@ class SelectedRepositoryItem(Generic[T], Observable, Observer):
         if self._item is not None:
             self._item.removeObserver(self)
             self._item = None
+            self._name = str()
 
     def selectItem(self, name: str) -> None:
         if self._name == name:

@@ -33,7 +33,6 @@ class ProbeParametersController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        # FIXME remove active probe then cannot make valid again
         # FIXME save probe without suffix then get exception because something adds the suffix during save
 
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)

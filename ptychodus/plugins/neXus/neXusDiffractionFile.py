@@ -75,8 +75,13 @@ class DetectorSpecificGroup:
         assert photonEnergy.attrs['units'] == b'eV'
         xPixelsInDetector = group['x_pixels_in_detector']
         yPixelsInDetector = group['y_pixels_in_detector']
-        return cls(nimages[()], ntrigger[()], photonEnergy[()], xPixelsInDetector[()],
-                   yPixelsInDetector[()])
+        return cls(
+            nimages[()],
+            ntrigger[()],
+            float(photonEnergy[()]),
+            xPixelsInDetector[()],
+            yPixelsInDetector[()],
+        )
 
 
 @dataclass(frozen=True)
@@ -103,8 +108,15 @@ class DetectorGroup:
         assert h5XPixelSize.attrs['units'] == b'm'
         h5YPixelSize = group['y_pixel_size']
         assert h5YPixelSize.attrs['units'] == b'm'
-        return cls(detectorSpecific, h5DetectorDistance[()], h5BeamCenterX[()], h5BeamCenterY[()],
-                   h5BitDepthImage[()], h5XPixelSize[()], h5YPixelSize[()])
+        return cls(
+            detectorSpecific,
+            float(h5DetectorDistance[()]),
+            h5BeamCenterX[()],
+            h5BeamCenterY[()],
+            h5BitDepthImage[()],
+            float(h5XPixelSize[()]),
+            float(h5YPixelSize[()]),
+        )
 
 
 @dataclass(frozen=True)

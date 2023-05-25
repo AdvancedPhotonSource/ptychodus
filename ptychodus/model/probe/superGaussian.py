@@ -55,7 +55,9 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
         Z = (R_m - float(self._annularRadiusInMeters)) / float(self._probeWidthInMeters)
         ZP = numpy.power(2 * Z, 2 * float(self._orderParameter))
 
-        return numpy.exp(-numpy.log(2) * ZP) + 0j
+        array = numpy.exp(-numpy.log(2) * ZP) + 0j
+        array /= numpy.sqrt(numpy.sum(numpy.abs(array)**2))
+        return array
 
     def getAnnularRadiusInMeters(self) -> Decimal:
         return self._annularRadiusInMeters

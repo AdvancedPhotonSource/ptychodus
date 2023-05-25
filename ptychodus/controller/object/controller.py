@@ -80,7 +80,6 @@ class ObjectController(Observer):
                          fileDialogFactory)
         repositoryPresenter.addObserver(controller)
 
-        # FIXME remove active probe then cannot make valid again
         # FIXME save probe without suffix then get exception because something adds the suffix during save
 
         controller._proxyModel.setSourceModel(controller._tableModel)

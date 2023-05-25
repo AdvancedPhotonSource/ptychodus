@@ -126,8 +126,6 @@ class ProbeRepositoryItem(Observable, Observer):
             modeList.append(mode)
 
         array = numpy.stack(modeList)
-        # TODO array /= numpy.sqrt(numpy.sum(numpy.abs(array)**2))
-
         self._setArray(array)
 
     def getInitializerSimpleName(self) -> str:
