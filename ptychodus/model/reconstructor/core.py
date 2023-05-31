@@ -97,7 +97,7 @@ class ReconstructorCore:
         self.settings = ReconstructorSettings.createInstance(settingsRegistry)
         self._repository = ReconstructorRepository.createInstance(libraryList)
         self._activeReconstructor = ActiveReconstructor.createInstance(
-            self.settings, self._repository)
+            self.settings, self._repository, settingsRegistry)
         self.presenter = ReconstructorPresenter.createInstance(self.settings, self._repository,
                                                                self._activeReconstructor)
         self.plotPresenter = ReconstructorPlotPresenter()

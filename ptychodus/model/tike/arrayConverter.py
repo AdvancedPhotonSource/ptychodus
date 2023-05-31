@@ -30,6 +30,7 @@ class TikeArrayConverter:
 
     def __init__(self, scanAPI: ScanAPI, probeAPI: ProbeAPI, objectAPI: ObjectAPI,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
+        # FIXME change scan point alignment; do not autogrow
         self._scanAPI = scanAPI
         self._probeAPI = probeAPI
         self._objectAPI = objectAPI

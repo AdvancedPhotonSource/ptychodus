@@ -198,7 +198,7 @@ class ProbeRepositoryItem(Observable, Observer):
         if powersum > 0.:
             power /= powersum
 
-        return Decimal.from_float(power[mode])
+        return Decimal.from_float(float(power[mode]))
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

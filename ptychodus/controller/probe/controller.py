@@ -33,7 +33,7 @@ class ProbeParametersController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        # FIXME save probe without suffix then get exception because something adds the suffix during save
+        # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
 
         view.energyWidget.energyChanged.connect(presenter.setProbeEnergyInElectronVolts)
         view.wavelengthWidget.setReadOnly(True)

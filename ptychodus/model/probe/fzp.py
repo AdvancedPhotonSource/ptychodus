@@ -155,6 +155,10 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         #         zonePlateRadiusInMeters = 114.8e-6 / 2,
         #         outermostZoneWidthInMeters = 60e-9,
         #         centralBeamstopDiameterInMeters = 40e-6)
+        # hxn   = FresnelZonePlate(
+        #         zonePlateRadiusInMeters = 160e-6,
+        #         outermostZoneWidthInMeters = 30e-9,
+        #         centralBeamstopDiameterInMeters = 80e-6)
 
         probeExtent = self._sizer.getProbeExtent()
         probe = numpy.zeros(probeExtent.shape, dtype=complex)

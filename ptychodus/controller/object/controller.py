@@ -80,7 +80,7 @@ class ObjectController(Observer):
                          fileDialogFactory)
         repositoryPresenter.addObserver(controller)
 
-        # FIXME save probe without suffix then get exception because something adds the suffix during save
+        # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
         view.repositoryView.tableView.setModel(controller._proxyModel)
