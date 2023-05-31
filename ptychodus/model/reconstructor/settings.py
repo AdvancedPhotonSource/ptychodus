@@ -13,8 +13,9 @@ class ReconstructorSettings(Observable, Observer):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ReconstructorSettings:
-        settings = cls(settingsRegistry.createGroup('Reconstructor'))
-        settings._settingsGroup.addObserver(settings)
+        settingsGroup = settingsRegistry.createGroup('Reconstructor')
+        settings = cls(settingsGroup)
+        settingsGroup.addObserver(settings)
         return settings
 
     def update(self, observable: Observable) -> None:

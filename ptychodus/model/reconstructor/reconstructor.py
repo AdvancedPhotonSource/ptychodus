@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 import logging
+import time
 
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginEntry
@@ -45,23 +46,21 @@ class ReconstructorRepository(Mapping[str, Reconstructor], Observable):
 
 class ActiveReconstructor(Reconstructor, Observable, Observer):
 
-    def __init__(self, settings: ReconstructorSettings,
-                 repository: ReconstructorRepository) -> None:
+    def __init__(self, settings: ReconstructorSettings, repository: ReconstructorRepository,
+                 reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._repository = repository
+        self._reinitObservable = reinitObservable
         self._reconstructorPlugin = PluginEntry[Reconstructor]('None', 'None',
                                                                NullReconstructor('None'))
 
     @classmethod
-    def createInstance(cls, settings: ReconstructorSettings,
-                       repository: ReconstructorRepository) -> ActiveReconstructor:
-        reconstructor = cls(settings, repository)
-        settings.algorithm.addObserver(reconstructor)
-        repository.addObserver(reconstructor)
-
-        reconstructor._syncReconstructorFromSettings()
-
+    def createInstance(cls, settings: ReconstructorSettings, repository: ReconstructorRepository,
+                       reinitObservable: Observable) -> ActiveReconstructor:
+        reconstructor = cls(settings, repository, reinitObservable)
+        reinitObservable.addObserver(reconstructor)
+        reconstructor._syncFromSettings()
         return reconstructor
 
     @property
@@ -69,7 +68,12 @@ class ActiveReconstructor(Reconstructor, Observable, Observer):
         return self._reconstructorPlugin.displayName
 
     def reconstruct(self) -> ReconstructResult:
-        return self._reconstructorPlugin.strategy.reconstruct()
+        # FIXME reconstruct on copies of selected scans/objects/probes; select so it shows on monitor screen
+        tic = time.perf_counter()
+        result = self._reconstructorPlugin.strategy.reconstruct()
+        toc = time.perf_counter()
+        logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')
+        return result
 
     @staticmethod
     def _simplifyName(name: str) -> str:
@@ -99,9 +103,9 @@ class ActiveReconstructor(Reconstructor, Observable, Observer):
         self._settings.algorithm.value = self._reconstructorPlugin.simpleName
         self.notifyObservers()
 
-    def _syncReconstructorFromSettings(self) -> None:
+    def _syncFromSettings(self) -> None:
         self.selectReconstructor(self._settings.algorithm.value)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings.algorithm:
-            self._syncReconstructorFromSettings()
+        if observable is self._reinitObservable:
+            self._syncFromSettings()

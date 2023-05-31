@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget
 
 from ...model.tike import TikeReconstructorLibrary
-from ...view import TikeParametersView
+from ...view.tike import TikeParametersView
 from ..reconstructor import ReconstructorViewControllerFactory
 from .controller import TikeParametersController
 

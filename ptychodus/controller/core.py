@@ -7,7 +7,7 @@ from ..model import ModelCore
 from ..view import ViewCore
 from .automation import AutomationController
 from .data import DataParametersController, FileDialogFactory
-from .detector import (DatasetImageController, DatasetParametersController, DetectorController)
+from .detector import DetectorController
 from .object import ObjectImageController, ObjectController
 from .probe import ProbeImageController, ProbeController
 from .ptychonn import PtychoNNViewControllerFactory
@@ -38,27 +38,20 @@ class ControllerCore:
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
-            model.detectorPresenter, model.apparatusPresenter,
-            view.detectorParametersView.detectorView)
-        self._datasetParametersController = DatasetParametersController.createInstance(
-            model.diffractionDatasetPresenter, model.activeDiffractionPatternPresenter,
-            view.detectorParametersView.patternView)
-        self._datasetImageController = DatasetImageController.createInstance(
-            model.activeDiffractionPatternPresenter, model.detectorImagePresenter,
-            view.detectorImageView, self._fileDialogFactory)
-        self._probeController = ProbeController.createInstance(model.probePresenter,
-                                                               view.probeView,
-                                                               model.probeImagePresenter,
-                                                               view.probeImageView,
-                                                               self._fileDialogFactory)
+            model.detectorPresenter, model.apparatusPresenter, model.diffractionDatasetPresenter,
+            model.detectorImagePresenter, view.detectorView, view.detectorImageView,
+            self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepositoryPresenter,
                                                              view.scanView, view.scanPlotView,
                                                              self._fileDialogFactory)
-        self._objectController = ObjectController.createInstance(model.objectRepositoryPresenter,
-                                                                 model.objectImagePresenter,
-                                                                 view.objectView,
-                                                                 view.objectImageView,
-                                                                 self._fileDialogFactory)
+        self._probeController = ProbeController.createInstance(model.apparatusPresenter,
+                                                               model.probeRepositoryPresenter,
+                                                               model.probeImagePresenter,
+                                                               view.probeView, view.probeImageView,
+                                                               self._fileDialogFactory)
+        self._objectController = ObjectController.createInstance(
+            model.apparatusPresenter, model.objectRepositoryPresenter, model.objectImagePresenter,
+            view.objectView, view.objectImageView, self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
             model.settingsRegistry, model.diffractionDatasetInputOutputPresenter,
             model.diffractionDatasetPresenter, model.metadataPresenter, model.patternPresenter,

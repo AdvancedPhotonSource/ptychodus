@@ -44,7 +44,7 @@ class StateDataRegistry:
 
     def openStateData(self, filePath: Path) -> None:
         logger.debug(f'Reading state data from \"{filePath}\"')
-        data = numpy.load(filePath)
+        data = dict(numpy.load(filePath))
         data['restartFilePath'] = numpy.array(list(str(filePath.resolve())))
 
         for core in self._statefulCores:

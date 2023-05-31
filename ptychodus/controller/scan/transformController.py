@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ...api.observer import Observable, Observer
 from ...model.scan import ScanRepositoryItem
-from ...view import ScanTransformView
+from ...view.scan import ScanTransformView
 
 
 class ScanTransformController(Observer):

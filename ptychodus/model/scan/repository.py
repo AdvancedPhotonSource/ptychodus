@@ -71,11 +71,6 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         '''returns a name hint that is appropriate for a settings file'''
         return self._nameHint
 
-    @property
-    def canSelect(self) -> bool:
-        '''indicates whether item can be selected'''
-        return (self._initializer is not None)
-
     def reinitialize(self) -> None:
         '''reinitializes the scan point sequence'''
         if self._initializer is None:
@@ -140,9 +135,9 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         point = self._transform(self._scan[index])
 
         if self._jitterRadiusInMeters > Decimal():
-            rad = Decimal(repr(self._rng.uniform()))
-            dirX = Decimal(repr(self._rng.normal()))
-            dirY = Decimal(repr(self._rng.normal()))
+            rad = Decimal.from_float(self._rng.uniform())
+            dirX = Decimal.from_float(self._rng.normal())
+            dirY = Decimal.from_float(self._rng.normal())
 
             scalar = self._jitterRadiusInMeters * (rad / (dirX**2 + dirY**2)).sqrt()
             point = ScanPoint(point.x + scalar * dirX, point.y + scalar * dirY)

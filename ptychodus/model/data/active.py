@@ -39,7 +39,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         self._contentsTree = SimpleTreeNode.createRoot(list())
         self._arrayListLock = threading.RLock()
         self._arrayList: list[DiffractionPatternArray] = list()
-        self._arrayData: DiffractionPatternData = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
+        self._arrayData: DiffractionPatternData = numpy.zeros((0, 0, 0), dtype=numpy.uint16)
         self._changedEvent = threading.Event()
 
     def getMetadata(self) -> DiffractionMetadata:
@@ -47,6 +47,12 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     def getContentsTree(self) -> SimpleTreeNode:
         return self._contentsTree
+
+    def getInfoText(self) -> str:
+        number, height, width = self._arrayData.shape
+        dtype = str(self._arrayData.dtype)
+        sizeInMB = self._arrayData.nbytes / (1024 * 1024)
+        return f'Total: {number} {dtype}({width}W x {height}H) frames [{sizeInMB:.2f}MB]'
 
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ...model.tike import TikeReconstructorLibrary
-from ...view import TikeParametersView
+from ...view.tike import TikeParametersView
 from .basic import TikeBasicParametersController
 from .multigrid import TikeMultigridController
 from .objectCorrection import TikeObjectCorrectionController

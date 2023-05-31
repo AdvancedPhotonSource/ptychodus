@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 
 from PyQt5.QtCore import (Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject,
                           QVariant)
@@ -7,15 +6,13 @@ from PyQt5.QtWidgets import QTableView
 
 from ..api.observer import Observable, Observer
 from ..api.settings import SettingsGroup, SettingsRegistry
-from ..view import SettingsParametersView
+from ..view.settings import SettingsParametersView
 from .data import FileDialogFactory
 
 
 class SettingsGroupListModel(QAbstractListModel):
 
-    def __init__(self,
-                 settingsRegistry: SettingsRegistry,
-                 parent: Optional[QObject] = None) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._settingsRegistry = settingsRegistry
 
@@ -38,9 +35,7 @@ class SettingsGroupListModel(QAbstractListModel):
 
 class SettingsEntryTableModel(QAbstractTableModel):
 
-    def __init__(self,
-                 settingsGroup: Optional[SettingsGroup],
-                 parent: Optional[QObject] = None) -> None:
+    def __init__(self, settingsGroup: SettingsGroup | None, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._settingsGroup = settingsGroup
 

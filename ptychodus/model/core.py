@@ -16,13 +16,13 @@ from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
-from .data import (ActiveDiffractionPatternPresenter, DataCore, DiffractionDatasetPresenter,
-                   DiffractionDatasetInputOutputPresenter, DiffractionPatternPresenter)
+from .data import (DataCore, DiffractionDatasetPresenter, DiffractionDatasetInputOutputPresenter,
+                   DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import ImageCore, ImagePresenter
 from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
-from .probe import ApparatusPresenter, ProbeCore, ProbePresenter
+from .probe import ApparatusPresenter, ProbeCore, ProbePresenter, ProbeRepositoryPresenter
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter, ReconstructorPlotPresenter
@@ -99,10 +99,10 @@ class ModelCore:
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, self._dataCore.dataset, self._scanCore.scanAPI,
-            self._probeCore.probe, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
+            self._probeCore.probeAPI, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._pluginRegistry.buildObjectPhaseCenteringStrategyChooser(),
-            self._dataCore.dataset, self._scanCore.scanAPI, self._probeCore.probe,
+            self._dataCore.dataset, self._scanCore.scanAPI, self._probeCore.probeAPI,
             self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
@@ -119,7 +119,7 @@ class ModelCore:
             (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
         self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore.dataAPI,
-                                              self._scanCore.scanAPI, self._probeCore,
+                                              self._scanCore.scanAPI, self._probeCore.probeAPI,
                                               self._objectCore.objectAPI, self._workflowCore)
 
         self.rpcMessageService: Optional[RPCMessageService] = None
@@ -129,7 +129,7 @@ class ModelCore:
                                                        modelArgs.autoExecuteRPCs)
             self.rpcMessageService.registerProcedure(
                 LoadResultsMessage,
-                LoadResultsExecutor(self._probeCore.probe, self._objectCore.objectAPI))
+                LoadResultsExecutor(self._probeCore.probeAPI, self._objectCore.objectAPI))
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
@@ -180,10 +180,6 @@ class ModelCore:
     @property
     def patternPresenter(self) -> DiffractionPatternPresenter:
         return self._dataCore.patternPresenter
-
-    @property
-    def activeDiffractionPatternPresenter(self) -> ActiveDiffractionPatternPresenter:
-        return self._dataCore.activePatternPresenter
 
     @property
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
@@ -246,6 +242,10 @@ class ModelCore:
     @property
     def probePresenter(self) -> ProbePresenter:
         return self._probeCore.presenter
+
+    @property
+    def probeRepositoryPresenter(self) -> ProbeRepositoryPresenter:
+        return self._probeCore.repositoryPresenter
 
     @property
     def probeImagePresenter(self) -> ImagePresenter:

@@ -16,7 +16,7 @@ class ObjectSettings(Observable, Observer):
                                                            Path('/path/to/object.npy'))
         self.amplitudeMean = settingsGroup.createRealEntry('AmplitudeMean', '0.5')
         self.amplitudeDeviation = settingsGroup.createRealEntry('AmplitudeDeviation', '0')
-        self.randomizePhase = settingsGroup.createBooleanEntry('RandomizePhase', False)
+        self.phaseDeviation = settingsGroup.createRealEntry('PhaseDeviation', '0')
         self.extraPaddingX = settingsGroup.createIntegerEntry('ExtraPaddingX', 0)
         self.extraPaddingY = settingsGroup.createIntegerEntry('ExtraPaddingY', 0)
 

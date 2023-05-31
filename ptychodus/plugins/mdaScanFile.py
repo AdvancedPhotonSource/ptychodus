@@ -364,8 +364,8 @@ class MDAScanFileReader(ScanFileReader):
         yarray = mdaFile.scan.data.readback_array[1, :]
 
         for xf, yf in zip(xarray, yarray):
-            x = Decimal(repr(xf)) * micronsToMeters
-            y = Decimal(repr(yf)) * micronsToMeters
+            x = Decimal.from_float(xf) * micronsToMeters
+            y = Decimal.from_float(yf) * micronsToMeters
             point = ScanPoint(x, y)
 
             pointList.append(point)

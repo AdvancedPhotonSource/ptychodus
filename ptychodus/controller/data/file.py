@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QFileSystemModel
 
 from ...api.observer import Observable, Observer
 from ...model.data import DiffractionDatasetInputOutputPresenter
-from ...view import DataNavigationPage, DatasetFileView
+from ...view.data import DataNavigationPage, DatasetFileView
 from .dialogFactory import FileDialogFactory
 
 logger = logging.getLogger(__name__)

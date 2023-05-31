@@ -8,7 +8,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from .widgets import AngleWidget, LengthWidget, RepositoryView
+from .widgets import AngleWidget, LengthWidget, RepositoryTableView
 
 __all__ = [
     'CartesianScanView',
@@ -177,7 +177,6 @@ class ScanEditorDialog(Generic[T], QDialog):
         super().__init__(parent)
         self.editorView = editorView
         self.transformView = ScanTransformView.createInstance()
-        self.centerWidget = QWidget()
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
@@ -186,16 +185,12 @@ class ScanEditorDialog(Generic[T], QDialog):
                        parent: Optional[QWidget] = None) -> ScanEditorDialog[T]:
         view = cls(editorView, parent)
 
-        centerLayout = QVBoxLayout()
-        centerLayout.addWidget(editorView)
-        centerLayout.addWidget(view.transformView)
-        view.centerWidget.setLayout(centerLayout)
-
         view.buttonBox.addButton(QDialogButtonBox.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.centerWidget)
+        layout.addWidget(editorView)
+        layout.addWidget(view.transformView)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
@@ -212,7 +207,7 @@ class ScanView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.repositoryView = RepositoryView.createInstance('Repository')
+        self.repositoryView = RepositoryTableView.createInstance('Repository')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ScanView:

@@ -38,6 +38,9 @@ class ImagePresenter(Observable, Observer):
     def setArray(self, array: NumericArrayType) -> None:
         self._array.setArray(array)
 
+    def clearArray(self) -> None:
+        self._array.clearArray()
+
     @property
     def _colorizer(self) -> Colorizer:
         return self._colorizerChooser.getCurrentStrategy()
@@ -79,8 +82,8 @@ class ImagePresenter(Observable, Observer):
 
     def setDisplayRangeToDataRange(self) -> None:
         values = self._colorizer.getDataArray()
-        lower = Decimal(repr(values.min()))
-        upper = Decimal(repr(values.max()))
+        lower = Decimal.from_float(values.min())
+        upper = Decimal.from_float(values.max())
         dataRange = Interval[Decimal](lower, upper)
 
         if dataRange.lower.is_nan() or dataRange.upper.is_nan():
@@ -110,7 +113,13 @@ class ImagePresenter(Observable, Observer):
         return self._image
 
     def _updateImage(self) -> None:
-        self._image = self._colorizer()
+        try:
+            image = self._colorizer()
+        except:
+            logger.exception('Failed to render image!')
+            return
+
+        self._image = image
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:

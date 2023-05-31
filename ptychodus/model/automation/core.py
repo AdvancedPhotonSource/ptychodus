@@ -8,7 +8,7 @@ from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
-from ..probe import ProbeCore
+from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 from .buffer import AutomationDatasetBuffer
@@ -148,11 +148,11 @@ class AutomationProcessingPresenter(Observable, Observer):
 class AutomationCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, dataAPI: DiffractionDataAPI,
-                 scanAPI: ScanAPI, probeCore: ProbeCore, objectAPI: ObjectAPI,
+                 scanAPI: ScanAPI, probeAPI: ProbeAPI, objectAPI: ObjectAPI,
                  workflowCore: WorkflowCore) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
-        self._workflow = S02AutomationDatasetWorkflow(dataAPI, scanAPI, probeCore, objectAPI,
+        self._workflow = S02AutomationDatasetWorkflow(dataAPI, scanAPI, probeAPI, objectAPI,
                                                       workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,

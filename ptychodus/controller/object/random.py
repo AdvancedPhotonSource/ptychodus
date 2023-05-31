@@ -1,12 +1,11 @@
 from __future__ import annotations
-from typing import Optional
 import logging
 
 from PyQt5.QtWidgets import QWidget
 
 from ...api.observer import Observable, Observer
 from ...model.object import ObjectRepositoryItemPresenter, RandomObjectInitializer
-from ...view import ObjectEditorDialog, RandomObjectView
+from ...view.object import ObjectEditorDialog, RandomObjectView
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ class RandomObjectViewController(Observer):
         self._view = RandomObjectView.createInstance()
         self._dialog = ObjectEditorDialog.createInstance(self._view, parent)
         self._dialog.setWindowTitle(presenter.name)
-        self._initializer: Optional[RandomObjectInitializer] = None
+        self._initializer: RandomObjectInitializer | None = None
 
     @classmethod
     def createInstance(cls, presenter: ObjectRepositoryItemPresenter,
@@ -47,8 +46,7 @@ class RandomObjectViewController(Observer):
 
         self._view.amplitudeMeanSlider.valueChanged.connect(initializer.setAmplitudeMean)
         self._view.amplitudeDeviationSlider.valueChanged.connect(initializer.setAmplitudeDeviation)
-
-        self._view.randomizePhaseCheckBox.toggled.connect(initializer.setRandomizePhaseEnabled)
+        self._view.phaseDeviationSlider.valueChanged.connect(initializer.setPhaseDeviation)
 
     def _syncModelToView(self) -> None:
         if self._initializer is None:
@@ -62,9 +60,8 @@ class RandomObjectViewController(Observer):
             self._view.amplitudeDeviationSlider.setValueAndRange(
                 self._initializer.getAmplitudeDeviation(),
                 self._initializer.getAmplitudeDeviationLimits())
-
-            self._view.randomizePhaseCheckBox.setChecked(
-                self._initializer.isRandomizePhaseEnabled())
+            self._view.phaseDeviationSlider.setValueAndRange(
+                self._initializer.getPhaseDeviation(), self._initializer.getPhaseDeviationLimits())
 
     def update(self, observable: Observable) -> None:
         if observable is self._item:

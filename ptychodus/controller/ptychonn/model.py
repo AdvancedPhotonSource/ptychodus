@@ -3,7 +3,7 @@ from pathlib import Path
 
 from ...api.observer import Observable, Observer
 from ...model.ptychonn import PtychoNNModelPresenter
-from ...view import PtychoNNModelParametersView
+from ...view.ptychonn import PtychoNNModelParametersView
 from ..data import FileDialogFactory
 
 

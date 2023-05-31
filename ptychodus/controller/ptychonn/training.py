@@ -4,8 +4,8 @@ from pathlib import Path
 
 from ...api.observer import Observable, Observer
 from ...model.ptychonn import PtychoNNTrainingPresenter
-from ...view import (PtychoNNOutputParametersView, PtychoNNTrainingDataView,
-                     PtychoNNTrainingParametersView)
+from ...view.ptychonn import (PtychoNNOutputParametersView, PtychoNNTrainingDataView,
+                              PtychoNNTrainingParametersView)
 from ..data import FileDialogFactory
 
 

@@ -23,7 +23,7 @@ class RandomObjectInitializer(ObjectInitializer):
         self._extraPaddingY = 0
         self._amplitudeMean = Decimal(1) / 2
         self._amplitudeDeviation = Decimal()
-        self._randomizePhase = False
+        self._phaseDeviation = Decimal()
 
     @property
     def simpleName(self) -> str:
@@ -38,7 +38,7 @@ class RandomObjectInitializer(ObjectInitializer):
         self._extraPaddingY = settings.extraPaddingY.value
         self._amplitudeMean = settings.amplitudeMean.value
         self._amplitudeDeviation = settings.amplitudeDeviation.value
-        self._randomizePhase = settings.randomizePhase.value
+        self._phaseDeviation = settings.phaseDeviation.value
         self.notifyObservers()
 
     def syncToSettings(self, settings: ObjectSettings) -> None:
@@ -46,19 +46,17 @@ class RandomObjectInitializer(ObjectInitializer):
         settings.extraPaddingY.value = self._extraPaddingY
         settings.amplitudeMean.value = self._amplitudeMean
         settings.amplitudeDeviation.value = self._amplitudeDeviation
-        settings.randomizePhase.value = self._randomizePhase
+        settings.phaseDeviation.value = self._phaseDeviation
 
     def __call__(self) -> ObjectArrayType:
         extraPaddingExtent = ImageExtent(self._extraPaddingX, self._extraPaddingY)
         paddedObjectExtent = self._sizer.getObjectExtent() + extraPaddingExtent
 
-        size = paddedObjectExtent.shape
-        amplitude = numpy.clip(
-            self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation), size),
-            0., 1.)
-        phase = self._rng.uniform(0, 2 * numpy.pi, size=size) \
-                if self._randomizePhase else numpy.zeros_like(amplitude)
-        return amplitude * numpy.exp(1j * phase)
+        amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),
+                                     paddedObjectExtent.shape)
+        phase = self._rng.normal(0., float(self._phaseDeviation), paddedObjectExtent.shape)
+
+        return numpy.clip(amplitude, 0., 1.) * numpy.exp(1j * phase)
 
     def getExtraPaddingX(self) -> int:
         return self._extraPaddingX
@@ -80,7 +78,8 @@ class RandomObjectInitializer(ObjectInitializer):
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getAmplitudeMean(self) -> Decimal:
-        return self._amplitudeMean
+        limits = self.getAmplitudeMeanLimits()
+        return limits.clamp(self._amplitudeMean)
 
     def setAmplitudeMean(self, mean: Decimal) -> None:
         if self._amplitudeMean != mean:
@@ -91,17 +90,23 @@ class RandomObjectInitializer(ObjectInitializer):
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getAmplitudeDeviation(self) -> Decimal:
-        return self._amplitudeDeviation
+        limits = self.getAmplitudeDeviationLimits()
+        return limits.clamp(self._amplitudeDeviation)
 
     def setAmplitudeDeviation(self, stddev: Decimal) -> None:
         if self._amplitudeDeviation != stddev:
             self._amplitudeDeviation = stddev
             self.notifyObservers()
 
-    def isRandomizePhaseEnabled(self) -> bool:
-        return self._randomizePhase
+    def getPhaseDeviationLimits(self) -> Interval[Decimal]:
+        pi = Decimal.from_float(numpy.pi)
+        return Interval[Decimal](Decimal(0), pi)
 
-    def setRandomizePhaseEnabled(self, enabled: bool) -> None:
-        if self._randomizePhase != enabled:
-            self._randomizePhase = enabled
+    def getPhaseDeviation(self) -> Decimal:
+        limits = self.getPhaseDeviationLimits()
+        return limits.clamp(self._phaseDeviation)
+
+    def setPhaseDeviation(self, stddev: Decimal) -> None:
+        if self._phaseDeviation != stddev:
+            self._phaseDeviation = stddev
             self.notifyObservers()

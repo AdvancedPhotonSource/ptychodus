@@ -1,8 +1,11 @@
+from .api import ProbeAPI
 from .apparatus import Apparatus, ApparatusPresenter
-from .core import ProbeCore, ProbePresenter
-from .file import FileProbeInitializer
+from .core import (ProbeCore, ProbePresenter, ProbeRepositoryItemPresenter,
+                   ProbeRepositoryPresenter)
+from .disk import DiskProbeInitializer
+from .file import FromFileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
-from .probe import Probe
+from .repository import ProbeRepositoryItem
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
 from .superGaussian import SuperGaussianProbeInitializer
@@ -10,11 +13,15 @@ from .superGaussian import SuperGaussianProbeInitializer
 __all__ = [
     'Apparatus',
     'ApparatusPresenter',
-    'FileProbeInitializer',
+    'DiskProbeInitializer',
     'FresnelZonePlateProbeInitializer',
-    'Probe',
+    'FromFileProbeInitializer',
+    'ProbeAPI',
     'ProbeCore',
     'ProbePresenter',
+    'ProbeRepositoryItem',
+    'ProbeRepositoryItemPresenter',
+    'ProbeRepositoryPresenter',
     'ProbeSettings',
     'ProbeSizer',
     'SuperGaussianProbeInitializer',

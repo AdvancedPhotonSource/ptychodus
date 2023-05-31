@@ -75,8 +75,8 @@ class StreamingScanBuilder:
 
         for index in arrayIndexSet:
             pointMap[index] = ScanPoint(
-                x=Decimal(repr(posX[index])),
-                y=Decimal(repr(posY[index])),
+                x=Decimal.from_float(posX[index]),
+                y=Decimal.from_float(posY[index]),
             )
 
         return TabularScan(pointMap)

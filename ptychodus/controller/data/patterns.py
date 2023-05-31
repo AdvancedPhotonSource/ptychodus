@@ -4,8 +4,8 @@ from pathlib import Path
 from ...api.observer import Observable, Observer
 from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
                            DiffractionPatternPresenter)
-from ...view import (DataNavigationPage, PatternCropView, PatternLoadView, PatternMemoryMapView,
-                     PatternTransformView, PatternsView)
+from ...view.data import (DataNavigationPage, PatternCropView, PatternLoadView,
+                          PatternMemoryMapView, PatternTransformView, PatternsView)
 from ..data import FileDialogFactory
 
 

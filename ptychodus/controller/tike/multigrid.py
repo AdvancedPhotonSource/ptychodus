@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ...api.observer import Observable, Observer
 from ...model.tike import TikeMultigridPresenter
-from ...view import TikeMultigridView
+from ...view.tike import TikeMultigridView
 
 
 class TikeMultigridController(Observer):

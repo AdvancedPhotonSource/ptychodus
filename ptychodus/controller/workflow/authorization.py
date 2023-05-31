@@ -3,7 +3,7 @@ from __future__ import annotations
 from PyQt5.QtWidgets import QDialog
 
 from ...model.workflow import WorkflowAuthorizationPresenter
-from ...view import WorkflowAuthorizationDialog
+from ...view.workflow import WorkflowAuthorizationDialog
 
 
 class WorkflowAuthorizationController:

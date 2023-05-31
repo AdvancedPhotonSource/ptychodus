@@ -5,7 +5,7 @@ import re
 
 from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
-from ..probe import ProbeCore
+from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 
@@ -22,11 +22,11 @@ class AutomationDatasetWorkflow(ABC):
 
 class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeCore: ProbeCore,
+    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
                  objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
         self._dataAPI = dataAPI
         self._scanAPI = scanAPI
-        self._probeCore = probeCore
+        self._probeAPI = probeAPI
         self._objectAPI = objectAPI
         self._workflowCore = workflowCore
 
@@ -50,18 +50,18 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         if scanItemName is not None:
             self._scanAPI.selectItem(scanItemName)
 
-        self._probeCore.initializeAndSelectProbe()
+        # NOTE reuse probe
         self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)
 
 
 class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeCore: ProbeCore,
+    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
                  objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
         self._dataAPI = dataAPI
         self._scanAPI = scanAPI
-        self._probeCore = probeCore
+        self._probeAPI = probeAPI
         self._objectAPI = objectAPI
         self._workflowCore = workflowCore
 
@@ -78,6 +78,6 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         if scanItemName is not None:
             self._scanAPI.selectItem(scanItemName)
 
-        self._probeCore.initializeAndSelectProbe()
+        # NOTE reuse probe
         self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)

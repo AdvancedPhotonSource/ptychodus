@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ...api.observer import Observable, Observer
 from ...model.data import DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter
-from ...view import DataNavigationPage, DatasetView
+from ...view.data import DataNavigationPage, DatasetView
 from .dialogFactory import FileDialogFactory
 
 

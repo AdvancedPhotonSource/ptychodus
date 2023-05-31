@@ -11,7 +11,7 @@ from ...api.probe import ProbeArrayType
 from ...api.scan import ScanPoint, TabularScan
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
-from ..probe import Probe
+from ..probe import ProbeAPI
 from ..scan import ScanAPI
 
 ScanArrayType = numpy.typing.NDArray[numpy.floating[Any]]
@@ -28,10 +28,11 @@ class TikeArrays:
 class TikeArrayConverter:
     PAD_WIDTH: Final[int] = 2
 
-    def __init__(self, scanAPI: ScanAPI, probe: Probe, objectAPI: ObjectAPI,
+    def __init__(self, scanAPI: ScanAPI, probeAPI: ProbeAPI, objectAPI: ObjectAPI,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
+        # FIXME change scan point alignment; do not autogrow
         self._scanAPI = scanAPI
-        self._probe = probe
+        self._probeAPI = probeAPI
         self._objectAPI = objectAPI
         self._diffractionDataset = diffractionDataset
 
@@ -67,7 +68,11 @@ class TikeArrayConverter:
             scanX.append(self.PAD_WIDTH + float((point.x - xMinInMeters) / pixelSizeXInMeters))
             scanY.append(self.PAD_WIDTH + float((point.y - yMinInMeters) / pixelSizeYInMeters))
 
-        probe = self._probe.getArray()
+        selectedProbe = self._probeAPI.getSelectedProbeArray()
+
+        if selectedProbe is None:
+            raise ValueError('No probe is selected!')
+
         selectedObject = self._objectAPI.getSelectedObjectArray()
 
         if selectedObject is None:
@@ -78,7 +83,7 @@ class TikeArrayConverter:
         return TikeArrays(
             indexes=tuple(indexes),
             scan=numpy.column_stack((scanY, scanX)).astype('float32'),
-            probe=probe[numpy.newaxis, numpy.newaxis, ...].astype('complex64'),
+            probe=selectedProbe[numpy.newaxis, numpy.newaxis, ...].astype('complex64'),
             object_=tikeObject.astype('complex64'),
         )
 
@@ -96,11 +101,24 @@ class TikeArrayConverter:
         for index, xy in zip(arrays.indexes, arrays.scan):
             uxInPixels = xy[1] - self.PAD_WIDTH
             uyInPixels = xy[0] - self.PAD_WIDTH
-            xInMeters = xMinInMeters + Decimal(repr(uxInPixels)) * pixelSizeXInMeters
-            yInMeters = yMinInMeters + Decimal(repr(uyInPixels)) * pixelSizeYInMeters
+            xInMeters = xMinInMeters + Decimal.from_float(uxInPixels) * pixelSizeXInMeters
+            yInMeters = yMinInMeters + Decimal.from_float(uyInPixels) * pixelSizeYInMeters
             pointDict[index] = ScanPoint(xInMeters, yInMeters)
 
+        # FIXME extract to reconstructor module: pass in copy of selected scan/probe/object
+        # to reconstructor so correct items are in restart file and on the monitor screen
         tabularScan = TabularScan(pointDict)
-        self._scanAPI.insertItemIntoRepositoryFromScan('Tike', tabularScan)
-        self._probe.setArray(arrays.probe[0, 0])
-        self._objectAPI.insertItemIntoRepositoryFromArray('Tike', arrays.object_)
+        scanName = self._scanAPI.insertItemIntoRepositoryFromScan('Tike', tabularScan)
+
+        if scanName:
+            self._scanAPI.selectItem(scanName)
+
+        probeName = self._probeAPI.insertItemIntoRepositoryFromArray('Tike', arrays.probe[0, 0])
+
+        if probeName:
+            self._probeAPI.selectItem(probeName)
+
+        objectName = self._objectAPI.insertItemIntoRepositoryFromArray('Tike', arrays.object_)
+
+        if objectName:
+            self._objectAPI.selectItem(objectName)

@@ -61,19 +61,38 @@ class Apparatus(Observable, Observer):
 
 class ApparatusPresenter(Observable, Observer):
 
-    def __init__(self, apparatus: Apparatus) -> None:
+    def __init__(self, settings: ProbeSettings, apparatus: Apparatus) -> None:
         super().__init__()
+        self._settings = settings
         self._apparatus = apparatus
 
     @classmethod
-    def createInstance(cls, apparatus: Apparatus) -> ApparatusPresenter:
-        presenter = cls(apparatus)
+    def createInstance(cls, settings: ProbeSettings, apparatus: Apparatus) -> ApparatusPresenter:
+        presenter = cls(settings, apparatus)
+        settings.addObserver(presenter)
         apparatus.addObserver(presenter)
         return presenter
+
+    def setProbeEnergyInElectronVolts(self, value: Decimal) -> None:
+        self._settings.probeEnergyInElectronVolts.value = value
+
+    def getProbeEnergyInElectronVolts(self) -> Decimal:
+        return self._settings.probeEnergyInElectronVolts.value
+
+    def getProbeWavelengthInMeters(self) -> Decimal:
+        return self._apparatus.getProbeWavelengthInMeters()
+
+    def getObjectPlanePixelSizeXInMeters(self) -> Decimal:
+        return self._apparatus.getObjectPlanePixelSizeXInMeters()
+
+    def getObjectPlanePixelSizeYInMeters(self) -> Decimal:
+        return self._apparatus.getObjectPlanePixelSizeYInMeters()
 
     def getFresnelNumber(self) -> Decimal:
         return self._apparatus.getFresnelNumber()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._apparatus:
+        if observable is self._settings:
+            self.notifyObservers()
+        elif observable is self._apparatus:
             self.notifyObservers()

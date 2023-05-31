@@ -1,7 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 import logging
@@ -105,12 +104,6 @@ class ObjectRepositoryPresenter(Observable, Observer):
 
     def removeObject(self, name: str) -> None:
         self._repository.removeItem(name)
-
-    def getPixelSizeXInMeters(self) -> Decimal:
-        return self._objectAPI.getPixelSizeXInMeters()
-
-    def getPixelSizeYInMeters(self) -> Decimal:
-        return self._objectAPI.getPixelSizeYInMeters()
 
     def update(self, observable: Observable) -> None:
         if observable is self._repository:

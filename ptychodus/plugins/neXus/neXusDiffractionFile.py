@@ -75,8 +75,13 @@ class DetectorSpecificGroup:
         assert photonEnergy.attrs['units'] == b'eV'
         xPixelsInDetector = group['x_pixels_in_detector']
         yPixelsInDetector = group['y_pixels_in_detector']
-        return cls(nimages[()], ntrigger[()], photonEnergy[()], xPixelsInDetector[()],
-                   yPixelsInDetector[()])
+        return cls(
+            nimages[()],
+            ntrigger[()],
+            float(photonEnergy[()]),
+            xPixelsInDetector[()],
+            yPixelsInDetector[()],
+        )
 
 
 @dataclass(frozen=True)
@@ -103,8 +108,15 @@ class DetectorGroup:
         assert h5XPixelSize.attrs['units'] == b'm'
         h5YPixelSize = group['y_pixel_size']
         assert h5YPixelSize.attrs['units'] == b'm'
-        return cls(detectorSpecific, h5DetectorDistance[()], h5BeamCenterX[()], h5BeamCenterY[()],
-                   h5BitDepthImage[()], h5XPixelSize[()], h5YPixelSize[()])
+        return cls(
+            detectorSpecific,
+            float(h5DetectorDistance[()]),
+            h5BeamCenterX[()],
+            h5BeamCenterY[()],
+            h5BitDepthImage[()],
+            float(h5XPixelSize[()]),
+            float(h5YPixelSize[()]),
+        )
 
 
 @dataclass(frozen=True)
@@ -215,8 +227,8 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 else:
                     detector = entry.instrument.detector
                     detectorPixelSizeInMeters = Array2D[Decimal](
-                        Decimal(repr(detector.x_pixel_size_m)),
-                        Decimal(repr(detector.y_pixel_size_m)),
+                        Decimal.from_float(detector.x_pixel_size_m),
+                        Decimal.from_float(detector.y_pixel_size_m),
                     )
                     cropCenterInPixels = Array2D[int](
                         int(round(detector.beam_center_x_px)),
@@ -228,14 +240,15 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         int(detectorSpecific.x_pixels_in_detector),
                         int(detectorSpecific.y_pixels_in_detector),
                     )
-                    probeEnergyInElectronVolts = Decimal(repr(detectorSpecific.photon_energy_eV))
+                    probeEnergyInElectronVolts = Decimal.from_float(
+                        detectorSpecific.photon_energy_eV)
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],
                         numberOfPatternsTotal=detectorSpecific.nimages,
                         # NOTE for catalyst particle numberOfPatternsTotal=detectorSpecific.ntrigger,
                         patternDataType=h5Dataset.dtype,
-                        detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
+                        detectorDistanceInMeters=Decimal.from_float(detector.detector_distance_m),
                         detectorNumberOfPixels=detectorNumberOfPixels,
                         detectorPixelSizeInMeters=detectorPixelSizeInMeters,
                         cropCenterInPixels=cropCenterInPixels,

@@ -14,7 +14,7 @@ from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
 from ..model.scan import ScanPresenter
-from ..view import ReconstructorParametersView, ReconstructorPlotView
+from ..view.reconstructor import ReconstructorParametersView, ReconstructorPlotView
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,9 @@ class ReconstructorParametersController(Observer):
 
     def _syncProbeToView(self) -> None:
         self._view.reconstructorView.probeComboBox.blockSignals(True)
-        self._probeListModel.setStringList(['Current Probe'])  # TODO
+        self._probeListModel.setStringList(self._probePresenter.getSelectableNames())
+        self._view.reconstructorView.probeComboBox.setCurrentText(
+            self._probePresenter.getSelectedProbe())
         self._view.reconstructorView.probeComboBox.blockSignals(False)
 
         isValid = self._probePresenter.isSelectedProbeValid()

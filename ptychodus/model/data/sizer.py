@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ...api.data import DiffractionPatternData
 from ...api.geometry import Interval
+from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
 from ..detector import Detector
 from .settings import DiffractionPatternSettings
@@ -66,6 +67,9 @@ class DiffractionPatternSizer(Observable, Observer):
         limitsInPixels = self.getCenterYLimitsInPixels()
         return limitsInPixels.clamp(self._settings.cropCenterYInPixels.value) \
                 if self.isCropEnabled() else limitsInPixels.lower
+
+    def getExtentInPixels(self) -> ImageExtent:
+        return ImageExtent(width=self.getExtentXInPixels(), height=self.getExtentYInPixels())
 
     def __call__(self, data: DiffractionPatternData) -> DiffractionPatternData:
         return data[:, self._sliceY, self._sliceX] if self.isCropEnabled() else data

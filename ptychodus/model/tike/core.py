@@ -10,7 +10,7 @@ from ...api.reconstructor import NullReconstructor, Reconstructor, Reconstructor
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
-from ..probe import Probe
+from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from .arrayConverter import TikeArrayConverter
 from .multigrid import TikeMultigridPresenter, TikeMultigridSettings
@@ -151,7 +151,7 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry,
                        diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                       probe: Probe, objectAPI: ObjectAPI,
+                       probe: ProbeAPI, objectAPI: ObjectAPI,
                        isDeveloperModeEnabled: bool) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
 

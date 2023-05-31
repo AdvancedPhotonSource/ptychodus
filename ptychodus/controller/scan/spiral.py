@@ -1,12 +1,11 @@
 from __future__ import annotations
-from typing import Optional
 import logging
 
 from PyQt5.QtWidgets import QWidget
 
 from ...api.observer import Observable, Observer
 from ...model.scan import ScanRepositoryItemPresenter, SpiralScanInitializer
-from ...view import SpiralScanView, ScanEditorDialog
+from ...view.scan import SpiralScanView, ScanEditorDialog
 from .transformController import ScanTransformController
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ class SpiralScanController(Observer):
         self._dialog.setWindowTitle(presenter.name)
         self._transformController = ScanTransformController.createInstance(
             presenter.item, self._dialog.transformView)
-        self._initializer: Optional[SpiralScanInitializer] = None
+        self._initializer: SpiralScanInitializer | None = None
 
     @classmethod
     def createInstance(cls, presenter: ScanRepositoryItemPresenter,

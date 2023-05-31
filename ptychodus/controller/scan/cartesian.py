@@ -1,12 +1,11 @@
 from __future__ import annotations
-from typing import Optional
 import logging
 
 from PyQt5.QtWidgets import QWidget
 
 from ...api.observer import Observable, Observer
 from ...model.scan import CartesianScanInitializer, ScanRepositoryItemPresenter
-from ...view import CartesianScanView, ScanEditorDialog
+from ...view.scan import CartesianScanView, ScanEditorDialog
 from .transformController import ScanTransformController
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ class CartesianScanController(Observer):
         self._dialog.setWindowTitle(presenter.name)
         self._transformController = ScanTransformController.createInstance(
             presenter.item, self._dialog.transformView)
-        self._initializer: Optional[CartesianScanInitializer] = None
+        self._initializer: CartesianScanInitializer | None = None
 
     @classmethod
     def createInstance(cls, presenter: ScanRepositoryItemPresenter,

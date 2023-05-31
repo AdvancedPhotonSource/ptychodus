@@ -1,4 +1,6 @@
 from __future__ import annotations
+from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import logging
@@ -6,9 +8,7 @@ import logging
 import h5py
 import numpy
 
-from ...api.data import (DiffractionDataset, DiffractionFileReader, DiffractionPatternArray,
-                         DiffractionPatternData, DiffractionPatternState,
-                         SimpleDiffractionPatternArray)
+from ...api.data import DiffractionFileReader, DiffractionPatternData, DiffractionPatternState
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
@@ -27,6 +27,17 @@ from .sizer import DiffractionPatternSizer
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class DiffractionPatternArrayPresenter:
+    label: str
+    state: DiffractionPatternState
+    data: DiffractionPatternData | None
+
+    @classmethod
+    def createNull(cls) -> DiffractionPatternArrayPresenter:
+        return cls(str(), DiffractionPatternState.UNKNOWN, None)
+
+
 class DiffractionDatasetPresenter(Observable, Observer):
 
     def __init__(self, settings: DiffractionDatasetSettings,
@@ -42,6 +53,20 @@ class DiffractionDatasetPresenter(Observable, Observer):
         settings.addObserver(presenter)
         dataset.addObserver(presenter)
         return presenter
+
+    def __iter__(self) -> Iterator[DiffractionPatternArrayPresenter]:
+        for array in self._dataset:
+            yield DiffractionPatternArrayPresenter(
+                label=array.getLabel(),
+                state=array.getState(),
+                data=array.getData(),
+            )
+
+    def __len__(self) -> int:
+        return len(self._dataset)
+
+    def getInfoText(self) -> str:
+        return self._dataset.getInfoText()
 
     def isMemmapEnabled(self) -> bool:
         return self._settings.memmapEnabled.value
@@ -71,15 +96,6 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     def getContentsTree(self) -> SimpleTreeNode:
         return self._dataset.getContentsTree()
-
-    def getArrayLabel(self, index: int) -> str:
-        return self._dataset[index].getLabel()
-
-    def getPatternState(self, index: int) -> DiffractionPatternState:
-        return self._dataset[index].getState()
-
-    def getNumberOfArrays(self) -> int:
-        return len(self._dataset)
 
     def getDatasetLabel(self) -> str:
         filePath = self._dataset.getMetadata().filePath
@@ -123,49 +139,6 @@ class DiffractionDatasetPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class ActiveDiffractionPatternPresenter(Observable, Observer):
-
-    def __init__(self, dataset: DiffractionDataset) -> None:
-        super().__init__()
-        self._dataset = dataset
-        self._array: DiffractionPatternArray = SimpleDiffractionPatternArray.createNullInstance()
-
-    @classmethod
-    def createInstance(cls, dataset: DiffractionDataset) -> ActiveDiffractionPatternPresenter:
-        presenter = cls(dataset)
-        dataset.addObserver(presenter)
-        return presenter
-
-    def setCurrentPatternIndex(self, index: int) -> None:
-        try:
-            data = self._dataset[index]
-        except IndexError:
-            logger.exception('Invalid data index!')
-            return
-
-        self._array.removeObserver(self)
-        self._array = data
-        self._array.addObserver(self)
-        self.notifyObservers()
-
-    def getCurrentPatternIndex(self) -> int:
-        return self._array.getIndex()
-
-    def getNumberOfImages(self) -> int:
-        return self._array.getData().shape[0]
-
-    def getImage(self, index: int) -> DiffractionPatternData:
-        return self._array.getData()[index]
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._dataset:
-            self._array.removeObserver(self)
-            self._array = SimpleDiffractionPatternArray.createNullInstance()
-            self.notifyObservers()
-        elif observable is self._array:
-            self.notifyObservers()
-
-
 class DataCore(StatefulCore):
 
     def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
@@ -188,8 +161,6 @@ class DataCore(StatefulCore):
             self._datasetSettings, self.dataset)
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter.createInstance(
             self._datasetSettings, self.dataset, self.dataAPI, settingsRegistry)
-        self.activePatternPresenter = ActiveDiffractionPatternPresenter.createInstance(
-            self.dataset)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
         state = dict()

@@ -1,18 +1,19 @@
 from __future__ import annotations
+from collections.abc import Sequence
 
 
 class SimpleTreeNode:
 
-    def __init__(self, parentItem: SimpleTreeNode | None, itemData: list[str]) -> None:
+    def __init__(self, parentItem: SimpleTreeNode | None, itemData: Sequence[str]) -> None:
         self.parentItem = parentItem
         self.itemData = itemData
         self.childItems: list[SimpleTreeNode] = list()
 
     @classmethod
-    def createRoot(cls, itemData: list[str]) -> SimpleTreeNode:
+    def createRoot(cls, itemData: Sequence[str]) -> SimpleTreeNode:
         return cls(None, itemData)
 
-    def createChild(self, itemData: list[str]) -> SimpleTreeNode:
+    def createChild(self, itemData: Sequence[str]) -> SimpleTreeNode:
         childItem = SimpleTreeNode(self, itemData)
         self.childItems.append(childItem)
         return childItem
