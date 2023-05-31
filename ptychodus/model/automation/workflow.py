@@ -12,6 +12,8 @@ from ..workflow import WorkflowCore
 logger = logging.getLogger(__name__)
 
 
+# FIXME add parameter optimization workflow
+# FIXME add training workflow
 class AutomationDatasetWorkflow(ABC):
 
     @abstractmethod
