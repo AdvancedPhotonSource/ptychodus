@@ -3,6 +3,7 @@ from decimal import Decimal, ROUND_CEILING
 
 from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
+from ...api.scan import ScanPoint
 from ..probe import Apparatus, ProbeSizer
 from ..scan import ScanSizer
 from .settings import ObjectSettings
@@ -27,24 +28,31 @@ class ObjectSizer(Observable, Observer):
         probeSizer.addObserver(sizer)
         return sizer
 
+    def getPixelSizeXInMeters(self) -> Decimal:
+        return self._apparatus.getObjectPlanePixelSizeXInMeters()
+
+    def getPixelSizeYInMeters(self) -> Decimal:
+        return self._apparatus.getObjectPlanePixelSizeYInMeters()
+
+    def getCentroidInMeters(self) -> ScanPoint:
+        return self._scanSizer.getCentroidInMeters()
+
     @staticmethod
     def _getIntegerCeilingOfQuotient(upper: Decimal, lower: Decimal) -> int:
         return int((upper / lower).to_integral_exact(rounding=ROUND_CEILING))
 
     def getScanExtent(self) -> ImageExtent:
-        extent = ImageExtent(0, 0)
-        boundingBoxInMeters = self._scanSizer.getBoundingBoxInMeters()
+        bbox = self._scanSizer.getBoundingBoxInMeters()
 
-        if boundingBoxInMeters is not None:
-            extentX = self._getIntegerCeilingOfQuotient(
-                boundingBoxInMeters.rangeX.width,
-                self._apparatus.getObjectPlanePixelSizeXInMeters())
-            extentY = self._getIntegerCeilingOfQuotient(
-                boundingBoxInMeters.rangeY.width,
-                self._apparatus.getObjectPlanePixelSizeYInMeters())
-            extent = ImageExtent(width=extentX, height=extentY)
+        if bbox is None:
+            return ImageExtent(width=0, height=0)
 
-        return extent
+        dx = self._apparatus.getObjectPlanePixelSizeXInMeters()
+        dy = self._apparatus.getObjectPlanePixelSizeYInMeters()
+        extentX = self._getIntegerCeilingOfQuotient(bbox.rangeX.width, dx)
+        extentY = self._getIntegerCeilingOfQuotient(bbox.rangeY.width, dy)
+
+        return ImageExtent(width=extentX, height=extentY)
 
     def getProbeExtent(self) -> ImageExtent:
         return self._probeSizer.getProbeExtent()

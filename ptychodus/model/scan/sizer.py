@@ -4,6 +4,7 @@ from typing import Optional
 
 from ...api.geometry import Box2D, Interval
 from ...api.observer import Observable, Observer
+from ...api.scan import ScanPoint
 from .selected import SelectedScan
 from .settings import ScanSettings
 
@@ -58,7 +59,12 @@ class ScanSizer(Observable, Observer):
         for point in it:
             boundingBoxInMeters = boundingBoxInMeters.hull(point.x, point.y)
 
+        # TODO cache this
         return boundingBoxInMeters
+
+    def getCentroidInMeters(self) -> ScanPoint:
+        bbox = self.getBoundingBoxInMeters()
+        return ScanPoint(Decimal(), Decimal()) if bbox is None else bbox.centroid
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

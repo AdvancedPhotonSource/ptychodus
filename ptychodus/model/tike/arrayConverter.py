@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Final
+from typing import Any
 
 import numpy
 import numpy.typing
 
 from ...api.data import DiffractionPatternData
-from ...api.object import ObjectArrayType
+from ...api.object import ObjectArrayType, ObjectPoint
 from ...api.probe import ProbeArrayType
 from ...api.scan import ScanPoint, TabularScan
 from ..data import ActiveDiffractionDataset
@@ -26,11 +26,9 @@ class TikeArrays:
 
 
 class TikeArrayConverter:
-    PAD_WIDTH: Final[int] = 2
 
     def __init__(self, scanAPI: ScanAPI, probeAPI: ProbeAPI, objectAPI: ObjectAPI,
                  diffractionDataset: ActiveDiffractionDataset) -> None:
-        # FIXME change scan point alignment; do not autogrow
         self._scanAPI = scanAPI
         self._probeAPI = probeAPI
         self._objectAPI = objectAPI
@@ -41,32 +39,10 @@ class TikeArrayConverter:
         return numpy.fft.ifftshift(data, axes=(-2, -1))
 
     def exportToTike(self) -> TikeArrays:
-        assembledIndexes = self._diffractionDataset.getAssembledIndexes()
-        pixelSizeXInMeters = self._objectAPI.getPixelSizeXInMeters()
-        pixelSizeYInMeters = self._objectAPI.getPixelSizeYInMeters()
-
-        scanBoundingBoxInMeters = self._scanAPI.getBoundingBoxInMeters()
-        xMinInMeters = scanBoundingBoxInMeters.rangeX.lower
-        yMinInMeters = scanBoundingBoxInMeters.rangeY.lower
-
         selectedScan = self._scanAPI.getSelectedScan()
 
         if selectedScan is None:
             raise ValueError('No scan is selected!')
-
-        indexes: list[int] = list()
-        scanX: list[float] = list()
-        scanY: list[float] = list()
-
-        for index in assembledIndexes:
-            try:
-                point = selectedScan[index]
-            except KeyError:
-                continue
-
-            indexes.append(index)
-            scanX.append(self.PAD_WIDTH + float((point.x - xMinInMeters) / pixelSizeXInMeters))
-            scanY.append(self.PAD_WIDTH + float((point.y - yMinInMeters) / pixelSizeYInMeters))
 
         selectedProbe = self._probeAPI.getSelectedProbeArray()
 
@@ -78,32 +54,37 @@ class TikeArrayConverter:
         if selectedObject is None:
             raise ValueError('No object is selected!')
 
-        tikeObject = numpy.pad(selectedObject, self.PAD_WIDTH, mode='constant', constant_values=0)
+        indexes: list[int] = list()
+        scanX: list[float] = list()
+        scanY: list[float] = list()
+
+        for index in self._diffractionDataset.getAssembledIndexes():
+            try:
+                objectPoint = self._objectAPI.mapScanPointToObjectPoint(selectedScan[index])
+            except KeyError:
+                continue
+
+            indexes.append(index)
+            scanX.append(float(objectPoint.x))
+            scanY.append(float(objectPoint.y))
 
         return TikeArrays(
             indexes=tuple(indexes),
             scan=numpy.column_stack((scanY, scanX)).astype('float32'),
             probe=selectedProbe[numpy.newaxis, numpy.newaxis, ...].astype('complex64'),
-            object_=tikeObject.astype('complex64'),
+            object_=selectedObject.astype('complex64'),
         )
 
     def importFromTike(self, arrays: TikeArrays) -> None:
         # TODO only update scan/probe/object if correction enabled
-        pixelSizeXInMeters = self._objectAPI.getPixelSizeXInMeters()
-        pixelSizeYInMeters = self._objectAPI.getPixelSizeYInMeters()
-
-        scanBoundingBoxInMeters = self._scanAPI.getBoundingBoxInMeters()
-        xMinInMeters = scanBoundingBoxInMeters.rangeX.lower
-        yMinInMeters = scanBoundingBoxInMeters.rangeY.lower
-
         pointDict: dict[int, ScanPoint] = dict()
 
         for index, xy in zip(arrays.indexes, arrays.scan):
-            uxInPixels = xy[1] - self.PAD_WIDTH
-            uyInPixels = xy[0] - self.PAD_WIDTH
-            xInMeters = xMinInMeters + Decimal.from_float(uxInPixels) * pixelSizeXInMeters
-            yInMeters = yMinInMeters + Decimal.from_float(uyInPixels) * pixelSizeYInMeters
-            pointDict[index] = ScanPoint(xInMeters, yInMeters)
+            objectPoint = ObjectPoint(
+                x=Decimal.from_float(xy[1]),
+                y=Decimal.from_float(xy[0]),
+            )
+            pointDict[index] = self._objectAPI.mapObjectPointToScanPoint(objectPoint)
 
         # FIXME extract to reconstructor module: pass in copy of selected scan/probe/object
         # to reconstructor so correct items are in restart file and on the monitor screen

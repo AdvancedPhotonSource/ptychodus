@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Colormap, Normalize
@@ -29,7 +29,7 @@ class MappedColorizer(Colorizer):
     @classmethod
     def createColorizerList(
             cls, array: VisualizationArray, displayRange: DisplayRange,
-            transformChooser: PluginChooser[ScalarTransformation]) -> list[Colorizer]:
+            transformChooser: PluginChooser[ScalarTransformation]) -> Sequence[Colorizer]:
         cyclicColormapEntries: list[PluginEntry[Colormap]] = list()
         acyclicColormapEntries: list[PluginEntry[Colormap]] = list()
 
@@ -67,7 +67,7 @@ class MappedColorizer(Colorizer):
     def name(self) -> str:
         return self._name
 
-    def getVariantNameList(self) -> list[str]:
+    def getVariantNameList(self) -> Sequence[str]:
         return self._variantChooser.getDisplayNameList()
 
     def getVariantName(self) -> str:

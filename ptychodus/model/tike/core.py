@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from typing import Final
 import logging
@@ -41,7 +41,7 @@ class TikePresenter(Observable, Observer):
     def setNumGpus(self, value: str) -> None:
         self._settings.numGpus.value = value
 
-    def getNoiseModelList(self) -> list[str]:
+    def getNoiseModelList(self) -> Sequence[str]:
         return ['poisson', 'gaussian']
 
     def getNoiseModel(self) -> str:
@@ -60,7 +60,7 @@ class TikePresenter(Observable, Observer):
     def setNumBatch(self, value: int) -> None:
         self._settings.numBatch.value = value
 
-    def getBatchMethodList(self) -> list[str]:
+    def getBatchMethodList(self) -> Sequence[str]:
         return ['by_scan_grid', 'by_scan_stripes', 'wobbly_center', 'compact']
 
     def getBatchMethod(self) -> str:

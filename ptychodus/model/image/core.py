@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from decimal import Decimal
 import logging
 
@@ -45,7 +46,7 @@ class ImagePresenter(Observable, Observer):
     def _colorizer(self) -> Colorizer:
         return self._colorizerChooser.getCurrentStrategy()
 
-    def getColorizerNameList(self) -> list[str]:
+    def getColorizerNameList(self) -> Sequence[str]:
         return self._colorizerChooser.getDisplayNameList()
 
     def getColorizerName(self) -> str:
@@ -56,7 +57,7 @@ class ImagePresenter(Observable, Observer):
         self._colorizerChooser.setFromDisplayName(name)
         self._colorizer.addObserver(self)
 
-    def getScalarTransformationNameList(self) -> list[str]:
+    def getScalarTransformationNameList(self) -> Sequence[str]:
         return self._colorizer.getScalarTransformationNameList()
 
     def getScalarTransformationName(self) -> str:
@@ -100,7 +101,7 @@ class ImagePresenter(Observable, Observer):
     def setCustomDisplayRange(self, minValue: Decimal, maxValue: Decimal) -> None:
         self._displayRange.setLimits(minValue, maxValue)
 
-    def getVariantNameList(self) -> list[str]:
+    def getVariantNameList(self) -> Sequence[str]:
         return self._colorizer.getVariantNameList()
 
     def getVariantName(self) -> str:
@@ -142,8 +143,10 @@ class ImageCore:
         self._displayRange = DisplayRange()
 
         colorizerArgs = (self._array, self._displayRange, transformChooser)
-        colorizerList = CylindricalColorModelColorizer.createColorizerList(*colorizerArgs) \
-                + MappedColorizer.createColorizerList(*colorizerArgs)
+        colorizerList: list[Colorizer] = list()
+        colorizerList.extend(CylindricalColorModelColorizer.createColorizerList(*colorizerArgs))
+        colorizerList.extend(MappedColorizer.createColorizerList(*colorizerArgs))
+
         self._colorizerChooser = PluginChooser[Colorizer].createFromList(
             [ImageCore._createColorizerPlugin(colorizer) for colorizer in colorizerList])
         self.presenter = ImagePresenter.createInstance(self._array, self._displayRange,

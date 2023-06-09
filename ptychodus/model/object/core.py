@@ -16,6 +16,7 @@ from ..scan import ScanSizer
 from ..statefulCore import StateDataType, StatefulCore
 from .api import ObjectAPI
 from .factory import ObjectRepositoryItemFactory
+from .interpolator import ObjectInterpolator
 from .repository import ObjectRepository, ObjectRepositoryItem
 from .selected import ObjectRepositoryItemSettingsDelegate, SelectedObject
 from .settings import ObjectSettings
@@ -146,8 +147,14 @@ class ObjectPresenter(Observable, Observer):
         return self._object.getSelectedName()
 
     def getSelectedObjectArray(self) -> Optional[ObjectArrayType]:
-        selectedObject = self._object.getSelectedItem()
-        return None if selectedObject is None else selectedObject.getArray()
+        array: Optional[ObjectArrayType] = None
+
+        try:
+            array = self._objectAPI.getSelectedObjectArray()
+        except ValueError as err:
+            logger.debug(err)
+
+        return array
 
     def getSelectableNames(self) -> Sequence[str]:
         return self._object.getSelectableNames()
@@ -174,13 +181,15 @@ class ObjectCore(StatefulCore):
             self._settings, self._factory, self._repository)
         self._object = SelectedObject.createInstance(self._repository, self._itemSettingsDelegate,
                                                      settingsRegistry)
-        self.objectAPI = ObjectAPI(apparatus, self._factory, self._repository, self._object)
+        self._interpolator = ObjectInterpolator.createInstance(self.sizer, self._object)
+        self.objectAPI = ObjectAPI(self._factory, self._repository, self._object, self.sizer,
+                                   self._interpolator)
         self.repositoryPresenter = ObjectRepositoryPresenter.createInstance(
             self._repository, self._factory, self.objectAPI, fileWriterChooser)
         self.presenter = ObjectPresenter.createInstance(self.sizer, self._object, self.objectAPI)
 
     def getStateData(self, *, restartable: bool) -> StateDataType:
-        selectedObjectArray = self.objectAPI.getSelectedObjectArray()
+        selectedObjectArray = self.objectAPI.getSelectedObjectArray()  # FIXME try/except
 
         if selectedObjectArray is not None:
             state: StateDataType = {

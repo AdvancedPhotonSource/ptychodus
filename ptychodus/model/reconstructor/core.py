@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 
 from ...api.observer import Observable, Observer
 from ...api.reconstructor import ReconstructResult, ReconstructorLibrary
@@ -24,7 +25,7 @@ class ReconstructorPresenter(Observable, Observer):
         activeReconstructor.addObserver(presenter)
         return presenter
 
-    def getReconstructorList(self) -> list[str]:
+    def getReconstructorList(self) -> Sequence[str]:
         return list(self._repository.keys())
 
     def getReconstructor(self) -> str:
@@ -48,9 +49,9 @@ class ReconstructorPlotPresenter(Observable):
     def __init__(self) -> None:
         super().__init__()
         self._xlabel: str = 'Iteration'
-        self._xvalues: list[list[float]] = list()
+        self._xvalues: Sequence[Sequence[float]] = list()
         self._ylabel: str = 'Objective'
-        self._yvalues: list[list[float]] = list()
+        self._yvalues: Sequence[Sequence[float]] = list()
 
     @property
     def xlabel(self) -> str:
@@ -73,19 +74,20 @@ class ReconstructorPlotPresenter(Observable):
             self.notifyObservers()
 
     @property
-    def xvalues(self) -> list[list[float]]:
+    def xvalues(self) -> Sequence[Sequence[float]]:
         return self._xvalues
 
     @property
-    def yvalues(self) -> list[list[float]]:
+    def yvalues(self) -> Sequence[Sequence[float]]:
         return self._yvalues
 
-    def setValues(self, xvalues: list[list[float]], yvalues: list[list[float]]) -> None:
+    def setValues(self, xvalues: Sequence[Sequence[float]],
+                  yvalues: Sequence[Sequence[float]]) -> None:
         self._xvalues = xvalues
         self._yvalues = yvalues
         self.notifyObservers()
 
-    def setEnumeratedYValues(self, yvalues: list[list[float]]) -> None:
+    def setEnumeratedYValues(self, yvalues: Sequence[Sequence[float]]) -> None:
         xvalues = [*range(len(yvalues))]
         self.setValues(xvalues, yvalues)
 

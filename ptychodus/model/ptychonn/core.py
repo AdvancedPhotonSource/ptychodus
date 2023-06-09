@@ -1,11 +1,10 @@
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final, Generator, Optional
 import logging
 
-from scipy.interpolate import RegularGridInterpolator
 import numpy
 import numpy.typing
 
@@ -39,7 +38,7 @@ class PtychoNNModelPresenter(Observable, Observer):
         settings.addObserver(presenter)
         return presenter
 
-    def getStateFileFilterList(self) -> list[str]:
+    def getStateFileFilterList(self) -> Sequence[str]:
         return self._fileFilterList
 
     def getStateFileFilter(self) -> str:
@@ -194,7 +193,7 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def setStatusIntervalInEpochs(self, value: int) -> None:
         self._settings.statusIntervalInEpochs.value = value
 
-    def getTrainingDataFileFilterList(self) -> list[str]:
+    def getTrainingDataFileFilterList(self) -> Sequence[str]:
         return self._fileFilterList
 
     def getTrainingDataFileFilter(self) -> str:
@@ -206,7 +205,7 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         axis += center - axis.mean()
         return axis
 
-    def getPhaseCenteringStrategyList(self) -> list[str]:
+    def getPhaseCenteringStrategyList(self) -> Sequence[str]:
         return self._phaseCenteringStrategyChooser.getDisplayNameList()
 
     def getPhaseCenteringStrategy(self) -> str:
@@ -224,42 +223,27 @@ class PtychoNNTrainingPresenter(Observable, Observer):
                 self._phaseCenteringStrategyChooser.getCurrentSimpleName()
 
     def saveTrainingData(self, filePath: Path) -> None:
-        selectedProbeArray = self._probeAPI.getSelectedProbeArray()
-
-        if selectedProbeArray is None:
-            raise ValueError('No probe is selected!')
-
-        selectedObjectArray = self._objectAPI.getSelectedObjectArray()
-
-        if selectedObjectArray is None:
-            raise ValueError('No object is selected!')
-
-        objectPhaseCenteringStrategy = self._phaseCenteringStrategyChooser.getCurrentStrategy()
-        object_ = objectPhaseCenteringStrategy(selectedObjectArray)
-
-        pixelSizeXInMeters = float(self._objectAPI.getPixelSizeXInMeters())
-        pixelSizeYInMeters = float(self._objectAPI.getPixelSizeYInMeters())
-
-        scanBoundingBoxInMeters = self._scanAPI.getBoundingBoxInMeters()
-        scanCentroidInMeters = scanBoundingBoxInMeters.centroid
-        pixelPositionsXInMeters = self._createAxis(object_.shape[-1], pixelSizeXInMeters,
-                                                   float(scanCentroidInMeters.x))
-        pixelPositionsYInMeters = self._createAxis(object_.shape[-2], pixelSizeYInMeters,
-                                                   float(scanCentroidInMeters.y))
-
-        interp = RegularGridInterpolator((pixelPositionsYInMeters, pixelPositionsXInMeters),
-                                         object_,
-                                         method='pchip')
-
-        diffractionData = self._diffractionDataset.getAssembledData()
         selectedScan = self._scanAPI.getSelectedScan()
+        selectedProbeArray = self._probeAPI.getSelectedProbeArray()
+        selectedObjectArray = self._objectAPI.getSelectedObjectArray()
 
         if selectedScan is None:
             raise ValueError('No scan is selected!')
 
+        if selectedProbeArray is None:
+            raise ValueError('No probe is selected!')
+
+        if selectedObjectArray is None:
+            raise ValueError('No object is selected!')
+
+        # FIXME objectPhaseCenteringStrategy = \
+        # FIXME         self._phaseCenteringStrategyChooser.getCurrentStrategy()
+        # FIXME object_ = objectPhaseCenteringStrategy(selectedObjectArray)
+
+        diffractionData = self._diffractionDataset.getAssembledData()
+        patches = numpy.zeros_like(diffractionData, dtype=complex)
         scanPositionsXInMeters: list[float] = list()
         scanPositionsYInMeters: list[float] = list()
-        patches = numpy.zeros_like(diffractionData, dtype=complex)
 
         for index in self._diffractionDataset.getAssembledIndexes():
             try:
@@ -269,16 +253,15 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
             scanPositionsXInMeters.append(float(point.x))
             scanPositionsYInMeters.append(float(point.y))
-
-            patchPositionsXInMeters = self._createAxis(patches.shape[-1], pixelSizeXInMeters,
-                                                       float(point.x))
-            patchPositionsYInMeters = self._createAxis(patches.shape[-2], pixelSizeYInMeters,
-                                                       float(point.y))
-            patches[index, ...] = interp((patchPositionsYInMeters, patchPositionsXInMeters))
+            patches[index, ...] = self._objectAPI.getObjectPatch(point)
 
         scanPositionsInMeters = numpy.column_stack(
             (scanPositionsYInMeters, scanPositionsXInMeters))
 
+        pixelSizeXInMeters = float(self._objectAPI.getPixelSizeXInMeters())
+        pixelSizeYInMeters = float(self._objectAPI.getPixelSizeYInMeters())
+
+        # FIXME redo for ptychodus
         data: dict[str, numpy.typing.NDArray[numpy.number[Any]]] = {
             'real': patches,
             'reciprocal': diffractionData,

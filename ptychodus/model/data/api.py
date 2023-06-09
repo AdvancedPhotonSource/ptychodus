@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Optional
 import logging
@@ -37,7 +38,7 @@ class DiffractionDataAPI:
     def stopAssemblingDiffractionPatterns(self, finishAssembling: bool) -> None:
         self._builder.stop(finishAssembling)
 
-    def getOpenFileFilterList(self) -> list[str]:
+    def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
     def getOpenFileFilter(self) -> str:

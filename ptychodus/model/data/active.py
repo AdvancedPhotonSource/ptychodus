@@ -133,7 +133,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         self._changedEvent.set()
 
-    def getAssembledIndexes(self) -> list[int]:
+    def getAssembledIndexes(self) -> Sequence[int]:
         indexes: list[int] = list()
 
         with self._arrayListLock:

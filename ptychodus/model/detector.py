@@ -31,6 +31,7 @@ class DetectorSettings(Observable, Observer):
 
 
 class Detector(Observable, Observer):
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: DetectorSettings) -> None:
         super().__init__()
@@ -42,14 +43,22 @@ class Detector(Observable, Observer):
         settings.addObserver(detector)
         return detector
 
+    def getNumberOfPixelsXLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
+
     def getNumberOfPixelsX(self) -> int:
-        return self._settings.numberOfPixelsX.value
+        limits = self.getNumberOfPixelsXLimits()
+        return limits.clamp(self._settings.numberOfPixelsX.value)
 
     def getPixelSizeXInMeters(self) -> Decimal:
         return self._settings.pixelSizeXInMeters.value
 
+    def getNumberOfPixelsYLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
+
     def getNumberOfPixelsY(self) -> int:
-        return self._settings.numberOfPixelsY.value
+        limits = self.getNumberOfPixelsYLimits()
+        return limits.clamp(self._settings.numberOfPixelsY.value)
 
     def getPixelSizeYInMeters(self) -> Decimal:
         return self._settings.pixelSizeYInMeters.value
@@ -63,54 +72,54 @@ class Detector(Observable, Observer):
 
 
 class DetectorPresenter(Observable, Observer):
-    MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, settings: DetectorSettings) -> None:
+    def __init__(self, settings: DetectorSettings, detector: Detector) -> None:
         super().__init__()
         self._settings = settings
+        self._detector = detector
 
     @classmethod
-    def createInstance(cls, settings: DetectorSettings) -> DetectorPresenter:
-        presenter = cls(settings)
-        settings.addObserver(presenter)
+    def createInstance(cls, settings: DetectorSettings, detector: Detector) -> DetectorPresenter:
+        presenter = cls(settings, detector)
+        detector.addObserver(presenter)
         return presenter
 
     def getNumberOfPixelsXLimits(self) -> Interval[int]:
-        return Interval[int](0, self.MAX_INT)
+        return self._detector.getNumberOfPixelsXLimits()
 
     def getNumberOfPixelsX(self) -> int:
-        return self._settings.numberOfPixelsX.value
+        return self._detector.getNumberOfPixelsX()
 
     def setNumberOfPixelsX(self, value: int) -> None:
         self._settings.numberOfPixelsX.value = value
 
-    def getNumberOfPixelsYLimits(self) -> Interval[int]:
-        return Interval[int](0, self.MAX_INT)
-
-    def getNumberOfPixelsY(self) -> int:
-        return self._settings.numberOfPixelsY.value
-
-    def setNumberOfPixelsY(self, value: int) -> None:
-        self._settings.numberOfPixelsY.value = value
-
     def getPixelSizeXInMeters(self) -> Decimal:
-        return self._settings.pixelSizeXInMeters.value
+        return self._detector.getPixelSizeXInMeters()
 
     def setPixelSizeXInMeters(self, value: Decimal) -> None:
         self._settings.pixelSizeXInMeters.value = value
 
+    def getNumberOfPixelsYLimits(self) -> Interval[int]:
+        return self._detector.getNumberOfPixelsYLimits()
+
+    def getNumberOfPixelsY(self) -> int:
+        return self._detector.getNumberOfPixelsY()
+
+    def setNumberOfPixelsY(self, value: int) -> None:
+        self._settings.numberOfPixelsY.value = value
+
     def getPixelSizeYInMeters(self) -> Decimal:
-        return self._settings.pixelSizeYInMeters.value
+        return self._detector.getPixelSizeYInMeters()
 
     def setPixelSizeYInMeters(self, value: Decimal) -> None:
         self._settings.pixelSizeYInMeters.value = value
 
     def getDetectorDistanceInMeters(self) -> Decimal:
-        return self._settings.detectorDistanceInMeters.value
+        return self._detector.getDetectorDistanceInMeters()
 
     def setDetectorDistanceInMeters(self, value: Decimal) -> None:
         self._settings.detectorDistanceInMeters.value = value
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings:
+        if observable is self._detector:
             self.notifyObservers()

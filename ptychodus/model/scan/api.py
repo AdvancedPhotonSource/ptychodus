@@ -1,10 +1,8 @@
 from collections.abc import Sequence
-from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 import logging
 
-from ...api.geometry import Box2D, Interval
 from ...api.scan import Scan
 from .factory import ScanRepositoryItemFactory
 from .repository import ScanRepository
@@ -66,11 +64,6 @@ class ScanAPI:
 
     def getSelectedScan(self) -> Optional[Scan]:
         return self._scan.getSelectedItem()
-
-    def getBoundingBoxInMeters(self) -> Box2D[Decimal]:
-        box = self._sizer.getBoundingBoxInMeters()
-        zero = Interval[Decimal](Decimal(), Decimal())
-        return box or Box2D[Decimal](zero, zero)
 
     def initializeStreamingScan(self) -> None:
         self._builder.reset()

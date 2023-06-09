@@ -57,6 +57,10 @@ class ProbeAPI:
     def selectItem(self, itemName: str) -> None:
         self._probe.selectItem(itemName)
 
-    def getSelectedProbeArray(self) -> Optional[ProbeArrayType]:
+    def getSelectedProbeArray(self) -> ProbeArrayType:
         selectedItem = self._probe.getSelectedItem()
-        return None if selectedItem is None else selectedItem.getArray()
+
+        if selectedItem is None:
+            raise ValueError('No probe is selected!')
+
+        return selectedItem.getArray()

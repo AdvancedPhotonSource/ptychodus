@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from pathlib import Path
 import logging
 
@@ -30,7 +31,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         reinitObservable.addObserver(presenter)
         return presenter
 
-    def getOpenFileFilterList(self) -> list[str]:
+    def getOpenFileFilterList(self) -> Sequence[str]:
         return self._dataAPI.getOpenFileFilterList()
 
     def getOpenFileFilter(self) -> str:
@@ -64,7 +65,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
     def stopAssemblingDiffractionPatterns(self, finishAssembling: bool) -> None:
         self._dataAPI.stopAssemblingDiffractionPatterns(finishAssembling)
 
-    def getSaveFileFilterList(self) -> list[str]:
+    def getSaveFileFilterList(self) -> Sequence[str]:
         return [self.getSaveFileFilter()]
 
     def getSaveFileFilter(self) -> str:

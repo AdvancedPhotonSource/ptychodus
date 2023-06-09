@@ -72,7 +72,8 @@ class ModelCore:
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._detector = Detector.createInstance(self._detectorSettings)
-        self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
+        self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings,
+                                                                  self._detector)
         self._detectorImageCore = ImageCore(
             self._pluginRegistry.buildScalarTransformationChooser())
 

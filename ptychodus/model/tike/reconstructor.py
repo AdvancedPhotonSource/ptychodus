@@ -145,13 +145,16 @@ class TikeReconstructor:
                 interp=None,  # TODO does this have other options?
             )
         else:
-            result = tike.ptycho.reconstruct(
-                data=data,
-                parameters=parameters,
-                model=self._settings.noiseModel.value,
-                num_gpu=numGpus,
-                use_mpi=False,
-            )
+            # TODO support interactive reconstructions
+            with tike.ptycho.Reconstruction(
+                    data=data,
+                    parameters=parameters,
+                    model=self._settings.noiseModel.value,
+                    num_gpu=numGpus,
+                    use_mpi=False,
+            ) as context:
+                context.iterate(parameters.algorithm_options.num_iter)
+            result = context.parameters
 
         logger.debug(f'Result: {pprint.pformat(result)}')
 

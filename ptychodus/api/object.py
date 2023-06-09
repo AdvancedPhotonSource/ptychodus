@@ -1,11 +1,17 @@
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypeAlias
 
 import numpy
 import numpy.typing
 
+from .geometry import Point2D
+
 ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+
+# object point coordinates are conventionally in pixel units
+ObjectPoint: TypeAlias = Point2D[Decimal]
 
 
 class ObjectPhaseCenteringStrategy(ABC):

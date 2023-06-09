@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 import colorsys
 
 from matplotlib.colors import Normalize
@@ -96,7 +97,7 @@ class CylindricalColorModelColorizer(Colorizer):
     @classmethod
     def createColorizerList(
             cls, array: VisualizationArray, displayRange: DisplayRange,
-            transformChooser: PluginChooser[ScalarTransformation]) -> list[Colorizer]:
+            transformChooser: PluginChooser[ScalarTransformation]) -> Sequence[Colorizer]:
         modelList = [
             HSVSaturationColorModel(),
             HSVValueColorModel(),
@@ -118,7 +119,7 @@ class CylindricalColorModelColorizer(Colorizer):
     def name(self) -> str:
         return 'Complex'
 
-    def getVariantNameList(self) -> list[str]:
+    def getVariantNameList(self) -> Sequence[str]:
         return self._variantChooser.getDisplayNameList()
 
     def getVariantName(self) -> str:

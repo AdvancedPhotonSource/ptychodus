@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
@@ -24,7 +25,7 @@ class Colorizer(Observable, Observer, ABC):
     def name(self) -> str:
         pass
 
-    def getScalarTransformationNameList(self) -> list[str]:
+    def getScalarTransformationNameList(self) -> Sequence[str]:
         return self._transformChooser.getDisplayNameList()
 
     def getScalarTransformationName(self) -> str:
@@ -34,7 +35,7 @@ class Colorizer(Observable, Observer, ABC):
         self._transformChooser.setFromDisplayName(name)
 
     @abstractmethod
-    def getVariantNameList(self) -> list[str]:
+    def getVariantNameList(self) -> Sequence[str]:
         pass
 
     @abstractmethod

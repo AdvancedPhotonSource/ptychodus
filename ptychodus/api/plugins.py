@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from types import ModuleType
 from typing import Generic, TypeVar
@@ -51,7 +51,7 @@ class PluginChooser(Generic[T], Observable):
     def setToDefault(self) -> None:
         self._setEntry(self._entryList[-1])
 
-    def getSimpleNameList(self) -> list[str]:
+    def getSimpleNameList(self) -> Sequence[str]:
         return [entry.simpleName for entry in self._entryList]
 
     def setFromSimpleName(self, name: str) -> None:
@@ -64,7 +64,7 @@ class PluginChooser(Generic[T], Observable):
 
         self._setEntry(entry)
 
-    def getDisplayNameList(self) -> list[str]:
+    def getDisplayNameList(self) -> Sequence[str]:
         return [entry.displayName for entry in self._entryList]
 
     def setFromDisplayName(self, name: str) -> None:

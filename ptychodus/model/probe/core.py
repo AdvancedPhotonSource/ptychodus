@@ -188,7 +188,7 @@ class ProbeCore(StatefulCore):
     def getStateData(self, *, restartable: bool) -> StateDataType:
         pixelSizeXInMeters = float(self.apparatus.getObjectPlanePixelSizeXInMeters())
         pixelSizeYInMeters = float(self.apparatus.getObjectPlanePixelSizeYInMeters())
-        selectedProbeArray = self.probeAPI.getSelectedProbeArray()
+        selectedProbeArray = self.probeAPI.getSelectedProbeArray()  # FIXME try/except
 
         if selectedProbeArray is not None:
             state: StateDataType = {
