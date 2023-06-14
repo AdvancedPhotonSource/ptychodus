@@ -9,9 +9,10 @@ except ModuleNotFoundError:
 
 import h5py
 
-from ptychodus.api.data import (DiffractionPatternData, DiffractionDataset, DiffractionFileReader,
-                                DiffractionMetadata, DiffractionPatternArray,
-                                DiffractionPatternState, SimpleDiffractionDataset)
+from ptychodus.api.data import (DiffractionPatternArrayType, DiffractionDataset,
+                                DiffractionFileReader, DiffractionMetadata,
+                                DiffractionPatternArray, DiffractionPatternState,
+                                SimpleDiffractionDataset)
 from ptychodus.api.geometry import Array2D
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -38,7 +39,7 @@ class H5DiffractionPatternArray(DiffractionPatternArray):
     def getState(self) -> DiffractionPatternState:
         return self._state
 
-    def getData(self) -> DiffractionPatternData:
+    def getData(self) -> DiffractionPatternArrayType:
         self._state = DiffractionPatternState.MISSING
 
         with h5py.File(self._filePath, 'r') as h5File:

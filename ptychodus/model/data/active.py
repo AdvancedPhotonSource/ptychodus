@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from typing import overload, Any, Union
+from typing import overload, Union
 import logging
 import tempfile
 import threading
@@ -9,8 +9,8 @@ import numpy
 import numpy.typing
 
 from ...api.data import (DiffractionDataset, DiffractionMetadata, DiffractionPatternArray,
-                         DiffractionPatternData, DiffractionPatternState,
-                         SimpleDiffractionPatternArray)
+                         DiffractionPatternArrayType, DiffractionPatternIndexes,
+                         DiffractionPatternState, SimpleDiffractionPatternArray)
 from ...api.geometry import Array2D
 from ...api.tree import SimpleTreeNode
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
@@ -19,8 +19,6 @@ from .sizer import DiffractionPatternSizer
 __all__ = [
     'ActiveDiffractionDataset',
 ]
-
-DiffractionPatternIndexes = numpy.typing.NDArray[numpy.integer[Any]]
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +37,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
         self._contentsTree = SimpleTreeNode.createRoot(list())
         self._arrayListLock = threading.RLock()
         self._arrayList: list[DiffractionPatternArray] = list()
-        self._arrayData: DiffractionPatternData = numpy.zeros((0, 0, 0), dtype=numpy.uint16)
+        self._arrayData: DiffractionPatternArrayType = numpy.zeros((0, 0, 0), dtype=numpy.uint16)
         self._changedEvent = threading.Event()
 
     def getMetadata(self) -> DiffractionMetadata:
@@ -145,11 +143,11 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
         return indexes
 
-    def getAssembledData(self) -> DiffractionPatternData:
+    def getAssembledData(self) -> DiffractionPatternArrayType:
         indexes = self.getAssembledIndexes()
         return self._arrayData[indexes]
 
-    def setAssembledData(self, arrayData: DiffractionPatternData,
+    def setAssembledData(self, arrayData: DiffractionPatternArrayType,
                          arrayIndexes: DiffractionPatternIndexes) -> None:
         with self._arrayListLock:
             numberOfPatterns, detectorHeight, detectorWidth = arrayData.shape

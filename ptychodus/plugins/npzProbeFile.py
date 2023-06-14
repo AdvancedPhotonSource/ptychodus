@@ -4,6 +4,7 @@ import numpy
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeArrayType, ProbeFileReader
+from ptychodus.api.state import StateDataRegistry
 
 
 class NPZProbeFileReader(ProbeFileReader):
@@ -14,11 +15,11 @@ class NPZProbeFileReader(ProbeFileReader):
 
     @property
     def fileFilter(self) -> str:
-        return 'NumPy Zipped Archive (*.npz)'
+        return StateDataRegistry.FILE_FILTER
 
     def read(self, filePath: Path) -> ProbeArrayType:
         npz = numpy.load(filePath)
-        return npz['probe']
+        return npz[StateDataRegistry.PROBE_ARRAY]
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

@@ -5,7 +5,7 @@ import logging
 import queue
 
 from ...api.settings import SettingsRegistry
-from ..statefulCore import StateDataRegistry
+from ...api.state import StateDataRegistry
 from .locator import DataLocator
 from .settings import WorkflowSettings
 

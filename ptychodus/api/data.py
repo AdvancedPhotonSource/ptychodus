@@ -14,7 +14,8 @@ from .geometry import Array2D
 from .observer import Observable
 from .tree import SimpleTreeNode
 
-DiffractionPatternData: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+DiffractionPatternArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+DiffractionPatternIndexes = numpy.typing.NDArray[numpy.integer[Any]]
 
 
 class DiffractionPatternState(Enum):
@@ -35,7 +36,7 @@ class DiffractionPatternArray(Observable):
         pass
 
     @abstractmethod
-    def getData(self) -> DiffractionPatternData:
+    def getData(self) -> DiffractionPatternArrayType:
         pass
 
     def getNumberOfPatterns(self) -> int:
@@ -48,7 +49,7 @@ class DiffractionPatternArray(Observable):
 
 class SimpleDiffractionPatternArray(DiffractionPatternArray):
 
-    def __init__(self, label: str, index: int, data: DiffractionPatternData,
+    def __init__(self, label: str, index: int, data: DiffractionPatternArrayType,
                  state: DiffractionPatternState) -> None:
         super().__init__()
         self._label = label
@@ -68,7 +69,7 @@ class SimpleDiffractionPatternArray(DiffractionPatternArray):
     def getIndex(self) -> int:
         return self._index
 
-    def getData(self) -> DiffractionPatternData:
+    def getData(self) -> DiffractionPatternArrayType:
         return self._data
 
     def getState(self) -> DiffractionPatternState:

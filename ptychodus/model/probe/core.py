@@ -11,9 +11,9 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry
+from ...api.state import ProbeStateData, StatefulCore
 from ..data import DiffractionPatternSizer
 from ..detector import Detector
-from ..statefulCore import StateDataType, StatefulCore
 from .api import ProbeAPI
 from .apparatus import Apparatus, ApparatusPresenter
 from .factory import ProbeRepositoryItemFactory
@@ -95,7 +95,7 @@ class ProbeRepositoryPresenter(Observable, Observer):
         writer = self._fileWriterChooser.getCurrentStrategy()
         writer.write(filePath, item.getArray())
 
-        # TODO test this
+        # FIXME test this
         if item.getInitializer() is None:
             initializer = self._itemFactory.createFileInitializer(filePath,
                                                                   simpleFileType=fileType)
@@ -162,7 +162,7 @@ class ProbePresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class ProbeCore(StatefulCore):
+class ProbeCore(StatefulCore[ProbeStateData]):
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
                  detector: Detector, diffractionPatternSizer: DiffractionPatternSizer,
@@ -185,31 +185,19 @@ class ProbeCore(StatefulCore):
             self._repository, self._factory, self.probeAPI, fileWriterChooser)
         self.presenter = ProbePresenter.createInstance(self.sizer, self._probe, self.probeAPI)
 
-    def getStateData(self, *, restartable: bool) -> StateDataType:
-        pixelSizeXInMeters = float(self.apparatus.getObjectPlanePixelSizeXInMeters())
-        pixelSizeYInMeters = float(self.apparatus.getObjectPlanePixelSizeYInMeters())
-        selectedProbeArray = self.probeAPI.getSelectedProbeArray()  # FIXME try/except
+    def getStateData(self) -> ProbeStateData:
+        return ProbeStateData(
+            pixelSizeXInMeters=float(self.apparatus.getObjectPlanePixelSizeXInMeters()),
+            pixelSizeYInMeters=float(self.apparatus.getObjectPlanePixelSizeYInMeters()),
+            array=self.probeAPI.getSelectedProbeArray(),  # FIXME try/except
+        )
 
-        if selectedProbeArray is not None:
-            state: StateDataType = {
-                'pixelSizeXInMeters': numpy.array([pixelSizeXInMeters]),
-                'pixelSizeYInMeters': numpy.array([pixelSizeYInMeters]),
-                'probe': selectedProbeArray,
-            }
-        return state
-
-    def setStateData(self, state: StateDataType) -> None:
-        try:
-            array = state['probe']
-        except KeyError:
-            logger.debug('Failed to restore probe array state!')
-            return
-
-        filePath = Path(''.join(state['restartFilePath']))
-        itemName = self.probeAPI.insertItemIntoRepositoryFromArray(nameHint='Restart',
-                                                                   array=array,
-                                                                   filePath=filePath,
-                                                                   simpleFileType='NPZ')
+    def setStateData(self, stateData: ProbeStateData, stateFilePath: Path) -> None:
+        itemName = self.probeAPI.insertItemIntoRepositoryFromArray(
+            nameHint='Restart',
+            array=stateData.array,
+            filePath=stateFilePath,
+            simpleFileType=stateFilePath.suffix)
 
         if itemName is None:
             logger.error('Failed to initialize \"{name}\"!')

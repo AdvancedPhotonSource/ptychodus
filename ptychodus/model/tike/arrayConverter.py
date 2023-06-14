@@ -5,7 +5,7 @@ from typing import Any
 import numpy
 import numpy.typing
 
-from ...api.data import DiffractionPatternData
+from ...api.data import DiffractionPatternArrayType
 from ...api.object import ObjectArrayType, ObjectPoint
 from ...api.probe import ProbeArrayType
 from ...api.scan import ScanPoint, TabularScan
@@ -34,7 +34,7 @@ class TikeArrayConverter:
         self._objectAPI = objectAPI
         self._diffractionDataset = diffractionDataset
 
-    def getDiffractionData(self) -> DiffractionPatternData:
+    def getDiffractionData(self) -> DiffractionPatternArrayType:
         data = self._diffractionDataset.getAssembledData()
         return numpy.fft.ifftshift(data, axes=(-2, -1))
 

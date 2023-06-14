@@ -5,6 +5,7 @@ import numpy
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
+from ptychodus.api.state import StateDataRegistry
 
 
 class NPZScanFileReader(ScanFileReader):
@@ -15,17 +16,17 @@ class NPZScanFileReader(ScanFileReader):
 
     @property
     def fileFilter(self) -> str:
-        return 'NumPy Zipped Archive (*.npz)'
+        return StateDataRegistry.FILE_FILTER
 
     def read(self, filePath: Path) -> Scan:
         pointMap: dict[int, ScanPoint] = dict()
 
         npz = numpy.load(filePath)
-        scanIndex = npz['scanIndex']
-        scanXInMeters = npz['scanXInMeters']
-        scanYInMeters = npz['scanYInMeters']
+        scanIndexes = npz[StateDataRegistry.SCAN_INDEXES]
+        scanXInMeters = npz[StateDataRegistry.SCAN_X]
+        scanYInMeters = npz[StateDataRegistry.SCAN_Y]
 
-        for index, x, y in zip(scanIndex, scanXInMeters, scanYInMeters):
+        for index, x, y in zip(scanIndexes, scanXInMeters, scanYInMeters):
             pointMap[index] = ScanPoint(
                 x=Decimal.from_float(x),
                 y=Decimal.from_float(y),

@@ -6,18 +6,20 @@ import numpy
 import ptychonn
 from ptychonn import ReconSmallPhaseModel, Tester, Trainer
 
-from ...api.reconstructor import ReconstructResult
+from ...api.data import DiffractionPatternArrayType
+from ...api.object import ObjectArrayType
+from ...api.reconstructor import Reconstructor, ReconstructResult
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
 from ..probe import ProbeAPI
 from ..scan import ScanAPI
+from .builder import ReconstructorTrainer
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
-from .trainable import TrainableReconstructor, TrainingData
 
 logger = logging.getLogger(__name__)
 
 
-class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
+class PtychoNNPhaseOnlyReconstructor(Reconstructor, ReconstructorTrainer):
 
     def __init__(self, settings: PtychoNNModelSettings, trainingSettings: PtychoNNTrainingSettings,
                  scanAPI: ScanAPI, probeAPI: ProbeAPI, objectAPI: ObjectAPI,
@@ -116,7 +118,8 @@ class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
 
         return ReconstructResult(0, [[]])
 
-    def train(self, diffractionPatterns: TrainingData, reconstructedPatches: TrainingData) -> None:
+    def train(self, diffractionPatterns: DiffractionPatternArrayType,
+              objectPatches: ObjectArrayType) -> None:
         outputPath = self._trainingSettings.outputPath.value \
                 if self._trainingSettings.saveTrainingArtifacts.value else None
         trainer = Trainer(
@@ -126,8 +129,8 @@ class PtychoNNPhaseOnlyReconstructor(TrainableReconstructor):
             output_suffix=self._trainingSettings.outputSuffix.value,
         )
         trainer.setTrainingData(
-            X_train_full=diffractionPatterns,
-            Y_ph_train_full=reconstructedPatches,
+            X_train_full=diffractionPatterns.astype(numpy.float32),
+            Y_ph_train_full=objectPatches.astype(numpy.float32),
             valid_data_ratio=float(self._trainingSettings.validationSetFractionalSize.value),
         )
         trainer.setOptimizationParams(

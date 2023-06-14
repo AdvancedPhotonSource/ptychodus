@@ -2,11 +2,8 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Final, Generator, Optional
+from typing import Final
 import logging
-
-import numpy
-import numpy.typing
 
 from ...api.geometry import Interval
 from ...api.object import ObjectPhaseCenteringStrategy
@@ -19,7 +16,6 @@ from ..object import ObjectAPI
 from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
-from .trainable import TrainableReconstructor
 
 logger = logging.getLogger(__name__)
 
@@ -96,8 +92,6 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         self._probeAPI = probeAPI
         self._objectAPI = objectAPI
         self._reinitObservable = reinitObservable
-        self._trainer: Optional[TrainableReconstructor] = None
-        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
 
     @classmethod
     def createInstance(cls, settings: PtychoNNTrainingSettings,
@@ -111,9 +105,6 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         phaseCenteringStrategyChooser.addObserver(presenter)
         presenter._syncFromSettings()
         return presenter
-
-    def setTrainer(self, trainer: TrainableReconstructor) -> None:
-        self._trainer = trainer
 
     def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
@@ -193,18 +184,6 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def setStatusIntervalInEpochs(self, value: int) -> None:
         self._settings.statusIntervalInEpochs.value = value
 
-    def getTrainingDataFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
-
-    def getTrainingDataFileFilter(self) -> str:
-        return self._fileFilterList[0]
-
-    def _createAxis(self, ticks: int, tickSize: float,
-                    center: float) -> numpy.typing.NDArray[numpy.float_]:
-        axis = numpy.arange(ticks) * tickSize
-        axis += center - axis.mean()
-        return axis
-
     def getPhaseCenteringStrategyList(self) -> Sequence[str]:
         return self._phaseCenteringStrategyChooser.getDisplayNameList()
 
@@ -222,80 +201,8 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         self._settings.phaseCenteringStrategy.value = \
                 self._phaseCenteringStrategyChooser.getCurrentSimpleName()
 
-    def saveTrainingData(self, filePath: Path) -> None:
-        selectedScan = self._scanAPI.getSelectedScan()
-        selectedProbeArray = self._probeAPI.getSelectedProbeArray()
-        selectedObjectArray = self._objectAPI.getSelectedObjectArray()
-
-        if selectedScan is None:
-            raise ValueError('No scan is selected!')
-
-        if selectedProbeArray is None:
-            raise ValueError('No probe is selected!')
-
-        if selectedObjectArray is None:
-            raise ValueError('No object is selected!')
-
-        # FIXME objectPhaseCenteringStrategy = \
-        # FIXME         self._phaseCenteringStrategyChooser.getCurrentStrategy()
-        # FIXME object_ = objectPhaseCenteringStrategy(selectedObjectArray)
-
-        diffractionData = self._diffractionDataset.getAssembledData()
-        patches = numpy.zeros_like(diffractionData, dtype=complex)
-        scanPositionsXInMeters: list[float] = list()
-        scanPositionsYInMeters: list[float] = list()
-
-        for index in self._diffractionDataset.getAssembledIndexes():
-            try:
-                point = selectedScan[index]
-            except KeyError:
-                continue
-
-            scanPositionsXInMeters.append(float(point.x))
-            scanPositionsYInMeters.append(float(point.y))
-            patches[index, ...] = self._objectAPI.getObjectPatch(point)
-
-        scanPositionsInMeters = numpy.column_stack(
-            (scanPositionsYInMeters, scanPositionsXInMeters))
-
-        pixelSizeXInMeters = float(self._objectAPI.getPixelSizeXInMeters())
-        pixelSizeYInMeters = float(self._objectAPI.getPixelSizeYInMeters())
-
-        # FIXME redo for ptychodus
-        data: dict[str, numpy.typing.NDArray[numpy.number[Any]]] = {
-            'real': patches,
-            'reciprocal': diffractionData,
-            'position': scanPositionsInMeters,
-            'probe': selectedProbeArray,
-            'pixelsize': numpy.array([pixelSizeYInMeters, pixelSizeXInMeters]),
-        }
-
-        numpy.savez_compressed(filePath, **data)
-
-    def train(self, trainingDirPath: Path) -> None:
-        logger.debug(f'Train using data in {trainingDirPath}.')
-        diffractionPatternsList = list()
-        reconstructedPatchesList = list()
-        trainingFilePathGlob: Generator[Path, None, None] = trainingDirPath.glob('*.npz')
-
-        for trainingFilePath in trainingFilePathGlob:
-            logger.debug(f'Reading training data from \"{trainingFilePath}\"...')
-
-            try:
-                with numpy.load(trainingFilePath) as trainingFile:
-                    diffractionPatternsList.append(trainingFile['reciprocal'])
-                    reconstructedPatchesList.append(trainingFile['real'])
-            except Exception:
-                logger.exception('Failed to load training data.')
-
-        diffractionPatterns = numpy.concatenate(diffractionPatternsList, axis=0)
-        reconstructedPatches = numpy.concatenate(reconstructedPatchesList, axis=0)
-
-        if self._trainer is None:
-            logger.error('Trainable reconstructor not found!')
-        else:
-            # NOTE PtychoNN writes training outputs using internal mechanisms
-            self._trainer.train(diffractionPatterns, reconstructedPatches)
+    def train(self) -> None:
+        pass  # FIXME
 
     def update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
@@ -341,7 +248,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
                                                                     core._trainingSettings,
                                                                     scanAPI, probeAPI, objectAPI,
                                                                     diffractionDataset)
-            core.trainingPresenter.setTrainer(trainableReconstructor)
+            # FIXME core.trainingPresenter.setTrainer(trainableReconstructor)
             core.reconstructorList.append(trainableReconstructor)
 
         return core

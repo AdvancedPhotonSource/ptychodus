@@ -3,9 +3,11 @@ from pathlib import Path
 import logging
 import re
 
+from ...api.state import StateDataRegistry
 from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
 from ..probe import ProbeAPI
+from ..ptychonn import PtychoNNTrainingDatasetBuilder
 from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 
@@ -13,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 # FIXME add parameter optimization workflow
-# FIXME add training workflow
 class AutomationDatasetWorkflow(ABC):
 
     @abstractmethod
@@ -83,3 +84,17 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         # NOTE reuse probe
         self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)
+
+
+class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
+
+    def __init__(self, registry: StateDataRegistry,
+                 builder: PtychoNNTrainingDatasetBuilder) -> None:
+        self._registry = registry
+        self._builder = builder
+
+    def execute(self, filePath: Path) -> None:
+        # FIXME watch for ptychodus NPZ files
+        self._registry.openStateData(filePath)
+        self._builder.incorporateTrainingDataFromActiveItems()
+        # FIXME save or train

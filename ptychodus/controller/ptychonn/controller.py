@@ -4,7 +4,7 @@ from ...model.ptychonn import PtychoNNModelPresenter, PtychoNNTrainingPresenter
 from ...view.ptychonn import PtychoNNParametersView
 from ..data import FileDialogFactory
 from .model import PtychoNNModelParametersController
-from .training import PtychoNNTrainingDataController, PtychoNNTrainingParametersController
+from .training import PtychoNNTrainingParametersController
 
 
 class PtychoNNParametersController:
@@ -17,8 +17,6 @@ class PtychoNNParametersController:
             modelPresenter, view.modelParametersView, fileDialogFactory)
         self._trainingParametersController = PtychoNNTrainingParametersController.createInstance(
             trainingPresenter, view.trainingParametersView, fileDialogFactory)
-        self._trainingDataController = PtychoNNTrainingDataController.createInstance(
-            trainingPresenter, view.trainingDataView, fileDialogFactory)
 
     @classmethod
     def createInstance(cls, modelPresenter: PtychoNNModelPresenter,

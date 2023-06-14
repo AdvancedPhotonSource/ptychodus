@@ -8,14 +8,14 @@ import logging
 import h5py
 import numpy
 
-from ...api.data import DiffractionFileReader, DiffractionPatternData, DiffractionPatternState
+from ...api.data import DiffractionFileReader, DiffractionPatternArrayType, DiffractionPatternState
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry
+from ...api.state import DiffractionPatternStateData, StatefulCore
 from ...api.tree import SimpleTreeNode
 from ..detector import Detector
-from ..statefulCore import StateDataType, StatefulCore
 from .active import ActiveDiffractionDataset
 from .api import DiffractionDataAPI
 from .builder import ActiveDiffractionDatasetBuilder
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 class DiffractionPatternArrayPresenter:
     label: str
     state: DiffractionPatternState
-    data: DiffractionPatternData | None
+    data: DiffractionPatternArrayType | None
 
     @classmethod
     def createNull(cls) -> DiffractionPatternArrayPresenter:
@@ -139,7 +139,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class DataCore(StatefulCore):
+class DataCore(StatefulCore[DiffractionPatternStateData]):
 
     def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
@@ -162,27 +162,17 @@ class DataCore(StatefulCore):
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter.createInstance(
             self._datasetSettings, self.dataset, self.dataAPI, settingsRegistry)
 
-    def getStateData(self, *, restartable: bool) -> StateDataType:
-        state = dict()
+    def getStateData(self) -> DiffractionPatternStateData:
+        return DiffractionPatternStateData(
+            indexes=numpy.array(self.dataset.getAssembledIndexes()),
+            array=self.dataset.getAssembledData(),
+        )
 
-        if restartable:
-            state['dataIndexes'] = numpy.array(self.dataset.getAssembledIndexes())
-            state['data'] = self.dataset.getAssembledData()
-
-        return state
-
-    def setStateData(self, state: StateDataType) -> None:
-        try:
-            dataIndexes = state['dataIndexes']
-            data = state['data']
-        except KeyError:
-            logger.debug('Skipped restoring data array state.')
-            return
-
+    def setStateData(self, stateData: DiffractionPatternStateData, stateFilePath: Path) -> None:
         if self._builder.isAssembling:
             self._builder.stop(finishAssembling=False)
 
-        self.dataset.setAssembledData(data, dataIndexes)
+        self.dataset.setAssembledData(stateData.array, stateData.indexes)
 
     def start(self) -> None:
         pass

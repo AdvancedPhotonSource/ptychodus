@@ -12,8 +12,8 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.scan import ScanFileReader, ScanFileWriter, ScanPoint, TabularScan
 from ...api.settings import SettingsRegistry
+from ...api.state import ScanStateData, StatefulCore
 from ..data import ActiveDiffractionDataset
-from ..statefulCore import StateDataType, StatefulCore
 from .api import ScanAPI
 from .factory import ScanRepositoryItemFactory
 from .repository import ScanRepository, ScanRepositoryItem
@@ -95,7 +95,7 @@ class ScanRepositoryPresenter(Observable, Observer):
         writer = self._fileWriterChooser.getCurrentStrategy()
         writer.write(filePath, item)
 
-        # TODO test this
+        # FIXME test this
         if item.getInitializer() is None:
             initializer = self._itemFactory.createFileInitializer(filePath,
                                                                   simpleFileType=fileType)
@@ -154,7 +154,7 @@ class ScanPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class ScanCore(StatefulCore):
+class ScanCore(StatefulCore[ScanStateData]):
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
                  dataset: ActiveDiffractionDataset,
@@ -175,43 +175,39 @@ class ScanCore(StatefulCore):
             self._repository, self._itemFactory, self.scanAPI, fileWriterChooser)
         self.presenter = ScanPresenter.createInstance(self._scan, self.scanAPI, dataset)
 
-    def getStateData(self, *, restartable: bool) -> StateDataType:
-        scanIndex: list[int] = list()
-        scanXInMeters: list[float] = list()
-        scanYInMeters: list[float] = list()
+    def getStateData(self) -> ScanStateData:
+        indexes: list[int] = list()
+        positionXInMeters: list[float] = list()
+        positionYInMeters: list[float] = list()
         selectedScan = self._scan.getSelectedItem()
 
         if selectedScan is not None:
             for index, point in selectedScan.untransformed.items():
-                scanIndex.append(index)
-                scanXInMeters.append(float(point.x))
-                scanYInMeters.append(float(point.y))
+                indexes.append(index)
+                positionXInMeters.append(float(point.x))
+                positionYInMeters.append(float(point.y))
 
-        state: StateDataType = {
-            'scanIndex': numpy.array(scanIndex),
-            'scanXInMeters': numpy.array(scanXInMeters),
-            'scanYInMeters': numpy.array(scanYInMeters),
-        }
+        return ScanStateData(
+            indexes=numpy.array(indexes),
+            positionXInMeters=numpy.array(positionXInMeters),
+            positionYInMeters=numpy.array(positionYInMeters),
+        )
 
-        return state
-
-    def setStateData(self, state: StateDataType) -> None:
+    def setStateData(self, stateData: ScanStateData, stateFilePath: Path) -> None:
         pointMap: dict[int, ScanPoint] = dict()
-        scanIndex = state['scanIndex']
-        scanXInMeters = state['scanXInMeters']
-        scanYInMeters = state['scanYInMeters']
 
-        for index, x, y in zip(scanIndex, scanXInMeters, scanYInMeters):
+        for index, x, y in zip(stateData.indexes, stateData.positionXInMeters,
+                               stateData.positionYInMeters):
             pointMap[index] = ScanPoint(
                 x=Decimal.from_float(x),
                 y=Decimal.from_float(y),
             )
 
-        filePath = Path(''.join(state['restartFilePath']))
-        itemName = self.scanAPI.insertItemIntoRepositoryFromScan(nameHint='Restart',
-                                                                 scan=TabularScan(pointMap),
-                                                                 filePath=filePath,
-                                                                 simpleFileType='NPZ')
+        itemName = self.scanAPI.insertItemIntoRepositoryFromScan(
+            nameHint='Restart',
+            scan=TabularScan(pointMap),
+            filePath=stateFilePath,
+            simpleFileType=stateFilePath.suffix)
 
         if itemName is None:
             logger.error('Failed to initialize \"{name}\"!')

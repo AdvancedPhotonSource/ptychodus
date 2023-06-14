@@ -3,11 +3,8 @@ from pathlib import Path
 from typing import Any
 import logging
 
-import numpy
-
 from ..api.rpc import RPCMessage, RPCExecutor
-from .object import ObjectAPI
-from .probe import ProbeAPI
+from ..api.state import StateDataRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -38,36 +35,12 @@ class LoadResultsMessage(RPCMessage):
 
 class LoadResultsExecutor(RPCExecutor):
 
-    def __init__(self, probeAPI: ProbeAPI, objectAPI: ObjectAPI) -> None:
-        self._probeAPI = probeAPI
-        self._objectAPI = objectAPI
+    def __init__(self, registry: StateDataRegistry) -> None:
+        self._registry = registry
 
     def submit(self, message: RPCMessage) -> None:
         if isinstance(message, LoadResultsMessage):
             if message.filePath.is_file():
-                logger.debug(f'Loading results from {message.filePath}')
-                results = numpy.load(message.filePath)
-
-                probeItem = self._probeAPI.insertItemIntoRepositoryFromArray(
-                    message.filePath.stem,
-                    results['probe'],
-                    filePath=message.filePath,
-                    simpleFileType='NPZ')
-
-                if probeItem is None:
-                    logger.error('Failed to load probe result!')
-                else:
-                    self._probeAPI.selectItem(probeItem)
-
-                objectItem = self._objectAPI.insertItemIntoRepositoryFromArray(
-                    message.filePath.stem,
-                    results['object'],
-                    filePath=message.filePath,
-                    simpleFileType='NPZ')
-
-                if objectItem is None:
-                    logger.error('Failed to load object result!')
-                else:
-                    self._objectAPI.selectItem(objectItem)
+                self._registry.openStateData(message.filePath)
             else:
                 logger.debug(f'{message.filePath} is not a file.')

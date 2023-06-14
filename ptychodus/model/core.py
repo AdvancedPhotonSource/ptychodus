@@ -15,6 +15,7 @@ import numpy
 from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
+from ..api.state import StateDataRegistry
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .data import (DataCore, DiffractionDatasetPresenter, DiffractionDatasetInputOutputPresenter,
                    DiffractionPatternPresenter)
@@ -29,7 +30,6 @@ from .reconstructor import ReconstructorCore, ReconstructorPresenter, Reconstruc
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter, ScanRepositoryPresenter
-from .statefulCore import StateDataRegistry
 from .tike import TikeReconstructorLibrary
 from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
                        WorkflowParametersPresenter, WorkflowStatusPresenter)
@@ -116,8 +116,8 @@ class ModelCore:
             ],
         )
 
-        self._stateDataRegistry = StateDataRegistry(
-            (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
+        self._stateDataRegistry = StateDataRegistry(self._dataCore, self._scanCore,
+                                                    self._probeCore, self._objectCore)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
         self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore.dataAPI,
                                               self._scanCore.scanAPI, self._probeCore.probeAPI,
@@ -128,9 +128,8 @@ class ModelCore:
         if modelArgs.rpcPort >= 0:
             self.rpcMessageService = RPCMessageService(modelArgs.rpcPort,
                                                        modelArgs.autoExecuteRPCs)
-            self.rpcMessageService.registerProcedure(
-                LoadResultsMessage,
-                LoadResultsExecutor(self._probeCore.probeAPI, self._objectCore.objectAPI))
+            self.rpcMessageService.registerProcedure(LoadResultsMessage,
+                                                     LoadResultsExecutor(self._stateDataRegistry))
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:

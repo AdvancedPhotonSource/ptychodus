@@ -11,9 +11,9 @@ from ...api.object import ObjectArrayType, ObjectFileReader, ObjectFileWriter
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry
+from ...api.state import ObjectStateData, StatefulCore
 from ..probe import Apparatus, ProbeSizer
 from ..scan import ScanSizer
-from ..statefulCore import StateDataType, StatefulCore
 from .api import ObjectAPI
 from .factory import ObjectRepositoryItemFactory
 from .interpolator import ObjectInterpolator
@@ -95,7 +95,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
         writer = self._fileWriterChooser.getCurrentStrategy()
         writer.write(filePath, item.getArray())
 
-        # TODO test this
+        # FIXME test this
         if item.getInitializer() is None:
             initializer = self._itemFactory.createFileInitializer(filePath,
                                                                   simpleFileType=fileType)
@@ -166,7 +166,7 @@ class ObjectPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class ObjectCore(StatefulCore):
+class ObjectCore(StatefulCore[ObjectStateData]):
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
                  apparatus: Apparatus, scanSizer: ScanSizer, probeSizer: ProbeSizer,
@@ -188,28 +188,17 @@ class ObjectCore(StatefulCore):
             self._repository, self._factory, self.objectAPI, fileWriterChooser)
         self.presenter = ObjectPresenter.createInstance(self.sizer, self._object, self.objectAPI)
 
-    def getStateData(self, *, restartable: bool) -> StateDataType:
-        selectedObjectArray = self.objectAPI.getSelectedObjectArray()  # FIXME try/except
+    def getStateData(self) -> ObjectStateData:
+        return ObjectStateData(
+            array=self.objectAPI.getSelectedObjectArray(),  # FIXME try/except
+        )
 
-        if selectedObjectArray is not None:
-            state: StateDataType = {
-                'object': selectedObjectArray,
-            }
-
-        return state
-
-    def setStateData(self, state: StateDataType) -> None:
-        try:
-            array = state['object']
-        except KeyError:
-            logger.debug('Failed to restore object array state!')
-            return
-
-        filePath = Path(''.join(state['restartFilePath']))
-        itemName = self.objectAPI.insertItemIntoRepositoryFromArray(nameHint='Restart',
-                                                                    array=array,
-                                                                    filePath=filePath,
-                                                                    simpleFileType='NPZ')
+    def setStateData(self, stateData: ObjectStateData, stateFilePath: Path) -> None:
+        itemName = self.objectAPI.insertItemIntoRepositoryFromArray(
+            nameHint='Restart',
+            array=stateData.array,
+            filePath=stateFilePath,
+            simpleFileType=stateFilePath.suffix)
 
         if itemName is None:
             logger.error('Failed to initialize \"{name}\"!')

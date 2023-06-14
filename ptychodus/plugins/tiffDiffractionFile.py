@@ -8,7 +8,7 @@ from tifffile import TiffFile
 import numpy
 
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, DiffractionPatternData,
+                                DiffractionPatternArray, DiffractionPatternArrayType,
                                 DiffractionPatternState, SimpleDiffractionDataset)
 from ptychodus.api.geometry import Array2D
 from ptychodus.api.plugins import PluginRegistry
@@ -34,7 +34,7 @@ class TiffDiffractionPatternArray(DiffractionPatternArray):
     def getState(self) -> DiffractionPatternState:
         return self._state
 
-    def getData(self) -> DiffractionPatternData:
+    def getData(self) -> DiffractionPatternArrayType:
         self._state = DiffractionPatternState.MISSING
 
         with TiffFile(self._filePath) as tiff:
