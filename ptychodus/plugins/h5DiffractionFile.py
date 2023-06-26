@@ -146,6 +146,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
         try:
             with h5py.File(filePath, 'r') as h5File:
+                metadata = DiffractionMetadata.createNullInstance(filePath)
                 contentsTree = self._treeBuilder.build(h5File)
 
                 try:
@@ -163,14 +164,14 @@ class H5DiffractionFileReader(DiffractionFileReader):
                         filePath=filePath,
                     )
 
-                    array = H5DiffractionPatternArray(
-                        label=filePath.stem,
-                        index=0,
-                        filePath=filePath,
-                        dataPath=self._dataPath,
-                    )
+                array = H5DiffractionPatternArray(
+                    label=filePath.stem,
+                    index=0,
+                    filePath=filePath,
+                    dataPath=self._dataPath,
+                )
 
-                    dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
+                dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 

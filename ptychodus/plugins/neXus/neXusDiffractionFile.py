@@ -135,9 +135,18 @@ class GoniometerGroup:
 
     @classmethod
     def read(cls, group: h5py.Group) -> GoniometerGroup:
-        chiDataset = group['chi']
-        assert chiDataset.attrs['units'] == b'degree'
-        chi_deg = float(chiDataset[0])
+        chiItem = group['chi']
+        chiSpace = chiItem.id.get_space()
+
+        assert chiItem.attrs['units'] == b'degree'
+
+        if chiSpace.get_simple_extent_type() == h5py.h5s.SCALAR:
+            chi_deg = float(chiItem[()])
+        elif isinstance(chiItem, h5py.Dataset):
+            chi_deg = float(chiItem[0])
+        else:
+            raise ValueError('Failed to read goniometer angle (chi)!')
+
         return cls(chi_deg)
 
 
@@ -217,6 +226,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
 
         try:
             with h5py.File(filePath, 'r') as h5File:
+                metadata = DiffractionMetadata.createNullInstance(filePath)
                 contentsTree = self._treeBuilder.build(h5File)
 
                 try:
@@ -246,7 +256,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],
                         numberOfPatternsTotal=detectorSpecific.nimages,
-                        # NOTE for catalyst particle numberOfPatternsTotal=detectorSpecific.ntrigger,
+                        # FIXME for catalyst particle numberOfPatternsTotal=detectorSpecific.ntrigger,
                         patternDataType=h5Dataset.dtype,
                         detectorDistanceInMeters=Decimal.from_float(detector.detector_distance_m),
                         detectorNumberOfPixels=detectorNumberOfPixels,
@@ -255,10 +265,11 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
                     )
-                    dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
 
-                    # vvv TODO This is a hack; remove when able! vvv
-                    self.stageRotationInDegrees = entry.sample.goniometer.chi_deg
+                dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
+
+                # vvv TODO This is a hack; remove when able! vvv
+                self.stageRotationInDegrees = entry.sample.goniometer.chi_deg
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 
