@@ -95,7 +95,6 @@ class ScanRepositoryPresenter(Observable, Observer):
         writer = self._fileWriterChooser.getCurrentStrategy()
         writer.write(filePath, item)
 
-        # FIXME test this
         if item.getInitializer() is None:
             initializer = self._itemFactory.createFileInitializer(filePath,
                                                                   simpleFileType=fileType)
@@ -139,7 +138,7 @@ class ScanPresenter(Observable, Observer):
         return (not scanIndexes.isdisjoint(datasetIndexes))
 
     def selectScan(self, name: str) -> None:
-        self._scanAPI.selectItem(name)
+        self._scan.selectItem(name)
 
     def getSelectedScan(self) -> str:
         return self._scan.getSelectedName()
@@ -203,13 +202,8 @@ class ScanCore(StatefulCore[ScanStateData]):
                 y=Decimal.from_float(y),
             )
 
-        itemName = self.scanAPI.insertItemIntoRepositoryFromScan(
-            nameHint='Restart',
-            scan=TabularScan(pointMap),
-            filePath=stateFilePath,
-            simpleFileType=stateFilePath.suffix)
-
-        if itemName is None:
-            logger.error('Failed to initialize \"{name}\"!')
-        else:
-            self.scanAPI.selectItem(itemName)
+        self.scanAPI.insertItemIntoRepositoryFromScan(name='Restart',
+                                                      scan=TabularScan(pointMap),
+                                                      filePath=stateFilePath,
+                                                      simpleFileType=stateFilePath.suffix,
+                                                      selectItem=True)

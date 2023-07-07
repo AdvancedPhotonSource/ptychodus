@@ -9,7 +9,6 @@ import logging
 import sys
 
 import h5py
-import matplotlib
 import numpy
 
 from ..api.data import DiffractionMetadata, DiffractionPatternArray
@@ -87,10 +86,11 @@ class ModelCore:
                                     self._pluginRegistry.buildProbeFileReaderChooser(),
                                     self._pluginRegistry.buildProbeFileWriterChooser())
         self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
-        self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
-                                      self._scanCore.sizer, self._probeCore.sizer,
-                                      self._pluginRegistry.buildObjectFileReaderChooser(),
-                                      self._pluginRegistry.buildObjectFileWriterChooser())
+        self._objectCore = ObjectCore(
+            self.rng, self.settingsRegistry, self._probeCore.apparatus, self._scanCore.sizer,
+            self._probeCore.sizer, self._pluginRegistry.buildObjectPhaseCenteringStrategyChooser(),
+            self._pluginRegistry.buildObjectFileReaderChooser(),
+            self._pluginRegistry.buildObjectFileWriterChooser())
         self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
         self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.dataset,
                                                                   self._detectorSettings,
@@ -99,16 +99,17 @@ class ModelCore:
                                                                   self._scanCore.scanAPI)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scanAPI,
-            self._probeCore.probeAPI, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._pluginRegistry.buildObjectPhaseCenteringStrategyChooser(),
-            self._dataCore.dataset, self._scanCore.scanAPI, self._probeCore.probeAPI,
-            self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
+            self._dataCore.dataset,
+            self._scanCore.scanAPI,
+            self._probeCore.probeAPI,
+            self._objectCore.objectAPI,
             [
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,

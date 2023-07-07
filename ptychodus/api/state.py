@@ -10,7 +10,7 @@ import numpy.typing
 from .data import DiffractionPatternArrayType, DiffractionPatternIndexes
 from .object import ObjectArrayType
 from .probe import ProbeArrayType
-from .scan import ScanArrayType, ScanIndexes
+from .scan import CoordinateArrayType, ScanIndexes
 
 T = TypeVar('T')
 
@@ -26,8 +26,8 @@ class DiffractionPatternStateData:
 @dataclass(frozen=True)
 class ScanStateData:
     indexes: ScanIndexes
-    positionXInMeters: ScanArrayType
-    positionYInMeters: ScanArrayType
+    positionXInMeters: CoordinateArrayType
+    positionYInMeters: CoordinateArrayType
 
 
 @dataclass(frozen=True)

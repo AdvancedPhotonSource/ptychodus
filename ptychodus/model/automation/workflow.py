@@ -7,7 +7,6 @@ from ...api.state import StateDataRegistry
 from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
 from ..probe import ProbeAPI
-from ..ptychonn import PtychoNNTrainingDatasetBuilder
 from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 
@@ -47,12 +46,9 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
                 break
 
         self._dataAPI.loadDiffractionDataset(diffractionFilePath, simpleFileType='HDF5')
-        scanItemName = self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
-                                                                      simpleFileType='MDA')
-
-        if scanItemName is not None:
-            self._scanAPI.selectItem(scanItemName)
-
+        self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
+                                                       simpleFileType='MDA',
+                                                       selectItem=True)
         # NOTE reuse probe
         self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)
@@ -75,12 +71,9 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
         diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
         self._dataAPI.loadDiffractionDataset(diffractionFilePath, simpleFileType='NeXus')
-        scanItemName = self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
-                                                                      simpleFileType='CSV')
-
-        if scanItemName is not None:
-            self._scanAPI.selectItem(scanItemName)
-
+        self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
+                                                       simpleFileType='CSV',
+                                                       selectItem=True)
         # NOTE reuse probe
         self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)
@@ -88,13 +81,11 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
 class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, registry: StateDataRegistry,
-                 builder: PtychoNNTrainingDatasetBuilder) -> None:
+    def __init__(self, registry: StateDataRegistry) -> None:
         self._registry = registry
-        self._builder = builder
 
     def execute(self, filePath: Path) -> None:
         # FIXME watch for ptychodus NPZ files
         self._registry.openStateData(filePath)
-        self._builder.incorporateTrainingDataFromActiveItems()
+        # FIXME self._builder.incorporateTrainingDataFromActiveItems()
         # FIXME save or train

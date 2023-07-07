@@ -8,11 +8,6 @@ from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
 from ...api.settings import SettingsRegistry
-from ..data import ActiveDiffractionDataset
-from ..object import ObjectAPI
-from ..probe import ProbeAPI
-from ..scan import ScanAPI
-from .arrayConverter import TikeArrayConverter
 from .multigrid import TikeMultigridPresenter, TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionPresenter, TikePositionCorrectionSettings
@@ -150,8 +145,6 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry,
-                       diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                       probe: ProbeAPI, objectAPI: ObjectAPI,
                        isDeveloperModeEnabled: bool) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
 
@@ -172,11 +165,10 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                 core.reconstructorList.append(NullReconstructor('lstsq_grad'))
                 core.reconstructorList.append(NullReconstructor('dm'))
         else:
-            arrayConverter = TikeArrayConverter(scanAPI, probe, objectAPI, diffractionDataset)
             tikeReconstructor = TikeReconstructor(core._settings, core._multigridSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings,
-                                                  core._objectCorrectionSettings, arrayConverter)
+                                                  core._objectCorrectionSettings)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

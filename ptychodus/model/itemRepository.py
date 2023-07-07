@@ -48,22 +48,26 @@ class ItemRepository(Mapping[str, T], Observable):
         name = self._nameList[index]
         return name, self._itemDict[name]
 
-    def insertItem(self, item: T | None) -> str | None:
+    def insertItem(self, item: T | None, *, name: str | None = None) -> str | None:
         if item is None:
             logger.error('Refusing to add null item to repository!')
             return None
 
-        uniqueName = item.nameHint
-        index = 0
+        if name is None:
+            name = item.nameHint
+            index = 0
 
-        while uniqueName in self._itemDict:
-            index += 1
-            uniqueName = f'{item.nameHint}-{index}'
+            while name in self._itemDict:
+                index += 1
+                name = f'{item.nameHint}-{index}'
 
-        self._itemDict[uniqueName] = item
-        self._nameList.append(uniqueName)
+        self._itemDict[name] = item
+
+        if name not in self._nameList:
+            self._nameList.append(name)
+
         self.notifyObservers()
-        return uniqueName
+        return name
 
     def removeItem(self, name: str) -> None:
         try:

@@ -9,7 +9,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
 
 from ..api.observer import Observable, Observer
-from ..api.reconstructor import ReconstructResult
+from ..api.reconstructor import ReconstructOutput
 from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
@@ -116,7 +116,7 @@ class ReconstructorParametersController(Observer):
         self._view.stackedWidget.addWidget(widget)
 
     def _reconstruct(self) -> None:
-        result = ReconstructResult(-1, [[]])
+        result = ReconstructOutput.createNull()
 
         try:
             result = self._presenter.reconstruct()

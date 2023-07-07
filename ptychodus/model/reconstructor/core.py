@@ -2,8 +2,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ...api.observer import Observable, Observer
-from ...api.reconstructor import ReconstructResult, ReconstructorLibrary
+from ...api.reconstructor import ReconstructOutput, ReconstructorLibrary
 from ...api.settings import SettingsRegistry
+from ..data import ActiveDiffractionDataset
+from ..object import ObjectAPI
+from ..probe import ProbeAPI
+from ..scan import ScanAPI
 from .reconstructor import ReconstructorRepository, ActiveReconstructor
 from .settings import ReconstructorSettings
 
@@ -34,8 +38,8 @@ class ReconstructorPresenter(Observable, Observer):
     def setReconstructor(self, name: str) -> None:
         self._activeReconstructor.selectReconstructor(name)
 
-    def reconstruct(self) -> ReconstructResult:
-        return self._activeReconstructor.reconstruct()
+    def reconstruct(self) -> ReconstructOutput:
+        return self._activeReconstructor.reconstruct('Result')  # FIXME better name
 
     def update(self, observable: Observable) -> None:
         if observable is self._repository:
@@ -95,11 +99,14 @@ class ReconstructorPlotPresenter(Observable):
 class ReconstructorCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry,
+                 diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
+                 probeAPI: ProbeAPI, objectAPI: ObjectAPI,
                  libraryList: list[ReconstructorLibrary]) -> None:
         self.settings = ReconstructorSettings.createInstance(settingsRegistry)
         self._repository = ReconstructorRepository.createInstance(libraryList)
         self._activeReconstructor = ActiveReconstructor.createInstance(
-            self.settings, self._repository, settingsRegistry)
+            self.settings, self._repository, diffractionDataset, scanAPI, probeAPI, objectAPI,
+            settingsRegistry)
         self.presenter = ReconstructorPresenter.createInstance(self.settings, self._repository,
                                                                self._activeReconstructor)
         self.plotPresenter = ReconstructorPlotPresenter()

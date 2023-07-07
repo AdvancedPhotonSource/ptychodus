@@ -1,105 +1,99 @@
 from __future__ import annotations
-from decimal import Decimal
-from typing import TypeAlias
+from collections.abc import Sequence
+import logging
 
-from scipy.interpolate import RegularGridInterpolator
+from scipy.ndimage import map_coordinates
 import numpy
-import numpy.typing
 
-from ...api.object import ObjectArrayType, ObjectPoint
+from ...api.image import ImageExtent
+from ...api.object import (ObjectArrayType, ObjectAxis, ObjectGrid, ObjectInterpolator,
+                           ObjectPatch, ObjectPatchAxis, ObjectPhaseCenteringStrategy)
 from ...api.observer import Observable, Observer
+from ...api.plugins import PluginChooser
 from ...api.scan import ScanPoint
-from .selected import SelectedObject
+from .settings import ObjectSettings
 from .sizer import ObjectSizer
 
-FloatArrayType: TypeAlias = numpy.typing.NDArray[numpy.float_]
+logger = logging.getLogger(__name__)
 
 
-class ObjectInterpolator(Observer):
+class ObjectLinearInterpolator(ObjectInterpolator):
 
-    def __init__(self, sizer: ObjectSizer, object_: SelectedObject) -> None:
+    def __init__(self, grid: ObjectGrid, array: ObjectArrayType) -> None:
+        self._grid = grid
+        self._array = array
+
+    def getGrid(self) -> ObjectGrid:
+        return self._grid
+
+    def getArray(self) -> ObjectArrayType:
+        return self._array
+
+    def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> ObjectPatch:
+        axisX = ObjectPatchAxis(self._grid.axisX, float(patchCenter.x), patchExtent.width)
+        axisY = ObjectPatchAxis(self._grid.axisY, float(patchCenter.y), patchExtent.height)
+        xx, yy = numpy.meshgrid(axisX.getPixelScanCoordinates(), axisY.getPixelScanCoordinates())
+        array = map_coordinates(self._array, (yy, xx), order=1)
+        return ObjectPatch(axisX=axisX, axisY=axisY, array=array)
+
+
+class ObjectInterpolatorFactory(Observable, Observer):
+
+    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer,
+                 phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
+                 reinitObservable: Observable) -> None:
         super().__init__()
+        self._settings = settings
         self._sizer = sizer
-        self._object = object_
-        self._probeGridXInMeters: FloatArrayType = numpy.array([])
-        self._probeGridYInMeters: FloatArrayType = numpy.array([])
-        self._interpolator = RegularGridInterpolator([], [])
+        self._phaseCenteringStrategyChooser = phaseCenteringStrategyChooser
+        self._reinitObservable = reinitObservable
 
     @classmethod
-    def createInstance(cls, sizer: ObjectSizer, object_: SelectedObject) -> ObjectInterpolator:
-        presenter = cls(sizer, object_)
-        sizer.addObserver(presenter)
-        object_.addObserver(presenter)
-        presenter._resetInterpolator()
-        return presenter
+    def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer,
+                       phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
+                       reinitObservable: Observable) -> ObjectInterpolatorFactory:
+        factory = cls(settings, sizer, phaseCenteringStrategyChooser, reinitObservable)
+        reinitObservable.addObserver(factory)
+        factory._syncFromSettings()
+        return factory
 
-    def mapScanPointToObjectPoint(self, point: ScanPoint) -> ObjectPoint:
-        selectedItem = self._object.getSelectedItem()
+    def createInterpolator(self, objectArray: ObjectArrayType,
+                           objectCentroid: ScanPoint) -> ObjectInterpolator:
+        centerPhase = self._phaseCenteringStrategyChooser.getCurrentStrategy()
 
-        if selectedItem is None:
-            raise ValueError('No object is selected!')
-
-        objectExtent = selectedItem.getExtentInPixels()
-        dx = self._sizer.getPixelSizeXInMeters()
-        dy = self._sizer.getPixelSizeYInMeters()
-        center = self._sizer.getCentroidInMeters()
-
-        return ObjectPoint(
-            x=(point.x - center.x) / dx + Decimal(objectExtent.width) / 2,
-            y=(point.y - center.y) / dy + Decimal(objectExtent.height) / 2,
+        objectGrid = ObjectGrid(
+            axisX=ObjectAxis(
+                centerInMeters=float(objectCentroid.x),
+                pixelSizeInMeters=float(self._sizer.getPixelSizeXInMeters()),
+                numberOfPixels=objectArray.shape[-1],
+            ),
+            axisY=ObjectAxis(
+                centerInMeters=float(objectCentroid.y),
+                pixelSizeInMeters=float(self._sizer.getPixelSizeYInMeters()),
+                numberOfPixels=objectArray.shape[-2],
+            ),
         )
 
-    def mapObjectPointToScanPoint(self, point: ObjectPoint) -> ScanPoint:
-        selectedItem = self._object.getSelectedItem()
-
-        if selectedItem is None:
-            raise ValueError('No object is selected!')
-
-        objectExtent = selectedItem.getExtentInPixels()
-        dx = self._sizer.getPixelSizeXInMeters()
-        dy = self._sizer.getPixelSizeYInMeters()
-        center = self._sizer.getCentroidInMeters()
-
-        return ScanPoint(
-            x=center.x + dx * (point.x - Decimal(objectExtent.width) / 2),
-            y=center.y + dy * (point.y - Decimal(objectExtent.height) / 2),
+        return ObjectLinearInterpolator(
+            grid=objectGrid,
+            array=centerPhase(objectArray),
         )
 
-    @staticmethod
-    def _createAxis(ticks: int, tickSize: float, center: float) -> FloatArrayType:
-        axis = numpy.arange(ticks) * tickSize
-        axis += center - axis.mean()
-        return axis
+    def getPhaseCenteringStrategyList(self) -> Sequence[str]:
+        return self._phaseCenteringStrategyChooser.getDisplayNameList()
 
-    def _resetInterpolator(self) -> None:
-        selectedItem = self._object.getSelectedItem()
+    def getPhaseCenteringStrategy(self) -> str:
+        return self._phaseCenteringStrategyChooser.getCurrentDisplayName()
 
-        if selectedItem is None:
-            # FIXME raise ValueError('No object is selected!')
-            return
+    def setPhaseCenteringStrategy(self, name: str) -> None:
+        self._phaseCenteringStrategyChooser.setFromDisplayName(name)
+        simpleName = self._phaseCenteringStrategyChooser.getCurrentSimpleName()
+        self._settings.phaseCenteringStrategy.value = simpleName
 
-        objectExtent = selectedItem.getExtentInPixels()
-        dy = float(self._sizer.getPixelSizeYInMeters())
-        dx = float(self._sizer.getPixelSizeXInMeters())
-        center = self._sizer.getCentroidInMeters()
-
-        objectYInMeters = self._createAxis(objectExtent.height, dy, float(center.y))
-        objectXInMeters = self._createAxis(objectExtent.width, dx, float(center.x))
-        self._interp = RegularGridInterpolator((objectYInMeters, objectXInMeters),
-                                               selectedItem.getArray(),
-                                               method='pchip')
-
-        probeExtent = self._sizer.getProbeExtent()
-        self._probeGridYInMeters, self._probeGridXInMeters = numpy.meshgrid(
-            self._createAxis(probeExtent.height, dy, 0.),
-            self._createAxis(probeExtent.width, dx, 0.),
-        )
-
-    def getPatch(self, point: ObjectPoint) -> ObjectArrayType:
-        y = float(point.y) + self._probeGridYInMeters
-        x = float(point.x) + self._probeGridXInMeters
-        return self._interpolator((y, x))
+    def _syncFromSettings(self) -> None:
+        simpleName = self._settings.phaseCenteringStrategy.value
+        self._phaseCenteringStrategyChooser.setFromSimpleName(simpleName)
 
     def update(self, observable: Observable) -> None:
-        if observable in (self._sizer, self._object):
-            self._resetInterpolator()
+        if observable is self._reinitObservable:
+            self._syncFromSettings()

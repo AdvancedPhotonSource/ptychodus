@@ -33,18 +33,27 @@ class ProbeAPI:
         return self._repository.insertItem(item)
 
     def insertItemIntoRepositoryFromArray(self,
-                                          nameHint: str,
+                                          name: str,
                                           array: ProbeArrayType,
                                           *,
                                           filePath: Optional[Path] = None,
                                           simpleFileType: str = '',
-                                          displayFileType: str = '') -> Optional[str]:
-        item = self._factory.createItemFromArray(nameHint,
+                                          displayFileType: str = '',
+                                          replaceItem: bool = False,
+                                          selectItem: bool = False) -> Optional[str]:
+        item = self._factory.createItemFromArray(name,
                                                  array,
                                                  filePath=filePath,
                                                  simpleFileType=simpleFileType,
                                                  displayFileType=displayFileType)
-        return self._repository.insertItem(item)
+        itemName = self._repository.insertItem(item, name=name if replaceItem else None)
+
+        if itemName is None:
+            logger.error(f'Failed to insert probe array \"{name}\"!')
+        elif selectItem:
+            self._probe.selectItem(itemName)
+
+        return itemName
 
     def insertItemIntoRepositoryFromInitializerSimpleName(self, name: str) -> Optional[str]:
         item = self._factory.createItemFromSimpleName(name)
@@ -53,9 +62,6 @@ class ProbeAPI:
     def insertItemIntoRepositoryFromInitializerDisplayName(self, name: str) -> Optional[str]:
         item = self._factory.createItemFromDisplayName(name)
         return self._repository.insertItem(item)
-
-    def selectItem(self, itemName: str) -> None:
-        self._probe.selectItem(itemName)
 
     def getSelectedProbeArray(self) -> ProbeArrayType:
         selectedItem = self._probe.getSelectedItem()

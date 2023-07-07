@@ -19,6 +19,8 @@ class ObjectSettings(Observable, Observer):
         self.phaseDeviation = settingsGroup.createRealEntry('PhaseDeviation', '0')
         self.extraPaddingX = settingsGroup.createIntegerEntry('ExtraPaddingX', 0)
         self.extraPaddingY = settingsGroup.createIntegerEntry('ExtraPaddingY', 0)
+        self.phaseCenteringStrategy = settingsGroup.createStringEntry(
+            'PhaseCenteringStrategy', 'Identity')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ObjectSettings:

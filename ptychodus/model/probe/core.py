@@ -139,7 +139,7 @@ class ProbePresenter(Observable, Observer):
         return (actualExtent == expectedExtent and hasComplexDataType)
 
     def selectProbe(self, name: str) -> None:
-        self._probeAPI.selectItem(name)
+        self._probe.selectItem(name)
 
     def getSelectedProbe(self) -> str:
         return self._probe.getSelectedName()
@@ -193,13 +193,8 @@ class ProbeCore(StatefulCore[ProbeStateData]):
         )
 
     def setStateData(self, stateData: ProbeStateData, stateFilePath: Path) -> None:
-        itemName = self.probeAPI.insertItemIntoRepositoryFromArray(
-            nameHint='Restart',
-            array=stateData.array,
-            filePath=stateFilePath,
-            simpleFileType=stateFilePath.suffix)
-
-        if itemName is None:
-            logger.error('Failed to initialize \"{name}\"!')
-        else:
-            self.probeAPI.selectItem(itemName)
+        self.probeAPI.insertItemIntoRepositoryFromArray(name='Restart',
+                                                        array=stateData.array,
+                                                        filePath=stateFilePath,
+                                                        simpleFileType=stateFilePath.suffix,
+                                                        selectItem=True)

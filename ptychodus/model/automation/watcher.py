@@ -23,7 +23,7 @@ class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
         if not event.is_directory:
             srcPath = Path(event.src_path)
 
-            # TODO generalize
+            # FIXME generalize
             if srcPath.suffix.casefold() == '.mda':
                 self._datasetBuffer.put(srcPath)
 
@@ -59,7 +59,7 @@ class DataDirectoryWatcher(Observable, Observer):
         observedWatch = self._observer.schedule(
             event_handler=DataDirectoryEventHandler(self._datasetBuffer),
             path=self._settings.dataDirectory.value,
-            recursive=False,  # TODO generalize
+            recursive=False,  # FIXME generalize
         )
         logger.debug(observedWatch)
 

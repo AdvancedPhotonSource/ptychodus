@@ -1,12 +1,10 @@
-from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 import logging
 
-from ...api.object import ObjectArrayType, ObjectPoint
-from ...api.scan import ScanPoint
+from ...api.object import ObjectArrayType, ObjectInterpolator
 from .factory import ObjectRepositoryItemFactory
-from .interpolator import ObjectInterpolator
+from .interpolator import ObjectInterpolatorFactory
 from .repository import ObjectRepository
 from .selected import SelectedObject
 from .sizer import ObjectSizer
@@ -18,12 +16,12 @@ class ObjectAPI:
 
     def __init__(self, factory: ObjectRepositoryItemFactory, repository: ObjectRepository,
                  object_: SelectedObject, sizer: ObjectSizer,
-                 interpolator: ObjectInterpolator) -> None:
+                 interpolatorFactory: ObjectInterpolatorFactory) -> None:
         self._factory = factory
         self._repository = repository
         self._object = object_
         self._sizer = sizer
-        self._interpolator = interpolator
+        self._interpolatorFactory = interpolatorFactory
 
     def insertItemIntoRepositoryFromFile(self,
                                          filePath: Path,
@@ -40,18 +38,27 @@ class ObjectAPI:
         return self._repository.insertItem(item)
 
     def insertItemIntoRepositoryFromArray(self,
-                                          nameHint: str,
+                                          name: str,
                                           array: ObjectArrayType,
                                           *,
                                           filePath: Optional[Path] = None,
                                           simpleFileType: str = '',
-                                          displayFileType: str = '') -> Optional[str]:
-        item = self._factory.createItemFromArray(nameHint,
+                                          displayFileType: str = '',
+                                          replaceItem: bool = False,
+                                          selectItem: bool = False) -> Optional[str]:
+        item = self._factory.createItemFromArray(name,
                                                  array,
                                                  filePath=filePath,
                                                  simpleFileType=simpleFileType,
                                                  displayFileType=displayFileType)
-        return self._repository.insertItem(item)
+        itemName = self._repository.insertItem(item, name=name if replaceItem else None)
+
+        if itemName is None:
+            logger.error(f'Failed to insert object array \"{name}\"!')
+        elif selectItem:
+            self._object.selectItem(itemName)
+
+        return itemName
 
     def insertItemIntoRepositoryFromInitializerSimpleName(self, name: str) -> Optional[str]:
         item = self._factory.createItemFromSimpleName(name)
@@ -61,16 +68,13 @@ class ObjectAPI:
         item = self._factory.createItemFromDisplayName(name)
         return self._repository.insertItem(item)
 
-    def selectItem(self, itemName: str) -> None:
-        self._object.selectItem(itemName)
-
     def selectNewItemFromInitializerSimpleName(self, name: str) -> None:  # TODO improve name
         itemName = self.insertItemIntoRepositoryFromInitializerSimpleName(name)
 
         if itemName is None:
             logger.error('Refusing to select null item!')
         else:
-            self.selectItem(itemName)
+            self._object.selectItem(itemName)
 
     def getSelectedObjectArray(self) -> ObjectArrayType:
         selectedItem = self._object.getSelectedItem()
@@ -80,19 +84,8 @@ class ObjectAPI:
 
         return selectedItem.getArray()
 
-    def getPixelSizeXInMeters(self) -> Decimal:  # FIXME remove
-        return self._sizer.getPixelSizeXInMeters()
-
-    def getPixelSizeYInMeters(self) -> Decimal:  # FIXME remove
-        return self._sizer.getPixelSizeYInMeters()
-
-    def mapScanPointToObjectPoint(self, point: ScanPoint) -> ObjectPoint:
-        '''returns the object position in pixels'''
-        return self._interpolator.mapScanPointToObjectPoint(point)
-
-    def mapObjectPointToScanPoint(self, point: ObjectPoint) -> ScanPoint:
-        '''returns the scan position in meters'''
-        return self._interpolator.mapObjectPointToScanPoint(point)
-
-    def getObjectPatch(self, point: ScanPoint) -> ObjectArrayType:
-        return self._interpolator.getPatch(point)
+    def getSelectedObjectInterpolator(self) -> ObjectInterpolator:
+        return self._interpolatorFactory.createInterpolator(
+            objectArray=self.getSelectedObjectArray(),
+            objectCentroid=self._sizer.getCentroidInMeters(),
+        )

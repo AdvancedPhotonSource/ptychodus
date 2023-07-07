@@ -11,7 +11,7 @@ import numpy.typing
 
 from .geometry import Point2D
 
-ScanArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
+CoordinateArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 ScanIndexes = numpy.typing.NDArray[numpy.integer[Any]]
 
 # scan point coordinates are conventionally in meters
