@@ -95,7 +95,6 @@ class ProbeRepositoryPresenter(Observable, Observer):
         writer = self._fileWriterChooser.getCurrentStrategy()
         writer.write(filePath, item.getArray())
 
-        # FIXME test this
         if item.getInitializer() is None:
             initializer = self._itemFactory.createFileInitializer(filePath,
                                                                   simpleFileType=fileType)

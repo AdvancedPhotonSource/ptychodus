@@ -44,6 +44,12 @@ class ProbeTreeNode:
 
         return self.presenter.name
 
+    def getInitializerName(self) -> str:
+        if self.presenter is None:
+            return str()
+
+        return self.presenter.item.getInitializerSimpleName()
+
     def getDataType(self) -> str:
         if self.presenter is None:
             return str()
@@ -102,7 +108,8 @@ class ProbeTreeModel(QAbstractItemModel):
         super().__init__(parent)
         self._rootNode = ProbeTreeNode.createRoot()
         self._header = [
-            'Name', 'Relative Power', 'Data Type', 'Width [px]', 'Height [px]', 'Size [MB]'
+            'Name', 'Relative Power', 'Initializer', 'Data Type', 'Width [px]', 'Height [px]',
+            'Size [MB]'
         ]
 
     def setRootNode(self, rootNode: ProbeTreeNode) -> None:
@@ -199,12 +206,14 @@ class ProbeTreeModel(QAbstractItemModel):
                     if index.column() == 0:
                         value = QVariant(node.getName())
                     elif index.column() == 2:
-                        value = QVariant(node.getDataType())
+                        value = QVariant(node.getInitializerName())
                     elif index.column() == 3:
-                        value = QVariant(node.getWidthInPixels())
+                        value = QVariant(node.getDataType())
                     elif index.column() == 4:
-                        value = QVariant(node.getHeightInPixels())
+                        value = QVariant(node.getWidthInPixels())
                     elif index.column() == 5:
+                        value = QVariant(node.getHeightInPixels())
+                    elif index.column() == 6:
                         value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
                 elif index.column() == 0:
                     value = QVariant(f'Mode {node.probeMode}')

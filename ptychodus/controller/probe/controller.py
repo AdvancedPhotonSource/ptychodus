@@ -154,7 +154,7 @@ class ProbeController(Observer):
                     itemPresenter, self._view)
                 sgController.openDialog()
             else:
-                # FIXME FromFile
+                # FIXME FromFile/FromMemory
                 logger.error('Unknown repository item!')
         else:
             logger.error('No items are selected!')

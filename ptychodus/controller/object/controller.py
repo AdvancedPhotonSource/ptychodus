@@ -160,7 +160,7 @@ class ObjectController(Observer):
                     itemPresenter, self._view)
                 randomController.openDialog()
             else:
-                # FIXME FromFile
+                # FIXME FromFile/FromMemory
                 logger.error('Unknown repository item!')
 
     def _removeSelectedObject(self) -> None:
