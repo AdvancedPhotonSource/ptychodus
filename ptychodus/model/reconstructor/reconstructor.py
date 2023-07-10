@@ -8,7 +8,7 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginEntry
 from ...api.probe import ProbeArrayType
 from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,
-                                  Reconstructor, ReconstructorLibrary)
+                                  Reconstructor, ReconstructorLibrary, TrainableReconstructor)
 from ...api.scan import Scan, ScanPoint, TabularScan
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
@@ -79,6 +79,10 @@ class ActiveReconstructor(Observable, Observer):
         return reconstructor
 
     @property
+    def isTrainable(self) -> bool:
+        return isinstance(self._reconstructorPlugin.strategy, TrainableReconstructor)
+
+    @property
     def name(self) -> str:
         return self._reconstructorPlugin.displayName
 
@@ -131,7 +135,7 @@ class ActiveReconstructor(Observable, Observer):
 
         return objectName, objectInterpolator
 
-    def reconstruct(self, name: str) -> ReconstructOutput:
+    def execute(self, name: str) -> ReconstructOutput:
         scanName, scan = self._createFilteredCopyOfSelectedScan(name)
         probeName, probeArray = self._cloneSelectedProbe(name)
         objectName, objectInterpolator = self._cloneSelectedObject(name)

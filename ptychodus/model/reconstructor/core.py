@@ -38,8 +38,15 @@ class ReconstructorPresenter(Observable, Observer):
     def setReconstructor(self, name: str) -> None:
         self._activeReconstructor.selectReconstructor(name)
 
-    def reconstruct(self) -> ReconstructOutput:
-        return self._activeReconstructor.reconstruct('Result')  # FIXME better name
+    @property
+    def isTrainable(self) -> bool:
+        return self._activeReconstructor.isTrainable
+
+    def train(self) -> None:
+        self._activeReconstructor.train()
+
+    def execute(self) -> ReconstructOutput:
+        return self._activeReconstructor.execute('Result')  # FIXME better name
 
     def update(self, observable: Observable) -> None:
         if observable is self._repository:

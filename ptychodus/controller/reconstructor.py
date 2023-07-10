@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 import logging
 import traceback
 
@@ -41,7 +42,7 @@ class ReconstructorParametersController(Observer):
         probePresenter: ProbePresenter,
         objectPresenter: ObjectPresenter,
         view: ReconstructorParametersView,
-        viewControllerFactoryList: list[ReconstructorViewControllerFactory],
+        viewControllerFactoryList: Iterable[ReconstructorViewControllerFactory],
     ) -> None:
         super().__init__()
         self._presenter = presenter
@@ -92,9 +93,11 @@ class ReconstructorParametersController(Observer):
             objectPresenter.selectObject)
         view.reconstructorView.objectComboBox.setModel(controller._objectListModel)
 
-        view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
+        view.reconstructorView.reconstructButton.clicked.connect(controller._execute)
+        view.reconstructorView.ingestButton.clicked.connect(controller._execute)
+        view.reconstructorView.trainButton.clicked.connect(controller._train)
 
-        controller._syncAlgorithmToView()
+        controller._syncModelToView()
         controller._syncScanToView()
         controller._syncProbeToView()
         controller._syncObjectToView()
@@ -115,11 +118,11 @@ class ReconstructorParametersController(Observer):
 
         self._view.stackedWidget.addWidget(widget)
 
-    def _reconstruct(self) -> None:
+    def _execute(self) -> None:
         result = ReconstructOutput.createNull()
 
         try:
-            result = self._presenter.reconstruct()
+            result = self._presenter.execute()
         except Exception as err:
             logger.exception(err)
 
@@ -133,7 +136,23 @@ class ReconstructorParametersController(Observer):
         else:
             self._plotPresenter.setEnumeratedYValues(result.objective)
 
-        print(result.result)  # TODO
+        logger.info(result.result)  # TODO
+
+    def _train(self) -> None:
+        try:
+            self._presenter.train()
+        except Exception as err:
+            logger.exception(err)
+
+            msgBox = QMessageBox()
+            msgBox.setWindowTitle('Exception Dialog')
+            msgBox.setIcon(QMessageBox.Critical)
+            msgBox.setText(f'The trainer raised a {err.__class__.__name__}!')
+            msgBox.setInformativeText(str(err))
+            msgBox.setDetailedText(traceback.format_exc())
+            _ = msgBox.exec_()
+
+        logger.info('Training complete.')
 
     def _syncScanToView(self) -> None:
         self._view.reconstructorView.scanComboBox.blockSignals(True)
@@ -172,13 +191,18 @@ class ReconstructorParametersController(Observer):
         pixmap = QPixmap(':/icons/check' if isValid else ':/icons/xmark')
         return pixmap.scaledToHeight(24)
 
-    def _syncAlgorithmToView(self) -> None:
+    def _syncModelToView(self) -> None:
         self._view.reconstructorView.algorithmComboBox.setCurrentText(
             self._presenter.getReconstructor())
 
+        isTrainable = self._presenter.isTrainable
+        self._view.reconstructorView.reconstructButton.setVisible(not isTrainable)
+        self._view.reconstructorView.ingestButton.setVisible(isTrainable)
+        self._view.reconstructorView.trainButton.setVisible(isTrainable)
+
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncAlgorithmToView()
+            self._syncModelToView()
         elif observable is self._scanPresenter:
             self._syncScanToView()
         elif observable is self._probePresenter:

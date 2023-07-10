@@ -228,7 +228,7 @@ class ModelCore:
         self._stateDataRegistry.openStateData(filePath)
 
     def batchModeReconstruct(self, filePath: Path) -> int:
-        result = self._reconstructorCore.presenter.reconstruct()
+        result = self._reconstructorCore.presenter.execute()
         self.saveStateData(filePath, restartable=False)
         return result.result
 
