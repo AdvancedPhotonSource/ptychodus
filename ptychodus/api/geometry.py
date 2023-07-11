@@ -39,7 +39,7 @@ class Interval(Generic[T]):
         return self.upper - self.lower
 
     @property
-    def median(self) -> T:
+    def midrange(self) -> T:
         total = self.lower + self.upper
         return total // 2 if isinstance(total, int) else total / 2
 
@@ -56,8 +56,8 @@ class Box2D(Generic[T]):
     rangeY: Interval[T]
 
     @property
-    def centroid(self) -> Point2D[T]:
-        return Point2D[T](self.rangeX.median, self.rangeY.median)
+    def midpoint(self) -> Point2D[T]:
+        return Point2D[T](self.rangeX.midrange, self.rangeY.midrange)
 
     def hull(self, x: T, y: T) -> Box2D[T]:
         return Box2D[T](self.rangeX.hull(x), self.rangeY.hull(y))

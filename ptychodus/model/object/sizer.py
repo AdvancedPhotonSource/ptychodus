@@ -34,8 +34,8 @@ class ObjectSizer(Observable, Observer):
     def getPixelSizeYInMeters(self) -> Decimal:
         return self._apparatus.getObjectPlanePixelSizeYInMeters()
 
-    def getCentroidInMeters(self) -> ScanPoint:
-        return self._scanSizer.getCentroidInMeters()
+    def getMidpointInMeters(self) -> ScanPoint:
+        return self._scanSizer.getMidpointInMeters()
 
     @staticmethod
     def _getIntegerCeilingOfQuotient(upper: Decimal, lower: Decimal) -> int:

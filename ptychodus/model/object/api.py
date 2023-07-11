@@ -87,5 +87,5 @@ class ObjectAPI:
     def getSelectedObjectInterpolator(self) -> ObjectInterpolator:
         return self._interpolatorFactory.createInterpolator(
             objectArray=self.getSelectedObjectArray(),
-            objectCentroid=self._sizer.getCentroidInMeters(),
+            objectCentroid=self._sizer.getMidpointInMeters(),
         )

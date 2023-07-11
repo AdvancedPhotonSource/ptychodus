@@ -62,9 +62,9 @@ class ScanSizer(Observable, Observer):
         # TODO cache this
         return boundingBoxInMeters
 
-    def getCentroidInMeters(self) -> ScanPoint:
+    def getMidpointInMeters(self) -> ScanPoint:
         bbox = self.getBoundingBoxInMeters()
-        return ScanPoint(Decimal(), Decimal()) if bbox is None else bbox.centroid
+        return ScanPoint(Decimal(), Decimal()) if bbox is None else bbox.midpoint
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

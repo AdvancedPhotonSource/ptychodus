@@ -1,8 +1,9 @@
 from __future__ import annotations
 from collections.abc import Sequence
+import logging
 
 from ...api.observer import Observable, Observer
-from ...api.reconstructor import ReconstructOutput, ReconstructorLibrary
+from ...api.reconstructor import ReconstructOutput, ReconstructorLibrary, TrainableReconstructor
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
@@ -10,6 +11,8 @@ from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from .reconstructor import ReconstructorRepository, ActiveReconstructor
 from .settings import ReconstructorSettings
+
+logger = logging.getLogger(__name__)
 
 
 class ReconstructorPresenter(Observable, Observer):
@@ -43,7 +46,13 @@ class ReconstructorPresenter(Observable, Observer):
         return self._activeReconstructor.isTrainable
 
     def train(self) -> None:
-        self._activeReconstructor.train()
+        recon = self._activeReconstructor
+
+        # FIXME as implemented, this is always false
+        if isinstance(recon, TrainableReconstructor):
+            recon.train()
+        else:
+            logger.error('Reconstructor is not trainable!')
 
     def execute(self) -> ReconstructOutput:
         return self._activeReconstructor.execute('Result')  # FIXME better name

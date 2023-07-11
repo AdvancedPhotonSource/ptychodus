@@ -141,6 +141,7 @@ class ActiveReconstructor(Observable, Observer):
         objectName, objectInterpolator = self._cloneSelectedObject(name)
 
         # FIXME prefilter diffraction patterns so that scan indexes are authoritative
+        # FIXME diffractionPatternArray = numpy.take(arr, indices, axis=0)
         diffractionPatternArray = self._diffractionDataset.getAssembledData()
 
         parameters = ReconstructInput(

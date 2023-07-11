@@ -1,6 +1,6 @@
 from decimal import Decimal
 from importlib.metadata import version
-from typing import Any, Union
+from typing import Any, Final, Union
 import logging
 import pprint
 
@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class TikeReconstructor:
+    PAD_WIDTH: Final[int] = 2  # FIXME use object padding
 
     def __init__(self, settings: TikeSettings, multigridSettings: TikeMultigridSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
@@ -109,17 +110,24 @@ class TikeReconstructor:
     def __call__(self, parameters: ReconstructInput,
                  algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> ReconstructOutput:
         objectGrid = parameters.objectInterpolator.getGrid()
+        psi = parameters.objectInterpolator.getArray().astype('complex64')
+        probe = parameters.probeArray[numpy.newaxis, numpy.newaxis, ...].astype('complex64')
         data = numpy.fft.ifftshift(parameters.diffractionPatternArray, axes=(-2, -1))
         coordinateList: list[float] = list()
 
+        # Tike coordinate system origin is top-left corner; requires padding
+        ux = self.PAD_WIDTH - probe.shape[-1] / 2  # FIXME use object padding
+        uy = self.PAD_WIDTH - probe.shape[-2] / 2  # FIXME use object padding
+
         for scanPoint in parameters.scan.values():
             objectPoint = objectGrid.mapScanPointToObjectPoint(scanPoint)
-            coordinateList.append(float(objectPoint.y))
-            coordinateList.append(float(objectPoint.x))
+            coordinateList.append(float(objectPoint.y) + uy)
+            coordinateList.append(float(objectPoint.x) + ux)
 
         scan = numpy.array(coordinateList, dtype=numpy.float32).reshape(len(parameters.scan), 2)
-        probe = parameters.probeArray[numpy.newaxis, numpy.newaxis, ...].astype('complex64')
-        psi = parameters.objectInterpolator.getArray().astype('complex64')
+        scanMin = scan.min(axis=0)
+        scanMax = scan.max(axis=0)
+        logger.debug(f'Scan range [px]: {scanMin} -> {scanMax}')
         numGpus = self.getNumGpus()
 
         logger.debug(f'data shape={data.shape}')
