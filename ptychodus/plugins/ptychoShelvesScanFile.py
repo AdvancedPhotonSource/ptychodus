@@ -1,4 +1,3 @@
-from decimal import Decimal
 from pathlib import Path
 import logging
 
@@ -36,11 +35,8 @@ class PtychoShelvesScanFileReader(ScanFileReader):
                     else:
                         raise ScanPointParseError('Coordinate array shape mismatch!')
 
-                    for xf, yf in zip(ppX[:, 0], ppY[:, 0]):
-                        point = ScanPoint(
-                            x=Decimal.from_float(xf),
-                            y=Decimal.from_float(yf),
-                        )
+                    for x, y in zip(ppX[:, 0], ppY[:, 0]):
+                        point = ScanPoint(x, y)
                         pointList.append(point)
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')

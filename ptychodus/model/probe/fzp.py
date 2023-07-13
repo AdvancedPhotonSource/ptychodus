@@ -160,7 +160,7 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         #         outermostZoneWidthInMeters = 30e-9,
         #         centralBeamstopDiameterInMeters = 80e-6)
 
-        probeExtent = self._sizer.getProbeExtent()
+        probeExtent = self._sizer.getExtentInPixels()
         probe = numpy.zeros(probeExtent.shape, dtype=complex)
 
         # central wavelength

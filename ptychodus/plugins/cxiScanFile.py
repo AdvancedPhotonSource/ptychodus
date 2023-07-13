@@ -1,4 +1,3 @@
-from decimal import Decimal
 from pathlib import Path
 import logging
 
@@ -35,10 +34,7 @@ class CXIScanFileReader(ScanFileReader):
                     except ValueError:
                         logger.exception('Unable to load scan.')
                     else:
-                        point = ScanPoint(
-                            x=Decimal.from_float(x),
-                            y=Decimal.from_float(y),
-                        )
+                        point = ScanPoint(x, y)
                         pointList.append(point)
 
         return TabularScan.createFromPointIterable(pointList)

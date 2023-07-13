@@ -38,7 +38,7 @@ class DiskProbeInitializer(ProbeInitializer):
         settings.diskDiameterInMeters.value = self._diameterInMeters
 
     def __call__(self) -> ProbeArrayType:
-        extent = self._sizer.getProbeExtent()
+        extent = self._sizer.getExtentInPixels()
         cellCentersX = numpy.arange(extent.width) - (extent.width - 1) / 2
         cellCentersY = numpy.arange(extent.height) - (extent.height - 1) / 2
         Y_px, X_px = numpy.meshgrid(cellCentersY, cellCentersX)

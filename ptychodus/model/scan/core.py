@@ -1,7 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 import logging
@@ -197,10 +196,7 @@ class ScanCore(StatefulCore[ScanStateData]):
 
         for index, x, y in zip(stateData.indexes, stateData.positionXInMeters,
                                stateData.positionYInMeters):
-            pointMap[index] = ScanPoint(
-                x=Decimal.from_float(x),
-                y=Decimal.from_float(y),
-            )
+            pointMap[index] = ScanPoint(x, y)
 
         self.scanAPI.insertItemIntoRepositoryFromScan(name='Restart',
                                                       scan=TabularScan(pointMap),

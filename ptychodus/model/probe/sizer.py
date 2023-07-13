@@ -17,7 +17,7 @@ class ProbeSizer(Observable, Observer):
         diffractionPatternSizer.addObserver(sizer)
         return sizer
 
-    def getProbeExtent(self) -> ImageExtent:
+    def getExtentInPixels(self) -> ImageExtent:
         return self._diffractionPatternSizer.getExtentInPixels()
 
     def update(self, observable: Observable) -> None:

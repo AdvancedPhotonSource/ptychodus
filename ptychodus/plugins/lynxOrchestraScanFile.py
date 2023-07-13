@@ -1,5 +1,4 @@
 from collections import defaultdict
-from decimal import Decimal
 from pathlib import Path
 from typing import Final
 import csv
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class LYNXOrchestraScanFileReader(ScanFileReader):
-    MICRONS_TO_METERS: Final[Decimal] = Decimal('1e-6')
+    MICRONS_TO_METERS: Final[float] = 1.e-6
     DATA_POINT_COLUMN: Final[int] = 0
     X_COLUMN: Final[int] = 2
     Y_COLUMN: Final[int] = 5
@@ -80,8 +79,8 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
 
                 data_point = int(row[self.DATA_POINT_COLUMN])
                 point = ScanPoint(
-                    x=Decimal(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
-                    y=Decimal(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
+                    x=float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
+                    y=float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
                 )
                 pointSeqMap[data_point].append(point)
 

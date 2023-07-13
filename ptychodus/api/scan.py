@@ -1,7 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping
-from decimal import Decimal
 from pathlib import Path
 from statistics import median
 from typing import Any, TypeAlias
@@ -15,7 +14,7 @@ CoordinateArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 ScanIndexes = numpy.typing.NDArray[numpy.integer[Any]]
 
 # scan point coordinates are conventionally in meters
-ScanPoint: TypeAlias = Point2D[Decimal]
+ScanPoint: TypeAlias = Point2D[float]
 Scan: TypeAlias = Mapping[int, ScanPoint]
 
 

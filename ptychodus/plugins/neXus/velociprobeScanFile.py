@@ -1,8 +1,8 @@
 from __future__ import annotations
 from collections import defaultdict
-from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
+from typing import Final
 import csv
 
 import numpy
@@ -23,6 +23,7 @@ class VelociprobeScanFileColumn(IntEnum):
 
 
 class VelociprobeScanFileReader(ScanFileReader):
+    NANOMETERS_TO_METERS: Final[float] = 1.e-9
 
     def __init__(self, neXusReader: NeXusDiffractionFileReader, yColumn: int) -> None:
         self._neXusReader = neXusReader
@@ -62,11 +63,10 @@ class VelociprobeScanFileReader(ScanFileReader):
 
     def _applyTransform(self, scan: Scan) -> Scan:
         stageRotationInRadians = numpy.deg2rad(self._neXusReader.stageRotationInDegrees)
-        stageRotationCosine = Decimal.from_float(numpy.cos(stageRotationInRadians))
+        stageRotationCosine = numpy.cos(stageRotationInRadians)
 
-        zero = Decimal()
-        xMean = sum((p.x for p in scan.values()), start=zero) / len(scan)
-        yMean = sum((p.y for p in scan.values()), start=zero) / len(scan)
+        xMean = sum(p.x for p in scan.values()) / len(scan)
+        yMean = sum(p.y for p in scan.values()) / len(scan)
         pointMap: dict[int, ScanPoint] = dict()
 
         for index, point in scan.items():
@@ -80,7 +80,6 @@ class VelociprobeScanFileReader(ScanFileReader):
     def read(self, filePath: Path) -> Scan:
         pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
         minimumColumnCount = max(col.value for col in VelociprobeScanFileColumn) + 1
-        nanometersToMeters = Decimal('1e-9')
 
         with filePath.open(newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=',')
@@ -100,8 +99,8 @@ class VelociprobeScanFileReader(ScanFileReader):
                     y_nm = -y_nm
 
                 point = ScanPoint(
-                    x=x_nm * nanometersToMeters,
-                    y=y_nm * nanometersToMeters,
+                    x=x_nm * self.NANOMETERS_TO_METERS,
+                    y=y_nm * self.NANOMETERS_TO_METERS,
                 )
                 pointSeqMap[trigger].append(point)
 

@@ -1,4 +1,3 @@
-from decimal import Decimal
 from pathlib import Path
 
 import numpy
@@ -27,10 +26,7 @@ class NPZScanFileReader(ScanFileReader):
         scanYInMeters = npz[StateDataRegistry.SCAN_Y]
 
         for index, x, y in zip(scanIndexes, scanXInMeters, scanYInMeters):
-            pointMap[index] = ScanPoint(
-                x=Decimal.from_float(x),
-                y=Decimal.from_float(y),
-            )
+            pointMap[index] = ScanPoint(x, y)
 
         return TabularScan(pointMap)
 

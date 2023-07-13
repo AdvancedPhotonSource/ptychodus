@@ -33,7 +33,7 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         axisX = ObjectPatchAxis(self._grid.axisX, float(patchCenter.x), patchExtent.width)
         axisY = ObjectPatchAxis(self._grid.axisY, float(patchCenter.y), patchExtent.height)
         xx, yy = numpy.meshgrid(axisX.getPixelScanCoordinates(), axisY.getPixelScanCoordinates())
-        array = map_coordinates(self._array, (yy, xx), order=1)
+        array = map_coordinates(self._array, (yy, xx), order=1) # FIXME shape
         return ObjectPatch(axisX=axisX, axisY=axisY, array=array)
 
 

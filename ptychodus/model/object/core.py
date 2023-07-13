@@ -134,7 +134,7 @@ class ObjectPresenter(Observable, Observer):
             return False
 
         actualExtent = selectedObject.getExtentInPixels()
-        expectedExtent = self._sizer.getObjectExtent()
+        expectedExtent = self._sizer.getObjectExtentInPixels()
         widthIsBigEnough = (actualExtent.width >= expectedExtent.width)
         heightIsBigEnough = (actualExtent.height >= expectedExtent.height)
         hasComplexDataType = numpy.iscomplexobj(selectedObject.getArray())

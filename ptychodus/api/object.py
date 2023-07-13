@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypeAlias
 
@@ -15,7 +14,7 @@ from .scan import ScanPoint
 ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
 # object point coordinates are conventionally in pixel units
-ObjectPoint: TypeAlias = Point2D[Decimal]
+ObjectPoint: TypeAlias = Point2D[float]
 
 
 @dataclass(frozen=True)
@@ -43,14 +42,14 @@ class ObjectGrid:
     axisY: ObjectAxis
 
     def mapObjectPointToScanPoint(self, point: ObjectPoint) -> ScanPoint:
-        x = self.axisX.mapObjectCoordinateToScanCoordinate(float(point.x))
-        y = self.axisY.mapObjectCoordinateToScanCoordinate(float(point.y))
-        return ScanPoint(x=Decimal.from_float(x), y=Decimal.from_float(y))
+        x = self.axisX.mapObjectCoordinateToScanCoordinate(point.x)
+        y = self.axisY.mapObjectCoordinateToScanCoordinate(point.y)
+        return ScanPoint(x, y)
 
     def mapScanPointToObjectPoint(self, point: ScanPoint) -> ObjectPoint:
-        x = self.axisX.mapScanCoordinateToObjectCoordinate(float(point.x))
-        y = self.axisY.mapScanCoordinateToObjectCoordinate(float(point.y))
-        return ObjectPoint(x=Decimal.from_float(x), y=Decimal.from_float(y))
+        x = self.axisX.mapScanCoordinateToObjectCoordinate(point.x)
+        y = self.axisY.mapScanCoordinateToObjectCoordinate(point.y)
+        return ObjectPoint(x, y)
 
 
 @dataclass(frozen=True)

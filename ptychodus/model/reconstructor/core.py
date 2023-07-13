@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import logging
 
 from ...api.observer import Observable, Observer
-from ...api.reconstructor import ReconstructOutput, ReconstructorLibrary, TrainableReconstructor
+from ...api.reconstructor import ReconstructOutput, ReconstructorLibrary
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI

@@ -33,13 +33,13 @@ class SpiralScan(Scan):
         if index >= len(self):
             raise IndexError(f'Index {index} is out of range')
 
-        radiusInMeters = self.radiusScalarInMeters * Decimal(index).sqrt()
+        radiusInMeters = float(self.radiusScalarInMeters) * numpy.sqrt(index)
         divergenceAngleInRadians = (3. - numpy.sqrt(5)) * numpy.pi
         thetaInRadians = divergenceAngleInRadians * index
 
         return ScanPoint(
-            radiusInMeters * Decimal(numpy.cos(thetaInRadians)),
-            radiusInMeters * Decimal(numpy.sin(thetaInRadians)),
+            x=radiusInMeters * numpy.cos(thetaInRadians),
+            y=radiusInMeters * numpy.sin(thetaInRadians),
         )
 
     def __len__(self) -> int:

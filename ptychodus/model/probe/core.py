@@ -133,7 +133,7 @@ class ProbePresenter(Observable, Observer):
             return False
 
         actualExtent = selectedProbe.getExtentInPixels()
-        expectedExtent = self._sizer.getProbeExtent()
+        expectedExtent = self._sizer.getExtentInPixels()
         hasComplexDataType = numpy.iscomplexobj(selectedProbe.getArray())
         return (actualExtent == expectedExtent and hasComplexDataType)
 

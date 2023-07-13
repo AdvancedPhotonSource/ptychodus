@@ -50,7 +50,7 @@ class RandomObjectInitializer(ObjectInitializer):
 
     def __call__(self) -> ObjectArrayType:
         extraPaddingExtent = ImageExtent(self._extraPaddingX, self._extraPaddingY)
-        paddedObjectExtent = self._sizer.getObjectExtent() + extraPaddingExtent
+        paddedObjectExtent = self._sizer.getObjectExtentInPixels() + extraPaddingExtent
 
         amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),
                                      paddedObjectExtent.shape)

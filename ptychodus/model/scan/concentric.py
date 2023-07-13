@@ -43,13 +43,13 @@ class ConcentricScan(Scan):
         firstIndexInShell = self.numberOfPointsInFirstShell * shellTriangle
         pointIndexInShell = index - firstIndexInShell
 
-        radiusInMeters = self.radialStepSizeInMeters * (shellIndex + 1)
+        radiusInMeters = float(self.radialStepSizeInMeters) * (shellIndex + 1)
         numberOfPointsInShell = self.numberOfPointsInFirstShell * (shellIndex + 1)
         thetaInRadians = 2 * numpy.pi * pointIndexInShell / numberOfPointsInShell
 
         return ScanPoint(
-            radiusInMeters * Decimal(numpy.cos(thetaInRadians)),
-            radiusInMeters * Decimal(numpy.sin(thetaInRadians)),
+            x=radiusInMeters * numpy.cos(thetaInRadians),
+            y=radiusInMeters * numpy.sin(thetaInRadians),
         )
 
     def __len__(self) -> int:

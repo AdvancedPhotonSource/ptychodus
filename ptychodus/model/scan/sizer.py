@@ -1,10 +1,8 @@
 from __future__ import annotations
-from decimal import Decimal
 from typing import Optional
 
 from ...api.geometry import Box2D, Interval
 from ...api.observer import Observable, Observer
-from ...api.scan import ScanPoint
 from .selected import SelectedScan
 from .settings import ScanSettings
 
@@ -23,19 +21,19 @@ class ScanSizer(Observable, Observer):
         scan.addObserver(sizer)
         return sizer
 
-    def getBoundingBoxInMeters(self) -> Optional[Box2D[Decimal]]:
-        boundingBoxInMeters: Optional[Box2D[Decimal]] = None
+    def getBoundingBoxInMeters(self) -> Optional[Box2D[float]]:
+        boundingBoxInMeters: Optional[Box2D[float]] = None
 
         if self._settings.expandBoundingBox.value:
-            rangeXInMeters = Interval[Decimal](
-                self._settings.boundingBoxMinimumXInMeters.value,
-                self._settings.boundingBoxMaximumXInMeters.value,
+            rangeXInMeters = Interval[float](
+                float(self._settings.boundingBoxMinimumXInMeters.value),
+                float(self._settings.boundingBoxMaximumXInMeters.value),
             )
-            rangeYInMeters = Interval[Decimal](
-                self._settings.boundingBoxMinimumYInMeters.value,
-                self._settings.boundingBoxMaximumYInMeters.value,
+            rangeYInMeters = Interval[float](
+                float(self._settings.boundingBoxMinimumYInMeters.value),
+                float(self._settings.boundingBoxMaximumYInMeters.value),
             )
-            boundingBoxInMeters = Box2D[Decimal](rangeXInMeters, rangeYInMeters)
+            boundingBoxInMeters = Box2D[float](rangeXInMeters, rangeYInMeters)
 
         selectedScan = self._scan.getSelectedItem()
 
@@ -50,9 +48,9 @@ class ScanSizer(Observable, Observer):
             return boundingBoxInMeters
 
         if boundingBoxInMeters is None:
-            rangeXInMeters = Interval[Decimal](point.x, point.x)
-            rangeYInMeters = Interval[Decimal](point.y, point.y)
-            boundingBoxInMeters = Box2D[Decimal](rangeXInMeters, rangeYInMeters)
+            rangeXInMeters = Interval[float](point.x, point.x)
+            rangeYInMeters = Interval[float](point.y, point.y)
+            boundingBoxInMeters = Box2D[float](rangeXInMeters, rangeYInMeters)
         else:
             boundingBoxInMeters = boundingBoxInMeters.hull(point.x, point.y)
 
@@ -61,10 +59,6 @@ class ScanSizer(Observable, Observer):
 
         # TODO cache this
         return boundingBoxInMeters
-
-    def getMidpointInMeters(self) -> ScanPoint:
-        bbox = self.getBoundingBoxInMeters()
-        return ScanPoint(Decimal(), Decimal()) if bbox is None else bbox.midpoint
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

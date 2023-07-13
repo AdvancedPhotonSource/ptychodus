@@ -1,5 +1,4 @@
 from collections import defaultdict
-from decimal import Decimal
 from pathlib import Path
 from typing import Final
 import csv
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
-    MICRONS_TO_METERS: Final[Decimal] = Decimal('1e-6')
+    MICRONS_TO_METERS: Final[float] = 1.e-6
 
     EXPECTED_HEADER_RAW: Final[list[str]] = [
         'DataPoint',
@@ -77,8 +76,8 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
 
                 detector_count = int(row[DETECTOR_COUNT])
                 point = ScanPoint(
-                    x=Decimal(row[X]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
-                    y=Decimal(row[Y]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
+                    x=float(row[X]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
+                    y=float(row[Y]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
                 )
                 pointSeqMap[detector_count].append(point)
 

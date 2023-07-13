@@ -1,9 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from decimal import Decimal
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Final, Generic, TypeVar
 import logging
 import sys
 import typing
@@ -345,6 +344,7 @@ class MDAFile:
 
 
 class MDAScanFileReader(ScanFileReader):
+    MICRONS_TO_METERS: Final[float] = 1.e-6
 
     @property
     def simpleName(self) -> str:
@@ -357,17 +357,16 @@ class MDAScanFileReader(ScanFileReader):
     def read(self, filePath: Path) -> Scan:
         pointList = list()
 
-        micronsToMeters = Decimal('1e-6')
         mdaFile = MDAFile.read(filePath)
 
         xarray = mdaFile.scan.data.readback_array[0, :]
         yarray = mdaFile.scan.data.readback_array[1, :]
 
-        for xf, yf in zip(xarray, yarray):
-            x = Decimal.from_float(xf) * micronsToMeters
-            y = Decimal.from_float(yf) * micronsToMeters
-            point = ScanPoint(x, y)
-
+        for x, y in zip(xarray, yarray):
+            point = ScanPoint(
+                x=x * self.MICRONS_TO_METERS,
+                y=y * self.MICRONS_TO_METERS,
+            )
             pointList.append(point)
 
         return TabularScan.createFromPointIterable(pointList)

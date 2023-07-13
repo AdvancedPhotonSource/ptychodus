@@ -3,13 +3,16 @@ from collections.abc import Iterable, Iterator, Mapping
 import logging
 import time
 
+import numpy
+
+from ...api.data import DiffractionPatternArrayType
 from ...api.object import ObjectInterpolator
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginEntry
 from ...api.probe import ProbeArrayType
 from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,
                                   Reconstructor, ReconstructorLibrary, TrainableReconstructor)
-from ...api.scan import Scan, ScanPoint, TabularScan
+from ...api.scan import Scan, TabularScan
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
 from ..probe import ProbeAPI
@@ -78,20 +81,21 @@ class ActiveReconstructor(Observable, Observer):
         reconstructor._syncFromSettings()
         return reconstructor
 
-    def _createFilteredCopyOfSelectedScan(self, name: str) -> tuple[str, Scan]:
+    def _prepareInputData(self, name: str) -> tuple[str, Scan, DiffractionPatternArrayType]:
         selectedScan = self._scanAPI.getSelectedScan()
 
         if selectedScan is None:
             raise ValueError('No scan is selected!')
 
-        pointMap: dict[int, ScanPoint] = dict()
+        dataIndexes = self._diffractionDataset.getAssembledIndexes()
+        scanIndexes = selectedScan.keys()
+        commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))
 
-        for index in self._diffractionDataset.getAssembledIndexes():
-            try:
-                pointMap[index] = selectedScan[index]
-            except KeyError:
-                continue
+        diffractionPatternArray = numpy.take(self._diffractionDataset.getAssembledData(),
+                                             commonIndexes,
+                                             axis=0)
 
+        pointMap = {index: selectedScan[index] for index in commonIndexes}
         filteredScan = TabularScan(pointMap)
         scanName = self._scanAPI.insertItemIntoRepositoryFromScan(name,
                                                                   filteredScan,
@@ -100,7 +104,7 @@ class ActiveReconstructor(Observable, Observer):
         if scanName is None:
             raise ValueError('Failed to clone selected scan!')
 
-        return scanName, filteredScan
+        return scanName, filteredScan, diffractionPatternArray
 
     def _cloneSelectedProbe(self, name: str) -> tuple[str, ProbeArrayType]:
         selectedProbe = self._probeAPI.getSelectedProbeArray()
@@ -132,13 +136,9 @@ class ActiveReconstructor(Observable, Observer):
         return self._reconstructorPlugin.displayName
 
     def execute(self, name: str) -> ReconstructOutput:
-        scanName, scan = self._createFilteredCopyOfSelectedScan(name)
+        scanName, scan, diffractionPatternArray = self._prepareInputData(name)
         probeName, probeArray = self._cloneSelectedProbe(name)
         objectName, objectInterpolator = self._cloneSelectedObject(name)
-
-        # FIXME prefilter diffraction patterns so that scan indexes are authoritative
-        # FIXME diffractionPatternArray = numpy.take(arr, indices, axis=0)
-        diffractionPatternArray = self._diffractionDataset.getAssembledData()
 
         parameters = ReconstructInput(
             diffractionPatternArray=diffractionPatternArray,

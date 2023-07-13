@@ -1,5 +1,5 @@
 from __future__ import annotations
-from decimal import Decimal, ROUND_CEILING
+from decimal import Decimal
 
 from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
@@ -35,30 +35,39 @@ class ObjectSizer(Observable, Observer):
         return self._apparatus.getObjectPlanePixelSizeYInMeters()
 
     def getMidpointInMeters(self) -> ScanPoint:
-        return self._scanSizer.getMidpointInMeters()
+        bbox = self._scanSizer.getBoundingBoxInMeters()
+        return ScanPoint(0., 0.) if bbox is None else bbox.midpoint
 
     @staticmethod
-    def _getIntegerCeilingOfQuotient(upper: Decimal, lower: Decimal) -> int:
-        return int((upper / lower).to_integral_exact(rounding=ROUND_CEILING))
+    def _getExtentInPixels(center: float, width: float, pixelSize: float) -> int:
+        radius = width / 2
+        lowerPx = +int((center - radius) / +pixelSize)
+        upperPx = -int((center + radius) / -pixelSize)
+        radiusPx = (upperPx - lowerPx + 1) // 2
+        return 2 * radiusPx
 
-    def getScanExtent(self) -> ImageExtent:
+    def getScanExtentInPixels(self) -> ImageExtent:
         bbox = self._scanSizer.getBoundingBoxInMeters()
 
         if bbox is None:
-            return ImageExtent(width=0, height=0)
+            return ImageExtent(0, 0)
 
-        dx = self._apparatus.getObjectPlanePixelSizeXInMeters()
-        dy = self._apparatus.getObjectPlanePixelSizeYInMeters()
-        extentX = self._getIntegerCeilingOfQuotient(bbox.rangeX.width, dx)
-        extentY = self._getIntegerCeilingOfQuotient(bbox.rangeY.width, dy)
+        midpoint = bbox.midpoint
 
-        return ImageExtent(width=extentX, height=extentY)
+        return ImageExtent(
+            width=self._getExtentInPixels(midpoint.x, bbox.rangeX.width,
+                                          float(self.getPixelSizeXInMeters())),
+            height=self._getExtentInPixels(midpoint.y, bbox.rangeY.width,
+                                           float(self.getPixelSizeYInMeters())),
+        )
 
-    def getProbeExtent(self) -> ImageExtent:
-        return self._probeSizer.getProbeExtent()
+        return ImageExtent(width=bbox.rangeX.width, height=bbox.rangeY.width)
 
-    def getObjectExtent(self) -> ImageExtent:
-        return self.getScanExtent() + self.getProbeExtent()
+    def getProbeExtentInPixels(self) -> ImageExtent:
+        return self._probeSizer.getExtentInPixels()
+
+    def getObjectExtentInPixels(self) -> ImageExtent:
+        return self.getScanExtentInPixels() + self.getProbeExtentInPixels()
 
     def update(self, observable: Observable) -> None:
         if observable is self._apparatus:

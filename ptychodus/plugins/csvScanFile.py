@@ -1,4 +1,3 @@
-from decimal import Decimal
 from pathlib import Path
 import csv
 
@@ -36,8 +35,8 @@ class CSVScanFileReader(ScanFileReader):
                     raise ScanPointParseError('Bad number of columns!')
 
                 point = ScanPoint(
-                    x=Decimal(row[self._xcol]),
-                    y=Decimal(row[self._ycol]),
+                    x=float(row[self._xcol]),
+                    y=float(row[self._ycol]),
                 )
                 pointList.append(point)
 

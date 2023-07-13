@@ -74,9 +74,16 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
             output_path=outputPath,
             output_suffix=self._trainingSettings.outputSuffix.value,
         )
+
+        X_train_full = self._diffractionPatternsArray.astype(numpy.float32)
+        Y_ph_train_full = numpy.angle(self._objectPatchesArray).astype(numpy.float32)
+
+        logger.debug(X_train_full.shape) # FIXME
+        logger.debug(Y_ph_train_full.shape) # FIXME
+
         trainer.setTrainingData(
-            X_train_full=self._diffractionPatternsArray.astype(numpy.float32),
-            Y_ph_train_full=self._objectPatchesArray.astype(numpy.float32),
+            X_train_full=X_train_full,
+            Y_ph_train_full=Y_ph_train_full,
             valid_data_ratio=float(self._trainingSettings.validationSetFractionalSize.value),
         )
         trainer.setOptimizationParams(

@@ -1,4 +1,3 @@
-from decimal import Decimal
 from importlib.metadata import version
 from typing import Any, Final, Union
 import logging
@@ -177,10 +176,7 @@ class TikeReconstructor:
             pointDict: dict[int, ScanPoint] = dict()
 
             for index, xy in zip(parameters.scan, result.scan):
-                objectPoint = ObjectPoint(
-                    x=Decimal.from_float(xy[1]),
-                    y=Decimal.from_float(xy[0]),
-                )
+                objectPoint = ObjectPoint(x=xy[1], y=xy[0])
                 pointDict[index] = objectGrid.mapObjectPointToScanPoint(objectPoint)
 
             scanOutput = TabularScan(pointDict)
