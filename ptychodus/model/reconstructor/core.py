@@ -41,21 +41,18 @@ class ReconstructorPresenter(Observable, Observer):
     def setReconstructor(self, name: str) -> None:
         self._activeReconstructor.selectReconstructor(name)
 
+    def execute(self) -> ReconstructOutput:
+        return self._activeReconstructor.execute('Result')  # FIXME better name
+
     @property
     def isTrainable(self) -> bool:
         return self._activeReconstructor.isTrainable
 
     def train(self) -> None:
-        recon = self._activeReconstructor
+        self._activeReconstructor.train()
 
-        # FIXME as implemented, this is always false
-        if isinstance(recon, TrainableReconstructor):
-            recon.train()
-        else:
-            logger.error('Reconstructor is not trainable!')
-
-    def execute(self) -> ReconstructOutput:
-        return self._activeReconstructor.execute('Result')  # FIXME better name
+    def clear(self) -> None:
+        self._activeReconstructor.clear()
 
     def update(self, observable: Observable) -> None:
         if observable is self._repository:

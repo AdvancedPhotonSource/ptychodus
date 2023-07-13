@@ -94,6 +94,6 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
             output_frequency=self._trainingSettings.statusIntervalInEpochs.value,
         )
 
-    def reset(self) -> None:
+    def clear(self) -> None:
         self._diffractionPatternsArray = None
         self._objectPatchesArray = None

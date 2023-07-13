@@ -27,6 +27,7 @@ class ReconstructorView(QGroupBox):
         self.reconstructButton = QPushButton('Reconstruct')
         self.ingestButton = QPushButton('Ingest')
         self.trainButton = QPushButton('Train')
+        self.clearButton = QPushButton('Reset')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorView:
@@ -34,21 +35,23 @@ class ReconstructorView(QGroupBox):
 
         layout = QGridLayout()
         layout.addWidget(view.algorithmLabel, 0, 0)
-        layout.addWidget(view.algorithmComboBox, 0, 1, 1, 2)
+        layout.addWidget(view.algorithmComboBox, 0, 1, 1, 3)
         layout.addWidget(view.scanLabel, 1, 0)
-        layout.addWidget(view.scanComboBox, 1, 1, 1, 2)
-        layout.addWidget(view.scanValidationLabel, 1, 3)
+        layout.addWidget(view.scanComboBox, 1, 1, 1, 3)
+        layout.addWidget(view.scanValidationLabel, 1, 4)
         layout.addWidget(view.probeLabel, 2, 0)
-        layout.addWidget(view.probeComboBox, 2, 1, 1, 2)
-        layout.addWidget(view.probeValidationLabel, 2, 3)
+        layout.addWidget(view.probeComboBox, 2, 1, 1, 3)
+        layout.addWidget(view.probeValidationLabel, 2, 4)
         layout.addWidget(view.objectLabel, 3, 0)
-        layout.addWidget(view.objectComboBox, 3, 1, 1, 2)
-        layout.addWidget(view.objectValidationLabel, 3, 3)
-        layout.addWidget(view.reconstructButton, 4, 1, 1, 2)
+        layout.addWidget(view.objectComboBox, 3, 1, 1, 3)
+        layout.addWidget(view.objectValidationLabel, 3, 4)
+        layout.addWidget(view.reconstructButton, 4, 1, 1, 3)
         layout.addWidget(view.ingestButton, 5, 1)
         layout.addWidget(view.trainButton, 5, 2)
+        layout.addWidget(view.clearButton, 5, 3)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
+        layout.setColumnStretch(3, 1)
         view.setLayout(layout)
 
         return view

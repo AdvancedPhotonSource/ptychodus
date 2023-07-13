@@ -96,6 +96,7 @@ class ReconstructorParametersController(Observer):
         view.reconstructorView.reconstructButton.clicked.connect(controller._execute)
         view.reconstructorView.ingestButton.clicked.connect(controller._execute)
         view.reconstructorView.trainButton.clicked.connect(controller._train)
+        view.reconstructorView.clearButton.clicked.connect(presenter.clear)
 
         controller._syncModelToView()
         controller._syncScanToView()
@@ -199,6 +200,7 @@ class ReconstructorParametersController(Observer):
         self._view.reconstructorView.reconstructButton.setVisible(not isTrainable)
         self._view.reconstructorView.ingestButton.setVisible(isTrainable)
         self._view.reconstructorView.trainButton.setVisible(isTrainable)
+        self._view.reconstructorView.clearButton.setVisible(isTrainable)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

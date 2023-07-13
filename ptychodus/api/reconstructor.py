@@ -53,7 +53,7 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def reset(self) -> None:
+    def clear(self) -> None:
         pass
 
 
@@ -78,7 +78,7 @@ class NullReconstructor(TrainableReconstructor):
     def train(self) -> None:
         pass
 
-    def reset(self) -> None:
+    def clear(self) -> None:
         pass
 
 

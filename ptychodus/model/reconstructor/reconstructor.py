@@ -78,14 +78,6 @@ class ActiveReconstructor(Observable, Observer):
         reconstructor._syncFromSettings()
         return reconstructor
 
-    @property
-    def isTrainable(self) -> bool:
-        return isinstance(self._reconstructorPlugin.strategy, TrainableReconstructor)
-
-    @property
-    def name(self) -> str:
-        return self._reconstructorPlugin.displayName
-
     def _createFilteredCopyOfSelectedScan(self, name: str) -> tuple[str, Scan]:
         selectedScan = self._scanAPI.getSelectedScan()
 
@@ -135,6 +127,10 @@ class ActiveReconstructor(Observable, Observer):
 
         return objectName, objectInterpolator
 
+    @property
+    def name(self) -> str:
+        return self._reconstructorPlugin.displayName
+
     def execute(self, name: str) -> ReconstructOutput:
         scanName, scan = self._createFilteredCopyOfSelectedScan(name)
         probeName, probeArray = self._cloneSelectedProbe(name)
@@ -170,6 +166,27 @@ class ActiveReconstructor(Observable, Observer):
                                                               replaceItem=True)
 
         return result
+
+    @property
+    def isTrainable(self) -> bool:
+        reconstructor = self._reconstructorPlugin.strategy
+        return isinstance(reconstructor, TrainableReconstructor)
+
+    def train(self) -> None:
+        reconstructor = self._reconstructorPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            reconstructor.train()
+        else:
+            logger.error('Reconstructor is not trainable!')
+
+    def clear(self) -> None:
+        reconstructor = self._reconstructorPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            reconstructor.clear()
+        else:
+            logger.error('Reconstructor is not trainable!')
 
     @staticmethod
     def _simplifyName(name: str) -> str:
