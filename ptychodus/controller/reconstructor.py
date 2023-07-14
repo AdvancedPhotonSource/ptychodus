@@ -2,12 +2,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 import logging
-import traceback
 
 from PyQt5.QtCore import QStringListModel
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QLabel, QMessageBox, QWidget
+from PyQt5.QtWidgets import QLabel, QWidget
 
 from ..api.observer import Observable, Observer
 from ..api.reconstructor import ReconstructOutput
@@ -16,6 +15,7 @@ from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
 from ..model.scan import ScanPresenter
 from ..view.reconstructor import ReconstructorParametersView, ReconstructorPlotView
+from ..view.widgets import ExceptionDialog
 
 logger = logging.getLogger(__name__)
 
@@ -126,14 +126,7 @@ class ReconstructorParametersController(Observer):
             result = self._presenter.execute()
         except Exception as err:
             logger.exception(err)
-
-            msgBox = QMessageBox()
-            msgBox.setWindowTitle('Exception Dialog')
-            msgBox.setIcon(QMessageBox.Critical)
-            msgBox.setText(f'The reconstructor raised a {err.__class__.__name__}!')
-            msgBox.setInformativeText(str(err))
-            msgBox.setDetailedText(traceback.format_exc())
-            _ = msgBox.exec_()
+            ExceptionDialog.showException('Reconstructor', err)
         else:
             self._plotPresenter.setEnumeratedYValues(result.objective)
 
@@ -144,14 +137,7 @@ class ReconstructorParametersController(Observer):
             self._presenter.train()
         except Exception as err:
             logger.exception(err)
-
-            msgBox = QMessageBox()
-            msgBox.setWindowTitle('Exception Dialog')
-            msgBox.setIcon(QMessageBox.Critical)
-            msgBox.setText(f'The trainer raised a {err.__class__.__name__}!')
-            msgBox.setInformativeText(str(err))
-            msgBox.setDetailedText(traceback.format_exc())
-            _ = msgBox.exec_()
+            ExceptionDialog.showException('Trainer', err)
 
         logger.info('Training complete.')
 

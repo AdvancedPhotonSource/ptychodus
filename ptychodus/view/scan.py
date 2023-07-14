@@ -181,9 +181,11 @@ class ScanEditorDialog(Generic[T], QDialog):
 
     @classmethod
     def createInstance(cls,
+                       title: str,
                        editorView: T,
                        parent: Optional[QWidget] = None) -> ScanEditorDialog[T]:
         view = cls(editorView, parent)
+        view.setWindowTitle(title)
 
         view.buttonBox.addButton(QDialogButtonBox.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)

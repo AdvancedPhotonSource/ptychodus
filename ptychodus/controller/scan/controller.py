@@ -1,15 +1,15 @@
 from __future__ import annotations
 from typing import Callable, Final
 import logging
-import traceback
 
 from PyQt5.QtCore import Qt, QSortFilterProxyModel
-from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
+from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model.scan import (ScanRepositoryItem, ScanRepositoryItemPresenter,
                            ScanRepositoryPresenter)
 from ...view.scan import ScanView, ScanPlotView
+from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
 from .concentric import ConcentricScanController
@@ -112,14 +112,7 @@ class ScanController(Observer):
                     self._repositoryPresenter.saveScan(itemPresenter.name, filePath, nameFilter)
                 except Exception as err:
                     logger.exception(err)
-
-                    msgBox = QMessageBox()
-                    msgBox.setWindowTitle('Exception Dialog')
-                    msgBox.setIcon(QMessageBox.Critical)
-                    msgBox.setText(f'Saving scan raised a {err.__class__.__name__}!')
-                    msgBox.setInformativeText(str(err))
-                    msgBox.setDetailedText(traceback.format_exc())
-                    _ = msgBox.exec_()
+                    ExceptionDialog.showException('File writer', err)
 
     def _editSelectedScan(self) -> None:
         itemPresenter = self._getCurrentItemPresenter()
@@ -129,23 +122,15 @@ class ScanController(Observer):
             initializerName = item.getInitializerSimpleName()
 
             if initializerName in ('Snake', 'Raster', 'CenteredSnake', 'CenteredRaster'):
-                cartesianController = CartesianScanController.createInstance(
-                    itemPresenter, self._view)
-                cartesianController.openDialog()
+                CartesianScanController.editParameters(itemPresenter, self._view)
             elif initializerName == 'Concentric':
-                concentricController = ConcentricScanController.createInstance(
-                    itemPresenter, self._view)
-                concentricController.openDialog()
+                ConcentricScanController.editParameters(itemPresenter, self._view)
             elif initializerName == 'Spiral':
-                spiralController = SpiralScanController.createInstance(itemPresenter, self._view)
-                spiralController.openDialog()
+                SpiralScanController.editParameters(itemPresenter, self._view)
             elif initializerName == 'Lissajous':
-                lissajousController = LissajousScanController.createInstance(
-                    itemPresenter, self._view)
-                lissajousController.openDialog()
+                LissajousScanController.editParameters(itemPresenter, self._view)
             else:
-                tabularController = TabularScanController.createInstance(itemPresenter, self._view)
-                tabularController.openDialog()
+                TabularScanController.editParameters(itemPresenter, self._view)
 
     def _removeSelectedScan(self) -> None:
         itemPresenter = self._getCurrentItemPresenter()

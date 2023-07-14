@@ -16,21 +16,16 @@ class FresnelZonePlateProbeViewController(Observer):
         super().__init__()
         self._item = presenter.item
         self._view = FresnelZonePlateProbeView.createInstance()
-        self._dialog = ProbeEditorDialog.createInstance(self._view, parent)
-        self._dialog.setWindowTitle(presenter.name)
+        self._dialog = ProbeEditorDialog.createInstance(presenter.name, self._view, parent)
         self._initializer: FresnelZonePlateProbeInitializer | None = None
 
     @classmethod
-    def createInstance(cls, presenter: ProbeRepositoryItemPresenter,
-                       parent: QWidget) -> FresnelZonePlateProbeViewController:
+    def editParameters(cls, presenter: ProbeRepositoryItemPresenter, parent: QWidget) -> None:
         controller = cls(presenter, parent)
         controller._updateInitializer()
         controller._syncModelToView()
         presenter.item.addObserver(controller)
-        return controller
-
-    def openDialog(self) -> None:
-        self._dialog.open()
+        controller._dialog.open()
 
     def _updateInitializer(self) -> None:
         initializer = self._item.getInitializer()

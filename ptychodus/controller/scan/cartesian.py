@@ -17,23 +17,18 @@ class CartesianScanController(Observer):
         super().__init__()
         self._item = presenter.item
         self._view = CartesianScanView.createInstance()
-        self._dialog = ScanEditorDialog.createInstance(self._view, parent)
-        self._dialog.setWindowTitle(presenter.name)
+        self._dialog = ScanEditorDialog.createInstance(presenter.name, self._view, parent)
         self._transformController = ScanTransformController.createInstance(
             presenter.item, self._dialog.transformView)
         self._initializer: CartesianScanInitializer | None = None
 
     @classmethod
-    def createInstance(cls, presenter: ScanRepositoryItemPresenter,
-                       parent: QWidget) -> CartesianScanController:
+    def editParameters(cls, presenter: ScanRepositoryItemPresenter, parent: QWidget) -> None:
         controller = cls(presenter, parent)
         controller._updateInitializer()
         controller._syncModelToView()
         presenter.item.addObserver(controller)
-        return controller
-
-    def openDialog(self) -> None:
-        self._dialog.open()
+        controller._dialog.open()
 
     def _updateInitializer(self) -> None:
         initializer = self._item.getInitializer()

@@ -3,6 +3,7 @@ from .bottomTitledGroupBox import BottomTitledGroupBox
 from .decimalLineEdit import DecimalLineEdit
 from .decimalSlider import DecimalSlider
 from .energyWidget import EnergyWidget
+from .exceptionDialog import ExceptionDialog
 from .lengthWidget import LengthWidget
 from .progressBarItemDelegate import ProgressBarItemDelegate
 from .repositoryView import RepositoryTableView, RepositoryTreeView
@@ -14,6 +15,7 @@ __all__ = [
     'DecimalLineEdit',
     'DecimalSlider',
     'EnergyWidget',
+    'ExceptionDialog',
     'LengthWidget',
     'ProgressBarItemDelegate',
     'RepositoryTableView',
