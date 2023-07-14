@@ -1,9 +1,10 @@
 from __future__ import annotations
 from typing import Callable, Final
 import logging
+import traceback
 
 from PyQt5.QtCore import QSortFilterProxyModel
-from PyQt5.QtWidgets import QAbstractItemView
+from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
@@ -146,7 +147,18 @@ class ObjectController(Observer):
                 selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
             if filePath:
-                self._repositoryPresenter.saveObject(itemPresenter.name, filePath, nameFilter)
+                try:
+                    self._repositoryPresenter.saveObject(itemPresenter.name, filePath, nameFilter)
+                except Exception as err:
+                    logger.exception(err)
+
+                    msgBox = QMessageBox()
+                    msgBox.setWindowTitle('Exception Dialog')
+                    msgBox.setIcon(QMessageBox.Critical)
+                    msgBox.setText(f'Saving object raised a {err.__class__.__name__}!')
+                    msgBox.setInformativeText(str(err))
+                    msgBox.setDetailedText(traceback.format_exc())
+                    _ = msgBox.exec_()
 
     def _editSelectedObject(self) -> None:
         itemPresenter = self._getCurrentItemPresenter()
@@ -160,8 +172,8 @@ class ObjectController(Observer):
                     itemPresenter, self._view)
                 randomController.openDialog()
             else:
-                # FIXME FromFile/FromMemory
-                logger.error('Unknown repository item!')
+                _ = QMessageBox.information(self._view, itemPresenter.name,
+                                            f'\"{initializerName}\" has no editable parameters.')
 
     def _removeSelectedObject(self) -> None:
         itemPresenter = self._getCurrentItemPresenter()

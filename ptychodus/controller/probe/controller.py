@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import Callable, Final
 import logging
+import traceback
 
-from PyQt5.QtWidgets import QAbstractItemView
+from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
@@ -130,7 +131,19 @@ class ProbeController(Observer):
 
             if filePath:
                 name = current.internalPointer().getName()
-                self._repositoryPresenter.saveProbe(name, filePath, nameFilter)
+
+                try:
+                    self._repositoryPresenter.saveProbe(name, filePath, nameFilter)
+                except Exception as err:
+                    logger.exception(err)
+
+                    msgBox = QMessageBox()
+                    msgBox.setWindowTitle('Exception Dialog')
+                    msgBox.setIcon(QMessageBox.Critical)
+                    msgBox.setText(f'Saving probe raised a {err.__class__.__name__}!')
+                    msgBox.setInformativeText(str(err))
+                    msgBox.setDetailedText(traceback.format_exc())
+                    _ = msgBox.exec_()
         else:
             logger.error('No items are selected!')
 
@@ -154,8 +167,8 @@ class ProbeController(Observer):
                     itemPresenter, self._view)
                 sgController.openDialog()
             else:
-                # FIXME FromFile/FromMemory
-                logger.error('Unknown repository item!')
+                _ = QMessageBox.information(self._view, itemPresenter.name,
+                                            f'\"{initializerName}\" has no editable parameters.')
         else:
             logger.error('No items are selected!')
 

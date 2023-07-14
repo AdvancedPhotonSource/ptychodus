@@ -17,6 +17,7 @@ class FresnelZonePlateProbeViewController(Observer):
         self._item = presenter.item
         self._view = FresnelZonePlateProbeView.createInstance()
         self._dialog = ProbeEditorDialog.createInstance(self._view, parent)
+        self._dialog.setWindowTitle(presenter.name)
         self._initializer: FresnelZonePlateProbeInitializer | None = None
 
     @classmethod

@@ -17,6 +17,7 @@ class SuperGaussianProbeViewController(Observer):
         self._item = presenter.item
         self._view = SuperGaussianProbeView.createInstance()
         self._dialog = ProbeEditorDialog.createInstance(self._view, parent)
+        self._dialog.setWindowTitle(presenter.name)
         self._initializer: SuperGaussianProbeInitializer | None = None
 
     @classmethod

@@ -17,6 +17,7 @@ class DiskProbeViewController(Observer):
         self._item = presenter.item
         self._view = DiskProbeView.createInstance()
         self._dialog = ProbeEditorDialog.createInstance(self._view, parent)
+        self._dialog.setWindowTitle(presenter.name)
         self._initializer: DiskProbeInitializer | None = None
 
     @classmethod

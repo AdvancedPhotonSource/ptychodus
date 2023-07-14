@@ -57,7 +57,7 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
             objectPatchesList.append(objectPatch.array)
 
         self._appendDiffractionPatterns(parameters.diffractionPatternArray)
-        self._appendObjectPatches(numpy.concatenate(objectPatchesList, axis=0))
+        self._appendObjectPatches(numpy.stack(objectPatchesList))
 
         return ReconstructOutput.createNull()
 
@@ -78,9 +78,6 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
         X_train_full = self._diffractionPatternsArray.astype(numpy.float32)
         Y_ph_train_full = numpy.angle(self._objectPatchesArray).astype(numpy.float32)
 
-        logger.debug(X_train_full.shape) # FIXME
-        logger.debug(Y_ph_train_full.shape) # FIXME
-
         trainer.setTrainingData(
             X_train_full=X_train_full,
             Y_ph_train_full=Y_ph_train_full,
@@ -93,7 +90,7 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
         )
 
         logger.debug('Loading model state...')
-        trainer.initModel(model_params_path=self._settings.stateFilePath.value)
+        trainer.initModel()
 
         logger.debug('Training...')
         trainer.run(
