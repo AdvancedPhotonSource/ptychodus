@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from decimal import Decimal
+from enum import auto, Enum
 from typing import Final, Optional
 import logging
 
@@ -14,6 +15,11 @@ from ..itemRepository import ItemRepository
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
+
+
+class ProbeModeDecayType(Enum):
+    POLYNOMIAL = auto()
+    EXPONENTIAL = auto()
 
 
 class ProbeInitializer(ABC, Observable):
@@ -61,6 +67,8 @@ class ProbeRepositoryItem(Observable, Observer):
         self._array = numpy.zeros((1, 0, 0), dtype=complex)
         self._initializer: Optional[ProbeInitializer] = None
         self._numberOfModes: int = 0
+        self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
+        self._modeDecayRatio = Decimal(1)
 
         if array is not None:
             self._setArray(array)
@@ -125,6 +133,7 @@ class ProbeRepositoryItem(Observable, Observer):
             mode = modeList[0] * phaseShift[0][numpy.newaxis] * phaseShift[1][:, numpy.newaxis]
             modeList.append(mode)
 
+        # FIXME apply probe mode decay
         array = numpy.stack(modeList)
         self._setArray(array)
 
@@ -150,11 +159,20 @@ class ProbeRepositoryItem(Observable, Observer):
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state from settings'''
         self._numberOfModes = settings.numberOfModes.value
+
+        try:
+            self._modeDecayType = ProbeModeDecayType[settings.modeDecayType.value.upper()]
+        except KeyError:
+            self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
+
+        self._modeDecayRatio = settings.modeDecayRatio.value
         self.reinitialize()
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state to settings'''
         settings.numberOfModes.value = self.getNumberOfModes()
+        settings.modeDecayType.value = self.getModeDecayType().name
+        settings.modeDecayRatio.value = self.getModeDecayRatio()
 
     def getDataType(self) -> str:
         '''returns the array data type'''
@@ -178,6 +196,26 @@ class ProbeRepositoryItem(Observable, Observer):
         if self._numberOfModes != number:
             self._numberOfModes = number
             # TODO only reinitialize as needed
+            self.reinitialize()
+
+    def getModeDecayType(self) -> ProbeModeDecayType:
+        return self._modeDecayType
+
+    def setModeDecayType(self, value: ProbeModeDecayType) -> None:
+        if self._modeDecayType != value:
+            self._modeDecayType = value
+            self.reinitialize()
+
+    def getModeDecayRatioLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))
+
+    def getModeDecayRatio(self) -> Decimal:
+        limits = self.getModeDecayRatioLimits()
+        return limits.clamp(self._modeDecayRatio)
+
+    def setModeDecayRatio(self, value: Decimal) -> None:
+        if self._modeDecayRatio != value:
+            self._modeDecayRatio = value
             self.reinitialize()
 
     def getMode(self, mode: int) -> ProbeArrayType:

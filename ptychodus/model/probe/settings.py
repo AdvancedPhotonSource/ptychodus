@@ -17,6 +17,8 @@ class ProbeSettings(Observable, Observer):
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
             'ProbeEnergyInElectronVolts', '10000')
         self.numberOfModes = settingsGroup.createIntegerEntry('NumberOfModes', 1)
+        self.modeDecayType = settingsGroup.createStringEntry('ModeDecayType', 'Polynomial')
+        self.modeDecayRatio = settingsGroup.createRealEntry('ModeDecayRatio', '1')
 
         self.diskDiameterInMeters = settingsGroup.createRealEntry('DiskDiameterInMeters', '400e-6')
 

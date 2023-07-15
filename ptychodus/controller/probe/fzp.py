@@ -5,7 +5,8 @@ from PyQt5.QtWidgets import QWidget
 
 from ...api.observer import Observable, Observer
 from ...model.probe import FresnelZonePlateProbeInitializer, ProbeRepositoryItemPresenter
-from ...view.probe import FresnelZonePlateProbeView, ProbeEditorDialog
+from ...view.probe import FresnelZonePlateProbeView
+from .editor import ProbeEditorViewController
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,6 @@ class FresnelZonePlateProbeViewController(Observer):
         super().__init__()
         self._item = presenter.item
         self._view = FresnelZonePlateProbeView.createInstance()
-        self._dialog = ProbeEditorDialog.createInstance(presenter.name, self._view, parent)
         self._initializer: FresnelZonePlateProbeInitializer | None = None
 
     @classmethod
@@ -25,7 +25,8 @@ class FresnelZonePlateProbeViewController(Observer):
         controller._updateInitializer()
         controller._syncModelToView()
         presenter.item.addObserver(controller)
-        controller._dialog.open()
+        ProbeEditorViewController.editParameters(presenter, controller._view, parent)
+        presenter.item.removeObserver(controller)
 
     def _updateInitializer(self) -> None:
         initializer = self._item.getInitializer()
@@ -44,7 +45,6 @@ class FresnelZonePlateProbeViewController(Observer):
             initializer.setCentralBeamstopDiameterInMeters)
         self._view.defocusDistanceWidget.lengthChanged.connect(
             initializer.setDefocusDistanceInMeters)
-        self._view.numberOfModesSpinBox.valueChanged.connect(self._item.setNumberOfModes)
 
     def _syncModelToView(self) -> None:
         if self._initializer is None:
@@ -58,12 +58,6 @@ class FresnelZonePlateProbeViewController(Observer):
                 self._initializer.getCentralBeamstopDiameterInMeters())
             self._view.defocusDistanceWidget.setLengthInMeters(
                 self._initializer.getDefocusDistanceInMeters())
-
-            self._view.numberOfModesSpinBox.blockSignals(True)
-            self._view.numberOfModesSpinBox.setRange(self._item.getNumberOfModesLimits().lower,
-                                                     self._item.getNumberOfModesLimits().upper)
-            self._view.numberOfModesSpinBox.setValue(self._item.getNumberOfModes())
-            self._view.numberOfModesSpinBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:
