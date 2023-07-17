@@ -95,7 +95,6 @@ class PtychoNNTrainingParametersController(Observer):
         view.minimumLearningRateLineEdit.valueChanged.connect(presenter.setMinimumLearningRate)
         view.trainingEpochsSpinBox.valueChanged.connect(presenter.setTrainingEpochs)
         view.statusIntervalSpinBox.valueChanged.connect(presenter.setStatusIntervalInEpochs)
-        view.trainButton.clicked.connect(presenter.train)
 
         controller._syncModelToView()
 

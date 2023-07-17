@@ -67,6 +67,10 @@ class DetectorSpecificGroup:
     x_pixels_in_detector: int
     y_pixels_in_detector: int
 
+    @property
+    def numberOfPatternsTotal(self) -> int:
+        return max(self.nimages, self.ntrigger)
+
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorSpecificGroup:
         nimages = group['nimages']
@@ -255,8 +259,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],
-                        numberOfPatternsTotal=detectorSpecific.nimages,
-                        # FIXME for catalyst particle numberOfPatternsTotal=detectorSpecific.ntrigger,
+                        numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
                         patternDataType=h5Dataset.dtype,
                         detectorDistanceInMeters=Decimal.from_float(detector.detector_distance_m),
                         detectorNumberOfPixels=detectorNumberOfPixels,

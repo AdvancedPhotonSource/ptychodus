@@ -31,6 +31,7 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
         return 'TrainPhase'
 
     def _appendDiffractionPatterns(self, array: DiffractionPatternArrayType) -> None:
+        # FIXME as float32
         if self._diffractionPatternsArray is None:
             self._diffractionPatternsArray = array
         else:
@@ -38,6 +39,7 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
                 (self._diffractionPatternsArray, array))
 
     def _appendObjectPatches(self, array: ObjectArrayType) -> None:
+        # FIXME save phase only numpy.angle(array) as float32
         if self._objectPatchesArray is None:
             self._objectPatchesArray = array
         else:
@@ -97,6 +99,7 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
             epochs=self._trainingSettings.trainingEpochs.value,
             output_frequency=self._trainingSettings.statusIntervalInEpochs.value,
         )
+        # TODO ptychonn.plot.plot_metrics(trainer.metrics)
 
     def clear(self) -> None:
         self._diffractionPatternsArray = None

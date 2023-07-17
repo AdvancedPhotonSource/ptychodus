@@ -27,6 +27,7 @@ class PtychoNNPhaseOnlyReconstructor(Reconstructor):
         return 'InferPhase'
 
     def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+        # FIXME data size/shape requirements to GUI
         data = parameters.diffractionPatternArray
         dataSize = data.shape[-1]
 
@@ -39,8 +40,8 @@ class PtychoNNPhaseOnlyReconstructor(Reconstructor):
             raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
 
         # Bin diffraction data
-        # TODO extract binning to data loading (and verify that x-y coordinates are correct)
-        inputSize = self._settings.inputSize.value
+        # FIXME extract binning to data loading (and verify that x-y coordinates are correct)
+        inputSize = dataSize
         binSize = dataSize // inputSize
 
         if binSize == 1:
@@ -62,6 +63,7 @@ class PtychoNNPhaseOnlyReconstructor(Reconstructor):
         logger.debug('Inferring...')
         tester.setTestData(binnedData, batch_size=self._settings.batchSize.value)
         objectPhasePatches = tester.predictTestData()
+        # FIXME npz_save_path: str = inferences_out_file: Optional[Path]
 
         logger.debug('Stitching...')
         objectInterpolator = parameters.objectInterpolator
