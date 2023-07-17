@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from decimal import Decimal
 from enum import auto, Enum
 from typing import Final, Optional
@@ -20,6 +21,21 @@ logger = logging.getLogger(__name__)
 class ProbeModeDecayType(Enum):
     POLYNOMIAL = auto()
     EXPONENTIAL = auto()
+
+    def getWeights(self, decayRatio: Decimal, numberOfModes: int) -> Sequence[float]:
+        weights = [1.] * numberOfModes
+
+        if 0 < decayRatio and decayRatio < 1:
+            if self.value == ProbeModeDecayType.EXPONENTIAL.value:
+                print('EXP')
+                b = float(1 + (1 - decayRatio) / decayRatio)
+                weights = [b**-n for n in range(numberOfModes)]
+            else:
+                print('POLY')
+                b = float(decayRatio.ln() / Decimal(2).ln())
+                weights = [(n + 1)**b for n in range(numberOfModes)]
+
+        return weights
 
 
 class ProbeInitializer(ABC, Observable):
@@ -111,6 +127,8 @@ class ProbeRepositoryItem(Observable, Observer):
             logger.exception('Failed to reinitialize probe!')
             return
 
+        modeWeights = self._modeDecayType.getWeights(self._modeDecayRatio, self._numberOfModes)
+        print(modeWeights)  # FIXME apply probe mode decay
         modeList: list[ProbeArrayType] = list()
 
         if initialProbe.ndim == 2:
@@ -133,7 +151,6 @@ class ProbeRepositoryItem(Observable, Observer):
             mode = modeList[0] * phaseShift[0][numpy.newaxis] * phaseShift[1][:, numpy.newaxis]
             modeList.append(mode)
 
-        # FIXME apply probe mode decay
         array = numpy.stack(modeList)
         self._setArray(array)
 
