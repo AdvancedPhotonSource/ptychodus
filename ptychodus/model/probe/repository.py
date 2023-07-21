@@ -22,16 +22,14 @@ class ProbeModeDecayType(Enum):
     POLYNOMIAL = auto()
     EXPONENTIAL = auto()
 
-    def getWeights(self, decayRatio: Decimal, numberOfModes: int) -> Sequence[float]:
+    def getModeWeights(self, decayRatio: Decimal, numberOfModes: int) -> Sequence[float]:
         weights = [1.] * numberOfModes
 
         if 0 < decayRatio and decayRatio < 1:
             if self.value == ProbeModeDecayType.EXPONENTIAL.value:
-                print('EXP')
                 b = float(1 + (1 - decayRatio) / decayRatio)
                 weights = [b**-n for n in range(numberOfModes)]
             else:
-                print('POLY')
                 b = float(decayRatio.ln() / Decimal(2).ln())
                 weights = [(n + 1)**b for n in range(numberOfModes)]
 
@@ -127,8 +125,7 @@ class ProbeRepositoryItem(Observable, Observer):
             logger.exception('Failed to reinitialize probe!')
             return
 
-        modeWeights = self._modeDecayType.getWeights(self._modeDecayRatio, self._numberOfModes)
-        print(modeWeights)  # FIXME apply probe mode decay
+        modeWeights = self._modeDecayType.getModeWeights(self._modeDecayRatio, self._numberOfModes)
         modeList: list[ProbeArrayType] = list()
 
         if initialProbe.ndim == 2:
@@ -139,7 +136,9 @@ class ProbeRepositoryItem(Observable, Observer):
         else:
             raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
 
-        while len(modeList) < self._numberOfModes:
+        power0 = numpy.sum(numpy.square(numpy.abs(modeList[0])))
+
+        for weight in modeWeights[1:]:
             # randomly shift the first mode
             pw = initialProbe.shape[-1]
 
@@ -149,6 +148,8 @@ class ProbeRepositoryItem(Observable, Observer):
             phaseShift = numpy.exp(-2j * numpy.pi * variate)
 
             mode = modeList[0] * phaseShift[0][numpy.newaxis] * phaseShift[1][:, numpy.newaxis]
+            powerN = numpy.sum(numpy.square(numpy.abs(mode)))
+            mode *= numpy.sqrt(weight * power0 / powerN)
             modeList.append(mode)
 
         array = numpy.stack(modeList)
