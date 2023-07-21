@@ -12,14 +12,6 @@ class CSVScanFileReader(ScanFileReader):
         self._xcol = xcol
         self._ycol = ycol
 
-    @property
-    def simpleName(self) -> str:
-        return 'CSV'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Comma-Separated Values Files (*.csv)'
-
     def read(self, filePath: Path) -> Scan:
         pointList = list()
         minimumColumnCount = max(self._xcol, self._ycol) + 1
@@ -45,14 +37,6 @@ class CSVScanFileReader(ScanFileReader):
 
 class CSVScanFileWriter(ScanFileWriter):
 
-    @property
-    def simpleName(self) -> str:
-        return 'CSV'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Comma-Separated Values Files (*.csv)'
-
     def write(self, filePath: Path, scan: Scan) -> None:
         with filePath.open(mode='wt') as csvFile:
             for index, point in scan.items():
@@ -60,5 +44,13 @@ class CSVScanFileWriter(ScanFileWriter):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(CSVScanFileReader())
-    registry.registerPlugin(CSVScanFileWriter())
+    registry.scanFileReaders.registerPlugin(
+        CSVScanFileReader(),
+        simpleName='CSV',
+        displayName='Comma-Separated Values Files (*.csv)',
+    )
+    registry.scanFileWriters.registerPlugin(
+        CSVScanFileWriter(),
+        simpleName='CSV',
+        displayName='Comma-Separated Values Files (*.csv)',
+    )

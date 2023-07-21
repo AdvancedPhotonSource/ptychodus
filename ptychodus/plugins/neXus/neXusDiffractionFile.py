@@ -217,14 +217,6 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         self._treeBuilder = H5DiffractionFileTreeBuilder()
         self.stageRotationInDegrees = 0.  # TODO This is a hack; remove when able!
 
-    @property
-    def simpleName(self) -> str:
-        return 'NeXus'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'NeXus Master Files (*.h5 *.hdf5)'
-
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset: DiffractionDataset = SimpleDiffractionDataset.createNullInstance(filePath)
 

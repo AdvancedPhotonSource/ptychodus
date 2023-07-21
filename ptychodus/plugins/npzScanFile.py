@@ -9,14 +9,6 @@ from ptychodus.api.state import StateDataRegistry
 
 class NPZScanFileReader(ScanFileReader):
 
-    @property
-    def simpleName(self) -> str:
-        return 'NPZ'
-
-    @property
-    def fileFilter(self) -> str:
-        return StateDataRegistry.FILE_FILTER
-
     def read(self, filePath: Path) -> Scan:
         pointMap: dict[int, ScanPoint] = dict()
 
@@ -32,4 +24,8 @@ class NPZScanFileReader(ScanFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(NPZScanFileReader())
+    registry.scanFileReaders.registerPlugin(
+        NPZScanFileReader(),
+        simpleName='NPZ',
+        displayName=StateDataRegistry.FILE_FILTER,
+    )

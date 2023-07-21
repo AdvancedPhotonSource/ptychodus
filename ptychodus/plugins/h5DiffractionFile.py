@@ -127,19 +127,9 @@ class H5DiffractionFileTreeBuilder:
 
 class H5DiffractionFileReader(DiffractionFileReader):
 
-    def __init__(self, simpleName: str, fileFilter: str, dataPath: str) -> None:
-        self._simpleName = simpleName
-        self._fileFilter = fileFilter
+    def __init__(self, dataPath: str) -> None:
         self._dataPath = dataPath
         self._treeBuilder = H5DiffractionFileTreeBuilder()
-
-    @property
-    def simpleName(self) -> str:
-        return self._simpleName
-
-    @property
-    def fileFilter(self) -> str:
-        return self._fileFilter
 
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
@@ -179,15 +169,13 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(
-        H5DiffractionFileReader(
-            simpleName='HDF5',
-            fileFilter='Hierarchical Data Format 5 Files (*.h5 *.hdf5)',
-            dataPath='/entry/data/data',
-        ))
-    registry.registerPlugin(
-        H5DiffractionFileReader(
-            simpleName='PtychoShelves',
-            fileFilter='PtychoShelves Diffraction Data Files (*.h5 *.hdf5)',
-            dataPath='/dp',
-        ))
+    registry.diffractionFileReaders.registerPlugin(
+        H5DiffractionFileReader(dataPath='/entry/data/data'),
+        simpleName='HDF5',
+        displayName='Hierarchical Data Format 5 Files (*.h5 *.hdf5)',
+    )
+    registry.diffractionFileReaders.registerPlugin(
+        H5DiffractionFileReader(dataPath='/dp'),
+        simpleName='PtychoShelves',
+        displayName='PtychoShelves Diffraction Data Files (*.h5 *.hdf5)',
+    )

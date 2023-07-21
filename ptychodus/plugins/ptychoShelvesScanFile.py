@@ -11,14 +11,6 @@ logger = logging.getLogger(__name__)
 
 class PtychoShelvesScanFileReader(ScanFileReader):
 
-    @property
-    def simpleName(self) -> str:
-        return 'PtychoShelves'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'PtychoShelves Scan Position Files (*.h5 *.hdf5)'
-
     def read(self, filePath: Path) -> Scan:
         pointList = list()
 
@@ -45,4 +37,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(PtychoShelvesScanFileReader())
+    registry.scanFileReaders.registerPlugin(
+        PtychoShelvesScanFileReader(),
+        simpleName='PtychoShelves',
+        displayName='PtychoShelves Scan Position Files (*.h5 *.hdf5)')

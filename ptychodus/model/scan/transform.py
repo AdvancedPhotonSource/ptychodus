@@ -24,18 +24,6 @@ class ScanPointTransform(Enum):
     MYPX = 0x6
     MYMX = 0x7
 
-    @classmethod
-    def fromSimpleName(self, name: str) -> ScanPointTransform:
-        transform = ScanPointTransform.PXPY
-
-        try:
-            transform = next(xform for xform in ScanPointTransform
-                             if name.casefold() == xform.simpleName.casefold())
-        except StopIteration:
-            logger.debug(f'Invalid scan point transform \"{name}\"')
-
-        return transform
-
     @property
     def negateX(self) -> bool:
         '''indicates whether the x coordinate is negated'''
@@ -81,22 +69,14 @@ class SelectableScanPointTransform(Observable):
     def getSelectableTransforms(self) -> Sequence[str]:
         return [transform.displayName for transform in ScanPointTransform]
 
-    def selectTransformFromSimpleName(self, name: str) -> None:
-        nameFold = name.casefold()
+    def selectTransformByName(self, name: str) -> None:
+        namecf = name.casefold()
 
         for transform in ScanPointTransform:
-            if nameFold == transform.simpleName.casefold():
-                self._transform = transform
-                self.notifyObservers()
-                return
+            simpleMatch = (namecf == transform.simpleName.casefold())
+            displayMatch = (namecf == transform.displayName.casefold())
 
-        logger.error(f'Unknown scan point transform \"{name}\"!')
-
-    def selectTransformFromDisplayName(self, name: str) -> None:
-        nameFold = name.casefold()
-
-        for transform in ScanPointTransform:
-            if nameFold == transform.displayName.casefold():
+            if simpleMatch or displayMatch:
                 self._transform = transform
                 self.notifyObservers()
                 return

@@ -59,7 +59,7 @@ class ObjectInterpolatorFactory(Observable, Observer):
 
     def createInterpolator(self, objectArray: ObjectArrayType,
                            objectCentroid: ScanPoint) -> ObjectInterpolator:
-        centerPhase = self._phaseCenteringStrategyChooser.getCurrentStrategy()
+        centerPhase = self._phaseCenteringStrategyChooser.currentPlugin.strategy
 
         objectGrid = ObjectGrid(
             axisX=ObjectAxis(
@@ -83,16 +83,16 @@ class ObjectInterpolatorFactory(Observable, Observer):
         return self._phaseCenteringStrategyChooser.getDisplayNameList()
 
     def getPhaseCenteringStrategy(self) -> str:
-        return self._phaseCenteringStrategyChooser.getCurrentDisplayName()
+        return self._phaseCenteringStrategyChooser.currentPlugin.displayName
 
     def setPhaseCenteringStrategy(self, name: str) -> None:
-        self._phaseCenteringStrategyChooser.setFromDisplayName(name)
-        simpleName = self._phaseCenteringStrategyChooser.getCurrentSimpleName()
+        self._phaseCenteringStrategyChooser.setCurrentPluginByName(name)
+        simpleName = self._phaseCenteringStrategyChooser.currentPlugin.simpleName
         self._settings.phaseCenteringStrategy.value = simpleName
 
     def _syncFromSettings(self) -> None:
         simpleName = self._settings.phaseCenteringStrategy.value
-        self._phaseCenteringStrategyChooser.setFromSimpleName(simpleName)
+        self._phaseCenteringStrategyChooser.setCurrentPluginByName(simpleName)
 
     def update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:

@@ -18,14 +18,8 @@ class ProbeAPI:
         self._repository = repository
         self._probe = probe
 
-    def insertItemIntoRepositoryFromFile(self,
-                                         filePath: Path,
-                                         *,
-                                         simpleFileType: str = '',
-                                         displayFileType: str = '') -> Optional[str]:
-        item = self._factory.openItemFromFile(filePath,
-                                              simpleFileType=simpleFileType,
-                                              displayFileType=displayFileType)
+    def insertItemIntoRepositoryFromFile(self, filePath: Path, fileType: str) -> Optional[str]:
+        item = self._factory.openItemFromFile(filePath, fileType=fileType)
 
         if item is None:
             logger.error(f'Unable to open probe from \"{filePath}\"!')
@@ -37,15 +31,10 @@ class ProbeAPI:
                                           array: ProbeArrayType,
                                           *,
                                           filePath: Optional[Path] = None,
-                                          simpleFileType: str = '',
-                                          displayFileType: str = '',
+                                          fileType: str = '',
                                           replaceItem: bool = False,
                                           selectItem: bool = False) -> Optional[str]:
-        item = self._factory.createItemFromArray(name,
-                                                 array,
-                                                 filePath=filePath,
-                                                 simpleFileType=simpleFileType,
-                                                 displayFileType=displayFileType)
+        item = self._factory.createItemFromArray(name, array, filePath=filePath, fileType=fileType)
         itemName = self._repository.insertItem(item, name=name if replaceItem else None)
 
         if itemName is None:
@@ -55,12 +44,8 @@ class ProbeAPI:
 
         return itemName
 
-    def insertItemIntoRepositoryFromInitializerSimpleName(self, name: str) -> Optional[str]:
-        item = self._factory.createItemFromSimpleName(name)
-        return self._repository.insertItem(item)
-
-    def insertItemIntoRepositoryFromInitializerDisplayName(self, name: str) -> Optional[str]:
-        item = self._factory.createItemFromDisplayName(name)
+    def insertItemIntoRepositoryFromInitializerName(self, name: str) -> Optional[str]:
+        item = self._factory.createItemFromInitializerName(name)
         return self._repository.insertItem(item)
 
     def getSelectedProbeArray(self) -> ProbeArrayType:

@@ -25,12 +25,8 @@ class ObjectAPI:
 
     def insertItemIntoRepositoryFromFile(self,
                                          filePath: Path,
-                                         *,
-                                         simpleFileType: str = '',
-                                         displayFileType: str = '') -> Optional[str]:
-        item = self._factory.openItemFromFile(filePath,
-                                              simpleFileType=simpleFileType,
-                                              displayFileType=displayFileType)
+                                         fileType: str = '') -> Optional[str]:
+        item = self._factory.openItemFromFile(filePath, fileType)
 
         if item is None:
             logger.error(f'Unable to open object from \"{filePath}\"!')
@@ -42,15 +38,10 @@ class ObjectAPI:
                                           array: ObjectArrayType,
                                           *,
                                           filePath: Optional[Path] = None,
-                                          simpleFileType: str = '',
-                                          displayFileType: str = '',
+                                          fileType: str = '',
                                           replaceItem: bool = False,
                                           selectItem: bool = False) -> Optional[str]:
-        item = self._factory.createItemFromArray(name,
-                                                 array,
-                                                 filePath=filePath,
-                                                 simpleFileType=simpleFileType,
-                                                 displayFileType=displayFileType)
+        item = self._factory.createItemFromArray(name, array, filePath=filePath, fileType=fileType)
         itemName = self._repository.insertItem(item, name=name if replaceItem else None)
 
         if itemName is None:
@@ -60,16 +51,12 @@ class ObjectAPI:
 
         return itemName
 
-    def insertItemIntoRepositoryFromInitializerSimpleName(self, name: str) -> Optional[str]:
-        item = self._factory.createItemFromSimpleName(name)
-        return self._repository.insertItem(item)
-
-    def insertItemIntoRepositoryFromInitializerDisplayName(self, name: str) -> Optional[str]:
-        item = self._factory.createItemFromDisplayName(name)
+    def insertItemIntoRepositoryFromInitializerName(self, name: str) -> Optional[str]:
+        item = self._factory.createItemFromInitializerName(name)
         return self._repository.insertItem(item)
 
     def selectNewItemFromInitializerSimpleName(self, name: str) -> None:  # TODO improve name
-        itemName = self.insertItemIntoRepositoryFromInitializerSimpleName(name)
+        itemName = self.insertItemIntoRepositoryFromInitializerName(name)
 
         if itemName is None:
             logger.error('Refusing to select null item!')

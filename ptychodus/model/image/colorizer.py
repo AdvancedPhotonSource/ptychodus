@@ -29,10 +29,10 @@ class Colorizer(Observable, Observer, ABC):
         return self._transformChooser.getDisplayNameList()
 
     def getScalarTransformationName(self) -> str:
-        return self._transformChooser.getCurrentDisplayName()
+        return self._transformChooser.currentPlugin.displayName
 
     def setScalarTransformationByName(self, name: str) -> None:
-        self._transformChooser.setFromDisplayName(name)
+        self._transformChooser.setCurrentPluginByName(name)
 
     @abstractmethod
     def getVariantNameList(self) -> Sequence[str]:

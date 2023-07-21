@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Sequence
 import logging
 import time
 
@@ -8,10 +8,10 @@ import numpy
 from ...api.data import DiffractionPatternArrayType
 from ...api.object import ObjectInterpolator
 from ...api.observer import Observable, Observer
-from ...api.plugins import PluginEntry
+from ...api.plugins import PluginChooser
 from ...api.probe import ProbeArrayType
-from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,
-                                  Reconstructor, ReconstructorLibrary, TrainableReconstructor)
+from ...api.reconstructor import (ReconstructInput, ReconstructOutput, Reconstructor,
+                                  ReconstructorLibrary, TrainableReconstructor)
 from ...api.scan import Scan, TabularScan
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
@@ -22,64 +22,42 @@ from .settings import ReconstructorSettings
 logger = logging.getLogger(__name__)
 
 
-class ReconstructorRepository(Mapping[str, Reconstructor], Observable):
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._reconstructorDict: dict[str, Reconstructor] = dict()
-
-    @classmethod
-    def createInstance(cls, libraries: Iterable[ReconstructorLibrary]) -> ReconstructorRepository:
-        repository = cls()
-
-        for library in libraries:
-            repository.registerLibrary(library)
-
-        return repository
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._reconstructorDict)
-
-    def __getitem__(self, name: str) -> Reconstructor:
-        return self._reconstructorDict[name]
-
-    def __len__(self) -> int:
-        return len(self._reconstructorDict)
-
-    def registerLibrary(self, library: ReconstructorLibrary) -> None:
-        for reconstructor in library:
-            name = f'{library.name}/{reconstructor.name}'
-            self._reconstructorDict[name] = reconstructor
-
-        self.notifyObservers()
-
-
 class ActiveReconstructor(Observable, Observer):
 
-    def __init__(self, settings: ReconstructorSettings, repository: ReconstructorRepository,
+    def __init__(self, settings: ReconstructorSettings,
                  diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
                  probeAPI: ProbeAPI, objectAPI: ObjectAPI, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
-        self._repository = repository
         self._diffractionDataset = diffractionDataset
         self._scanAPI = scanAPI
         self._probeAPI = probeAPI
         self._objectAPI = objectAPI
         self._reinitObservable = reinitObservable
-        self._reconstructorPlugin = PluginEntry[Reconstructor]('None', 'None',
-                                                               NullReconstructor('None'))
+        self._pluginChooser = PluginChooser[Reconstructor]()
 
     @classmethod
-    def createInstance(cls, settings: ReconstructorSettings, repository: ReconstructorRepository,
+    def createInstance(cls, settings: ReconstructorSettings,
                        diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
                        probeAPI: ProbeAPI, objectAPI: ObjectAPI,
+                       libraries: Iterable[ReconstructorLibrary],
                        reinitObservable: Observable) -> ActiveReconstructor:
-        reconstructor = cls(settings, repository, diffractionDataset, scanAPI, probeAPI, objectAPI,
-                            reinitObservable)
-        reinitObservable.addObserver(reconstructor)
-        reconstructor._syncFromSettings()
-        return reconstructor
+        activeReconstructor = cls(settings, diffractionDataset, scanAPI, probeAPI, objectAPI,
+                                  reinitObservable)
+
+        for library in libraries:
+            for reconstructor in library:
+                activeReconstructor._pluginChooser.registerPlugin(
+                    reconstructor,
+                    simpleName=f'{library.name}/{reconstructor.name}',
+                )
+
+        reinitObservable.addObserver(activeReconstructor)
+        activeReconstructor._syncFromSettings()
+        return activeReconstructor
+
+    def getReconstructorList(self) -> Sequence[str]:
+        return self._pluginChooser.getDisplayNameList()
 
     def _prepareInputData(self, name: str) -> tuple[str, Scan, DiffractionPatternArrayType]:
         selectedScan = self._scanAPI.getSelectedScan()
@@ -133,7 +111,7 @@ class ActiveReconstructor(Observable, Observer):
 
     @property
     def name(self) -> str:
-        return self._reconstructorPlugin.displayName
+        return self._pluginChooser.currentPlugin.displayName
 
     def execute(self, name: str) -> ReconstructOutput:
         scanName, scan, diffractionPatternArray = self._prepareInputData(name)
@@ -148,7 +126,7 @@ class ActiveReconstructor(Observable, Observer):
         )
 
         tic = time.perf_counter()
-        result = self._reconstructorPlugin.strategy.execute(parameters)
+        result = self._pluginChooser.currentPlugin.strategy.execute(parameters)
         toc = time.perf_counter()
         logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')
 
@@ -169,11 +147,11 @@ class ActiveReconstructor(Observable, Observer):
 
     @property
     def isTrainable(self) -> bool:
-        reconstructor = self._reconstructorPlugin.strategy
+        reconstructor = self._pluginChooser.currentPlugin.strategy
         return isinstance(reconstructor, TrainableReconstructor)
 
     def train(self) -> None:
-        reconstructor = self._reconstructorPlugin.strategy
+        reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             reconstructor.train()
@@ -181,39 +159,16 @@ class ActiveReconstructor(Observable, Observer):
             logger.error('Reconstructor is not trainable!')
 
     def clear(self) -> None:
-        reconstructor = self._reconstructorPlugin.strategy
+        reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             reconstructor.clear()
         else:
             logger.error('Reconstructor is not trainable!')
 
-    @staticmethod
-    def _simplifyName(name: str) -> str:
-        # remove whitespace and casefold
-        return ''.join(name.split()).casefold()
-
     def selectReconstructor(self, name: str) -> None:
-        displayName = self._simplifyName(name)
-
-        for rname in self._repository:
-            if self._simplifyName(rname) == displayName:
-                displayName = rname
-                break
-
-        try:
-            reconstructor = self._repository[displayName]
-        except KeyError:
-            logger.debug(f'Invalid reconstructor name \"{name}\"')
-            reconstructor = NullReconstructor('None')
-
-        self._reconstructorPlugin = PluginEntry[Reconstructor](
-            simpleName=''.join(displayName.split()),
-            displayName=displayName,
-            strategy=reconstructor,
-        )
-
-        self._settings.algorithm.value = self._reconstructorPlugin.simpleName
+        self._pluginChooser.setCurrentPluginByName(name)
+        self._settings.algorithm.value = self._pluginChooser.currentPlugin.simpleName
         self.notifyObservers()
 
     def _syncFromSettings(self) -> None:

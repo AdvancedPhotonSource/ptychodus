@@ -66,7 +66,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
         return self._itemFactory.getInitializerDisplayNameList()
 
     def initializeObject(self, displayName: str) -> Optional[str]:
-        return self._objectAPI.insertItemIntoRepositoryFromInitializerDisplayName(displayName)
+        return self._objectAPI.insertItemIntoRepositoryFromInitializerName(displayName)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._itemFactory.getOpenFileFilterList()
@@ -75,13 +75,13 @@ class ObjectRepositoryPresenter(Observable, Observer):
         return self._itemFactory.getOpenFileFilter()
 
     def openObject(self, filePath: Path, fileFilter: str) -> None:
-        self._objectAPI.insertItemIntoRepositoryFromFile(filePath, displayFileType=fileFilter)
+        self._objectAPI.insertItemIntoRepositoryFromFile(filePath, fileFilter)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()
 
     def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.getCurrentDisplayName()
+        return self._fileWriterChooser.currentPlugin.displayName
 
     def saveObject(self, name: str, filePath: Path, fileFilter: str) -> None:
         try:
@@ -90,15 +90,14 @@ class ObjectRepositoryPresenter(Observable, Observer):
             logger.error(f'Unable to locate \"{name}\"!')
             return
 
-        self._fileWriterChooser.setFromDisplayName(fileFilter)
-        fileType = self._fileWriterChooser.getCurrentSimpleName()
+        self._fileWriterChooser.setCurrentPluginByName(fileFilter)
+        fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
-        writer = self._fileWriterChooser.getCurrentStrategy()
+        writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, item.getArray())
 
         if item.getInitializer() is None:
-            initializer = self._itemFactory.createFileInitializer(filePath,
-                                                                  simpleFileType=fileType)
+            initializer = self._itemFactory.createFileInitializer(filePath, fileType)
 
             if initializer is not None:
                 item.setInitializer(initializer)
@@ -199,5 +198,5 @@ class ObjectCore(StatefulCore[ObjectStateData]):
         self.objectAPI.insertItemIntoRepositoryFromArray(name='Restart',
                                                          array=stateData.array,
                                                          filePath=stateFilePath,
-                                                         simpleFileType=stateFilePath.suffix,
+                                                         fileType=stateFilePath.suffix,
                                                          selectItem=True)

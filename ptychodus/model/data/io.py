@@ -40,7 +40,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
     def openDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
         try:
             fileType = self._dataAPI.loadDiffractionDataset(filePath=filePath,
-                                                            displayFileType=fileFilter,
+                                                            fileType=fileFilter,
                                                             assemble=False)
         except Exception:
             logger.exception('Failed to load diffraction dataset.')
@@ -56,7 +56,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
 
     def _openDiffractionFileFromSettings(self) -> None:
         self._dataAPI.loadDiffractionDataset(filePath=self._settings.filePath.value,
-                                             simpleFileType=self._settings.fileType.value,
+                                             fileType=self._settings.fileType.value,
                                              assemble=True)
 
     def startAssemblingDiffractionPatterns(self) -> None:

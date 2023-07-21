@@ -88,22 +88,14 @@ class SelectableScanIndexFilter(ScanIndexFilter, Observable):
     def getSelectableFilters(self) -> Sequence[str]:
         return [indexFilter.displayName for indexFilter in self._availableFilters]
 
-    def selectFilterFromSimpleName(self, name: str) -> None:
-        nameFold = name.casefold()
+    def selectFilterByName(self, name: str) -> None:
+        namecf = name.casefold()
 
         for indexFilter in self._availableFilters:
-            if nameFold == indexFilter.simpleName.casefold():
-                self._indexFilter = indexFilter
-                self.notifyObservers()
-                return
+            simpleMatch = (namecf == indexFilter.simpleName.casefold())
+            displayMatch = (namecf == indexFilter.displayName.casefold())
 
-        logger.error(f'Unknown scan index filter \"{name}\"!')
-
-    def selectFilterFromDisplayName(self, name: str) -> None:
-        nameFold = name.casefold()
-
-        for indexFilter in self._availableFilters:
-            if nameFold == indexFilter.displayName.casefold():
+            if simpleMatch or displayMatch:
                 self._indexFilter = indexFilter
                 self.notifyObservers()
                 return

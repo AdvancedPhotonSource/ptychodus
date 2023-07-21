@@ -73,25 +73,24 @@ class ModelCore:
         self._detector = Detector.createInstance(self._detectorSettings)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings,
                                                                   self._detector)
-        self._detectorImageCore = ImageCore(
-            self._pluginRegistry.buildScalarTransformationChooser())
+        self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations)
 
         self._dataCore = DataCore(self.settingsRegistry, self._detector,
-                                  self._pluginRegistry.buildDiffractionFileReaderChooser())
+                                  self._pluginRegistry.diffractionFileReaders)
         self._scanCore = ScanCore(self.rng, self.settingsRegistry, self._dataCore.dataset,
-                                  self._pluginRegistry.buildScanFileReaderChooser(),
-                                  self._pluginRegistry.buildScanFileWriterChooser())
+                                  self._pluginRegistry.scanFileReaders,
+                                  self._pluginRegistry.scanFileWriters)
         self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
                                     self._dataCore.patternSizer,
-                                    self._pluginRegistry.buildProbeFileReaderChooser(),
-                                    self._pluginRegistry.buildProbeFileWriterChooser())
-        self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
-        self._objectCore = ObjectCore(
-            self.rng, self.settingsRegistry, self._probeCore.apparatus, self._scanCore.sizer,
-            self._probeCore.sizer, self._pluginRegistry.buildObjectPhaseCenteringStrategyChooser(),
-            self._pluginRegistry.buildObjectFileReaderChooser(),
-            self._pluginRegistry.buildObjectFileWriterChooser())
-        self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
+                                    self._pluginRegistry.probeFileReaders,
+                                    self._pluginRegistry.probeFileWriters)
+        self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy())
+        self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
+                                      self._scanCore.sizer, self._probeCore.sizer,
+                                      self._pluginRegistry.objectPhaseCenteringStrategies,
+                                      self._pluginRegistry.objectFileReaders,
+                                      self._pluginRegistry.objectFileWriters)
+        self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy())
         self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.dataset,
                                                                   self._detectorSettings,
                                                                   self._dataCore.patternSettings,

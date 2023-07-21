@@ -6,19 +6,11 @@ from ptychodus.api.plugins import PluginRegistry
 
 class IdentityPhaseCenteringStrategy(ObjectPhaseCenteringStrategy):
 
-    @property
-    def name(self) -> str:
-        return 'Identity'
-
     def __call__(self, array: ObjectArrayType) -> ObjectArrayType:
         return array
 
 
 class CenterBoxMeanPhaseCenteringStrategy(ObjectPhaseCenteringStrategy):
-
-    @property
-    def name(self) -> str:
-        return 'CenterBoxMean'
 
     def __call__(self, array: ObjectArrayType) -> ObjectArrayType:
         oneThirdHeight = array.shape[-2] // 3
@@ -34,5 +26,11 @@ class CenterBoxMeanPhaseCenteringStrategy(ObjectPhaseCenteringStrategy):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(IdentityPhaseCenteringStrategy())
-    registry.registerPlugin(CenterBoxMeanPhaseCenteringStrategy())
+    registry.objectPhaseCenteringStrategies.registerPlugin(
+        IdentityPhaseCenteringStrategy(),
+        simpleName='Identity',
+    )
+    registry.objectPhaseCenteringStrategies.registerPlugin(
+        CenterBoxMeanPhaseCenteringStrategy(),
+        simpleName='CenterBoxMean',
+    )

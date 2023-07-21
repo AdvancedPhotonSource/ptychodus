@@ -9,7 +9,7 @@ from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
 from ..probe import ProbeAPI
 from ..scan import ScanAPI
-from .reconstructor import ReconstructorRepository, ActiveReconstructor
+from .active import ActiveReconstructor
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
@@ -17,23 +17,18 @@ logger = logging.getLogger(__name__)
 
 class ReconstructorPresenter(Observable, Observer):
 
-    def __init__(self, settings: ReconstructorSettings, repository: ReconstructorRepository,
-                 activeReconstructor: ActiveReconstructor) -> None:
+    def __init__(self, activeReconstructor: ActiveReconstructor) -> None:
         super().__init__()
-        self._settings = settings
-        self._repository = repository
         self._activeReconstructor = activeReconstructor
 
     @classmethod
-    def createInstance(cls, settings: ReconstructorSettings, repository: ReconstructorRepository,
-                       activeReconstructor: ActiveReconstructor) -> ReconstructorPresenter:
-        presenter = cls(settings, repository, activeReconstructor)
-        repository.addObserver(presenter)
+    def createInstance(cls, activeReconstructor: ActiveReconstructor) -> ReconstructorPresenter:
+        presenter = cls(activeReconstructor)
         activeReconstructor.addObserver(presenter)
         return presenter
 
     def getReconstructorList(self) -> Sequence[str]:
-        return list(self._repository.keys())
+        return self._activeReconstructor.getReconstructorList()
 
     def getReconstructor(self) -> str:
         return self._activeReconstructor.name
@@ -55,9 +50,7 @@ class ReconstructorPresenter(Observable, Observer):
         self._activeReconstructor.clear()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._repository:
-            self.notifyObservers()
-        elif observable is self._activeReconstructor:
+        if observable is self._activeReconstructor:
             self.notifyObservers()
 
 
@@ -114,12 +107,10 @@ class ReconstructorCore:
     def __init__(self, settingsRegistry: SettingsRegistry,
                  diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
                  probeAPI: ProbeAPI, objectAPI: ObjectAPI,
-                 libraryList: list[ReconstructorLibrary]) -> None:
+                 libraryList: Sequence[ReconstructorLibrary]) -> None:
         self.settings = ReconstructorSettings.createInstance(settingsRegistry)
-        self._repository = ReconstructorRepository.createInstance(libraryList)
         self._activeReconstructor = ActiveReconstructor.createInstance(
-            self.settings, self._repository, diffractionDataset, scanAPI, probeAPI, objectAPI,
+            self.settings, diffractionDataset, scanAPI, probeAPI, objectAPI, libraryList,
             settingsRegistry)
-        self.presenter = ReconstructorPresenter.createInstance(self.settings, self._repository,
-                                                               self._activeReconstructor)
+        self.presenter = ReconstructorPresenter.createInstance(self._activeReconstructor)
         self.plotPresenter = ReconstructorPlotPresenter()

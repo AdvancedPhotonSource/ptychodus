@@ -68,12 +68,6 @@ class ImageExtent:
 class ScalarTransformation(ABC):
     '''interface for real-valued transformations of a real array'''
 
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        '''returns a unique name'''
-        pass
-
     @abstractmethod
     def __call__(self, array: RealArrayType) -> RealArrayType:
         '''returns the transformed input array'''

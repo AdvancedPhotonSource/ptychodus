@@ -6,19 +6,11 @@ from ptychodus.api.plugins import PluginRegistry
 
 class IdentityScalarTransformation(ScalarTransformation):
 
-    @property
-    def name(self) -> str:
-        return 'Identity'
-
     def __call__(self, array: RealArrayType) -> RealArrayType:
         return array
 
 
 class SquareRootScalarTransformation(ScalarTransformation):
-
-    @property
-    def name(self) -> str:
-        return 'Square Root'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -27,20 +19,12 @@ class SquareRootScalarTransformation(ScalarTransformation):
 
 class Log2ScalarTransformation(ScalarTransformation):
 
-    @property
-    def name(self) -> str:
-        return 'Logarithm (Base 2)'
-
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
         return numpy.log2(array, out=nil, where=(array > 0))
 
 
 class LogScalarTransformation(ScalarTransformation):
-
-    @property
-    def name(self) -> str:
-        return 'Natural Logarithm'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -49,18 +33,34 @@ class LogScalarTransformation(ScalarTransformation):
 
 class Log10ScalarTransformation(ScalarTransformation):
 
-    @property
-    def name(self) -> str:
-        return 'Logarithm (Base 10)'
-
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
         return numpy.log10(array, out=nil, where=(array > 0))
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(IdentityScalarTransformation())
-    registry.registerPlugin(SquareRootScalarTransformation())
-    registry.registerPlugin(Log2ScalarTransformation())
-    registry.registerPlugin(LogScalarTransformation())
-    registry.registerPlugin(Log10ScalarTransformation())
+    registry.scalarTransformations.registerPlugin(
+        IdentityScalarTransformation(),
+        simpleName='Identity',
+    )
+    registry.scalarTransformations.registerPlugin(
+        SquareRootScalarTransformation(),
+        simpleName='sqrt',
+        displayName='Square Root',
+    )
+    registry.scalarTransformations.registerPlugin(
+        Log2ScalarTransformation(),
+        simpleName='log2',
+        displayName='Logarithm (Base 2)',
+    )
+
+    registry.scalarTransformations.registerPlugin(
+        LogScalarTransformation(),
+        simpleName='ln',
+        displayName='Natural Logarithm',
+    )
+    registry.scalarTransformations.registerPlugin(
+        Log10ScalarTransformation(),
+        simpleName='log10',
+        displayName='Logarithm (Base 10)',
+    )

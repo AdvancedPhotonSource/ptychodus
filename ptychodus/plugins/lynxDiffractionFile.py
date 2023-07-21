@@ -25,14 +25,6 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
         self._dataPath = '/entry/data/eiger_4'
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
-    @property
-    def simpleName(self) -> str:
-        return 'LYNX'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'LYNX Diffraction Data Files (*.h5 *.hdf5)'
-
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
@@ -72,4 +64,8 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(LYNXDiffractionFileReader())
+    registry.diffractionFileReaders.registerPlugin(
+        LYNXDiffractionFileReader(),
+        simpleName='LYNX',
+        displayName='LYNX Diffraction Data Files (*.h5 *.hdf5)',
+    )

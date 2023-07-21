@@ -59,18 +59,6 @@ class ScanPointParseError(Exception):
 class ScanFileReader(ABC):
     '''interface for plugins that read scan files'''
 
-    @property
-    @abstractmethod
-    def simpleName(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
-        pass
-
-    @property
-    @abstractmethod
-    def fileFilter(self) -> str:
-        '''returns a unique name that is prettified for visual display'''
-        pass
-
     @abstractmethod
     def read(self, filePath: Path) -> Scan:
         '''reads a scan dictionary from file'''
@@ -79,18 +67,6 @@ class ScanFileReader(ABC):
 
 class ScanFileWriter(ABC):
     '''interface for plugins that write scan files'''
-
-    @property
-    @abstractmethod
-    def simpleName(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
-        pass
-
-    @property
-    @abstractmethod
-    def fileFilter(self) -> str:
-        '''returns a unique name that is prettified for visual display'''
-        pass
 
     @abstractmethod
     def write(self, filePath: Path, scan: Scan) -> None:

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Optional, TypeAlias
 import logging
@@ -30,52 +30,46 @@ class ProbeRepositoryItemFactory:
         self._apparatus = apparatus
         self._sizer = sizer
         self._fileReaderChooser = fileReaderChooser
-        self._initializersBySimpleName: Mapping[str, InitializerFactory] = {
-            FromFileProbeInitializer.SIMPLE_NAME: self.createItemFromFile,
-            DiskProbeInitializer.SIMPLE_NAME: self.createDiskItem,
-            FresnelZonePlateProbeInitializer.SIMPLE_NAME: self.createFZPItem,
-            SuperGaussianProbeInitializer.SIMPLE_NAME: self.createSuperGaussianItem,
-        }
-        self._initializersByDisplayName: Mapping[str, InitializerFactory] = {
-            FromFileProbeInitializer.DISPLAY_NAME: self.createItemFromFile,
-            DiskProbeInitializer.DISPLAY_NAME: self.createDiskItem,
-            FresnelZonePlateProbeInitializer.DISPLAY_NAME: self.createFZPItem,
-            SuperGaussianProbeInitializer.DISPLAY_NAME: self.createSuperGaussianItem,
-        }
+        self._initializers = PluginChooser[InitializerFactory]()
+        self._initializers.registerPlugin(
+            self.createItemFromFile,
+            simpleName=FromFileProbeInitializer.SIMPLE_NAME,
+            displayName=FromFileProbeInitializer.DISPLAY_NAME,
+        )
+        self._initializers.registerPlugin(
+            self.createDiskItem,
+            simpleName=DiskProbeInitializer.SIMPLE_NAME,
+            displayName=DiskProbeInitializer.DISPLAY_NAME,
+        )
+        self._initializers.registerPlugin(
+            self.createFZPItem,
+            simpleName=FresnelZonePlateProbeInitializer.SIMPLE_NAME,
+            displayName=FresnelZonePlateProbeInitializer.DISPLAY_NAME,
+        )
+        self._initializers.registerPlugin(
+            self.createSuperGaussianItem,
+            simpleName=SuperGaussianProbeInitializer.SIMPLE_NAME,
+            displayName=SuperGaussianProbeInitializer.DISPLAY_NAME,
+        )
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
     def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.getCurrentDisplayName()
+        return self._fileReaderChooser.currentPlugin.displayName
 
-    def createFileInitializer(self,
-                              filePath: Path,
-                              *,
-                              simpleFileType: str = '',
-                              displayFileType: str = '') -> Optional[FromFileProbeInitializer]:
-        if simpleFileType:
-            self._fileReaderChooser.setFromSimpleName(simpleFileType)
-        elif displayFileType:
-            self._fileReaderChooser.setFromDisplayName(displayFileType)
-        else:
-            logger.error('Refusing to create file initializer without file type!')
-            return None
+    def createFileInitializer(self, filePath: Path,
+                              fileType: str) -> Optional[FromFileProbeInitializer]:
+        self._fileReaderChooser.setCurrentPluginByName(fileType)
+        fileReader = self._fileReaderChooser.currentPlugin.strategy
+        return FromFileProbeInitializer(filePath, self._fileReaderChooser.currentPlugin.simpleName,
+                                        fileReader)
 
-        fileReader = self._fileReaderChooser.getCurrentStrategy()
-        return FromFileProbeInitializer(filePath, fileReader)
-
-    def openItemFromFile(self,
-                         filePath: Path,
-                         *,
-                         simpleFileType: str = '',
-                         displayFileType: str = '') -> Optional[ProbeRepositoryItem]:
+    def openItemFromFile(self, filePath: Path, fileType: str) -> Optional[ProbeRepositoryItem]:
         item: Optional[ProbeRepositoryItem] = None
 
         if filePath.is_file():
-            initializer = self.createFileInitializer(filePath,
-                                                     simpleFileType=simpleFileType,
-                                                     displayFileType=displayFileType)
+            initializer = self.createFileInitializer(filePath, fileType)
 
             if initializer is None:
                 logger.error('Refusing to create item without initializer!')
@@ -92,15 +86,12 @@ class ProbeRepositoryItemFactory:
                             array: ProbeArrayType,
                             *,
                             filePath: Optional[Path] = None,
-                            simpleFileType: str = '',
-                            displayFileType: str = '') -> ProbeRepositoryItem:
+                            fileType: str = '') -> ProbeRepositoryItem:
         item = ProbeRepositoryItem(self._rng, nameHint, array)
 
         if filePath is not None:
             if filePath.is_file():
-                initializer = self.createFileInitializer(filePath,
-                                                         simpleFileType=simpleFileType,
-                                                         displayFileType=displayFileType)
+                initializer = self.createFileInitializer(filePath, fileType)
 
                 if initializer is None:
                     logger.error('Refusing to add null initializer!')
@@ -114,7 +105,7 @@ class ProbeRepositoryItemFactory:
     def createItemFromFile(self) -> Optional[ProbeRepositoryItem]:
         filePath = self._settings.inputFilePath.value
         fileType = self._settings.inputFileType.value
-        return self.openItemFromFile(filePath, simpleFileType=fileType)
+        return self.openItemFromFile(filePath, fileType)
 
     def createDiskItem(self) -> ProbeRepositoryItem:
         initializer = DiskProbeInitializer(self._sizer, self._apparatus)
@@ -135,28 +126,16 @@ class ProbeRepositoryItemFactory:
         return item
 
     def getInitializerDisplayNameList(self) -> Sequence[str]:
-        return [initializerName for initializerName in self._initializersByDisplayName]
+        return self._initializers.getDisplayNameList()
 
-    def createItemFromSimpleName(self, name: str) -> Optional[ProbeRepositoryItem]:
+    def createItemFromInitializerName(self, name: str) -> Optional[ProbeRepositoryItem]:
         item: Optional[ProbeRepositoryItem] = None
 
         try:
-            itemFactory = self._initializersBySimpleName[name]
+            plugin = self._initializers[name]
         except KeyError:
             logger.error(f'Unknown probe initializer \"{name}\"!')
         else:
-            item = itemFactory()
-
-        return item
-
-    def createItemFromDisplayName(self, name: str) -> Optional[ProbeRepositoryItem]:
-        item: Optional[ProbeRepositoryItem] = None
-
-        try:
-            itemFactory = self._initializersByDisplayName[name]
-        except KeyError:
-            logger.error(f'Unknown probe initializer \"{name}\"!')
-        else:
-            item = itemFactory()
+            item = plugin.strategy()
 
         return item

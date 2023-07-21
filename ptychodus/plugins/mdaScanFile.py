@@ -346,14 +346,6 @@ class MDAFile:
 class MDAScanFileReader(ScanFileReader):
     MICRONS_TO_METERS: Final[float] = 1.e-6
 
-    @property
-    def simpleName(self) -> str:
-        return 'MDA'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'EPICS MDA Files (*.mda)'
-
     def read(self, filePath: Path) -> Scan:
         pointList = list()
 
@@ -373,7 +365,11 @@ class MDAScanFileReader(ScanFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(MDAScanFileReader())
+    registry.scanFileReaders.registerPlugin(
+        MDAScanFileReader(),
+        simpleName='MDA',
+        displayName='EPICS MDA Files (*.mda)',
+    )
 
 
 if __name__ == '__main__':

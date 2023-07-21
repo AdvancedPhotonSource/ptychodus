@@ -25,13 +25,10 @@ class ScanAPI:
 
     def insertItemIntoRepositoryFromFile(self,
                                          filePath: Path,
+                                         fileType: str,
                                          *,
-                                         simpleFileType: str = '',
-                                         displayFileType: str = '',
                                          selectItem: bool = False) -> Optional[str]:
-        item = self._factory.openItemFromFile(filePath,
-                                              simpleFileType=simpleFileType,
-                                              displayFileType=displayFileType)
+        item = self._factory.openItemFromFile(filePath, fileType)
 
         if item is None:
             logger.error(f'Failed to open scan from \"{filePath}\"!')
@@ -50,30 +47,21 @@ class ScanAPI:
                                          scan: Scan,
                                          *,
                                          filePath: Optional[Path] = None,
-                                         simpleFileType: str = '',
-                                         displayFileType: str = '',
+                                         fileType: str = '',
                                          replaceItem: bool = False,
                                          selectItem: bool = False) -> Optional[str]:
-        item = self._factory.createItemFromScan(name,
-                                                scan,
-                                                filePath=filePath,
-                                                simpleFileType=simpleFileType,
-                                                displayFileType=displayFileType)
+        item = self._factory.createItemFromScan(name, scan, filePath=filePath, fileType=fileType)
         itemName = self._repository.insertItem(item, name=name if replaceItem else None)
 
         if itemName is None:
-            logger.error(f'Failed to insert tabular scan \"{name}\"!')
+            logger.error(f'Failed to insert scan \"{name}\"!')
         elif selectItem:
             self._scan.selectItem(itemName)
 
         return itemName
 
-    def insertItemIntoRepositoryFromInitializerSimpleName(self, name: str) -> Optional[str]:
-        item = self._factory.createItemFromSimpleName(name)
-        return self._repository.insertItem(item)
-
-    def insertItemIntoRepositoryFromInitializerDisplayName(self, name: str) -> Optional[str]:
-        item = self._factory.createItemFromDisplayName(name)
+    def insertItemIntoRepositoryFromInitializerName(self, name: str) -> Optional[str]:
+        item = self._factory.createItemFromInitializerName(name)
         return self._repository.insertItem(item)
 
     def getSelectedScan(self) -> Optional[Scan]:

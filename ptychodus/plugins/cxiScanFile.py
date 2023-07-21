@@ -11,14 +11,6 @@ logger = logging.getLogger(__name__)
 
 class CXIScanFileReader(ScanFileReader):
 
-    @property
-    def simpleName(self) -> str:
-        return 'CXI'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Coherent X-ray Imaging Files (*.cxi)'
-
     def read(self, filePath: Path) -> Scan:
         pointList = list()
 
@@ -41,4 +33,8 @@ class CXIScanFileReader(ScanFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(CXIScanFileReader())
+    registry.scanFileReaders.registerPlugin(
+        CXIScanFileReader(),
+        simpleName='CXI',
+        displayName='Coherent X-ray Imaging Files (*.cxi)',
+    )

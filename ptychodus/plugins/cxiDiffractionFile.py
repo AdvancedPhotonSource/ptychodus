@@ -19,14 +19,6 @@ class CXIDiffractionFileReader(DiffractionFileReader):
         self._dataPath = '/entry_1/data_1/data'
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
-    @property
-    def simpleName(self) -> str:
-        return 'CXI'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Coherent X-ray Imaging Files (*.cxi)'
-
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
@@ -81,4 +73,8 @@ class CXIDiffractionFileReader(DiffractionFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(CXIDiffractionFileReader())
+    registry.diffractionFileReaders.registerPlugin(
+        CXIDiffractionFileReader(),
+        simpleName='CXI',
+        displayName='Coherent X-ray Imaging Files (*.cxi)',
+    )

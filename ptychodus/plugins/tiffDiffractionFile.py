@@ -53,14 +53,6 @@ class TiffDiffractionPatternArray(DiffractionPatternArray):
 
 class TiffDiffractionFileReader(DiffractionFileReader):
 
-    @property
-    def simpleName(self) -> str:
-        return 'TIFF'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Tagged Image File Format Files (*.tif *.tiff)'
-
     def _getFileSeries(self, filePath: Path) -> tuple[Mapping[int, Path], str]:
         filePathDict: dict[int, Path] = dict()
 
@@ -114,7 +106,11 @@ class TiffDiffractionFileReader(DiffractionFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(TiffDiffractionFileReader())
+    registry.diffractionFileReaders.registerPlugin(
+        TiffDiffractionFileReader(),
+        simpleName='TIFF',
+        displayName='Tagged Image File Format Files (*.tif *.tiff)',
+    )
 
 
 if __name__ == '__main__':

@@ -102,8 +102,8 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self.reinitialize()
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
-        self._indexFilter.selectFilterFromSimpleName(settings.indexFilter.value)
-        self._transform.selectTransformFromSimpleName(settings.transform.value)
+        self._indexFilter.selectFilterByName(settings.indexFilter.value)
+        self._transform.selectTransformByName(settings.transform.value)
         self._jitterRadiusInMeters = settings.jitterRadiusInMeters.value
         self._centroidX = settings.centroidXInMeters.value
         self._centroidY = settings.centroidYInMeters.value
@@ -183,7 +183,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         return self._indexFilter.displayName
 
     def setIndexFilterByName(self, name: str) -> None:
-        self._indexFilter.selectFilterFromDisplayName(name)
+        self._indexFilter.selectFilterByName(name)
 
     def getTransformNameList(self) -> Sequence[str]:
         return self._transform.getSelectableTransforms()
@@ -192,7 +192,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         return self._transform.displayName
 
     def setTransformByName(self, name: str) -> None:
-        self._transform.selectTransformFromDisplayName(name)
+        self._transform.selectTransformByName(name)
 
     def getJitterRadiusInMeters(self) -> Decimal:
         '''gets the jitter radius'''

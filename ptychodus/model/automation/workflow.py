@@ -45,10 +45,8 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
             if digits != 0:
                 break
 
-        self._dataAPI.loadDiffractionDataset(diffractionFilePath, simpleFileType='HDF5')
-        self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
-                                                       simpleFileType='MDA',
-                                                       selectItem=True)
+        self._dataAPI.loadDiffractionDataset(diffractionFilePath, fileType='HDF5')
+        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='MDA', selectItem=True)
         # NOTE reuse probe
         self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)
@@ -70,10 +68,8 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         flowLabel = f'scan{scanID}'
 
         diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
-        self._dataAPI.loadDiffractionDataset(diffractionFilePath, simpleFileType='NeXus')
-        self._scanAPI.insertItemIntoRepositoryFromFile(filePath,
-                                                       simpleFileType='CSV',
-                                                       selectItem=True)
+        self._dataAPI.loadDiffractionDataset(diffractionFilePath, fileType='NeXus')
+        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='CSV', selectItem=True)
         # NOTE reuse probe
         self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)

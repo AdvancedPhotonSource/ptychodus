@@ -6,7 +6,7 @@ import logging
 from ...api.geometry import Interval
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
-from ...api.plugins import PluginChooser, PluginEntry
+from ...api.plugins import PluginChooser
 from .colorizer import Colorizer
 from .displayRange import DisplayRange
 from .mappedColorizer import MappedColorizer
@@ -24,7 +24,7 @@ class ImagePresenter(Observable, Observer):
         self._array = array
         self._displayRange = displayRange
         self._colorizerChooser = colorizerChooser
-        self._image = colorizerChooser.getCurrentStrategy()()
+        self._image = colorizerChooser.currentPlugin.strategy()
 
     @classmethod
     def createInstance(cls, array: VisualizationArray, displayRange: DisplayRange,
@@ -32,7 +32,7 @@ class ImagePresenter(Observable, Observer):
         presenter = cls(array, displayRange, colorizerChooser)
         displayRange.addObserver(presenter)
         colorizerChooser.addObserver(presenter)
-        colorizerChooser.getCurrentStrategy().addObserver(presenter)
+        colorizerChooser.currentPlugin.strategy.addObserver(presenter)
         return presenter
 
     # TODO do this via dependency injection
@@ -44,17 +44,17 @@ class ImagePresenter(Observable, Observer):
 
     @property
     def _colorizer(self) -> Colorizer:
-        return self._colorizerChooser.getCurrentStrategy()
+        return self._colorizerChooser.currentPlugin.strategy
 
     def getColorizerNameList(self) -> Sequence[str]:
         return self._colorizerChooser.getDisplayNameList()
 
     def getColorizerName(self) -> str:
-        return self._colorizerChooser.getCurrentDisplayName()
+        return self._colorizerChooser.currentPlugin.displayName
 
     def setColorizerByName(self, name: str) -> None:
         self._colorizer.removeObserver(self)
-        self._colorizerChooser.setFromDisplayName(name)
+        self._colorizerChooser.setCurrentPluginByName(name)
         self._colorizer.addObserver(self)
 
     def getScalarTransformationNameList(self) -> Sequence[str]:
@@ -132,22 +132,18 @@ class ImagePresenter(Observable, Observer):
 
 class ImageCore:
 
-    @staticmethod
-    def _createColorizerPlugin(colorizer: Colorizer) -> PluginEntry[Colorizer]:
-        return PluginEntry[Colorizer](simpleName=colorizer.name,
-                                      displayName=colorizer.name,
-                                      strategy=colorizer)
-
     def __init__(self, transformChooser: PluginChooser[ScalarTransformation]) -> None:
         self._array = VisualizationArray()
         self._displayRange = DisplayRange()
+        self._colorizerChooser = PluginChooser[Colorizer]()
 
-        colorizerArgs = (self._array, self._displayRange, transformChooser)
-        colorizerList: list[Colorizer] = list()
-        colorizerList.extend(CylindricalColorModelColorizer.createColorizerList(*colorizerArgs))
-        colorizerList.extend(MappedColorizer.createColorizerList(*colorizerArgs))
+        cargs = (self._array, self._displayRange, transformChooser)
 
-        self._colorizerChooser = PluginChooser[Colorizer].createFromList(
-            [ImageCore._createColorizerPlugin(colorizer) for colorizer in colorizerList])
+        for colorizer in CylindricalColorModelColorizer.createColorizerVariants(*cargs):
+            self._colorizerChooser.registerPlugin(colorizer, simpleName=colorizer.name)
+
+        for colorizer in MappedColorizer.createColorizerVariants(*cargs):
+            self._colorizerChooser.registerPlugin(colorizer, simpleName=colorizer.name)
+
         self.presenter = ImagePresenter.createInstance(self._array, self._displayRange,
                                                        self._colorizerChooser)

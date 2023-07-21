@@ -7,18 +7,13 @@ import numpy
 
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable
-from ...api.plugins import PluginChooser, PluginEntry
+from ...api.plugins import PluginChooser
 from .colorizer import Colorizer
 from .displayRange import DisplayRange
 from .visarray import VisualizationArray
 
 
 class CylindricalColorModel(ABC):
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        pass
 
     @abstractmethod
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
@@ -27,19 +22,11 @@ class CylindricalColorModel(ABC):
 
 class HSVSaturationColorModel(CylindricalColorModel):
 
-    @property
-    def name(self) -> str:
-        return 'HSV Saturation'
-
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, x, 1.0), 1.0
 
 
 class HSVValueColorModel(CylindricalColorModel):
-
-    @property
-    def name(self) -> str:
-        return 'HSV Value'
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, x), 1.0
@@ -47,19 +34,11 @@ class HSVValueColorModel(CylindricalColorModel):
 
 class HSVAlphaColorModel(CylindricalColorModel):
 
-    @property
-    def name(self) -> str:
-        return 'HSV Alpha'
-
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, 1.0), x
 
 
 class HLSLightnessColorModel(CylindricalColorModel):
-
-    @property
-    def name(self) -> str:
-        return 'HLS Lightness'
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, x, 1.0), 1.0
@@ -67,19 +46,11 @@ class HLSLightnessColorModel(CylindricalColorModel):
 
 class HLSSaturationColorModel(CylindricalColorModel):
 
-    @property
-    def name(self) -> str:
-        return 'HLS Saturation'
-
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, x), 1.0
 
 
 class HLSAlphaColorModel(CylindricalColorModel):
-
-    @property
-    def name(self) -> str:
-        return 'HLS Alpha'
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, 1.0), x
@@ -95,24 +66,41 @@ class CylindricalColorModelColorizer(Colorizer):
         self._variantChooser.addObserver(self)
 
     @classmethod
-    def createColorizerList(
+    def createColorizerVariants(
             cls, array: VisualizationArray, displayRange: DisplayRange,
             transformChooser: PluginChooser[ScalarTransformation]) -> Sequence[Colorizer]:
-        modelList = [
+        variantChooser = PluginChooser[CylindricalColorModel]()
+        variantChooser.registerPlugin(
             HSVSaturationColorModel(),
+            simpleName='HSV-S',
+            displayName='HSV Saturation',
+        )
+        variantChooser.registerPlugin(
             HSVValueColorModel(),
+            simpleName='HSV-V',
+            displayName='HSV Value',
+        )
+        variantChooser.registerPlugin(
             HSVAlphaColorModel(),
+            simpleName='HSV-A',
+            displayName='HSV Alpha',
+        )
+        variantChooser.registerPlugin(
             HLSLightnessColorModel(),
+            simpleName='HLS-L',
+            displayName='HLS Lightness',
+        )
+        variantChooser.registerPlugin(
             HLSSaturationColorModel(),
+            simpleName='HLS-S',
+            displayName='HLS Saturation',
+        )
+        variantChooser.registerPlugin(
             HLSAlphaColorModel(),
-        ]
-        variantList = [
-            PluginEntry[CylindricalColorModel](simpleName=model.name,
-                                               displayName=model.name,
-                                               strategy=model) for model in modelList
-        ]
-        variantChooser = PluginChooser[CylindricalColorModel].createFromList(variantList)
-        variantChooser.setFromSimpleName('HSV Value')
+            simpleName='HLS-A',
+            displayName='HLS Alpha',
+        )
+        variantChooser.setCurrentPluginByName('HSV-V')
         return [cls(array, displayRange, transformChooser, variantChooser)]
 
     @property
@@ -123,13 +111,13 @@ class CylindricalColorModelColorizer(Colorizer):
         return self._variantChooser.getDisplayNameList()
 
     def getVariantName(self) -> str:
-        return self._variantChooser.getCurrentDisplayName()
+        return self._variantChooser.currentPlugin.displayName
 
     def setVariantByName(self, name: str) -> None:
-        self._variantChooser.setFromDisplayName(name)
+        self._variantChooser.setCurrentPluginByName(name)
 
     def getDataArray(self) -> RealArrayType:
-        transform = self._transformChooser.getCurrentStrategy()
+        transform = self._transformChooser.currentPlugin.strategy
         values = self._array.getAmplitude()
         return transform(values)
 
@@ -141,7 +129,7 @@ class CylindricalColorModelColorizer(Colorizer):
                          vmax=float(self._displayRange.getUpper()),
                          clip=False)
 
-        model = numpy.vectorize(self._variantChooser.getCurrentStrategy())
+        model = numpy.vectorize(self._variantChooser.currentPlugin.strategy)
         h = (self._array.getPhaseInRadians() + numpy.pi) / (2 * numpy.pi)
         x = norm(self.getDataArray())
         r, g, b, a = model(h, x)

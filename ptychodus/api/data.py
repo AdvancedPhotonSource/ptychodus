@@ -145,18 +145,6 @@ class SimpleDiffractionDataset(DiffractionDataset):
 class DiffractionFileReader(ABC):
     '''interface for plugins that read diffraction files'''
 
-    @property
-    @abstractmethod
-    def simpleName(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
-        pass
-
-    @property
-    @abstractmethod
-    def fileFilter(self) -> str:
-        '''returns a unique name that is prettified for visual display'''
-        pass
-
     @abstractmethod
     def read(self, filePath: Path) -> DiffractionDataset:
         '''reads a diffraction dataset from file'''
