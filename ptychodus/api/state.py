@@ -39,6 +39,8 @@ class ProbeStateData:
 
 @dataclass(frozen=True)
 class ObjectStateData:
+    centerXInMeters: float
+    centerYInMeters: float
     array: ObjectArrayType
 
 
@@ -69,10 +71,12 @@ class StateDataRegistry:
     PIXEL_SIZE_Y: Final[str] = 'pixelSizeYInMeters'
     DATA_INDEXES: Final[str] = 'dataIndexes'
     DATA_ARRAY: Final[str] = 'data'
-    SCAN_INDEXES: Final[str] = 'scanIndexes'
-    SCAN_X: Final[str] = 'scanXInMeters'
-    SCAN_Y: Final[str] = 'scanYInMeters'
+    POSITION_INDEXES: Final[str] = 'positionIndexes'
+    POSITION_X: Final[str] = 'positionXInMeters'
+    POSITION_Y: Final[str] = 'positionYInMeters'
     PROBE_ARRAY: Final[str] = 'probe'
+    OBJECT_CENTER_X: Final[str] = 'objectCenterXInMeters'
+    OBJECT_CENTER_Y: Final[str] = 'objectCenterYInMeters'
     OBJECT_ARRAY: Final[str] = 'object'
 
     def __init__(self, dataCore: StatefulCore[DiffractionPatternStateData],
@@ -100,9 +104,9 @@ class StateDataRegistry:
 
         try:
             scanState = ScanStateData(
-                indexes=stateData[self.SCAN_INDEXES],
-                positionXInMeters=stateData[self.SCAN_X],
-                positionYInMeters=stateData[self.SCAN_Y],
+                indexes=stateData[self.POSITION_INDEXES],
+                positionXInMeters=stateData[self.POSITION_X],
+                positionYInMeters=stateData[self.POSITION_Y],
             )
         except KeyError:
             logger.error('Failed to restore scan state.')
@@ -110,16 +114,22 @@ class StateDataRegistry:
             self._scanCore.setStateData(scanState, filePath)
 
         try:
-            probeState = ProbeStateData(pixelSizeXInMeters=float(stateData[self.PIXEL_SIZE_X]),
-                                        pixelSizeYInMeters=float(stateData[self.PIXEL_SIZE_Y]),
-                                        array=stateData[self.PROBE_ARRAY])
+            probeState = ProbeStateData(
+                pixelSizeXInMeters=float(stateData[self.PIXEL_SIZE_X]),
+                pixelSizeYInMeters=float(stateData[self.PIXEL_SIZE_Y]),
+                array=stateData[self.PROBE_ARRAY],
+            )
         except KeyError:
             logger.error('Failed to restore probe state.')
         else:
             self._probeCore.setStateData(probeState, filePath)
 
         try:
-            objectState = ObjectStateData(array=stateData[self.OBJECT_ARRAY])
+            objectState = ObjectStateData(
+                centerXInMeters=float(stateData[self.OBJECT_CENTER_X]),
+                centerYInMeters=float(stateData[self.OBJECT_CENTER_Y]),
+                array=stateData[self.OBJECT_ARRAY],
+            )
         except KeyError:
             logger.error('Failed to restore object state.')
         else:
@@ -136,9 +146,9 @@ class StateDataRegistry:
             stateData[self.DATA_ARRAY] = dataState.array
 
         scanState = self._scanCore.getStateData()
-        stateData[self.SCAN_INDEXES] = scanState.indexes
-        stateData[self.SCAN_X] = scanState.positionXInMeters
-        stateData[self.SCAN_Y] = scanState.positionYInMeters
+        stateData[self.POSITION_INDEXES] = scanState.indexes
+        stateData[self.POSITION_X] = scanState.positionXInMeters
+        stateData[self.POSITION_Y] = scanState.positionYInMeters
 
         probeState = self._probeCore.getStateData()
         stateData[self.PIXEL_SIZE_X] = numpy.array(probeState.pixelSizeXInMeters)

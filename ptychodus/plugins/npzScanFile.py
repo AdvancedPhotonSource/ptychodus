@@ -13,11 +13,11 @@ class NPZScanFileReader(ScanFileReader):
         pointMap: dict[int, ScanPoint] = dict()
 
         npz = numpy.load(filePath)
-        scanIndexes = npz[StateDataRegistry.SCAN_INDEXES]
-        scanXInMeters = npz[StateDataRegistry.SCAN_X]
-        scanYInMeters = npz[StateDataRegistry.SCAN_Y]
+        positionIndexes = npz[StateDataRegistry.POSITION_INDEXES]
+        positionXInMeters = npz[StateDataRegistry.POSITION_X]
+        positionYInMeters = npz[StateDataRegistry.POSITION_Y]
 
-        for index, x, y in zip(scanIndexes, scanXInMeters, scanYInMeters):
+        for index, x, y in zip(positionIndexes, positionXInMeters, positionYInMeters):
             pointMap[index] = ScanPoint(x, y)
 
         return TabularScan(pointMap)

@@ -190,7 +190,11 @@ class ObjectCore(StatefulCore[ObjectStateData]):
         self.presenter = ObjectPresenter.createInstance(self.sizer, self._object, self.objectAPI)
 
     def getStateData(self) -> ObjectStateData:
+        centerInMeters = self._sizer.getMidpointInMeters()
+
         return ObjectStateData(
+            centerXInMeters=centerInMeters.x,
+            centerYInMeters=centerInMeters.y,
             array=self.objectAPI.getSelectedObjectArray(),  # FIXME try/except
         )
 

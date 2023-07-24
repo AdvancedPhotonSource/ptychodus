@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
@@ -7,6 +8,7 @@ import logging
 import sys
 import typing
 import xdrlib
+import yaml
 
 import numpy
 
@@ -112,6 +114,15 @@ class MDAHeader:
     def has_extra_pvs(self) -> bool:
         return (self.extra_pvs_offset > 0)
 
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'version': self.version,
+            'scan_number': self.scan_number,
+            'dimensions': self.dimensions,
+            'is_regular': self.is_regular,
+            'extra_pvs_offset': self.extra_pvs_offset,
+        }
+
 
 @dataclass(frozen=True)
 class MDAScanHeader:
@@ -133,6 +144,14 @@ class MDAScanHeader:
             lower_scan_offsets = unpacker.unpack_farray(npts, unpacker.unpack_int)
 
         return cls(rank, npts, cpt, lower_scan_offsets)
+
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'rank': self.rank,
+            'num_requested_points': self.num_requested_points,
+            'current_point': self.current_point,
+            'lower_scan_offsets': self.lower_scan_offsets,
+        }
 
 
 @dataclass(frozen=True)
@@ -160,6 +179,18 @@ class MDAScanPositionerInfo:
         return cls(number, name, description, step_mode, unit, readback_name, readback_description,
                    readback_unit)
 
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'number': self.number,
+            'name': self.name,
+            'description': self.description,
+            'step_mode': self.step_mode,
+            'unit': self.unit,
+            'readback_name': self.readback_name,
+            'readback_description': self.readback_description,
+            'readback_unit': self.readback_unit,
+        }
+
 
 @dataclass(frozen=True)
 class MDAScanDetectorInfo:
@@ -176,6 +207,14 @@ class MDAScanDetectorInfo:
         unit = read_counted_string_from_buffer(fp)
         return cls(number, name, description, unit)
 
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'number': self.number,
+            'name': self.name,
+            'description': self.description,
+            'unit': self.unit,
+        }
+
 
 @dataclass(frozen=True)
 class MDAScanTriggerInfo:
@@ -189,6 +228,13 @@ class MDAScanTriggerInfo:
         name = read_counted_string_from_buffer(fp)
         command = read_float_from_buffer(fp)
         return cls(number, name, command)
+
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'number': self.number,
+            'name': self.name,
+            'command': self.command,
+        }
 
 
 @dataclass(frozen=True)
@@ -227,6 +273,15 @@ class MDAScanInfo:
     def num_triggers(self) -> int:
         return len(self.trigger)
 
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'scan_name': self.scan_name,
+            'time_stamp': self.time_stamp,
+            'positioner': [pos.to_mapping() for pos in self.positioner],
+            'detector': [det.to_mapping() for det in self.detector],
+            'trigger': [tri.to_mapping() for tri in self.trigger],
+        }
+
 
 @dataclass(frozen=True)
 class MDAScanData:
@@ -250,6 +305,12 @@ class MDAScanData:
 
         return cls(readback_array, detector_array)
 
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'readback_array': f'{self.readback_array.dtype}{self.readback_array.shape}',
+            'detector_array': f'{self.detector_array.dtype}{self.detector_array.shape}',
+        }
+
 
 @dataclass(frozen=True)
 class MDAScan:
@@ -272,6 +333,17 @@ class MDAScan:
 
         return cls(header, info, data, lower_scans)
 
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'header': self.header.to_mapping(),
+            'info': self.info.to_mapping(),
+            'data': self.data.to_mapping(),
+            'lower_scans': [scan.to_mapping() for scan in self.lower_scans],
+        }
+
+    def __str__(self) -> str:
+        return yaml.safe_dump(self.to_mapping(), sort_keys=False)
+
 
 @dataclass(frozen=True)
 class MDAProcessVariable(Generic[T]):
@@ -280,6 +352,15 @@ class MDAProcessVariable(Generic[T]):
     epicsType: EpicsType
     unit: str
     value: T
+
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'name': self.name,
+            'description': self.description,
+            'epicsType': self.epicsType.name,
+            'unit': self.unit,
+            'value': self.value,
+        }
 
 
 @dataclass(frozen=True)
@@ -342,8 +423,42 @@ class MDAFile:
 
         return cls(header, scan, extra_pvs)
 
+    def to_mapping(self) -> Mapping[str, Any]:
+        return {
+            'header': self.header.to_mapping(),
+            'scan': self.scan.to_mapping(),
+            'extra_pvs': [pv.to_mapping() for pv in self.extra_pvs],
+        }
+
+    def __str__(self) -> str:
+        return yaml.safe_dump(self.to_mapping(), sort_keys=False)
+
 
 class MDAScanFileReader(ScanFileReader):
+    MICRONS_TO_METERS: Final[float] = 1.e-6
+
+    def read(self, filePath: Path) -> Scan:
+        pointList = list()
+
+        mdaFile = MDAFile.read(filePath)
+
+        yscan = mdaFile.scan
+        yarray = yscan.data.readback_array[0, :]
+
+        for y, xscan in zip(yarray, yscan.lower_scans):
+            xarray = xscan.data.readback_array[0, :]
+
+            for x in xarray:
+                point = ScanPoint(
+                    x=x * self.MICRONS_TO_METERS,
+                    y=y * self.MICRONS_TO_METERS,
+                )
+                pointList.append(point)
+
+        return TabularScan.createFromPointIterable(pointList)
+
+
+class HXNScanFileReader(ScanFileReader):
     MICRONS_TO_METERS: Final[float] = 1.e-6
 
     def read(self, filePath: Path) -> Scan:
@@ -369,6 +484,11 @@ def registerPlugins(registry: PluginRegistry) -> None:
         MDAScanFileReader(),
         simpleName='MDA',
         displayName='EPICS MDA Files (*.mda)',
+    )
+    registry.scanFileReaders.registerPlugin(
+        HXNScanFileReader(),
+        simpleName='HXN',
+        displayName='HXN Scan Files (*.mda)',
     )
 
 
