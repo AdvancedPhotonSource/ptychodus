@@ -69,6 +69,8 @@ class ProbeInitializer(ABC, Observable):
 
 class ProbeRepositoryItem(Observable, Observer):
     '''container for items that can be stored in a probe repository'''
+    SIMPLE_NAME: Final[str] = 'FromMemory'
+    DISPLAY_NAME: Final[str] = 'From Memory'
     MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self,
@@ -125,17 +127,21 @@ class ProbeRepositoryItem(Observable, Observer):
             logger.exception('Failed to reinitialize probe!')
             return
 
-        modeWeights = self._modeDecayType.getModeWeights(self._modeDecayRatio, self._numberOfModes)
         modeList: list[ProbeArrayType] = list()
 
         if initialProbe.ndim == 2:
             modeList.append(initialProbe)
-        elif initialProbe.ndim == 3:
+        elif initialProbe.ndim >= 3:
+            # TODO update when ready to support spatially-varying probes
+            while initialProbe.ndim > 3:
+                initialProbe = initialProbe[0, ...]
+
             for mode in initialProbe:
                 modeList.append(mode)
         else:
             raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
 
+        modeWeights = self._modeDecayType.getModeWeights(self._modeDecayRatio, self._numberOfModes)
         power0 = numpy.sum(numpy.square(numpy.abs(modeList[0])))
 
         for weight in modeWeights[1:]:
@@ -156,10 +162,10 @@ class ProbeRepositoryItem(Observable, Observer):
         self._setArray(array)
 
     def getInitializerSimpleName(self) -> str:
-        return 'FromMemory' if self._initializer is None else self._initializer.simpleName
+        return self.SIMPLE_NAME if self._initializer is None else self._initializer.simpleName
 
     def getInitializerDisplayName(self) -> str:
-        return 'From Memory' if self._initializer is None else self._initializer.displayName
+        return self.DISPLAY_NAME if self._initializer is None else self._initializer.displayName
 
     def getInitializer(self) -> Optional[ProbeInitializer]:
         '''returns the initializer'''
