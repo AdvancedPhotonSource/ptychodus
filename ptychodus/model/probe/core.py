@@ -17,6 +17,7 @@ from ..detector import Detector
 from .api import ProbeAPI
 from .apparatus import Apparatus, ApparatusPresenter
 from .factory import ProbeRepositoryItemFactory
+from .modes import MultimodalProbeFactory
 from .repository import ProbeRepository, ProbeRepositoryItem
 from .selected import ProbeRepositoryItemSettingsDelegate, SelectedProbe
 from .settings import ProbeSettings
@@ -171,8 +172,9 @@ class ProbeCore(StatefulCore[ProbeStateData]):
         self.apparatus = Apparatus.createInstance(detector, diffractionPatternSizer, self.settings)
         self.apparatusPresenter = ApparatusPresenter.createInstance(self.settings, self.apparatus)
 
-        self._factory = ProbeRepositoryItemFactory(rng, self.settings, self.apparatus, self.sizer,
-                                                   fileReaderChooser)
+        self._modesFactory = MultimodalProbeFactory(rng)
+        self._factory = ProbeRepositoryItemFactory(self._modesFactory, self.settings,
+                                                   self.apparatus, self.sizer, fileReaderChooser)
         self._repository = ProbeRepository()
         self._itemSettingsDelegate = ProbeRepositoryItemSettingsDelegate(
             self.settings, self._factory, self._repository)

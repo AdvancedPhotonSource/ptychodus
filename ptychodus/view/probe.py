@@ -103,6 +103,7 @@ class ProbeModesView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Additional Modes', parent)
         self.numberOfModesSpinBox = QSpinBox()
+        self.orthogonalizeModesCheckBox = QCheckBox('Orthogonalize Modes')
         self.polynomialDecayButton = QRadioButton('Polynomial')
         self.exponentialDecayButton = QRadioButton('Exponential')
         self.decayRatioSlider = DecimalSlider.createInstance(Qt.Horizontal)
@@ -117,6 +118,7 @@ class ProbeModesView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Number of Modes:', view.numberOfModesSpinBox)
+        layout.addRow(view.orthogonalizeModesCheckBox)
         layout.addRow('Decay Type:', decayButtonBox)
         layout.addRow('Decay Ratio:', view.decayRatioSlider)
         view.setLayout(layout)

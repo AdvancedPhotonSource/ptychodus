@@ -3,14 +3,13 @@ from pathlib import Path
 from typing import Optional, TypeAlias
 import logging
 
-import numpy
-
 from ...api.plugins import PluginChooser
 from ...api.probe import ProbeArrayType, ProbeFileReader
 from .apparatus import Apparatus
 from .disk import DiskProbeInitializer
 from .file import FromFileProbeInitializer
 from .fzp import FresnelZonePlateProbeInitializer
+from .modes import MultimodalProbeFactory
 from .repository import ProbeRepositoryItem
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
@@ -23,9 +22,10 @@ InitializerFactory: TypeAlias = Callable[[], Optional[ProbeRepositoryItem]]
 
 class ProbeRepositoryItemFactory:
 
-    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings, apparatus: Apparatus,
-                 sizer: ProbeSizer, fileReaderChooser: PluginChooser[ProbeFileReader]) -> None:
-        self._rng = rng
+    def __init__(self, modesFactory: MultimodalProbeFactory, settings: ProbeSettings,
+                 apparatus: Apparatus, sizer: ProbeSizer,
+                 fileReaderChooser: PluginChooser[ProbeFileReader]) -> None:
+        self._modesFactory = modesFactory
         self._settings = settings
         self._apparatus = apparatus
         self._sizer = sizer
@@ -74,7 +74,7 @@ class ProbeRepositoryItemFactory:
             if initializer is None:
                 logger.error('Refusing to create item without initializer!')
             else:
-                item = ProbeRepositoryItem(self._rng, filePath.stem)
+                item = ProbeRepositoryItem(self._modesFactory, filePath.stem)
                 item.setInitializer(initializer)
         else:
             logger.debug(f'Refusing to create item with invalid file path \"{filePath}\"')
@@ -87,7 +87,7 @@ class ProbeRepositoryItemFactory:
                             *,
                             filePath: Optional[Path] = None,
                             fileType: str = '') -> ProbeRepositoryItem:
-        item = ProbeRepositoryItem(self._rng, nameHint, array)
+        item = ProbeRepositoryItem(self._modesFactory, nameHint, array)
 
         if filePath is not None:
             if filePath.is_file():
@@ -109,19 +109,19 @@ class ProbeRepositoryItemFactory:
 
     def createDiskItem(self) -> ProbeRepositoryItem:
         initializer = DiskProbeInitializer(self._sizer, self._apparatus)
-        item = ProbeRepositoryItem(self._rng, initializer.simpleName)
+        item = ProbeRepositoryItem(self._modesFactory, initializer.simpleName)
         item.setInitializer(initializer)
         return item
 
     def createFZPItem(self) -> ProbeRepositoryItem:
         initializer = FresnelZonePlateProbeInitializer(self._sizer, self._apparatus)
-        item = ProbeRepositoryItem(self._rng, initializer.simpleName)
+        item = ProbeRepositoryItem(self._modesFactory, initializer.simpleName)
         item.setInitializer(initializer)
         return item
 
     def createSuperGaussianItem(self) -> ProbeRepositoryItem:
         initializer = SuperGaussianProbeInitializer(self._sizer, self._apparatus)
-        item = ProbeRepositoryItem(self._rng, initializer.simpleName)
+        item = ProbeRepositoryItem(self._modesFactory, initializer.simpleName)
         item.setInitializer(initializer)
         return item
 

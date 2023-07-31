@@ -28,6 +28,7 @@ class ProbeModesController(Observer):
         controller._syncModelToView()
 
         view.numberOfModesSpinBox.valueChanged.connect(item.setNumberOfModes)
+        view.orthogonalizeModesCheckBox.toggled.connect(item.setOrthogonalizeModesEnabled)
         view.exponentialDecayButton.toggled.connect(controller._exponentialDecayButtonToggled)
         view.decayRatioSlider.valueChanged.connect(item.setModeDecayRatio)
         item.addObserver(controller)
@@ -50,6 +51,7 @@ class ProbeModesController(Observer):
         self._view.numberOfModesSpinBox.setValue(self._item.getNumberOfModes())
         self._view.numberOfModesSpinBox.blockSignals(False)
 
+        self._view.orthogonalizeModesCheckBox.setChecked(self._item.isOrthogonalizeModesEnabled)
         self._syncDecayTypeModelToView()
         self._view.decayRatioSlider.setValueAndRange(self._item.getModeDecayRatio(),
                                                      self._item.getModeDecayRatioLimits())

@@ -17,6 +17,8 @@ class ProbeSettings(Observable, Observer):
         self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
             'ProbeEnergyInElectronVolts', '10000')
         self.numberOfModes = settingsGroup.createIntegerEntry('NumberOfModes', 1)
+        self.orthogonalizeModesEnabled = settingsGroup.createBooleanEntry(
+            'OrthogonalizeModesEnabled', True)
         self.modeDecayType = settingsGroup.createStringEntry('ModeDecayType', 'Polynomial')
         self.modeDecayRatio = settingsGroup.createRealEntry('ModeDecayRatio', '1')
 

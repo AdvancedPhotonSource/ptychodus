@@ -1,18 +1,38 @@
 from __future__ import annotations
+from typing import TypeAlias
 import logging
 
 from ptychonn import Trainer
 import numpy
 import numpy.typing
 
-from ...api.data import DiffractionPatternArrayType
 from ...api.image import ImageExtent
-from ...api.object import ObjectArrayType
 from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
 from .factory import PtychoNNModelFactory
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
+FloatArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]
+
 logger = logging.getLogger(__name__)
+
+
+class CircularBuffer:
+
+    def __init__(self, extent: ImageExtent, maxSize: int) -> None:
+        self._buffer: FloatArrayType = numpy.zeros((maxSize, *extent.shape), dtype=numpy.float32)
+        self._pos = 0
+        self._full = False
+
+    def append(self, array: FloatArrayType) -> None:
+        self._buffer[self._pos, :, :] = array
+        self._pos += 1
+
+        if self._pos == self._buffer.shape[0]:
+            self._pos = 0
+            self._full = True
+
+    def getBuffer(self) -> FloatArrayType:
+        return self._buffer if self._full else self._buffer[:self._pos]
 
 
 class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
@@ -23,30 +43,14 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
         self._settings = settings
         self._trainingSettings = trainingSettings
         self._factory = factory
-        self._diffractionPatternsArray: DiffractionPatternArrayType | None = None
-        self._objectPatchesArray: ObjectArrayType | None = None
+        self._diffractionPatternBuffer = CircularBuffer(ImageExtent(0, 0), 0)  # FIXME reset
+        self._objectPhasePatchBuffer = CircularBuffer(ImageExtent(0, 0), 0)  # FIXME reset
 
     @property
     def name(self) -> str:
         return 'TrainPhase'
 
-    def _appendDiffractionPatterns(self, array: DiffractionPatternArrayType) -> None:
-        # FIXME as float32
-        if self._diffractionPatternsArray is None:
-            self._diffractionPatternsArray = array
-        else:
-            self._diffractionPatternsArray = numpy.concatenate(
-                (self._diffractionPatternsArray, array))
-
-    def _appendObjectPatches(self, array: ObjectArrayType) -> None:
-        # FIXME save phase only numpy.angle(array) as float32
-        if self._objectPatchesArray is None:
-            self._objectPatchesArray = array
-        else:
-            self._objectPatchesArray = numpy.concatenate((self._objectPatchesArray, array))
-
     def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
-        objectPatchesList: list[ObjectArrayType] = list()
         objectInterpolator = parameters.objectInterpolator
 
         probeExtent = ImageExtent(
@@ -54,19 +58,20 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
             height=parameters.probeArray.shape[-2],
         )
 
-        for scanPoint in parameters.scan.values():
+        for scanIndex, scanPoint in parameters.scan.items():
             objectPatch = objectInterpolator.getPatch(scanPoint, probeExtent)
-            objectPatchesList.append(objectPatch.array)
+            objectPhasePatch = numpy.angle(objectPatch.array).astype(numpy.float32)
+            # FIXME save phase patch
+            self._objectPhasePatchBuffer.append(objectPhasePatch)
 
-        self._appendDiffractionPatterns(parameters.diffractionPatternArray)
-        self._appendObjectPatches(numpy.stack(objectPatchesList))
+        for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
+            self._diffractionPatternBuffer.append(pattern)
+
+        # FIXME train?
 
         return ReconstructOutput.createNull()
 
     def train(self) -> None:
-        if self._diffractionPatternsArray is None or self._objectPatchesArray is None:
-            raise ValueError('Missing training data!')
-
         outputPath = self._trainingSettings.outputPath.value \
                 if self._trainingSettings.saveTrainingArtifacts.value else None
 
@@ -77,12 +82,9 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
             output_suffix=self._trainingSettings.outputSuffix.value,
         )
 
-        X_train_full = self._diffractionPatternsArray.astype(numpy.float32)
-        Y_ph_train_full = numpy.angle(self._objectPatchesArray).astype(numpy.float32)
-
         trainer.setTrainingData(
-            X_train_full=X_train_full,
-            Y_ph_train_full=Y_ph_train_full,
+            X_train_full=self._diffractionPatternBuffer.getBuffer(),
+            Y_ph_train_full=self._objectPhasePatchBuffer.getBuffer(),
             valid_data_ratio=float(self._trainingSettings.validationSetFractionalSize.value),
         )
         trainer.setOptimizationParams(
@@ -101,6 +103,6 @@ class PtychoNNPhaseOnlyTrainer(TrainableReconstructor):
         )
         # TODO ptychonn.plot.plot_metrics(trainer.metrics)
 
-    def clear(self) -> None:
-        self._diffractionPatternsArray = None
-        self._objectPatchesArray = None
+    def clear(self) -> None:  # FIXME
+        self._diffractionPatternArray = None  # FIXME
+        self._objectPhasePatchArray = None  # FIXME

@@ -46,6 +46,9 @@ class Interval(Generic[T]):
     def copy(self) -> Interval[T]:
         return Interval[T](self.lower, self.upper)
 
+    def __contains__(self, item: T) -> bool:
+        return (self.lower <= item and item < self.upper)
+
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.lower}, {self.upper})'
 
