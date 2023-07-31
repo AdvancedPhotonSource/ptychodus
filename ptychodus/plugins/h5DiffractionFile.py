@@ -1,12 +1,6 @@
 from pathlib import Path
 import logging
 
-try:
-    # NOTE must import hdf5plugin before h5py
-    import hdf5plugin
-except ModuleNotFoundError:
-    pass
-
 import h5py
 
 from ptychodus.api.data import (DiffractionPatternArrayType, DiffractionDataset,

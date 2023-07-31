@@ -158,11 +158,11 @@ class ActiveReconstructor(Observable, Observer):
         else:
             logger.error('Reconstructor is not trainable!')
 
-    def clear(self) -> None:
+    def reset(self) -> None:
         reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            reconstructor.clear()
+            reconstructor.reset()
         else:
             logger.error('Reconstructor is not trainable!')
 

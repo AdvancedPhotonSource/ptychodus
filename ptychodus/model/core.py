@@ -8,6 +8,12 @@ from typing import overload, Optional
 import logging
 import sys
 
+try:
+    # NOTE must import hdf5plugin before h5py
+    import hdf5plugin
+except ModuleNotFoundError:
+    pass
+
 import h5py
 import numpy
 
@@ -46,6 +52,7 @@ def configureLogger() -> None:
     logger.info(f'Ptychodus {version("ptychodus")}')
     logger.info(f'NumPy {version("numpy")}')
     logger.info(f'Matplotlib {version("matplotlib")}')
+    logger.info(f'HDF5Plugin {version("hdf5plugin")}')
     logger.info(f'H5Py {version("h5py")}')
     logger.info(f'HDF5 {h5py.version.hdf5_version}')
 

@@ -34,6 +34,8 @@ class PtychoNNTrainingSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
+        self.maximumTrainingDatasetSize = settingsGroup.createIntegerEntry(
+            'MaximumTrainingDatasetSize', 100000)
         self.validationSetFractionalSize = settingsGroup.createRealEntry(
             'ValidationSetFractionalSize', '0.1')
         self.optimizationEpochsPerHalfCycle = settingsGroup.createIntegerEntry(

@@ -46,8 +46,8 @@ class ReconstructorPresenter(Observable, Observer):
     def train(self) -> None:
         self._activeReconstructor.train()
 
-    def clear(self) -> None:
-        self._activeReconstructor.clear()
+    def reset(self) -> None:
+        self._activeReconstructor.reset()
 
     def update(self, observable: Observable) -> None:
         if observable is self._activeReconstructor:

@@ -109,6 +109,10 @@ class ControllerCore:
 
         return controller
 
+    def showMainWindow(self, windowTitle: str) -> None:
+        self.view.setWindowTitle(windowTitle)
+        self.view.show()
+
     def swapCentralWidgets(self, action: QAction) -> None:
         index = action.data()
         self.view.parametersWidget.setCurrentIndex(index)
