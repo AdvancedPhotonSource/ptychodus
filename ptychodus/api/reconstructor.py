@@ -42,11 +42,15 @@ class Reconstructor(ABC):
         pass
 
     @abstractmethod
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         pass
 
 
 class TrainableReconstructor(Reconstructor):
+
+    @abstractmethod
+    def ingest(self, parameters: ReconstructInput) -> None:
+        pass
 
     @abstractmethod
     def train(self) -> None:
@@ -66,7 +70,7 @@ class NullReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return self._name
 
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput(
             scan=parameters.scan,
             probeArray=parameters.probeArray,
@@ -74,6 +78,9 @@ class NullReconstructor(TrainableReconstructor):
             objective=[[]],
             result=0,
         )
+
+    def ingest(self, parameters: ReconstructInput) -> None:
+        pass
 
     def train(self) -> None:
         pass

@@ -234,9 +234,20 @@ class ModelCore:
         self._stateDataRegistry.openStateData(filePath)
 
     def batchModeReconstruct(self, filePath: Path) -> int:
-        result = self._reconstructorCore.presenter.execute()
+        result = self._reconstructorCore.presenter.reconstruct()
         self.saveStateData(filePath, restartable=False)
         return result.result
+
+    def batchModeTrain(self, directoryPath: Path) -> float:
+        for filePath in directoryPath.glob('*.npz'):
+            # TODO sort by filePath.stat().st_mtime
+            self._stateDataRegistry.openStateData(filePath)
+            self._reconstructorCore.presenter.ingest()
+
+        self._reconstructorCore.presenter.train()
+
+        someQualityMetric = 0.  # TODO
+        return someQualityMetric
 
     @property
     def scanPresenter(self) -> ScanPresenter:

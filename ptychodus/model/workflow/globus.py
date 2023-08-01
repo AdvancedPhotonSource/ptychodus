@@ -209,7 +209,7 @@ class GlobusWorkflowThread(threading.Thread):
         if not action:
             try:
                 det = status['details']
-            except:
+            except Exception:
                 logger.exception('Unexpected flow status!')
                 logger.error(pformat(status))
             else:
@@ -271,7 +271,7 @@ class GlobusWorkflowThread(threading.Thread):
                     label=input_.flowLabel,
                     tags=['aps', 'ptychography'],
                 )
-            except:
+            except Exception:
                 logger.exception('Error running flow!')
             else:
                 logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')

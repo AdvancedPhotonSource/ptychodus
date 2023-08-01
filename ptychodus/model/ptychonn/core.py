@@ -178,14 +178,15 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
     def __init__(self, modelSettings: PtychoNNModelSettings,
-                 trainingSettings: PtychoNNTrainingSettings, trainPhase: TrainableReconstructor,
+                 trainingSettings: PtychoNNTrainingSettings,
+                 phaseOnlyTrainableReconstructor: TrainableReconstructor,
                  reconstructors: Sequence[Reconstructor]) -> None:
         super().__init__()
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self.modelPresenter = PtychoNNModelPresenter.createInstance(modelSettings)
         self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(
-            trainingSettings, trainPhase)
+            trainingSettings, phaseOnlyTrainableReconstructor)
         self._reconstructors = reconstructors
 
     @classmethod
@@ -193,27 +194,23 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
                        isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
         modelSettings = PtychoNNModelSettings.createInstance(settingsRegistry)
         trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
-        trainPhase: TrainableReconstructor = NullReconstructor('TrainPhase')
-        reconstructors: list[Reconstructor] = list()
+        phaseOnlyTrainableReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
+        reconstructors: list[TrainableReconstructor] = list()
 
         try:
-            from .factory import PtychoNNModelFactory
-            from .inference import PtychoNNPhaseOnlyReconstructor
-            from .training import PtychoNNPhaseOnlyTrainer
+            from .phaseOnly import PtychoNNPhaseOnlyTrainableReconstructor
         except ModuleNotFoundError:
             logger.info('PtychoNN not found.')
 
             if isDeveloperModeEnabled:
-                reconstructors.append(NullReconstructor('InferPhase'))
-                reconstructors.append(trainPhase)
+                reconstructors.append(phaseOnlyTrainableReconstructor)
         else:
-            factory = PtychoNNModelFactory(modelSettings)
-            inferPhase = PtychoNNPhaseOnlyReconstructor(modelSettings, factory, objectAPI)
-            trainPhase = PtychoNNPhaseOnlyTrainer(modelSettings, trainingSettings, factory)
-            reconstructors.append(inferPhase)
-            reconstructors.append(trainPhase)
+            phaseOnlyTrainableReconstructor = PtychoNNPhaseOnlyTrainableReconstructor(
+                modelSettings, trainingSettings, objectAPI)
+            reconstructors.append(phaseOnlyTrainableReconstructor)
 
-        return cls(modelSettings, trainingSettings, trainPhase, reconstructors)
+        return cls(modelSettings, trainingSettings, phaseOnlyTrainableReconstructor,
+                   reconstructors)
 
     @property
     def name(self) -> str:

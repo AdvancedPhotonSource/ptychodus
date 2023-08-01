@@ -45,7 +45,7 @@ class ActiveDiffractionDatasetBuilder:
                     self._arrayQueue.task_done()
             except queue.Empty:
                 pass
-            except:
+            except Exception:
                 logger.exception('Error while assembling array!')
 
     def _assemble(self, array: DiffractionPatternArray) -> None:
@@ -53,7 +53,7 @@ class ActiveDiffractionDatasetBuilder:
 
         try:
             data = array.getData()
-        except:
+        except Exception:
             metadata = self._dataset.getMetadata()
             data = numpy.zeros((0, 0, 0), dtype=metadata.patternDataType)
             state = DiffractionPatternState.MISSING

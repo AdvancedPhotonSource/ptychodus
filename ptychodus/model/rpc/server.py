@@ -54,7 +54,7 @@ class RPCSocketServer(socketserver.TCPServer):
 
         try:
             messageObject = MessageClass.fromDict(messageDict)
-        except:
+        except Exception:
             logger.debug(f'Exception while creating message object: \"{message}\"!')
             return 'FAILURE'
 

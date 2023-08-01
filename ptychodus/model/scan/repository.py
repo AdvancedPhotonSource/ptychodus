@@ -80,7 +80,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
 
         try:
             self._scan = self._initializer()
-        except:
+        except Exception:
             logger.exception('Failed to reinitialize scan!')
         else:
             self.notifyObservers()

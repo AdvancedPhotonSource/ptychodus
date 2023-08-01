@@ -211,7 +211,7 @@ class RegularizedPIEReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
@@ -235,7 +235,7 @@ class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
@@ -260,7 +260,7 @@ class ConjugateGradientReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
@@ -285,7 +285,7 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
@@ -308,7 +308,7 @@ class DifferenceMapReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value

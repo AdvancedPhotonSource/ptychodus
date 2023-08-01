@@ -5,14 +5,11 @@ import time
 
 import numpy
 
-from ...api.data import DiffractionPatternArrayType
-from ...api.object import ObjectInterpolator
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
-from ...api.probe import ProbeArrayType
 from ...api.reconstructor import (ReconstructInput, ReconstructOutput, Reconstructor,
                                   ReconstructorLibrary, TrainableReconstructor)
-from ...api.scan import Scan, TabularScan
+from ...api.scan import TabularScan
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
 from ..probe import ProbeAPI
@@ -59,7 +56,7 @@ class ActiveReconstructor(Observable, Observer):
     def getReconstructorList(self) -> Sequence[str]:
         return self._pluginChooser.getDisplayNameList()
 
-    def _prepareInputData(self, name: str) -> tuple[str, Scan, DiffractionPatternArrayType]:
+    def _prepareInputData(self) -> ReconstructInput:
         selectedScan = self._scanAPI.getSelectedScan()
 
         if selectedScan is None:
@@ -72,76 +69,40 @@ class ActiveReconstructor(Observable, Observer):
         diffractionPatternArray = numpy.take(self._diffractionDataset.getAssembledData(),
                                              commonIndexes,
                                              axis=0)
-
         pointMap = {index: selectedScan[index] for index in commonIndexes}
-        filteredScan = TabularScan(pointMap)
-        scanName = self._scanAPI.insertItemIntoRepositoryFromScan(name,
-                                                                  filteredScan,
-                                                                  selectItem=True)
 
-        if scanName is None:
-            raise ValueError('Failed to clone selected scan!')
-
-        return scanName, filteredScan, diffractionPatternArray
-
-    def _cloneSelectedProbe(self, name: str) -> tuple[str, ProbeArrayType]:
-        selectedProbe = self._probeAPI.getSelectedProbeArray()
-
-        if selectedProbe is None:
-            raise ValueError('No probe is selected!')
-
-        probeName = self._probeAPI.insertItemIntoRepositoryFromArray(name,
-                                                                     selectedProbe,
-                                                                     selectItem=True)
-
-        if probeName is None:
-            raise ValueError('Failed to clone selected probe!')
-
-        return probeName, selectedProbe
-
-    def _cloneSelectedObject(self, name: str) -> tuple[str, ObjectInterpolator]:
-        objectInterpolator = self._objectAPI.getSelectedObjectInterpolator()
-        objectName = self._objectAPI.insertItemIntoRepositoryFromArray(
-            name, objectInterpolator.getArray(), selectItem=True)
-
-        if objectName is None:
-            raise ValueError('Failed to clone selected object!')
-
-        return objectName, objectInterpolator
+        return ReconstructInput(
+            diffractionPatternArray=diffractionPatternArray,
+            scan=TabularScan(pointMap),
+            probeArray=self._probeAPI.getSelectedProbeArray(),
+            objectInterpolator=self._objectAPI.getSelectedObjectInterpolator(),
+        )
 
     @property
     def name(self) -> str:
         return self._pluginChooser.currentPlugin.displayName
 
-    def execute(self, name: str) -> ReconstructOutput:
-        scanName, scan, diffractionPatternArray = self._prepareInputData(name)
-        probeName, probeArray = self._cloneSelectedProbe(name)
-        objectName, objectInterpolator = self._cloneSelectedObject(name)
-
-        parameters = ReconstructInput(
-            diffractionPatternArray=diffractionPatternArray,
-            scan=scan,
-            probeArray=probeArray,
-            objectInterpolator=objectInterpolator,
-        )
+    def reconstruct(self, name: str) -> ReconstructOutput:
+        reconstructor = self._pluginChooser.currentPlugin.strategy
+        parameters = self._prepareInputData()
 
         tic = time.perf_counter()
-        result = self._pluginChooser.currentPlugin.strategy.execute(parameters)
+        result = reconstructor.reconstruct(parameters)
         toc = time.perf_counter()
         logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')
 
         if result.scan is not None:
-            self._scanAPI.insertItemIntoRepositoryFromScan(scanName, result.scan, replaceItem=True)
+            self._scanAPI.insertItemIntoRepositoryFromScan(name, result.scan, selectItem=True)
 
         if result.probeArray is not None:
-            self._probeAPI.insertItemIntoRepositoryFromArray(probeName,
+            self._probeAPI.insertItemIntoRepositoryFromArray(name,
                                                              result.probeArray,
-                                                             replaceItem=True)
+                                                             selectItem=True)
 
         if result.objectArray is not None:
-            self._objectAPI.insertItemIntoRepositoryFromArray(objectName,
+            self._objectAPI.insertItemIntoRepositoryFromArray(name,
                                                               result.objectArray,
-                                                              replaceItem=True)
+                                                              selectItem=True)
 
         return result
 
@@ -149,6 +110,18 @@ class ActiveReconstructor(Observable, Observer):
     def isTrainable(self) -> bool:
         reconstructor = self._pluginChooser.currentPlugin.strategy
         return isinstance(reconstructor, TrainableReconstructor)
+
+    def ingest(self) -> None:
+        reconstructor = self._pluginChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            parameters = self._prepareInputData()
+            tic = time.perf_counter()
+            reconstructor.ingest(parameters)
+            toc = time.perf_counter()
+            logger.info(f'Training time {toc - tic:.4f} seconds.')
+        else:
+            logger.error('Reconstructor is not trainable!')
 
     def train(self) -> None:
         reconstructor = self._pluginChooser.currentPlugin.strategy

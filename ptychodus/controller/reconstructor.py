@@ -93,8 +93,8 @@ class ReconstructorParametersController(Observer):
             objectPresenter.selectObject)
         view.reconstructorView.objectComboBox.setModel(controller._objectListModel)
 
-        view.reconstructorView.reconstructButton.clicked.connect(controller._execute)
-        view.reconstructorView.ingestButton.clicked.connect(controller._execute)
+        view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
+        view.reconstructorView.ingestButton.clicked.connect(controller._ingest)
         view.reconstructorView.trainButton.clicked.connect(controller._train)
         view.reconstructorView.resetButton.clicked.connect(presenter.reset)
 
@@ -119,11 +119,11 @@ class ReconstructorParametersController(Observer):
 
         self._view.stackedWidget.addWidget(widget)
 
-    def _execute(self) -> None:
+    def _reconstruct(self) -> None:
         result = ReconstructOutput.createNull()
 
         try:
-            result = self._presenter.execute()
+            result = self._presenter.reconstruct()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
@@ -131,6 +131,15 @@ class ReconstructorParametersController(Observer):
             self._plotPresenter.setEnumeratedYValues(result.objective)
 
         logger.info(result.result)  # TODO
+
+    def _ingest(self) -> None:
+        try:
+            self._presenter.ingest()
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.showException('Ingester', err)
+
+        logger.info('Ingestion complete.')
 
     def _train(self) -> None:
         try:
@@ -183,7 +192,6 @@ class ReconstructorParametersController(Observer):
             self._presenter.getReconstructor())
 
         isTrainable = self._presenter.isTrainable
-        self._view.reconstructorView.reconstructButton.setVisible(not isTrainable)
         self._view.reconstructorView.ingestButton.setVisible(isTrainable)
         self._view.reconstructorView.trainButton.setVisible(isTrainable)
         self._view.reconstructorView.resetButton.setVisible(isTrainable)

@@ -332,7 +332,7 @@ class ExtendedPIEReconstructor(Reconstructor):
     def name(self) -> str:
         return 'ePIE'
 
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput.createNull()  # TODO
 
 
@@ -356,7 +356,7 @@ class DifferenceMapReconstructor(Reconstructor):
     def name(self) -> str:
         return 'DM'
 
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput.createNull()  # TODO
 
 
@@ -371,7 +371,7 @@ class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
     def name(self) -> str:
         return 'MLs'
 
-    def execute(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput.createNull()  # TODO
 
 

@@ -20,8 +20,8 @@ class PtychoPyBasicView(QGroupBox):
         view.probeModesSpinBox.setToolTip(
             'Number of orthogonal probe modes to simulate partial incoherence of the beam')
         view.thresholdSpinBox.setToolTip(
-            'To remove noise from the diffraction patterns. Any count below this number will be set to zero in the diffraction data.'
-        )
+            'To remove noise from the diffraction patterns. '
+            'Any count below this number will be set to zero in the diffraction data.')
         view.iterationLimitSpinBox.setToolTip('Number of reconstruction iterations')
         view.timeLimitSpinBox.setToolTip(
             'Maximum allowed reconstruction time (in sec). Overrides iterations.')

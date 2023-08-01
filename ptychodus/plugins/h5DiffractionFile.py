@@ -101,8 +101,8 @@ class H5DiffractionFileTreeBuilder:
                                 itemDetails = value.decode()
                             else:
                                 stringInfo = h5py.check_string_dtype(value.dtype)
-                                itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"' if stringInfo \
-                                        else f'SCALAR {value.dtype} = {value}'
+                                itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"' \
+                                        if stringInfo else f'SCALAR {value.dtype} = {value}'
                         else:
                             itemDetails = f'{h5Item.shape} {h5Item.dtype}'
                 elif isinstance(h5Item, h5py.SoftLink):

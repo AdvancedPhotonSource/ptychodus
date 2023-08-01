@@ -89,7 +89,7 @@ class SettingsGroup(Observable, Observer):
                                     candidateEntry: SettingsEntry[Any]) -> SettingsEntry[Any]:
         for existingEntry in self._entryList:
             if existingEntry.name.casefold() == candidateEntry.name.casefold():
-                if type(existingEntry.value) != type(candidateEntry.value):
+                if not isinstance(candidateEntry, existingEntry.value.__class__):
                     raise TypeError('Attempted to duplicate settings entry with conflicting type.')
 
                 return existingEntry

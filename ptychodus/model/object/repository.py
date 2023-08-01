@@ -88,7 +88,7 @@ class ObjectRepositoryItem(Observable, Observer):
 
         try:
             self._array = self._initializer()
-        except:
+        except Exception:
             logger.exception('Failed to reinitialize object!')
         else:
             self.notifyObservers()

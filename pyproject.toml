@@ -30,6 +30,9 @@ module = [
 ]
 ignore_missing_imports = true
 
+[tool.ruff]
+line-length = 99
+
 [tool.yapf]
 based_on_style = "pep8"
 column_limit = 99

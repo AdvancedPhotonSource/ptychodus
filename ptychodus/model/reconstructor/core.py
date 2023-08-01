@@ -36,12 +36,15 @@ class ReconstructorPresenter(Observable, Observer):
     def setReconstructor(self, name: str) -> None:
         self._activeReconstructor.selectReconstructor(name)
 
-    def execute(self) -> ReconstructOutput:
-        return self._activeReconstructor.execute('Result')  # FIXME better name
+    def reconstruct(self) -> ReconstructOutput:
+        return self._activeReconstructor.reconstruct('Result')  # FIXME better name
 
     @property
     def isTrainable(self) -> bool:
         return self._activeReconstructor.isTrainable
+
+    def ingest(self) -> None:
+        self._activeReconstructor.ingest()
 
     def train(self) -> None:
         self._activeReconstructor.train()

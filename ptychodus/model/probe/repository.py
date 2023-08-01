@@ -102,7 +102,7 @@ class ProbeRepositoryItem(Observable, Observer):
 
         try:
             initialProbe = self._initializer()
-        except:
+        except Exception:
             logger.exception('Failed to reinitialize probe!')
             return
 
