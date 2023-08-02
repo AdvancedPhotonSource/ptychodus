@@ -96,7 +96,7 @@ class ReconstructorParametersController(Observer):
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
         view.reconstructorView.ingestButton.clicked.connect(controller._ingest)
         view.reconstructorView.trainButton.clicked.connect(controller._train)
-        view.reconstructorView.resetButton.clicked.connect(presenter.reset)
+        view.reconstructorView.resetButton.clicked.connect(controller._reset)
 
         controller._syncModelToView()
         controller._syncScanToView()
@@ -106,7 +106,7 @@ class ReconstructorParametersController(Observer):
         return controller
 
     def _addReconstructor(self, name: str) -> None:
-        backendName, reconstructorName = name.split('/')  # FIXME REDO
+        backendName, reconstructorName = name.split('/')  # TODO REDO
         self._view.reconstructorView.algorithmComboBox.addItem(
             name, self._view.reconstructorView.algorithmComboBox.count())
 
@@ -149,6 +149,15 @@ class ReconstructorParametersController(Observer):
             ExceptionDialog.showException('Trainer', err)
 
         logger.info('Training complete.')
+
+    def _reset(self) -> None:
+        try:
+            self._presenter.reset()
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.showException('Reset', err)
+
+        logger.info('Reset complete.')
 
     def _syncScanToView(self) -> None:
         self._view.reconstructorView.scanComboBox.blockSignals(True)

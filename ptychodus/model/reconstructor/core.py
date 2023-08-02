@@ -37,7 +37,8 @@ class ReconstructorPresenter(Observable, Observer):
         self._activeReconstructor.selectReconstructor(name)
 
     def reconstruct(self) -> ReconstructOutput:
-        return self._activeReconstructor.reconstruct('Result')  # FIXME better name
+        label = self._activeReconstructor.name
+        return self._activeReconstructor.reconstruct(label)
 
     @property
     def isTrainable(self) -> bool:

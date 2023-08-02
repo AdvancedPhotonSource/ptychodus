@@ -106,8 +106,8 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
 
         logger.debug('Inferring...')
         tester.setTestData(binnedData, batch_size=self._settings.batchSize.value)
-        objectPhasePatches = tester.predictTestData()
-        # FIXME npz_save_path: str = inferences_out_file: Optional[Path]
+        npzSavePath = None  # TODO self._trainingSettings.outputPath.value / 'preds.npz'
+        objectPhasePatches = tester.predictTestData(npz_save_path=npzSavePath)
 
         logger.debug('Stitching...')
         objectInterpolator = parameters.objectInterpolator

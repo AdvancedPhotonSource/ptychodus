@@ -33,7 +33,7 @@ class WorkflowExecutor:
         self.jobQueue: queue.Queue[WorkflowJob] = queue.Queue()
 
     def runFlow(self, flowLabel: str) -> None:
-        transferSyncLevel = 3  # Copy files if checksums of the source and destination do not match.
+        transferSyncLevel = 3  # Copy files if checksums of the source and destination mismatch
 
         inputDataPosixPath = self._inputDataLocator.getPosixPath() / flowLabel
         computeDataPosixPath = self._computeDataLocator.getPosixPath() / flowLabel
