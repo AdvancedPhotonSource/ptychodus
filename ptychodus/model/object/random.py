@@ -49,7 +49,7 @@ class RandomObjectInitializer(ObjectInitializer):
         settings.phaseDeviation.value = self._phaseDeviation
 
     def __call__(self) -> ObjectArrayType:
-        extraPaddingExtent = ImageExtent(self._extraPaddingX, self._extraPaddingY)
+        extraPaddingExtent = ImageExtent(2 * self._extraPaddingX, 2 * self._extraPaddingY)
         paddedObjectExtent = self._sizer.getObjectExtentInPixels() + extraPaddingExtent
 
         amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),

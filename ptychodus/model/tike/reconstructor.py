@@ -1,5 +1,5 @@
 from importlib.metadata import version
-from typing import Any, Final, Union
+from typing import Any, Union
 import logging
 import pprint
 
@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class TikeReconstructor:
-    PAD_WIDTH: Final[int] = 2  # FIXME use object padding
 
     def __init__(self, settings: TikeSettings, multigridSettings: TikeMultigridSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
@@ -115,8 +114,8 @@ class TikeReconstructor:
         coordinateList: list[float] = list()
 
         # Tike coordinate system origin is top-left corner; requires padding
-        ux = self.PAD_WIDTH - probe.shape[-1] / 2  # FIXME use object padding
-        uy = self.PAD_WIDTH - probe.shape[-2] / 2  # FIXME use object padding
+        ux = -probe.shape[-1] / 2
+        uy = -probe.shape[-2] / 2
 
         for scanPoint in parameters.scan.values():
             objectPoint = objectGrid.mapScanPointToObjectPoint(scanPoint)

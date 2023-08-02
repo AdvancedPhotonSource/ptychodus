@@ -17,8 +17,8 @@ class ObjectSettings(Observable, Observer):
         self.amplitudeMean = settingsGroup.createRealEntry('AmplitudeMean', '0.5')
         self.amplitudeDeviation = settingsGroup.createRealEntry('AmplitudeDeviation', '0')
         self.phaseDeviation = settingsGroup.createRealEntry('PhaseDeviation', '0')
-        self.extraPaddingX = settingsGroup.createIntegerEntry('ExtraPaddingX', 0)
-        self.extraPaddingY = settingsGroup.createIntegerEntry('ExtraPaddingY', 0)
+        self.extraPaddingX = settingsGroup.createIntegerEntry('ExtraPaddingX', 1)
+        self.extraPaddingY = settingsGroup.createIntegerEntry('ExtraPaddingY', 1)
         self.phaseCenteringStrategy = settingsGroup.createStringEntry(
             'PhaseCenteringStrategy', 'Identity')
 
