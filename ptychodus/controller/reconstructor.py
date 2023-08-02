@@ -139,8 +139,6 @@ class ReconstructorParametersController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Ingester', err)
 
-        logger.info('Ingestion complete.')
-
     def _train(self) -> None:
         try:
             self._presenter.train()
@@ -148,16 +146,12 @@ class ReconstructorParametersController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Trainer', err)
 
-        logger.info('Training complete.')
-
     def _reset(self) -> None:
         try:
             self._presenter.reset()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Reset', err)
-
-        logger.info('Reset complete.')
 
     def _syncScanToView(self) -> None:
         self._view.reconstructorView.scanComboBox.blockSignals(True)

@@ -119,7 +119,7 @@ class ActiveReconstructor(Observable, Observer):
             tic = time.perf_counter()
             reconstructor.ingest(parameters)
             toc = time.perf_counter()
-            logger.info(f'Training time {toc - tic:.4f} seconds.')
+            logger.info(f'Ingest time {toc - tic:.4f} seconds.')
         else:
             logger.error('Reconstructor is not trainable!')
 
@@ -127,7 +127,10 @@ class ActiveReconstructor(Observable, Observer):
         reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
+            tic = time.perf_counter()
             reconstructor.train()
+            toc = time.perf_counter()
+            logger.info(f'Training time {toc - tic:.4f} seconds.')
         else:
             logger.error('Reconstructor is not trainable!')
 
@@ -135,7 +138,10 @@ class ActiveReconstructor(Observable, Observer):
         reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
+            tic = time.perf_counter()
             reconstructor.reset()
+            toc = time.perf_counter()
+            logger.info(f'Reset time {toc - tic:.4f} seconds.')
         else:
             logger.error('Reconstructor is not trainable!')
 
