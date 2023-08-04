@@ -28,7 +28,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
                 try:
                     data = h5File[self._dataPath]
-                    pixelSize = Decimal.from_float(data.attrs['Pixel_size'].item())
+                    pixelSize = Decimal(repr(data.attrs['Pixel_size'].item()))
                 except KeyError:
                     logger.debug('Unable to load data.')
                 else:
