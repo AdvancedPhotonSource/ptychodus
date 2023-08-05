@@ -4,9 +4,10 @@ import logging
 
 import h5py
 
+from ptychodus.api.apparatus import PixelGeometry
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 SimpleDiffractionDataset)
-from ptychodus.api.geometry import Array2D
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
@@ -38,8 +39,8 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
-                        detectorNumberOfPixels=Array2D[int](detectorWidth, detectorHeight),
-                        detectorPixelSizeInMeters=Array2D[Decimal](pixelSize, pixelSize),
+                        detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
+                        detectorPixelGeometry=PixelGeometry(pixelSize, pixelSize),
                         filePath=filePath,
                     )
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from typing import Any, TypeAlias
 import numpy
 import numpy.typing
 
+from .apparatus import PixelGeometry
 from .geometry import Point2D
 from .image import ImageExtent
 from .scan import ScanPoint
@@ -20,8 +22,8 @@ ObjectPoint: TypeAlias = Point2D[float]
 @dataclass(frozen=True)
 class ObjectAxis:
     centerInMeters: float
-    pixelSizeInMeters: float
     numberOfPixels: int
+    pixelSizeInMeters: float
 
     @property
     def _radius(self) -> float:
@@ -40,6 +42,22 @@ class ObjectAxis:
 class ObjectGrid:
     axisX: ObjectAxis
     axisY: ObjectAxis
+
+    @classmethod
+    def createInstance(cls, midpoint: ScanPoint, extent: ImageExtent,
+                       pixelGeometry: PixelGeometry) -> ObjectGrid:
+        return cls(
+            axisX=ObjectAxis(
+                centerInMeters=midpoint.x,
+                numberOfPixels=extent.width,
+                pixelSizeInMeters=float(pixelGeometry.widthInMeters),
+            ),
+            axisY=ObjectAxis(
+                centerInMeters=midpoint.y,
+                numberOfPixels=extent.height,
+                pixelSizeInMeters=float(pixelGeometry.heightInMeters),
+            ),
+        )
 
     def mapObjectPointToScanPoint(self, point: ObjectPoint) -> ScanPoint:
         x = self.axisX.mapObjectCoordinateToScanCoordinate(point.x)
@@ -92,9 +110,22 @@ class ObjectPatchAxis:
 
 
 @dataclass(frozen=True)
-class ObjectPatch:
+class ObjectPatchGrid:
     axisX: ObjectPatchAxis
     axisY: ObjectPatchAxis
+
+    @classmethod
+    def createInstance(cls, parent: ObjectGrid, patchCenter: ScanPoint,
+                       patchExtent: ImageExtent) -> ObjectPatchGrid:
+        return cls(
+            axisX=ObjectPatchAxis(parent.axisX, float(patchCenter.x), patchExtent.width),
+            axisY=ObjectPatchAxis(parent.axisY, float(patchCenter.y), patchExtent.height),
+        )
+
+
+@dataclass(frozen=True)
+class ObjectPatch:
+    grid: ObjectPatchGrid
     array: ObjectArrayType
 
 

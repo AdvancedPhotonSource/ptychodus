@@ -7,7 +7,7 @@ import numpy
 
 from ...api.image import ImageExtent
 from ...api.object import (ObjectArrayType, ObjectAxis, ObjectGrid, ObjectInterpolator,
-                           ObjectPatch, ObjectPatchAxis, ObjectPhaseCenteringStrategy)
+                           ObjectPatch, ObjectPatchGrid, ObjectPhaseCenteringStrategy)
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.scan import ScanPoint
@@ -30,11 +30,12 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         return self._array
 
     def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> ObjectPatch:
-        axisX = ObjectPatchAxis(self._grid.axisX, float(patchCenter.x), patchExtent.width)
-        axisY = ObjectPatchAxis(self._grid.axisY, float(patchCenter.y), patchExtent.height)
-        xx, yy = numpy.meshgrid(axisX.getPixelScanCoordinates(), axisY.getPixelScanCoordinates())
+        grid = ObjectPatchGrid.createInstance(self._grid, patchCenter, patchExtent)
+        yy, xx = numpy.meshgrid(grid.axisY.getPixelScanCoordinates(),
+                                grid.axisX.getPixelScanCoordinates(),
+                                indexing='ij')
         array = map_coordinates(self._array, (yy, xx), order=1)
-        return ObjectPatch(axisX=axisX, axisY=axisY, array=array.reshape(patchExtent.shape))
+        return ObjectPatch(grid=grid, array=array.reshape(patchExtent.shape))
 
 
 class ObjectInterpolatorFactory(Observable, Observer):

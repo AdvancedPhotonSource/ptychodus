@@ -7,7 +7,7 @@ T = TypeVar('T', int, float, Decimal)
 
 
 @dataclass(frozen=True)
-class Array2D(Generic[T]):
+class Array2D(Generic[T]):  # TODO remove
     x: T
     y: T
 

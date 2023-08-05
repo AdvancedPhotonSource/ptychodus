@@ -150,12 +150,12 @@ class StateDataRegistry:
         stateData[self.POSITION_X] = scanState.positionXInMeters
         stateData[self.POSITION_Y] = scanState.positionYInMeters
 
-        probeState = self._probeCore.getStateData()
+        probeState = self._probeCore.getStateData()  # FIXME try/except ValueError
         stateData[self.PIXEL_SIZE_X] = numpy.array(probeState.pixelSizeXInMeters)
         stateData[self.PIXEL_SIZE_Y] = numpy.array(probeState.pixelSizeYInMeters)
         stateData[self.PROBE_ARRAY] = probeState.array
 
-        objectState = self._objectCore.getStateData()
+        objectState = self._objectCore.getStateData()  # FIXME try/except ValueError
         stateData[self.OBJECT_ARRAY] = objectState.array
 
         numpy.savez(filePath, **stateData)

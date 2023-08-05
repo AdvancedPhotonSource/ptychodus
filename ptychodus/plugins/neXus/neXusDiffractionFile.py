@@ -8,11 +8,13 @@ import logging
 
 import h5py
 
-from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
+from ptychodus.api.apparatus import PixelGeometry
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, SimpleDiffractionDataset)
 from ptychodus.api.geometry import Array2D
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.tree import SimpleTreeNode
+from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -232,7 +234,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     logger.info(f'File {filePath} is not a NeXus data file.')
                 else:
                     detector = entry.instrument.detector
-                    detectorPixelSizeInMeters = Array2D[Decimal](
+                    detectorPixelGeometry = PixelGeometry(
                         Decimal.from_float(detector.x_pixel_size_m),
                         Decimal.from_float(detector.y_pixel_size_m),
                     )
@@ -242,7 +244,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     )
 
                     detectorSpecific = detector.detectorSpecific
-                    detectorNumberOfPixels = Array2D[int](
+                    detectorExtentInPixels = ImageExtent(
                         int(detectorSpecific.x_pixels_in_detector),
                         int(detectorSpecific.y_pixels_in_detector),
                     )
@@ -254,8 +256,8 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
                         patternDataType=h5Dataset.dtype,
                         detectorDistanceInMeters=Decimal.from_float(detector.detector_distance_m),
-                        detectorNumberOfPixels=detectorNumberOfPixels,
-                        detectorPixelSizeInMeters=detectorPixelSizeInMeters,
+                        detectorExtentInPixels=detectorExtentInPixels,
+                        detectorPixelGeometry=detectorPixelGeometry,
                         cropCenterInPixels=cropCenterInPixels,
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,

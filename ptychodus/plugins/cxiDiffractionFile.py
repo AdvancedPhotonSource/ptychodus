@@ -4,9 +4,10 @@ import logging
 
 import h5py
 
+from ptychodus.api.apparatus import PixelGeometry
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 SimpleDiffractionDataset)
-from ptychodus.api.geometry import Array2D
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
@@ -33,10 +34,10 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                 else:
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
-                    detectorNumberOfPixels = Array2D[int](detectorWidth, detectorHeight)
+                    detectorExtentInPixels = ImageExtent(detectorWidth, detectorHeight)
                     detectorDistanceInMeters = Decimal.from_float(
                         h5File['/entry_1/instrument_1/detector_1/distance'][()])
-                    detectorPixelSizeInMeters = Array2D[Decimal](
+                    detectorPixelGeometry = PixelGeometry(
                         Decimal.from_float(
                             h5File['/entry_1/instrument_1/detector_1/x_pixel_size'][()]),
                         Decimal.from_float(
@@ -52,8 +53,8 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
                         detectorDistanceInMeters=detectorDistanceInMeters,
-                        detectorNumberOfPixels=detectorNumberOfPixels,
-                        detectorPixelSizeInMeters=detectorPixelSizeInMeters,
+                        detectorExtentInPixels=detectorExtentInPixels,
+                        detectorPixelGeometry=detectorPixelGeometry,
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
                     )

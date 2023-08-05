@@ -10,7 +10,7 @@ import numpy
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, DiffractionPatternArrayType,
                                 DiffractionPatternState, SimpleDiffractionDataset)
-from ptychodus.api.geometry import Array2D
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -96,7 +96,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                 numberOfPatternsPerArray=numberOfPatternsPerArray,
                 numberOfPatternsTotal=numberOfPatternsPerArray * len(arrayList),
                 patternDataType=data.dtype,
-                detectorNumberOfPixels=Array2D[int](detectorWidth, detectorHeight),
+                detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
                 filePath=filePath.parent / filePattern,
             )
 

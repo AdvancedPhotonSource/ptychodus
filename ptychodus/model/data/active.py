@@ -11,7 +11,7 @@ import numpy.typing
 from ...api.data import (DiffractionDataset, DiffractionMetadata, DiffractionPatternArray,
                          DiffractionPatternArrayType, DiffractionPatternIndexes,
                          DiffractionPatternState, SimpleDiffractionPatternArray)
-from ...api.geometry import Array2D
+from ...api.image import ImageExtent
 from ...api.tree import SimpleTreeNode
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
 from .sizer import DiffractionPatternSizer
@@ -156,7 +156,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
                 numberOfPatternsPerArray=numberOfPatterns,
                 numberOfPatternsTotal=numberOfPatterns,
                 patternDataType=arrayData.dtype,
-                detectorNumberOfPixels=Array2D[int](detectorWidth, detectorHeight),
+                detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
             )
 
             self._contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
