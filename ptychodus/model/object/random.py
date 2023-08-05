@@ -19,8 +19,8 @@ class RandomObjectInitializer(ObjectInitializer):
         super().__init__()
         self._rng = rng
         self._sizer = sizer
-        self._extraPaddingX = 0
-        self._extraPaddingY = 0
+        self._extraPaddingX = 1
+        self._extraPaddingY = 1
         self._amplitudeMean = Decimal(1) / 2
         self._amplitudeDeviation = Decimal()
         self._phaseDeviation = Decimal()

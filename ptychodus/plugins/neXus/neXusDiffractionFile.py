@@ -235,8 +235,8 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 else:
                     detector = entry.instrument.detector
                     detectorPixelGeometry = PixelGeometry(
-                        Decimal.from_float(detector.x_pixel_size_m),
-                        Decimal.from_float(detector.y_pixel_size_m),
+                        Decimal(repr(detector.x_pixel_size_m)),
+                        Decimal(repr(detector.y_pixel_size_m)),
                     )
                     cropCenterInPixels = Array2D[int](
                         int(round(detector.beam_center_x_px)),
@@ -248,14 +248,13 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         int(detectorSpecific.x_pixels_in_detector),
                         int(detectorSpecific.y_pixels_in_detector),
                     )
-                    probeEnergyInElectronVolts = Decimal.from_float(
-                        detectorSpecific.photon_energy_eV)
+                    probeEnergyInElectronVolts = Decimal(repr(detectorSpecific.photon_energy_eV))
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],
                         numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
                         patternDataType=h5Dataset.dtype,
-                        detectorDistanceInMeters=Decimal.from_float(detector.detector_distance_m),
+                        detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
                         detectorExtentInPixels=detectorExtentInPixels,
                         detectorPixelGeometry=detectorPixelGeometry,
                         cropCenterInPixels=cropCenterInPixels,
