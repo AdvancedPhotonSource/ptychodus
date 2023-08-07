@@ -2,8 +2,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from .data import DiffractionPatternArrayType
+from .image import ImageExtent
 from .object import ObjectArrayType, ObjectInterpolator
 from .probe import ProbeArrayType
 from .scan import Scan
@@ -17,8 +19,29 @@ class ReconstructInput:
     objectInterpolator: ObjectInterpolator
 
     @property
+    def diffractionPatternExtent(self) -> ImageExtent:
+        return ImageExtent(
+            width=self.diffractionPatternArray.shape[-1],
+            height=self.diffractionPatternArray.shape[-2],
+        )
+
+    @property
+    def probeExtent(self) -> ImageExtent:
+        return ImageExtent(
+            width=self.probeArray.shape[-1],
+            height=self.probeArray.shape[-2],
+        )
+
+    @property
     def objectArray(self) -> ObjectArrayType:
         return self.objectInterpolator.getArray()
+
+    @property
+    def objectExtent(self) -> ImageExtent:
+        return ImageExtent(
+            width=self.objectArray.shape[-1],
+            height=self.objectArray.shape[-2],
+        )
 
 
 @dataclass(frozen=True)
@@ -60,6 +83,10 @@ class TrainableReconstructor(Reconstructor):
     def reset(self) -> None:
         pass
 
+    @abstractmethod
+    def saveTrainingData(self, filePath: Path) -> None:
+        pass
+
 
 class NullReconstructor(TrainableReconstructor):
 
@@ -86,6 +113,9 @@ class NullReconstructor(TrainableReconstructor):
         pass
 
     def reset(self) -> None:
+        pass
+
+    def saveTrainingData(self, filePath: Path) -> None:
         pass
 
 

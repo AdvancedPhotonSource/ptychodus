@@ -1,11 +1,15 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
+import logging
 
 from ...api.observer import Observable, Observer
 from ...model.ptychonn import PtychoNNTrainingPresenter
 from ...view.ptychonn import PtychoNNOutputParametersView, PtychoNNTrainingParametersView
+from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
+
+logger = logging.getLogger(__name__)
 
 
 class PtychoNNOutputParametersController(Observer):
@@ -95,10 +99,25 @@ class PtychoNNTrainingParametersController(Observer):
         view.minimumLearningRateLineEdit.valueChanged.connect(presenter.setMinimumLearningRate)
         view.trainingEpochsSpinBox.valueChanged.connect(presenter.setTrainingEpochs)
         view.statusIntervalSpinBox.valueChanged.connect(presenter.setStatusIntervalInEpochs)
+        view.saveTrainingDataButton.clicked.connect(controller._saveTrainingData)
 
         controller._syncModelToView()
 
         return controller
+
+    def _saveTrainingData(self) -> None:
+        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+            self._view,
+            'Save Training Data',
+            nameFilters=self._presenter.getSaveFileFilterList(),
+            selectedNameFilter=self._presenter.getSaveFileFilter())
+
+        if filePath:
+            try:
+                self._presenter.saveTrainingData(filePath)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException('File writer', err)
 
     def _syncModelToView(self) -> None:
         self._view.validationSetFractionalSizeSlider.setValueAndRange(

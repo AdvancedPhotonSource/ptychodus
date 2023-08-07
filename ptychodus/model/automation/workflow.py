@@ -13,7 +13,7 @@ from ..workflow import WorkflowCore
 logger = logging.getLogger(__name__)
 
 
-# FIXME add parameter optimization workflow
+# TODO add parameter optimization workflow
 class AutomationDatasetWorkflow(ABC):
 
     @abstractmethod
@@ -81,7 +81,7 @@ class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
         self._registry = registry
 
     def execute(self, filePath: Path) -> None:
-        # FIXME watch for ptychodus NPZ files
+        # TODO watch for ptychodus NPZ files
         self._registry.openStateData(filePath)
-        # FIXME self._builder.incorporateTrainingDataFromActiveItems()
-        # FIXME save or train
+        # TODO self._reconstructorAPI.ingestTrainingData()
+        # FIXME self._reconstructorAPI.train()

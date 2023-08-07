@@ -42,10 +42,9 @@ class ObjectParametersController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.pixelSizeXWidget.setLengthInMeters(
-            self._presenter.getObjectPlanePixelSizeXInMeters())
-        self._view.pixelSizeYWidget.setLengthInMeters(
-            self._presenter.getObjectPlanePixelSizeYInMeters())
+        pixelGeometry = self._presenter.getObjectPlanePixelGeometry()
+        self._view.pixelSizeXWidget.setLengthInMeters(pixelGeometry.widthInMeters)
+        self._view.pixelSizeYWidget.setLengthInMeters(pixelGeometry.heightInMeters)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

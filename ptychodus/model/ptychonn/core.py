@@ -170,6 +170,16 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def train(self) -> None:
         self._trainer.train()
 
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return [self.getSaveFileFilter()]
+
+    def getSaveFileFilter(self) -> str:
+        return 'NumPy Zipped Archive (*.npz)'
+
+    def saveTrainingData(self, filePath: Path) -> None:
+        logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
+        self._trainer.saveTrainingData(filePath)
+
     def update(self, observable: Observable) -> None:
         if observable is self._modelSettings:
             self.notifyObservers()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from importlib.metadata import version
+from pathlib import Path
 from typing import TypeAlias
 import logging
 
@@ -71,7 +72,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         )
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        # FIXME data size/shape requirements to GUI
+        # TODO data size/shape requirements to GUI
         data = parameters.diffractionPatternArray
         dataSize = data.shape[-1]
 
@@ -84,7 +85,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
 
         # Bin diffraction data
-        # FIXME extract binning to data loading (and verify that x-y coordinates are correct)
+        # TODO extract binning to data loading (and verify that x-y coordinates are correct)
         inputSize = dataSize
         binSize = dataSize // inputSize
 
@@ -149,26 +150,18 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         )
 
     def ingest(self, parameters: ReconstructInput) -> None:
-        probeExtent = ImageExtent(
-            width=parameters.probeArray.shape[-1],
-            height=parameters.probeArray.shape[-2],
-        )
         objectInterpolator = parameters.objectInterpolator
 
         if self._diffractionPatternBuffer.isZeroSized:
-            diffractionPatternExtent = ImageExtent(
-                width=parameters.diffractionPatternArray.shape[-1],
-                height=parameters.diffractionPatternArray.shape[-2],
-            )
+            diffractionPatternExtent = parameters.diffractionPatternExtent
             maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
 
             self._diffractionPatternBuffer = CircularBuffer(diffractionPatternExtent, maximumSize)
             self._objectPhasePatchBuffer = CircularBuffer(diffractionPatternExtent, maximumSize)
 
         for scanIndex, scanPoint in parameters.scan.items():
-            objectPatch = objectInterpolator.getPatch(scanPoint, probeExtent)
+            objectPatch = objectInterpolator.getPatch(scanPoint, parameters.probeExtent)
             objectPhasePatch = numpy.angle(objectPatch.array).astype(numpy.float32)
-            # FIXME save phase patch
             self._objectPhasePatchBuffer.append(objectPhasePatch)
 
         for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
@@ -209,3 +202,10 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
     def reset(self) -> None:
         self._diffractionPatternBuffer = CircularBuffer.createZeroSized()
         self._objectPhasePatchBuffer = CircularBuffer.createZeroSized()
+
+    def saveTrainingData(self, filePath: Path) -> None:
+        trainingData = {
+            'diffractionPatterns': self._diffractionPatternBuffer.getBuffer(),
+            'objectPhasePatches': self._objectPhasePatchBuffer.getBuffer(),
+        }
+        numpy.savez(filePath, **trainingData)

@@ -65,7 +65,7 @@ class AutomationPresenter(Observable, Observer):
     def setProcessingIntervalInSeconds(self, value: int) -> None:
         self._settings.processingIntervalInSeconds.value = value
 
-    def execute(self) -> None:  # FIXME generalize
+    def execute(self) -> None:  # TODO generalize
         dataDirectory = self.getDataDirectory()
         scanFileGlob: Generator[Path, None, None] = dataDirectory.glob('*.csv')
 
@@ -170,7 +170,7 @@ class AutomationCore:
         self._datasetBuffer.start()
 
     def executeWaitingTasks(self) -> None:
-        # FIXME this belongs in AutomationDatasetProcessor
+        # TODO this belongs in AutomationDatasetProcessor
         try:
             filePath = self._processingQueue.get(block=False)
 

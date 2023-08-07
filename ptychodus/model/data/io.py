@@ -72,8 +72,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         return 'NumPy Binary Files (*.npy)'
 
     def saveDiffractionFile(self, filePath: Path) -> None:
-        fileFilter = self.getSaveFileFilter()
-        logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
+        logger.debug(f'Writing \"{filePath}\" as \"NPY\"')
         array = self._dataset.getAssembledData()
         numpy.save(filePath, array)
 

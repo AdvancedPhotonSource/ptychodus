@@ -186,9 +186,10 @@ class ProbeCore(StatefulCore[ProbeStateData]):
         self.presenter = ProbePresenter.createInstance(self.sizer, self._probe, self.probeAPI)
 
     def getStateData(self) -> ProbeStateData:
+        pixelGeometry = self.apparatus.getObjectPlanePixelGeometry()
         return ProbeStateData(
-            pixelSizeXInMeters=float(self.apparatus.getObjectPlanePixelSizeXInMeters()),
-            pixelSizeYInMeters=float(self.apparatus.getObjectPlanePixelSizeYInMeters()),
+            pixelSizeXInMeters=float(pixelGeometry.widthInMeters),
+            pixelSizeYInMeters=float(pixelGeometry.heightInMeters),
             array=self.probeAPI.getSelectedProbeArray(),  # FIXME try/except
         )
 

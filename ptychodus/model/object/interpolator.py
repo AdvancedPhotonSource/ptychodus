@@ -6,8 +6,8 @@ from scipy.ndimage import map_coordinates
 import numpy
 
 from ...api.image import ImageExtent
-from ...api.object import (ObjectArrayType, ObjectAxis, ObjectGrid, ObjectInterpolator,
-                           ObjectPatch, ObjectPatchGrid, ObjectPhaseCenteringStrategy)
+from ...api.object import (ObjectArrayType, ObjectGrid, ObjectInterpolator, ObjectPatch,
+                           ObjectPatchGrid, ObjectPhaseCenteringStrategy)
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.scan import ScanPoint
@@ -31,8 +31,8 @@ class ObjectLinearInterpolator(ObjectInterpolator):
 
     def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> ObjectPatch:
         grid = ObjectPatchGrid.createInstance(self._grid, patchCenter, patchExtent)
-        yy, xx = numpy.meshgrid(grid.axisY.getPixelScanCoordinates(),
-                                grid.axisX.getPixelScanCoordinates(),
+        yy, xx = numpy.meshgrid(grid.axisY.getObjectCoordinates(),
+                                grid.axisX.getObjectCoordinates(),
                                 indexing='ij')
         array = map_coordinates(self._array, (yy, xx), order=1)
         return ObjectPatch(grid=grid, array=array.reshape(patchExtent.shape))
@@ -61,19 +61,12 @@ class ObjectInterpolatorFactory(Observable, Observer):
     def createInterpolator(self, objectArray: ObjectArrayType,
                            objectCentroid: ScanPoint) -> ObjectInterpolator:
         centerPhase = self._phaseCenteringStrategyChooser.currentPlugin.strategy
-
-        objectGrid = ObjectGrid(
-            axisX=ObjectAxis(
-                centerInMeters=float(objectCentroid.x),
-                pixelSizeInMeters=float(self._sizer.getPixelSizeXInMeters()),
-                numberOfPixels=objectArray.shape[-1],
-            ),
-            axisY=ObjectAxis(
-                centerInMeters=float(objectCentroid.y),
-                pixelSizeInMeters=float(self._sizer.getPixelSizeYInMeters()),
-                numberOfPixels=objectArray.shape[-2],
-            ),
+        objectExtent = ImageExtent(
+            width=objectArray.shape[-1],
+            height=objectArray.shape[-2],
         )
+        pixelGeometry = self._sizer.getPixelGeometry()
+        objectGrid = ObjectGrid.createInstance(objectCentroid, objectExtent, pixelGeometry)
 
         return ObjectLinearInterpolator(
             grid=objectGrid,

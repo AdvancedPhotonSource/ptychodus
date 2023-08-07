@@ -1,8 +1,8 @@
 from __future__ import annotations
-from decimal import Decimal
 
 import numpy
 
+from ...api.apparatus import PixelGeometry
 from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
 from ...api.scan import ScanPoint
@@ -30,11 +30,8 @@ class ObjectSizer(Observable, Observer):
         probeSizer.addObserver(sizer)
         return sizer
 
-    def getPixelSizeXInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeXInMeters()
-
-    def getPixelSizeYInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeYInMeters()
+    def getPixelGeometry(self) -> PixelGeometry:
+        return self._apparatus.getObjectPlanePixelGeometry()
 
     def getMidpointInMeters(self) -> ScanPoint:
         bbox = self._scanSizer.getBoundingBoxInMeters()
@@ -42,12 +39,13 @@ class ObjectSizer(Observable, Observer):
 
     def getScanExtentInPixels(self) -> ImageExtent:
         bbox = self._scanSizer.getBoundingBoxInMeters()
+        pixelGeometry = self.getPixelGeometry()
         extentX = 0
         extentY = 0
 
         if bbox is not None:
-            extentX = int(numpy.ceil(bbox.rangeX.width / float(self.getPixelSizeXInMeters())))
-            extentY = int(numpy.ceil(bbox.rangeY.width / float(self.getPixelSizeYInMeters())))
+            extentX = int(numpy.ceil(bbox.rangeX.width / float(pixelGeometry.widthInMeters)))
+            extentY = int(numpy.ceil(bbox.rangeY.width / float(pixelGeometry.heightInMeters)))
 
         return ImageExtent(width=extentX, height=extentY)
 

@@ -44,12 +44,13 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
 
     def __call__(self) -> ProbeArrayType:
         extent = self._sizer.getExtentInPixels()
+        pixelGeometry = self._apparatus.getObjectPlanePixelGeometry()
         cellCentersX = numpy.arange(extent.width) - (extent.width - 1) / 2
         cellCentersY = numpy.arange(extent.height) - (extent.height - 1) / 2
         Y_px, X_px = numpy.meshgrid(cellCentersY, cellCentersX)
 
-        X_m = X_px * float(self._apparatus.getObjectPlanePixelSizeXInMeters())
-        Y_m = Y_px * float(self._apparatus.getObjectPlanePixelSizeYInMeters())
+        X_m = X_px * float(pixelGeometry.widthInMeters)
+        Y_m = Y_px * float(pixelGeometry.heightInMeters)
         R_m = numpy.hypot(X_m, Y_m)
 
         Z = (R_m - float(self._annularRadiusInMeters)) / float(self._probeWidthInMeters)

@@ -167,7 +167,7 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         lambda0 = self._apparatus.getProbeWavelengthInMeters()
 
         # pixel size on sample plane (TODO non-square pixels are unsupported)
-        dx = self._apparatus.getObjectPlanePixelSizeXInMeters()
+        dx = self._apparatus.getObjectPlanePixelGeometry().widthInMeters
 
         T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters, probeExtent.width,
                                        dx, self._zonePlate)
