@@ -47,7 +47,7 @@ class ViewCore(QMainWindow):
         self.detectorAction = self.navigationToolBar.addAction(QIcon(':/icons/detector'),
                                                                'Detector')
         self.detectorView = DetectorView.createInstance()
-        self.detectorImageView = ImageView.createInstance()
+        self.detectorImageView = ImageView.createInstance(self.statusBar())
 
         self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
         self.scanView = ScanView.createInstance()
@@ -55,11 +55,11 @@ class ViewCore(QMainWindow):
 
         self.probeAction = self.navigationToolBar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probeView = ProbeView.createInstance()
-        self.probeImageView = ImageView.createInstance()
+        self.probeImageView = ImageView.createInstance(self.statusBar())
 
         self.objectAction = self.navigationToolBar.addAction(QIcon(':/icons/object'), 'Object')
         self.objectView = ObjectView.createInstance()
-        self.objectImageView = ImageView.createInstance()
+        self.objectImageView = ImageView.createInstance(self.statusBar())
 
         self.reconstructorAction = self.navigationToolBar.addAction(QIcon(':/icons/reconstructor'),
                                                                     'Reconstructor')
@@ -77,8 +77,8 @@ class ViewCore(QMainWindow):
         self.automationWidget = QWidget()
 
         self.monitorAction = self.navigationToolBar.addAction(QIcon(':/icons/monitor'), 'Monitor')
-        self.monitorProbeView = MonitorProbeView.createInstance()
-        self.monitorObjectView = MonitorObjectView.createInstance()
+        self.monitorProbeView = MonitorProbeView.createInstance(self.statusBar())
+        self.monitorObjectView = MonitorObjectView.createInstance(self.statusBar())
 
     @classmethod
     def createInstance(cls,
