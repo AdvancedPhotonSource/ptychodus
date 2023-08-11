@@ -181,8 +181,8 @@ class ScanCore(StatefulCore[ScanStateData]):
         if selectedScan is not None:
             for index, point in selectedScan.untransformed.items():
                 indexes.append(index)
-                positionXInMeters.append(float(point.x))
-                positionYInMeters.append(float(point.y))
+                positionXInMeters.append(point.x)
+                positionYInMeters.append(point.y)
 
         return ScanStateData(
             indexes=numpy.array(indexes),

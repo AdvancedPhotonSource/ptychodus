@@ -118,8 +118,8 @@ class ObjectPatchGrid:
     def createInstance(cls, parent: ObjectGrid, patchCenter: ScanPoint,
                        patchExtent: ImageExtent) -> ObjectPatchGrid:
         return cls(
-            axisX=ObjectPatchAxis(parent.axisX, float(patchCenter.x), patchExtent.width),
-            axisY=ObjectPatchAxis(parent.axisY, float(patchCenter.y), patchExtent.height),
+            axisX=ObjectPatchAxis(parent.axisX, patchCenter.x, patchExtent.width),
+            axisY=ObjectPatchAxis(parent.axisY, patchCenter.y, patchExtent.height),
         )
 
 

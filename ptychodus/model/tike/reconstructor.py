@@ -119,8 +119,8 @@ class TikeReconstructor:
 
         for scanPoint in parameters.scan.values():
             objectPoint = objectGrid.mapScanPointToObjectPoint(scanPoint)
-            coordinateList.append(float(objectPoint.y) + uy)
-            coordinateList.append(float(objectPoint.x) + ux)
+            coordinateList.append(objectPoint.y + uy)
+            coordinateList.append(objectPoint.x + ux)
 
         scan = numpy.array(coordinateList, dtype=numpy.float32).reshape(len(parameters.scan), 2)
         scanMin = scan.min(axis=0)

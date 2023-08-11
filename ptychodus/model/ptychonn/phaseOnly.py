@@ -125,8 +125,8 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         for scanPoint, objectPhasePatch in zip(parameters.scan.values(), objectPhasePatches):
             objectPatch = numpy.exp(1j * objectPhasePatch)
 
-            patchAxisX = ObjectPatchAxis(objectGrid.axisX, float(scanPoint.x), patchExtent.width)
-            patchAxisY = ObjectPatchAxis(objectGrid.axisY, float(scanPoint.y), patchExtent.height)
+            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
+            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
 
             pixelCentersX = patchAxisX.getObjectPixelCenters()
             pixelCentersY = patchAxisY.getObjectPixelCenters()

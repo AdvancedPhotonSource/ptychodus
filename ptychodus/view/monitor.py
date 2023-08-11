@@ -14,7 +14,9 @@ class MonitorProbeView(BottomTitledGroupBox):
         self.imageView = ImageView.createInstance(statusbar)
 
     @classmethod
-    def createInstance(cls, statusbar: QStatusBar, parent: Optional[QWidget] = None) -> MonitorProbeView:
+    def createInstance(cls,
+                       statusbar: QStatusBar,
+                       parent: Optional[QWidget] = None) -> MonitorProbeView:
         view = cls(statusbar, parent)
 
         layout = QVBoxLayout()
@@ -32,7 +34,9 @@ class MonitorObjectView(BottomTitledGroupBox):
         self.imageView = ImageView.createInstance(statusbar)
 
     @classmethod
-    def createInstance(cls, statusbar: QStatusBar, parent: Optional[QWidget] = None) -> MonitorObjectView:
+    def createInstance(cls,
+                       statusbar: QStatusBar,
+                       parent: Optional[QWidget] = None) -> MonitorObjectView:
         view = cls(statusbar, parent)
 
         layout = QVBoxLayout()

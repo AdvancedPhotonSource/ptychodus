@@ -2,7 +2,6 @@ from __future__ import annotations
 import math
 from decimal import Decimal
 from typing import Optional
-from PyQt5 import QtGui
 
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QPixmap, QWheelEvent, QMouseEvent
@@ -221,7 +220,9 @@ class ImageWidget(QGraphicsView):
         self._statusbar = statusbar
 
     @classmethod
-    def createInstance(cls, statusbar: QStatusBar, parent: Optional[QWidget] = None) -> ImageWidget:
+    def createInstance(cls,
+                       statusbar: QStatusBar,
+                       parent: Optional[QWidget] = None) -> ImageWidget:
         widget = cls(statusbar, parent)
 
         scene = QGraphicsScene()
@@ -255,9 +256,9 @@ class ImageWidget(QGraphicsView):
             pixel_coords = item.mapFromScene(scene_pos)
             self._statusbar.showMessage(
                 'Mouse click coordinates: '
-                f'{math.floor(pixel_coords.x())},{math.floor(pixel_coords.y())}'
-            )
+                f'{math.floor(pixel_coords.x())},{math.floor(pixel_coords.y())}')
         super().mousePressEvent(event)
+
 
 class ImageView(QWidget):
 
