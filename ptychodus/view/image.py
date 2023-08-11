@@ -1,13 +1,15 @@
 from __future__ import annotations
+import math
 from decimal import Decimal
 from typing import Optional
+from PyQt5 import QtGui
 
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon, QPixmap, QWheelEvent
+from PyQt5.QtGui import QIcon, QPixmap, QWheelEvent, QMouseEvent
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
                              QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent,
                              QGraphicsSceneMouseEvent, QGraphicsView, QHBoxLayout, QPushButton,
-                             QSizePolicy, QSpinBox, QToolButton, QVBoxLayout, QWidget)
+                             QSizePolicy, QSpinBox, QToolButton, QVBoxLayout, QWidget, QStatusBar)
 
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
@@ -213,13 +215,14 @@ class ImageItem(QGraphicsPixmapItem):
 
 class ImageWidget(QGraphicsView):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, statusbar: QStatusBar, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self._pixmapItem = ImageItem()
+        self._statusbar = statusbar
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageWidget:
-        widget = cls(parent)
+    def createInstance(cls, statusbar: QStatusBar, parent: Optional[QWidget] = None) -> ImageWidget:
+        widget = cls(statusbar, parent)
 
         scene = QGraphicsScene()
         scene.addItem(widget._pixmapItem)
@@ -245,17 +248,27 @@ class ImageWidget(QGraphicsView):
         deltaPosition = newPosition - oldPosition
         self.translate(deltaPosition.x(), deltaPosition.y())
 
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        scene_pos = self.mapToScene(event.pos())
+        item = self.itemAt(scene_pos.toPoint())
+        if isinstance(item, QGraphicsPixmapItem):
+            pixel_coords = item.mapFromScene(scene_pos)
+            self._statusbar.showMessage(
+                'Mouse click coordinates: '
+                f'{math.floor(pixel_coords.x())},{math.floor(pixel_coords.y())}'
+            )
+        super().mousePressEvent(event)
 
 class ImageView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, statusbar: QStatusBar, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.imageRibbon = ImageRibbon.createInstance()
-        self.imageWidget = ImageWidget.createInstance()
+        self.imageWidget = ImageWidget.createInstance(statusbar)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageView:
-        view = cls(parent)
+    def createInstance(cls, statusbar: QStatusBar, parent: Optional[QWidget] = None) -> ImageView:
+        view = cls(statusbar, parent)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

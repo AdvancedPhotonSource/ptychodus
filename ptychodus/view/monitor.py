@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 
-from PyQt5.QtWidgets import QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QVBoxLayout, QWidget, QStatusBar
 
 from .image import ImageView
 from .widgets import BottomTitledGroupBox
@@ -9,13 +9,13 @@ from .widgets import BottomTitledGroupBox
 
 class MonitorProbeView(BottomTitledGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, statusbar: QStatusBar, parent: Optional[QWidget]) -> None:
         super().__init__('Probe', parent)
-        self.imageView = ImageView.createInstance()
+        self.imageView = ImageView.createInstance(statusbar)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> MonitorProbeView:
-        view = cls(parent)
+    def createInstance(cls, statusbar: QStatusBar, parent: Optional[QWidget] = None) -> MonitorProbeView:
+        view = cls(statusbar, parent)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 30)
@@ -27,13 +27,13 @@ class MonitorProbeView(BottomTitledGroupBox):
 
 class MonitorObjectView(BottomTitledGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, statusbar: QStatusBar, parent: Optional[QWidget]) -> None:
         super().__init__('Object', parent)
-        self.imageView = ImageView.createInstance()
+        self.imageView = ImageView.createInstance(statusbar)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> MonitorObjectView:
-        view = cls(parent)
+    def createInstance(cls, statusbar: QStatusBar, parent: Optional[QWidget] = None) -> MonitorObjectView:
+        view = cls(statusbar, parent)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 30)
