@@ -2,16 +2,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 from enum import auto, Enum
-from typing import Final
 import logging
 
 import numpy
 import scipy.linalg
 
-from ...api.geometry import Interval
-from ...api.observer import Observable
 from ...api.probe import ProbeArrayType
-from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
 
@@ -21,77 +17,13 @@ class ProbeModeDecayType(Enum):
     EXPONENTIAL = auto()
 
 
-class MultimodalProbeFactory(Observable):
-    MAX_INT: Final[int] = 0x7FFFFFFF
+class MultimodalProbeFactory:
 
     def __init__(self, rng: numpy.random.Generator) -> None:
         super().__init__()
         self._rng = rng
-        self._numberOfModes = 0
-        self._orthogonalizeModesEnabled = False
-        self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
-        self._modeDecayRatio = Decimal(1)
 
-    def getNumberOfModesLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getNumberOfModes(self) -> int:
-        limits = self.getNumberOfModesLimits()
-        return limits.clamp(self._numberOfModes)
-
-    def setNumberOfModes(self, number: int) -> None:
-        if self._numberOfModes != number:
-            self._numberOfModes = number
-            self.notifyObservers()
-
-    @property
-    def isOrthogonalizeModesEnabled(self) -> bool:
-        return self._orthogonalizeModesEnabled
-
-    def setOrthogonalizeModesEnabled(self, value: bool) -> None:
-        if self._orthogonalizeModesEnabled != value:
-            self._orthogonalizeModesEnabled = value
-            self.notifyObservers()
-
-    def getModeDecayType(self) -> ProbeModeDecayType:
-        return self._modeDecayType
-
-    def setModeDecayType(self, value: ProbeModeDecayType) -> None:
-        if self._modeDecayType != value:
-            self._modeDecayType = value
-            self.notifyObservers()
-
-    def getModeDecayRatioLimits(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))
-
-    def getModeDecayRatio(self) -> Decimal:
-        limits = self.getModeDecayRatioLimits()
-        return limits.clamp(self._modeDecayRatio)
-
-    def setModeDecayRatio(self, value: Decimal) -> None:
-        if self._modeDecayRatio != value:
-            self._modeDecayRatio = value
-            self.notifyObservers()
-
-    def syncFromSettings(self, settings: ProbeSettings) -> None:
-        self._numberOfModes = settings.numberOfModes.value
-        self._orthogonalizeModesEnabled = settings.orthogonalizeModesEnabled.value
-
-        try:
-            self._modeDecayType = ProbeModeDecayType[settings.modeDecayType.value.upper()]
-        except KeyError:
-            self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
-
-        self._modeDecayRatio = settings.modeDecayRatio.value
-        self.notifyObservers()
-
-    def syncToSettings(self, settings: ProbeSettings) -> None:
-        settings.numberOfModes.value = self._numberOfModes
-        settings.orthogonalizeModesEnabled.value = self._orthogonalizeModesEnabled
-        settings.modeDecayType.value = self._modeDecayType.name
-        settings.modeDecayRatio.value = self._modeDecayRatio
-
-    def _initializeModes(self, probe: ProbeArrayType) -> ProbeArrayType:
+    def _initializeModes(self, probe: ProbeArrayType, numberOfModes: int) -> ProbeArrayType:
         modeList: list[ProbeArrayType] = list()
 
         if probe.ndim == 2:
@@ -107,7 +39,7 @@ class MultimodalProbeFactory(Observable):
         else:
             raise ValueError('Probe array must contain at least two dimensions.')
 
-        while len(modeList) < self.getNumberOfModes():
+        while len(modeList) < numberOfModes:
             # randomly shift the first mode
             pw = probe.shape[-1]  # TODO clean up
             variate1 = self._rng.uniform(size=(2, 1)) - 0.5
@@ -126,23 +58,24 @@ class MultimodalProbeFactory(Observable):
         probeModesAsOrthoRows = probeModesAsOrthoCols.T
         return probeModesAsOrthoRows.reshape(*probe.shape)
 
-    def _getModeWeights(self, numberOfModes: int) -> Sequence[float]:
+    def _getModeWeights(self, numberOfModes: int, modeDecayType: ProbeModeDecayType,
+                        modeDecayRatio: Decimal) -> Sequence[float]:
         weights = [1.] * numberOfModes
-        decayRatio = self.getModeDecayRatio()
-        decayRatioLimits = self.getModeDecayRatioLimits()
 
-        if decayRatio in decayRatioLimits:
-            if self._modeDecayType == ProbeModeDecayType.EXPONENTIAL.value:
-                b = float(1 + (1 - decayRatio) / decayRatio)
+        if Decimal(0) < modeDecayRatio and modeDecayRatio < Decimal(1):
+            if modeDecayType == ProbeModeDecayType.EXPONENTIAL:
+                b = float(1 + (1 - modeDecayRatio) / modeDecayRatio)
                 weights = [b**-n for n in range(numberOfModes)]
             else:
-                b = float(decayRatio.ln() / Decimal(2).ln())
+                b = float(modeDecayRatio.ln() / Decimal(2).ln())
                 weights = [(n + 1)**b for n in range(numberOfModes)]
 
         return weights
 
-    def _adjustRelativePower(self, probe: ProbeArrayType) -> ProbeArrayType:
-        modeWeights = self._getModeWeights(probe.shape[-3])
+    def _adjustRelativePower(self, probe: ProbeArrayType, numberOfModes: int,
+                             modeDecayType: ProbeModeDecayType,
+                             modeDecayRatio: Decimal) -> ProbeArrayType:
+        modeWeights = self._getModeWeights(probe.shape[-3], modeDecayType, modeDecayRatio)
         power0 = numpy.sum(numpy.square(numpy.abs(probe[0, ...])))
         adjustedProbe = probe.copy()
 
@@ -152,10 +85,12 @@ class MultimodalProbeFactory(Observable):
 
         return adjustedProbe
 
-    def build(self, initialProbe: ProbeArrayType) -> ProbeArrayType:
-        probe = self._initializeModes(initialProbe)
+    def build(self, initialProbe: ProbeArrayType, numberOfModes: int,
+              orthogonalizeModesEnabled: bool, modeDecayType: ProbeModeDecayType,
+              modeDecayRatio: Decimal) -> ProbeArrayType:
+        probe = self._initializeModes(initialProbe, numberOfModes)
 
-        if self._orthogonalizeModesEnabled:
+        if orthogonalizeModesEnabled:
             probe = self._orthogonalizeModes(probe)
 
-        return self._adjustRelativePower(probe)
+        return self._adjustRelativePower(probe, numberOfModes, modeDecayType, modeDecayRatio)

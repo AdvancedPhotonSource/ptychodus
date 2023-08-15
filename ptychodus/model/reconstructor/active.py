@@ -115,7 +115,13 @@ class ActiveReconstructor(Observable, Observer):
         reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
+            logger.info('Preparing input data...')
+            tic = time.perf_counter()
             parameters = self._prepareInputData()
+            toc = time.perf_counter()
+            logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
+
+            logger.info('Ingesting...')
             tic = time.perf_counter()
             reconstructor.ingest(parameters)
             toc = time.perf_counter()
@@ -127,6 +133,7 @@ class ActiveReconstructor(Observable, Observer):
         reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
+            logger.info('Training...')
             tic = time.perf_counter()
             reconstructor.train()
             toc = time.perf_counter()
@@ -138,6 +145,7 @@ class ActiveReconstructor(Observable, Observer):
         reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
+            logger.info('Resetting...')
             tic = time.perf_counter()
             reconstructor.reset()
             toc = time.perf_counter()

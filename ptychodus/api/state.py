@@ -141,21 +141,39 @@ class StateDataRegistry:
         stateData: dict[str, numpy.typing.NDArray[Any]] = dict()
 
         if restartable:
-            dataState = self._dataCore.getStateData()
-            stateData[self.DATA_INDEXES] = dataState.indexes
-            stateData[self.DATA_ARRAY] = dataState.array
+            try:
+                dataState = self._dataCore.getStateData()
+            except ValueError:
+                logger.error('Failed to save data state.')
+            else:
+                stateData[self.DATA_INDEXES] = dataState.indexes
+                stateData[self.DATA_ARRAY] = dataState.array
 
-        scanState = self._scanCore.getStateData()
-        stateData[self.POSITION_INDEXES] = scanState.indexes
-        stateData[self.POSITION_X] = scanState.positionXInMeters
-        stateData[self.POSITION_Y] = scanState.positionYInMeters
+        try:
+            scanState = self._scanCore.getStateData()
+        except ValueError:
+            logger.error('Failed to save scan state.')
+        else:
+            stateData[self.POSITION_INDEXES] = scanState.indexes
+            stateData[self.POSITION_X] = scanState.positionXInMeters
+            stateData[self.POSITION_Y] = scanState.positionYInMeters
 
-        probeState = self._probeCore.getStateData()  # FIXME try/except ValueError
-        stateData[self.PIXEL_SIZE_X] = numpy.array(probeState.pixelSizeXInMeters)
-        stateData[self.PIXEL_SIZE_Y] = numpy.array(probeState.pixelSizeYInMeters)
-        stateData[self.PROBE_ARRAY] = probeState.array
+        try:
+            probeState = self._probeCore.getStateData()
+        except ValueError:
+            logger.error('Failed to save probe state.')
+        else:
+            stateData[self.PIXEL_SIZE_X] = numpy.array(probeState.pixelSizeXInMeters)
+            stateData[self.PIXEL_SIZE_Y] = numpy.array(probeState.pixelSizeYInMeters)
+            stateData[self.PROBE_ARRAY] = probeState.array
 
-        objectState = self._objectCore.getStateData()  # FIXME try/except ValueError
-        stateData[self.OBJECT_ARRAY] = objectState.array
+        try:
+            objectState = self._objectCore.getStateData()
+        except ValueError:
+            logger.error('Failed to save object state.')
+        else:
+            stateData[self.OBJECT_CENTER_X] = numpy.array(objectState.centerXInMeters)
+            stateData[self.OBJECT_CENTER_Y] = numpy.array(objectState.centerYInMeters)
+            stateData[self.OBJECT_ARRAY] = objectState.array
 
         numpy.savez(filePath, **stateData)

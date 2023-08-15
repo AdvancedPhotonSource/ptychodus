@@ -52,6 +52,7 @@ class ProbeRepositoryItem(Observable, Observer):
     '''container for items that can be stored in a probe repository'''
     SIMPLE_NAME: Final[str] = 'FromMemory'
     DISPLAY_NAME: Final[str] = 'From Memory'
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self,
                  modesFactory: MultimodalProbeFactory,
@@ -62,11 +63,13 @@ class ProbeRepositoryItem(Observable, Observer):
         self._nameHint = nameHint
         self._array = numpy.zeros((1, 0, 0), dtype=complex)
         self._initializer: Optional[ProbeInitializer] = None
+        self._numberOfModes = 0
+        self._orthogonalizeModesEnabled = False
+        self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
+        self._modeDecayRatio = Decimal(1)
 
         if array is not None:
             self._setArray(array)
-
-        modesFactory.addObserver(self)
 
     @property
     def nameHint(self) -> str:
@@ -106,7 +109,10 @@ class ProbeRepositoryItem(Observable, Observer):
             logger.exception('Failed to reinitialize probe!')
             return
 
-        array = self._modesFactory.build(initialProbe)
+        numberOfModes = max(self._numberOfModes, 1)
+        array = self._modesFactory.build(initialProbe, numberOfModes,
+                                         self._orthogonalizeModesEnabled, self._modeDecayType,
+                                         self._modeDecayRatio)
         self._setArray(array)
 
     def getInitializerSimpleName(self) -> str:
@@ -130,12 +136,23 @@ class ProbeRepositoryItem(Observable, Observer):
 
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state from settings'''
-        self._modesFactory.syncFromSettings(settings)
+        self._numberOfModes = settings.numberOfModes.value
+        self._orthogonalizeModesEnabled = settings.orthogonalizeModesEnabled.value
+
+        try:
+            self._modeDecayType = ProbeModeDecayType[settings.modeDecayType.value.upper()]
+        except KeyError:
+            self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
+
+        self._modeDecayRatio = settings.modeDecayRatio.value
         self.reinitialize()
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state to settings'''
-        self._modesFactory.syncToSettings(settings)
+        settings.numberOfModes.value = self._numberOfModes
+        settings.orthogonalizeModesEnabled.value = self._orthogonalizeModesEnabled
+        settings.modeDecayType.value = self._modeDecayType.name
+        settings.modeDecayRatio.value = self._modeDecayRatio
 
     def getDataType(self) -> str:
         '''returns the array data type'''
@@ -150,35 +167,44 @@ class ProbeRepositoryItem(Observable, Observer):
         return self._array.nbytes
 
     def getNumberOfModesLimits(self) -> Interval[int]:
-        return self._modesFactory.getNumberOfModesLimits()
+        return Interval[int](1, self.MAX_INT)
 
     def getNumberOfModes(self) -> int:
         return self._array.shape[0]
 
     def setNumberOfModes(self, number: int) -> None:
-        self._modesFactory.setNumberOfModes(number)
+        if self._numberOfModes != number:
+            self._numberOfModes = number
+            self.reinitialize()
 
     @property
     def isOrthogonalizeModesEnabled(self) -> bool:
-        return self._modesFactory.isOrthogonalizeModesEnabled
+        return self._orthogonalizeModesEnabled
 
     def setOrthogonalizeModesEnabled(self, value: bool) -> None:
-        self._modesFactory.setOrthogonalizeModesEnabled(value)
+        if self._orthogonalizeModesEnabled != value:
+            self._orthogonalizeModesEnabled = value
+            self.reinitialize()
 
     def getModeDecayType(self) -> ProbeModeDecayType:
-        return self._modesFactory.getModeDecayType()
+        return self._modeDecayType
 
     def setModeDecayType(self, value: ProbeModeDecayType) -> None:
-        self._modesFactory.setModeDecayType(value)
+        if self._modeDecayType != value:
+            self._modeDecayType = value
+            self.reinitialize()
 
     def getModeDecayRatioLimits(self) -> Interval[Decimal]:
-        return self._modesFactory.getModeDecayRatioLimits()
+        return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getModeDecayRatio(self) -> Decimal:
-        return self._modesFactory.getModeDecayRatio()
+        limits = self.getModeDecayRatioLimits()
+        return limits.clamp(self._modeDecayRatio)
 
     def setModeDecayRatio(self, value: Decimal) -> None:
-        self._modesFactory.setModeDecayRatio(value)
+        if self._modeDecayRatio != value:
+            self._modeDecayRatio = value
+            self.reinitialize()
 
     def getMode(self, mode: int) -> ProbeArrayType:
         return self._array[mode, :, :]

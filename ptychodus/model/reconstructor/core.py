@@ -10,6 +10,7 @@ from ..object import ObjectAPI
 from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from .active import ActiveReconstructor
+from .api import ReconstructorAPI
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
@@ -116,5 +117,6 @@ class ReconstructorCore:
         self._activeReconstructor = ActiveReconstructor.createInstance(
             self.settings, diffractionDataset, scanAPI, probeAPI, objectAPI, libraryList,
             settingsRegistry)
+        self.reconstructorAPI = ReconstructorAPI(self._activeReconstructor)
         self.presenter = ReconstructorPresenter.createInstance(self._activeReconstructor)
         self.plotPresenter = ReconstructorPlotPresenter()

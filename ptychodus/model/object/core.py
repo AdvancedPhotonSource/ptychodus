@@ -195,7 +195,7 @@ class ObjectCore(StatefulCore[ObjectStateData]):
         return ObjectStateData(
             centerXInMeters=centerInMeters.x,
             centerYInMeters=centerInMeters.y,
-            array=self.objectAPI.getSelectedObjectArray(),  # FIXME try/except
+            array=self.objectAPI.getSelectedObjectArray(),
         )
 
     def setStateData(self, stateData: ObjectStateData, stateFilePath: Path) -> None:

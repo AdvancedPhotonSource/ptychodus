@@ -190,7 +190,7 @@ class ProbeCore(StatefulCore[ProbeStateData]):
         return ProbeStateData(
             pixelSizeXInMeters=float(pixelGeometry.widthInMeters),
             pixelSizeYInMeters=float(pixelGeometry.heightInMeters),
-            array=self.probeAPI.getSelectedProbeArray(),  # FIXME try/except
+            array=self.probeAPI.getSelectedProbeArray(),
         )
 
     def setStateData(self, stateData: ProbeStateData, stateFilePath: Path) -> None:

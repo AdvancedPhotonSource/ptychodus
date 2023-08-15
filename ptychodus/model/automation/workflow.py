@@ -7,6 +7,7 @@ from ...api.state import StateDataRegistry
 from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
 from ..probe import ProbeAPI
+from ..reconstructor import ReconstructorAPI
 from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 
@@ -77,11 +78,12 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
 class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, registry: StateDataRegistry) -> None:
+    def __init__(self, registry: StateDataRegistry, reconstructorAPI: ReconstructorAPI) -> None:
         self._registry = registry
+        self._reconstructorAPI = reconstructorAPI
 
     def execute(self, filePath: Path) -> None:
         # TODO watch for ptychodus NPZ files
         self._registry.openStateData(filePath)
-        # TODO self._reconstructorAPI.ingestTrainingData()
-        # FIXME self._reconstructorAPI.train()
+        self._reconstructorAPI.ingest()
+        self._reconstructorAPI.train()
