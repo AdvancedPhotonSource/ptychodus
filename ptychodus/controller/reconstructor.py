@@ -12,7 +12,7 @@ from ..api.observer import Observable, Observer
 from ..api.reconstructor import ReconstructOutput
 from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
-from ..model.reconstructor import ReconstructorPlotPresenter, ReconstructorPresenter
+from ..model.reconstructor import ReconstructorPresenter
 from ..model.scan import ScanPresenter
 from ..view.reconstructor import ReconstructorParametersView, ReconstructorPlotView
 from ..view.widgets import ExceptionDialog
@@ -37,7 +37,6 @@ class ReconstructorParametersController(Observer):
     def __init__(
         self,
         presenter: ReconstructorPresenter,
-        plotPresenter: ReconstructorPlotPresenter,
         scanPresenter: ScanPresenter,
         probePresenter: ProbePresenter,
         objectPresenter: ObjectPresenter,
@@ -46,7 +45,6 @@ class ReconstructorParametersController(Observer):
     ) -> None:
         super().__init__()
         self._presenter = presenter
-        self._plotPresenter = plotPresenter
         self._scanPresenter = scanPresenter
         self._probePresenter = probePresenter
         self._objectPresenter = objectPresenter
@@ -61,15 +59,14 @@ class ReconstructorParametersController(Observer):
     def createInstance(
         cls,
         presenter: ReconstructorPresenter,
-        plotPresenter: ReconstructorPlotPresenter,
         scanPresenter: ScanPresenter,
         probePresenter: ProbePresenter,
         objectPresenter: ObjectPresenter,
         view: ReconstructorParametersView,
         viewControllerFactoryList: list[ReconstructorViewControllerFactory],
     ) -> ReconstructorParametersController:
-        controller = cls(presenter, plotPresenter, scanPresenter, probePresenter, objectPresenter,
-                         view, viewControllerFactoryList)
+        controller = cls(presenter, scanPresenter, probePresenter, objectPresenter, view,
+                         viewControllerFactoryList)
         presenter.addObserver(controller)
         scanPresenter.addObserver(controller)
         probePresenter.addObserver(controller)
@@ -128,7 +125,8 @@ class ReconstructorParametersController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
         else:
-            self._plotPresenter.setEnumeratedYValues(result.objective)
+            self._plotPresenter.setEnumeratedYValues(result.objective) # FIXME update plot
+
 
         logger.info(result.result)  # TODO
 
@@ -139,7 +137,7 @@ class ReconstructorParametersController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Ingester', err)
 
-    def _train(self) -> None:
+    def _train(self) -> None: # FIXME update plot
         try:
             self._presenter.train()
         except Exception as err:
@@ -210,15 +208,15 @@ class ReconstructorParametersController(Observer):
             self._syncObjectToView()
 
 
-class ReconstructorPlotController(Observer):
+class ReconstructorPlotController(Observer):  # FIXME merge with above
 
-    def __init__(self, presenter: ReconstructorPlotPresenter, view: ReconstructorPlotView) -> None:
+    def __init__(self, presenter: ReconstructorPresenter, view: ReconstructorPlotView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ReconstructorPlotPresenter,
+    def createInstance(cls, presenter: ReconstructorPresenter,
                        view: ReconstructorPlotView) -> ReconstructorPlotController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)

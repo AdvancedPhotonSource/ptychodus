@@ -10,6 +10,7 @@ import tike.ptycho
 
 from ...api.object import ObjectArrayType
 from ...api.object import ObjectPoint
+from ...api.plot import Plot2D
 from ...api.probe import ProbeArrayType
 from ...api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ...api.scan import Scan, ScanPoint, TabularScan
@@ -186,11 +187,26 @@ class TikeReconstructor:
         if self._objectCorrectionSettings.useObjectCorrection.value:
             objectOutputArray = result.psi
 
+        # FIXME BEGIN
+        plot2D = Plot2D.createEmpty()
+        # def setValues(self, xvalues: Sequence[Sequence[float]],
+        #               yvalues: Sequence[Sequence[float]]) -> None:
+        #     self._xvalues = xvalues
+        #     self._yvalues = yvalues
+        #     self.notifyObservers()
+        #
+        # def setEnumeratedYValues(self, yvalues: Sequence[Sequence[float]]) -> None:
+        #     xvalues = [*range(len(yvalues))]
+        #     self.setValues(xvalues, yvalues)
+        #     # FIXME plotPresenter.setEnumeratedYValues(result.objective)
+        # FIXME END
+
         return ReconstructOutput(
             scan=scanOutput,
             probeArray=probeOutputArray,
             objectArray=objectOutputArray,
             objective=result.algorithm_options.costs,
+            plot2D=plot2D,
             result=0,
         )
 

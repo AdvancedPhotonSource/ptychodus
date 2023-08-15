@@ -7,6 +7,7 @@ from pathlib import Path
 from .data import DiffractionPatternArrayType
 from .image import ImageExtent
 from .object import ObjectArrayType, ObjectInterpolator
+from .plot import Plot2D
 from .probe import ProbeArrayType
 from .scan import Scan
 
@@ -50,11 +51,12 @@ class ReconstructOutput:
     probeArray: ProbeArrayType | None
     objectArray: ObjectArrayType | None
     objective: Sequence[Sequence[float]]
+    plot2D: Plot2D
     result: int
 
     @classmethod
     def createNull(cls) -> ReconstructOutput:
-        return cls(None, None, None, [[]], 0)
+        return cls(None, None, None, [[]], Plot2D.createEmpty(), 0)
 
 
 class Reconstructor(ABC):
@@ -76,7 +78,7 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def train(self) -> None:
+    def train(self) -> Plot2D:
         pass
 
     @abstractmethod
@@ -103,14 +105,15 @@ class NullReconstructor(TrainableReconstructor):
             probeArray=parameters.probeArray,
             objectArray=parameters.objectInterpolator.getArray(),
             objective=[[]],
+            plot2D=Plot2D.createEmpty(),
             result=0,
         )
 
     def ingest(self, parameters: ReconstructInput) -> None:
         pass
 
-    def train(self) -> None:
-        pass
+    def train(self) -> Plot2D:
+        return Plot2D.createEmpty()
 
     def reset(self) -> None:
         pass

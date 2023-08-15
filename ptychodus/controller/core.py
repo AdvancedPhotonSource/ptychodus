@@ -58,7 +58,6 @@ class ControllerCore:
             view.dataParametersView, view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter,
-            model.reconstructorPlotPresenter,
             model.scanPresenter,
             model.probePresenter,
             model.objectPresenter,
@@ -69,7 +68,7 @@ class ControllerCore:
             ],
         )
         self._reconstructorPlotController = ReconstructorPlotController.createInstance(
-            model.reconstructorPlotPresenter, view.reconstructorPlotView)
+            model.reconstructorPresenter, view.reconstructorPlotView)
         self._workflowController = WorkflowController.createInstance(
             model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
             model.workflowStatusPresenter, model.workflowExecutionPresenter,

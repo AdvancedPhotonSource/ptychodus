@@ -59,54 +59,6 @@ class ReconstructorPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class ReconstructorPlotPresenter(Observable):
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._xlabel: str = 'Iteration'
-        self._xvalues: Sequence[Sequence[float]] = list()
-        self._ylabel: str = 'Objective'
-        self._yvalues: Sequence[Sequence[float]] = list()
-
-    @property
-    def xlabel(self) -> str:
-        return self._xlabel
-
-    @xlabel.setter
-    def xlabel(self, value: str) -> None:
-        if self._xlabel != value:
-            self._xlabel = value
-            self.notifyObservers()
-
-    @property
-    def ylabel(self) -> str:
-        return self._ylabel
-
-    @ylabel.setter
-    def ylabel(self, value: str) -> None:
-        if self._ylabel != value:
-            self._ylabel = value
-            self.notifyObservers()
-
-    @property
-    def xvalues(self) -> Sequence[Sequence[float]]:
-        return self._xvalues
-
-    @property
-    def yvalues(self) -> Sequence[Sequence[float]]:
-        return self._yvalues
-
-    def setValues(self, xvalues: Sequence[Sequence[float]],
-                  yvalues: Sequence[Sequence[float]]) -> None:
-        self._xvalues = xvalues
-        self._yvalues = yvalues
-        self.notifyObservers()
-
-    def setEnumeratedYValues(self, yvalues: Sequence[Sequence[float]]) -> None:
-        xvalues = [*range(len(yvalues))]
-        self.setValues(xvalues, yvalues)
-
-
 class ReconstructorCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry,
@@ -119,4 +71,3 @@ class ReconstructorCore:
             settingsRegistry)
         self.reconstructorAPI = ReconstructorAPI(self._activeReconstructor)
         self.presenter = ReconstructorPresenter.createInstance(self._activeReconstructor)
-        self.plotPresenter = ReconstructorPlotPresenter()

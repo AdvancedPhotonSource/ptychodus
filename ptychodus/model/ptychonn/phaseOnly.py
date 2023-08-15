@@ -11,6 +11,7 @@ import numpy.typing
 
 from ...api.image import ImageExtent
 from ...api.object import ObjectPatchAxis
+from ...api.plot import Plot2D
 from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
 from ..object import ObjectAPI
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
@@ -146,6 +147,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             probeArray=None,
             objectArray=objectArray,
             objective=[[]],
+            plot2D=Plot2D.createEmpty(),  # FIXME
             result=0,
         )
 
@@ -167,7 +169,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
             self._diffractionPatternBuffer.append(pattern)
 
-    def train(self) -> None:
+    def train(self) -> Plot2D:
         outputPath = self._trainingSettings.outputPath.value \
                 if self._trainingSettings.saveTrainingArtifacts.value else None
 
@@ -197,7 +199,30 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             epochs=self._trainingSettings.trainingEpochs.value,
             output_frequency=self._trainingSettings.statusIntervalInEpochs.value,
         )
-        # FIXME ptychonn.plot.plot_metrics(trainer.metrics)
+
+        # FIXME BEGIN
+        #
+        # ptychonn.plot.plot_metrics(trainer.metrics)
+        #
+        # def plot_metrics(metrics: dict):
+        #     losses_arr = np.array(metrics['losses'])
+        #     val_losses_arr = np.array(metrics['val_losses'])
+        #     print("Shape of losses array is ", losses_arr.shape)
+        #
+        #     fig, ax = plt.subplots(3, sharex=True, figsize=(15, 8))
+        #     ax[0].plot(losses_arr[1:, 0], 'C3o-', label="Train")
+        #     ax[0].plot(val_losses_arr[1:, 0], 'C0o-', label="Val")
+        #     ax[0].set(ylabel='Loss')
+        #     ax[0].set_yscale('log')
+        #     ax[0].grid()
+        #     ax[0].legend(loc='center right')
+        #     ax[0].set_title('Total loss')
+        #
+        #     plt.tight_layout()
+        #     plt.xlabel("Epochs")
+        # FIXME END
+
+        return Plot2D.createEmpty()  # FIXME
 
     def reset(self) -> None:
         self._diffractionPatternBuffer = CircularBuffer.createZeroSized()

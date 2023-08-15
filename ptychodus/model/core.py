@@ -31,7 +31,7 @@ from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
 from .probe import ApparatusPresenter, ProbeCore, ProbePresenter, ProbeRepositoryPresenter
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
-from .reconstructor import ReconstructorCore, ReconstructorPresenter, ReconstructorPlotPresenter
+from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter, ScanRepositoryPresenter
@@ -284,10 +284,6 @@ class ModelCore:
     @property
     def reconstructorPresenter(self) -> ReconstructorPresenter:
         return self._reconstructorCore.presenter
-
-    @property
-    def reconstructorPlotPresenter(self) -> ReconstructorPlotPresenter:
-        return self._reconstructorCore.plotPresenter
 
     @property
     def areWorkflowsSupported(self) -> bool:
