@@ -3,6 +3,7 @@ from collections.abc import Sequence
 import logging
 
 from ...api.observer import Observable, Observer
+from ...api.plot import Plot2D
 from ...api.reconstructor import ReconstructOutput, ReconstructorLibrary
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
@@ -21,6 +22,7 @@ class ReconstructorPresenter(Observable, Observer):
     def __init__(self, activeReconstructor: ActiveReconstructor) -> None:
         super().__init__()
         self._activeReconstructor = activeReconstructor
+        self._plot2D = Plot2D.createNull()
 
     @classmethod
     def createInstance(cls, activeReconstructor: ActiveReconstructor) -> ReconstructorPresenter:
@@ -39,7 +41,13 @@ class ReconstructorPresenter(Observable, Observer):
 
     def reconstruct(self) -> ReconstructOutput:
         label = self._activeReconstructor.name
-        return self._activeReconstructor.reconstruct(label)
+        result = self._activeReconstructor.reconstruct(label)
+        self._plot2D = result.plot2D
+        self.notifyObservers()
+        return result
+
+    def getPlot(self) -> Plot2D:
+        return self._plot2D
 
     @property
     def isTrainable(self) -> bool:
@@ -49,7 +57,8 @@ class ReconstructorPresenter(Observable, Observer):
         self._activeReconstructor.ingest()
 
     def train(self) -> None:
-        self._activeReconstructor.train()
+        self._plot2D = self._activeReconstructor.train()
+        self.notifyObservers()
 
     def reset(self) -> None:
         self._activeReconstructor.reset()

@@ -56,7 +56,7 @@ class ReconstructOutput:
 
     @classmethod
     def createNull(cls) -> ReconstructOutput:
-        return cls(None, None, None, [[]], Plot2D.createEmpty(), 0)
+        return cls(None, None, None, [[]], Plot2D.createNull(), 0)
 
 
 class Reconstructor(ABC):
@@ -105,7 +105,7 @@ class NullReconstructor(TrainableReconstructor):
             probeArray=parameters.probeArray,
             objectArray=parameters.objectInterpolator.getArray(),
             objective=[[]],
-            plot2D=Plot2D.createEmpty(),
+            plot2D=Plot2D.createNull(),
             result=0,
         )
 
@@ -113,7 +113,7 @@ class NullReconstructor(TrainableReconstructor):
         pass
 
     def train(self) -> Plot2D:
-        return Plot2D.createEmpty()
+        return Plot2D.createNull()
 
     def reset(self) -> None:
         pass

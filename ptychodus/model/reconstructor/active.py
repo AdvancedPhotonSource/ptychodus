@@ -6,6 +6,7 @@ import time
 import numpy
 
 from ...api.observer import Observable, Observer
+from ...api.plot import Plot2D
 from ...api.plugins import PluginChooser
 from ...api.reconstructor import (ReconstructInput, ReconstructOutput, Reconstructor,
                                   ReconstructorLibrary, TrainableReconstructor)
@@ -129,17 +130,20 @@ class ActiveReconstructor(Observable, Observer):
         else:
             logger.error('Reconstructor is not trainable!')
 
-    def train(self) -> None:
+    def train(self) -> Plot2D:
         reconstructor = self._pluginChooser.currentPlugin.strategy
+        plot2D = Plot2D.createNull()
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Training...')
             tic = time.perf_counter()
-            reconstructor.train()
+            plot2D = reconstructor.train()
             toc = time.perf_counter()
             logger.info(f'Training time {toc - tic:.4f} seconds.')
         else:
             logger.error('Reconstructor is not trainable!')
+
+        return plot2D
 
     def reset(self) -> None:
         reconstructor = self._pluginChooser.currentPlugin.strategy

@@ -41,6 +41,7 @@ class ReconstructorParametersController(Observer):
         probePresenter: ProbePresenter,
         objectPresenter: ObjectPresenter,
         view: ReconstructorParametersView,
+        plotView: ReconstructorPlotView,
         viewControllerFactoryList: Iterable[ReconstructorViewControllerFactory],
     ) -> None:
         super().__init__()
@@ -49,6 +50,7 @@ class ReconstructorParametersController(Observer):
         self._probePresenter = probePresenter
         self._objectPresenter = objectPresenter
         self._view = view
+        self._plotView = plotView
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = \
                 { vcf.backendName: vcf for vcf in viewControllerFactoryList }
         self._scanListModel = QStringListModel()
@@ -63,9 +65,10 @@ class ReconstructorParametersController(Observer):
         probePresenter: ProbePresenter,
         objectPresenter: ObjectPresenter,
         view: ReconstructorParametersView,
+        plotView: ReconstructorPlotView,
         viewControllerFactoryList: list[ReconstructorViewControllerFactory],
     ) -> ReconstructorParametersController:
-        controller = cls(presenter, scanPresenter, probePresenter, objectPresenter, view,
+        controller = cls(presenter, scanPresenter, probePresenter, objectPresenter, view, plotView,
                          viewControllerFactoryList)
         presenter.addObserver(controller)
         scanPresenter.addObserver(controller)
@@ -124,9 +127,6 @@ class ReconstructorParametersController(Observer):
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
-        else:
-            self._plotPresenter.setEnumeratedYValues(result.objective) # FIXME update plot
-
 
         logger.info(result.result)  # TODO
 
@@ -137,7 +137,7 @@ class ReconstructorParametersController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Ingester', err)
 
-    def _train(self) -> None: # FIXME update plot
+    def _train(self) -> None:
         try:
             self._presenter.train()
         except Exception as err:
@@ -188,6 +188,31 @@ class ReconstructorParametersController(Observer):
         pixmap = QPixmap(':/icons/check' if isValid else ':/icons/xmark')
         return pixmap.scaledToHeight(24)
 
+    def _redrawPlot(self) -> None:
+        plot2D = self._presenter.getPlot()
+        axisX = plot2D.axisX
+        axisY = plot2D.axisY
+
+        ax = self._plotView.axes
+        ax.clear()
+
+        if len(axisX.series) == len(axisY.series):
+            for sx, sy in zip(axisX.series, axisY.series):
+                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
+        elif len(axisX.series) == 1:
+            sx = axisX.series[0]
+
+            for sy in axisY.series:
+                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
+        else:
+            logger.error('Failed to broadcast plot series!')
+
+        ax.set_xlabel(axisX.label)
+        ax.set_ylabel(axisY.label)
+        ax.grid(True)
+        ax.legend(loc='best')
+        self._plotView.figureCanvas.draw()
+
     def _syncModelToView(self) -> None:
         self._view.reconstructorView.algorithmComboBox.setCurrentText(
             self._presenter.getReconstructor())
@@ -196,6 +221,8 @@ class ReconstructorParametersController(Observer):
         self._view.reconstructorView.ingestButton.setVisible(isTrainable)
         self._view.reconstructorView.trainButton.setVisible(isTrainable)
         self._view.reconstructorView.resetButton.setVisible(isTrainable)
+
+        self._redrawPlot()
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -206,34 +233,3 @@ class ReconstructorParametersController(Observer):
             self._syncProbeToView()
         elif observable is self._objectPresenter:
             self._syncObjectToView()
-
-
-class ReconstructorPlotController(Observer):  # FIXME merge with above
-
-    def __init__(self, presenter: ReconstructorPresenter, view: ReconstructorPlotView) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-
-    @classmethod
-    def createInstance(cls, presenter: ReconstructorPresenter,
-                       view: ReconstructorPlotView) -> ReconstructorPlotController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-        controller._syncModelToView()
-        return controller
-
-    def _syncModelToView(self) -> None:
-        x = self._presenter.xvalues
-        y = self._presenter.yvalues
-
-        self._view.axes.clear()
-        self._view.axes.semilogy(x, y, '.-', linewidth=1.5)
-        self._view.axes.grid(True)
-        self._view.axes.set_xlabel(self._presenter.xlabel)
-        self._view.axes.set_ylabel(self._presenter.ylabel)
-        self._view.figureCanvas.draw()
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()

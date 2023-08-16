@@ -15,7 +15,7 @@ class PlotAxis:
     series: Sequence[PlotSeries]
 
     @classmethod
-    def createEmpty(cls) -> PlotAxis:
+    def createNull(cls) -> PlotAxis:
         return cls('', [])
 
 
@@ -25,5 +25,5 @@ class Plot2D:
     axisY: PlotAxis
 
     @classmethod
-    def createEmpty(cls) -> Plot2D:
-        return cls(PlotAxis.createEmpty(), PlotAxis.createEmpty())
+    def createNull(cls) -> Plot2D:
+        return cls(PlotAxis.createNull(), PlotAxis.createNull())

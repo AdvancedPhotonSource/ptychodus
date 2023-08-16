@@ -1,7 +1,7 @@
 from __future__ import annotations
 from importlib.metadata import version
 from pathlib import Path
-from typing import TypeAlias
+from typing import Any, Mapping, TypeAlias
 import logging
 
 from ptychonn import ReconSmallPhaseModel, Tester, Trainer
@@ -11,7 +11,7 @@ import numpy.typing
 
 from ...api.image import ImageExtent
 from ...api.object import ObjectPatchAxis
-from ...api.plot import Plot2D
+from ...api.plot import Plot2D, PlotAxis, PlotSeries
 from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
 from ..object import ObjectAPI
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
@@ -124,7 +124,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         )
 
         for scanPoint, objectPhasePatch in zip(parameters.scan.values(), objectPhasePatches):
-            objectPatch = numpy.exp(1j * objectPhasePatch)
+            objectPatch = 0.5 * numpy.exp(1j * objectPhasePatch)
 
             patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
             patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
@@ -147,7 +147,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             probeArray=None,
             objectArray=objectArray,
             objective=[[]],
-            plot2D=Plot2D.createEmpty(),  # FIXME
+            plot2D=Plot2D.createNull(),  # TODO show something here?
             result=0,
         )
 
@@ -168,6 +168,18 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
 
         for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
             self._diffractionPatternBuffer.append(pattern)
+
+    def _plotMetrics(self, metrics: Mapping[str, Any]) -> Plot2D:
+        trainingLoss = [losses[0] for losses in metrics['losses']]
+        validationLoss = [losses[0] for losses in metrics['val_losses']]
+        validationLossSeries = PlotSeries(label='Validation Loss', values=validationLoss)
+        trainingLossSeries = PlotSeries(label='Training Loss', values=trainingLoss)
+        seriesX = PlotSeries(label='Iteration', values=[*range(len(trainingLoss))])
+
+        return Plot2D(
+            axisX=PlotAxis(label='Epoch', series=[seriesX]),
+            axisY=PlotAxis(label='Loss', series=[trainingLossSeries, validationLossSeries]),
+        )
 
     def train(self) -> Plot2D:
         outputPath = self._trainingSettings.outputPath.value \
@@ -200,29 +212,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             output_frequency=self._trainingSettings.statusIntervalInEpochs.value,
         )
 
-        # FIXME BEGIN
-        #
-        # ptychonn.plot.plot_metrics(trainer.metrics)
-        #
-        # def plot_metrics(metrics: dict):
-        #     losses_arr = np.array(metrics['losses'])
-        #     val_losses_arr = np.array(metrics['val_losses'])
-        #     print("Shape of losses array is ", losses_arr.shape)
-        #
-        #     fig, ax = plt.subplots(3, sharex=True, figsize=(15, 8))
-        #     ax[0].plot(losses_arr[1:, 0], 'C3o-', label="Train")
-        #     ax[0].plot(val_losses_arr[1:, 0], 'C0o-', label="Val")
-        #     ax[0].set(ylabel='Loss')
-        #     ax[0].set_yscale('log')
-        #     ax[0].grid()
-        #     ax[0].legend(loc='center right')
-        #     ax[0].set_title('Total loss')
-        #
-        #     plt.tight_layout()
-        #     plt.xlabel("Epochs")
-        # FIXME END
-
-        return Plot2D.createEmpty()  # FIXME
+        return self._plotMetrics(trainer.metrics)
 
     def reset(self) -> None:
         self._diffractionPatternBuffer = CircularBuffer.createZeroSized()
