@@ -21,6 +21,7 @@ class TikeBasicParametersView(QGroupBox):
         self.cgIterSpinBox = QSpinBox()
         self.alphaSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.stepLengthSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.logLevelComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls,
@@ -63,6 +64,8 @@ class TikeBasicParametersView(QGroupBox):
 
         if showStepLength:
             layout.addRow('Step Length:', view.stepLengthSlider)
+
+        layout.addRow('Log Level:', view.logLevelComboBox)
 
         view.setLayout(layout)
 

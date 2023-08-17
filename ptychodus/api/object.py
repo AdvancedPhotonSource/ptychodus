@@ -71,7 +71,7 @@ class ObjectGrid:
 
 
 @dataclass(frozen=True)
-class ObjectPixelCenters:  # FIXME
+class ObjectPixelCenters:
     objectSlice: slice
     patchCoordinates: Sequence[float]
 
@@ -96,7 +96,7 @@ class ObjectPatchAxis:
         shift = self._shift
         return [idx + shift for idx in range(self.numberOfPixels)]
 
-    def getObjectPixelCenters(self) -> ObjectPixelCenters:  # FIXME
+    def getObjectPixelCenters(self) -> ObjectPixelCenters:
         '''returns object pixel centers covered by this patch'''
         patchCenter = self.parent.mapScanCoordinateToObjectCoordinate(self.centerInMeters)
         first = int(patchCenter - self._radius + 0.5)

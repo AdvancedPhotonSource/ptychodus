@@ -23,6 +23,7 @@ class TikePresenter(Observable, Observer):
     def __init__(self, settings: TikeSettings) -> None:
         super().__init__()
         self._settings = settings
+        self._logger = logging.getLogger('tike')
 
     @classmethod
     def createInstance(cls, settings: TikeSettings) -> TikePresenter:
@@ -113,6 +114,28 @@ class TikePresenter(Observable, Observer):
 
     def setStepLength(self, value: Decimal) -> None:
         self._settings.stepLength.value = value
+
+    def getLogLevelList(self) -> Sequence[str]:
+        return ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG']
+
+    def getLogLevel(self) -> str:
+        level = self._logger.getEffectiveLevel()
+        return logging.getLevelName(level)
+
+    def setLogLevel(self, name: str) -> None:
+        nameBefore = self.getLogLevel()
+
+        if name == nameBefore:
+            return
+
+        try:
+            self._logger.setLevel(name)
+        except ValueError:
+            logger.error(f'Bad log level \"{name}\".')
+
+        nameAfter = self.getLogLevel()
+        logger.info(f'Changed Tike log level {nameBefore} -> {nameAfter}')
+        self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

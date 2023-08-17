@@ -44,6 +44,11 @@ class TikeBasicParametersController(Observer):
         view.alphaSlider.valueChanged.connect(presenter.setAlpha)
         view.stepLengthSlider.valueChanged.connect(presenter.setStepLength)
 
+        for model in presenter.getLogLevelList():
+            view.logLevelComboBox.addItem(model)
+
+        view.logLevelComboBox.currentTextChanged.connect(presenter.setLogLevel)
+
         controller._syncModelToView()
 
         return controller
@@ -88,6 +93,7 @@ class TikeBasicParametersController(Observer):
         self._view.stepLengthSlider.setValueAndRange(self._presenter.getStepLength(),
                                                      self._presenter.getStepLengthLimits(),
                                                      blockValueChangedSignal=True)
+        self._view.logLevelComboBox.setCurrentText(self._presenter.getLogLevel())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
