@@ -1,7 +1,8 @@
-from .core import ReconstructorCore, ReconstructorPlotPresenter, ReconstructorPresenter
+from .api import ReconstructorAPI
+from .core import ReconstructorCore, ReconstructorPresenter
 
 __all__ = [
+    'ReconstructorAPI',
     'ReconstructorCore',
-    'ReconstructorPlotPresenter',
     'ReconstructorPresenter',
 ]

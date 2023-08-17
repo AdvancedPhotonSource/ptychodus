@@ -1,4 +1,3 @@
-from decimal import Decimal
 from pathlib import Path
 import logging
 
@@ -11,14 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoShelvesScanFileReader(ScanFileReader):
-
-    @property
-    def simpleName(self) -> str:
-        return 'PtychoShelves'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'PtychoShelves Scan Position Files (*.h5 *.hdf5)'
 
     def read(self, filePath: Path) -> Scan:
         pointList = list()
@@ -36,11 +27,8 @@ class PtychoShelvesScanFileReader(ScanFileReader):
                     else:
                         raise ScanPointParseError('Coordinate array shape mismatch!')
 
-                    for xf, yf in zip(ppX[:, 0], ppY[:, 0]):
-                        point = ScanPoint(
-                            x=Decimal.from_float(xf),
-                            y=Decimal.from_float(yf),
-                        )
+                    for x, y in zip(ppX[:, 0], ppY[:, 0]):
+                        point = ScanPoint(x, y)
                         pointList.append(point)
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
@@ -49,4 +37,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(PtychoShelvesScanFileReader())
+    registry.scanFileReaders.registerPlugin(
+        PtychoShelvesScanFileReader(),
+        simpleName='PtychoShelves',
+        displayName='PtychoShelves Scan Position Files (*.h5 *.hdf5)')

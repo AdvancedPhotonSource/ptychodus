@@ -1,38 +1,31 @@
-from decimal import Decimal
 from pathlib import Path
 
 import numpy
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
+from ptychodus.api.state import StateDataRegistry
 
 
 class NPZScanFileReader(ScanFileReader):
-
-    @property
-    def simpleName(self) -> str:
-        return 'NPZ'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'NumPy Zipped Archive (*.npz)'
 
     def read(self, filePath: Path) -> Scan:
         pointMap: dict[int, ScanPoint] = dict()
 
         npz = numpy.load(filePath)
-        scanIndex = npz['scanIndex']
-        scanXInMeters = npz['scanXInMeters']
-        scanYInMeters = npz['scanYInMeters']
+        positionIndexes = npz[StateDataRegistry.POSITION_INDEXES]
+        positionXInMeters = npz[StateDataRegistry.POSITION_X]
+        positionYInMeters = npz[StateDataRegistry.POSITION_Y]
 
-        for index, x, y in zip(scanIndex, scanXInMeters, scanYInMeters):
-            pointMap[index] = ScanPoint(
-                x=Decimal.from_float(x),
-                y=Decimal.from_float(y),
-            )
+        for index, x, y in zip(positionIndexes, positionXInMeters, positionYInMeters):
+            pointMap[index] = ScanPoint(x, y)
 
         return TabularScan(pointMap)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(NPZScanFileReader())
+    registry.scanFileReaders.registerPlugin(
+        NPZScanFileReader(),
+        simpleName='NPZ',
+        displayName=StateDataRegistry.FILE_FILTER,
+    )

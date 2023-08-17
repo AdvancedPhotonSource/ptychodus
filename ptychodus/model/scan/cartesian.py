@@ -42,17 +42,17 @@ class CartesianScan(Scan):
             if y & 1:
                 x = self.numberOfPointsX - 1 - x
 
-        cx = Decimal(self.numberOfPointsX - 1) / 2
-        cy = Decimal(self.numberOfPointsY - 1) / 2
+        cx = (self.numberOfPointsX - 1) / 2
+        cy = (self.numberOfPointsY - 1) / 2
 
-        xf = (x - cx) * self.stepSizeXInMeters
-        yf = (y - cy) * self.stepSizeYInMeters
+        xf = (x - cx) * float(self.stepSizeXInMeters)
+        yf = (y - cy) * float(self.stepSizeYInMeters)
 
         if self._centered:
             if y & 1:
-                xf += self.stepSizeXInMeters / 4
+                xf += float(self.stepSizeXInMeters) / 4
             else:
-                xf -= self.stepSizeXInMeters / 4
+                xf -= float(self.stepSizeXInMeters) / 4
 
         return ScanPoint(xf, yf)
 

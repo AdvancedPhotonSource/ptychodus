@@ -19,8 +19,8 @@ class RandomObjectInitializer(ObjectInitializer):
         super().__init__()
         self._rng = rng
         self._sizer = sizer
-        self._extraPaddingX = 0
-        self._extraPaddingY = 0
+        self._extraPaddingX = 1
+        self._extraPaddingY = 1
         self._amplitudeMean = Decimal(1) / 2
         self._amplitudeDeviation = Decimal()
         self._phaseDeviation = Decimal()
@@ -49,8 +49,8 @@ class RandomObjectInitializer(ObjectInitializer):
         settings.phaseDeviation.value = self._phaseDeviation
 
     def __call__(self) -> ObjectArrayType:
-        extraPaddingExtent = ImageExtent(self._extraPaddingX, self._extraPaddingY)
-        paddedObjectExtent = self._sizer.getObjectExtent() + extraPaddingExtent
+        extraPaddingExtent = ImageExtent(2 * self._extraPaddingX, 2 * self._extraPaddingY)
+        paddedObjectExtent = self._sizer.getObjectExtentInPixels() + extraPaddingExtent
 
         amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),
                                      paddedObjectExtent.shape)

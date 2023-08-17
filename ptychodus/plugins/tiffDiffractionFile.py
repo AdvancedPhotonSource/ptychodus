@@ -8,9 +8,9 @@ from tifffile import TiffFile
 import numpy
 
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, DiffractionPatternData,
+                                DiffractionPatternArray, DiffractionPatternArrayType,
                                 DiffractionPatternState, SimpleDiffractionDataset)
-from ptychodus.api.geometry import Array2D
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -34,7 +34,7 @@ class TiffDiffractionPatternArray(DiffractionPatternArray):
     def getState(self) -> DiffractionPatternState:
         return self._state
 
-    def getData(self) -> DiffractionPatternData:
+    def getData(self) -> DiffractionPatternArrayType:
         self._state = DiffractionPatternState.MISSING
 
         with TiffFile(self._filePath) as tiff:
@@ -52,14 +52,6 @@ class TiffDiffractionPatternArray(DiffractionPatternArray):
 
 
 class TiffDiffractionFileReader(DiffractionFileReader):
-
-    @property
-    def simpleName(self) -> str:
-        return 'TIFF'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Tagged Image File Format Files (*.tif *.tiff)'
 
     def _getFileSeries(self, filePath: Path) -> tuple[Mapping[int, Path], str]:
         filePathDict: dict[int, Path] = dict()
@@ -104,7 +96,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
                 numberOfPatternsPerArray=numberOfPatternsPerArray,
                 numberOfPatternsTotal=numberOfPatternsPerArray * len(arrayList),
                 patternDataType=data.dtype,
-                detectorNumberOfPixels=Array2D[int](detectorWidth, detectorHeight),
+                detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
                 filePath=filePath.parent / filePattern,
             )
 
@@ -114,7 +106,11 @@ class TiffDiffractionFileReader(DiffractionFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(TiffDiffractionFileReader())
+    registry.diffractionFileReaders.registerPlugin(
+        TiffDiffractionFileReader(),
+        simpleName='TIFF',
+        displayName='Tagged Image File Format Files (*.tif *.tiff)',
+    )
 
 
 if __name__ == '__main__':

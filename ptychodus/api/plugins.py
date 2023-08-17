@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from types import ModuleType
 from typing import Generic, TypeVar
@@ -27,92 +27,80 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PluginEntry(Generic[T]):
+    strategy: T
     simpleName: str
     displayName: str
-    strategy: T
 
 
 class PluginChooser(Generic[T], Observable):
 
-    def __init__(self, defaultEntry: PluginEntry[T]) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._entryList: list[PluginEntry[T]] = [defaultEntry]
-        self._entry: PluginEntry[T] = defaultEntry
+        self._entryList: list[PluginEntry[T]] = list()
+        self._currentIndex = 0
 
-    @classmethod
-    def createFromList(cls, entryList: list[PluginEntry[T]]) -> PluginChooser[T]:
-        chooser = cls(entryList[0])
-        chooser._entryList = entryList.copy()
-        return chooser
-
-    def addStrategy(self, entry: PluginEntry[T]) -> None:
-        self._entryList.insert(0, entry)
-
-    def setToDefault(self) -> None:
-        self._setEntry(self._entryList[-1])
-
-    def getSimpleNameList(self) -> list[str]:
+    def getSimpleNameList(self) -> Sequence[str]:
         return [entry.simpleName for entry in self._entryList]
 
-    def setFromSimpleName(self, name: str) -> None:
-        try:
-            entry = next(entry for entry in self._entryList
-                         if name.casefold() == entry.simpleName.casefold())
-        except StopIteration:
-            logger.debug(f'Invalid strategy simple name \"{name}\"')
-            return
-
-        self._setEntry(entry)
-
-    def getDisplayNameList(self) -> list[str]:
+    def getDisplayNameList(self) -> Sequence[str]:
         return [entry.displayName for entry in self._entryList]
 
-    def setFromDisplayName(self, name: str) -> None:
-        try:
-            entry = next(entry for entry in self._entryList if name == entry.displayName)
-        except StopIteration:
-            logger.debug(f'Invalid strategy display name \"{name}\"')
-            return
+    def registerPlugin(self, strategy: T, *, simpleName: str, displayName: str = '') -> None:
+        if not displayName:
+            displayName = simpleName
 
-        self._setEntry(entry)
+        entry = PluginEntry[T](strategy, simpleName, displayName)
+        self._entryList.append(entry)
+        self.notifyObservers()
 
-    def getCurrentSimpleName(self) -> str:
-        return self._entry.simpleName
+    @property
+    def currentPlugin(self) -> PluginEntry[T]:
+        return self._entryList[self._currentIndex]
 
-    def getCurrentDisplayName(self) -> str:
-        return self._entry.displayName
+    def setCurrentPluginByName(self, name: str) -> None:
+        namecf = name.casefold()
 
-    def getCurrentStrategy(self) -> T:
-        return self._entry.strategy
+        for index, entry in enumerate(self._entryList):
+            if namecf == entry.simpleName.casefold() or namecf == entry.displayName.casefold():
+                if self._currentIndex != index:
+                    self._currentIndex = index
+                    self.notifyObservers()
 
-    def _setEntry(self, entry: PluginEntry[T]) -> None:
-        if self._entry is not entry:
-            self._entry = entry
-            self.notifyObservers()
+                return
+
+        logger.debug(f'Invalid plugin name \"{name}\"')
 
     def __iter__(self) -> Iterator[PluginEntry[T]]:
         return iter(self._entryList)
 
-    def __getitem__(self, index: int) -> PluginEntry[T]:
-        return self._entryList[index]
+    def __getitem__(self, name: str) -> PluginEntry[T]:
+        namecf = name.casefold()
 
-    def __len__(self) -> int:
-        return len(self._entryList)
+        for entry in self._entryList:
+            if namecf == entry.simpleName.casefold() or namecf == entry.displayName.casefold():
+                return entry
+
+        raise KeyError(f'Invalid plugin name \"{name}\"')
+
+    def copy(self) -> PluginChooser[T]:
+        clone = PluginChooser[T]()
+        clone._entryList = self._entryList.copy()
+        clone._currentIndex = self._currentIndex
+        return clone
 
 
 class PluginRegistry:
 
     def __init__(self) -> None:
-        self.diffractionFileReaders: list[PluginEntry[DiffractionFileReader]] = list()
-        self.scalarTransformations: list[PluginEntry[ScalarTransformation]] = list()
-        self.scanFileReaders: list[PluginEntry[ScanFileReader]] = list()
-        self.scanFileWriters: list[PluginEntry[ScanFileWriter]] = list()
-        self.probeFileReaders: list[PluginEntry[ProbeFileReader]] = list()
-        self.probeFileWriters: list[PluginEntry[ProbeFileWriter]] = list()
-        self.objectPhaseCenteringStrategies: list[
-            PluginEntry[ObjectPhaseCenteringStrategy]] = list()
-        self.objectFileReaders: list[PluginEntry[ObjectFileReader]] = list()
-        self.objectFileWriters: list[PluginEntry[ObjectFileWriter]] = list()
+        self.diffractionFileReaders = PluginChooser[DiffractionFileReader]()
+        self.scalarTransformations = PluginChooser[ScalarTransformation]()
+        self.scanFileReaders = PluginChooser[ScanFileReader]()
+        self.scanFileWriters = PluginChooser[ScanFileWriter]()
+        self.probeFileReaders = PluginChooser[ProbeFileReader]()
+        self.probeFileWriters = PluginChooser[ProbeFileWriter]()
+        self.objectPhaseCenteringStrategies = PluginChooser[ObjectPhaseCenteringStrategy]()
+        self.objectFileReaders = PluginChooser[ObjectFileReader]()
+        self.objectFileWriters = PluginChooser[ObjectFileWriter]()
 
     @classmethod
     def loadPlugins(cls) -> PluginRegistry:
@@ -131,79 +119,3 @@ class PluginRegistry:
             module.registerPlugins(registry)
 
         return registry
-
-    def registerPlugin(self, plugin: T) -> None:
-        if isinstance(plugin, DiffractionFileReader):
-            diffractionFileReaderEntry = PluginEntry[DiffractionFileReader](
-                simpleName=plugin.simpleName, displayName=plugin.fileFilter, strategy=plugin)
-            self.diffractionFileReaders.append(diffractionFileReaderEntry)
-        elif isinstance(plugin, ScalarTransformation):
-            scalarTransformationEntry = PluginEntry[ScalarTransformation](simpleName=plugin.name,
-                                                                          displayName=plugin.name,
-                                                                          strategy=plugin)
-            self.scalarTransformations.append(scalarTransformationEntry)
-        elif isinstance(plugin, ScanFileReader):
-            scanFileReaderEntry = PluginEntry[ScanFileReader](simpleName=plugin.simpleName,
-                                                              displayName=plugin.fileFilter,
-                                                              strategy=plugin)
-            self.scanFileReaders.append(scanFileReaderEntry)
-        elif isinstance(plugin, ScanFileWriter):
-            scanFileWriterEntry = PluginEntry[ScanFileWriter](simpleName=plugin.simpleName,
-                                                              displayName=plugin.fileFilter,
-                                                              strategy=plugin)
-            self.scanFileWriters.append(scanFileWriterEntry)
-        elif isinstance(plugin, ProbeFileReader):
-            probeFileReaderEntry = PluginEntry[ProbeFileReader](simpleName=plugin.simpleName,
-                                                                displayName=plugin.fileFilter,
-                                                                strategy=plugin)
-            self.probeFileReaders.append(probeFileReaderEntry)
-        elif isinstance(plugin, ProbeFileWriter):
-            probeFileWriterEntry = PluginEntry[ProbeFileWriter](simpleName=plugin.simpleName,
-                                                                displayName=plugin.fileFilter,
-                                                                strategy=plugin)
-            self.probeFileWriters.append(probeFileWriterEntry)
-        elif isinstance(plugin, ObjectPhaseCenteringStrategy):
-            objectPhaseCenteringStrategyEntry = PluginEntry[ObjectPhaseCenteringStrategy](
-                simpleName=plugin.name, displayName=plugin.name, strategy=plugin)
-            self.objectPhaseCenteringStrategies.append(objectPhaseCenteringStrategyEntry)
-        elif isinstance(plugin, ObjectFileReader):
-            objectFileReaderEntry = PluginEntry[ObjectFileReader](simpleName=plugin.simpleName,
-                                                                  displayName=plugin.fileFilter,
-                                                                  strategy=plugin)
-            self.objectFileReaders.append(objectFileReaderEntry)
-        elif isinstance(plugin, ObjectFileWriter):
-            objectFileWriterEntry = PluginEntry[ObjectFileWriter](simpleName=plugin.simpleName,
-                                                                  displayName=plugin.fileFilter,
-                                                                  strategy=plugin)
-            self.objectFileWriters.append(objectFileWriterEntry)
-        else:
-            raise TypeError(f'Invalid plugin type \"{type(plugin).__name__}\".')
-
-    def buildDiffractionFileReaderChooser(self) -> PluginChooser[DiffractionFileReader]:
-        return PluginChooser[DiffractionFileReader].createFromList(self.diffractionFileReaders)
-
-    def buildScalarTransformationChooser(self) -> PluginChooser[ScalarTransformation]:
-        return PluginChooser[ScalarTransformation].createFromList(self.scalarTransformations)
-
-    def buildScanFileReaderChooser(self) -> PluginChooser[ScanFileReader]:
-        return PluginChooser[ScanFileReader].createFromList(self.scanFileReaders)
-
-    def buildScanFileWriterChooser(self) -> PluginChooser[ScanFileWriter]:
-        return PluginChooser[ScanFileWriter].createFromList(self.scanFileWriters)
-
-    def buildProbeFileReaderChooser(self) -> PluginChooser[ProbeFileReader]:
-        return PluginChooser[ProbeFileReader].createFromList(self.probeFileReaders)
-
-    def buildProbeFileWriterChooser(self) -> PluginChooser[ProbeFileWriter]:
-        return PluginChooser[ProbeFileWriter].createFromList(self.probeFileWriters)
-
-    def buildObjectPhaseCenteringStrategyChooser(
-            self) -> PluginChooser[ObjectPhaseCenteringStrategy]:
-        return PluginChooser[ObjectPhaseCenteringStrategy].createFromList(
-            self.objectPhaseCenteringStrategies)
-
-    def buildObjectFileReaderChooser(self) -> PluginChooser[ObjectFileReader]:
-        return PluginChooser[ObjectFileReader].createFromList(self.objectFileReaders)
-
-    def buildObjectFileWriterChooser(self) -> PluginChooser[ObjectFileWriter]:
-        return PluginChooser[ObjectFileWriter].createFromList(self.objectFileWriters)

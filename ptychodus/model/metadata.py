@@ -35,24 +35,24 @@ class MetadataPresenter(Observable, Observer):
         return self._diffractionDataset.getMetadata()
 
     def canSyncDetectorPixelCount(self) -> bool:
-        return (self._metadata.detectorNumberOfPixels is not None)
+        return (self._metadata.detectorExtentInPixels is not None)
 
     def syncDetectorPixelCount(self) -> None:
-        if self._metadata.detectorNumberOfPixels:
+        if self._metadata.detectorExtentInPixels:
             self._detectorSettings.numberOfPixelsX.value = \
-                self._metadata.detectorNumberOfPixels.x
+                self._metadata.detectorExtentInPixels.width
             self._detectorSettings.numberOfPixelsY.value = \
-                self._metadata.detectorNumberOfPixels.y
+                self._metadata.detectorExtentInPixels.height
 
     def canSyncDetectorPixelSize(self) -> bool:
-        return (self._metadata.detectorPixelSizeInMeters is not None)
+        return (self._metadata.detectorPixelGeometry is not None)
 
     def syncDetectorPixelSize(self) -> None:
-        if self._metadata.detectorPixelSizeInMeters:
+        if self._metadata.detectorPixelGeometry:
             self._detectorSettings.pixelSizeXInMeters.value = \
-                self._metadata.detectorPixelSizeInMeters.x
+                self._metadata.detectorPixelGeometry.widthInMeters
             self._detectorSettings.pixelSizeYInMeters.value = \
-                self._metadata.detectorPixelSizeInMeters.y
+                self._metadata.detectorPixelGeometry.heightInMeters
 
     def canSyncDetectorDistance(self) -> bool:
         return (self._metadata.detectorDistanceInMeters is not None)
@@ -64,10 +64,10 @@ class MetadataPresenter(Observable, Observer):
 
     def canSyncPatternCropCenter(self) -> bool:
         return (self._metadata.cropCenterInPixels is not None \
-                or self._metadata.detectorNumberOfPixels is not None)
+                or self._metadata.detectorExtentInPixels is not None)
 
     def canSyncPatternCropExtent(self) -> bool:
-        return (self._metadata.detectorNumberOfPixels is not None)
+        return (self._metadata.detectorExtentInPixels is not None)
 
     def syncPatternCrop(self, syncCenter: bool, syncExtent: bool) -> None:
         if syncCenter:
@@ -76,18 +76,18 @@ class MetadataPresenter(Observable, Observer):
                         self._metadata.cropCenterInPixels.x
                 self._patternSettings.cropCenterYInPixels.value = \
                         self._metadata.cropCenterInPixels.y
-            elif self._metadata.detectorNumberOfPixels:
+            elif self._metadata.detectorExtentInPixels:
                 self._patternSettings.cropCenterXInPixels.value = \
-                        int(self._metadata.detectorNumberOfPixels.x) // 2
+                        int(self._metadata.detectorExtentInPixels.width) // 2
                 self._patternSettings.cropCenterYInPixels.value = \
-                        int(self._metadata.detectorNumberOfPixels.y) // 2
+                        int(self._metadata.detectorExtentInPixels.height) // 2
 
-        if syncExtent and self._metadata.detectorNumberOfPixels:
+        if syncExtent and self._metadata.detectorExtentInPixels:
             centerX = self._patternSettings.cropCenterXInPixels.value
             centerY = self._patternSettings.cropCenterYInPixels.value
 
-            extentX = int(self._metadata.detectorNumberOfPixels.x)
-            extentY = int(self._metadata.detectorNumberOfPixels.y)
+            extentX = int(self._metadata.detectorExtentInPixels.width)
+            extentY = int(self._metadata.detectorExtentInPixels.height)
 
             maxRadiusX = min(centerX, extentX - centerX)
             maxRadiusY = min(centerY, extentY - centerY)
@@ -116,7 +116,7 @@ class MetadataPresenter(Observable, Observer):
 
         fileName = filePathMaster.stem.replace('master', 'pos') + '.csv'
         filePath = filePathMaster.parents[2] / 'positions' / fileName
-        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, simpleFileType='CSV')
+        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, 'CSV')
 
     def update(self, observable: Observable) -> None:
         if observable is self._diffractionDataset:

@@ -3,7 +3,7 @@ from typing import Callable, Final
 import logging
 
 from PyQt5.QtCore import QSortFilterProxyModel
-from PyQt5.QtWidgets import QAbstractItemView
+from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
@@ -12,6 +12,7 @@ from ...model.object import (ObjectRepositoryItem, ObjectRepositoryItemPresenter
 from ...model.probe import ApparatusPresenter
 from ...view.image import ImageView
 from ...view.object import ObjectParametersView, ObjectView
+from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .random import RandomObjectViewController
@@ -41,10 +42,9 @@ class ObjectParametersController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.pixelSizeXWidget.setLengthInMeters(
-            self._presenter.getObjectPlanePixelSizeXInMeters())
-        self._view.pixelSizeYWidget.setLengthInMeters(
-            self._presenter.getObjectPlanePixelSizeYInMeters())
+        pixelGeometry = self._presenter.getObjectPlanePixelGeometry()
+        self._view.pixelSizeXWidget.setLengthInMeters(pixelGeometry.widthInMeters)
+        self._view.pixelSizeYWidget.setLengthInMeters(pixelGeometry.heightInMeters)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -146,7 +146,11 @@ class ObjectController(Observer):
                 selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
             if filePath:
-                self._repositoryPresenter.saveObject(itemPresenter.name, filePath, nameFilter)
+                try:
+                    self._repositoryPresenter.saveObject(itemPresenter.name, filePath, nameFilter)
+                except Exception as err:
+                    logger.exception(err)
+                    ExceptionDialog.showException('File writer', err)
 
     def _editSelectedObject(self) -> None:
         itemPresenter = self._getCurrentItemPresenter()
@@ -156,12 +160,10 @@ class ObjectController(Observer):
             initializerName = item.getInitializerSimpleName()
 
             if initializerName == 'Random':
-                randomController = RandomObjectViewController.createInstance(
-                    itemPresenter, self._view)
-                randomController.openDialog()
+                RandomObjectViewController.editParameters(itemPresenter, self._view)
             else:
-                # FIXME FromFile
-                logger.error('Unknown repository item!')
+                _ = QMessageBox.information(self._view, itemPresenter.name,
+                                            f'\"{initializerName}\" has no editable parameters.')
 
     def _removeSelectedObject(self) -> None:
         itemPresenter = self._getCurrentItemPresenter()

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from typing import Final
 import logging
@@ -8,11 +8,6 @@ from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
 from ...api.settings import SettingsRegistry
-from ..data import ActiveDiffractionDataset
-from ..object import ObjectAPI
-from ..probe import ProbeAPI
-from ..scan import ScanAPI
-from .arrayConverter import TikeArrayConverter
 from .multigrid import TikeMultigridPresenter, TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionPresenter, TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionPresenter, TikePositionCorrectionSettings
@@ -28,6 +23,7 @@ class TikePresenter(Observable, Observer):
     def __init__(self, settings: TikeSettings) -> None:
         super().__init__()
         self._settings = settings
+        self._logger = logging.getLogger('tike')
 
     @classmethod
     def createInstance(cls, settings: TikeSettings) -> TikePresenter:
@@ -41,7 +37,7 @@ class TikePresenter(Observable, Observer):
     def setNumGpus(self, value: str) -> None:
         self._settings.numGpus.value = value
 
-    def getNoiseModelList(self) -> list[str]:
+    def getNoiseModelList(self) -> Sequence[str]:
         return ['poisson', 'gaussian']
 
     def getNoiseModel(self) -> str:
@@ -60,7 +56,7 @@ class TikePresenter(Observable, Observer):
     def setNumBatch(self, value: int) -> None:
         self._settings.numBatch.value = value
 
-    def getBatchMethodList(self) -> list[str]:
+    def getBatchMethodList(self) -> Sequence[str]:
         return ['by_scan_grid', 'by_scan_stripes', 'wobbly_center', 'compact']
 
     def getBatchMethod(self) -> str:
@@ -119,6 +115,28 @@ class TikePresenter(Observable, Observer):
     def setStepLength(self, value: Decimal) -> None:
         self._settings.stepLength.value = value
 
+    def getLogLevelList(self) -> Sequence[str]:
+        return ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG']
+
+    def getLogLevel(self) -> str:
+        level = self._logger.getEffectiveLevel()
+        return logging.getLevelName(level)
+
+    def setLogLevel(self, name: str) -> None:
+        nameBefore = self.getLogLevel()
+
+        if name == nameBefore:
+            return
+
+        try:
+            self._logger.setLevel(name)
+        except ValueError:
+            logger.error(f'Bad log level \"{name}\".')
+
+        nameAfter = self.getLogLevel()
+        logger.info(f'Changed Tike log level {nameBefore} -> {nameAfter}')
+        self.notifyObservers()
+
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
@@ -150,8 +168,6 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry,
-                       diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                       probe: ProbeAPI, objectAPI: ObjectAPI,
                        isDeveloperModeEnabled: bool) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
 
@@ -172,11 +188,10 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                 core.reconstructorList.append(NullReconstructor('lstsq_grad'))
                 core.reconstructorList.append(NullReconstructor('dm'))
         else:
-            arrayConverter = TikeArrayConverter(scanAPI, probe, objectAPI, diffractionDataset)
             tikeReconstructor = TikeReconstructor(core._settings, core._multigridSettings,
                                                   core._positionCorrectionSettings,
                                                   core._probeCorrectionSettings,
-                                                  core._objectCorrectionSettings, arrayConverter)
+                                                  core._objectCorrectionSettings)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
             core.reconstructorList.append(
                 AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))

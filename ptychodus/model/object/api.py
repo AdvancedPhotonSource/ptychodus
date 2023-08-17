@@ -1,34 +1,32 @@
-from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 import logging
 
-from ...api.object import ObjectArrayType
-from ..probe import Apparatus
+from ...api.object import ObjectArrayType, ObjectInterpolator
 from .factory import ObjectRepositoryItemFactory
+from .interpolator import ObjectInterpolatorFactory
 from .repository import ObjectRepository
 from .selected import SelectedObject
+from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
 
 
 class ObjectAPI:
 
-    def __init__(self, apparatus: Apparatus, factory: ObjectRepositoryItemFactory,
-                 repository: ObjectRepository, object_: SelectedObject) -> None:
-        self._apparatus = apparatus
+    def __init__(self, factory: ObjectRepositoryItemFactory, repository: ObjectRepository,
+                 object_: SelectedObject, sizer: ObjectSizer,
+                 interpolatorFactory: ObjectInterpolatorFactory) -> None:
         self._factory = factory
         self._repository = repository
         self._object = object_
+        self._sizer = sizer
+        self._interpolatorFactory = interpolatorFactory
 
     def insertItemIntoRepositoryFromFile(self,
                                          filePath: Path,
-                                         *,
-                                         simpleFileType: str = '',
-                                         displayFileType: str = '') -> Optional[str]:
-        item = self._factory.openItemFromFile(filePath,
-                                              simpleFileType=simpleFileType,
-                                              displayFileType=displayFileType)
+                                         fileType: str = '') -> Optional[str]:
+        item = self._factory.openItemFromFile(filePath, fileType)
 
         if item is None:
             logger.error(f'Unable to open object from \"{filePath}\"!')
@@ -36,44 +34,45 @@ class ObjectAPI:
         return self._repository.insertItem(item)
 
     def insertItemIntoRepositoryFromArray(self,
-                                          nameHint: str,
+                                          name: str,
                                           array: ObjectArrayType,
                                           *,
                                           filePath: Optional[Path] = None,
-                                          simpleFileType: str = '',
-                                          displayFileType: str = '') -> Optional[str]:
-        item = self._factory.createItemFromArray(nameHint,
-                                                 array,
-                                                 filePath=filePath,
-                                                 simpleFileType=simpleFileType,
-                                                 displayFileType=displayFileType)
-        return self._repository.insertItem(item)
+                                          fileType: str = '',
+                                          replaceItem: bool = False,
+                                          selectItem: bool = False) -> Optional[str]:
+        item = self._factory.createItemFromArray(name, array, filePath=filePath, fileType=fileType)
+        itemName = self._repository.insertItem(item, name=name if replaceItem else None)
 
-    def insertItemIntoRepositoryFromInitializerSimpleName(self, name: str) -> Optional[str]:
-        item = self._factory.createItemFromSimpleName(name)
-        return self._repository.insertItem(item)
+        if itemName is None:
+            logger.error(f'Failed to insert object array \"{name}\"!')
+        elif selectItem:
+            self._object.selectItem(itemName)
 
-    def insertItemIntoRepositoryFromInitializerDisplayName(self, name: str) -> Optional[str]:
-        item = self._factory.createItemFromDisplayName(name)
-        return self._repository.insertItem(item)
+        return itemName
 
-    def selectItem(self, itemName: str) -> None:
-        self._object.selectItem(itemName)
+    def insertItemIntoRepositoryFromInitializerName(self, name: str) -> Optional[str]:
+        item = self._factory.createItemFromInitializerName(name)
+        return self._repository.insertItem(item)
 
     def selectNewItemFromInitializerSimpleName(self, name: str) -> None:  # TODO improve name
-        itemName = self.insertItemIntoRepositoryFromInitializerSimpleName(name)
+        itemName = self.insertItemIntoRepositoryFromInitializerName(name)
 
         if itemName is None:
             logger.error('Refusing to select null item!')
         else:
-            self.selectItem(itemName)
+            self._object.selectItem(itemName)
 
-    def getSelectedObjectArray(self) -> Optional[ObjectArrayType]:
+    def getSelectedObjectArray(self) -> ObjectArrayType:
         selectedItem = self._object.getSelectedItem()
-        return None if selectedItem is None else selectedItem.getArray()
 
-    def getPixelSizeXInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeXInMeters()
+        if selectedItem is None:
+            raise ValueError('No object is selected!')
 
-    def getPixelSizeYInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeYInMeters()
+        return selectedItem.getArray()
+
+    def getSelectedObjectInterpolator(self) -> ObjectInterpolator:
+        return self._interpolatorFactory.createInterpolator(
+            objectArray=self.getSelectedObjectArray(),
+            objectCentroid=self._sizer.getMidpointInMeters(),
+        )

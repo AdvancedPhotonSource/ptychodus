@@ -1,5 +1,4 @@
 from collections import defaultdict
-from decimal import Decimal
 from pathlib import Path
 from typing import Final
 import csv
@@ -12,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 class LYNXOrchestraScanFileReader(ScanFileReader):
-    MICRONS_TO_METERS: Final[Decimal] = Decimal('1e-6')
+    SIMPLE_NAME: Final[str] = 'LYNXOrchestra'
+    MICRONS_TO_METERS: Final[float] = 1.e-6
     DATA_POINT_COLUMN: Final[int] = 0
     X_COLUMN: Final[int] = 2
     Y_COLUMN: Final[int] = 5
@@ -38,17 +38,9 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
         'Stdev_cap5',
     ]
 
-    @property
-    def simpleName(self) -> str:
-        return 'LYNXOrchestra'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'LYNX Orchestra Scan Files (*.dat)'
-
     def read(self, filePath: Path) -> Scan:
         pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
-        scanName = self.simpleName
+        scanName = self.SIMPLE_NAME
 
         with filePath.open(newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=' ', skipinitialspace=True)
@@ -80,8 +72,8 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
 
                 data_point = int(row[self.DATA_POINT_COLUMN])
                 point = ScanPoint(
-                    x=Decimal(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
-                    y=Decimal(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
+                    x=float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
+                    y=float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
                 )
                 pointSeqMap[data_point].append(point)
 
@@ -89,4 +81,8 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(LYNXOrchestraScanFileReader())
+    registry.scanFileReaders.registerPlugin(
+        LYNXOrchestraScanFileReader(),
+        simpleName=LYNXOrchestraScanFileReader.SIMPLE_NAME,
+        displayName='LYNX Orchestra Scan Files (*.dat)',
+    )

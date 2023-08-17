@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable, Final, Generic, TypeVar
@@ -89,7 +89,7 @@ class SettingsGroup(Observable, Observer):
                                     candidateEntry: SettingsEntry[Any]) -> SettingsEntry[Any]:
         for existingEntry in self._entryList:
             if existingEntry.name.casefold() == candidateEntry.name.casefold():
-                if type(existingEntry.value) != type(candidateEntry.value):
+                if not isinstance(candidateEntry, existingEntry.value.__class__):
                     raise TypeError('Attempted to duplicate settings entry with conflicting type.')
 
                 return existingEntry
@@ -148,7 +148,7 @@ class SettingsRegistry(Observable):
     def setReplacementPathPrefix(self, replacementPathPrefix: str) -> None:
         self._replacementPathPrefix = replacementPathPrefix
 
-    def getOpenFileFilterList(self) -> list[str]:
+    def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileFilterList
 
     def getOpenFileFilter(self) -> str:
@@ -177,7 +177,7 @@ class SettingsRegistry(Observable):
 
         self.notifyObservers()
 
-    def getSaveFileFilterList(self) -> list[str]:
+    def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileFilterList
 
     def getSaveFileFilter(self) -> str:

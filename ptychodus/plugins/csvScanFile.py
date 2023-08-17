@@ -1,4 +1,3 @@
-from decimal import Decimal
 from pathlib import Path
 import csv
 
@@ -12,14 +11,6 @@ class CSVScanFileReader(ScanFileReader):
     def __init__(self, xcol: int = 1, ycol: int = 0) -> None:
         self._xcol = xcol
         self._ycol = ycol
-
-    @property
-    def simpleName(self) -> str:
-        return 'CSV'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Comma-Separated Values Files (*.csv)'
 
     def read(self, filePath: Path) -> Scan:
         pointList = list()
@@ -36,8 +27,8 @@ class CSVScanFileReader(ScanFileReader):
                     raise ScanPointParseError('Bad number of columns!')
 
                 point = ScanPoint(
-                    x=Decimal(row[self._xcol]),
-                    y=Decimal(row[self._ycol]),
+                    x=float(row[self._xcol]),
+                    y=float(row[self._ycol]),
                 )
                 pointList.append(point)
 
@@ -46,14 +37,6 @@ class CSVScanFileReader(ScanFileReader):
 
 class CSVScanFileWriter(ScanFileWriter):
 
-    @property
-    def simpleName(self) -> str:
-        return 'CSV'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Comma-Separated Values Files (*.csv)'
-
     def write(self, filePath: Path, scan: Scan) -> None:
         with filePath.open(mode='wt') as csvFile:
             for index, point in scan.items():
@@ -61,5 +44,13 @@ class CSVScanFileWriter(ScanFileWriter):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(CSVScanFileReader())
-    registry.registerPlugin(CSVScanFileWriter())
+    registry.scanFileReaders.registerPlugin(
+        CSVScanFileReader(),
+        simpleName='CSV',
+        displayName='Comma-Separated Values Files (*.csv)',
+    )
+    registry.scanFileWriters.registerPlugin(
+        CSVScanFileWriter(),
+        simpleName='CSV',
+        displayName='Comma-Separated Values Files (*.csv)',
+    )

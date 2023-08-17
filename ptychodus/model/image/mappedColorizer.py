@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Colormap, Normalize
@@ -8,7 +8,7 @@ import numpy
 
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable
-from ...api.plugins import PluginChooser, PluginEntry
+from ...api.plugins import PluginChooser
 from .colorizer import Colorizer
 from .displayRange import DisplayRange
 from .visarray import VisualizationArray
@@ -27,28 +27,23 @@ class MappedColorizer(Colorizer):
         self._variantChooser.addObserver(self)
 
     @classmethod
-    def createColorizerList(
+    def createColorizerVariants(
             cls, array: VisualizationArray, displayRange: DisplayRange,
-            transformChooser: PluginChooser[ScalarTransformation]) -> list[Colorizer]:
-        cyclicColormapEntries: list[PluginEntry[Colormap]] = list()
-        acyclicColormapEntries: list[PluginEntry[Colormap]] = list()
-
+            transformChooser: PluginChooser[ScalarTransformation]) -> Sequence[Colorizer]:
         # See https://matplotlib.org/stable/gallery/color/colormap_reference.html
         cyclicColormapNames = ['hsv', 'twilight', 'twilight_shifted']
 
+        cyclicColormapChooser = PluginChooser[Colormap]()
+        acyclicColormapChooser = PluginChooser[Colormap]()
+
         for name, cmap in matplotlib.colormaps.items():
-            entry = PluginEntry[Colormap](simpleName=name, displayName=name, strategy=cmap)
-
             if name in cyclicColormapNames:
-                cyclicColormapEntries.append(entry)
+                cyclicColormapChooser.registerPlugin(cmap, simpleName=name)
             else:
-                acyclicColormapEntries.append(entry)
+                acyclicColormapChooser.registerPlugin(cmap, simpleName=name)
 
-        cyclicColormapChooser = PluginChooser[Colormap].createFromList(cyclicColormapEntries)
-        cyclicColormapChooser.setFromSimpleName('hsv')
-
-        acyclicColormapChooser = PluginChooser[Colormap].createFromList(acyclicColormapEntries)
-        acyclicColormapChooser.setFromSimpleName('viridis')
+        cyclicColormapChooser.setCurrentPluginByName('hsv')
+        acyclicColormapChooser.setCurrentPluginByName('viridis')
 
         amplitude = cls(array, displayRange, transformChooser, 'Amplitude', array.getAmplitude,
                         acyclicColormapChooser)
@@ -67,17 +62,17 @@ class MappedColorizer(Colorizer):
     def name(self) -> str:
         return self._name
 
-    def getVariantNameList(self) -> list[str]:
+    def getVariantNameList(self) -> Sequence[str]:
         return self._variantChooser.getDisplayNameList()
 
     def getVariantName(self) -> str:
-        return self._variantChooser.getCurrentDisplayName()
+        return self._variantChooser.currentPlugin.displayName
 
     def setVariantByName(self, name: str) -> None:
-        self._variantChooser.setFromDisplayName(name)
+        self._variantChooser.setCurrentPluginByName(name)
 
     def getDataArray(self) -> RealArrayType:
-        transform = self._transformChooser.getCurrentStrategy()
+        transform = self._transformChooser.currentPlugin.strategy
         values = self._arrayComponent()
         return transform(values)
 
@@ -90,7 +85,7 @@ class MappedColorizer(Colorizer):
                          vmax=float(self._displayRange.getUpper()),
                          clip=False)
 
-        cmap = self._variantChooser.getCurrentStrategy()
+        cmap = self._variantChooser.currentPlugin.strategy
         scalarMappable = ScalarMappable(norm, cmap)
 
         return scalarMappable.to_rgba(self.getDataArray())

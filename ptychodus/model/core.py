@@ -8,13 +8,19 @@ from typing import overload, Optional
 import logging
 import sys
 
+try:
+    # NOTE must import hdf5plugin before h5py
+    import hdf5plugin
+except ModuleNotFoundError:
+    pass
+
 import h5py
-import matplotlib
 import numpy
 
 from ..api.data import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
+from ..api.state import StateDataRegistry
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .data import (DataCore, DiffractionDatasetPresenter, DiffractionDatasetInputOutputPresenter,
                    DiffractionPatternPresenter)
@@ -25,11 +31,10 @@ from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
 from .probe import ApparatusPresenter, ProbeCore, ProbePresenter, ProbeRepositoryPresenter
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
-from .reconstructor import ReconstructorCore, ReconstructorPresenter, ReconstructorPlotPresenter
+from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore, ScanPresenter, ScanRepositoryPresenter
-from .statefulCore import StateDataRegistry
 from .tike import TikeReconstructorLibrary
 from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
                        WorkflowParametersPresenter, WorkflowStatusPresenter)
@@ -47,6 +52,7 @@ def configureLogger() -> None:
     logger.info(f'Ptychodus {version("ptychodus")}')
     logger.info(f'NumPy {version("numpy")}')
     logger.info(f'Matplotlib {version("matplotlib")}')
+    logger.info(f'HDF5Plugin {version("hdf5plugin")}')
     logger.info(f'H5Py {version("h5py")}')
     logger.info(f'HDF5 {h5py.version.hdf5_version}')
 
@@ -72,25 +78,26 @@ class ModelCore:
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._detector = Detector.createInstance(self._detectorSettings)
-        self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings)
-        self._detectorImageCore = ImageCore(
-            self._pluginRegistry.buildScalarTransformationChooser())
+        self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings,
+                                                                  self._detector)
+        self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations)
 
         self._dataCore = DataCore(self.settingsRegistry, self._detector,
-                                  self._pluginRegistry.buildDiffractionFileReaderChooser())
+                                  self._pluginRegistry.diffractionFileReaders)
         self._scanCore = ScanCore(self.rng, self.settingsRegistry, self._dataCore.dataset,
-                                  self._pluginRegistry.buildScanFileReaderChooser(),
-                                  self._pluginRegistry.buildScanFileWriterChooser())
+                                  self._pluginRegistry.scanFileReaders,
+                                  self._pluginRegistry.scanFileWriters)
         self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
                                     self._dataCore.patternSizer,
-                                    self._pluginRegistry.buildProbeFileReaderChooser(),
-                                    self._pluginRegistry.buildProbeFileWriterChooser())
-        self._probeImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
+                                    self._pluginRegistry.probeFileReaders,
+                                    self._pluginRegistry.probeFileWriters)
+        self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy())
         self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
                                       self._scanCore.sizer, self._probeCore.sizer,
-                                      self._pluginRegistry.buildObjectFileReaderChooser(),
-                                      self._pluginRegistry.buildObjectFileWriterChooser())
-        self._objectImageCore = ImageCore(self._pluginRegistry.buildScalarTransformationChooser())
+                                      self._pluginRegistry.objectPhaseCenteringStrategies,
+                                      self._pluginRegistry.objectFileReaders,
+                                      self._pluginRegistry.objectFileWriters)
+        self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy())
         self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.dataset,
                                                                   self._detectorSettings,
                                                                   self._dataCore.patternSettings,
@@ -98,16 +105,17 @@ class ModelCore:
                                                                   self._scanCore.scanAPI)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._dataCore.dataset, self._scanCore.scanAPI,
-            self._probeCore.probeAPI, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._pluginRegistry.buildObjectPhaseCenteringStrategyChooser(),
-            self._dataCore.dataset, self._scanCore.scanAPI, self._probeCore.probeAPI,
-            self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
+            self._dataCore.dataset,
+            self._scanCore.scanAPI,
+            self._probeCore.probeAPI,
+            self._objectCore.objectAPI,
             [
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
@@ -115,8 +123,8 @@ class ModelCore:
             ],
         )
 
-        self._stateDataRegistry = StateDataRegistry(
-            (self._dataCore, self._scanCore, self._probeCore, self._objectCore))
+        self._stateDataRegistry = StateDataRegistry(self._dataCore, self._scanCore,
+                                                    self._probeCore, self._objectCore)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
         self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore.dataAPI,
                                               self._scanCore.scanAPI, self._probeCore.probeAPI,
@@ -127,9 +135,8 @@ class ModelCore:
         if modelArgs.rpcPort >= 0:
             self.rpcMessageService = RPCMessageService(modelArgs.rpcPort,
                                                        modelArgs.autoExecuteRPCs)
-            self.rpcMessageService.registerProcedure(
-                LoadResultsMessage,
-                LoadResultsExecutor(self._probeCore.probeAPI, self._objectCore.objectAPI))
+            self.rpcMessageService.registerProcedure(LoadResultsMessage,
+                                                     LoadResultsExecutor(self._stateDataRegistry))
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
@@ -231,6 +238,17 @@ class ModelCore:
         self.saveStateData(filePath, restartable=False)
         return result.result
 
+    def batchModeTrain(self, directoryPath: Path) -> float:
+        for filePath in directoryPath.glob('*.npz'):
+            # TODO sort by filePath.stat().st_mtime
+            self._stateDataRegistry.openStateData(filePath)
+            self._reconstructorCore.presenter.ingest()
+
+        self._reconstructorCore.presenter.train()
+
+        someQualityMetric = 0.  # TODO
+        return someQualityMetric
+
     @property
     def scanPresenter(self) -> ScanPresenter:
         return self._scanCore.presenter
@@ -266,10 +284,6 @@ class ModelCore:
     @property
     def reconstructorPresenter(self) -> ReconstructorPresenter:
         return self._reconstructorCore.presenter
-
-    @property
-    def reconstructorPlotPresenter(self) -> ReconstructorPlotPresenter:
-        return self._reconstructorCore.plotPresenter
 
     @property
     def areWorkflowsSupported(self) -> bool:

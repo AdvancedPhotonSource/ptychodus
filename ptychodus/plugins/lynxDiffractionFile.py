@@ -2,17 +2,12 @@ from decimal import Decimal
 from pathlib import Path
 import logging
 
-try:
-    # NOTE must import hdf5plugin before h5py
-    import hdf5plugin
-except ModuleNotFoundError:
-    pass
-
 import h5py
 
+from ptychodus.api.apparatus import PixelGeometry
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 SimpleDiffractionDataset)
-from ptychodus.api.geometry import Array2D
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
@@ -25,14 +20,6 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
         self._dataPath = '/entry/data/eiger_4'
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
-    @property
-    def simpleName(self) -> str:
-        return 'LYNX'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'LYNX Diffraction Data Files (*.h5 *.hdf5)'
-
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
@@ -42,7 +29,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
                 try:
                     data = h5File[self._dataPath]
-                    pixelSize = Decimal.from_float(data.attrs['Pixel_size'].item())
+                    pixelSize = Decimal(repr(data.attrs['Pixel_size'].item()))
                 except KeyError:
                     logger.debug('Unable to load data.')
                 else:
@@ -52,8 +39,8 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
-                        detectorNumberOfPixels=Array2D[int](detectorWidth, detectorHeight),
-                        detectorPixelSizeInMeters=Array2D[Decimal](pixelSize, pixelSize),
+                        detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
+                        detectorPixelGeometry=PixelGeometry(pixelSize, pixelSize),
                         filePath=filePath,
                     )
 
@@ -72,4 +59,8 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(LYNXDiffractionFileReader())
+    registry.diffractionFileReaders.registerPlugin(
+        LYNXDiffractionFileReader(),
+        simpleName='LYNX',
+        displayName='LYNX Diffraction Data Files (*.h5 *.hdf5)',
+    )

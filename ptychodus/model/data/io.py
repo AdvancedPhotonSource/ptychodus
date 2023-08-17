@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from pathlib import Path
 import logging
 
@@ -30,7 +31,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         reinitObservable.addObserver(presenter)
         return presenter
 
-    def getOpenFileFilterList(self) -> list[str]:
+    def getOpenFileFilterList(self) -> Sequence[str]:
         return self._dataAPI.getOpenFileFilterList()
 
     def getOpenFileFilter(self) -> str:
@@ -39,7 +40,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
     def openDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
         try:
             fileType = self._dataAPI.loadDiffractionDataset(filePath=filePath,
-                                                            displayFileType=fileFilter,
+                                                            fileType=fileFilter,
                                                             assemble=False)
         except Exception:
             logger.exception('Failed to load diffraction dataset.')
@@ -55,7 +56,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
 
     def _openDiffractionFileFromSettings(self) -> None:
         self._dataAPI.loadDiffractionDataset(filePath=self._settings.filePath.value,
-                                             simpleFileType=self._settings.fileType.value,
+                                             fileType=self._settings.fileType.value,
                                              assemble=True)
 
     def startAssemblingDiffractionPatterns(self) -> None:
@@ -64,16 +65,14 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
     def stopAssemblingDiffractionPatterns(self, finishAssembling: bool) -> None:
         self._dataAPI.stopAssemblingDiffractionPatterns(finishAssembling)
 
-    def getSaveFileFilterList(self) -> list[str]:
+    def getSaveFileFilterList(self) -> Sequence[str]:
         return [self.getSaveFileFilter()]
 
     def getSaveFileFilter(self) -> str:
         return 'NumPy Binary Files (*.npy)'
 
     def saveDiffractionFile(self, filePath: Path) -> None:
-        # TODO saveDiffractionFile should share code with state data I/O
-        fileFilter = self.getSaveFileFilter()
-        logger.debug(f'Writing \"{filePath}\" as \"{fileFilter}\"')
+        logger.debug(f'Writing \"{filePath}\" as \"NPY\"')
         array = self._dataset.getAssembledData()
         numpy.save(filePath, array)
 

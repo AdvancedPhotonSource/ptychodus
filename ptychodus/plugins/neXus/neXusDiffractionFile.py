@@ -8,11 +8,13 @@ import logging
 
 import h5py
 
-from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
+from ptychodus.api.apparatus import PixelGeometry
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, SimpleDiffractionDataset)
 from ptychodus.api.geometry import Array2D
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.tree import SimpleTreeNode
+from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +68,10 @@ class DetectorSpecificGroup:
     photon_energy_eV: float
     x_pixels_in_detector: int
     y_pixels_in_detector: int
+
+    @property
+    def numberOfPatternsTotal(self) -> int:
+        return max(self.nimages, self.ntrigger)
 
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorSpecificGroup:
@@ -135,9 +141,18 @@ class GoniometerGroup:
 
     @classmethod
     def read(cls, group: h5py.Group) -> GoniometerGroup:
-        chiDataset = group['chi']
-        assert chiDataset.attrs['units'] == b'degree'
-        chi_deg = float(chiDataset[0])
+        chiItem = group['chi']
+        chiSpace = chiItem.id.get_space()
+
+        assert chiItem.attrs['units'] == b'degree'
+
+        if chiSpace.get_simple_extent_type() == h5py.h5s.SCALAR:
+            chi_deg = float(chiItem[()])
+        elif isinstance(chiItem, h5py.Dataset):
+            chi_deg = float(chiItem[0])
+        else:
+            raise ValueError('Failed to read goniometer angle (chi)!')
+
         return cls(chi_deg)
 
 
@@ -204,19 +219,12 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         self._treeBuilder = H5DiffractionFileTreeBuilder()
         self.stageRotationInDegrees = 0.  # TODO This is a hack; remove when able!
 
-    @property
-    def simpleName(self) -> str:
-        return 'NeXus'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'NeXus Master Files (*.h5 *.hdf5)'
-
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset: DiffractionDataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
         try:
             with h5py.File(filePath, 'r') as h5File:
+                metadata = DiffractionMetadata.createNullInstance(filePath)
                 contentsTree = self._treeBuilder.build(h5File)
 
                 try:
@@ -226,9 +234,9 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     logger.info(f'File {filePath} is not a NeXus data file.')
                 else:
                     detector = entry.instrument.detector
-                    detectorPixelSizeInMeters = Array2D[Decimal](
-                        Decimal.from_float(detector.x_pixel_size_m),
-                        Decimal.from_float(detector.y_pixel_size_m),
+                    detectorPixelGeometry = PixelGeometry(
+                        Decimal(repr(detector.x_pixel_size_m)),
+                        Decimal(repr(detector.y_pixel_size_m)),
                     )
                     cropCenterInPixels = Array2D[int](
                         int(round(detector.beam_center_x_px)),
@@ -236,29 +244,28 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     )
 
                     detectorSpecific = detector.detectorSpecific
-                    detectorNumberOfPixels = Array2D[int](
+                    detectorExtentInPixels = ImageExtent(
                         int(detectorSpecific.x_pixels_in_detector),
                         int(detectorSpecific.y_pixels_in_detector),
                     )
-                    probeEnergyInElectronVolts = Decimal.from_float(
-                        detectorSpecific.photon_energy_eV)
+                    probeEnergyInElectronVolts = Decimal(repr(detectorSpecific.photon_energy_eV))
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],
-                        numberOfPatternsTotal=detectorSpecific.nimages,
-                        # NOTE for catalyst particle numberOfPatternsTotal=detectorSpecific.ntrigger,
+                        numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
                         patternDataType=h5Dataset.dtype,
-                        detectorDistanceInMeters=Decimal.from_float(detector.detector_distance_m),
-                        detectorNumberOfPixels=detectorNumberOfPixels,
-                        detectorPixelSizeInMeters=detectorPixelSizeInMeters,
+                        detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
+                        detectorExtentInPixels=detectorExtentInPixels,
+                        detectorPixelGeometry=detectorPixelGeometry,
                         cropCenterInPixels=cropCenterInPixels,
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
                     )
-                    dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
 
-                    # vvv TODO This is a hack; remove when able! vvv
-                    self.stageRotationInDegrees = entry.sample.goniometer.chi_deg
+                dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
+
+                # vvv TODO This is a hack; remove when able! vvv
+                self.stageRotationInDegrees = entry.sample.goniometer.chi_deg
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 

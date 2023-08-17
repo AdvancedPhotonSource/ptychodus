@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Optional
 import logging
@@ -37,29 +38,22 @@ class DiffractionDataAPI:
     def stopAssemblingDiffractionPatterns(self, finishAssembling: bool) -> None:
         self._builder.stop(finishAssembling)
 
-    def getOpenFileFilterList(self) -> list[str]:
+    def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
     def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.getCurrentDisplayName()
+        return self._fileReaderChooser.currentPlugin.displayName
 
     def loadDiffractionDataset(self,
                                filePath: Path,
+                               fileType: str,
                                *,
-                               simpleFileType: str = '',
-                               displayFileType: str = '',
                                assemble: bool = True) -> Optional[str]:
-        if simpleFileType:
-            self._fileReaderChooser.setFromSimpleName(simpleFileType)
-        elif displayFileType:
-            self._fileReaderChooser.setFromDisplayName(displayFileType)
-        else:
-            logger.error('Refusing to load diffraction dataset without file type!')
-            return None
+        self._fileReaderChooser.setCurrentPluginByName(fileType)
 
         if filePath.is_file():
-            fileReader = self._fileReaderChooser.getCurrentStrategy()
-            fileType = fileReader.simpleName
+            fileReader = self._fileReaderChooser.currentPlugin.strategy
+            fileType = self._fileReaderChooser.currentPlugin.simpleName
             logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
 
             try:
@@ -76,4 +70,4 @@ class DiffractionDataAPI:
             self._builder.start()
             self._builder.stop(finishAssembling=True)
 
-        return self._fileReaderChooser.getCurrentSimpleName()
+        return self._fileReaderChooser.currentPlugin.simpleName

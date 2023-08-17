@@ -11,12 +11,13 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry
+from ...api.state import ProbeStateData, StatefulCore
 from ..data import DiffractionPatternSizer
 from ..detector import Detector
-from ..statefulCore import StateDataType, StatefulCore
 from .api import ProbeAPI
 from .apparatus import Apparatus, ApparatusPresenter
 from .factory import ProbeRepositoryItemFactory
+from .modes import MultimodalProbeFactory
 from .repository import ProbeRepository, ProbeRepositoryItem
 from .selected import ProbeRepositoryItemSettingsDelegate, SelectedProbe
 from .settings import ProbeSettings
@@ -65,7 +66,7 @@ class ProbeRepositoryPresenter(Observable, Observer):
         return self._itemFactory.getInitializerDisplayNameList()
 
     def initializeProbe(self, displayName: str) -> Optional[str]:
-        return self._probeAPI.insertItemIntoRepositoryFromInitializerDisplayName(displayName)
+        return self._probeAPI.insertItemIntoRepositoryFromInitializerName(displayName)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._itemFactory.getOpenFileFilterList()
@@ -74,13 +75,13 @@ class ProbeRepositoryPresenter(Observable, Observer):
         return self._itemFactory.getOpenFileFilter()
 
     def openProbe(self, filePath: Path, fileFilter: str) -> None:
-        self._probeAPI.insertItemIntoRepositoryFromFile(filePath, displayFileType=fileFilter)
+        self._probeAPI.insertItemIntoRepositoryFromFile(filePath, fileFilter)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()
 
     def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.getCurrentDisplayName()
+        return self._fileWriterChooser.currentPlugin.displayName
 
     def saveProbe(self, name: str, filePath: Path, fileFilter: str) -> None:
         try:
@@ -89,16 +90,14 @@ class ProbeRepositoryPresenter(Observable, Observer):
             logger.error(f'Unable to locate \"{name}\"!')
             return
 
-        self._fileWriterChooser.setFromDisplayName(fileFilter)
-        fileType = self._fileWriterChooser.getCurrentSimpleName()
+        self._fileWriterChooser.setCurrentPluginByName(fileFilter)
+        fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
-        writer = self._fileWriterChooser.getCurrentStrategy()
+        writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, item.getArray())
 
-        # TODO test this
         if item.getInitializer() is None:
-            initializer = self._itemFactory.createFileInitializer(filePath,
-                                                                  simpleFileType=fileType)
+            initializer = self._itemFactory.createFileInitializer(filePath, fileType)
 
             if initializer is not None:
                 item.setInitializer(initializer)
@@ -134,12 +133,12 @@ class ProbePresenter(Observable, Observer):
             return False
 
         actualExtent = selectedProbe.getExtentInPixels()
-        expectedExtent = self._sizer.getProbeExtent()
+        expectedExtent = self._sizer.getExtentInPixels()
         hasComplexDataType = numpy.iscomplexobj(selectedProbe.getArray())
         return (actualExtent == expectedExtent and hasComplexDataType)
 
     def selectProbe(self, name: str) -> None:
-        self._probeAPI.selectItem(name)
+        self._probe.selectItem(name)
 
     def getSelectedProbe(self) -> str:
         return self._probe.getSelectedName()
@@ -162,7 +161,7 @@ class ProbePresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class ProbeCore(StatefulCore):
+class ProbeCore(StatefulCore[ProbeStateData]):
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
                  detector: Detector, diffractionPatternSizer: DiffractionPatternSizer,
@@ -173,8 +172,9 @@ class ProbeCore(StatefulCore):
         self.apparatus = Apparatus.createInstance(detector, diffractionPatternSizer, self.settings)
         self.apparatusPresenter = ApparatusPresenter.createInstance(self.settings, self.apparatus)
 
-        self._factory = ProbeRepositoryItemFactory(rng, self.settings, self.apparatus, self.sizer,
-                                                   fileReaderChooser)
+        self._modesFactory = MultimodalProbeFactory(rng)
+        self._factory = ProbeRepositoryItemFactory(self._modesFactory, self.settings,
+                                                   self.apparatus, self.sizer, fileReaderChooser)
         self._repository = ProbeRepository()
         self._itemSettingsDelegate = ProbeRepositoryItemSettingsDelegate(
             self.settings, self._factory, self._repository)
@@ -185,33 +185,17 @@ class ProbeCore(StatefulCore):
             self._repository, self._factory, self.probeAPI, fileWriterChooser)
         self.presenter = ProbePresenter.createInstance(self.sizer, self._probe, self.probeAPI)
 
-    def getStateData(self, *, restartable: bool) -> StateDataType:
-        pixelSizeXInMeters = float(self.apparatus.getObjectPlanePixelSizeXInMeters())
-        pixelSizeYInMeters = float(self.apparatus.getObjectPlanePixelSizeYInMeters())
-        selectedProbeArray = self.probeAPI.getSelectedProbeArray()
+    def getStateData(self) -> ProbeStateData:
+        pixelGeometry = self.apparatus.getObjectPlanePixelGeometry()
+        return ProbeStateData(
+            pixelSizeXInMeters=float(pixelGeometry.widthInMeters),
+            pixelSizeYInMeters=float(pixelGeometry.heightInMeters),
+            array=self.probeAPI.getSelectedProbeArray(),
+        )
 
-        if selectedProbeArray is not None:
-            state: StateDataType = {
-                'pixelSizeXInMeters': numpy.array([pixelSizeXInMeters]),
-                'pixelSizeYInMeters': numpy.array([pixelSizeYInMeters]),
-                'probe': selectedProbeArray,
-            }
-        return state
-
-    def setStateData(self, state: StateDataType) -> None:
-        try:
-            array = state['probe']
-        except KeyError:
-            logger.debug('Failed to restore probe array state!')
-            return
-
-        filePath = Path(''.join(state['restartFilePath']))
-        itemName = self.probeAPI.insertItemIntoRepositoryFromArray(nameHint='Restart',
-                                                                   array=array,
-                                                                   filePath=filePath,
-                                                                   simpleFileType='NPZ')
-
-        if itemName is None:
-            logger.error('Failed to initialize \"{name}\"!')
-        else:
-            self.probeAPI.selectItem(itemName)
+    def setStateData(self, stateData: ProbeStateData, stateFilePath: Path) -> None:
+        self.probeAPI.insertItemIntoRepositoryFromArray(name='Restart',
+                                                        array=stateData.array,
+                                                        filePath=stateFilePath,
+                                                        fileType=stateFilePath.suffix,
+                                                        selectItem=True)

@@ -5,7 +5,7 @@ import logging
 import queue
 
 from ...api.settings import SettingsRegistry
-from ..statefulCore import StateDataRegistry
+from ...api.state import StateDataRegistry
 from .locator import DataLocator
 from .settings import WorkflowSettings
 
@@ -33,7 +33,7 @@ class WorkflowExecutor:
         self.jobQueue: queue.Queue[WorkflowJob] = queue.Queue()
 
     def runFlow(self, flowLabel: str) -> None:
-        transferSyncLevel = 3  # Copy files if checksums of the source and destination do not match.
+        transferSyncLevel = 3  # Copy files if checksums of the source and destination mismatch
 
         inputDataPosixPath = self._inputDataLocator.getPosixPath() / flowLabel
         computeDataPosixPath = self._computeDataLocator.getPosixPath() / flowLabel

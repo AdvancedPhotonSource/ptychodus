@@ -64,7 +64,8 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self._indexFilter = SelectableScanIndexFilter()
         self._indexFilter.addObserver(self)
         self._jitterRadiusInMeters = Decimal()
-        self._centroid = ScanPoint(Decimal(), Decimal())
+        self._centroidX = Decimal()
+        self._centroidY = Decimal()
 
     @property
     def nameHint(self) -> str:
@@ -79,7 +80,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
 
         try:
             self._scan = self._initializer()
-        except:
+        except Exception:
             logger.exception('Failed to reinitialize scan!')
         else:
             self.notifyObservers()
@@ -101,19 +102,19 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self.reinitialize()
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
-        self._indexFilter.selectFilterFromSimpleName(settings.indexFilter.value)
-        self._transform.selectTransformFromSimpleName(settings.transform.value)
+        self._indexFilter.selectFilterByName(settings.indexFilter.value)
+        self._transform.selectTransformByName(settings.transform.value)
         self._jitterRadiusInMeters = settings.jitterRadiusInMeters.value
-        self._centroid = ScanPoint(settings.centroidXInMeters.value,
-                                   settings.centroidYInMeters.value)
+        self._centroidX = settings.centroidXInMeters.value
+        self._centroidY = settings.centroidYInMeters.value
         self.notifyObservers()
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         settings.indexFilter.value = self._indexFilter.simpleName
         settings.transform.value = self._transform.simpleName
         settings.jitterRadiusInMeters.value = self._jitterRadiusInMeters
-        settings.centroidXInMeters.value = self._centroid.x
-        settings.centroidYInMeters.value = self._centroid.y
+        settings.centroidXInMeters.value = self._centroidX
+        settings.centroidYInMeters.value = self._centroidX
 
     def __iter__(self) -> Iterator[int]:
         it = iter(self._scan)
@@ -135,16 +136,16 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         point = self._transform(self._scan[index])
 
         if self._jitterRadiusInMeters > Decimal():
-            rad = Decimal.from_float(self._rng.uniform())
-            dirX = Decimal.from_float(self._rng.normal())
-            dirY = Decimal.from_float(self._rng.normal())
+            rad = self._rng.uniform()
+            dirX = self._rng.normal()
+            dirY = self._rng.normal()
 
-            scalar = self._jitterRadiusInMeters * (rad / (dirX**2 + dirY**2)).sqrt()
+            scalar = float(self._jitterRadiusInMeters) * numpy.sqrt(rad / (dirX**2 + dirY**2))
             point = ScanPoint(point.x + scalar * dirX, point.y + scalar * dirY)
 
         return ScanPoint(
-            self._centroid.x + point.x,
-            self._centroid.y + point.y,
+            float(self._centroidX) + point.x,
+            float(self._centroidY) + point.y,
         )
 
     def __len__(self) -> int:
@@ -154,14 +155,14 @@ class ScanRepositoryItem(Scan, Observable, Observer):
     def untransformed(self) -> Scan:
         return self._scan
 
-    def getLengthInMeters(self) -> Decimal:
+    def getLengthInMeters(self) -> float:
         pointList = [point for point in self._scan.values()]
-        lengthInMeters = Decimal()
+        lengthInMeters = 0.
 
         for pointA, pointB in zip(pointList[:-1], pointList[1:]):
             dx = pointB.x - pointA.x
             dy = pointB.y - pointA.y
-            lengthInMeters += (dx * dx + dy * dy).sqrt()
+            lengthInMeters += numpy.hypot(dx, dy)
 
         return lengthInMeters
 
@@ -182,7 +183,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         return self._indexFilter.displayName
 
     def setIndexFilterByName(self, name: str) -> None:
-        self._indexFilter.selectFilterFromDisplayName(name)
+        self._indexFilter.selectFilterByName(name)
 
     def getTransformNameList(self) -> Sequence[str]:
         return self._transform.getSelectableTransforms()
@@ -191,7 +192,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         return self._transform.displayName
 
     def setTransformByName(self, name: str) -> None:
-        self._transform.selectTransformFromDisplayName(name)
+        self._transform.selectTransformByName(name)
 
     def getJitterRadiusInMeters(self) -> Decimal:
         '''gets the jitter radius'''
@@ -205,22 +206,22 @@ class ScanRepositoryItem(Scan, Observable, Observer):
 
     def getCentroidXInMeters(self) -> Decimal:
         '''gets the x centroid'''
-        return self._centroid.x
+        return self._centroidX
 
     def setCentroidXInMeters(self, value: Decimal) -> None:
         '''sets the x centroid'''
-        if self._centroid.x != value:
-            self._centroid = ScanPoint(value, self._centroid.y)
+        if self._centroidX != value:
+            self._centroidX = value
             self.notifyObservers()
 
     def getCentroidYInMeters(self) -> Decimal:
         '''gets the y centroid'''
-        return self._centroid.y
+        return self._centroidY
 
     def setCentroidYInMeters(self, value: Decimal) -> None:
         '''sets the y centroid'''
-        if self._centroid.y != value:
-            self._centroid = ScanPoint(self._centroid.x, value)
+        if self._centroidY != value:
+            self._centroidY = value
             self.notifyObservers()
 
     def update(self, observable: Observable) -> None:

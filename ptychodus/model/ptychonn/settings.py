@@ -10,8 +10,6 @@ class PtychoNNModelSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.inputSize = settingsGroup.createIntegerEntry('InputSize', 128)
-        self.outputSize = settingsGroup.createIntegerEntry('OutputSize', 128)
         self.stateFilePath = settingsGroup.createPathEntry('StateFilePath',
                                                            Path('/path/to/best_model.pth'))
         self.numberOfConvolutionChannels = settingsGroup.createIntegerEntry(
@@ -36,8 +34,8 @@ class PtychoNNTrainingSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.phaseCenteringStrategy = settingsGroup.createStringEntry(
-            'PhaseCenteringStrategy', 'Identity')
+        self.maximumTrainingDatasetSize = settingsGroup.createIntegerEntry(
+            'MaximumTrainingDatasetSize', 100000)
         self.validationSetFractionalSize = settingsGroup.createRealEntry(
             'ValidationSetFractionalSize', '0.1')
         self.optimizationEpochsPerHalfCycle = settingsGroup.createIntegerEntry(

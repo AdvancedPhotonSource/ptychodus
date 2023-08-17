@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from importlib.metadata import version
 from typing import Any, Union
 import logging
@@ -8,8 +9,12 @@ import numpy.typing
 
 import tike.ptycho
 
-from ...api.reconstructor import ReconstructResult, Reconstructor
-from .arrayConverter import TikeArrays, TikeArrayConverter
+from ...api.object import ObjectArrayType
+from ...api.object import ObjectPoint
+from ...api.plot import Plot2D, PlotAxis, PlotSeries
+from ...api.probe import ProbeArrayType
+from ...api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
+from ...api.scan import Scan, ScanPoint, TabularScan
 from .multigrid import TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionSettings
@@ -24,14 +29,12 @@ class TikeReconstructor:
     def __init__(self, settings: TikeSettings, multigridSettings: TikeMultigridSettings,
                  positionCorrectionSettings: TikePositionCorrectionSettings,
                  probeCorrectionSettings: TikeProbeCorrectionSettings,
-                 objectCorrectionSettings: TikeObjectCorrectionSettings,
-                 arrayConverter: TikeArrayConverter) -> None:
+                 objectCorrectionSettings: TikeObjectCorrectionSettings) -> None:
         self._settings = settings
         self._multigridSettings = multigridSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
         self._objectCorrectionSettings = objectCorrectionSettings
-        self._arrayConverter = arrayConverter
 
         tikeVersion = version('tike')
         logger.info(f'\tTike {tikeVersion}')
@@ -104,20 +107,46 @@ class TikeReconstructor:
 
         return 1
 
-    def __call__(self,
-                 algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> ReconstructResult:
-        inputArrays = self._arrayConverter.exportToTike()
+    def _plotCosts(self, costs: Sequence[Sequence[float]]) -> Plot2D:
+        plot = Plot2D.createNull()
 
-        data = self._arrayConverter.getDiffractionData()
-        scan = inputArrays.scan
-        probe = inputArrays.probe
-        psi = inputArrays.object_
+        if len(costs) > 0:
+            seriesX = PlotSeries(label='Iteration', values=[*range(len(costs))])
+            seriesYList: list[PlotSeries] = list()
+
+            for batch in range(len(costs[0])):
+                seriesY = PlotSeries(label=f'Batch {batch}', values=[c[batch] for c in costs])
+                seriesYList.append(seriesY)
+
+            plot = Plot2D(
+                axisX=PlotAxis(label='Iteration', series=[seriesX]),
+                axisY=PlotAxis(label='Cost', series=seriesYList),
+            )
+
+        return plot
+
+    def __call__(self, parameters: ReconstructInput,
+                 algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> ReconstructOutput:
+        objectGrid = parameters.objectInterpolator.getGrid()
+        psi = parameters.objectInterpolator.getArray().astype('complex64')
+        probe = parameters.probeArray[numpy.newaxis, numpy.newaxis, ...].astype('complex64')
+        data = numpy.fft.ifftshift(parameters.diffractionPatternArray, axes=(-2, -1))
+        coordinateList: list[float] = list()
+
+        # Tike coordinate system origin is top-left corner; requires padding
+        ux = -probe.shape[-1] / 2
+        uy = -probe.shape[-2] / 2
+
+        for scanPoint in parameters.scan.values():
+            objectPoint = objectGrid.mapScanPointToObjectPoint(scanPoint)
+            coordinateList.append(objectPoint.y + uy)
+            coordinateList.append(objectPoint.x + ux)
+
+        scan = numpy.array(coordinateList, dtype=numpy.float32).reshape(len(parameters.scan), 2)
+        scanMin = scan.min(axis=0)
+        scanMax = scan.max(axis=0)
+        logger.debug(f'Scan range [px]: {scanMin} -> {scanMax}')
         numGpus = self.getNumGpus()
-
-        if len(data) != len(scan):
-            numFrame = min(len(data), len(scan))
-            scan = scan[:numFrame, ...]
-            data = data[:numFrame, ...]
 
         logger.debug(f'data shape={data.shape}')
         logger.debug(f'scan shape={scan.shape}')
@@ -125,7 +154,7 @@ class TikeReconstructor:
         logger.debug(f'object shape={psi.shape}')
         logger.debug(f'num_gpu={numGpus}')
 
-        parameters = tike.ptycho.solvers.PtychoParameters(
+        ptychoParameters = tike.ptycho.solvers.PtychoParameters(
             probe=probe,
             psi=psi,
             scan=scan,
@@ -137,7 +166,7 @@ class TikeReconstructor:
         if self._multigridSettings.useMultigrid.value:
             result = tike.ptycho.reconstruct_multigrid(
                 data=data,
-                parameters=parameters,
+                parameters=ptychoParameters,
                 model=self._settings.noiseModel.value,
                 num_gpu=numGpus,
                 use_mpi=False,
@@ -145,25 +174,46 @@ class TikeReconstructor:
                 interp=None,  # TODO does this have other options?
             )
         else:
-            result = tike.ptycho.reconstruct(
-                data=data,
-                parameters=parameters,
-                model=self._settings.noiseModel.value,
-                num_gpu=numGpus,
-                use_mpi=False,
-            )
+            # TODO support interactive reconstructions
+            with tike.ptycho.Reconstruction(
+                    data=data,
+                    parameters=ptychoParameters,
+                    model=self._settings.noiseModel.value,
+                    num_gpu=numGpus,
+                    use_mpi=False,
+            ) as context:
+                context.iterate(ptychoParameters.algorithm_options.num_iter)
+            result = context.parameters
 
         logger.debug(f'Result: {pprint.pformat(result)}')
 
-        outputArrays = TikeArrays(
-            indexes=inputArrays.indexes,
-            scan=result.scan,
-            probe=result.probe,
-            object_=result.psi,
-        )
-        self._arrayConverter.importFromTike(outputArrays)
+        scanOutput: Scan | None = None
+        probeOutputArray: ProbeArrayType | None = None
+        objectOutputArray: ObjectArrayType | None = None
 
-        return ReconstructResult(0, result.algorithm_options.costs)
+        if self._positionCorrectionSettings.usePositionCorrection.value:
+            pointDict: dict[int, ScanPoint] = dict()
+
+            for index, xy in zip(parameters.scan, result.scan):
+                objectPoint = ObjectPoint(x=xy[1], y=xy[0])
+                pointDict[index] = objectGrid.mapObjectPointToScanPoint(objectPoint)
+
+            scanOutput = TabularScan(pointDict)
+
+        if self._probeCorrectionSettings.useProbeCorrection.value:
+            probeOutputArray = result.probe[0, 0]
+
+        if self._objectCorrectionSettings.useObjectCorrection.value:
+            objectOutputArray = result.psi
+
+        return ReconstructOutput(
+            scan=scanOutput,
+            probeArray=probeOutputArray,
+            objectArray=objectOutputArray,
+            objective=result.algorithm_options.costs,
+            plot2D=self._plotCosts(result.algorithm_options.costs),
+            result=0,
+        )
 
 
 class RegularizedPIEReconstructor(Reconstructor):
@@ -181,13 +231,13 @@ class RegularizedPIEReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> ReconstructResult:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.alpha = float(self._settings.alpha.value)
-        return self._tikeReconstructor(self._algorithmOptions)
+        return self._tikeReconstructor(parameters, self._algorithmOptions)
 
 
 class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
@@ -205,14 +255,14 @@ class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> ReconstructResult:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.alpha = float(self._settings.alpha.value)
         self._algorithmOptions.step_length = float(self._settings.stepLength.value)
-        return self._tikeReconstructor(self._algorithmOptions)
+        return self._tikeReconstructor(parameters, self._algorithmOptions)
 
 
 class ConjugateGradientReconstructor(Reconstructor):
@@ -230,14 +280,14 @@ class ConjugateGradientReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> ReconstructResult:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.cg_iter = self._settings.cgIter.value
         self._algorithmOptions.step_length = float(self._settings.stepLength.value)
-        return self._tikeReconstructor(self._algorithmOptions)
+        return self._tikeReconstructor(parameters, self._algorithmOptions)
 
 
 class IterativeLeastSquaresReconstructor(Reconstructor):
@@ -255,12 +305,12 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> ReconstructResult:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
-        return self._tikeReconstructor(self._algorithmOptions)
+        return self._tikeReconstructor(parameters, self._algorithmOptions)
 
 
 class DifferenceMapReconstructor(Reconstructor):
@@ -278,9 +328,9 @@ class DifferenceMapReconstructor(Reconstructor):
     def _settings(self) -> TikeSettings:
         return self._tikeReconstructor._settings
 
-    def reconstruct(self) -> ReconstructResult:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         self._algorithmOptions.num_batch = self._settings.numBatch.value
         self._algorithmOptions.batch_method = self._settings.batchMethod.value
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
-        return self._tikeReconstructor(self._algorithmOptions)
+        return self._tikeReconstructor(parameters, self._algorithmOptions)

@@ -19,7 +19,7 @@ class ProbeRepositoryItemSettingsDelegate(RepositoryItemSettingsDelegate[ProbeRe
 
     def syncFromSettings(self) -> str | None:
         name = self._settings.initializer.value
-        item = self._factory.createItemFromSimpleName(name)
+        item = self._factory.createItemFromInitializerName(name)
 
         if item is None:
             logger.error('Failed to create item!')

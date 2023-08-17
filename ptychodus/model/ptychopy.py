@@ -10,7 +10,8 @@ except ModuleNotFoundError:
     ptychopy = None
 
 from ..api.observer import Observable, Observer
-from ..api.reconstructor import ReconstructResult, Reconstructor, ReconstructorLibrary
+from ..api.reconstructor import (ReconstructInput, ReconstructOutput, Reconstructor,
+                                 ReconstructorLibrary)
 from ..api.settings import SettingsRegistry, SettingsGroup
 
 logger = logging.getLogger(__name__)
@@ -331,8 +332,8 @@ class ExtendedPIEReconstructor(Reconstructor):
     def name(self) -> str:
         return 'ePIE'
 
-    def reconstruct(self) -> ReconstructResult:
-        return ReconstructResult(0, [[]])  # TODO
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+        return ReconstructOutput.createNull()  # TODO
 
 
 # {"epie", (PyCFunction)ptycholib_epie, METH_VARARGS|METH_KEYWORDS, epie_docstring},
@@ -355,8 +356,8 @@ class DifferenceMapReconstructor(Reconstructor):
     def name(self) -> str:
         return 'DM'
 
-    def reconstruct(self) -> ReconstructResult:
-        return ReconstructResult(0, [[]])  # TODO
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+        return ReconstructOutput.createNull()  # TODO
 
 
 # {"dm", (PyCFunction)ptycholib_dm, METH_VARARGS|METH_KEYWORDS, dm_docstring},
@@ -370,8 +371,8 @@ class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
     def name(self) -> str:
         return 'MLs'
 
-    def reconstruct(self) -> ReconstructResult:
-        return ReconstructResult(0, [[]])  # TODO
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+        return ReconstructOutput.createNull()  # TODO
 
 
 # {"mls", (PyCFunction)ptycholib_mls, METH_VARARGS|METH_KEYWORDS, mls_docstring},

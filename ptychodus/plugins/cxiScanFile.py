@@ -1,4 +1,3 @@
-from decimal import Decimal
 from pathlib import Path
 import logging
 
@@ -11,14 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class CXIScanFileReader(ScanFileReader):
-
-    @property
-    def simpleName(self) -> str:
-        return 'CXI'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Coherent X-ray Imaging Files (*.cxi)'
 
     def read(self, filePath: Path) -> Scan:
         pointList = list()
@@ -35,14 +26,15 @@ class CXIScanFileReader(ScanFileReader):
                     except ValueError:
                         logger.exception('Unable to load scan.')
                     else:
-                        point = ScanPoint(
-                            x=Decimal.from_float(x),
-                            y=Decimal.from_float(y),
-                        )
+                        point = ScanPoint(x, y)
                         pointList.append(point)
 
         return TabularScan.createFromPointIterable(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(CXIScanFileReader())
+    registry.scanFileReaders.registerPlugin(
+        CXIScanFileReader(),
+        simpleName='CXI',
+        displayName='Coherent X-ray Imaging Files (*.cxi)',
+    )

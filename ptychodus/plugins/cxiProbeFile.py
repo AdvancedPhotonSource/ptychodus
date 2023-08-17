@@ -12,14 +12,6 @@ logger = logging.getLogger(__name__)
 
 class CXIProbeFileReader(ProbeFileReader):
 
-    @property
-    def simpleName(self) -> str:
-        return 'CXI'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Coherent X-ray Imaging Files (*.cxi)'
-
     def read(self, filePath: Path) -> ProbeArrayType:
         probe = numpy.zeros((0, 0, 0), dtype=complex)
 
@@ -33,4 +25,8 @@ class CXIProbeFileReader(ProbeFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(CXIProbeFileReader())
+    registry.probeFileReaders.registerPlugin(
+        CXIProbeFileReader(),
+        simpleName='CXI',
+        displayName='Coherent X-ray Imaging Files (*.cxi)',
+    )

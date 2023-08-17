@@ -1,26 +1,17 @@
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Final, Generator, Optional
+from typing import Final
 import logging
 
-from scipy.interpolate import RegularGridInterpolator
-import numpy
-import numpy.typing
-
 from ...api.geometry import Interval
-from ...api.object import ObjectPhaseCenteringStrategy
 from ...api.observer import Observable, Observer
-from ...api.plugins import PluginChooser
-from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
+from ...api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
+                                  TrainableReconstructor)
 from ...api.settings import SettingsRegistry
-from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
-from ..probe import ProbeAPI
-from ..scan import ScanAPI
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
-from .trainable import TrainableReconstructor
 
 logger = logging.getLogger(__name__)
 
@@ -28,344 +19,212 @@ logger = logging.getLogger(__name__)
 class PtychoNNModelPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, settings: PtychoNNModelSettings) -> None:
+    def __init__(self, modelSettings: PtychoNNModelSettings) -> None:
         super().__init__()
-        self._settings = settings
+        self._modelSettings = modelSettings
         self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
 
     @classmethod
-    def createInstance(cls, settings: PtychoNNModelSettings) -> PtychoNNModelPresenter:
-        presenter = cls(settings)
-        settings.addObserver(presenter)
+    def createInstance(cls, modelSettings: PtychoNNModelSettings) -> PtychoNNModelPresenter:
+        presenter = cls(modelSettings)
+        modelSettings.addObserver(presenter)
         return presenter
 
-    def getStateFileFilterList(self) -> list[str]:
+    def getStateFileFilterList(self) -> Sequence[str]:
         return self._fileFilterList
 
     def getStateFileFilter(self) -> str:
         return self._fileFilterList[0]
 
     def getStateFilePath(self) -> Path:
-        return self._settings.stateFilePath.value
+        return self._modelSettings.stateFilePath.value
 
     def setStateFilePath(self, directory: Path) -> None:
-        self._settings.stateFilePath.value = directory
+        self._modelSettings.stateFilePath.value = directory
 
     def getNumberOfConvolutionChannelsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getNumberOfConvolutionChannels(self) -> int:
         limits = self.getNumberOfConvolutionChannelsLimits()
-        return limits.clamp(self._settings.numberOfConvolutionChannels.value)
+        return limits.clamp(self._modelSettings.numberOfConvolutionChannels.value)
 
     def setNumberOfConvolutionChannels(self, value: int) -> None:
-        self._settings.numberOfConvolutionChannels.value = value
+        self._modelSettings.numberOfConvolutionChannels.value = value
 
     def getBatchSizeLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getBatchSize(self) -> int:
         limits = self.getBatchSizeLimits()
-        return limits.clamp(self._settings.batchSize.value)
+        return limits.clamp(self._modelSettings.batchSize.value)
 
     def setBatchSize(self, value: int) -> None:
-        self._settings.batchSize.value = value
+        self._modelSettings.batchSize.value = value
 
     def isBatchNormalizationEnabled(self) -> bool:
-        return self._settings.useBatchNormalization.value
+        return self._modelSettings.useBatchNormalization.value
 
     def setBatchNormalizationEnabled(self, enabled: bool) -> None:
-        self._settings.useBatchNormalization.value = enabled
+        self._modelSettings.useBatchNormalization.value = enabled
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settings:
+        if observable is self._modelSettings:
             self.notifyObservers()
 
 
 class PtychoNNTrainingPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, settings: PtychoNNTrainingSettings,
-                 phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
-                 diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                 probeAPI: ProbeAPI, objectAPI: ObjectAPI, reinitObservable: Observable) -> None:
+    def __init__(self, modelSettings: PtychoNNTrainingSettings,
+                 trainer: TrainableReconstructor) -> None:
         super().__init__()
-        self._settings = settings
-        self._phaseCenteringStrategyChooser = phaseCenteringStrategyChooser
-        self._diffractionDataset = diffractionDataset
-        self._scanAPI = scanAPI
-        self._probeAPI = probeAPI
-        self._objectAPI = objectAPI
-        self._reinitObservable = reinitObservable
-        self._trainer: Optional[TrainableReconstructor] = None
-        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
+        self._modelSettings = modelSettings
+        self._trainer = trainer
 
     @classmethod
-    def createInstance(cls, settings: PtychoNNTrainingSettings,
-                       phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
-                       diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                       probeAPI: ProbeAPI, objectAPI: ObjectAPI,
-                       reinitObservable: Observable) -> PtychoNNTrainingPresenter:
-        presenter = cls(settings, phaseCenteringStrategyChooser, diffractionDataset, scanAPI,
-                        probeAPI, objectAPI, reinitObservable)
-        reinitObservable.addObserver(presenter)
-        phaseCenteringStrategyChooser.addObserver(presenter)
-        presenter._syncFromSettings()
+    def createInstance(cls, modelSettings: PtychoNNTrainingSettings,
+                       trainer: TrainableReconstructor) -> PtychoNNTrainingPresenter:
+        presenter = cls(modelSettings, trainer)
+        modelSettings.addObserver(presenter)
         return presenter
-
-    def setTrainer(self, trainer: TrainableReconstructor) -> None:
-        self._trainer = trainer
 
     def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getValidationSetFractionalSize(self) -> Decimal:
         limits = self.getValidationSetFractionalSizeLimits()
-        return limits.clamp(self._settings.validationSetFractionalSize.value)
+        return limits.clamp(self._modelSettings.validationSetFractionalSize.value)
 
     def setValidationSetFractionalSize(self, value: Decimal) -> None:
-        self._settings.validationSetFractionalSize.value = value
+        self._modelSettings.validationSetFractionalSize.value = value
 
     def getOptimizationEpochsPerHalfCycleLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getOptimizationEpochsPerHalfCycle(self) -> int:
         limits = self.getOptimizationEpochsPerHalfCycleLimits()
-        return limits.clamp(self._settings.optimizationEpochsPerHalfCycle.value)
+        return limits.clamp(self._modelSettings.optimizationEpochsPerHalfCycle.value)
 
     def setOptimizationEpochsPerHalfCycle(self, value: int) -> None:
-        self._settings.optimizationEpochsPerHalfCycle.value = value
+        self._modelSettings.optimizationEpochsPerHalfCycle.value = value
 
     def getMaximumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMaximumLearningRate(self) -> Decimal:
         limits = self.getMaximumLearningRateLimits()
-        return limits.clamp(self._settings.maximumLearningRate.value)
+        return limits.clamp(self._modelSettings.maximumLearningRate.value)
 
     def setMaximumLearningRate(self, value: Decimal) -> None:
-        self._settings.maximumLearningRate.value = value
+        self._modelSettings.maximumLearningRate.value = value
 
     def getMinimumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMinimumLearningRate(self) -> Decimal:
         limits = self.getMinimumLearningRateLimits()
-        return limits.clamp(self._settings.minimumLearningRate.value)
+        return limits.clamp(self._modelSettings.minimumLearningRate.value)
 
     def setMinimumLearningRate(self, value: Decimal) -> None:
-        self._settings.minimumLearningRate.value = value
+        self._modelSettings.minimumLearningRate.value = value
 
     def getTrainingEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getTrainingEpochs(self) -> int:
         limits = self.getTrainingEpochsLimits()
-        return limits.clamp(self._settings.trainingEpochs.value)
+        return limits.clamp(self._modelSettings.trainingEpochs.value)
 
     def setTrainingEpochs(self, value: int) -> None:
-        self._settings.trainingEpochs.value = value
+        self._modelSettings.trainingEpochs.value = value
 
     def isSaveTrainingArtifactsEnabled(self) -> bool:
-        return self._settings.saveTrainingArtifacts.value
+        return self._modelSettings.saveTrainingArtifacts.value
 
     def setSaveTrainingArtifactsEnabled(self, enabled: bool) -> None:
-        self._settings.saveTrainingArtifacts.value = enabled
+        self._modelSettings.saveTrainingArtifacts.value = enabled
 
     def getOutputPath(self) -> Path:
-        return self._settings.outputPath.value
+        return self._modelSettings.outputPath.value
 
     def setOutputPath(self, directory: Path) -> None:
-        self._settings.outputPath.value = directory
+        self._modelSettings.outputPath.value = directory
 
     def getOutputSuffix(self) -> str:
-        return self._settings.outputSuffix.value
+        return self._modelSettings.outputSuffix.value
 
     def setOutputSuffix(self, suffix: str) -> None:
-        self._settings.outputSuffix.value = suffix
+        self._modelSettings.outputSuffix.value = suffix
 
     def getStatusIntervalInEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getStatusIntervalInEpochs(self) -> int:
         limits = self.getStatusIntervalInEpochsLimits()
-        return limits.clamp(self._settings.statusIntervalInEpochs.value)
+        return limits.clamp(self._modelSettings.statusIntervalInEpochs.value)
 
     def setStatusIntervalInEpochs(self, value: int) -> None:
-        self._settings.statusIntervalInEpochs.value = value
+        self._modelSettings.statusIntervalInEpochs.value = value
 
-    def getTrainingDataFileFilterList(self) -> list[str]:
-        return self._fileFilterList
+    def train(self) -> None:
+        self._trainer.train()
 
-    def getTrainingDataFileFilter(self) -> str:
-        return self._fileFilterList[0]
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return [self.getSaveFileFilter()]
 
-    def _createAxis(self, ticks: int, tickSize: float,
-                    center: float) -> numpy.typing.NDArray[numpy.float_]:
-        axis = numpy.arange(ticks) * tickSize
-        axis += center - axis.mean()
-        return axis
-
-    def getPhaseCenteringStrategyList(self) -> list[str]:
-        return self._phaseCenteringStrategyChooser.getDisplayNameList()
-
-    def getPhaseCenteringStrategy(self) -> str:
-        return self._phaseCenteringStrategyChooser.getCurrentDisplayName()
-
-    def setPhaseCenteringStrategy(self, name: str) -> None:
-        self._phaseCenteringStrategyChooser.setFromDisplayName(name)
-
-    def _syncFromSettings(self) -> None:
-        self._phaseCenteringStrategyChooser.setFromSimpleName(
-            self._settings.phaseCenteringStrategy.value)
-
-    def _syncToSettings(self) -> None:
-        self._settings.phaseCenteringStrategy.value = \
-                self._phaseCenteringStrategyChooser.getCurrentSimpleName()
+    def getSaveFileFilter(self) -> str:
+        return 'NumPy Zipped Archive (*.npz)'
 
     def saveTrainingData(self, filePath: Path) -> None:
-        selectedProbeArray = self._probeAPI.getSelectedProbeArray()
-
-        if selectedProbeArray is None:
-            raise ValueError('No probe is selected!')
-
-        selectedObjectArray = self._objectAPI.getSelectedObjectArray()
-
-        if selectedObjectArray is None:
-            raise ValueError('No object is selected!')
-
-        objectPhaseCenteringStrategy = self._phaseCenteringStrategyChooser.getCurrentStrategy()
-        object_ = objectPhaseCenteringStrategy(selectedObjectArray)
-
-        pixelSizeXInMeters = float(self._objectAPI.getPixelSizeXInMeters())
-        pixelSizeYInMeters = float(self._objectAPI.getPixelSizeYInMeters())
-
-        scanBoundingBoxInMeters = self._scanAPI.getBoundingBoxInMeters()
-        scanCentroidInMeters = scanBoundingBoxInMeters.centroid
-        pixelPositionsXInMeters = self._createAxis(object_.shape[-1], pixelSizeXInMeters,
-                                                   float(scanCentroidInMeters.x))
-        pixelPositionsYInMeters = self._createAxis(object_.shape[-2], pixelSizeYInMeters,
-                                                   float(scanCentroidInMeters.y))
-
-        interp = RegularGridInterpolator((pixelPositionsYInMeters, pixelPositionsXInMeters),
-                                         object_,
-                                         method='pchip')
-
-        diffractionData = self._diffractionDataset.getAssembledData()
-        selectedScan = self._scanAPI.getSelectedScan()
-
-        if selectedScan is None:
-            raise ValueError('No scan is selected!')
-
-        scanPositionsXInMeters: list[float] = list()
-        scanPositionsYInMeters: list[float] = list()
-        patches = numpy.zeros_like(diffractionData, dtype=complex)
-
-        for index in self._diffractionDataset.getAssembledIndexes():
-            try:
-                point = selectedScan[index]
-            except KeyError:
-                continue
-
-            scanPositionsXInMeters.append(float(point.x))
-            scanPositionsYInMeters.append(float(point.y))
-
-            patchPositionsXInMeters = self._createAxis(patches.shape[-1], pixelSizeXInMeters,
-                                                       float(point.x))
-            patchPositionsYInMeters = self._createAxis(patches.shape[-2], pixelSizeYInMeters,
-                                                       float(point.y))
-            patches[index, ...] = interp((patchPositionsYInMeters, patchPositionsXInMeters))
-
-        scanPositionsInMeters = numpy.column_stack(
-            (scanPositionsYInMeters, scanPositionsXInMeters))
-
-        data: dict[str, numpy.typing.NDArray[numpy.number[Any]]] = {
-            'real': patches,
-            'reciprocal': diffractionData,
-            'position': scanPositionsInMeters,
-            'probe': selectedProbeArray,
-            'pixelsize': numpy.array([pixelSizeYInMeters, pixelSizeXInMeters]),
-        }
-
-        numpy.savez_compressed(filePath, **data)
-
-    def train(self, trainingDirPath: Path) -> None:
-        logger.debug(f'Train using data in {trainingDirPath}.')
-        diffractionPatternsList = list()
-        reconstructedPatchesList = list()
-        trainingFilePathGlob: Generator[Path, None, None] = trainingDirPath.glob('*.npz')
-
-        for trainingFilePath in trainingFilePathGlob:
-            logger.debug(f'Reading training data from \"{trainingFilePath}\"...')
-
-            try:
-                with numpy.load(trainingFilePath) as trainingFile:
-                    diffractionPatternsList.append(trainingFile['reciprocal'])
-                    reconstructedPatchesList.append(trainingFile['real'])
-            except Exception:
-                logger.exception('Failed to load training data.')
-
-        diffractionPatterns = numpy.concatenate(diffractionPatternsList, axis=0)
-        reconstructedPatches = numpy.concatenate(reconstructedPatchesList, axis=0)
-
-        if self._trainer is None:
-            logger.error('Trainable reconstructor not found!')
-        else:
-            # NOTE PtychoNN writes training outputs using internal mechanisms
-            self._trainer.train(diffractionPatterns, reconstructedPatches)
+        logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
+        self._trainer.saveTrainingData(filePath)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._reinitObservable:
-            self._syncFromSettings()
+        if observable is self._modelSettings:
             self.notifyObservers()
-        elif observable is self._phaseCenteringStrategyChooser:
-            self._syncToSettings()
 
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
-    def __init__(self, settingsRegistry: SettingsRegistry,
-                 phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
-                 diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                 probeAPI: ProbeAPI, objectAPI: ObjectAPI) -> None:
+    def __init__(self, modelSettings: PtychoNNModelSettings,
+                 trainingSettings: PtychoNNTrainingSettings,
+                 phaseOnlyTrainableReconstructor: TrainableReconstructor,
+                 reconstructors: Sequence[Reconstructor]) -> None:
         super().__init__()
-        self._settings = PtychoNNModelSettings.createInstance(settingsRegistry)
-        self._trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
-        self.modelPresenter = PtychoNNModelPresenter.createInstance(self._settings)
+        self._modelSettings = modelSettings
+        self._trainingSettings = trainingSettings
+        self.modelPresenter = PtychoNNModelPresenter.createInstance(modelSettings)
         self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(
-            self._trainingSettings, phaseCenteringStrategyChooser, diffractionDataset, scanAPI,
-            probeAPI, objectAPI, settingsRegistry)
-        self.reconstructorList: list[Reconstructor] = list()
+            trainingSettings, phaseOnlyTrainableReconstructor)
+        self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry,
-                       phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
-                       diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                       probeAPI: ProbeAPI, objectAPI: ObjectAPI,
+    def createInstance(cls, settingsRegistry: SettingsRegistry, objectAPI: ObjectAPI,
                        isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
-        core = cls(settingsRegistry, phaseCenteringStrategyChooser, diffractionDataset, scanAPI,
-                   probeAPI, objectAPI)
+        modelSettings = PtychoNNModelSettings.createInstance(settingsRegistry)
+        trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
+        phaseOnlyTrainableReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
+        reconstructors: list[TrainableReconstructor] = list()
 
         try:
-            from .reconstructor import PtychoNNPhaseOnlyReconstructor
+            from .phaseOnly import PtychoNNPhaseOnlyTrainableReconstructor
         except ModuleNotFoundError:
             logger.info('PtychoNN not found.')
 
             if isDeveloperModeEnabled:
-                core.reconstructorList.append(NullReconstructor('PhaseOnly'))
+                reconstructors.append(phaseOnlyTrainableReconstructor)
         else:
-            trainableReconstructor = PtychoNNPhaseOnlyReconstructor(core._settings,
-                                                                    core._trainingSettings,
-                                                                    scanAPI, probeAPI, objectAPI,
-                                                                    diffractionDataset)
-            core.trainingPresenter.setTrainer(trainableReconstructor)
-            core.reconstructorList.append(trainableReconstructor)
+            phaseOnlyTrainableReconstructor = PtychoNNPhaseOnlyTrainableReconstructor(
+                modelSettings, trainingSettings, objectAPI)
+            reconstructors.append(phaseOnlyTrainableReconstructor)
 
-        return core
+        return cls(modelSettings, trainingSettings, phaseOnlyTrainableReconstructor,
+                   reconstructors)
 
     @property
     def name(self) -> str:
         return 'PtychoNN'
 
     def __iter__(self) -> Iterator[Reconstructor]:
-        return iter(self.reconstructorList)
+        return iter(self._reconstructors)

@@ -13,9 +13,10 @@ class FromFileObjectInitializer(ObjectInitializer):
     SIMPLE_NAME: Final[str] = 'FromFile'
     DISPLAY_NAME: Final[str] = 'Open File...'
 
-    def __init__(self, filePath: Path, fileReader: ObjectFileReader) -> None:
+    def __init__(self, filePath: Path, fileType: str, fileReader: ObjectFileReader) -> None:
         super().__init__()
         self._filePath = filePath
+        self._fileType = fileType
         self._fileReader = fileReader
 
     @property
@@ -31,12 +32,11 @@ class FromFileObjectInitializer(ObjectInitializer):
         pass
 
     def syncToSettings(self, settings: ObjectSettings) -> None:
-        settings.inputFileType.value = self._fileReader.simpleName
+        settings.inputFileType.value = self._fileType
         settings.inputFilePath.value = self._filePath
 
     def __call__(self) -> ObjectArrayType:
-        fileType = self._fileReader.simpleName
-        logger.debug(f'Reading \"{self._filePath}\" as \"{fileType}\"')
+        logger.debug(f'Reading \"{self._filePath}\" as \"{self._fileType}\"')
 
         try:
             array = self._fileReader.read(self._filePath)

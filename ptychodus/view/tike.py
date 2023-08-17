@@ -21,6 +21,7 @@ class TikeBasicParametersView(QGroupBox):
         self.cgIterSpinBox = QSpinBox()
         self.alphaSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.stepLengthSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.logLevelComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls,
@@ -31,17 +32,16 @@ class TikeBasicParametersView(QGroupBox):
         view = cls(parent)
 
         view.numGpusLineEdit.setToolTip(
-            'The number of GPUs to use. If the number of GPUs is less than the requested number, only workers for the available GPUs are allocated.'
-        )
+            'The number of GPUs to use. If the number of GPUs is less than the requested number, '
+            'only workers for the available GPUs are allocated.')
         view.noiseModelComboBox.setToolTip('The noise model to use for the cost function.')
-        view.numBatchSpinBox.setToolTip(
-            'The dataset is divided into this number of groups where each group is processed sequentially.'
-        )
+        view.numBatchSpinBox.setToolTip('The dataset is divided into this number of groups '
+                                        'where each group is processed sequentially.')
         view.batchMethodComboBox.setToolTip('The name of the batch selection method.')
         view.numIterSpinBox.setToolTip('The number of epochs to process before returning.')
         view.convergenceWindowSpinBox.setToolTip(
-            'The number of epochs to consider for convergence monitoring. Set to any value less than 2 to disable.'
-        )
+            'The number of epochs to consider for convergence monitoring. '
+            'Set to any value less than 2 to disable.')
         view.cgIterSpinBox.setToolTip(
             'The number of conjugate directions to search for each update.')
         view.alphaSlider.setToolTip('RPIE becomes EPIE when this parameter is 1.')
@@ -64,6 +64,8 @@ class TikeBasicParametersView(QGroupBox):
 
         if showStepLength:
             layout.addRow('Step Length:', view.stepLengthSlider)
+
+        layout.addRow('Log Level:', view.logLevelComboBox)
 
         view.setLayout(layout)
 

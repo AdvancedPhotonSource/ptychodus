@@ -1,12 +1,15 @@
 from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
+import logging
 
 from ...api.observer import Observable, Observer
 from ...model.ptychonn import PtychoNNTrainingPresenter
-from ...view.ptychonn import (PtychoNNOutputParametersView, PtychoNNTrainingDataView,
-                              PtychoNNTrainingParametersView)
+from ...view.ptychonn import PtychoNNOutputParametersView, PtychoNNTrainingParametersView
+from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
+
+logger = logging.getLogger(__name__)
 
 
 class PtychoNNOutputParametersController(Observer):
@@ -96,18 +99,25 @@ class PtychoNNTrainingParametersController(Observer):
         view.minimumLearningRateLineEdit.valueChanged.connect(presenter.setMinimumLearningRate)
         view.trainingEpochsSpinBox.valueChanged.connect(presenter.setTrainingEpochs)
         view.statusIntervalSpinBox.valueChanged.connect(presenter.setStatusIntervalInEpochs)
-        view.trainButton.clicked.connect(controller._train)
+        view.saveTrainingDataButton.clicked.connect(controller._saveTrainingData)
 
         controller._syncModelToView()
 
         return controller
 
-    def _train(self) -> None:
-        dirPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, 'Choose Training Input Data Directory')
+    def _saveTrainingData(self) -> None:
+        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+            self._view,
+            'Save Training Data',
+            nameFilters=self._presenter.getSaveFileFilterList(),
+            selectedNameFilter=self._presenter.getSaveFileFilter())
 
-        if dirPath:
-            self._presenter.train(dirPath)
+        if filePath:
+            try:
+                self._presenter.saveTrainingData(filePath)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException('File writer', err)
 
     def _syncModelToView(self) -> None:
         self._view.validationSetFractionalSizeSlider.setValueAndRange(
@@ -141,50 +151,6 @@ class PtychoNNTrainingParametersController(Observer):
             self._presenter.getStatusIntervalInEpochsLimits().upper)
         self._view.statusIntervalSpinBox.setValue(self._presenter.getStatusIntervalInEpochs())
         self._view.statusIntervalSpinBox.blockSignals(False)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
-
-
-class PtychoNNTrainingDataController(Observer):
-
-    def __init__(self, presenter: PtychoNNTrainingPresenter, view: PtychoNNTrainingDataView,
-                 fileDialogFactory: FileDialogFactory) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-        self._fileDialogFactory = fileDialogFactory
-
-    @classmethod
-    def createInstance(cls, presenter: PtychoNNTrainingPresenter, view: PtychoNNTrainingDataView,
-                       fileDialogFactory: FileDialogFactory) -> PtychoNNTrainingDataController:
-        controller = cls(presenter, view, fileDialogFactory)
-        presenter.addObserver(controller)
-
-        for name in presenter.getPhaseCenteringStrategyList():
-            view.phaseCenteringComboBox.addItem(name)
-
-        view.phaseCenteringComboBox.currentTextChanged.connect(presenter.setPhaseCenteringStrategy)
-        view.exportButton.clicked.connect(controller._exportTrainingData)
-
-        return controller
-
-    def _exportTrainingData(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._view,
-            'Export Training Data',
-            nameFilters=self._presenter.getTrainingDataFileFilterList(),
-            selectedNameFilter=self._presenter.getTrainingDataFileFilter())
-
-        if filePath:
-            self._presenter.saveTrainingData(filePath)
-
-    def _syncModelToView(self) -> None:
-        self._view.phaseCenteringComboBox.blockSignals(True)
-        self._view.phaseCenteringComboBox.setCurrentText(
-            self._presenter.getPhaseCenteringStrategy())
-        self._view.phaseCenteringComboBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

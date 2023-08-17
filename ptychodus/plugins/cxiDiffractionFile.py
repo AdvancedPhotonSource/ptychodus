@@ -4,9 +4,10 @@ import logging
 
 import h5py
 
+from ptychodus.api.apparatus import PixelGeometry
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 SimpleDiffractionDataset)
-from ptychodus.api.geometry import Array2D
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
@@ -18,14 +19,6 @@ class CXIDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         self._dataPath = '/entry_1/data_1/data'
         self._treeBuilder = H5DiffractionFileTreeBuilder()
-
-    @property
-    def simpleName(self) -> str:
-        return 'CXI'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'Coherent X-ray Imaging Files (*.cxi)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
@@ -41,17 +34,15 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                 else:
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
-                    detectorNumberOfPixels = Array2D[int](detectorWidth, detectorHeight)
-                    detectorDistanceInMeters = Decimal.from_float(
-                        h5File['/entry_1/instrument_1/detector_1/distance'][()])
-                    detectorPixelSizeInMeters = Array2D[Decimal](
-                        Decimal.from_float(
-                            h5File['/entry_1/instrument_1/detector_1/x_pixel_size'][()]),
-                        Decimal.from_float(
-                            h5File['/entry_1/instrument_1/detector_1/y_pixel_size'][()]),
+                    detectorExtentInPixels = ImageExtent(detectorWidth, detectorHeight)
+                    detectorDistanceInMeters = Decimal(
+                        repr(h5File['/entry_1/instrument_1/detector_1/distance'][()]))
+                    detectorPixelGeometry = PixelGeometry(
+                        Decimal(repr(h5File['/entry_1/instrument_1/detector_1/x_pixel_size'][()])),
+                        Decimal(repr(h5File['/entry_1/instrument_1/detector_1/y_pixel_size'][()])),
                     )
-                    probeEnergyInJoules = Decimal.from_float(
-                        h5File['/entry_1/instrument_1/source_1/energy'][()])
+                    probeEnergyInJoules = Decimal(
+                        repr(h5File['/entry_1/instrument_1/source_1/energy'][()]))
                     oneJouleInElectronVolts = Decimal('6.241509074e18')
                     probeEnergyInElectronVolts = probeEnergyInJoules * oneJouleInElectronVolts
 
@@ -60,8 +51,8 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
                         detectorDistanceInMeters=detectorDistanceInMeters,
-                        detectorNumberOfPixels=detectorNumberOfPixels,
-                        detectorPixelSizeInMeters=detectorPixelSizeInMeters,
+                        detectorExtentInPixels=detectorExtentInPixels,
+                        detectorPixelGeometry=detectorPixelGeometry,
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
                     )
@@ -81,4 +72,8 @@ class CXIDiffractionFileReader(DiffractionFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(CXIDiffractionFileReader())
+    registry.diffractionFileReaders.registerPlugin(
+        CXIDiffractionFileReader(),
+        simpleName='CXI',
+        displayName='Coherent X-ray Imaging Files (*.cxi)',
+    )

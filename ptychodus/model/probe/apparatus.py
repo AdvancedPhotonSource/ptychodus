@@ -1,6 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
 
+from ...api.apparatus import PixelGeometry
 from ...api.observer import Observable, Observer
 from ..data import DiffractionPatternSizer
 from ..detector import Detector
@@ -37,19 +38,20 @@ class Apparatus(Observable, Observer):
         zInMeters = self._detector.getDetectorDistanceInMeters()
         return lambdaInMeters * zInMeters
 
-    def getObjectPlanePixelSizeXInMeters(self) -> Decimal:
+    def getObjectPlanePixelGeometry(self) -> PixelGeometry:
+        lambdaZInSquareMeters = self.getLambdaZInSquareMeters()
         extentXInMeters = self._diffractionPatternSizer.getExtentXInPixels() \
-                * self._detector.getPixelSizeXInMeters()
-        return self.getLambdaZInSquareMeters() / extentXInMeters
-
-    def getObjectPlanePixelSizeYInMeters(self) -> Decimal:
+                * self._detector.getPixelGeometry().widthInMeters
         extentYInMeters = self._diffractionPatternSizer.getExtentYInPixels() \
-                * self._detector.getPixelSizeYInMeters()
-        return self.getLambdaZInSquareMeters() / extentYInMeters
+                * self._detector.getPixelGeometry().heightInMeters
+        return PixelGeometry(
+            widthInMeters=lambdaZInSquareMeters / extentXInMeters,
+            heightInMeters=lambdaZInSquareMeters / extentYInMeters,
+        )
 
     def getFresnelNumber(self) -> Decimal:
         extentXInMeters = self._diffractionPatternSizer.getExtentXInPixels() \
-                * self._detector.getPixelSizeXInMeters()
+                * self._detector.getPixelGeometry().widthInMeters
         return extentXInMeters**2 / self.getLambdaZInSquareMeters()
 
     def update(self, observable: Observable) -> None:
@@ -82,11 +84,8 @@ class ApparatusPresenter(Observable, Observer):
     def getProbeWavelengthInMeters(self) -> Decimal:
         return self._apparatus.getProbeWavelengthInMeters()
 
-    def getObjectPlanePixelSizeXInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeXInMeters()
-
-    def getObjectPlanePixelSizeYInMeters(self) -> Decimal:
-        return self._apparatus.getObjectPlanePixelSizeYInMeters()
+    def getObjectPlanePixelGeometry(self) -> PixelGeometry:
+        return self._apparatus.getObjectPlanePixelGeometry()
 
     def getFresnelNumber(self) -> Decimal:
         return self._apparatus.getFresnelNumber()

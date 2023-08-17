@@ -10,11 +10,14 @@ from typing import overload, Any, Optional, TypeAlias, Union
 import numpy
 import numpy.typing
 
+from .apparatus import PixelGeometry
 from .geometry import Array2D
+from .image import ImageExtent
 from .observer import Observable
 from .tree import SimpleTreeNode
 
-DiffractionPatternData: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+DiffractionPatternArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+DiffractionPatternIndexes = numpy.typing.NDArray[numpy.integer[Any]]
 
 
 class DiffractionPatternState(Enum):
@@ -35,7 +38,7 @@ class DiffractionPatternArray(Observable):
         pass
 
     @abstractmethod
-    def getData(self) -> DiffractionPatternData:
+    def getData(self) -> DiffractionPatternArrayType:
         pass
 
     def getNumberOfPatterns(self) -> int:
@@ -48,7 +51,7 @@ class DiffractionPatternArray(Observable):
 
 class SimpleDiffractionPatternArray(DiffractionPatternArray):
 
-    def __init__(self, label: str, index: int, data: DiffractionPatternData,
+    def __init__(self, label: str, index: int, data: DiffractionPatternArrayType,
                  state: DiffractionPatternState) -> None:
         super().__init__()
         self._label = label
@@ -68,7 +71,7 @@ class SimpleDiffractionPatternArray(DiffractionPatternArray):
     def getIndex(self) -> int:
         return self._index
 
-    def getData(self) -> DiffractionPatternData:
+    def getData(self) -> DiffractionPatternArrayType:
         return self._data
 
     def getState(self) -> DiffractionPatternState:
@@ -81,8 +84,8 @@ class DiffractionMetadata:
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype[numpy.integer[Any]]
     detectorDistanceInMeters: Optional[Decimal] = None
-    detectorNumberOfPixels: Optional[Array2D[int]] = None
-    detectorPixelSizeInMeters: Optional[Array2D[Decimal]] = None
+    detectorExtentInPixels: Optional[ImageExtent] = None
+    detectorPixelGeometry: Optional[PixelGeometry] = None
     cropCenterInPixels: Optional[Array2D[int]] = None
     probeEnergyInElectronVolts: Optional[Decimal] = None
     filePath: Optional[Path] = None
@@ -143,18 +146,6 @@ class SimpleDiffractionDataset(DiffractionDataset):
 
 class DiffractionFileReader(ABC):
     '''interface for plugins that read diffraction files'''
-
-    @property
-    @abstractmethod
-    def simpleName(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
-        pass
-
-    @property
-    @abstractmethod
-    def fileFilter(self) -> str:
-        '''returns a unique name that is prettified for visual display'''
-        pass
 
     @abstractmethod
     def read(self, filePath: Path) -> DiffractionDataset:

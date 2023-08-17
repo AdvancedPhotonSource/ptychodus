@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Generator
 import queue
@@ -36,7 +37,7 @@ class AutomationPresenter(Observable, Observer):
         watcher.addObserver(presenter)
         return presenter
 
-    def getStrategyList(self) -> list[str]:
+    def getStrategyList(self) -> Sequence[str]:
         return [
             'LYNX Catalyst Particle',
             'CNM/APS Hard X-Ray Nanoprobe',

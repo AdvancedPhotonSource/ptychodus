@@ -7,7 +7,7 @@ T = TypeVar('T', int, float, Decimal)
 
 
 @dataclass(frozen=True)
-class Array2D(Generic[T]):
+class Array2D(Generic[T]):  # TODO remove
     x: T
     y: T
 
@@ -39,12 +39,15 @@ class Interval(Generic[T]):
         return self.upper - self.lower
 
     @property
-    def median(self) -> T:
+    def midrange(self) -> T:
         total = self.lower + self.upper
         return total // 2 if isinstance(total, int) else total / 2
 
     def copy(self) -> Interval[T]:
         return Interval[T](self.lower, self.upper)
+
+    def __contains__(self, item: T) -> bool:
+        return (self.lower <= item and item < self.upper)
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.lower}, {self.upper})'
@@ -56,8 +59,8 @@ class Box2D(Generic[T]):
     rangeY: Interval[T]
 
     @property
-    def centroid(self) -> Point2D[T]:
-        return Point2D[T](self.rangeX.median, self.rangeY.median)
+    def midpoint(self) -> Point2D[T]:
+        return Point2D[T](self.rangeX.midrange, self.rangeY.midrange)
 
     def hull(self, x: T, y: T) -> Box2D[T]:
         return Box2D[T](self.rangeX.hull(x), self.rangeY.hull(y))

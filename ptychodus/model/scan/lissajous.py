@@ -42,8 +42,8 @@ class LissajousScan(Scan):
         thetaY = twoPi * float(self.angularStepYInTurns * index)
 
         return ScanPoint(
-            self.amplitudeXInMeters * Decimal(numpy.sin(thetaX)),
-            self.amplitudeYInMeters * Decimal(numpy.sin(thetaY)),
+            x=float(self.amplitudeXInMeters) * numpy.sin(thetaX),
+            y=float(self.amplitudeYInMeters) * numpy.sin(thetaY),
         )
 
     def __len__(self) -> int:

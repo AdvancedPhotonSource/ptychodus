@@ -15,16 +15,11 @@ class TabularScanController:
     def __init__(self, presenter: ScanRepositoryItemPresenter, parent: QWidget) -> None:
         self._item = presenter.item
         self._view = TabularScanView.createInstance()
-        self._dialog = ScanEditorDialog.createInstance(self._view, parent)
-        self._dialog.setWindowTitle(presenter.name)
+        self._dialog = ScanEditorDialog.createInstance(presenter.name, self._view, parent)
         self._transformController = ScanTransformController.createInstance(
             presenter.item, self._dialog.transformView)
 
     @classmethod
-    def createInstance(cls, presenter: ScanRepositoryItemPresenter,
-                       parent: QWidget) -> TabularScanController:
+    def editParameters(cls, presenter: ScanRepositoryItemPresenter, parent: QWidget) -> None:
         controller = cls(presenter, parent)
-        return controller
-
-    def openDialog(self) -> None:
-        self._dialog.open()
+        controller._dialog.open()

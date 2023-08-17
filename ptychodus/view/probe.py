@@ -1,10 +1,11 @@
 from __future__ import annotations
 from typing import Generic, Optional, TypeVar
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
+                             QGroupBox, QHBoxLayout, QRadioButton, QSpinBox, QVBoxLayout, QWidget)
 
-from .widgets import DecimalLineEdit, EnergyWidget, LengthWidget, RepositoryTreeView
+from .widgets import DecimalLineEdit, DecimalSlider, EnergyWidget, LengthWidget, RepositoryTreeView
 
 __all__ = [
     'ProbeEditorDialog',
@@ -39,7 +40,6 @@ class DiskProbeView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.diameterWidget = LengthWidget.createInstance()
-        self.numberOfModesSpinBox = QSpinBox()
         self.testPatternCheckBox = QCheckBox('Test Pattern')
 
     @classmethod
@@ -48,7 +48,6 @@ class DiskProbeView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Diameter:', view.diameterWidget)
-        layout.addRow('Number of Modes:', view.numberOfModesSpinBox)
         layout.addWidget(view.testPatternCheckBox)
         view.setLayout(layout)
 
@@ -62,7 +61,6 @@ class SuperGaussianProbeView(QGroupBox):
         self.annularRadiusWidget = LengthWidget.createInstance()
         self.fwhmWidget = LengthWidget.createInstance()
         self.orderParameterWidget = DecimalLineEdit.createInstance()
-        self.numberOfModesSpinBox = QSpinBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> SuperGaussianProbeView:
@@ -72,7 +70,6 @@ class SuperGaussianProbeView(QGroupBox):
         layout.addRow('Annular Radius:', view.annularRadiusWidget)
         layout.addRow('Full Width at Half Maximum:', view.fwhmWidget)
         layout.addRow('Order Parameter:', view.orderParameterWidget)
-        layout.addRow('Number of Modes:', view.numberOfModesSpinBox)
         view.setLayout(layout)
 
         return view
@@ -86,7 +83,6 @@ class FresnelZonePlateProbeView(QGroupBox):
         self.outermostZoneWidthWidget = LengthWidget.createInstance()
         self.beamstopDiameterWidget = LengthWidget.createInstance()
         self.defocusDistanceWidget = LengthWidget.createInstance()
-        self.numberOfModesSpinBox = QSpinBox()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> FresnelZonePlateProbeView:
@@ -97,7 +93,34 @@ class FresnelZonePlateProbeView(QGroupBox):
         layout.addRow('Outermost Zone Width:', view.outermostZoneWidthWidget)
         layout.addRow('Beamstop Diameter:', view.beamstopDiameterWidget)
         layout.addRow('Defocus Distance:', view.defocusDistanceWidget)
+        view.setLayout(layout)
+
+        return view
+
+
+class ProbeModesView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Additional Modes', parent)
+        self.numberOfModesSpinBox = QSpinBox()
+        self.orthogonalizeModesCheckBox = QCheckBox('Orthogonalize Modes')
+        self.polynomialDecayButton = QRadioButton('Polynomial')
+        self.exponentialDecayButton = QRadioButton('Exponential')
+        self.decayRatioSlider = DecimalSlider.createInstance(Qt.Horizontal)
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeModesView:
+        view = cls(parent)
+
+        decayButtonBox = QHBoxLayout()
+        decayButtonBox.addWidget(view.polynomialDecayButton)
+        decayButtonBox.addWidget(view.exponentialDecayButton)
+
+        layout = QFormLayout()
         layout.addRow('Number of Modes:', view.numberOfModesSpinBox)
+        layout.addRow(view.orthogonalizeModesCheckBox)
+        layout.addRow('Decay Type:', decayButtonBox)
+        layout.addRow('Decay Ratio:', view.decayRatioSlider)
         view.setLayout(layout)
 
         return view
@@ -108,19 +131,24 @@ class ProbeEditorDialog(Generic[T], QDialog):
     def __init__(self, editorView: T, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.editorView = editorView
+        self.modesView = ProbeModesView.createInstance(parent)
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
     def createInstance(cls,
+                       title: str,
                        editorView: T,
                        parent: Optional[QWidget] = None) -> ProbeEditorDialog[T]:
         view = cls(editorView, parent)
+        view.setWindowTitle(title)
+        editorView.setTitle('Primary Mode')
 
         view.buttonBox.addButton(QDialogButtonBox.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
         layout.addWidget(editorView)
+        layout.addWidget(view.modesView)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 

@@ -1,7 +1,6 @@
 from bisect import bisect
 from collections import defaultdict
 from collections.abc import Sequence
-from decimal import Decimal
 from statistics import median
 
 from ...api.scan import ScanPoint, TabularScan
@@ -75,8 +74,8 @@ class StreamingScanBuilder:
 
         for index in arrayIndexSet:
             pointMap[index] = ScanPoint(
-                x=Decimal.from_float(posX[index]),
-                y=Decimal.from_float(posY[index]),
+                x=posX[index],
+                y=posY[index],
             )
 
         return TabularScan(pointMap)

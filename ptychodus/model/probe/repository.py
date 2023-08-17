@@ -11,6 +11,7 @@ from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
 from ...api.probe import ProbeArrayType
 from ..itemRepository import ItemRepository
+from .modes import MultimodalProbeFactory, ProbeModeDecayType
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
@@ -49,18 +50,23 @@ class ProbeInitializer(ABC, Observable):
 
 class ProbeRepositoryItem(Observable, Observer):
     '''container for items that can be stored in a probe repository'''
+    SIMPLE_NAME: Final[str] = 'FromMemory'
+    DISPLAY_NAME: Final[str] = 'From Memory'
     MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self,
-                 rng: numpy.random.Generator,
+                 modesFactory: MultimodalProbeFactory,
                  nameHint: str,
                  array: Optional[ProbeArrayType] = None) -> None:
         super().__init__()
-        self._rng = rng
+        self._modesFactory = modesFactory
         self._nameHint = nameHint
         self._array = numpy.zeros((1, 0, 0), dtype=complex)
         self._initializer: Optional[ProbeInitializer] = None
-        self._numberOfModes: int = 0
+        self._numberOfModes = 0
+        self._orthogonalizeModesEnabled = False
+        self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
+        self._modeDecayRatio = Decimal(1)
 
         if array is not None:
             self._setArray(array)
@@ -99,40 +105,21 @@ class ProbeRepositoryItem(Observable, Observer):
 
         try:
             initialProbe = self._initializer()
-        except:
+        except Exception:
             logger.exception('Failed to reinitialize probe!')
             return
 
-        modeList: list[ProbeArrayType] = list()
-
-        if initialProbe.ndim == 2:
-            modeList.append(initialProbe)
-        elif initialProbe.ndim == 3:
-            for mode in initialProbe:
-                modeList.append(mode)
-        else:
-            raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
-
-        while len(modeList) < self._numberOfModes:
-            # randomly shift the first mode
-            pw = initialProbe.shape[-1]
-
-            variate1 = self._rng.uniform(size=(2, 1)) - 0.5
-            variate2 = (numpy.arange(0, pw) + 0.5) / pw - 0.5
-            variate = variate1 * variate2
-            phaseShift = numpy.exp(-2j * numpy.pi * variate)
-
-            mode = modeList[0] * phaseShift[0][numpy.newaxis] * phaseShift[1][:, numpy.newaxis]
-            modeList.append(mode)
-
-        array = numpy.stack(modeList)
+        numberOfModes = max(self._numberOfModes, 1)
+        array = self._modesFactory.build(initialProbe, numberOfModes,
+                                         self._orthogonalizeModesEnabled, self._modeDecayType,
+                                         self._modeDecayRatio)
         self._setArray(array)
 
     def getInitializerSimpleName(self) -> str:
-        return 'FromMemory' if self._initializer is None else self._initializer.simpleName
+        return self.SIMPLE_NAME if self._initializer is None else self._initializer.simpleName
 
     def getInitializerDisplayName(self) -> str:
-        return 'From Memory' if self._initializer is None else self._initializer.displayName
+        return self.DISPLAY_NAME if self._initializer is None else self._initializer.displayName
 
     def getInitializer(self) -> Optional[ProbeInitializer]:
         '''returns the initializer'''
@@ -150,11 +137,22 @@ class ProbeRepositoryItem(Observable, Observer):
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state from settings'''
         self._numberOfModes = settings.numberOfModes.value
+        self._orthogonalizeModesEnabled = settings.orthogonalizeModesEnabled.value
+
+        try:
+            self._modeDecayType = ProbeModeDecayType[settings.modeDecayType.value.upper()]
+        except KeyError:
+            self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
+
+        self._modeDecayRatio = settings.modeDecayRatio.value
         self.reinitialize()
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
         '''synchronizes item state to settings'''
-        settings.numberOfModes.value = self.getNumberOfModes()
+        settings.numberOfModes.value = self._numberOfModes
+        settings.orthogonalizeModesEnabled.value = self._orthogonalizeModesEnabled
+        settings.modeDecayType.value = self._modeDecayType.name
+        settings.modeDecayRatio.value = self._modeDecayRatio
 
     def getDataType(self) -> str:
         '''returns the array data type'''
@@ -177,7 +175,35 @@ class ProbeRepositoryItem(Observable, Observer):
     def setNumberOfModes(self, number: int) -> None:
         if self._numberOfModes != number:
             self._numberOfModes = number
-            # TODO only reinitialize as needed
+            self.reinitialize()
+
+    @property
+    def isOrthogonalizeModesEnabled(self) -> bool:
+        return self._orthogonalizeModesEnabled
+
+    def setOrthogonalizeModesEnabled(self, value: bool) -> None:
+        if self._orthogonalizeModesEnabled != value:
+            self._orthogonalizeModesEnabled = value
+            self.reinitialize()
+
+    def getModeDecayType(self) -> ProbeModeDecayType:
+        return self._modeDecayType
+
+    def setModeDecayType(self, value: ProbeModeDecayType) -> None:
+        if self._modeDecayType != value:
+            self._modeDecayType = value
+            self.reinitialize()
+
+    def getModeDecayRatioLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal(0), Decimal(1))
+
+    def getModeDecayRatio(self) -> Decimal:
+        limits = self.getModeDecayRatioLimits()
+        return limits.clamp(self._modeDecayRatio)
+
+    def setModeDecayRatio(self, value: Decimal) -> None:
+        if self._modeDecayRatio != value:
+            self._modeDecayRatio = value
             self.reinitialize()
 
     def getMode(self, mode: int) -> ProbeArrayType:
@@ -201,7 +227,9 @@ class ProbeRepositoryItem(Observable, Observer):
         return Decimal.from_float(float(power[mode]))
 
     def update(self, observable: Observable) -> None:
-        if observable is self._initializer:
+        if observable is self._modesFactory:
+            self.reinitialize()
+        elif observable is self._initializer:
             self.reinitialize()
 
 

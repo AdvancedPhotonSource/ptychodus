@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGridLayout, QGroupBox, QLabel,
-                             QLineEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QCheckBox, QFormLayout, QGridLayout, QGroupBox, QLabel, QLineEdit,
+                             QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, DecimalSlider
 
@@ -79,7 +79,7 @@ class PtychoNNTrainingParametersView(QGroupBox):
         self.trainingEpochsSpinBox = QSpinBox()
         self.statusIntervalSpinBox = QSpinBox()
         self.outputParametersView = PtychoNNOutputParametersView.createInstance()
-        self.trainButton = QPushButton('Train')
+        self.saveTrainingDataButton = QPushButton("Save Training Data")
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNTrainingParametersView:
@@ -94,26 +94,7 @@ class PtychoNNTrainingParametersView(QGroupBox):
         layout.addRow('Training Epochs:', view.trainingEpochsSpinBox)
         layout.addRow('Status Interval:', view.statusIntervalSpinBox)
         layout.addRow(view.outputParametersView)
-        layout.addRow(view.trainButton)
-        view.setLayout(layout)
-
-        return view
-
-
-class PtychoNNTrainingDataView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Training Data', parent)
-        self.phaseCenteringComboBox = QComboBox()
-        self.exportButton = QPushButton('Export')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNTrainingDataView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Phase Centering:', view.phaseCenteringComboBox)
-        layout.addRow(view.exportButton)
+        layout.addRow(view.saveTrainingDataButton)
         view.setLayout(layout)
 
         return view
@@ -124,7 +105,6 @@ class PtychoNNParametersView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.modelParametersView = PtychoNNModelParametersView.createInstance()
-        self.trainingDataView = PtychoNNTrainingDataView.createInstance()
         self.trainingParametersView = PtychoNNTrainingParametersView.createInstance()
 
     @classmethod
@@ -133,7 +113,6 @@ class PtychoNNParametersView(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(view.modelParametersView)
-        layout.addWidget(view.trainingDataView)
         layout.addWidget(view.trainingParametersView)
         layout.addStretch()
         view.setLayout(layout)

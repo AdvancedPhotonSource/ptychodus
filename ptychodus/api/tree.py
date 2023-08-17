@@ -20,7 +20,7 @@ class SimpleTreeNode:
 
     @property
     def isRoot(self) -> bool:
-        return (self.parentItem == None)
+        return (self.parentItem is None)
 
     @property
     def isLeaf(self) -> bool:

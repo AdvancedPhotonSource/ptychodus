@@ -1,31 +1,37 @@
 from __future__ import annotations
+from collections.abc import Sequence
+import logging
 
 from ...api.observer import Observable, Observer
-from ...api.reconstructor import ReconstructResult, ReconstructorLibrary
+from ...api.plot import Plot2D
+from ...api.reconstructor import ReconstructOutput, ReconstructorLibrary
 from ...api.settings import SettingsRegistry
-from .reconstructor import ReconstructorRepository, ActiveReconstructor
+from ..data import ActiveDiffractionDataset
+from ..object import ObjectAPI
+from ..probe import ProbeAPI
+from ..scan import ScanAPI
+from .active import ActiveReconstructor
+from .api import ReconstructorAPI
 from .settings import ReconstructorSettings
+
+logger = logging.getLogger(__name__)
 
 
 class ReconstructorPresenter(Observable, Observer):
 
-    def __init__(self, settings: ReconstructorSettings, repository: ReconstructorRepository,
-                 activeReconstructor: ActiveReconstructor) -> None:
+    def __init__(self, activeReconstructor: ActiveReconstructor) -> None:
         super().__init__()
-        self._settings = settings
-        self._repository = repository
         self._activeReconstructor = activeReconstructor
+        self._plot2D = Plot2D.createNull()
 
     @classmethod
-    def createInstance(cls, settings: ReconstructorSettings, repository: ReconstructorRepository,
-                       activeReconstructor: ActiveReconstructor) -> ReconstructorPresenter:
-        presenter = cls(settings, repository, activeReconstructor)
-        repository.addObserver(presenter)
+    def createInstance(cls, activeReconstructor: ActiveReconstructor) -> ReconstructorPresenter:
+        presenter = cls(activeReconstructor)
         activeReconstructor.addObserver(presenter)
         return presenter
 
-    def getReconstructorList(self) -> list[str]:
-        return list(self._repository.keys())
+    def getReconstructorList(self) -> Sequence[str]:
+        return self._activeReconstructor.getReconstructorList()
 
     def getReconstructor(self) -> str:
         return self._activeReconstructor.name
@@ -33,71 +39,44 @@ class ReconstructorPresenter(Observable, Observer):
     def setReconstructor(self, name: str) -> None:
         self._activeReconstructor.selectReconstructor(name)
 
-    def reconstruct(self) -> ReconstructResult:
-        return self._activeReconstructor.reconstruct()
+    def reconstruct(self) -> ReconstructOutput:
+        label = self._activeReconstructor.name
+        result = self._activeReconstructor.reconstruct(label)
+        self._plot2D = result.plot2D
+        self.notifyObservers()
+        return result
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._repository:
-            self.notifyObservers()
-        elif observable is self._activeReconstructor:
-            self.notifyObservers()
-
-
-class ReconstructorPlotPresenter(Observable):
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._xlabel: str = 'Iteration'
-        self._xvalues: list[list[float]] = list()
-        self._ylabel: str = 'Objective'
-        self._yvalues: list[list[float]] = list()
+    def getPlot(self) -> Plot2D:
+        return self._plot2D
 
     @property
-    def xlabel(self) -> str:
-        return self._xlabel
+    def isTrainable(self) -> bool:
+        return self._activeReconstructor.isTrainable
 
-    @xlabel.setter
-    def xlabel(self, value: str) -> None:
-        if self._xlabel != value:
-            self._xlabel = value
-            self.notifyObservers()
+    def ingest(self) -> None:
+        self._activeReconstructor.ingest()
 
-    @property
-    def ylabel(self) -> str:
-        return self._ylabel
-
-    @ylabel.setter
-    def ylabel(self, value: str) -> None:
-        if self._ylabel != value:
-            self._ylabel = value
-            self.notifyObservers()
-
-    @property
-    def xvalues(self) -> list[list[float]]:
-        return self._xvalues
-
-    @property
-    def yvalues(self) -> list[list[float]]:
-        return self._yvalues
-
-    def setValues(self, xvalues: list[list[float]], yvalues: list[list[float]]) -> None:
-        self._xvalues = xvalues
-        self._yvalues = yvalues
+    def train(self) -> None:
+        self._plot2D = self._activeReconstructor.train()
         self.notifyObservers()
 
-    def setEnumeratedYValues(self, yvalues: list[list[float]]) -> None:
-        xvalues = [*range(len(yvalues))]
-        self.setValues(xvalues, yvalues)
+    def reset(self) -> None:
+        self._activeReconstructor.reset()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._activeReconstructor:
+            self.notifyObservers()
 
 
 class ReconstructorCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry,
-                 libraryList: list[ReconstructorLibrary]) -> None:
+                 diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
+                 probeAPI: ProbeAPI, objectAPI: ObjectAPI,
+                 libraryList: Sequence[ReconstructorLibrary]) -> None:
         self.settings = ReconstructorSettings.createInstance(settingsRegistry)
-        self._repository = ReconstructorRepository.createInstance(libraryList)
         self._activeReconstructor = ActiveReconstructor.createInstance(
-            self.settings, self._repository, settingsRegistry)
-        self.presenter = ReconstructorPresenter.createInstance(self.settings, self._repository,
-                                                               self._activeReconstructor)
-        self.plotPresenter = ReconstructorPlotPresenter()
+            self.settings, diffractionDataset, scanAPI, probeAPI, objectAPI, libraryList,
+            settingsRegistry)
+        self.reconstructorAPI = ReconstructorAPI(self._activeReconstructor)
+        self.presenter = ReconstructorPresenter.createInstance(self._activeReconstructor)

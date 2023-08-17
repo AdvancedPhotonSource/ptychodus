@@ -2,14 +2,14 @@ from __future__ import annotations
 from typing import Callable, Final
 import logging
 
-from PyQt5.QtWidgets import QAbstractItemView
+from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.probe import (ApparatusPresenter, ProbeRepositoryItem, ProbeRepositoryPresenter)
 from ...view.image import ImageView
 from ...view.probe import ProbeParametersView, ProbeView
-from ...view.widgets import ProgressBarItemDelegate
+from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .disk import DiskProbeViewController
@@ -130,7 +130,12 @@ class ProbeController(Observer):
 
             if filePath:
                 name = current.internalPointer().getName()
-                self._repositoryPresenter.saveProbe(name, filePath, nameFilter)
+
+                try:
+                    self._repositoryPresenter.saveProbe(name, filePath, nameFilter)
+                except Exception as err:
+                    logger.exception(err)
+                    ExceptionDialog.showException('File writer', err)
         else:
             logger.error('No items are selected!')
 
@@ -143,19 +148,14 @@ class ProbeController(Observer):
             initializerName = item.getInitializerSimpleName()
 
             if initializerName == 'Disk':
-                diskController = DiskProbeViewController.createInstance(itemPresenter, self._view)
-                diskController.openDialog()
+                DiskProbeViewController.editParameters(itemPresenter, self._view)
             elif initializerName == 'FresnelZonePlate':
-                fzpController = FresnelZonePlateProbeViewController.createInstance(
-                    itemPresenter, self._view)
-                fzpController.openDialog()
+                FresnelZonePlateProbeViewController.editParameters(itemPresenter, self._view)
             elif initializerName == 'SuperGaussian':
-                sgController = SuperGaussianProbeViewController.createInstance(
-                    itemPresenter, self._view)
-                sgController.openDialog()
+                SuperGaussianProbeViewController.editParameters(itemPresenter, self._view)
             else:
-                # FIXME FromFile
-                logger.error('Unknown repository item!')
+                _ = QMessageBox.information(self._view, itemPresenter.name,
+                                            f'\"{initializerName}\" has no editable parameters.')
         else:
             logger.error('No items are selected!')
 

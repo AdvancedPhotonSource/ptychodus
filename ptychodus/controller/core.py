@@ -12,7 +12,7 @@ from .object import ObjectImageController, ObjectController
 from .probe import ProbeImageController, ProbeController
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
-from .reconstructor import ReconstructorParametersController, ReconstructorPlotController
+from .reconstructor import ReconstructorParametersController
 from .scan import ScanController
 from .settings import SettingsController
 from .tike import TikeViewControllerFactory
@@ -58,18 +58,16 @@ class ControllerCore:
             view.dataParametersView, view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter,
-            model.reconstructorPlotPresenter,
             model.scanPresenter,
             model.probePresenter,
             model.objectPresenter,
             view.reconstructorParametersView,
+            view.reconstructorPlotView,
             [
                 self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory,
                 self._tikeViewControllerFactory
             ],
         )
-        self._reconstructorPlotController = ReconstructorPlotController.createInstance(
-            model.reconstructorPlotPresenter, view.reconstructorPlotView)
         self._workflowController = WorkflowController.createInstance(
             model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
             model.workflowStatusPresenter, model.workflowExecutionPresenter,
@@ -108,6 +106,10 @@ class ControllerCore:
             controller._processMessagesTimer.start(1000)  # TODO make configurable
 
         return controller
+
+    def showMainWindow(self, windowTitle: str) -> None:
+        self.view.setWindowTitle(windowTitle)
+        self.view.show()
 
     def swapCentralWidgets(self, action: QAction) -> None:
         index = action.data()

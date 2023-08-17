@@ -1,12 +1,62 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
+
+from .data import DiffractionPatternArrayType
+from .image import ImageExtent
+from .object import ObjectArrayType, ObjectInterpolator
+from .plot import Plot2D
+from .probe import ProbeArrayType
+from .scan import Scan
 
 
 @dataclass(frozen=True)
-class ReconstructResult:
+class ReconstructInput:
+    diffractionPatternArray: DiffractionPatternArrayType
+    scan: Scan
+    probeArray: ProbeArrayType
+    objectInterpolator: ObjectInterpolator
+
+    @property
+    def diffractionPatternExtent(self) -> ImageExtent:
+        return ImageExtent(
+            width=self.diffractionPatternArray.shape[-1],
+            height=self.diffractionPatternArray.shape[-2],
+        )
+
+    @property
+    def probeExtent(self) -> ImageExtent:
+        return ImageExtent(
+            width=self.probeArray.shape[-1],
+            height=self.probeArray.shape[-2],
+        )
+
+    @property
+    def objectArray(self) -> ObjectArrayType:
+        return self.objectInterpolator.getArray()
+
+    @property
+    def objectExtent(self) -> ImageExtent:
+        return ImageExtent(
+            width=self.objectArray.shape[-1],
+            height=self.objectArray.shape[-2],
+        )
+
+
+@dataclass(frozen=True)
+class ReconstructOutput:
+    scan: Scan | None
+    probeArray: ProbeArrayType | None
+    objectArray: ObjectArrayType | None
+    objective: Sequence[Sequence[float]]
+    plot2D: Plot2D
     result: int
-    objective: list[list[float]]
+
+    @classmethod
+    def createNull(cls) -> ReconstructOutput:
+        return cls(None, None, None, [[]], Plot2D.createNull(), 0)
 
 
 class Reconstructor(ABC):
@@ -17,11 +67,30 @@ class Reconstructor(ABC):
         pass
 
     @abstractmethod
-    def reconstruct(self) -> ReconstructResult:
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         pass
 
 
-class NullReconstructor(Reconstructor):
+class TrainableReconstructor(Reconstructor):
+
+    @abstractmethod
+    def ingest(self, parameters: ReconstructInput) -> None:
+        pass
+
+    @abstractmethod
+    def train(self) -> Plot2D:
+        pass
+
+    @abstractmethod
+    def reset(self) -> None:
+        pass
+
+    @abstractmethod
+    def saveTrainingData(self, filePath: Path) -> None:
+        pass
+
+
+class NullReconstructor(TrainableReconstructor):
 
     def __init__(self, name: str) -> None:
         self._name = name
@@ -30,8 +99,27 @@ class NullReconstructor(Reconstructor):
     def name(self) -> str:
         return self._name
 
-    def reconstruct(self) -> ReconstructResult:
-        return ReconstructResult(0, [[]])
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+        return ReconstructOutput(
+            scan=parameters.scan,
+            probeArray=parameters.probeArray,
+            objectArray=parameters.objectInterpolator.getArray(),
+            objective=[[]],
+            plot2D=Plot2D.createNull(),
+            result=0,
+        )
+
+    def ingest(self, parameters: ReconstructInput) -> None:
+        pass
+
+    def train(self) -> Plot2D:
+        return Plot2D.createNull()
+
+    def reset(self) -> None:
+        pass
+
+    def saveTrainingData(self, filePath: Path) -> None:
+        pass
 
 
 class ReconstructorLibrary(Iterable[Reconstructor]):

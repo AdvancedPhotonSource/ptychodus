@@ -6,7 +6,7 @@ import numpy
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternState, SimpleDiffractionDataset,
                                 SimpleDiffractionPatternArray)
-from ptychodus.api.geometry import Array2D
+from ptychodus.api.image import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -14,14 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class NPYDiffractionFileReader(DiffractionFileReader):
-
-    @property
-    def simpleName(self) -> str:
-        return 'NPY'
-
-    @property
-    def fileFilter(self) -> str:
-        return 'NumPy Binary Files (*.npy)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
@@ -40,7 +32,7 @@ class NPYDiffractionFileReader(DiffractionFileReader):
                 numberOfPatternsPerArray=numberOfPatterns,
                 numberOfPatternsTotal=numberOfPatterns,
                 patternDataType=data.dtype,
-                detectorNumberOfPixels=Array2D[int](detectorWidth, detectorHeight),
+                detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
                 filePath=filePath,
             )
 
@@ -61,4 +53,8 @@ class NPYDiffractionFileReader(DiffractionFileReader):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    registry.registerPlugin(NPYDiffractionFileReader())
+    registry.diffractionFileReaders.registerPlugin(
+        NPYDiffractionFileReader(),
+        simpleName='NPY',
+        displayName='NumPy Binary Files (*.npy)',
+    )

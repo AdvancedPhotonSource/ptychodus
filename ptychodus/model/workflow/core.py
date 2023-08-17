@@ -10,7 +10,7 @@ import threading
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
-from ..statefulCore import StateDataRegistry
+from ...api.state import StateDataRegistry
 from .authorizer import WorkflowAuthorizer
 from .executor import WorkflowExecutor
 from .locator import DataLocator, OutputDataLocator, SimpleDataLocator
