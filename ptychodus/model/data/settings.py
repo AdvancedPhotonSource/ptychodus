@@ -40,8 +40,12 @@ class DiffractionPatternSettings(Observable, Observer):
         self.cropExtentYInPixels = settingsGroup.createIntegerEntry('CropExtentYInPixels', 64)
         self.flipXEnabled = settingsGroup.createBooleanEntry('FlipXEnabled', False)
         self.flipYEnabled = settingsGroup.createBooleanEntry('FlipYEnabled', False)
-        self.thresholdEnabled = settingsGroup.createBooleanEntry('ThresholdEnabled', False)
-        self.thresholdValue = settingsGroup.createIntegerEntry('ThresholdValue', 0)
+        self.valueLowerBoundEnabled = settingsGroup.createBooleanEntry(
+            'ValueLowerBoundEnabled', False)
+        self.valueLowerBound = settingsGroup.createIntegerEntry('ValueLowerBound', 0)
+        self.valueUpperBoundEnabled = settingsGroup.createBooleanEntry(
+            'ValueUpperBoundEnabled', False)
+        self.valueUpperBound = settingsGroup.createIntegerEntry('ValueUpperBound', 65535)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DiffractionPatternSettings:

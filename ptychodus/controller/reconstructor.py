@@ -210,7 +210,10 @@ class ReconstructorParametersController(Observer):
         ax.set_xlabel(axisX.label)
         ax.set_ylabel(axisY.label)
         ax.grid(True)
-        ax.legend(loc='best')
+
+        if len(axisX.series) > 0:
+            ax.legend()
+
         self._plotView.figureCanvas.draw()
 
     def _syncModelToView(self) -> None:

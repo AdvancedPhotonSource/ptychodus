@@ -106,9 +106,14 @@ class ActiveDiffractionDataset(DiffractionDataset):
         if array.getState() == DiffractionPatternState.LOADED:
             data = self._diffractionPatternSizer(array.getData())
 
-            if self._patternSettings.thresholdEnabled.value:
-                thresholdValue = self._patternSettings.thresholdValue.value
-                data[data < thresholdValue] = thresholdValue
+            if self._patternSettings.valueUpperBoundEnabled.value:
+                valueLowerBound = self._patternSettings.valueLowerBound.value
+                valueUpperBound = self._patternSettings.valueUpperBound.value
+                data[data >= valueUpperBound] = valueLowerBound
+
+            if self._patternSettings.valueLowerBoundEnabled.value:
+                valueLowerBound = self._patternSettings.valueLowerBound.value
+                data[data < valueLowerBound] = valueLowerBound
 
             if self._patternSettings.flipXEnabled.value:
                 data = numpy.flip(data, axis=-1)
