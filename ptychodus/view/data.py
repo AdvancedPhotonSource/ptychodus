@@ -55,7 +55,7 @@ class DatasetFileView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Dataset', parent)
-        self.filePathLineEdit = QLineEdit()
+        self.directoryComboBox = QComboBox()
         self.fileSystemTableView = QTableView()
         self.fileTypeComboBox = QComboBox()
 
@@ -64,7 +64,7 @@ class DatasetFileView(QGroupBox):
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.filePathLineEdit)
+        layout.addWidget(view.directoryComboBox)
         layout.addWidget(view.fileSystemTableView)
         layout.addWidget(view.fileTypeComboBox)
         view.setLayout(layout)
