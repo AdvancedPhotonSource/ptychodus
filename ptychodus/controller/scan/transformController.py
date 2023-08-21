@@ -28,7 +28,11 @@ class ScanTransformController(Observer):
 
         view.transformComboBox.currentTextChanged.connect(item.setTransformByName)
         view.jitterRadiusWidget.lengthChanged.connect(item.setJitterRadiusInMeters)
+
+        view.centroidXCheckBox.toggled.connect(item.setOverrideCentroidXEnabled)
         view.centroidXWidget.lengthChanged.connect(item.setCentroidXInMeters)
+
+        view.centroidYCheckBox.toggled.connect(item.setOverrideCentroidYEnabled)
         view.centroidYWidget.lengthChanged.connect(item.setCentroidYInMeters)
 
         controller._syncModelToView()
@@ -39,7 +43,13 @@ class ScanTransformController(Observer):
         self._view.indexFilterComboBox.setCurrentText(self._item.getIndexFilterName())
         self._view.transformComboBox.setCurrentText(self._item.getTransformName())
         self._view.jitterRadiusWidget.setLengthInMeters(self._item.getJitterRadiusInMeters())
+
+        self._view.centroidXCheckBox.setChecked(self._item.isOverrideCentroidXEnabled)
+        self._view.centroidXWidget.setEnabled(self._item.isOverrideCentroidXEnabled)
         self._view.centroidXWidget.setLengthInMeters(self._item.getCentroidXInMeters())
+
+        self._view.centroidYCheckBox.setChecked(self._item.isOverrideCentroidYEnabled)
+        self._view.centroidYWidget.setEnabled(self._item.isOverrideCentroidYEnabled)
         self._view.centroidYWidget.setLengthInMeters(self._item.getCentroidYInMeters())
 
     def update(self, observable: Observable) -> None:

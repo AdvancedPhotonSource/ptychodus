@@ -19,8 +19,14 @@ class ScanSettings(Observable, Observer):
         self.angularShiftInTurns = settingsGroup.createRealEntry('AngularShiftInTurns', '0.25')
         self.angularStepXInTurns = settingsGroup.createRealEntry('AngularStepXInTurns', '0.03')
         self.angularStepYInTurns = settingsGroup.createRealEntry('AngularStepYInTurns', '0.04')
-        self.centroidXInMeters = settingsGroup.createRealEntry('CentroidXInMeters', '0')
-        self.centroidYInMeters = settingsGroup.createRealEntry('CentroidYInMeters', '0')
+        self.overrideCentroidXEnabled = settingsGroup.createBooleanEntry(
+            'OverrideCentroidXEnabled', False)
+        self.overrideCentroidXInMeters = settingsGroup.createRealEntry(
+            'OverrideCentroidXInMeters', '0')
+        self.overrideCentroidYEnabled = settingsGroup.createBooleanEntry(
+            'OverrideCentroidYEnabled', False)
+        self.overrideCentroidYInMeters = settingsGroup.createRealEntry(
+            'OverrideCentroidYInMeters', '0')
         self.jitterRadiusInMeters = settingsGroup.createRealEntry('JitterRadiusInMeters', '0')
         self.numberOfPointsX = settingsGroup.createIntegerEntry('NumberOfPointsX', 10)
         self.numberOfPointsY = settingsGroup.createIntegerEntry('NumberOfPointsY', 10)

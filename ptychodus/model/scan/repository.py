@@ -8,6 +8,7 @@ import sys
 
 import numpy
 
+from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.scan import Scan, ScanPoint, TabularScan
 from ..itemRepository import ItemRepository
@@ -48,7 +49,6 @@ class ScanInitializer(ABC, Observable):
 
 
 class ScanRepositoryItem(Scan, Observable, Observer):
-    '''container for items that can be stored in a scan repository'''
 
     def __init__(self,
                  rng: numpy.random.Generator,
@@ -63,9 +63,47 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self._transform.addObserver(self)
         self._indexFilter = SelectableScanIndexFilter()
         self._indexFilter.addObserver(self)
+        self._overrideCentroidXEnabled = False
+        self._overrideCentroidXInMeters = Decimal()
+        self._overrideCentroidYEnabled = False
+        self._overrideCentroidYInMeters = Decimal()
         self._jitterRadiusInMeters = Decimal()
-        self._centroidX = Decimal()
-        self._centroidY = Decimal()
+
+        self._cachedNumberOfPoints = 0
+        self._cachedLengthInMeters = 0.
+        self._cachedCentroidXInMeters = 0.
+        self._cachedCentroidYInMeters = 0.
+        self._cachedSizeInBytes = 0
+
+    def _updateCacheAndNotifyObservers(self) -> None:
+        pointList = [point for point in self.values()]
+        lengthInMeters = 0.
+
+        try:
+            point = pointList[0]
+        except IndexError:
+            self._cachedCentroidXInMeters = 0.
+            self._cachedCentroidYInMeters = 0.
+            logger.debug('Scan is empty!')
+        else:
+            rangeX = Interval[float](point.x, point.x)
+            rangeY = Interval[float](point.y, point.y)
+
+            for pointA, pointB in zip(pointList[:-1], pointList[1:]):
+                rangeX = rangeX.hull(pointB.x)
+                rangeY = rangeY.hull(pointB.y)
+
+                dx = pointB.x - pointA.x
+                dy = pointB.y - pointA.y
+                lengthInMeters += numpy.hypot(dx, dy)
+
+            self._cachedCentroidXInMeters = rangeX.midrange
+            self._cachedCentroidYInMeters = rangeY.midrange
+
+        self._cachedNumberOfPoints = len(pointList)
+        self._cachedLengthInMeters = lengthInMeters
+        self._cachedSizeInBytes = self._getSizeInBytes()
+        self.notifyObservers()
 
     @property
     def nameHint(self) -> str:
@@ -83,17 +121,15 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         except Exception:
             logger.exception('Failed to reinitialize scan!')
         else:
-            self.notifyObservers()
+            self._updateCacheAndNotifyObservers()
 
     def getInitializerSimpleName(self) -> str:
         return 'FromMemory' if self._initializer is None else self._initializer.simpleName
 
     def getInitializer(self) -> Optional[ScanInitializer]:
-        '''returns the initializer'''
         return self._initializer
 
     def setInitializer(self, initializer: ScanInitializer) -> None:
-        '''sets the initializer'''
         if self._initializer is not None:
             self._initializer.removeObserver(self)
 
@@ -105,16 +141,24 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self._indexFilter.selectFilterByName(settings.indexFilter.value)
         self._transform.selectTransformByName(settings.transform.value)
         self._jitterRadiusInMeters = settings.jitterRadiusInMeters.value
-        self._centroidX = settings.centroidXInMeters.value
-        self._centroidY = settings.centroidYInMeters.value
+        self._overrideCentroidXEnabled = settings.overrideCentroidXEnabled.value
+        self._overrideCentroidXInMeters = settings.overrideCentroidXInMeters.value
+        self._overrideCentroidYEnabled = settings.overrideCentroidYEnabled.value
+        self._overrideCentroidYInMeters = settings.overrideCentroidYInMeters.value
         self.notifyObservers()
 
     def syncToSettings(self, settings: ScanSettings) -> None:
         settings.indexFilter.value = self._indexFilter.simpleName
         settings.transform.value = self._transform.simpleName
         settings.jitterRadiusInMeters.value = self._jitterRadiusInMeters
-        settings.centroidXInMeters.value = self._centroidX
-        settings.centroidYInMeters.value = self._centroidX
+        settings.overrideCentroidXEnabled.value = self._overrideCentroidXEnabled
+        settings.overrideCentroidXInMeters.value = self._overrideCentroidXInMeters
+        settings.overrideCentroidYEnabled.value = self._overrideCentroidYEnabled
+        settings.overrideCentroidYInMeters.value = self._overrideCentroidYInMeters
+
+    @property
+    def untransformed(self) -> Scan:
+        return self._scan
 
     def __iter__(self) -> Iterator[int]:
         it = iter(self._scan)
@@ -134,6 +178,14 @@ class ScanRepositoryItem(Scan, Observable, Observer):
             raise KeyError
 
         point = self._transform(self._scan[index])
+        posX = point.x
+        posY = point.y
+
+        if self.isOverrideCentroidXEnabled:
+            posX += float(self._overrideCentroidXInMeters) - self._cachedCentroidXInMeters
+
+        if self.isOverrideCentroidYEnabled:
+            posY += float(self._overrideCentroidYInMeters) - self._cachedCentroidYInMeters
 
         if self._jitterRadiusInMeters > Decimal():
             rad = self._rng.uniform()
@@ -141,33 +193,18 @@ class ScanRepositoryItem(Scan, Observable, Observer):
             dirY = self._rng.normal()
 
             scalar = float(self._jitterRadiusInMeters) * numpy.sqrt(rad / (dirX**2 + dirY**2))
-            point = ScanPoint(point.x + scalar * dirX, point.y + scalar * dirY)
+            posX += scalar * dirX
+            posY += scalar * dirY
 
-        return ScanPoint(
-            float(self._centroidX) + point.x,
-            float(self._centroidY) + point.y,
-        )
+        return ScanPoint(posX, posY)
 
     def __len__(self) -> int:
-        return sum(1 for index in iter(self))
-
-    @property
-    def untransformed(self) -> Scan:
-        return self._scan
+        return self._cachedNumberOfPoints
 
     def getLengthInMeters(self) -> float:
-        pointList = [point for point in self._scan.values()]
-        lengthInMeters = 0.
+        return self._cachedLengthInMeters
 
-        for pointA, pointB in zip(pointList[:-1], pointList[1:]):
-            dx = pointB.x - pointA.x
-            dy = pointB.y - pointA.y
-            lengthInMeters += numpy.hypot(dx, dy)
-
-        return lengthInMeters
-
-    def getSizeInBytes(self) -> int:
-        # TODO verify getSizeInBytes; implement __sizeof__ operator in scan class
+    def _getSizeInBytes(self) -> int:
         sizeInBytes = sys.getsizeof(self._scan)
 
         for index, point in self._scan.items():
@@ -175,6 +212,9 @@ class ScanRepositoryItem(Scan, Observable, Observer):
             sizeInBytes += sys.getsizeof(point)
 
         return sizeInBytes
+
+    def getSizeInBytes(self) -> int:
+        return self._cachedSizeInBytes
 
     def getIndexFilterNameList(self) -> Sequence[str]:
         return self._indexFilter.getSelectableFilters()
@@ -195,33 +235,47 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self._transform.selectTransformByName(name)
 
     def getJitterRadiusInMeters(self) -> Decimal:
-        '''gets the jitter radius'''
         return self._jitterRadiusInMeters
 
     def setJitterRadiusInMeters(self, jitterRadiusInMeters: Decimal) -> None:
-        '''sets the jitter radius'''
         if self._jitterRadiusInMeters != jitterRadiusInMeters:
             self._jitterRadiusInMeters = jitterRadiusInMeters
             self.notifyObservers()
 
+    @property
+    def isOverrideCentroidXEnabled(self) -> bool:
+        return self._overrideCentroidXEnabled
+
+    def setOverrideCentroidXEnabled(self, enabled: bool) -> None:
+        if self._overrideCentroidXEnabled != enabled:
+            self._overrideCentroidXEnabled = enabled
+            self.notifyObservers()
+
     def getCentroidXInMeters(self) -> Decimal:
-        '''gets the x centroid'''
-        return self._centroidX
+        return self._overrideCentroidXInMeters if self._overrideCentroidXEnabled \
+                else Decimal(repr(self._cachedCentroidXInMeters))
 
     def setCentroidXInMeters(self, value: Decimal) -> None:
-        '''sets the x centroid'''
-        if self._centroidX != value:
-            self._centroidX = value
+        if self._overrideCentroidXInMeters != value:
+            self._overrideCentroidXInMeters = value
+            self.notifyObservers()
+
+    @property
+    def isOverrideCentroidYEnabled(self) -> bool:
+        return self._overrideCentroidYEnabled
+
+    def setOverrideCentroidYEnabled(self, enabled: bool) -> None:
+        if self._overrideCentroidYEnabled != enabled:
+            self._overrideCentroidYEnabled = enabled
             self.notifyObservers()
 
     def getCentroidYInMeters(self) -> Decimal:
-        '''gets the y centroid'''
-        return self._centroidY
+        return self._overrideCentroidYInMeters if self._overrideCentroidYEnabled \
+                else Decimal(repr(self._cachedCentroidYInMeters))
 
     def setCentroidYInMeters(self, value: Decimal) -> None:
-        '''sets the y centroid'''
-        if self._centroidY != value:
-            self._centroidY = value
+        if self._overrideCentroidYInMeters != value:
+            self._overrideCentroidYInMeters = value
             self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
