@@ -104,15 +104,16 @@ class ProbeRepositoryItem(Observable, Observer):
             return
 
         try:
-            initialProbe = self._initializer()
+            array = self._initializer()
         except Exception:
             logger.exception('Failed to reinitialize probe!')
             return
 
-        numberOfModes = max(self._numberOfModes, 1)
-        array = self._modesFactory.build(initialProbe, numberOfModes,
-                                         self._orthogonalizeModesEnabled, self._modeDecayType,
-                                         self._modeDecayRatio)
+        if self._numberOfModes > 0:
+            array = self._modesFactory.build(array, self._numberOfModes,
+                                             self._orthogonalizeModesEnabled, self._modeDecayType,
+                                             self._modeDecayRatio)
+
         self._setArray(array)
 
     def getInitializerSimpleName(self) -> str:
@@ -170,7 +171,7 @@ class ProbeRepositoryItem(Observable, Observer):
         return Interval[int](1, self.MAX_INT)
 
     def getNumberOfModes(self) -> int:
-        return self._array.shape[0]
+        return self._array.shape[-3]
 
     def setNumberOfModes(self, number: int) -> None:
         if self._numberOfModes != number:
@@ -210,7 +211,7 @@ class ProbeRepositoryItem(Observable, Observer):
         return self._array[mode, :, :]
 
     def getModesFlattened(self) -> ProbeArrayType:
-        return self._array.transpose((1, 0, 2)).reshape(self._array.shape[1], -1)
+        return self._array.transpose((1, 0, 2)).reshape(self._array.shape[-2], -1)
 
     def getModeRelativePower(self, mode: int) -> Decimal:
         if numpy.isnan(self._array).any():

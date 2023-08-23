@@ -12,14 +12,23 @@ class MATProbeFileReader(ProbeFileReader):
     def read(self, filePath: Path) -> ProbeArrayType:
         matDict = scipy.io.loadmat(filePath)
         probes = matDict['probe']
-        return numpy.transpose(probes, [x for x in reversed(range(probes.ndim))])
+
+        if probes.ndim == 4:
+            # probes[width, height, num_shared_modes, num_varying_modes]
+            probes = probes[..., 0]
+
+        if probes.ndim == 3:
+            # probes[width, height, num_shared_modes]
+            probes = probes.transpose(2, 0, 1)
+
+        return probes
 
 
 class MATProbeFileWriter(ProbeFileWriter):
 
     def write(self, filePath: Path, array: ProbeArrayType) -> None:
         probes = numpy.transpose(array, [x for x in reversed(range(array.ndim))])
-        matDict = {'probe': probes}
+        matDict = {'probe': probes.transpose(1, 2, 0)}
         scipy.io.savemat(filePath, matDict)
 
 

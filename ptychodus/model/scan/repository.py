@@ -75,6 +75,8 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self._cachedCentroidYInMeters = 0.
         self._cachedSizeInBytes = 0
 
+        self._updateCacheAndNotifyObservers()
+
     def _updateCacheAndNotifyObservers(self) -> None:
         pointList = [point for point in self.values()]
         lengthInMeters = 0.
