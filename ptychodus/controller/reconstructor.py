@@ -212,7 +212,7 @@ class ReconstructorParametersController(Observer):
         ax.grid(True)
 
         if len(axisX.series) > 0:
-            ax.legend()
+            ax.legend(loc='upper right')
 
         self._plotView.figureCanvas.draw()
 
