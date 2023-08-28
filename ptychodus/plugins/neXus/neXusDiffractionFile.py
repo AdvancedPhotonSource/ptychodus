@@ -65,9 +65,9 @@ class DataGroup:
 class DetectorSpecificGroup:
     nimages: int
     ntrigger: int
-    photon_energy_eV: float
-    x_pixels_in_detector: int
-    y_pixels_in_detector: int
+    photonEnergyInElectronVolts: Decimal
+    xPixelsInDetector: int
+    yPixelsInDetector: int
 
     @property
     def numberOfPatternsTotal(self) -> int:
@@ -82,23 +82,23 @@ class DetectorSpecificGroup:
         xPixelsInDetector = group['x_pixels_in_detector']
         yPixelsInDetector = group['y_pixels_in_detector']
         return cls(
-            nimages[()],
-            ntrigger[()],
-            float(photonEnergy[()]),
-            xPixelsInDetector[()],
-            yPixelsInDetector[()],
+            int(nimages[()]),
+            int(ntrigger[()]),
+            Decimal(repr(photonEnergy[()])),
+            int(xPixelsInDetector[()]),
+            int(yPixelsInDetector[()]),
         )
 
 
 @dataclass(frozen=True)
 class DetectorGroup:
     detectorSpecific: DetectorSpecificGroup
-    detector_distance_m: float
-    beam_center_x_px: int
-    beam_center_y_px: int
-    bit_depth_image: int
-    x_pixel_size_m: float
-    y_pixel_size_m: float
+    detectorDistanceInMeters: Decimal
+    beamCenterXInPixels: int
+    beamCenterYInPixels: int
+    bitDepthReadout: int
+    xPixelSizeInMeters: Decimal
+    yPixelSizeInMeters: Decimal
 
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorGroup:
@@ -109,19 +109,19 @@ class DetectorGroup:
         assert h5BeamCenterX.attrs['units'] == b'pixel'
         h5BeamCenterY = group['beam_center_y']
         assert h5BeamCenterY.attrs['units'] == b'pixel'
-        h5BitDepthImage = group['bit_depth_image']
+        h5BitDepthReadout = group['bit_depth_readout']
         h5XPixelSize = group['x_pixel_size']
         assert h5XPixelSize.attrs['units'] == b'm'
         h5YPixelSize = group['y_pixel_size']
         assert h5YPixelSize.attrs['units'] == b'm'
         return cls(
             detectorSpecific,
-            float(h5DetectorDistance[()]),
-            h5BeamCenterX[()],
-            h5BeamCenterY[()],
-            h5BitDepthImage[()],
-            float(h5XPixelSize[()]),
-            float(h5YPixelSize[()]),
+            Decimal(repr(h5DetectorDistance[()])),
+            int(h5BeamCenterX[()]),
+            int(h5BeamCenterY[()]),
+            int(h5BitDepthReadout[()]),
+            Decimal(repr(h5XPixelSize[()])),
+            Decimal(repr(h5YPixelSize[()])),
         )
 
 
@@ -137,7 +137,7 @@ class InstrumentGroup:
 
 @dataclass(frozen=True)
 class GoniometerGroup:
-    chi_deg: float
+    chiDeg: float
 
     @classmethod
     def read(cls, group: h5py.Group) -> GoniometerGroup:
@@ -147,13 +147,13 @@ class GoniometerGroup:
         assert chiItem.attrs['units'] == b'degree'
 
         if chiSpace.get_simple_extent_type() == h5py.h5s.SCALAR:
-            chi_deg = float(chiItem[()])
+            chiDeg = float(chiItem[()])
         elif isinstance(chiItem, h5py.Dataset):
-            chi_deg = float(chiItem[0])
+            chiDeg = float(chiItem[0])
         else:
             raise ValueError('Failed to read goniometer angle (chi)!')
 
-        return cls(chi_deg)
+        return cls(chiDeg)
 
 
 @dataclass(frozen=True)
@@ -235,28 +235,29 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 else:
                     detector = entry.instrument.detector
                     detectorPixelGeometry = PixelGeometry(
-                        Decimal(repr(detector.x_pixel_size_m)),
-                        Decimal(repr(detector.y_pixel_size_m)),
+                        detector.xPixelSizeInMeters,
+                        detector.yPixelSizeInMeters,
                     )
                     cropCenterInPixels = Array2D[int](
-                        int(round(detector.beam_center_x_px)),
-                        int(round(detector.beam_center_y_px)),
+                        detector.beamCenterXInPixels,
+                        detector.beamCenterYInPixels,
                     )
 
                     detectorSpecific = detector.detectorSpecific
                     detectorExtentInPixels = ImageExtent(
-                        int(detectorSpecific.x_pixels_in_detector),
-                        int(detectorSpecific.y_pixels_in_detector),
+                        detectorSpecific.xPixelsInDetector,
+                        detectorSpecific.yPixelsInDetector,
                     )
-                    probeEnergyInElectronVolts = Decimal(repr(detectorSpecific.photon_energy_eV))
+                    probeEnergyInElectronVolts = detectorSpecific.photonEnergyInElectronVolts
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],
                         numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
                         patternDataType=h5Dataset.dtype,
-                        detectorDistanceInMeters=Decimal(repr(detector.detector_distance_m)),
+                        detectorDistanceInMeters=detector.detectorDistanceInMeters,
                         detectorExtentInPixels=detectorExtentInPixels,
                         detectorPixelGeometry=detectorPixelGeometry,
+                        detectorBitDepth=detector.bitDepthReadout,
                         cropCenterInPixels=cropCenterInPixels,
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
@@ -265,7 +266,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
 
                 # vvv TODO This is a hack; remove when able! vvv
-                self.stageRotationInDegrees = entry.sample.goniometer.chi_deg
+                self.stageRotationInDegrees = entry.sample.goniometer.chiDeg
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 
