@@ -11,18 +11,23 @@ from .decimalLineEdit import DecimalLineEdit
 class LengthWidget(QWidget):
     lengthChanged = pyqtSignal(Decimal)
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, isSigned: bool, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.lengthInMeters = Decimal()
-        self.magnitudeLineEdit = DecimalLineEdit.createNonNegativeInstance()
+        self.lineEdit = DecimalLineEdit.createInstance(isSigned=isSigned)
         self.unitsComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> LengthWidget:
-        widget = cls(parent)
+    def createInstance(cls,
+                       *,
+                       isSigned: bool = False,
+                       parent: Optional[QWidget] = None) -> LengthWidget:
+        widget = cls(isSigned, parent)
 
-        widget.magnitudeLineEdit.setMinimum(Decimal())
-        widget.magnitudeLineEdit.valueChanged.connect(widget._setLengthInMetersFromWidgets)
+        if not isSigned:
+            widget.lineEdit.setMinimum(Decimal())
+
+        widget.lineEdit.valueChanged.connect(widget._setLengthInMetersFromWidgets)
 
         widget.unitsComboBox.addItem('m', 0)
         widget.unitsComboBox.addItem('mm', -3)
@@ -34,17 +39,17 @@ class LengthWidget(QWidget):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(widget.magnitudeLineEdit)
+        layout.addWidget(widget.lineEdit)
         layout.addWidget(widget.unitsComboBox)
         widget.setLayout(layout)
 
         return widget
 
     def isReadOnly(self) -> bool:
-        return self.magnitudeLineEdit.isReadOnly()
+        return self.lineEdit.isReadOnly()
 
     def setReadOnly(self, enable: bool) -> None:
-        self.magnitudeLineEdit.setReadOnly(enable)
+        self.lineEdit.setReadOnly(enable)
 
     def getLengthInMeters(self) -> Decimal:
         return self.lengthInMeters
@@ -52,9 +57,9 @@ class LengthWidget(QWidget):
     def setLengthInMeters(self, lengthInMeters: Decimal) -> None:
         self.lengthInMeters = lengthInMeters
 
-        if lengthInMeters > Decimal():
+        if not lengthInMeters.is_zero():
             exponent = 3 * int(
-                (lengthInMeters.log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
+                (abs(lengthInMeters).log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
             index = self.unitsComboBox.findData(exponent)
 
             if index != -1:
@@ -74,4 +79,4 @@ class LengthWidget(QWidget):
 
     def _updateDisplay(self) -> None:
         lengthInDisplayUnits = self.lengthInMeters / self._scaleToMeters
-        self.magnitudeLineEdit.setValue(lengthInDisplayUnits)
+        self.lineEdit.setValue(lengthInDisplayUnits)

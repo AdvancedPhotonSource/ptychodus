@@ -26,6 +26,7 @@ class DetectorParametersController(Observer):
         view.numberOfPixelsYSpinBox.valueChanged.connect(presenter.setNumberOfPixelsY)
         view.pixelSizeXWidget.lengthChanged.connect(presenter.setPixelSizeXInMeters)
         view.pixelSizeYWidget.lengthChanged.connect(presenter.setPixelSizeYInMeters)
+        view.bitDepthSpinBox.valueChanged.connect(presenter.setBitDepth)
         view.detectorDistanceWidget.lengthChanged.connect(presenter.setDetectorDistanceInMeters)
 
         controller._syncModelToView()
@@ -49,6 +50,13 @@ class DetectorParametersController(Observer):
 
         self._view.pixelSizeXWidget.setLengthInMeters(self._presenter.getPixelSizeXInMeters())
         self._view.pixelSizeYWidget.setLengthInMeters(self._presenter.getPixelSizeYInMeters())
+
+        self._view.bitDepthSpinBox.blockSignals(True)
+        self._view.bitDepthSpinBox.setRange(self._presenter.getBitDepthLimits().lower,
+                                            self._presenter.getBitDepthLimits().upper)
+        self._view.bitDepthSpinBox.setValue(self._presenter.getBitDepth())
+        self._view.bitDepthSpinBox.blockSignals(False)
+
         self._view.detectorDistanceWidget.setLengthInMeters(
             self._presenter.getDetectorDistanceInMeters())
 

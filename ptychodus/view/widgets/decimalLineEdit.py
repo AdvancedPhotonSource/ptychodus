@@ -22,7 +22,10 @@ class DecimalLineEdit(QWidget):
         self._maximum: Optional[Decimal] = None
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> DecimalLineEdit:
+    def createInstance(cls,
+                       *,
+                       isSigned: bool = False,
+                       parent: Optional[QWidget] = None) -> DecimalLineEdit:
         widget = cls(parent)
 
         widget._lineEdit.setValidator(widget._validator)
@@ -34,12 +37,9 @@ class DecimalLineEdit(QWidget):
         layout.addWidget(widget._lineEdit)
         widget.setLayout(layout)
 
-        return widget
+        if not isSigned:
+            widget._validator.setBottom(0.)
 
-    @classmethod
-    def createNonNegativeInstance(cls, parent: Optional[QWidget] = None) -> DecimalLineEdit:
-        widget = cls.createInstance(parent)
-        widget._validator.setBottom(0.)
         return widget
 
     def isReadOnly(self) -> bool:

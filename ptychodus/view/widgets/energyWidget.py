@@ -14,7 +14,7 @@ class EnergyWidget(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.energyInElectronVolts = Decimal()
-        self.magnitudeLineEdit = DecimalLineEdit.createNonNegativeInstance()
+        self.magnitudeLineEdit = DecimalLineEdit.createInstance(isSigned=False)
         self.unitsComboBox = QComboBox()
 
     @classmethod

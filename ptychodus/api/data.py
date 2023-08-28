@@ -86,6 +86,7 @@ class DiffractionMetadata:
     detectorDistanceInMeters: Optional[Decimal] = None
     detectorExtentInPixels: Optional[ImageExtent] = None
     detectorPixelGeometry: Optional[PixelGeometry] = None
+    detectorBitDepth: Optional[int] = None
     cropCenterInPixels: Optional[Array2D[int]] = None
     probeEnergyInElectronVolts: Optional[Decimal] = None
     filePath: Optional[Path] = None

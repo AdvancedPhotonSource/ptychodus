@@ -157,8 +157,10 @@ class PatternTransformController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        view.thresholdCheckBox.toggled.connect(presenter.setThresholdEnabled)
-        view.thresholdSpinBox.valueChanged.connect(presenter.setThresholdValue)
+        view.valueLowerBoundCheckBox.toggled.connect(presenter.setValueLowerBoundEnabled)
+        view.valueLowerBoundSpinBox.valueChanged.connect(presenter.setValueLowerBound)
+        view.valueUpperBoundCheckBox.toggled.connect(presenter.setValueUpperBoundEnabled)
+        view.valueUpperBoundSpinBox.valueChanged.connect(presenter.setValueUpperBound)
         view.flipXCheckBox.toggled.connect(presenter.setFlipXEnabled)
         view.flipYCheckBox.toggled.connect(presenter.setFlipYEnabled)
 
@@ -166,13 +168,23 @@ class PatternTransformController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.thresholdCheckBox.setChecked(self._presenter.isThresholdEnabled())
+        self._view.valueLowerBoundCheckBox.setChecked(self._presenter.isValueLowerBoundEnabled())
 
-        self._view.thresholdSpinBox.blockSignals(True)
-        self._view.thresholdSpinBox.setRange(self._presenter.getThresholdValueLimits().lower,
-                                             self._presenter.getThresholdValueLimits().upper)
-        self._view.thresholdSpinBox.setValue(self._presenter.getThresholdValue())
-        self._view.thresholdSpinBox.blockSignals(False)
+        self._view.valueLowerBoundSpinBox.blockSignals(True)
+        self._view.valueLowerBoundSpinBox.setRange(
+            self._presenter.getValueLowerBoundLimits().lower,
+            self._presenter.getValueLowerBoundLimits().upper)
+        self._view.valueLowerBoundSpinBox.setValue(self._presenter.getValueLowerBound())
+        self._view.valueLowerBoundSpinBox.blockSignals(False)
+
+        self._view.valueUpperBoundCheckBox.setChecked(self._presenter.isValueUpperBoundEnabled())
+
+        self._view.valueUpperBoundSpinBox.blockSignals(True)
+        self._view.valueUpperBoundSpinBox.setRange(
+            self._presenter.getValueUpperBoundLimits().lower,
+            self._presenter.getValueUpperBoundLimits().upper)
+        self._view.valueUpperBoundSpinBox.setValue(self._presenter.getValueUpperBound())
+        self._view.valueUpperBoundSpinBox.blockSignals(False)
 
         self._view.flipXCheckBox.setChecked(self._presenter.isFlipXEnabled())
         self._view.flipYCheckBox.setChecked(self._presenter.isFlipYEnabled())

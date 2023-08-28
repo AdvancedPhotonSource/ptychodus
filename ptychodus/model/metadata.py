@@ -54,6 +54,13 @@ class MetadataPresenter(Observable, Observer):
             self._detectorSettings.pixelSizeYInMeters.value = \
                 self._metadata.detectorPixelGeometry.heightInMeters
 
+    def canSyncDetectorBitDepth(self) -> bool:
+        return (self._metadata.detectorBitDepth is not None)
+
+    def syncDetectorBitDepth(self) -> None:
+        if self._metadata.detectorBitDepth:
+            self._detectorSettings.bitDepth.value = self._metadata.detectorBitDepth
+
     def canSyncDetectorDistance(self) -> bool:
         return (self._metadata.detectorDistanceInMeters is not None)
 

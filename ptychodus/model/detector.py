@@ -18,6 +18,7 @@ class DetectorSettings(Observable, Observer):
         self.pixelSizeXInMeters = settingsGroup.createRealEntry('PixelSizeXInMeters', '75e-6')
         self.numberOfPixelsY = settingsGroup.createIntegerEntry('NumberOfPixelsY', 1024)
         self.pixelSizeYInMeters = settingsGroup.createRealEntry('PixelSizeYInMeters', '75e-6')
+        self.bitDepth = settingsGroup.createIntegerEntry('BitDepth', 8)
         self.detectorDistanceInMeters = settingsGroup.createRealEntry(
             'DetectorDistanceInMeters', '2')
 
@@ -55,6 +56,9 @@ class Detector(Observable, Observer):
             widthInMeters=max(Decimal(), self._settings.pixelSizeXInMeters.value),
             heightInMeters=max(Decimal(), self._settings.pixelSizeYInMeters.value),
         )
+
+    def getBitDepth(self) -> int:
+        return max(1, self._settings.bitDepth.value)
 
     def getDetectorDistanceInMeters(self) -> Decimal:
         return max(Decimal(), self._settings.detectorDistanceInMeters.value)
@@ -107,6 +111,16 @@ class DetectorPresenter(Observable, Observer):
 
     def setPixelSizeYInMeters(self, value: Decimal) -> None:
         self._settings.pixelSizeYInMeters.value = value
+
+    def getBitDepthLimits(self) -> Interval[int]:
+        return Interval[int](1, 64)
+
+    def getBitDepth(self) -> int:
+        limits = self.getBitDepthLimits()
+        return limits.clamp(self._settings.bitDepth.value)
+
+    def setBitDepth(self, value: int) -> None:
+        self._settings.bitDepth.value = value
 
     def getDetectorDistanceInMeters(self) -> Decimal:
         return self._detector.getDetectorDistanceInMeters()

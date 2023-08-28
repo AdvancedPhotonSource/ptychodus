@@ -27,7 +27,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
                     else:
                         raise ScanPointParseError('Coordinate array shape mismatch!')
 
-                    for x, y in zip(ppX[:, 0], ppY[:, 0]):
+                    for x, y in zip(ppX, ppY):
                         point = ScanPoint(x, y)
                         pointList.append(point)
         except OSError:

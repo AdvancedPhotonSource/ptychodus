@@ -31,6 +31,9 @@ class MetadataController(Observer):
         if self._view.contentsView.detectorPixelSizeCheckBox.isChecked():
             self._presenter.syncDetectorPixelSize()
 
+        if self._view.contentsView.detectorBitDepthCheckBox.isChecked():
+            self._presenter.syncDetectorBitDepth()
+
         if self._view.contentsView.detectorDistanceCheckBox.isChecked():
             self._presenter.syncDetectorDistance()
 
@@ -49,6 +52,10 @@ class MetadataController(Observer):
         canSyncDetectorPixelSize = self._presenter.canSyncDetectorPixelSize()
         self._view.contentsView.detectorPixelSizeCheckBox.setVisible(canSyncDetectorPixelSize)
         self._view.contentsView.detectorPixelSizeCheckBox.setChecked(canSyncDetectorPixelSize)
+
+        canSyncDetectorBitDepth = self._presenter.canSyncDetectorBitDepth()
+        self._view.contentsView.detectorBitDepthCheckBox.setVisible(canSyncDetectorBitDepth)
+        self._view.contentsView.detectorBitDepthCheckBox.setChecked(canSyncDetectorBitDepth)
 
         canSyncDetectorDistance = self._presenter.canSyncDetectorDistance()
         self._view.contentsView.detectorDistanceCheckBox.setVisible(canSyncDetectorDistance)

@@ -57,7 +57,10 @@ class TikePresenter(Observable, Observer):
         self._settings.numBatch.value = value
 
     def getBatchMethodList(self) -> Sequence[str]:
-        return ['by_scan_grid', 'by_scan_stripes', 'wobbly_center', 'compact']
+        return [
+            'by_scan_grid', 'by_scan_stripes', 'wobbly_center', 'wobbly_center_random_bootstrap',
+            'compact'
+        ]
 
     def getBatchMethod(self) -> str:
         return self._settings.batchMethod.value

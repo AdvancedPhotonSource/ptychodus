@@ -55,7 +55,7 @@ class DatasetFileView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Diffraction Dataset', parent)
-        self.filePathLineEdit = QLineEdit()
+        self.directoryComboBox = QComboBox()
         self.fileSystemTableView = QTableView()
         self.fileTypeComboBox = QComboBox()
 
@@ -64,7 +64,7 @@ class DatasetFileView(QGroupBox):
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.filePathLineEdit)
+        layout.addWidget(view.directoryComboBox)
         layout.addWidget(view.fileSystemTableView)
         layout.addWidget(view.fileTypeComboBox)
         view.setLayout(layout)
@@ -78,6 +78,7 @@ class MetadataView(QGroupBox):
         super().__init__('Metadata', parent)
         self.detectorPixelCountCheckBox = QCheckBox('Detector Pixel Count')
         self.detectorPixelSizeCheckBox = QCheckBox('Detector Pixel Size')
+        self.detectorBitDepthCheckBox = QCheckBox('Detector Bit Depth')
         self.detectorDistanceCheckBox = QCheckBox('Detector Distance')
         self.patternCropCenterCheckBox = QCheckBox('Pattern Crop Center')
         self.patternCropExtentCheckBox = QCheckBox('Pattern Crop Extent')
@@ -90,6 +91,7 @@ class MetadataView(QGroupBox):
         layout = QVBoxLayout()
         layout.addWidget(view.detectorPixelCountCheckBox)
         layout.addWidget(view.detectorPixelSizeCheckBox)
+        layout.addWidget(view.detectorBitDepthCheckBox)
         layout.addWidget(view.detectorDistanceCheckBox)
         layout.addWidget(view.patternCropCenterCheckBox)
         layout.addWidget(view.patternCropExtentCheckBox)
@@ -150,8 +152,10 @@ class PatternTransformView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Transform', parent)
-        self.thresholdCheckBox = QCheckBox('Threshold:')
-        self.thresholdSpinBox = QSpinBox()
+        self.valueLowerBoundCheckBox = QCheckBox('Value Lower Bound:')
+        self.valueLowerBoundSpinBox = QSpinBox()
+        self.valueUpperBoundCheckBox = QCheckBox('Value Upper Bound:')
+        self.valueUpperBoundSpinBox = QSpinBox()
         self.axesLabel = QLabel('Axes:')
         self.flipXCheckBox = QCheckBox('Flip X')
         self.flipYCheckBox = QCheckBox('Flip Y')
@@ -161,13 +165,15 @@ class PatternTransformView(QGroupBox):
         view = cls(parent)
 
         layout = QGridLayout()
-        layout.addWidget(view.thresholdCheckBox, 0, 0)
-        layout.addWidget(view.thresholdSpinBox, 0, 1, 1, 2)
-        layout.addWidget(view.axesLabel, 1, 0)
-        layout.addWidget(view.flipXCheckBox, 1, 1, Qt.AlignHCenter)
-        layout.addWidget(view.flipYCheckBox, 1, 2, Qt.AlignHCenter)
-        layout.setColumnStretch(1, 1)
+        layout.addWidget(view.valueLowerBoundCheckBox, 0, 0)
+        layout.addWidget(view.valueLowerBoundSpinBox, 0, 1, 1, 2)
+        layout.addWidget(view.valueUpperBoundCheckBox, 1, 0)
+        layout.addWidget(view.valueUpperBoundSpinBox, 1, 1, 1, 2)
+        layout.addWidget(view.axesLabel, 2, 0)
+        layout.addWidget(view.flipXCheckBox, 2, 1, Qt.AlignHCenter)
+        layout.addWidget(view.flipYCheckBox, 2, 2, Qt.AlignHCenter)
         layout.setColumnStretch(2, 1)
+        layout.setColumnStretch(3, 1)
         view.setLayout(layout)
 
         return view

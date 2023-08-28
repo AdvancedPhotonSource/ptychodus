@@ -146,14 +146,8 @@ class ObjectPresenter(Observable, Observer):
         return self._object.getSelectedName()
 
     def getSelectedObjectArray(self) -> Optional[ObjectArrayType]:
-        array: Optional[ObjectArrayType] = None
-
-        try:
-            array = self._objectAPI.getSelectedObjectArray()
-        except ValueError as err:
-            logger.debug(err)
-
-        return array
+        selectedObject = self._object.getSelectedItem()
+        return None if selectedObject is None else selectedObject.getArray()
 
     def getSelectableNames(self) -> Sequence[str]:
         return self._object.getSelectableNames()

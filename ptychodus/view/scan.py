@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Generic, Optional, TypeVar
 
-from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QLabel, QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFormLayout, QGroupBox, QLabel, QSpinBox, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -153,8 +153,10 @@ class ScanTransformView(QGroupBox):
         self.indexFilterComboBox = QComboBox()
         self.transformComboBox = QComboBox()
         self.jitterRadiusWidget = LengthWidget.createInstance()
-        self.centroidXWidget = LengthWidget.createInstance()
-        self.centroidYWidget = LengthWidget.createInstance()
+        self.centroidXCheckBox = QCheckBox('Centroid X:')
+        self.centroidXWidget = LengthWidget.createInstance(isSigned=True)
+        self.centroidYCheckBox = QCheckBox('Centroid Y:')
+        self.centroidYWidget = LengthWidget.createInstance(isSigned=True)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ScanTransformView:
@@ -164,8 +166,8 @@ class ScanTransformView(QGroupBox):
         layout.addRow('Index Filter:', view.indexFilterComboBox)
         layout.addRow('(x,y) \u2192', view.transformComboBox)
         layout.addRow('Jitter Radius:', view.jitterRadiusWidget)
-        layout.addRow('Centroid X:', view.centroidXWidget)
-        layout.addRow('Centroid Y:', view.centroidYWidget)
+        layout.addRow(view.centroidXCheckBox, view.centroidXWidget)
+        layout.addRow(view.centroidYCheckBox, view.centroidYWidget)
         view.setLayout(layout)
 
         return view

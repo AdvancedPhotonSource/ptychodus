@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import numpy
 import scipy.io
 
 from ptychodus.api.object import ObjectArrayType, ObjectFileReader, ObjectFileWriter
@@ -11,15 +10,13 @@ class MATObjectFileReader(ObjectFileReader):
 
     def read(self, filePath: Path) -> ObjectArrayType:
         matDict = scipy.io.loadmat(filePath)
-        array = matDict['object']
-        return numpy.transpose(array, [x for x in reversed(range(array.ndim))])
+        return matDict['object']
 
 
 class MATObjectFileWriter(ObjectFileWriter):
 
     def write(self, filePath: Path, array: ObjectArrayType) -> None:
-        object_ = numpy.transpose(array, [x for x in reversed(range(array.ndim))])
-        matDict = {'object': object_}
+        matDict = {'object': array}
         scipy.io.savemat(filePath, matDict)
 
 

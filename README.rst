@@ -78,7 +78,7 @@ Developer Installation
 
 .. code-block:: shell
 
-   $ conda install -n ptychodus -c conda-forge ptychonn
+   $ conda install -n ptychodus -c conda-forge ptychonn pytorch-gpu
 
 * To launch the `ptychodus` GUI (with the "ptychodus" conda environment activated):
 

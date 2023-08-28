@@ -48,6 +48,7 @@ def configureLogger() -> None:
                         encoding='utf-8',
                         level=logging.DEBUG)
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
+    logging.getLogger('tike').setLevel(logging.WARNING)
 
     logger.info(f'Ptychodus {version("ptychodus")}')
     logger.info(f'NumPy {version("numpy")}')

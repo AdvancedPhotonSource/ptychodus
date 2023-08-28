@@ -3,7 +3,7 @@ from pathlib import Path
 import logging
 import re
 
-from PyQt5.QtCore import Qt, QDir, QModelIndex, QSortFilterProxyModel
+from PyQt5.QtCore import Qt, QDir, QFileInfo, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView, QFileSystemModel
 
 from ...api.observer import Observable, Observer
@@ -49,8 +49,12 @@ class DatasetFileController(Observer):
             controller._setNameFiltersInFileSystemModel)
         controller._syncModelToView()
 
-        controller._fileSystemModel.rootPathChanged.connect(
-            view.contentsView.filePathLineEdit.setText)
+        view.contentsView.directoryComboBox.addItem(
+            str(fileDialogFactory.getOpenWorkingDirectory()))
+        view.contentsView.directoryComboBox.addItem(str(Path.home()))
+        view.contentsView.directoryComboBox.setEditable(True)
+        view.contentsView.directoryComboBox.textActivated.connect(
+            controller._handleDirectoryComboBoxActivated)
         controller._setRootPath(fileDialogFactory.getOpenWorkingDirectory())
 
         view.contentsView.fileSystemTableView.doubleClicked.connect(
@@ -68,6 +72,14 @@ class DatasetFileController(Observer):
         index = self._fileSystemModel.setRootPath(str(rootPath))
         proxyIndex = self._fileSystemProxyModel.mapFromSource(index)
         self._view.contentsView.fileSystemTableView.setRootIndex(proxyIndex)
+        self._view.contentsView.directoryComboBox.setCurrentText(str(rootPath))
+        self._fileDialogFactory.setOpenWorkingDirectory(rootPath)
+
+    def _handleDirectoryComboBoxActivated(self, text: str) -> None:
+        fileInfo = QFileInfo(text)
+
+        if fileInfo.isDir():
+            self._setRootPath(Path(fileInfo.canonicalFilePath()))
 
     def _handleFileSystemTableDoubleClicked(self, proxyIndex: QModelIndex) -> None:
         index = self._fileSystemProxyModel.mapToSource(proxyIndex)

@@ -77,20 +77,35 @@ class DiffractionPatternPresenter(Observable, Observer):
     def setFlipYEnabled(self, value: bool) -> None:
         self._settings.flipYEnabled.value = value
 
-    def isThresholdEnabled(self) -> bool:
-        return self._settings.thresholdEnabled.value
+    def isValueLowerBoundEnabled(self) -> bool:
+        return self._settings.valueLowerBoundEnabled.value
 
-    def setThresholdEnabled(self, value: bool) -> None:
-        self._settings.thresholdEnabled.value = value
+    def setValueLowerBoundEnabled(self, value: bool) -> None:
+        self._settings.valueLowerBoundEnabled.value = value
 
-    def getThresholdValueLimits(self) -> Interval[int]:
+    def getValueLowerBoundLimits(self) -> Interval[int]:
         return Interval[int](0, self.MAX_INT)
 
-    def getThresholdValue(self) -> int:
-        return self._settings.thresholdValue.value
+    def getValueLowerBound(self) -> int:
+        return self._settings.valueLowerBound.value
 
-    def setThresholdValue(self, value: int) -> None:
-        self._settings.thresholdValue.value = value
+    def setValueLowerBound(self, value: int) -> None:
+        self._settings.valueLowerBound.value = value
+
+    def isValueUpperBoundEnabled(self) -> bool:
+        return self._settings.valueUpperBoundEnabled.value
+
+    def setValueUpperBoundEnabled(self, value: bool) -> None:
+        self._settings.valueUpperBoundEnabled.value = value
+
+    def getValueUpperBoundLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
+
+    def getValueUpperBound(self) -> int:
+        return self._settings.valueUpperBound.value
+
+    def setValueUpperBound(self, value: int) -> None:
+        self._settings.valueUpperBound.value = value
 
     def update(self, observable: Observable) -> None:
         if observable is self._sizer:
