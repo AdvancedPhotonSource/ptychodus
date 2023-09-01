@@ -156,7 +156,8 @@ class ImageController(Observer):
         qpixmap = QPixmap()
 
         if realImage is not None and numpy.size(realImage) > 0:
-            integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8)
+            # NOTE .copy() ensures integerImage is not a view
+            integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8).copy()
 
             qimage = QImage(integerImage.data, integerImage.shape[1], integerImage.shape[0],
                             integerImage.strides[0], QImage.Format_RGBA8888)
