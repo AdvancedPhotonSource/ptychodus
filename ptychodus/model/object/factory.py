@@ -7,6 +7,7 @@ import numpy
 
 from ...api.object import ObjectArrayType, ObjectFileReader
 from ...api.plugins import PluginChooser
+from .compare import CompareObjectInitializer
 from .file import FromFileObjectInitializer
 from .random import RandomObjectInitializer
 from .repository import ObjectRepositoryItem
@@ -36,6 +37,11 @@ class ObjectRepositoryItemFactory:
             self.createRandomItem,
             simpleName=RandomObjectInitializer.SIMPLE_NAME,
             displayName=RandomObjectInitializer.DISPLAY_NAME,
+        )
+        self._initializers.registerPlugin(
+            self.createCompareItem,
+            simpleName=CompareObjectInitializer.SIMPLE_NAME,
+            displayName=CompareObjectInitializer.DISPLAY_NAME,
         )
 
     def getOpenFileFilterList(self) -> Sequence[str]:
@@ -96,6 +102,12 @@ class ObjectRepositoryItemFactory:
 
     def createRandomItem(self) -> ObjectRepositoryItem:
         initializer = RandomObjectInitializer(self._rng, self._sizer)
+        item = ObjectRepositoryItem(initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def createCompareItem(self) -> ObjectRepositoryItem:
+        initializer = CompareObjectInitializer()
         item = ObjectRepositoryItem(initializer.simpleName)
         item.setInitializer(initializer)
         return item

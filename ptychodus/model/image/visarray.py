@@ -29,6 +29,9 @@ class VisualizationArray(Observable):
     def getAmplitude(self) -> RealArrayType:
         return numpy.absolute(self._array).astype(numpy.float_)
 
+    def getIntensity(self) -> RealArrayType:
+        return numpy.square(self.getAmplitude())
+
     def getPhaseInRadians(self) -> RealArrayType:
         return numpy.angle(self._array).astype(numpy.float_)
 

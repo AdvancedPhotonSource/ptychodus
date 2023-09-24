@@ -36,6 +36,7 @@ class RandomObjectViewController(Observer):
             logger.error('Null initializer!')
             return
 
+        self._view.numberOfSlicesSpinBox.valueChanged.connect(initializer.setNumberOfSlices)
         self._view.extraPaddingXSpinBox.valueChanged.connect(initializer.setExtraPaddingX)
         self._view.extraPaddingYSpinBox.valueChanged.connect(initializer.setExtraPaddingY)
 
@@ -47,8 +48,26 @@ class RandomObjectViewController(Observer):
         if self._initializer is None:
             logger.error('Null initializer!')
         else:
+            self._view.numberOfSlicesSpinBox.blockSignals(True)
+            self._view.numberOfSlicesSpinBox.setRange(
+                self._initializer.getNumberOfSlicesLimits().lower,
+                self._initializer.getNumberOfSlicesLimits().upper)
+            self._view.numberOfSlicesSpinBox.setValue(self._initializer.getNumberOfSlices())
+            self._view.numberOfSlicesSpinBox.blockSignals(False)
+
+            self._view.extraPaddingXSpinBox.blockSignals(True)
+            self._view.extraPaddingXSpinBox.setRange(
+                self._initializer.getExtraPaddingXLimits().lower,
+                self._initializer.getExtraPaddingXLimits().upper)
             self._view.extraPaddingXSpinBox.setValue(self._initializer.getExtraPaddingX())
+            self._view.extraPaddingXSpinBox.blockSignals(False)
+
+            self._view.extraPaddingYSpinBox.blockSignals(True)
+            self._view.extraPaddingYSpinBox.setRange(
+                self._initializer.getExtraPaddingYLimits().lower,
+                self._initializer.getExtraPaddingYLimits().upper)
             self._view.extraPaddingYSpinBox.setValue(self._initializer.getExtraPaddingY())
+            self._view.extraPaddingYSpinBox.blockSignals(False)
 
             self._view.amplitudeMeanSlider.setValueAndRange(
                 self._initializer.getAmplitudeMean(), self._initializer.getAmplitudeMeanLimits())

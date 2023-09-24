@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Final, Optional
 import logging
 
 import numpy
@@ -41,16 +41,19 @@ class ObjectInitializer(ABC, Observable):
 
     @abstractmethod
     def __call__(self) -> ObjectArrayType:
+        '''produces an initial object guess'''
         pass
 
 
 class ObjectRepositoryItem(Observable, Observer):
     '''container for items that can be stored in a object repository'''
+    SIMPLE_NAME: Final[str] = 'FromMemory'
+    DISPLAY_NAME: Final[str] = 'From Memory'
 
     def __init__(self, nameHint: str, array: Optional[ObjectArrayType] = None) -> None:
         super().__init__()
         self._nameHint = nameHint
-        self._array = numpy.zeros((0, 0), dtype=complex)
+        self._array = numpy.zeros((1, 0, 0), dtype=complex)
         self._initializer: Optional[ObjectInitializer] = None
 
         if array is not None:
@@ -70,9 +73,12 @@ class ObjectRepositoryItem(Observable, Observer):
             raise TypeError('Object must be a complex-valued ndarray')
 
         if array.ndim == 2:
+            # FIXME make this work with reconstructors and MATLAB I/O
+            self._array = array[numpy.newaxis, ...]
+        elif array.ndim == 3:
             self._array = array
         else:
-            raise ValueError('Object must be 2-dimensional ndarray.')
+            raise ValueError('Object must be 2- or 3-dimensional ndarray.')
 
         self.notifyObservers()
 
@@ -87,17 +93,18 @@ class ObjectRepositoryItem(Observable, Observer):
             return
 
         try:
-            self._array = self._initializer()
+            array = self._initializer()
         except Exception:
             logger.exception('Failed to reinitialize object!')
-        else:
-            self.notifyObservers()
+            return
+
+        self._setArray(array)
 
     def getInitializerSimpleName(self) -> str:
-        return 'FromMemory' if self._initializer is None else self._initializer.simpleName
+        return self.SIMPLE_NAME if self._initializer is None else self._initializer.simpleName
 
     def getInitializerDisplayName(self) -> str:
-        return 'From Memory' if self._initializer is None else self._initializer.displayName
+        return self.DISPLAY_NAME if self._initializer is None else self._initializer.displayName
 
     def getInitializer(self) -> Optional[ObjectInitializer]:
         '''returns the initializer'''
@@ -123,6 +130,15 @@ class ObjectRepositoryItem(Observable, Observer):
     def getSizeInBytes(self) -> int:
         '''returns the array size in bytes'''
         return self._array.nbytes
+
+    def getNumberOfSlices(self) -> int:
+        return self._array.shape[-3]
+
+    def getSlice(self, number: int) -> ObjectArrayType:
+        return self._array[number, :, :]
+
+    def getSlicesFlattened(self) -> ObjectArrayType:
+        return numpy.prod(self._array, axis=-3)
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

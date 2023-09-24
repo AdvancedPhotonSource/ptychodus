@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
                              QSpinBox, QVBoxLayout, QWidget)
 
-from .widgets import DecimalSlider, LengthWidget, RepositoryTableView
+from .widgets import DecimalSlider, LengthWidget, RepositoryTreeView
 
 __all__ = [
     'ObjectEditorDialog',
@@ -21,6 +21,7 @@ class RandomObjectView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
+        self.numberOfSlicesSpinBox = QSpinBox()
         self.extraPaddingXSpinBox = QSpinBox()
         self.extraPaddingYSpinBox = QSpinBox()
         self.amplitudeMeanSlider = DecimalSlider.createInstance(Qt.Horizontal)
@@ -31,11 +32,8 @@ class RandomObjectView(QGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> RandomObjectView:
         view = cls(parent)
 
-        MAX_INT = 0x7FFFFFFF
-        view.extraPaddingXSpinBox.setRange(0, MAX_INT)
-        view.extraPaddingYSpinBox.setRange(0, MAX_INT)
-
         layout = QFormLayout()
+        layout.addRow('Number of Slices:', view.numberOfSlicesSpinBox)
         layout.addRow('Extra Padding X:', view.extraPaddingXSpinBox)
         layout.addRow('Extra Padding Y:', view.extraPaddingYSpinBox)
         layout.addRow('Amplitude Mean:', view.amplitudeMeanSlider)
@@ -102,7 +100,7 @@ class ObjectView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.parametersView = ObjectParametersView.createInstance()
-        self.repositoryView = RepositoryTableView.createInstance('Repository')
+        self.repositoryView = RepositoryTreeView.createInstance('Repository')
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectView:

@@ -45,6 +45,8 @@ class MappedColorizer(Colorizer):
         cyclicColormapChooser.setCurrentPluginByName('hsv')
         acyclicColormapChooser.setCurrentPluginByName('viridis')
 
+        intensity = cls(array, displayRange, transformChooser, 'Intensity', array.getIntensity,
+                        acyclicColormapChooser)
         amplitude = cls(array, displayRange, transformChooser, 'Amplitude', array.getAmplitude,
                         acyclicColormapChooser)
         phase = cls(array, displayRange, transformChooser, 'Phase', array.getPhaseInRadians,
@@ -56,7 +58,7 @@ class MappedColorizer(Colorizer):
         imag = cls(array, displayRange, transformChooser, 'Imaginary', array.getImaginaryPart,
                    acyclicColormapChooser)
 
-        return [amplitude, phase, phaseUnwrapped, real, imag]
+        return [intensity, amplitude, phase, phaseUnwrapped, real, imag]
 
     @property
     def name(self) -> str:

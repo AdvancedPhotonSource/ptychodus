@@ -2,13 +2,11 @@ from __future__ import annotations
 from typing import Callable, Final
 import logging
 
-from PyQt5.QtCore import QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
-from ...model.object import (ObjectRepositoryItem, ObjectRepositoryItemPresenter,
-                             ObjectRepositoryPresenter)
+from ...model.object import ObjectRepositoryItem, ObjectRepositoryPresenter
 from ...model.probe import ApparatusPresenter
 from ...view.image import ImageView
 from ...view.object import ObjectParametersView, ObjectView
@@ -16,7 +14,7 @@ from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .random import RandomObjectViewController
-from .tableModel import ObjectTableModel
+from .treeModel import ObjectTreeModel, ObjectTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +31,8 @@ class ObjectParametersController(Observer):
                        view: ObjectParametersView) -> ObjectParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
+
+        # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
 
         view.pixelSizeXWidget.setReadOnly(True)
         view.pixelSizeYWidget.setReadOnly(True)
@@ -66,8 +66,7 @@ class ObjectController(Observer):
         self._fileDialogFactory = fileDialogFactory
         self._parametersController = ObjectParametersController.createInstance(
             apparatusPresenter, view.parametersView)
-        self._tableModel = ObjectTableModel(repositoryPresenter)
-        self._proxyModel = QSortFilterProxyModel()
+        self._treeModel = ObjectTreeModel()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
 
@@ -82,12 +81,9 @@ class ObjectController(Observer):
 
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
 
-        controller._proxyModel.setSourceModel(controller._tableModel)
-        view.repositoryView.tableView.setModel(controller._proxyModel)
-        view.repositoryView.tableView.setSortingEnabled(True)
-        view.repositoryView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        view.repositoryView.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
-        view.repositoryView.tableView.selectionModel().selectionChanged.connect(
+        view.repositoryView.treeView.setModel(controller._treeModel)
+        view.repositoryView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.repositoryView.treeView.selectionModel().selectionChanged.connect(
             controller._updateView)
 
         for name in repositoryPresenter.getInitializerDisplayNameList():
@@ -123,22 +119,10 @@ class ObjectController(Observer):
         if filePath:
             self._repositoryPresenter.openObject(filePath, nameFilter)
 
-    def _getCurrentItemPresenter(self) -> ObjectRepositoryItemPresenter | None:
-        itemPresenter: ObjectRepositoryItemPresenter | None = None
-        proxyIndex = self._view.repositoryView.tableView.currentIndex()
-
-        if proxyIndex.isValid():
-            index = self._proxyModel.mapToSource(proxyIndex)
-            itemPresenter = self._repositoryPresenter[index.row()]
-        else:
-            logger.error('No items are selected!')
-
-        return itemPresenter
-
     def _saveSelectedObject(self) -> None:
-        itemPresenter = self._getCurrentItemPresenter()
+        current = self._view.repositoryView.treeView.currentIndex()
 
-        if itemPresenter is not None:
+        if current.isValid():
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
                 self._view.repositoryView,
                 'Save Object',
@@ -146,16 +130,21 @@ class ObjectController(Observer):
                 selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
 
             if filePath:
+                name = current.internalPointer().getName()
+
                 try:
-                    self._repositoryPresenter.saveObject(itemPresenter.name, filePath, nameFilter)
+                    self._repositoryPresenter.saveObject(name, filePath, nameFilter)
                 except Exception as err:
                     logger.exception(err)
                     ExceptionDialog.showException('File writer', err)
+        else:
+            logger.error('No items are selected!')
 
     def _editSelectedObject(self) -> None:
-        itemPresenter = self._getCurrentItemPresenter()
+        current = self._view.repositoryView.treeView.currentIndex()
 
-        if itemPresenter is not None:
+        if current.isValid():
+            itemPresenter = current.internalPointer().presenter  # TODO do this cleaner
             item = itemPresenter.item
             initializerName = item.getInitializerSimpleName()
 
@@ -164,30 +153,29 @@ class ObjectController(Observer):
             else:
                 _ = QMessageBox.information(self._view, itemPresenter.name,
                                             f'\"{initializerName}\" has no editable parameters.')
+        else:
+            logger.error('No items are selected!')
 
     def _removeSelectedObject(self) -> None:
-        itemPresenter = self._getCurrentItemPresenter()
+        current = self._view.repositoryView.treeView.currentIndex()
 
-        if itemPresenter is not None:
-            self._repositoryPresenter.removeObject(itemPresenter.name)
+        if current.isValid():
+            name = current.internalPointer().getName()
+            self._repositoryPresenter.removeObject(name)
+        else:
+            logger.error('No items are selected!')
 
     def _updateView(self) -> None:
-        selectionModel = self._view.repositoryView.tableView.selectionModel()
+        selectionModel = self._view.repositoryView.treeView.selectionModel()
         hasSelection = selectionModel.hasSelection()
 
         self._view.repositoryView.buttonBox.saveButton.setEnabled(hasSelection)
         self._view.repositoryView.buttonBox.editButton.setEnabled(hasSelection)
         self._view.repositoryView.buttonBox.removeButton.setEnabled(hasSelection)
 
-        for proxyIndex in selectionModel.selectedIndexes():
-            index = self._proxyModel.mapToSource(proxyIndex)
-            itemPresenter = self._repositoryPresenter[index.row()]
-
-            if itemPresenter is None:
-                logger.error('Bad item!')
-            else:
-                item = itemPresenter.item
-                self._imagePresenter.setArray(item.getArray())
+        for index in selectionModel.selectedIndexes():
+            node = index.internalPointer()
+            self._imagePresenter.setArray(node.getArray())
 
             return
 
@@ -197,14 +185,19 @@ class ObjectController(Observer):
         for itemPresenter in self._repositoryPresenter:
             itemPresenter.item.addObserver(self)
 
-        self._tableModel.beginResetModel()
-        self._tableModel.endResetModel()
+        rootNode = ObjectTreeNode.createRoot()
+
+        for itemPresenter in self._repositoryPresenter:
+            rootNode.createChild(itemPresenter)
+
+        self._treeModel.setRootNode(rootNode)
 
     def update(self, observable: Observable) -> None:
         if observable is self._repositoryPresenter:
             self._syncModelToView()
         elif isinstance(observable, ObjectRepositoryItem):
-            for itemPresenter in self._repositoryPresenter:
+            for row, itemPresenter in enumerate(self._repositoryPresenter):
                 if observable is itemPresenter.item:
+                    self._treeModel.refreshObject(row)
                     self._updateView()
                     break

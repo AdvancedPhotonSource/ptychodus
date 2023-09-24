@@ -14,6 +14,7 @@ from .sizer import ObjectSizer
 class RandomObjectInitializer(ObjectInitializer):
     SIMPLE_NAME: Final[str] = 'Random'
     DISPLAY_NAME: Final[str] = 'Random'
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, rng: numpy.random.Generator, sizer: ObjectSizer) -> None:
         super().__init__()
@@ -24,6 +25,7 @@ class RandomObjectInitializer(ObjectInitializer):
         self._amplitudeMean = Decimal(1) / 2
         self._amplitudeDeviation = Decimal()
         self._phaseDeviation = Decimal()
+        self._numberOfSlices = 1
 
     @property
     def simpleName(self) -> str:
@@ -39,6 +41,7 @@ class RandomObjectInitializer(ObjectInitializer):
         self._amplitudeMean = settings.amplitudeMean.value
         self._amplitudeDeviation = settings.amplitudeDeviation.value
         self._phaseDeviation = settings.phaseDeviation.value
+        self._numberOfSlices = settings.numberOfSlices.value
         self.notifyObservers()
 
     def syncToSettings(self, settings: ObjectSettings) -> None:
@@ -47,31 +50,41 @@ class RandomObjectInitializer(ObjectInitializer):
         settings.amplitudeMean.value = self._amplitudeMean
         settings.amplitudeDeviation.value = self._amplitudeDeviation
         settings.phaseDeviation.value = self._phaseDeviation
+        settings.numberOfSlices.value = self._numberOfSlices
 
     def __call__(self) -> ObjectArrayType:
         extraPaddingExtent = ImageExtent(2 * self._extraPaddingX, 2 * self._extraPaddingY)
         paddedObjectExtent = self._sizer.getObjectExtentInPixels() + extraPaddingExtent
+        objectShape = self.getNumberOfSlices(), *paddedObjectExtent.shape
 
         amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),
-                                     paddedObjectExtent.shape)
-        phase = self._rng.normal(0., float(self._phaseDeviation), paddedObjectExtent.shape)
+                                     objectShape)
+        phase = self._rng.normal(0., float(self._phaseDeviation), objectShape)
 
         return numpy.clip(amplitude, 0., 1.) * numpy.exp(1j * phase)
 
-    def getExtraPaddingX(self) -> int:
-        return self._extraPaddingX
+    def getExtraPaddingXLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
 
-    def setExtraPaddingX(self, value: int) -> None:
-        if self._extraPaddingX != value:
-            self._extraPaddingX = value
+    def getExtraPaddingX(self) -> int:
+        limits = self.getExtraPaddingXLimits()
+        return limits.clamp(self._extraPaddingX)
+
+    def setExtraPaddingX(self, amount: int) -> None:
+        if self._extraPaddingX != amount:
+            self._extraPaddingX = amount
             self.notifyObservers()
 
-    def getExtraPaddingY(self) -> int:
-        return self._extraPaddingY
+    def getExtraPaddingYLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
 
-    def setExtraPaddingY(self, value: int) -> None:
-        if self._extraPaddingY != value:
-            self._extraPaddingY = value
+    def getExtraPaddingY(self) -> int:
+        limits = self.getExtraPaddingYLimits()
+        return limits.clamp(self._extraPaddingY)
+
+    def setExtraPaddingY(self, amount: int) -> None:
+        if self._extraPaddingY != amount:
+            self._extraPaddingY = amount
             self.notifyObservers()
 
     def getAmplitudeMeanLimits(self) -> Interval[Decimal]:
@@ -109,4 +122,16 @@ class RandomObjectInitializer(ObjectInitializer):
     def setPhaseDeviation(self, stddev: Decimal) -> None:
         if self._phaseDeviation != stddev:
             self._phaseDeviation = stddev
+            self.notifyObservers()
+
+    def getNumberOfSlicesLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getNumberOfSlices(self) -> int:
+        limits = self.getNumberOfSlicesLimits()
+        return limits.clamp(self._numberOfSlices)
+
+    def setNumberOfSlices(self, number: int) -> None:
+        if self._numberOfSlices != number:
+            self._numberOfSlices = number
             self.notifyObservers()
