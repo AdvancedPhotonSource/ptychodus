@@ -10,7 +10,7 @@ from ...api.plugins import PluginChooser
 from .compare import CompareObjectInitializer
 from .file import FromFileObjectInitializer
 from .random import RandomObjectInitializer
-from .repository import ObjectRepositoryItem
+from .repository import ObjectRepository, ObjectRepositoryItem
 from .settings import ObjectSettings
 from .sizer import ObjectSizer
 
@@ -22,10 +22,12 @@ InitializerFactory: TypeAlias = Callable[[], Optional[ObjectRepositoryItem]]
 class ObjectRepositoryItemFactory:
 
     def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings, sizer: ObjectSizer,
+                 repository: ObjectRepository,
                  fileReaderChooser: PluginChooser[ObjectFileReader]) -> None:
         self._rng = rng
         self._settings = settings
         self._sizer = sizer
+        self._repository = repository
         self._fileReaderChooser = fileReaderChooser
         self._initializers = PluginChooser[InitializerFactory]()
         self._initializers.registerPlugin(
@@ -107,7 +109,7 @@ class ObjectRepositoryItemFactory:
         return item
 
     def createCompareItem(self) -> ObjectRepositoryItem:
-        initializer = CompareObjectInitializer()
+        initializer = CompareObjectInitializer(self._repository)
         item = ObjectRepositoryItem(initializer.simpleName)
         item.setInitializer(initializer)
         return item

@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Generic, Optional, TypeVar
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
-                             QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
 
 from .widgets import DecimalSlider, LengthWidget, RepositoryTreeView
 
@@ -15,6 +15,25 @@ __all__ = [
 ]
 
 T = TypeVar('T', bound=QGroupBox)
+
+
+class ObjectParametersView(QGroupBox):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__('Parameters', parent)
+        self.pixelSizeXWidget = LengthWidget.createInstance()
+        self.pixelSizeYWidget = LengthWidget.createInstance()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectParametersView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
+        layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
+        view.setLayout(layout)
+
+        return view
 
 
 class RandomObjectView(QGroupBox):
@@ -44,20 +63,20 @@ class RandomObjectView(QGroupBox):
         return view
 
 
-class ObjectParametersView(QGroupBox):
+class CompareObjectView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
-        self.pixelSizeXWidget = LengthWidget.createInstance()
-        self.pixelSizeYWidget = LengthWidget.createInstance()
+        self.name1ComboBox = QComboBox()
+        self.name2ComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> CompareObjectView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
-        layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
+        layout.addRow('Name 1:', view.name1ComboBox)
+        layout.addRow('Name 2:', view.name2ComboBox)
         view.setLayout(layout)
 
         return view

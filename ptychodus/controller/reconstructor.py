@@ -3,8 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 import logging
 
-from PyQt5.QtCore import QStringListModel
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QStringListModel
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QWidget
 

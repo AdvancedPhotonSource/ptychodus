@@ -13,6 +13,7 @@ from ...view.object import ObjectParametersView, ObjectView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
+from .compare import CompareObjectViewController
 from .random import RandomObjectViewController
 from .treeModel import ObjectTreeModel, ObjectTreeNode
 
@@ -150,6 +151,8 @@ class ObjectController(Observer):
 
             if initializerName == 'Random':
                 RandomObjectViewController.editParameters(itemPresenter, self._view)
+            elif initializerName == 'Compare':
+                CompareObjectViewController.editParameters(itemPresenter, self._view)
             else:
                 _ = QMessageBox.information(self._view, itemPresenter.name,
                                             f'\"{initializerName}\" has no editable parameters.')

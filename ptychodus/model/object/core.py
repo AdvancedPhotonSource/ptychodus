@@ -168,9 +168,9 @@ class ObjectCore(StatefulCore[ObjectStateData]):
                  fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
         self._settings = ObjectSettings.createInstance(settingsRegistry)
         self.sizer = ObjectSizer.createInstance(self._settings, apparatus, scanSizer, probeSizer)
-        self._itemFactory = ObjectRepositoryItemFactory(rng, self._settings, self.sizer,
-                                                        fileReaderChooser)
         self._repository = ObjectRepository()
+        self._itemFactory = ObjectRepositoryItemFactory(rng, self._settings, self.sizer,
+                                                        self._repository, fileReaderChooser)
         self._itemSettingsDelegate = ObjectRepositoryItemSettingsDelegate(
             self._settings, self._itemFactory, self._repository)
         self._object = SelectedObject.createInstance(self._repository, self._itemSettingsDelegate,
