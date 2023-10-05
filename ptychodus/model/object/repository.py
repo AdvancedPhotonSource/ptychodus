@@ -73,7 +73,7 @@ class ObjectRepositoryItem(Observable, Observer):
             raise TypeError('Object must be a complex-valued ndarray')
 
         if array.ndim == 2:
-            # FIXME make this work with reconstructors and MATLAB I/O
+            # FIXME test MATLAB I/O
             self._array = array[numpy.newaxis, ...]
         elif array.ndim == 3:
             self._array = array
