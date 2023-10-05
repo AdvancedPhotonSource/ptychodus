@@ -33,7 +33,7 @@ class FresnelZonePlateProbeViewController(Observer):
 
         if isinstance(initializer, FresnelZonePlateProbeInitializer):
             self._initializer = initializer
-            self._initializer.addObserver(self) # FIXME manual update on combobox change?
+            self._initializer.addObserver(self)  # FIXME manual update on combobox change?
         else:
             logger.error('Null initializer!')
             return

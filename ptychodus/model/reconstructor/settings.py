@@ -9,7 +9,7 @@ class ReconstructorSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.algorithm = settingsGroup.createStringEntry('Algorithm', 'Tike/rPIE')
+        self.algorithm = settingsGroup.createStringEntry('Algorithm', 'Tike/lstsq_grad')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ReconstructorSettings:

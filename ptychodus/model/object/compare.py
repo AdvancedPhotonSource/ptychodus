@@ -3,6 +3,8 @@ from collections.abc import Mapping, Sequence
 from typing import Final
 import logging
 
+import numpy
+
 from ...api.object import ObjectArrayType
 from ...api.observer import Observable, Observer
 from .repository import ObjectInitializer, ObjectRepositoryItem
@@ -97,6 +99,15 @@ class CompareObjectInitializer(ObjectInitializer, Observer):
             self._item2 = item
             self._item2.addObserver(self)
             self.notifyObservers()
+
+    def getSpatialFrequency(self) -> Sequence[float]:
+        n = 100
+        return [i / (n - 1) for i in range(n)]
+
+    def getFourierRingCorrelation(self) -> Sequence[float]:
+        x = self.getSpatialFrequency()
+        y = numpy.sin(2 * numpy.pi * numpy.array(x))  # FIXME
+        return list(y)
 
     def update(self, observable: Observable) -> None:
         if observable is self._item1:

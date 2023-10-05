@@ -3,7 +3,12 @@ from typing import Generic, Optional, TypeVar
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
+                             QGridLayout, QGroupBox, QLabel, QSizePolicy, QSpinBox, QVBoxLayout,
+                             QWidget)
+
+from matplotlib.backends.backend_qt5agg import FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
 
 from .widgets import DecimalSlider, LengthWidget, RepositoryTreeView
 
@@ -14,7 +19,7 @@ __all__ = [
     'RandomObjectView',
 ]
 
-T = TypeVar('T', bound=QGroupBox)
+T = TypeVar('T', bound=QWidget)
 
 
 class ObjectParametersView(QGroupBox):
@@ -63,20 +68,69 @@ class RandomObjectView(QGroupBox):
         return view
 
 
-class CompareObjectView(QGroupBox):
+class CompareObjectParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
+        self.name1Label = QLabel('Name 1:')
         self.name1ComboBox = QComboBox()
+        self.name2Label = QLabel('Name 2:')
         self.name2ComboBox = QComboBox()
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> CompareObjectParametersView:
+        view = cls(parent)
+        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+
+        layout = QGridLayout()
+        layout.addWidget(view.name1Label, 0, 0)
+        layout.addWidget(view.name1ComboBox, 0, 1)
+        layout.addWidget(view.name2Label, 0, 2)
+        layout.addWidget(view.name2ComboBox, 0, 3)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(3, 1)
+        view.setLayout(layout)
+
+        return view
+
+
+class CompareObjectPlotView(QWidget):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.figure = Figure()
+        self.figureCanvas = FigureCanvas(self.figure)
+        self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
+        self.axes = self.figure.add_subplot(111)
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> CompareObjectPlotView:
+        view = cls(parent)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.navigationToolbar)
+        layout.addWidget(view.figureCanvas)
+        view.setLayout(layout)
+
+        return view
+
+
+class CompareObjectView(QWidget):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.parametersView = CompareObjectParametersView.createInstance(self)
+        self.plotView = CompareObjectPlotView.createInstance(self)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> CompareObjectView:
         view = cls(parent)
 
-        layout = QFormLayout()
-        layout.addRow('Name 1:', view.name1ComboBox)
-        layout.addRow('Name 2:', view.name2ComboBox)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.parametersView)
+        layout.addWidget(view.plotView)
         view.setLayout(layout)
 
         return view

@@ -30,6 +30,7 @@ class ProbeSettings(Observable, Observer):
             'SuperGaussianProbeWidthInMeters', '400e-6')
         self.sgOrderParameter = settingsGroup.createRealEntry('SuperGaussianOrderParameter', '1')
 
+        self.zonePlate = settingsGroup.createStringEntry('ZonePlate', 'Custom')
         self.zonePlateRadiusInMeters = settingsGroup.createRealEntry('ZonePlateRadiusInMeters',
                                                                      '90e-6')
         self.outermostZoneWidthInMeters = settingsGroup.createRealEntry(

@@ -124,7 +124,7 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         self._defocusDistanceInMeters = Decimal('800e-6')  # from sample to the focal plane
 
     def syncFromSettings(self, settings: ProbeSettings) -> None:
-        # FIXME sync presets
+        self._presets = settings.zonePlate.value
         self._custom = FresnelZonePlate(
             zonePlateRadiusInMeters=settings.zonePlateRadiusInMeters.value,
             outermostZoneWidthInMeters=settings.outermostZoneWidthInMeters.value,
@@ -134,7 +134,7 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         super().syncFromSettings(settings)
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
-        # FIXME sync presets
+        settings.zonePlate.value = self._presets
         settings.zonePlateRadiusInMeters.value = self._custom.zonePlateRadiusInMeters
         settings.outermostZoneWidthInMeters.value = self._custom.outermostZoneWidthInMeters
         settings.centralBeamstopDiameterInMeters.value = \
@@ -178,7 +178,6 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
 
     def setPresets(self, presets: str) -> None:
         if self._presets != presets:
-            print(f'preset: {self._presets} -> {presets}')  # FIXME
             self._presets = presets
             self.notifyObservers()
 
