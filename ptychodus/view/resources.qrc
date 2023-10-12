@@ -8,7 +8,7 @@
         <file alias="home">Font-Awesome-6.4.2/svgs/solid/house-chimney.svg</file>
         <file alias="measure">Font-Awesome-6.4.2/svgs/solid/ruler.svg</file>
         <file alias="monitor">Font-Awesome-6.4.2/svgs/solid/display.svg</file>
-        <file alias="move">Font-Awesome-6.4.2/svgs/solid/hand.svg</file>
+        <file alias="move">Font-Awesome-6.4.2/svgs/solid/arrows-up-down-left-right.svg</file>
         <file alias="object">Font-Awesome-6.4.2/svgs/solid/cube.svg</file>
         <file alias="probe">Font-Awesome-6.4.2/svgs/solid/circle-radiation.svg</file>
         <file alias="reconstructor">Font-Awesome-6.4.2/svgs/solid/screwdriver-wrench.svg</file>

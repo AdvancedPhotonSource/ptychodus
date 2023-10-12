@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from PyQt5.QtCore import QStringListModel
 from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import QButtonGroup
 
 import numpy
 
 from ..api.observer import Observable, Observer
 from ..model.image import ImagePresenter
-from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageToolsGroupBox,
-                          ImageView, ImageWidget)
+from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageMouseTool,
+                          ImageToolsGroupBox, ImageView, ImageWidget)
 from .data import FileDialogFactory
 
 
@@ -16,17 +17,28 @@ class ImageToolsController:
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
     def __init__(self, view: ImageToolsGroupBox, imageWidget: ImageWidget,
-                 fileDialogFactory: FileDialogFactory) -> None:
+                 fileDialogFactory: FileDialogFactory, mouseToolButtonGroup: QButtonGroup) -> None:
         self._view = view
         self._imageWidget = imageWidget
         self._fileDialogFactory = fileDialogFactory
+        self._mouseToolButtonGroup = mouseToolButtonGroup
 
     @classmethod
     def createInstance(cls, view: ImageToolsGroupBox, imageWidget: ImageWidget,
                        fileDialogFactory: FileDialogFactory) -> ImageToolsController:
-        controller = cls(view, imageWidget, fileDialogFactory)
-        view.saveButton.clicked.connect(controller._saveImage)
+        view.moveButton.setCheckable(True)
+        view.measureButton.setCheckable(True)
+
+        view.moveButton.setChecked(True)
+
+        mouseToolButtonGroup = QButtonGroup()
+        mouseToolButtonGroup.addButton(view.moveButton, ImageMouseTool.MOVE_TOOL.value)
+        mouseToolButtonGroup.addButton(view.measureButton, ImageMouseTool.MEASURE_TOOL.value)
+
+        controller = cls(view, imageWidget, fileDialogFactory, mouseToolButtonGroup)
         view.homeButton.clicked.connect(imageWidget.zoomToFit)
+        view.saveButton.clicked.connect(controller._saveImage)
+        mouseToolButtonGroup.idToggled.connect(controller._setMouseTool)
         return controller
 
     def _saveImage(self) -> None:
@@ -36,6 +48,11 @@ class ImageToolsController:
         if filePath:
             pixmap = self._imageWidget.getPixmap()
             pixmap.save(str(filePath))
+
+    def _setMouseTool(self, toolId: int, checked: bool) -> None:
+        if checked:
+            mouseTool = ImageMouseTool(toolId)
+            self._imageWidget.setMouseTool(mouseTool)
 
 
 class ImageColorizerController(Observer):
