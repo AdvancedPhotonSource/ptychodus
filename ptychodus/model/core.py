@@ -26,6 +26,7 @@ from .data import (DataCore, DiffractionDatasetPresenter, DiffractionDatasetInpu
                    DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import ImageCore, ImagePresenter
+from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
 from .probe import ApparatusPresenter, ProbeCore, ProbePresenter, ProbeRepositoryPresenter
@@ -76,6 +77,7 @@ class ModelCore:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
+        self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._detector = Detector.createInstance(self._detectorSettings)

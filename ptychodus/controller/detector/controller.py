@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import Observable, Observer
 from ...model import DetectorPresenter
-from ...model.data import DiffractionDatasetPresenter
+from ...model.data import DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter
 from ...model.image import ImagePresenter
 from ...model.probe import ApparatusPresenter
 from ...view.detector import DetectorView
@@ -23,14 +23,17 @@ class DetectorController(Observer):
 
     def __init__(self, detectorPresenter: DetectorPresenter,
                  apparatusPresenter: ApparatusPresenter,
+                 inputOutputPresenter: DiffractionDatasetInputOutputPresenter,
                  datasetPresenter: DiffractionDatasetPresenter, imagePresenter: ImagePresenter,
                  view: DetectorView, imageView: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
+        self._inputOutputPresenter = inputOutputPresenter
         self._datasetPresenter = datasetPresenter
         self._imagePresenter = imagePresenter
         self._view = view
         self._imageView = imageView
+        self._fileDialogFactory = fileDialogFactory
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
         self._parametersController = DetectorParametersController.createInstance(
@@ -40,15 +43,20 @@ class DetectorController(Observer):
     @classmethod
     def createInstance(cls, detectorPresenter: DetectorPresenter,
                        apparatusPresenter: ApparatusPresenter,
+                       inputOutputPresenter: DiffractionDatasetInputOutputPresenter,
                        datasetPresenter: DiffractionDatasetPresenter,
                        imagePresenter: ImagePresenter, view: DetectorView, imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> DetectorController:
-        controller = cls(detectorPresenter, apparatusPresenter, datasetPresenter, imagePresenter,
-                         view, imageView, fileDialogFactory)
+        controller = cls(detectorPresenter, apparatusPresenter, inputOutputPresenter,
+                         datasetPresenter, imagePresenter, view, imageView, fileDialogFactory)
 
         view.dataView.treeView.setModel(controller._treeModel)
         view.dataView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.dataView.treeView.selectionModel().selectionChanged.connect(controller._updateView)
+        view.dataView.buttonBox.openButton.clicked.connect(controller._openDiffractionFile)
+        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDiffractionFile)
+        view.dataView.buttonBox.inspectButton.clicked.connect(controller._inspectDiffractionFile)
+        view.dataView.buttonBox.closeButton.clicked.connect(controller._closeDiffractionFile)
         datasetPresenter.addObserver(controller)
 
         controller._syncModelToView()
@@ -64,6 +72,26 @@ class DetectorController(Observer):
             node = index.internalPointer()
             self._imagePresenter.setArray(node.data)
             break
+
+    def _openDiffractionFile(self) -> None:
+        self._view.dataView.openDataWizard.restart()
+        self._view.dataView.openDataWizard.show()
+
+    def _saveDiffractionFile(self) -> None:
+        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+            self._view,
+            'Save Diffraction File',
+            nameFilters=self._inputOutputPresenter.getSaveFileFilterList(),
+            selectedNameFilter=self._inputOutputPresenter.getSaveFileFilter())
+
+        if filePath:
+            self._inputOutputPresenter.saveDiffractionFile(filePath)
+
+    def _inspectDiffractionFile(self) -> None:
+        self._view.dataView.inspectDataDialog.show()
+
+    def _closeDiffractionFile(self) -> None:
+        logger.error('Close not implemented!')  # FIXME
 
     def _syncModelToView(self) -> None:
         rootNode = DatasetTreeNode.createRoot()

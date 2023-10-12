@@ -47,10 +47,12 @@ class ActiveDiffractionDataset(DiffractionDataset):
         return self._contentsTree
 
     def getInfoText(self) -> str:
+        filePath = self._metadata.filePath
+        label = filePath.stem if filePath else 'None'
         number, height, width = self._arrayData.shape
         dtype = str(self._arrayData.dtype)
         sizeInMB = self._arrayData.nbytes / (1024 * 1024)
-        return f'Total: {number} {dtype}({width}W x {height}H) frames [{sizeInMB:.2f}MB]'
+        return f'{label}: {number} x {width}W x {height}H {dtype} [{sizeInMB:.2f}MB]'
 
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray:

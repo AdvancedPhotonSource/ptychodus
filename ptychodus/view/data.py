@@ -19,7 +19,7 @@ __all__ = [
     'PatternsView',
 ]
 
-T = TypeVar('T', bound=QGroupBox)
+T = TypeVar('T', bound=QWidget)
 
 
 class DataNavigationPage(Generic[T], QWidget):

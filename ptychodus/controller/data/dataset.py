@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from ...api.observer import Observable, Observer
 from ...model.data import DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter
 from ...view.data import DataNavigationPage, DatasetView
 from .dialogFactory import FileDialogFactory
 
 
-class DatasetController(Observer):
+class DatasetController:
 
     def __init__(self, inputOutputPresenter: DiffractionDatasetInputOutputPresenter,
                  presenter: DiffractionDatasetPresenter, view: DataNavigationPage[DatasetView],
@@ -23,12 +22,9 @@ class DatasetController(Observer):
                        view: DataNavigationPage[DatasetView],
                        fileDialogFactory: FileDialogFactory) -> DatasetController:
         controller = cls(inputOutputPresenter, presenter, view, fileDialogFactory)
-        presenter.addObserver(controller)
 
         view.backwardButton.clicked.connect(inputOutputPresenter.stopAssemblingDiffractionPatterns)
         view.forwardButton.clicked.connect(controller._saveDiffractionFile)
-
-        controller._syncModelToView()
 
         return controller
 
@@ -41,11 +37,3 @@ class DatasetController(Observer):
 
         if filePath:
             self._inputOutputPresenter.saveDiffractionFile(filePath)
-
-    def _syncModelToView(self) -> None:
-        datasetLabel = self._presenter.getDatasetLabel()
-        self._view.contentsView.setTitle(f'Dataset: {datasetLabel}')
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()

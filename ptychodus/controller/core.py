@@ -8,6 +8,7 @@ from ..view import ViewCore
 from .automation import AutomationController
 from .data import DataParametersController, FileDialogFactory
 from .detector import DetectorController
+from .memory import MemoryController
 from .object import ObjectImageController, ObjectController
 from .probe import ProbeImageController, ProbeController
 from .ptychonn import PtychoNNViewControllerFactory
@@ -25,6 +26,8 @@ class ControllerCore:
         self.model = model
         self.view = view
 
+        self._memoryController = MemoryController.createInstance(model.memoryPresenter,
+                                                                 view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
 
         self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(
@@ -38,7 +41,8 @@ class ControllerCore:
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
-            model.detectorPresenter, model.apparatusPresenter, model.diffractionDatasetPresenter,
+            model.detectorPresenter, model.apparatusPresenter,
+            model.diffractionDatasetInputOutputPresenter, model.diffractionDatasetPresenter,
             model.detectorImagePresenter, view.detectorView, view.detectorImageView,
             self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepositoryPresenter,

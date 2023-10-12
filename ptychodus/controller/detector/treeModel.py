@@ -60,7 +60,7 @@ class DatasetTreeNode:
         return 1
 
     @property
-    def sizeInBytes(self) -> float:
+    def sizeInBytes(self) -> int:
         if self._presenter.data is None:
             return 0
         elif self._frameIndex < 0:

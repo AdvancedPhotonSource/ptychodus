@@ -7,30 +7,31 @@ import numpy
 
 from ..api.observer import Observable, Observer
 from ..model.image import ImagePresenter
-from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageFileGroupBox,
+from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageToolsGroupBox,
                           ImageView, ImageWidget)
 from .data import FileDialogFactory
 
 
-class ImageFileController:
+class ImageToolsController:
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
-    def __init__(self, view: ImageFileGroupBox, imageWidget: ImageWidget,
+    def __init__(self, view: ImageToolsGroupBox, imageWidget: ImageWidget,
                  fileDialogFactory: FileDialogFactory) -> None:
         self._view = view
         self._imageWidget = imageWidget
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, view: ImageFileGroupBox, imageWidget: ImageWidget,
-                       fileDialogFactory: FileDialogFactory) -> ImageFileController:
+    def createInstance(cls, view: ImageToolsGroupBox, imageWidget: ImageWidget,
+                       fileDialogFactory: FileDialogFactory) -> ImageToolsController:
         controller = cls(view, imageWidget, fileDialogFactory)
         view.saveButton.clicked.connect(controller._saveImage)
+        view.homeButton.clicked.connect(imageWidget.zoomToFit)
         return controller
 
     def _saveImage(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view, 'Save Image', mimeTypeFilters=ImageFileController.MIME_TYPES)
+            self._view, 'Save Image', mimeTypeFilters=ImageToolsController.MIME_TYPES)
 
         if filePath:
             pixmap = self._imageWidget.getPixmap()
@@ -95,8 +96,8 @@ class ImageDataRangeController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: ImagePresenter,
-                       view: ImageDataRangeGroupBox) -> ImageDataRangeController:
+    def createInstance(cls, presenter: ImagePresenter, view: ImageDataRangeGroupBox,
+                       imageWidget: ImageWidget) -> ImageDataRangeController:
         controller = cls(presenter, view)
 
         controller._syncModelToView()
@@ -105,11 +106,15 @@ class ImageDataRangeController(Observer):
         view.minDisplayValueSlider.valueChanged.connect(presenter.setMinDisplayValue)
         view.maxDisplayValueSlider.valueChanged.connect(presenter.setMaxDisplayValue)
         view.autoButton.clicked.connect(presenter.setDisplayRangeToDataRange)
-        view.setButton.clicked.connect(controller._setCustomDisplayRange)
+        view.editButton.clicked.connect(controller._editDisplayRange)
+
+        view.colorLegendButton.setCheckable(True)
+        imageWidget.setColorLegendVisible(view.colorLegendButton.isChecked())
+        view.colorLegendButton.toggled.connect(imageWidget.setColorLegendVisible)
 
         return controller
 
-    def _setCustomDisplayRange(self) -> None:
+    def _editDisplayRange(self) -> None:
         if self._view.displayRangeDialog.exec_():
             minValue = self._view.displayRangeDialog.minValue()
             maxValue = self._view.displayRangeDialog.maxValue()
@@ -136,12 +141,12 @@ class ImageController(Observer):
                  fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
         self._view = view
-        self._fileController = ImageFileController.createInstance(
-            view.imageRibbon.imageFileGroupBox, view.imageWidget, fileDialogFactory)
+        self._toolsController = ImageToolsController.createInstance(
+            view.imageRibbon.imageToolsGroupBox, view.imageWidget, fileDialogFactory)
         self._colorizerController = ImageColorizerController.createInstance(
             presenter, view.imageRibbon.colormapGroupBox)
         self._dataRangeController = ImageDataRangeController.createInstance(
-            presenter, view.imageRibbon.dataRangeGroupBox)
+            presenter, view.imageRibbon.dataRangeGroupBox, view.imageWidget)
 
     @classmethod
     def createInstance(cls, presenter: ImagePresenter, view: ImageView,

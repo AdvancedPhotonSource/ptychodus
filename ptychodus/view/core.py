@@ -4,8 +4,8 @@ import logging
 
 from PyQt5.QtCore import PYQT_VERSION_STR, QSize, QT_VERSION_STR, Qt
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QSizePolicy, QSplitter,
-                             QStackedWidget, QTableView, QToolBar, QWidget)
+from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QProgressBar, QSizePolicy,
+                             QSplitter, QStackedWidget, QTableView, QToolBar, QWidget)
 
 from . import resources
 from .automation import AutomationView
@@ -34,6 +34,7 @@ class ViewCore(QMainWindow):
         self.splitter = QSplitter(Qt.Horizontal)
         self.parametersWidget = QStackedWidget()
         self.contentsWidget = QStackedWidget()
+        self.memoryProgressBar = QProgressBar()
 
         self.settingsAction = self.navigationToolBar.addAction(QIcon(':/icons/settings'),
                                                                'Settings')
@@ -137,6 +138,9 @@ class ViewCore(QMainWindow):
         preferredHeight = desktopSize.height() * 2 // 3
         preferredWidth = min(desktopSize.width() * 2 // 3, 2 * preferredHeight)
         view.resize(preferredWidth, preferredHeight)
-        view.statusBar().showMessage('Ready')  # TODO make better use of the statusBar
+
+        view.memoryProgressBar.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+        view.statusBar().addPermanentWidget(view.memoryProgressBar)
+        view.statusBar().showMessage('Ready')
 
         return view
