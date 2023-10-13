@@ -76,7 +76,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
 
-        for idx, fp in enumerate(filePathMapping.values()):  # TODO use keys
+        for idx, (_, fp) in enumerate(sorted(filePathMapping.items())):  # TODO use keys
             array = TiffDiffractionPatternArray(fp, idx)
             contentsTree.createChild([array.getLabel(), 'TIFF', str(idx)])
             arrayList.append(array)

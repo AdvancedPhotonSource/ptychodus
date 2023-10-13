@@ -2,11 +2,12 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QItemSelection
-from PyQt5.QtWidgets import QAbstractItemView
+from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ...api.observer import Observable, Observer
-from ...model import DetectorPresenter
-from ...model.data import DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter
+from ...model import DetectorPresenter, MetadataPresenter
+from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
+                           DiffractionPatternPresenter)
 from ...model.image import ImagePresenter
 from ...model.probe import ApparatusPresenter
 from ...view.detector import DetectorView
@@ -15,6 +16,7 @@ from ..data import FileDialogFactory
 from ..image import ImageController
 from .parameters import DetectorParametersController
 from .treeModel import DatasetTreeModel, DatasetTreeNode
+from .wizard import OpenDataWizardController
 
 logger = logging.getLogger(__name__)
 
@@ -23,40 +25,48 @@ class DetectorController(Observer):
 
     def __init__(self, detectorPresenter: DetectorPresenter,
                  apparatusPresenter: ApparatusPresenter,
-                 inputOutputPresenter: DiffractionDatasetInputOutputPresenter,
-                 datasetPresenter: DiffractionDatasetPresenter, imagePresenter: ImagePresenter,
+                 ioPresenter: DiffractionDatasetInputOutputPresenter,
+                 metadataPresenter: MetadataPresenter,
+                 datasetPresenter: DiffractionDatasetPresenter,
+                 patternPresenter: DiffractionPatternPresenter, imagePresenter: ImagePresenter,
                  view: DetectorView, imageView: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
-        self._inputOutputPresenter = inputOutputPresenter
         self._datasetPresenter = datasetPresenter
+        self._ioPresenter = ioPresenter
         self._imagePresenter = imagePresenter
         self._view = view
-        self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
         self._parametersController = DetectorParametersController.createInstance(
             detectorPresenter, apparatusPresenter, view.parametersView)
+        self._wizardController = OpenDataWizardController.createInstance(
+            ioPresenter, metadataPresenter, datasetPresenter, patternPresenter,
+            view.dataView.openDataWizard, fileDialogFactory)
         self._treeModel = DatasetTreeModel()
 
     @classmethod
     def createInstance(cls, detectorPresenter: DetectorPresenter,
                        apparatusPresenter: ApparatusPresenter,
-                       inputOutputPresenter: DiffractionDatasetInputOutputPresenter,
+                       ioPresenter: DiffractionDatasetInputOutputPresenter,
+                       metadataPresenter: MetadataPresenter,
                        datasetPresenter: DiffractionDatasetPresenter,
+                       patternPresenter: DiffractionPatternPresenter,
                        imagePresenter: ImagePresenter, view: DetectorView, imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> DetectorController:
-        controller = cls(detectorPresenter, apparatusPresenter, inputOutputPresenter,
-                         datasetPresenter, imagePresenter, view, imageView, fileDialogFactory)
+        controller = cls(detectorPresenter, apparatusPresenter, ioPresenter, metadataPresenter,
+                         datasetPresenter, patternPresenter, imagePresenter, view, imageView,
+                         fileDialogFactory)
 
         view.dataView.treeView.setModel(controller._treeModel)
         view.dataView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.dataView.treeView.selectionModel().selectionChanged.connect(controller._updateView)
-        view.dataView.buttonBox.openButton.clicked.connect(controller._openDiffractionFile)
-        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDiffractionFile)
-        view.dataView.buttonBox.inspectButton.clicked.connect(controller._inspectDiffractionFile)
-        view.dataView.buttonBox.closeButton.clicked.connect(controller._closeDiffractionFile)
+        view.dataView.buttonBox.openButton.clicked.connect(
+            controller._wizardController.openDiffractionData)
+        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDiffractionData)
+        view.dataView.buttonBox.inspectButton.clicked.connect(controller._inspectDiffractionData)
+        view.dataView.buttonBox.closeButton.clicked.connect(controller._closeDiffractionData)
         datasetPresenter.addObserver(controller)
 
         controller._syncModelToView()
@@ -73,24 +83,27 @@ class DetectorController(Observer):
             self._imagePresenter.setArray(node.data)
             break
 
-    def _openDiffractionFile(self) -> None:
-        self._view.dataView.openDataWizard.restart()
-        self._view.dataView.openDataWizard.show()
-
-    def _saveDiffractionFile(self) -> None:
+    def _saveDiffractionData(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Diffraction File',
-            nameFilters=self._inputOutputPresenter.getSaveFileFilterList(),
-            selectedNameFilter=self._inputOutputPresenter.getSaveFileFilter())
+            nameFilters=self._ioPresenter.getSaveFileFilterList(),
+            selectedNameFilter=self._ioPresenter.getSaveFileFilter())
 
         if filePath:
-            self._inputOutputPresenter.saveDiffractionFile(filePath)
+            self._ioPresenter.saveDiffractionFile(filePath)
 
-    def _inspectDiffractionFile(self) -> None:
-        self._view.dataView.inspectDataDialog.show()
+    def _inspectDiffractionData(self) -> None:
+        self._view.dataView.inspectDataDialog.show()  # FIXME to inspectController
 
-    def _closeDiffractionFile(self) -> None:
+    def _closeDiffractionData(self) -> None:
+        button = QMessageBox.question(
+            self._view, 'Confirm Close',
+            'This will free the diffraction data from memory. Do you want to continue?')
+
+        if button != QMessageBox.Yes:
+            return
+
         logger.error('Close not implemented!')  # FIXME
 
     def _syncModelToView(self) -> None:

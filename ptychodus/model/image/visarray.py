@@ -43,7 +43,7 @@ class VisualizationArray(Observable):
         return self._array.shape
 
     def clearArray(self) -> None:
-        self._array = numpy.zeros((1, 1))
+        self._array = numpy.zeros((1, 1))  # FIXME invalidate
 
     def setArray(self, array: NumericArrayType) -> None:
         if array is None:

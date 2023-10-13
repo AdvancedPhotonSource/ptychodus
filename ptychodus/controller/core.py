@@ -42,7 +42,8 @@ class ControllerCore:
                                                                      self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
             model.detectorPresenter, model.apparatusPresenter,
-            model.diffractionDatasetInputOutputPresenter, model.diffractionDatasetPresenter,
+            model.diffractionDatasetInputOutputPresenter, model.metadataPresenter,
+            model.diffractionDatasetPresenter, model.patternPresenter,
             model.detectorImagePresenter, view.detectorView, view.detectorImageView,
             self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepositoryPresenter,

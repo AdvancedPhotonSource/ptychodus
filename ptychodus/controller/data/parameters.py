@@ -10,11 +10,7 @@ from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDa
                            DiffractionPatternPresenter)
 from ...view.data import DataParametersView
 from ..tree import SimpleTreeModel
-from .dataset import DatasetController
 from .dialogFactory import FileDialogFactory
-from .file import DatasetFileController
-from .metadata import MetadataController
-from .patterns import PatternsController
 from .tableModel import DataArrayTableModel
 
 
@@ -34,20 +30,6 @@ class DataParametersController(Observer):
         self._fileDialogFactory = fileDialogFactory
         self._treeModel = SimpleTreeModel(datasetPresenter.getContentsTree())
         self._tableModel = DataArrayTableModel()
-        self._fileController = DatasetFileController.createInstance(datasetInputOutputPresenter,
-                                                                    view.filePage,
-                                                                    fileDialogFactory)
-        self._metadataController = MetadataController.createInstance(metadataPresenter,
-                                                                     view.metadataPage)
-        self._patternsController = PatternsController.createInstance(datasetInputOutputPresenter,
-                                                                     datasetPresenter,
-                                                                     patternPresenter,
-                                                                     view.patternsPage,
-                                                                     fileDialogFactory)
-        self._datasetController = DatasetController.createInstance(datasetInputOutputPresenter,
-                                                                   datasetPresenter,
-                                                                   view.datasetPage,
-                                                                   fileDialogFactory)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry,
@@ -62,18 +44,12 @@ class DataParametersController(Observer):
         settingsRegistry.addObserver(controller)
         datasetPresenter.addObserver(controller)
 
-        view.datasetPage.contentsView.treeView.setModel(controller._treeModel)
-        view.datasetPage.contentsView.treeView.selectionModel().currentChanged.connect(
+        view.treeView.setModel(controller._treeModel)
+        view.treeView.selectionModel().currentChanged.connect(
             controller._updateDataArrayInTableView)
         tableView.setModel(controller._tableModel)
 
-        if datasetPresenter.isAssembled:
-            controller._switchToDatasetView()
-
         return controller
-
-    def _switchToDatasetView(self) -> None:
-        self._view.setCurrentIndex(self._view.count() - 1)
 
     def _updateDataArrayInTableView(self, current: QModelIndex, previous: QModelIndex) -> None:
         names = list()
@@ -88,8 +64,7 @@ class DataParametersController(Observer):
         self._tableModel.setArray(array)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settingsRegistry:
+        if observable is self._settingsRegistry:  # FIXME relocate?
             self._datasetInputOutputPresenter.startAssemblingDiffractionPatterns()
-            self._switchToDatasetView()
         elif observable is self._datasetPresenter:
             self._treeModel.setRootNode(self._datasetPresenter.getContentsTree())

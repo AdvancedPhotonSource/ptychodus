@@ -62,7 +62,22 @@ class DetectorButtonBox(QWidget):
         return view
 
 
-class OpenDataWizardFilesPage(QWizardPage):
+class OpenDataWizardPage(QWizardPage):
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__(parent)
+        self._isComplete = False
+
+    def isComplete(self) -> bool:
+        return self._isComplete
+
+    def _setComplete(self, complete: bool) -> None:
+        if self._isComplete != complete:
+            self._isComplete = complete
+            self.completeChanged.emit()
+
+
+class OpenDataWizardFilesPage(OpenDataWizardPage):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
@@ -84,7 +99,7 @@ class OpenDataWizardFilesPage(QWizardPage):
         return view
 
 
-class OpenDataWizardMetadataPage(QWizardPage):
+class OpenDataWizardMetadataPage(OpenDataWizardPage):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
@@ -115,14 +130,14 @@ class OpenDataWizardMetadataPage(QWizardPage):
         return view
 
 
-class PatternLoadView(QGroupBox):
+class OpenDataWizardPatternLoadView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Load', parent)
         self.numberOfThreadsSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> PatternLoadView:
+    def createInstance(cls, parent: QWidget | None = None) -> OpenDataWizardPatternLoadView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -132,7 +147,7 @@ class PatternLoadView(QGroupBox):
         return view
 
 
-class PatternCropView(QGroupBox):
+class OpenDataWizardPatternCropView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Crop', parent)
@@ -144,7 +159,7 @@ class PatternCropView(QGroupBox):
         self.extentYSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> PatternCropView:
+    def createInstance(cls, parent: QWidget | None = None) -> OpenDataWizardPatternCropView:
         view = cls(parent)
 
         layout = QGridLayout()
@@ -161,7 +176,7 @@ class PatternCropView(QGroupBox):
         return view
 
 
-class PatternTransformView(QGroupBox):
+class OpenDataWizardPatternTransformView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Transform', parent)
@@ -174,7 +189,7 @@ class PatternTransformView(QGroupBox):
         self.flipYCheckBox = QCheckBox('Flip Y')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> PatternTransformView:
+    def createInstance(cls, parent: QWidget | None = None) -> OpenDataWizardPatternTransformView:
         view = cls(parent)
 
         layout = QGridLayout()
@@ -192,7 +207,7 @@ class PatternTransformView(QGroupBox):
         return view
 
 
-class PatternMemoryMapView(QGroupBox):
+class OpenDataWizardPatternMemoryMapView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Memory Map Diffraction Data', parent)
@@ -201,7 +216,7 @@ class PatternMemoryMapView(QGroupBox):
         self.scratchDirectoryBrowseButton = QPushButton('Browse')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> PatternMemoryMapView:
+    def createInstance(cls, parent: QWidget | None = None) -> OpenDataWizardPatternMemoryMapView:
         view = cls(parent)
 
         layout = QGridLayout()
@@ -214,19 +229,19 @@ class PatternMemoryMapView(QGroupBox):
         return view
 
 
-class OpenDataWizardPatternsPage(QWizardPage):
+class OpenDataWizardPatternsPage(OpenDataWizardPage):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.loadView = PatternLoadView.createInstance()
-        self.memoryMapView = PatternMemoryMapView.createInstance()
-        self.cropView = PatternCropView.createInstance()
-        self.transformView = PatternTransformView.createInstance()
+        self.loadView = OpenDataWizardPatternLoadView.createInstance()
+        self.memoryMapView = OpenDataWizardPatternMemoryMapView.createInstance()
+        self.cropView = OpenDataWizardPatternCropView.createInstance()
+        self.transformView = OpenDataWizardPatternTransformView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> OpenDataWizardPatternsPage:
         view = cls(parent)
-        view.setTitle('Pre-process Patterns')
+        view.setTitle('Pattern Processing')
 
         layout = QVBoxLayout()
         layout.addWidget(view.loadView)
