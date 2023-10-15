@@ -57,6 +57,10 @@ class ImagePresenter(Observable, Observer):
         self._colorizerChooser.setCurrentPluginByName(name)
         self._colorizer.addObserver(self)
 
+    def getColorSamples(self, normalizedValues: RealArrayType) -> RealArrayType:
+        colorizer = self._colorizerChooser.currentPlugin.strategy
+        return colorizer.getColorSamples(normalizedValues)
+
     def getScalarTransformationNameList(self) -> Sequence[str]:
         return self._colorizer.getScalarTransformationNameList()
 

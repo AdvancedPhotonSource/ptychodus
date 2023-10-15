@@ -108,14 +108,16 @@ class ImageColorizerController(Observer):
 
 class ImageDataRangeController(Observer):
 
-    def __init__(self, presenter: ImagePresenter, view: ImageDataRangeGroupBox) -> None:
+    def __init__(self, presenter: ImagePresenter, view: ImageDataRangeGroupBox,
+                 imageWidget: ImageWidget) -> None:
         self._presenter = presenter
         self._view = view
+        self._imageWidget = imageWidget
 
     @classmethod
     def createInstance(cls, presenter: ImagePresenter, view: ImageDataRangeGroupBox,
                        imageWidget: ImageWidget) -> ImageDataRangeController:
-        controller = cls(presenter, view)
+        controller = cls(presenter, view, imageWidget)
 
         controller._syncModelToView()
         presenter.addObserver(controller)
@@ -139,13 +141,18 @@ class ImageDataRangeController(Observer):
 
     def _syncModelToView(self) -> None:
         displayRangeLimits = self._presenter.getDisplayRangeLimits()
+        minDisplayValue = self._presenter.getMinDisplayValue()
+        maxDisplayValue = self._presenter.getMaxDisplayValue()
 
-        self._view.minDisplayValueSlider.setValueAndRange(self._presenter.getMinDisplayValue(),
-                                                          displayRangeLimits)
-        self._view.maxDisplayValueSlider.setValueAndRange(self._presenter.getMaxDisplayValue(),
-                                                          displayRangeLimits)
+        self._view.minDisplayValueSlider.setValueAndRange(minDisplayValue, displayRangeLimits)
+        self._view.maxDisplayValueSlider.setValueAndRange(maxDisplayValue, displayRangeLimits)
         self._view.displayRangeDialog.setMinAndMaxValues(displayRangeLimits.lower,
                                                          displayRangeLimits.upper)
+        self._imageWidget.setColorLegendRange(float(minDisplayValue), float(maxDisplayValue))
+
+        xArray = numpy.linspace(0., 1., 256)
+        rgbaArray = self._presenter.getColorSamples(xArray)
+        self._imageWidget.setColorLegendColors(xArray, rgbaArray)
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

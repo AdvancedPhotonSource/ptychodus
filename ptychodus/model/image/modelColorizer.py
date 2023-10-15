@@ -19,11 +19,18 @@ class CylindricalColorModel(ABC):
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         pass
 
+    @abstractmethod
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        pass
+
 
 class HSVSaturationColorModel(CylindricalColorModel):
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, x, 1.0), 1.0
+
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
 
 
 class HSVValueColorModel(CylindricalColorModel):
@@ -31,11 +38,17 @@ class HSVValueColorModel(CylindricalColorModel):
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, x), 1.0
 
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
+
 
 class HSVAlphaColorModel(CylindricalColorModel):
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, 1.0), x
+
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
 
 
 class HLSLightnessColorModel(CylindricalColorModel):
@@ -43,17 +56,26 @@ class HLSLightnessColorModel(CylindricalColorModel):
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, x, 1.0), 1.0
 
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 0.5)
+
 
 class HLSSaturationColorModel(CylindricalColorModel):
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, x), 1.0
 
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
+
 
 class HLSAlphaColorModel(CylindricalColorModel):
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, 1.0), x
+
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
 
 
 class CylindricalColorModelColorizer(Colorizer):
@@ -115,6 +137,11 @@ class CylindricalColorModelColorizer(Colorizer):
 
     def setVariantByName(self, name: str) -> None:
         self._variantChooser.setCurrentPluginByName(name)
+
+    def getColorSamples(self, normalizedValues: RealArrayType) -> RealArrayType:
+        model = numpy.vectorize(self._variantChooser.currentPlugin.strategy.getHue)
+        r, g, b, a = model(normalizedValues)
+        return numpy.stack((r, g, b, a), axis=-1)
 
     def getDataArray(self) -> RealArrayType:
         transform = self._transformChooser.currentPlugin.strategy

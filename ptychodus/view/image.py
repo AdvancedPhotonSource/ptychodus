@@ -1,16 +1,18 @@
 from __future__ import annotations
+from collections.abc import Generator
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QPoint, QRect, QRectF, QSize
-from PyQt5.QtGui import QIcon, QLinearGradient, QPainter, QPen, QPixmap, QWheelEvent
+from PyQt5.QtGui import QColor, QIcon, QLinearGradient, QPainter, QPen, QPixmap, QWheelEvent
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
                              QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent,
                              QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QHBoxLayout,
                              QPushButton, QSizePolicy, QSpinBox, QToolButton, QVBoxLayout, QWidget,
                              QStatusBar)
 
+from ..api.image import RealArrayType
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
@@ -64,19 +66,19 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         view = cls(parent)
 
         view.homeButton.setIcon(QIcon(':/icons/home'))
-        view.homeButton.setIconSize(QSize(48, 48))
+        view.homeButton.setIconSize(QSize(32, 32))
         view.homeButton.setToolTip('Home')
 
         view.saveButton.setIcon(QIcon(':/icons/save'))
-        view.saveButton.setIconSize(QSize(48, 48))
+        view.saveButton.setIconSize(QSize(32, 32))
         view.saveButton.setToolTip('Save Image')
 
         view.moveButton.setIcon(QIcon(':/icons/move'))
-        view.moveButton.setIconSize(QSize(48, 48))
+        view.moveButton.setIconSize(QSize(32, 32))
         view.moveButton.setToolTip('Move')
 
         view.measureButton.setIcon(QIcon(':/icons/measure'))
-        view.measureButton.setIconSize(QSize(48, 48))
+        view.measureButton.setIconSize(QSize(32, 32))
         view.measureButton.setToolTip('Measure')
 
         layout = QGridLayout()
@@ -269,6 +271,14 @@ class ImageWidget(QGraphicsView):
     def __init__(self, imageItem: ImageItem, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self._imageItem = imageItem
+        self._colorLegendMinValue = 0.
+        self._colorLegendMaxValue = 1.
+        self._colorLegendStopPoints: list[tuple[float, QColor]] = [
+            (0.0, QColor(Qt.green)),
+            (0.5, QColor(Qt.yellow)),
+            (1.0, QColor(Qt.red)),
+        ]
+        self._colorLegendNumberOfTicks = 5  # TODO
         self._isColorLegendVisible = False
 
     @classmethod
@@ -295,9 +305,28 @@ class ImageWidget(QGraphicsView):
     def setMouseTool(self, mouseTool: ImageMouseTool) -> None:
         self._imageItem.setMouseTool(mouseTool)
 
+    def _forceRedraw(self) -> None:
+        self.scene().update()
+
+    def setColorLegendColors(self, xArray: RealArrayType, rgbaArray: RealArrayType) -> None:
+        colorLegendStopPoints: list[tuple[float, QColor]] = list()
+
+        for x, rgba in zip(xArray, rgbaArray):
+            color = QColor()
+            color.setRgbF(rgba[0], rgba[1], rgba[2], rgba[3])
+            colorLegendStopPoints.append((x, color))
+
+        self._colorLegendStopPoints = colorLegendStopPoints
+        self._forceRedraw()
+
+    def setColorLegendRange(self, minValue: float, maxValue: float) -> None:
+        self._colorLegendMinValue = minValue
+        self._colorLegendMaxValue = maxValue
+        self._forceRedraw()
+
     def setColorLegendVisible(self, visible: bool):
         self._isColorLegendVisible = visible
-        self.scene().update()  # forces redraw
+        self._forceRedraw()
 
     def zoomToFit(self) -> None:
         self._imageItem.setPos(0, 0)
@@ -305,6 +334,12 @@ class ImageWidget(QGraphicsView):
         boundingRect = scene.itemsBoundingRect()
         scene.setSceneRect(boundingRect)
         self.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
+
+    @property
+    def _colorLegendTicks(self) -> Generator[float, None, None]:
+        for tick in range(self._colorLegendNumberOfTicks):
+            a = tick / (self._colorLegendNumberOfTicks - 1)
+            yield (1. - a) * self._colorLegendMinValue + a * self._colorLegendMaxValue
 
     def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
         if self._isColorLegendVisible:
@@ -320,7 +355,7 @@ class ImageWidget(QGraphicsView):
             dx = fontMetrics.horizontalAdvance('m')
             dy = fontMetrics.lineSpacing()
 
-            tickLabels = ['1.00' + str(idx + 1) for idx in range(8)]  # FIXME tick labels
+            tickLabels = [f'{tick:5g}' for tick in self._colorLegendTicks]
             tickLabelWidth = max(fontMetrics.width(label) for label in tickLabels)
 
             legendWidth = 2 * dx
@@ -335,9 +370,7 @@ class ImageWidget(QGraphicsView):
             tickY0 = legendRect.bottom() + fontMetrics.strikeOutPos()
 
             gradient = QLinearGradient(legendRect.bottomLeft(), legendRect.topLeft())
-            gradient.setColorAt(0.0, Qt.green)  # FIXME gradient value
-            gradient.setColorAt(0.5, Qt.yellow)  # FIXME gradient value
-            gradient.setColorAt(1.0, Qt.red)  # FIXME gradient value
+            gradient.setStops(self._colorLegendStopPoints)
             fgPainter.setBrush(gradient)
             fgPainter.drawRect(legendRect)
 

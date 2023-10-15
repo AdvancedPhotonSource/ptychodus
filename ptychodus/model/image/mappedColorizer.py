@@ -73,6 +73,10 @@ class MappedColorizer(Colorizer):
     def setVariantByName(self, name: str) -> None:
         self._variantChooser.setCurrentPluginByName(name)
 
+    def getColorSamples(self, normalizedValues: RealArrayType) -> RealArrayType:
+        cmap = self._variantChooser.currentPlugin.strategy
+        return cmap(normalizedValues)
+
     def getDataArray(self) -> RealArrayType:
         transform = self._transformChooser.currentPlugin.strategy
         values = self._arrayComponent()

@@ -13,7 +13,6 @@ class DataParametersView(QGroupBox):
     def createInstance(cls, parent: QWidget | None = None) -> DataParametersView:
         view = cls(parent)
 
-        # FIXME data size/rate stats live view; assembled size on memory/disk
         layout = QVBoxLayout()
         layout.addWidget(view.treeView)
         view.setLayout(layout)

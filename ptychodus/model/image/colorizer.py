@@ -47,6 +47,10 @@ class Colorizer(Observable, Observer, ABC):
         pass
 
     @abstractmethod
+    def getColorSamples(self, normalizedValues: RealArrayType) -> RealArrayType:
+        pass
+
+    @abstractmethod
     def getDataArray(self) -> RealArrayType:
         pass
 
