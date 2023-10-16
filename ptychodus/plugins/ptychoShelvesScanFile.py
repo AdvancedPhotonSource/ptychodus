@@ -2,6 +2,7 @@ from pathlib import Path
 import logging
 
 import h5py
+import numpy
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
@@ -17,8 +18,8 @@ class PtychoShelvesScanFileReader(ScanFileReader):
         try:
             with h5py.File(filePath, 'r') as h5File:
                 try:
-                    ppX = h5File['/ppX']
-                    ppY = h5File['/ppY']
+                    ppX = numpy.squeeze(h5File['/ppX'])
+                    ppY = numpy.squeeze(h5File['/ppY'])
                 except KeyError:
                     logger.debug('Unable to find data.')
                 else:

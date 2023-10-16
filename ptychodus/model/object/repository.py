@@ -73,7 +73,6 @@ class ObjectRepositoryItem(Observable, Observer):
             raise TypeError('Object must be a complex-valued ndarray')
 
         if array.ndim == 2:
-            # FIXME test MATLAB I/O
             self._array = array[numpy.newaxis, ...]
         elif array.ndim == 3:
             self._array = array
@@ -131,13 +130,13 @@ class ObjectRepositoryItem(Observable, Observer):
         '''returns the array size in bytes'''
         return self._array.nbytes
 
-    def getNumberOfSlices(self) -> int:
+    def getNumberOfLayers(self) -> int:
         return self._array.shape[-3]
 
-    def getSlice(self, number: int) -> ObjectArrayType:
+    def getLayer(self, number: int) -> ObjectArrayType:
         return self._array[number, :, :]
 
-    def getSlicesFlattened(self) -> ObjectArrayType:
+    def getLayersFlattened(self) -> ObjectArrayType:
         return numpy.prod(self._array, axis=-3)
 
     def update(self, observable: Observable) -> None:

@@ -12,29 +12,29 @@ from ...model.object import ObjectRepositoryItemPresenter
 class ObjectTreeNode:
 
     def __init__(self, parentNode: ObjectTreeNode | None,
-                 presenter: ObjectRepositoryItemPresenter | None, objectSlice: int) -> None:
+                 presenter: ObjectRepositoryItemPresenter | None, objectLayer: int) -> None:
         self.parentNode = parentNode
         self.presenter = presenter
-        self.objectSlice = objectSlice
+        self.objectLayer = objectLayer
         self.children: list[ObjectTreeNode] = list()
 
     @classmethod
     def createRoot(cls) -> ObjectTreeNode:
         return cls(None, None, -1)
 
-    def populateSlices(self) -> None:
+    def populateLayers(self) -> None:
         if self.presenter is None:
             return
 
         self.children.clear()
 
-        for objectSlice in range(self.presenter.item.getNumberOfSlices()):
-            childNode = ObjectTreeNode(self, self.presenter, objectSlice)
+        for objectLayer in range(self.presenter.item.getNumberOfLayers()):
+            childNode = ObjectTreeNode(self, self.presenter, objectLayer)
             self.children.append(childNode)
 
     def createChild(self, presenter: ObjectRepositoryItemPresenter) -> ObjectTreeNode:
         childNode = ObjectTreeNode(self, presenter, -1)
-        childNode.populateSlices()
+        childNode.populateLayers()
         self.children.append(childNode)
         return childNode
 
@@ -56,11 +56,11 @@ class ObjectTreeNode:
 
         return self.presenter.item.getDataType()
 
-    def getNumberOfSlices(self) -> int:
+    def getNumberOfLayers(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getNumberOfSlices()
+        return self.presenter.item.getNumberOfLayers()
 
     def getWidthInPixels(self) -> int:
         if self.presenter is None:
@@ -83,10 +83,10 @@ class ObjectTreeNode:
     def getArray(self) -> ObjectArrayType:
         if self.presenter is None:
             return numpy.zeros((0, 0, 0), dtype=complex)
-        elif self.objectSlice < 0:
-            return self.presenter.item.getSlicesFlattened()
+        elif self.objectLayer < 0:
+            return self.presenter.item.getLayersFlattened()
 
-        return self.presenter.item.getSlice(self.objectSlice)
+        return self.presenter.item.getLayer(self.objectLayer)
 
     def row(self) -> int:
         if self.parentNode:
@@ -115,20 +115,20 @@ class ObjectTreeModel(QAbstractItemModel):
         self.dataChanged.emit(topLeft, bottomRight)
 
         node = self._rootNode.children[row]
-        numSlicesOld = len(node.children)
-        numSlicesNew = node.getNumberOfSlices()
+        numLayersOld = len(node.children)
+        numLayersNew = node.getNumberOfLayers()
 
-        if numSlicesOld < numSlicesNew:
-            self.beginInsertRows(topLeft, numSlicesOld, numSlicesNew)
-            node.populateSlices()
+        if numLayersOld < numLayersNew:
+            self.beginInsertRows(topLeft, numLayersOld, numLayersNew)
+            node.populateLayers()
             self.endInsertRows()
         else:
-            self.beginRemoveRows(topLeft, numSlicesNew, numSlicesOld)
-            node.populateSlices()
+            self.beginRemoveRows(topLeft, numLayersNew, numLayersOld)
+            node.populateLayers()
             self.endRemoveRows()
 
         childTopLeft = self.index(0, 0, topLeft)
-        childBottomRight = self.index(numSlicesNew, len(self._header), topLeft)
+        childBottomRight = self.index(numLayersNew, len(self._header), topLeft)
         self.dataChanged.emit(childTopLeft, childBottomRight)
 
     @overload
@@ -193,7 +193,7 @@ class ObjectTreeModel(QAbstractItemModel):
         if index.isValid() and role == Qt.DisplayRole:
             node = index.internalPointer()
 
-            if node.objectSlice < 0:
+            if node.objectLayer < 0:
                 if index.column() == 0:
                     value = QVariant(node.getName())
                 elif index.column() == 1:
@@ -207,7 +207,7 @@ class ObjectTreeModel(QAbstractItemModel):
                 elif index.column() == 5:
                     value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
             elif index.column() == 0:
-                value = QVariant(f'Slice {node.objectSlice}')
+                value = QVariant(f'Layer {node.objectLayer}')
 
         return value
 

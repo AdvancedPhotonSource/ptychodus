@@ -27,8 +27,7 @@ class MATProbeFileReader(ProbeFileReader):
 class MATProbeFileWriter(ProbeFileWriter):
 
     def write(self, filePath: Path, array: ProbeArrayType) -> None:
-        probes = numpy.transpose(array, [x for x in reversed(range(array.ndim))])
-        matDict = {'probe': probes.transpose(1, 2, 0)}
+        matDict = {'probe': array.transpose(1, 2, 0)}
         scipy.io.savemat(filePath, matDict)
 
 

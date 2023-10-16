@@ -37,7 +37,7 @@ class RandomObjectViewController(Observer):
             logger.error('Null initializer!')
             return
 
-        self._view.numberOfSlicesSpinBox.valueChanged.connect(initializer.setNumberOfSlices)
+        self._view.numberOfLayersSpinBox.valueChanged.connect(initializer.setNumberOfLayers)
         self._view.extraPaddingXSpinBox.valueChanged.connect(initializer.setExtraPaddingX)
         self._view.extraPaddingYSpinBox.valueChanged.connect(initializer.setExtraPaddingY)
 
@@ -49,12 +49,12 @@ class RandomObjectViewController(Observer):
         if self._initializer is None:
             logger.error('Null initializer!')
         else:
-            self._view.numberOfSlicesSpinBox.blockSignals(True)
-            self._view.numberOfSlicesSpinBox.setRange(
-                self._initializer.getNumberOfSlicesLimits().lower,
-                self._initializer.getNumberOfSlicesLimits().upper)
-            self._view.numberOfSlicesSpinBox.setValue(self._initializer.getNumberOfSlices())
-            self._view.numberOfSlicesSpinBox.blockSignals(False)
+            self._view.numberOfLayersSpinBox.blockSignals(True)
+            self._view.numberOfLayersSpinBox.setRange(
+                self._initializer.getNumberOfLayersLimits().lower,
+                self._initializer.getNumberOfLayersLimits().upper)
+            self._view.numberOfLayersSpinBox.setValue(self._initializer.getNumberOfLayers())
+            self._view.numberOfLayersSpinBox.blockSignals(False)
 
             self._view.extraPaddingXSpinBox.blockSignals(True)
             self._view.extraPaddingXSpinBox.setRange(

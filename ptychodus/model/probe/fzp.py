@@ -1,28 +1,17 @@
 from __future__ import annotations
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Final
 
 import numpy
 import numpy.typing
 
+from ...api.apparatus import FresnelZonePlate
 from ...api.probe import ProbeArrayType
 from .apparatus import Apparatus
 from .repository import ProbeInitializer
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
-
-
-@dataclass(frozen=True)
-class FresnelZonePlate:
-    zonePlateRadiusInMeters: Decimal
-    outermostZoneWidthInMeters: Decimal
-    centralBeamstopDiameterInMeters: Decimal
-
-    def focalLengthInMeters(self, centralWavelengthInMeters: Decimal) -> Decimal:
-        return 2 * self.zonePlateRadiusInMeters * self.outermostZoneWidthInMeters \
-                / centralWavelengthInMeters
 
 
 def gaussian_spectrum(lambda0: float, bandwidth: float, energy: int) -> numpy.typing.NDArray[Any]:

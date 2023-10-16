@@ -14,7 +14,9 @@ class ObjectSettings(Observable, Observer):
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/object.npy'))
-        self.numberOfSlices = settingsGroup.createIntegerEntry('NumberOfSlices', 1)
+        self.numberOfLayers = settingsGroup.createIntegerEntry('NumberOfLayers', 1)
+        # FIXME expose layer spacing
+        self.layerSpacingInMeters = settingsGroup.createRealEntry('LayerSpacingInMeters', '1e-6')
         self.amplitudeMean = settingsGroup.createRealEntry('AmplitudeMean', '0.5')
         self.amplitudeDeviation = settingsGroup.createRealEntry('AmplitudeDeviation', '0')
         self.phaseDeviation = settingsGroup.createRealEntry('PhaseDeviation', '0')

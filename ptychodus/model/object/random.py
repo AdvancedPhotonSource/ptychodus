@@ -25,7 +25,7 @@ class RandomObjectInitializer(ObjectInitializer):
         self._amplitudeMean = Decimal(1) / 2
         self._amplitudeDeviation = Decimal()
         self._phaseDeviation = Decimal()
-        self._numberOfSlices = 1
+        self._numberOfLayers = 1
 
     @property
     def simpleName(self) -> str:
@@ -41,7 +41,7 @@ class RandomObjectInitializer(ObjectInitializer):
         self._amplitudeMean = settings.amplitudeMean.value
         self._amplitudeDeviation = settings.amplitudeDeviation.value
         self._phaseDeviation = settings.phaseDeviation.value
-        self._numberOfSlices = settings.numberOfSlices.value
+        self._numberOfLayers = settings.numberOfLayers.value
         self.notifyObservers()
 
     def syncToSettings(self, settings: ObjectSettings) -> None:
@@ -50,12 +50,12 @@ class RandomObjectInitializer(ObjectInitializer):
         settings.amplitudeMean.value = self._amplitudeMean
         settings.amplitudeDeviation.value = self._amplitudeDeviation
         settings.phaseDeviation.value = self._phaseDeviation
-        settings.numberOfSlices.value = self._numberOfSlices
+        settings.numberOfLayers.value = self._numberOfLayers
 
     def __call__(self) -> ObjectArrayType:
         extraPaddingExtent = ImageExtent(2 * self._extraPaddingX, 2 * self._extraPaddingY)
         paddedObjectExtent = self._sizer.getObjectExtentInPixels() + extraPaddingExtent
-        objectShape = self.getNumberOfSlices(), *paddedObjectExtent.shape
+        objectShape = self.getNumberOfLayers(), *paddedObjectExtent.shape
 
         amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),
                                      objectShape)
@@ -124,14 +124,14 @@ class RandomObjectInitializer(ObjectInitializer):
             self._phaseDeviation = stddev
             self.notifyObservers()
 
-    def getNumberOfSlicesLimits(self) -> Interval[int]:
+    def getNumberOfLayersLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
-    def getNumberOfSlices(self) -> int:
-        limits = self.getNumberOfSlicesLimits()
-        return limits.clamp(self._numberOfSlices)
+    def getNumberOfLayers(self) -> int:
+        limits = self.getNumberOfLayersLimits()
+        return limits.clamp(self._numberOfLayers)
 
-    def setNumberOfSlices(self, number: int) -> None:
-        if self._numberOfSlices != number:
-            self._numberOfSlices = number
+    def setNumberOfLayers(self, number: int) -> None:
+        if self._numberOfLayers != number:
+            self._numberOfLayers = number
             self.notifyObservers()

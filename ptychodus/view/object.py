@@ -45,7 +45,7 @@ class RandomObjectView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Parameters', parent)
-        self.numberOfSlicesSpinBox = QSpinBox()
+        self.numberOfLayersSpinBox = QSpinBox()
         self.extraPaddingXSpinBox = QSpinBox()
         self.extraPaddingYSpinBox = QSpinBox()
         self.amplitudeMeanSlider = DecimalSlider.createInstance(Qt.Horizontal)
@@ -57,7 +57,7 @@ class RandomObjectView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Number of Slices:', view.numberOfSlicesSpinBox)
+        layout.addRow('Number of Layers:', view.numberOfLayersSpinBox)
         layout.addRow('Extra Padding X:', view.extraPaddingXSpinBox)
         layout.addRow('Extra Padding Y:', view.extraPaddingYSpinBox)
         layout.addRow('Amplitude Mean:', view.amplitudeMeanSlider)
