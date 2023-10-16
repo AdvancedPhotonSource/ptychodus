@@ -14,9 +14,10 @@ from ...view.detector import DetectorView
 from ...view.image import ImageView
 from ..data import FileDialogFactory
 from ..image import ImageController
+from .inspect import InspectDatasetController
 from .parameters import DetectorParametersController
 from .treeModel import DatasetTreeModel, DatasetTreeNode
-from .wizard import OpenDataWizardController
+from .wizard import OpenDatasetWizardController
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +42,11 @@ class DetectorController(Observer):
                                                                fileDialogFactory)
         self._parametersController = DetectorParametersController.createInstance(
             detectorPresenter, apparatusPresenter, view.parametersView)
-        self._wizardController = OpenDataWizardController.createInstance(
+        self._wizardController = OpenDatasetWizardController.createInstance(
             ioPresenter, metadataPresenter, datasetPresenter, patternPresenter,
-            view.dataView.openDataWizard, fileDialogFactory)
+            view.dataView.openDatasetWizard, fileDialogFactory)
+        self._inspectDatasetController = InspectDatasetController.createInstance(
+            datasetPresenter, view.dataView.inspectDatasetDialog)
         self._treeModel = DatasetTreeModel()
 
     @classmethod
@@ -63,10 +66,11 @@ class DetectorController(Observer):
         view.dataView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
         view.dataView.treeView.selectionModel().selectionChanged.connect(controller._updateView)
         view.dataView.buttonBox.openButton.clicked.connect(
-            controller._wizardController.openDiffractionData)
-        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDiffractionData)
-        view.dataView.buttonBox.inspectButton.clicked.connect(controller._inspectDiffractionData)
-        view.dataView.buttonBox.closeButton.clicked.connect(controller._closeDiffractionData)
+            controller._wizardController.openDataset)
+        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDataset)
+        view.dataView.buttonBox.inspectButton.clicked.connect(
+            controller._inspectDatasetController.inspectDataset)
+        view.dataView.buttonBox.closeButton.clicked.connect(controller._closeDataset)
         datasetPresenter.addObserver(controller)
 
         controller._syncModelToView()
@@ -83,7 +87,7 @@ class DetectorController(Observer):
             self._imagePresenter.setArray(node.data)
             break
 
-    def _saveDiffractionData(self) -> None:
+    def _saveDataset(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Diffraction File',
@@ -93,10 +97,7 @@ class DetectorController(Observer):
         if filePath:
             self._ioPresenter.saveDiffractionFile(filePath)
 
-    def _inspectDiffractionData(self) -> None:
-        self._view.dataView.inspectDataDialog.show()  # FIXME to inspectController
-
-    def _closeDiffractionData(self) -> None:
+    def _closeDataset(self) -> None:
         button = QMessageBox.question(
             self._view, 'Confirm Close',
             'This will free the diffraction data from memory. Do you want to continue?')

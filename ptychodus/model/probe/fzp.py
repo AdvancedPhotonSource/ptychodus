@@ -14,7 +14,7 @@ from .settings import ProbeSettings
 from .sizer import ProbeSizer
 
 
-@dataclass  # FIXME (frozen=True)
+@dataclass(frozen=True)
 class FresnelZonePlate:
     zonePlateRadiusInMeters: Decimal
     outermostZoneWidthInMeters: Decimal
@@ -193,7 +193,11 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
 
     def setZonePlateRadiusInMeters(self, value: Decimal) -> None:
         if self._custom.zonePlateRadiusInMeters != value:
-            self._custom.zonePlateRadiusInMeters = value
+            self._custom = FresnelZonePlate(
+                zonePlateRadiusInMeters=value,
+                outermostZoneWidthInMeters=self._custom.outermostZoneWidthInMeters,
+                centralBeamstopDiameterInMeters=self._custom.centralBeamstopDiameterInMeters,
+            )
             self.notifyObservers()
 
     def getZonePlateRadiusInMeters(self) -> Decimal:
@@ -201,7 +205,11 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
 
     def setOutermostZoneWidthInMeters(self, value: Decimal) -> None:
         if self._custom.outermostZoneWidthInMeters != value:
-            self._custom.outermostZoneWidthInMeters = value
+            self._custom = FresnelZonePlate(
+                zonePlateRadiusInMeters=self._custom.zonePlateRadiusInMeters,
+                outermostZoneWidthInMeters=value,
+                centralBeamstopDiameterInMeters=self._custom.centralBeamstopDiameterInMeters,
+            )
             self.notifyObservers()
 
     def getOutermostZoneWidthInMeters(self) -> Decimal:
@@ -209,7 +217,11 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
 
     def setCentralBeamstopDiameterInMeters(self, value: Decimal) -> None:
         if self._custom.centralBeamstopDiameterInMeters != value:
-            self._custom.centralBeamstopDiameterInMeters = value
+            self._custom = FresnelZonePlate(
+                zonePlateRadiusInMeters=self._custom.zonePlateRadiusInMeters,
+                outermostZoneWidthInMeters=self._custom.outermostZoneWidthInMeters,
+                centralBeamstopDiameterInMeters=value,
+            )
             self.notifyObservers()
 
     def getCentralBeamstopDiameterInMeters(self) -> Decimal:

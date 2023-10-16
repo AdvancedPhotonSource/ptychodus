@@ -48,5 +48,5 @@ class DiskProbeViewController(Observer):
             self._view.testPatternCheckBox.setChecked(self._initializer.isTestPattern())
 
     def update(self, observable: Observable) -> None:
-        if observable is self._initializer:
+        if observable is self._item:
             self._syncModelToView()

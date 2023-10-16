@@ -52,5 +52,5 @@ class SuperGaussianProbeViewController(Observer):
             self._view.orderParameterWidget.setValue(self._initializer.getOrderParameter())
 
     def update(self, observable: Observable) -> None:
-        if observable is self._initializer:
+        if observable is self._item:
             self._syncModelToView()

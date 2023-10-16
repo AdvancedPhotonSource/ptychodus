@@ -33,7 +33,6 @@ class FresnelZonePlateProbeViewController(Observer):
 
         if isinstance(initializer, FresnelZonePlateProbeInitializer):
             self._initializer = initializer
-            self._initializer.addObserver(self)  # FIXME manual update on combobox change?
         else:
             logger.error('Null initializer!')
             return
@@ -41,7 +40,7 @@ class FresnelZonePlateProbeViewController(Observer):
         for presets in initializer.getPresetsList():
             self._view.presetsComboBox.addItem(presets)
 
-        self._view.presetsComboBox.currentTextChanged.connect(initializer.setPresets)
+        self._view.presetsComboBox.currentTextChanged.connect(self._choosePresets)
         self._view.zonePlateRadiusWidget.lengthChanged.connect(
             initializer.setZonePlateRadiusInMeters)
         self._view.outermostZoneWidthWidget.lengthChanged.connect(
@@ -77,6 +76,13 @@ class FresnelZonePlateProbeViewController(Observer):
                 self._initializer.getDefocusDistanceInMeters())
             self._view.defocusDistanceWidget.blockSignals(False)
 
+    def _choosePresets(self, currentText: str) -> None:  # FIXME broken
+        if self._initializer is None:
+            logger.error('Null initializer!')
+        else:
+            self._initializer.setPresets(currentText)
+            self._syncModelToView()
+
     def update(self, observable: Observable) -> None:
-        if observable is self._initializer:
+        if observable is self._item:
             self._syncModelToView()
