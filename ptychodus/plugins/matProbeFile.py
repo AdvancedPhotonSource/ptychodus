@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import numpy
 import scipy.io
 
 from ptychodus.api.plugins import PluginRegistry

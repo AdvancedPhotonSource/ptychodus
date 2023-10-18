@@ -27,13 +27,14 @@ class ImageToolsController:
     def createInstance(cls, view: ImageToolsGroupBox, imageWidget: ImageWidget,
                        fileDialogFactory: FileDialogFactory) -> ImageToolsController:
         view.moveButton.setCheckable(True)
-        view.measureButton.setCheckable(True)
-
         view.moveButton.setChecked(True)
+        view.rulerButton.setCheckable(True)
+        view.rectangleButton.setCheckable(True)
 
         mouseToolButtonGroup = QButtonGroup()
         mouseToolButtonGroup.addButton(view.moveButton, ImageMouseTool.MOVE_TOOL.value)
-        mouseToolButtonGroup.addButton(view.measureButton, ImageMouseTool.MEASURE_TOOL.value)
+        mouseToolButtonGroup.addButton(view.rulerButton, ImageMouseTool.RULER_TOOL.value)
+        mouseToolButtonGroup.addButton(view.rectangleButton, ImageMouseTool.RECTANGLE_TOOL.value)
 
         controller = cls(view, imageWidget, fileDialogFactory, mouseToolButtonGroup)
         view.homeButton.clicked.connect(imageWidget.zoomToFit)

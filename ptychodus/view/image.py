@@ -1,16 +1,16 @@
 from __future__ import annotations
 from collections.abc import Generator
 from decimal import Decimal
-from enum import Enum
+from enum import auto, Enum
 from typing import Optional
 
-from PyQt5.QtCore import Qt, QPoint, QRect, QRectF, QSize
+from PyQt5.QtCore import Qt, QPoint, QPointF, QLineF, QRect, QRectF, QSize, QSizeF
 from PyQt5.QtGui import QColor, QIcon, QLinearGradient, QPainter, QPen, QPixmap, QWheelEvent
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent,
-                             QGraphicsSceneMouseEvent, QGraphicsView, QGridLayout, QHBoxLayout,
-                             QPushButton, QSizePolicy, QSpinBox, QToolButton, QVBoxLayout, QWidget,
-                             QStatusBar)
+                             QGraphicsLineItem, QGraphicsPixmapItem, QGraphicsRectItem,
+                             QGraphicsScene, QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent,
+                             QGraphicsView, QGridLayout, QHBoxLayout, QPushButton, QSizePolicy,
+                             QSpinBox, QToolButton, QVBoxLayout, QWidget, QStatusBar)
 
 from ..api.image import RealArrayType
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
@@ -59,7 +59,8 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         self.homeButton = QToolButton()
         self.saveButton = QToolButton()
         self.moveButton = QToolButton()
-        self.measureButton = QToolButton()
+        self.rulerButton = QToolButton()
+        self.rectangleButton = QToolButton()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageToolsGroupBox:
@@ -77,15 +78,20 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         view.moveButton.setIconSize(QSize(32, 32))
         view.moveButton.setToolTip('Move')
 
-        view.measureButton.setIcon(QIcon(':/icons/measure'))
-        view.measureButton.setIconSize(QSize(32, 32))
-        view.measureButton.setToolTip('Measure')
+        view.rulerButton.setIcon(QIcon(':/icons/ruler'))
+        view.rulerButton.setIconSize(QSize(32, 32))
+        view.rulerButton.setToolTip('Ruler')
+
+        view.rectangleButton.setIcon(QIcon(':/icons/rectangle'))
+        view.rectangleButton.setIconSize(QSize(32, 32))
+        view.rectangleButton.setToolTip('Rectangle')
 
         layout = QGridLayout()
         layout.addWidget(view.homeButton, 0, 0)
         layout.addWidget(view.saveButton, 0, 1)
         layout.addWidget(view.moveButton, 1, 0)
-        layout.addWidget(view.measureButton, 1, 1)
+        layout.addWidget(view.rulerButton, 1, 1)
+        layout.addWidget(view.rectangleButton, 1, 2)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
@@ -207,8 +213,9 @@ class ImageRibbon(QWidget):
 
 
 class ImageMouseTool(Enum):
-    MOVE_TOOL = Qt.OpenHandCursor
-    MEASURE_TOOL = Qt.CrossCursor
+    MOVE_TOOL = auto()
+    RULER_TOOL = auto()
+    RECTANGLE_TOOL = auto()
 
 
 class ImageItem(QGraphicsPixmapItem):
@@ -217,6 +224,11 @@ class ImageItem(QGraphicsPixmapItem):
         super().__init__()
         self._statusBar = statusBar
         self._mouseTool = ImageMouseTool.MOVE_TOOL
+        self._rulerItem = QGraphicsLineItem(self)
+        self._rulerItem.hide()
+        self._rectangleItem = QGraphicsRectItem(self)
+        self._rectangleItem.hide()
+        self._rectangleOrigin = QPointF()
         self.setTransformationMode(Qt.FastTransformation)
         self.setAcceptedMouseButtons(Qt.LeftButton)
         self.setAcceptHoverEvents(True)
@@ -228,7 +240,12 @@ class ImageItem(QGraphicsPixmapItem):
         app = QApplication.instance()
 
         if app:
-            app.setOverrideCursor(self._mouseTool.value)  # type: ignore
+            cursor = Qt.CrossCursor
+
+            if self._mouseTool == ImageMouseTool.MOVE_TOOL:
+                cursor = Qt.OpenHandCursor
+
+            app.setOverrideCursor(cursor)  # type: ignore
 
         super().hoverEnterEvent(event)
 
@@ -256,14 +273,47 @@ class ImageItem(QGraphicsPixmapItem):
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self._mouseTool == ImageMouseTool.MOVE_TOOL:
             self._changeOverrideCursor(Qt.ClosedHandCursor)
+        elif self._mouseTool == ImageMouseTool.RULER_TOOL:
+            line = QLineF(event.pos(), event.pos())
+            self.prepareGeometryChange()
+            self._rulerItem.setLine(line)
+            self._rulerItem.show()
+        elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
+            self._rectangleOrigin = event.pos()
+            rect = QRectF(self._rectangleOrigin, QSizeF())
+            self.prepareGeometryChange()
+            self._rectangleItem.setRect(rect)
+            self._rectangleItem.show()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self._mouseTool == ImageMouseTool.MOVE_TOOL:
             self.setPos(self.scenePos() + event.scenePos() - event.lastScenePos())
+        elif self._mouseTool == ImageMouseTool.RULER_TOOL:
+            origin = self._rulerItem.line().p1()
+            line = QLineF(origin, event.pos())
+            self.prepareGeometryChange()
+            self._rulerItem.setLine(line)
+            message1 = f'{line.length():.1f} pixels, {line.angle():.2f}\u00b0'
+            message2 = f'{line.dx():.1f} \u00d7 {line.dy():.1f}'
+            self._statusBar.showMessage(f'{message1} ({message2})')
+        elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
+            rect = QRectF(self._rectangleOrigin, event.pos()).normalized()
+            center = rect.center()
+            self.prepareGeometryChange()
+            self._rectangleItem.setRect(rect)
+            message1 = f'{rect.width():.1f} \u00d7 {rect.height():.1f}'
+            message2 = f'{center.x():.1f}, {center.y():.1f}'
+            self._statusBar.showMessage(f'Rectangle: {message1} (Center: {message2})')
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self._mouseTool == ImageMouseTool.MOVE_TOOL:
-            self._changeOverrideCursor(self._mouseTool.value)
+            self._changeOverrideCursor(Qt.OpenHandCursor)
+        elif self._mouseTool == ImageMouseTool.RULER_TOOL:
+            self._rulerItem.setLine(QLineF())
+            self._rulerItem.hide()
+        elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
+            self._rectangleItem.setRect(QRectF())
+            self._rectangleItem.hide()
 
 
 class ImageWidget(QGraphicsView):
