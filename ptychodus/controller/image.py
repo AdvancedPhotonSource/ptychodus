@@ -153,7 +153,8 @@ class ImageDataRangeController(Observer):
 
         xArray = numpy.linspace(0., 1., 256)
         rgbaArray = self._presenter.getColorSamples(xArray)
-        self._imageWidget.setColorLegendColors(xArray, rgbaArray)
+        self._imageWidget.setColorLegendColors(xArray, rgbaArray,
+                                               self._presenter.isColorizerCyclic())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

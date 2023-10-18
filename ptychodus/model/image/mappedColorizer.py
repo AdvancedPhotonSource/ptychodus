@@ -19,12 +19,13 @@ class MappedColorizer(Colorizer):
     def __init__(self, array: VisualizationArray, displayRange: DisplayRange,
                  transformChooser: PluginChooser[ScalarTransformation], name: str,
                  arrayComponent: Callable[[], RealArrayType],
-                 variantChooser: PluginChooser[Colormap]) -> None:
+                 variantChooser: PluginChooser[Colormap], *, isCyclic: bool) -> None:
         super().__init__(array, displayRange, transformChooser)
         self._name = name
         self._arrayComponent = arrayComponent
         self._variantChooser = variantChooser
         self._variantChooser.addObserver(self)
+        self._isCyclic = isCyclic
 
     @classmethod
     def createColorizerVariants(
@@ -45,18 +46,48 @@ class MappedColorizer(Colorizer):
         cyclicColormapChooser.setCurrentPluginByName('hsv')
         acyclicColormapChooser.setCurrentPluginByName('viridis')
 
-        intensity = cls(array, displayRange, transformChooser, 'Intensity', array.getIntensity,
-                        acyclicColormapChooser)
-        amplitude = cls(array, displayRange, transformChooser, 'Amplitude', array.getAmplitude,
-                        acyclicColormapChooser)
-        phase = cls(array, displayRange, transformChooser, 'Phase', array.getPhaseInRadians,
-                    cyclicColormapChooser)
-        phaseUnwrapped = cls(array, displayRange, transformChooser, 'Phase (Unwrapped)',
-                             array.getPhaseUnwrappedInRadians, acyclicColormapChooser)
-        real = cls(array, displayRange, transformChooser, 'Real', array.getRealPart,
-                   acyclicColormapChooser)
-        imag = cls(array, displayRange, transformChooser, 'Imaginary', array.getImaginaryPart,
-                   acyclicColormapChooser)
+        intensity = cls(array,
+                        displayRange,
+                        transformChooser,
+                        'Intensity',
+                        array.getIntensity,
+                        acyclicColormapChooser,
+                        isCyclic=False)
+        amplitude = cls(array,
+                        displayRange,
+                        transformChooser,
+                        'Amplitude',
+                        array.getAmplitude,
+                        acyclicColormapChooser,
+                        isCyclic=False)
+        phase = cls(array,
+                    displayRange,
+                    transformChooser,
+                    'Phase',
+                    array.getPhaseInRadians,
+                    cyclicColormapChooser,
+                    isCyclic=True)
+        phaseUnwrapped = cls(array,
+                             displayRange,
+                             transformChooser,
+                             'Phase (Unwrapped)',
+                             array.getPhaseUnwrappedInRadians,
+                             acyclicColormapChooser,
+                             isCyclic=False)
+        real = cls(array,
+                   displayRange,
+                   transformChooser,
+                   'Real',
+                   array.getRealPart,
+                   acyclicColormapChooser,
+                   isCyclic=False)
+        imag = cls(array,
+                   displayRange,
+                   transformChooser,
+                   'Imaginary',
+                   array.getImaginaryPart,
+                   acyclicColormapChooser,
+                   isCyclic=False)
 
         return [intensity, amplitude, phase, phaseUnwrapped, real, imag]
 
@@ -76,6 +107,9 @@ class MappedColorizer(Colorizer):
     def getColorSamples(self, normalizedValues: RealArrayType) -> RealArrayType:
         cmap = self._variantChooser.currentPlugin.strategy
         return cmap(normalizedValues)
+
+    def isCyclic(self) -> bool:
+        return self._isCyclic
 
     def getDataArray(self) -> RealArrayType:
         transform = self._transformChooser.currentPlugin.strategy

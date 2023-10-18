@@ -143,6 +143,9 @@ class CylindricalColorModelColorizer(Colorizer):
         r, g, b, a = model(normalizedValues)
         return numpy.stack((r, g, b, a), axis=-1)
 
+    def isCyclic(self) -> bool:
+        return True
+
     def getDataArray(self) -> RealArrayType:
         transform = self._transformChooser.currentPlugin.strategy
         values = self._array.getAmplitude()

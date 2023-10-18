@@ -51,6 +51,10 @@ class Colorizer(Observable, Observer, ABC):
         pass
 
     @abstractmethod
+    def isCyclic(self) -> bool:
+        pass
+
+    @abstractmethod
     def getDataArray(self) -> RealArrayType:
         pass
 

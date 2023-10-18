@@ -5,12 +5,13 @@ from enum import auto, Enum
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QPoint, QPointF, QLineF, QRect, QRectF, QSize, QSizeF
-from PyQt5.QtGui import QColor, QIcon, QLinearGradient, QPainter, QPen, QPixmap, QWheelEvent
+from PyQt5.QtGui import (QColor, QConicalGradient, QIcon, QLinearGradient, QPainter, QPen, QPixmap,
+                         QWheelEvent)
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
                              QGraphicsLineItem, QGraphicsPixmapItem, QGraphicsRectItem,
                              QGraphicsScene, QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent,
                              QGraphicsView, QGridLayout, QHBoxLayout, QPushButton, QSizePolicy,
-                             QSpinBox, QToolButton, QVBoxLayout, QWidget, QStatusBar)
+                             QSpinBox, QStatusBar, QToolButton, QVBoxLayout, QWidget)
 
 from ..api.image import RealArrayType
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
@@ -67,11 +68,11 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         view = cls(parent)
 
         view.homeButton.setIcon(QIcon(':/icons/home'))
-        view.homeButton.setIconSize(QSize(32, 32))
+        view.homeButton.setIconSize(QSize(48, 48))
         view.homeButton.setToolTip('Home')
 
         view.saveButton.setIcon(QIcon(':/icons/save'))
-        view.saveButton.setIconSize(QSize(32, 32))
+        view.saveButton.setIconSize(QSize(48, 48))
         view.saveButton.setToolTip('Save Image')
 
         view.moveButton.setIcon(QIcon(':/icons/move'))
@@ -87,11 +88,13 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         view.rectangleButton.setToolTip('Rectangle')
 
         layout = QGridLayout()
-        layout.addWidget(view.homeButton, 0, 0)
-        layout.addWidget(view.saveButton, 0, 1)
-        layout.addWidget(view.moveButton, 1, 0)
-        layout.addWidget(view.rulerButton, 1, 1)
-        layout.addWidget(view.rectangleButton, 1, 2)
+        layout.addWidget(view.homeButton, 0, 0, 1, 3)
+        layout.setAlignment(view.homeButton, Qt.AlignHCenter)
+        layout.addWidget(view.saveButton, 0, 3, 1, 3)
+        layout.setAlignment(view.saveButton, Qt.AlignHCenter)
+        layout.addWidget(view.moveButton, 1, 0, 1, 2)
+        layout.addWidget(view.rulerButton, 1, 2, 1, 2)
+        layout.addWidget(view.rectangleButton, 1, 4, 1, 2)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
@@ -330,6 +333,7 @@ class ImageWidget(QGraphicsView):
         ]
         self._colorLegendNumberOfTicks = 5  # TODO
         self._isColorLegendVisible = False
+        self._isColorLegendCyclic = False
 
     @classmethod
     def createInstance(cls,
@@ -358,7 +362,8 @@ class ImageWidget(QGraphicsView):
     def _forceRedraw(self) -> None:
         self.scene().update()
 
-    def setColorLegendColors(self, xArray: RealArrayType, rgbaArray: RealArrayType) -> None:
+    def setColorLegendColors(self, xArray: RealArrayType, rgbaArray: RealArrayType,
+                             isCyclic: bool) -> None:
         colorLegendStopPoints: list[tuple[float, QColor]] = list()
 
         for x, rgba in zip(xArray, rgbaArray):
@@ -367,6 +372,7 @@ class ImageWidget(QGraphicsView):
             colorLegendStopPoints.append((x, color))
 
         self._colorLegendStopPoints = colorLegendStopPoints
+        self._isColorLegendCyclic = isCyclic
         self._forceRedraw()
 
     def setColorLegendRange(self, minValue: float, maxValue: float) -> None:
@@ -392,37 +398,54 @@ class ImageWidget(QGraphicsView):
             yield (1. - a) * self._colorLegendMinValue + a * self._colorLegendMaxValue
 
     def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
-        if self._isColorLegendVisible:
-            fgPainter = QPainter(self.viewport())
+        if not self._isColorLegendVisible:
+            return
 
-            # cosmetic pens have the same thickness at different scale factors
-            pen = QPen()
-            pen.setCosmetic(True)
-            pen.setWidth(3)
-            fgPainter.setPen(pen)
+        fgPainter = QPainter(self.viewport())
 
-            fontMetrics = fgPainter.fontMetrics()
-            dx = fontMetrics.horizontalAdvance('m')
-            dy = fontMetrics.lineSpacing()
+        # cosmetic pens have the same thickness at different scale factors
+        pen = QPen()
+        pen.setCosmetic(True)
+        pen.setWidth(3)
+        fgPainter.setPen(pen)
 
+        fontMetrics = fgPainter.fontMetrics()
+        dx = fontMetrics.horizontalAdvance('m')
+        dy = fontMetrics.lineSpacing()
+
+        widgetRect = self.viewport().rect()
+
+        if self._isColorLegendCyclic:
+            legendDiameter = 6 * dx
+            legendMargin = 2 * dx
+
+            legendRect = QRect(0, 0, legendDiameter, legendDiameter)
+            legendRect.moveRight(widgetRect.right() - legendMargin)
+            legendRect.moveBottom(widgetRect.height() - legendMargin)
+
+            cgradient = QConicalGradient(legendRect.center(), 90.)
+            cgradient.setStops(self._colorLegendStopPoints)
+            fgPainter.setBrush(cgradient)
+            fgPainter.drawEllipse(legendRect)
+        else:
             tickLabels = [f'{tick:5g}' for tick in self._colorLegendTicks]
             tickLabelWidth = max(fontMetrics.width(label) for label in tickLabels)
 
             legendWidth = 2 * dx
             legendHeight = (2 * len(tickLabels) - 1) * dy
-            legendHMargin = tickLabelWidth + 2 * dx
+            legendMargin = tickLabelWidth + 2 * dx
 
-            widgetRect = self.viewport().rect()
             legendRect = QRect(0, 0, legendWidth, legendHeight)
-            legendRect.moveRight(widgetRect.right() - legendHMargin)
+            legendRect.moveRight(widgetRect.right() - legendMargin)
             legendRect.moveTop((widgetRect.height() - legendHeight) // 2)
+
+            lgradient = QLinearGradient(legendRect.bottomLeft(), legendRect.topLeft())
+            lgradient.setStops(self._colorLegendStopPoints)
+            fgPainter.setBrush(lgradient)
+            fgPainter.drawRect(legendRect)
+
             tickX0 = legendRect.right() + dx
             tickY0 = legendRect.bottom() + fontMetrics.strikeOutPos()
-
-            gradient = QLinearGradient(legendRect.bottomLeft(), legendRect.topLeft())
-            gradient.setStops(self._colorLegendStopPoints)
-            fgPainter.setBrush(gradient)
-            fgPainter.drawRect(legendRect)
 
             for tickIndex, tickLabel in enumerate(tickLabels):
                 tickDY = (tickIndex * legendRect.height()) // (len(tickLabels) - 1)

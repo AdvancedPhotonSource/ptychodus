@@ -61,6 +61,10 @@ class ImagePresenter(Observable, Observer):
         colorizer = self._colorizerChooser.currentPlugin.strategy
         return colorizer.getColorSamples(normalizedValues)
 
+    def isColorizerCyclic(self) -> bool:
+        colorizer = self._colorizerChooser.currentPlugin.strategy
+        return colorizer.isCyclic()
+
     def getScalarTransformationNameList(self) -> Sequence[str]:
         return self._colorizer.getScalarTransformationNameList()
 
