@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Mapping, TypeAlias
 import logging
 
-from ptychonn import ReconSmallPhaseModel, Tester, Trainer
+from ptychonn import ReconSmallModel, Tester, Trainer
 from scipy.ndimage import map_coordinates
 import numpy
 import numpy.typing
@@ -65,9 +65,9 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return 'PhaseOnly'
 
-    def _createModel(self) -> ReconSmallPhaseModel:
+    def _createModel(self) -> ReconSmallModel:
         logger.debug('Building model...')
-        return ReconSmallPhaseModel(
+        return ReconSmallModel(
             nconv=self._settings.numberOfConvolutionChannels.value,
             use_batch_norm=self._settings.useBatchNormalization.value,
         )

@@ -105,7 +105,8 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         self._fzpDict: Mapping[str, FresnelZonePlate] = {
             'Velociprobe': FresnelZonePlate(Decimal('90e-6'), Decimal('50e-9'), Decimal('60e-6')),
             '2-ID-D': FresnelZonePlate(Decimal('80e-6'), Decimal('70e-9'), Decimal('60e-6')),
-            'LamNI': FresnelZonePlate(Decimal('114.8e-6') / 2, Decimal('60e-9'), Decimal('40e-6')),
+            # FIXME Wrong LYNX parameters
+            'LYNX': FresnelZonePlate(Decimal('114.8e-6') / 2, Decimal('60e-9'), Decimal('40e-6')),
             'HXN': FresnelZonePlate(Decimal('160e-6'), Decimal('30e-9'), Decimal('80e-6')),
         }
         self._presets = self.CUSTOM_PRESET

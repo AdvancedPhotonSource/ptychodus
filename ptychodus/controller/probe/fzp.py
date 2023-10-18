@@ -33,6 +33,7 @@ class FresnelZonePlateProbeViewController(Observer):
 
         if isinstance(initializer, FresnelZonePlateProbeInitializer):
             self._initializer = initializer
+            self._initializer.addObserver(self)
         else:
             logger.error('Null initializer!')
             return
@@ -40,7 +41,7 @@ class FresnelZonePlateProbeViewController(Observer):
         for presets in initializer.getPresetsList():
             self._view.presetsComboBox.addItem(presets)
 
-        self._view.presetsComboBox.currentTextChanged.connect(self._choosePresets)
+        self._view.presetsComboBox.textActivated.connect(initializer.setPresets)
         self._view.zonePlateRadiusWidget.lengthChanged.connect(
             initializer.setZonePlateRadiusInMeters)
         self._view.outermostZoneWidthWidget.lengthChanged.connect(
@@ -54,35 +55,24 @@ class FresnelZonePlateProbeViewController(Observer):
         if self._initializer is None:
             logger.error('Null initializer!')
         else:
-            self._view.presetsComboBox.setCurrentText(self._initializer.getPresets())
+            presets = self._initializer.getPresets()
+            arePresetsCustomized = (presets == FresnelZonePlateProbeInitializer.CUSTOM_PRESET)
 
-            self._view.zonePlateRadiusWidget.blockSignals(True)
+            self._view.presetsComboBox.setCurrentText(presets)
+            self._view.zonePlateRadiusWidget.setEnabled(arePresetsCustomized)
             self._view.zonePlateRadiusWidget.setLengthInMeters(
                 self._initializer.getZonePlateRadiusInMeters())
-            self._view.zonePlateRadiusWidget.blockSignals(False)
-
-            self._view.outermostZoneWidthWidget.blockSignals(True)
+            self._view.outermostZoneWidthWidget.setEnabled(arePresetsCustomized)
             self._view.outermostZoneWidthWidget.setLengthInMeters(
                 self._initializer.getOutermostZoneWidthInMeters())
-            self._view.outermostZoneWidthWidget.blockSignals(False)
-
-            self._view.beamstopDiameterWidget.blockSignals(True)
+            self._view.beamstopDiameterWidget.setEnabled(arePresetsCustomized)
             self._view.beamstopDiameterWidget.setLengthInMeters(
                 self._initializer.getCentralBeamstopDiameterInMeters())
-            self._view.beamstopDiameterWidget.blockSignals(False)
-
-            self._view.defocusDistanceWidget.blockSignals(True)
             self._view.defocusDistanceWidget.setLengthInMeters(
                 self._initializer.getDefocusDistanceInMeters())
-            self._view.defocusDistanceWidget.blockSignals(False)
-
-    def _choosePresets(self, currentText: str) -> None:  # FIXME broken
-        if self._initializer is None:
-            logger.error('Null initializer!')
-        else:
-            self._initializer.setPresets(currentText)
-            self._syncModelToView()
 
     def update(self, observable: Observable) -> None:
         if observable is self._item:
+            self._syncModelToView()
+        elif observable is self._initializer:
             self._syncModelToView()
