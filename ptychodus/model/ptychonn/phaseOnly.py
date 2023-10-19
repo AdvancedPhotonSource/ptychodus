@@ -194,7 +194,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
 
         trainer.setTrainingData(
             X_train_full=self._diffractionPatternBuffer.getBuffer(),
-            Y_ph_train_full=self._objectPhasePatchBuffer.getBuffer(),
+            Y_ph_train_full=numpy.expand_dims(self._objectPhasePatchBuffer.getBuffer(), 1),
             valid_data_ratio=float(self._trainingSettings.validationSetFractionalSize.value),
         )
         trainer.setOptimizationParams(

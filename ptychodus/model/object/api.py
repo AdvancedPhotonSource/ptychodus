@@ -76,3 +76,9 @@ class ObjectAPI:
             objectArray=self.getSelectedObjectArray(),
             objectCentroid=self._sizer.getMidpointInMeters(),
         )
+
+    def getSelectedThinObjectInterpolator(self) -> ObjectInterpolator:  # TODO remove when able
+        return self._interpolatorFactory.createInterpolator(
+            objectArray=self.getSelectedObjectArray()[0, ...],
+            objectCentroid=self._sizer.getMidpointInMeters(),
+        )

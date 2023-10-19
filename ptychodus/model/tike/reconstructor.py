@@ -140,8 +140,7 @@ class TikeReconstructor:
     def __call__(self, parameters: ReconstructInput,
                  algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> ReconstructOutput:
         objectGrid = parameters.objectInterpolator.getGrid()
-        objectArray = parameters.objectInterpolator.getArray()
-        psi = objectArray[0, ...].astype('complex64')  # TODO update when Tike supports multislice
+        psi = parameters.objectInterpolator.getArray().astype('complex64')
         probe = parameters.probeArray[numpy.newaxis, numpy.newaxis, ...].astype('complex64')
         data = numpy.fft.ifftshift(parameters.diffractionPatternArray, axes=(-2, -1))
         coordinateList: list[float] = list()

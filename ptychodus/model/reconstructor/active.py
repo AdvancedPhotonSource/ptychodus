@@ -76,7 +76,8 @@ class ActiveReconstructor(Observable, Observer):
             diffractionPatternArray=diffractionPatternArray,
             scan=TabularScan(pointMap),
             probeArray=self._probeAPI.getSelectedProbeArray(),
-            objectInterpolator=self._objectAPI.getSelectedObjectInterpolator(),
+            # TODO vvv generalize when able vvv
+            objectInterpolator=self._objectAPI.getSelectedThinObjectInterpolator(),
         )
 
     @property
