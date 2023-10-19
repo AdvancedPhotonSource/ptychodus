@@ -78,10 +78,9 @@ class ImageColorizerController(Observer):
         controller._syncModelToView()
         presenter.addObserver(controller)
 
-        view.colorizerComboBox.currentTextChanged.connect(presenter.setColorizerByName)
-        view.scalarTransformComboBox.currentTextChanged.connect(
-            presenter.setScalarTransformationByName)
-        view.variantComboBox.currentTextChanged.connect(presenter.setVariantByName)
+        view.colorizerComboBox.textActivated.connect(presenter.setColorizerByName)
+        view.scalarTransformComboBox.textActivated.connect(presenter.setScalarTransformationByName)
+        view.variantComboBox.textActivated.connect(presenter.setVariantByName)
 
         return controller
 

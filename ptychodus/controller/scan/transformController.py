@@ -21,12 +21,12 @@ class ScanTransformController(Observer):
         for name in item.getIndexFilterNameList():
             view.indexFilterComboBox.addItem(name)
 
-        view.indexFilterComboBox.currentTextChanged.connect(item.setIndexFilterByName)
+        view.indexFilterComboBox.textActivated.connect(item.setIndexFilterByName)
 
         for name in item.getTransformNameList():
             view.transformComboBox.addItem(name)
 
-        view.transformComboBox.currentTextChanged.connect(item.setTransformByName)
+        view.transformComboBox.textActivated.connect(item.setTransformByName)
         view.jitterRadiusWidget.lengthChanged.connect(item.setJitterRadiusInMeters)
 
         view.centroidXCheckBox.toggled.connect(item.setOverrideCentroidXEnabled)

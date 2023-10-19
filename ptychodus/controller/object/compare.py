@@ -40,9 +40,9 @@ class CompareObjectParametersController(Observer):
             return
 
         self._view.name1ComboBox.setModel(self._nameListModel)
-        self._view.name1ComboBox.currentTextChanged.connect(initializer.setName1)
+        self._view.name1ComboBox.textActivated.connect(initializer.setName1)
         self._view.name2ComboBox.setModel(self._nameListModel)
-        self._view.name2ComboBox.currentTextChanged.connect(initializer.setName2)
+        self._view.name2ComboBox.textActivated.connect(initializer.setName2)
 
     def _syncModelToView(self) -> None:
         if self._initializer is None:

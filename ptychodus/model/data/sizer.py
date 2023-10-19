@@ -41,14 +41,18 @@ class DiffractionPatternSizer(Observable, Observer):
                 if self.isCropEnabled() else limitsInPixels.upper
 
     def getCenterXLimitsInPixels(self) -> Interval[int]:
-        lower = self.getExtentXInPixels() // 2
-        upper = self._detector.getExtentInPixels().width - 1 - lower
-        return Interval[int](lower, upper)
+        return Interval[int](0, self._detector.getExtentInPixels().width)
 
     def getCenterXInPixels(self) -> int:
         limitsInPixels = self.getCenterXLimitsInPixels()
         return limitsInPixels.clamp(self._settings.cropCenterXInPixels.value) \
-                if self.isCropEnabled() else limitsInPixels.lower
+                if self.isCropEnabled() else limitsInPixels.midrange
+
+    def _getSafeCenterXInPixels(self) -> int:
+        lower = self.getExtentXInPixels() // 2
+        upper = self._detector.getExtentInPixels().width - 1 - lower
+        limits = Interval[int](lower, upper)
+        return limits.clamp(self.getCenterXInPixels())
 
     def getExtentYLimitsInPixels(self) -> Interval[int]:
         return Interval[int](1, self._detector.getExtentInPixels().height)
@@ -59,14 +63,18 @@ class DiffractionPatternSizer(Observable, Observer):
                 if self.isCropEnabled() else limitsInPixels.upper
 
     def getCenterYLimitsInPixels(self) -> Interval[int]:
-        lower = self.getExtentYInPixels() // 2
-        upper = self._detector.getExtentInPixels().height - 1 - lower
-        return Interval[int](lower, upper)
+        return Interval[int](0, self._detector.getExtentInPixels().height)
 
     def getCenterYInPixels(self) -> int:
         limitsInPixels = self.getCenterYLimitsInPixels()
         return limitsInPixels.clamp(self._settings.cropCenterYInPixels.value) \
-                if self.isCropEnabled() else limitsInPixels.lower
+                if self.isCropEnabled() else limitsInPixels.midrange
+
+    def _getSafeCenterYInPixels(self) -> int:
+        lower = self.getExtentYInPixels() // 2
+        upper = self._detector.getExtentInPixels().height - 1 - lower
+        limits = Interval[int](lower, upper)
+        return limits.clamp(self.getCenterYInPixels())
 
     def getExtentInPixels(self) -> ImageExtent:
         return ImageExtent(width=self.getExtentXInPixels(), height=self.getExtentYInPixels())
@@ -75,11 +83,11 @@ class DiffractionPatternSizer(Observable, Observer):
         return data[:, self._sliceY, self._sliceX] if self.isCropEnabled() else data
 
     def _updateSlicesAndNotifyObservers(self) -> None:
-        centerXInPixels = self.getCenterXInPixels()
+        centerXInPixels = self._getSafeCenterXInPixels()
         radiusXInPixels = self.getExtentXInPixels() // 2
         self._sliceX = slice(centerXInPixels - radiusXInPixels, centerXInPixels + radiusXInPixels)
 
-        centerYInPixels = self.getCenterYInPixels()
+        centerYInPixels = self._getSafeCenterYInPixels()
         radiusYInPixels = self.getExtentYInPixels() // 2
         self._sliceY = slice(centerYInPixels - radiusYInPixels, centerYInPixels + radiusYInPixels)
 

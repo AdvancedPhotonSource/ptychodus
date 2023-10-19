@@ -64,7 +64,7 @@ class DataParametersController(Observer):
         self._tableModel.setArray(array)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settingsRegistry:  # FIXME relocate?
+        if observable is self._settingsRegistry:  # FIXME remove?
             self._datasetInputOutputPresenter.startAssemblingDiffractionPatterns()
         elif observable is self._datasetPresenter:
             self._treeModel.setRootNode(self._datasetPresenter.getContentsTree())

@@ -130,7 +130,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.notifyObservers
+            self.notifyObservers()
         elif observable is self._dataset:
             self.notifyObservers()
 

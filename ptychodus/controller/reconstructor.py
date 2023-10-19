@@ -77,19 +77,17 @@ class ReconstructorParametersController(Observer):
         for name in presenter.getReconstructorList():
             controller._addReconstructor(name)
 
-        view.reconstructorView.algorithmComboBox.currentTextChanged.connect(
-            presenter.setReconstructor)
+        view.reconstructorView.algorithmComboBox.textActivated.connect(presenter.setReconstructor)
         view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex)
 
-        view.reconstructorView.scanComboBox.currentTextChanged.connect(scanPresenter.selectScan)
+        view.reconstructorView.scanComboBox.textActivated.connect(scanPresenter.selectScan)
         view.reconstructorView.scanComboBox.setModel(controller._scanListModel)
 
-        view.reconstructorView.probeComboBox.currentTextChanged.connect(probePresenter.selectProbe)
+        view.reconstructorView.probeComboBox.textActivated.connect(probePresenter.selectProbe)
         view.reconstructorView.probeComboBox.setModel(controller._probeListModel)
 
-        view.reconstructorView.objectComboBox.currentTextChanged.connect(
-            objectPresenter.selectObject)
+        view.reconstructorView.objectComboBox.textActivated.connect(objectPresenter.selectObject)
         view.reconstructorView.objectComboBox.setModel(controller._objectListModel)
 
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)

@@ -32,7 +32,7 @@ class AutomationParametersController(Observer):
 
         controller._syncModelToView()
 
-        view.strategyComboBox.currentTextChanged.connect(presenter.setStrategy)
+        view.strategyComboBox.textActivated.connect(presenter.setStrategy)
         view.directoryLineEdit.editingFinished.connect(controller._syncDirectoryToModel)
         view.directoryBrowseButton.clicked.connect(controller._browseDirectory)
         view.intervalSpinBox.valueChanged.connect(presenter.setProcessingIntervalInSeconds)

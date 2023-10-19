@@ -68,8 +68,7 @@ class OpenDatasetWizardFilesController(Observer):
         for fileFilter in presenter.getOpenFileFilterList():
             page.fileTypeComboBox.addItem(fileFilter)
 
-        page.fileTypeComboBox.currentTextChanged.connect(
-            controller._setNameFiltersInFileSystemModel)
+        page.fileTypeComboBox.textActivated.connect(controller._setNameFiltersInFileSystemModel)
 
         controller._setRootPath(fileDialogFactory.getOpenWorkingDirectory())
         controller._syncModelToView()
@@ -226,7 +225,7 @@ class PatternLoadController(Observer):
             self._syncModelToView()
 
 
-class PatternMemoryMapController(Observer):  # FIXME verify
+class PatternMemoryMapController(Observer):
 
     def __init__(self, presenter: DiffractionDatasetPresenter,
                  view: OpenDatasetWizardPatternMemoryMapView,
@@ -277,7 +276,7 @@ class PatternMemoryMapController(Observer):  # FIXME verify
             self._syncModelToView()
 
 
-class PatternCropController(Observer):  # FIXME fix crop controls
+class PatternCropController(Observer):
 
     def __init__(self, presenter: DiffractionPatternPresenter,
                  view: OpenDatasetWizardPatternCropView) -> None:
@@ -456,6 +455,6 @@ class OpenDatasetWizardController:
         self._ioPresenter.startAssemblingDiffractionPatterns()
 
     def openDataset(self) -> None:
-        self._ioPresenter.stopAssemblingDiffractionPatterns(finishAssembling=False)  # FIXME
+        self._ioPresenter.stopAssemblingDiffractionPatterns(finishAssembling=False)
         self._wizard.restart()
         self._wizard.show()
