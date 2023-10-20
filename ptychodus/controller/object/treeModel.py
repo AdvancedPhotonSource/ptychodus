@@ -74,7 +74,7 @@ class ObjectTreeNode:
 
         return self.presenter.item.getExtentInPixels().height
 
-    def getSizeInBytes(self) -> float:
+    def getSizeInBytes(self) -> int:
         if self.presenter is None:
             return 0
 
@@ -87,6 +87,13 @@ class ObjectTreeNode:
             return self.presenter.item.getLayersFlattened()
 
         return self.presenter.item.getLayer(self.objectLayer)
+
+    def getLayerDistanceInMeters(self) -> float:
+        if self.presenter is None or self.objectLayer < 0:
+            return 0.
+
+        distanceInMeters = self.presenter.item.getLayerDistanceInMeters(self.objectLayer)
+        return float(distanceInMeters)
 
     def row(self) -> int:
         if self.parentNode:
@@ -101,7 +108,8 @@ class ObjectTreeModel(QAbstractItemModel):
         super().__init__(parent)
         self._rootNode = ObjectTreeNode.createRoot()
         self._header = [
-            'Name', 'Initializer', 'Data Type', 'Width [px]', 'Height [px]', 'Size [MB]'
+            'Name', 'Distance [m]', 'Initializer', 'Data Type', 'Width [px]', 'Height [px]',
+            'Size [MB]'
         ]
 
     def setRootNode(self, rootNode: ObjectTreeNode) -> None:
@@ -196,18 +204,20 @@ class ObjectTreeModel(QAbstractItemModel):
             if node.objectLayer < 0:
                 if index.column() == 0:
                     value = QVariant(node.getName())
-                elif index.column() == 1:
-                    value = QVariant(node.getInitializerName())
                 elif index.column() == 2:
-                    value = QVariant(node.getDataType())
+                    value = QVariant(node.getInitializerName())
                 elif index.column() == 3:
-                    value = QVariant(node.getWidthInPixels())
+                    value = QVariant(node.getDataType())
                 elif index.column() == 4:
-                    value = QVariant(node.getHeightInPixels())
+                    value = QVariant(node.getWidthInPixels())
                 elif index.column() == 5:
+                    value = QVariant(node.getHeightInPixels())
+                elif index.column() == 6:
                     value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
             elif index.column() == 0:
                 value = QVariant(f'Layer {node.objectLayer}')
+            elif index.column() == 1:
+                value = QVariant(node.getLayerDistanceInMeters())
 
         return value
 

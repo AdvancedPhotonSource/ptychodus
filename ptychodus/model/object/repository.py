@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from typing import Final, Optional
 import logging
 
@@ -138,6 +139,9 @@ class ObjectRepositoryItem(Observable, Observer):
 
     def getLayersFlattened(self) -> ObjectArrayType:
         return numpy.prod(self._array, axis=-3)
+
+    def getLayerDistanceInMeters(self, number: int) -> Decimal:
+        return Decimal('10e-9')  # FIXME from settings
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

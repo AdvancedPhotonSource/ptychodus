@@ -58,9 +58,9 @@ class ControllerCore:
             model.apparatusPresenter, model.objectRepositoryPresenter, model.objectImagePresenter,
             view.objectView, view.objectImageView, self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
-            model.settingsRegistry, model.diffractionDatasetInputOutputPresenter,
-            model.diffractionDatasetPresenter, model.metadataPresenter, model.patternPresenter,
-            view.dataParametersView, view.dataTableView, self._fileDialogFactory)
+            model.diffractionDatasetInputOutputPresenter, model.diffractionDatasetPresenter,
+            model.metadataPresenter, model.patternPresenter, view.dataParametersView,
+            view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter,
             model.scanPresenter,

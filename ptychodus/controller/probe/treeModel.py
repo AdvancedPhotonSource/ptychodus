@@ -74,7 +74,7 @@ class ProbeTreeNode:
 
         return self.presenter.item.getExtentInPixels().height
 
-    def getSizeInBytes(self) -> float:
+    def getSizeInBytes(self) -> int:
         if self.presenter is None:
             return 0
 

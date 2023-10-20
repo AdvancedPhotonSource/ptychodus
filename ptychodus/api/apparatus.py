@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .image import ImageExtent
-
 
 @dataclass(frozen=True)
 class FresnelZonePlate:
@@ -19,10 +17,3 @@ class FresnelZonePlate:
 class PixelGeometry:
     widthInMeters: Decimal
     heightInMeters: Decimal
-
-
-@dataclass(frozen=True)
-class Detector:  # FIXME use this
-    extentInPixels: ImageExtent
-    pixelGeometry: PixelGeometry
-    bitDepth: int

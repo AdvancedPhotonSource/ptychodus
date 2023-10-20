@@ -4,7 +4,6 @@ from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import QTableView
 
 from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry
 from ...model import MetadataPresenter
 from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
                            DiffractionPatternPresenter)
@@ -16,13 +15,11 @@ from .tableModel import DataArrayTableModel
 
 class DataParametersController(Observer):
 
-    def __init__(self, settingsRegistry: SettingsRegistry,
-                 datasetInputOutputPresenter: DiffractionDatasetInputOutputPresenter,
+    def __init__(self, datasetInputOutputPresenter: DiffractionDatasetInputOutputPresenter,
                  datasetPresenter: DiffractionDatasetPresenter,
                  metadataPresenter: MetadataPresenter,
                  patternPresenter: DiffractionPatternPresenter, view: DataParametersView,
                  tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
-        self._settingsRegistry = settingsRegistry
         self._datasetInputOutputPresenter = datasetInputOutputPresenter
         self._datasetPresenter = datasetPresenter
         self._view = view
@@ -32,16 +29,14 @@ class DataParametersController(Observer):
         self._tableModel = DataArrayTableModel()
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry,
-                       datasetInputOutputPresenter: DiffractionDatasetInputOutputPresenter,
+    def createInstance(cls, datasetInputOutputPresenter: DiffractionDatasetInputOutputPresenter,
                        datasetPresenter: DiffractionDatasetPresenter,
                        metadataPresenter: MetadataPresenter,
                        patternPresenter: DiffractionPatternPresenter, view: DataParametersView,
                        tableView: QTableView,
                        fileDialogFactory: FileDialogFactory) -> DataParametersController:
-        controller = cls(settingsRegistry, datasetInputOutputPresenter, datasetPresenter,
-                         metadataPresenter, patternPresenter, view, tableView, fileDialogFactory)
-        settingsRegistry.addObserver(controller)
+        controller = cls(datasetInputOutputPresenter, datasetPresenter, metadataPresenter,
+                         patternPresenter, view, tableView, fileDialogFactory)
         datasetPresenter.addObserver(controller)
 
         view.treeView.setModel(controller._treeModel)
@@ -64,7 +59,5 @@ class DataParametersController(Observer):
         self._tableModel.setArray(array)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settingsRegistry:  # FIXME remove?
-            self._datasetInputOutputPresenter.startAssemblingDiffractionPatterns()
-        elif observable is self._datasetPresenter:
+        if observable is self._datasetPresenter:
             self._treeModel.setRootNode(self._datasetPresenter.getContentsTree())
