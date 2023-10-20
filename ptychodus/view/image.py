@@ -68,11 +68,11 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         view = cls(parent)
 
         view.homeButton.setIcon(QIcon(':/icons/home'))
-        view.homeButton.setIconSize(QSize(48, 48))
+        view.homeButton.setIconSize(QSize(32, 32))
         view.homeButton.setToolTip('Home')
 
         view.saveButton.setIcon(QIcon(':/icons/save'))
-        view.saveButton.setIconSize(QSize(48, 48))
+        view.saveButton.setIconSize(QSize(32, 32))
         view.saveButton.setToolTip('Save Image')
 
         view.moveButton.setIcon(QIcon(':/icons/move'))

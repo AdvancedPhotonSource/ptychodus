@@ -81,7 +81,7 @@ class FresnelZonePlateProbeView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.presetsComboBox = QComboBox()
-        self.zonePlateRadiusWidget = LengthWidget.createInstance()
+        self.zonePlateDiameterWidget = LengthWidget.createInstance()
         self.outermostZoneWidthWidget = LengthWidget.createInstance()
         self.beamstopDiameterWidget = LengthWidget.createInstance()
         self.defocusDistanceWidget = LengthWidget.createInstance()
@@ -92,7 +92,7 @@ class FresnelZonePlateProbeView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Presets:', view.presetsComboBox)
-        layout.addRow('Zone Plate Radius:', view.zonePlateRadiusWidget)
+        layout.addRow('Zone Plate Diameter:', view.zonePlateDiameterWidget)
         layout.addRow('Outermost Zone Width:', view.outermostZoneWidthWidget)
         layout.addRow('Beamstop Diameter:', view.beamstopDiameterWidget)
         layout.addRow('Defocus Distance:', view.defocusDistanceWidget)

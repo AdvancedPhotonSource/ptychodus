@@ -6,12 +6,12 @@ from .image import ImageExtent
 
 @dataclass(frozen=True)
 class FresnelZonePlate:
-    zonePlateRadiusInMeters: Decimal
+    zonePlateDiameterInMeters: Decimal
     outermostZoneWidthInMeters: Decimal
     centralBeamstopDiameterInMeters: Decimal
 
     def focalLengthInMeters(self, centralWavelengthInMeters: Decimal) -> Decimal:
-        return 2 * self.zonePlateRadiusInMeters * self.outermostZoneWidthInMeters \
+        return self.zonePlateDiameterInMeters * self.outermostZoneWidthInMeters \
                 / centralWavelengthInMeters
 
 

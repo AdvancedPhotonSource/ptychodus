@@ -45,7 +45,7 @@ def fzp_calculate(
 
     # transmission function of FZP
     T = numpy.exp(-1j * 2 * numpy.pi / float(wavelength) * (XX_FZP**2 + YY_FZP**2) / 2 / float(FL))
-    C = numpy.sqrt(XX_FZP**2 + YY_FZP**2) <= zonePlate.zonePlateRadiusInMeters
+    C = numpy.sqrt(XX_FZP**2 + YY_FZP**2) <= zonePlate.zonePlateDiameterInMeters / 2
     H = numpy.sqrt(XX_FZP**2 + YY_FZP**2) >= zonePlate.centralBeamstopDiameterInMeters / 2
 
     return T * C * H, dx_fzp, FL
@@ -103,10 +103,9 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         self._sizer = sizer
         self._apparatus = apparatus
         self._fzpDict: Mapping[str, FresnelZonePlate] = {
-            'Velociprobe': FresnelZonePlate(Decimal('90e-6'), Decimal('50e-9'), Decimal('60e-6')),
-            '2-ID-D': FresnelZonePlate(Decimal('80e-6'), Decimal('70e-9'), Decimal('60e-6')),
-            # FIXME Wrong LYNX parameters
-            'LYNX': FresnelZonePlate(Decimal('114.8e-6') / 2, Decimal('60e-9'), Decimal('40e-6')),
+            'Velociprobe': FresnelZonePlate(Decimal('180e-6'), Decimal('50e-9'), Decimal('60e-6')),
+            '2-ID-D': FresnelZonePlate(Decimal('160e-6'), Decimal('70e-9'), Decimal('60e-6')),
+            'LYNX': FresnelZonePlate(Decimal('114.8e-6'), Decimal('60e-9'), Decimal('40e-6')),
             'HXN': FresnelZonePlate(Decimal('160e-6'), Decimal('30e-9'), Decimal('80e-6')),
         }
         self._presets = self.CUSTOM_PRESET
@@ -116,7 +115,7 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         self._presets = settings.zonePlate.value
         self._custom = FresnelZonePlate(
-            zonePlateRadiusInMeters=settings.zonePlateRadiusInMeters.value,
+            zonePlateDiameterInMeters=settings.zonePlateDiameterInMeters.value,
             outermostZoneWidthInMeters=settings.outermostZoneWidthInMeters.value,
             centralBeamstopDiameterInMeters=settings.centralBeamstopDiameterInMeters.value,
         )
@@ -125,7 +124,7 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
         settings.zonePlate.value = self._presets
-        settings.zonePlateRadiusInMeters.value = self._custom.zonePlateRadiusInMeters
+        settings.zonePlateDiameterInMeters.value = self._custom.zonePlateDiameterInMeters
         settings.outermostZoneWidthInMeters.value = self._custom.outermostZoneWidthInMeters
         settings.centralBeamstopDiameterInMeters.value = \
                 self._custom.centralBeamstopDiameterInMeters
@@ -181,22 +180,22 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         except KeyError:
             return self._custom
 
-    def setZonePlateRadiusInMeters(self, value: Decimal) -> None:
-        if self._custom.zonePlateRadiusInMeters != value:
+    def setZonePlateDiameterInMeters(self, value: Decimal) -> None:
+        if self._custom.zonePlateDiameterInMeters != value:
             self._custom = FresnelZonePlate(
-                zonePlateRadiusInMeters=value,
+                zonePlateDiameterInMeters=value,
                 outermostZoneWidthInMeters=self._custom.outermostZoneWidthInMeters,
                 centralBeamstopDiameterInMeters=self._custom.centralBeamstopDiameterInMeters,
             )
             self.notifyObservers()
 
-    def getZonePlateRadiusInMeters(self) -> Decimal:
-        return self._fzp.zonePlateRadiusInMeters
+    def getZonePlateDiameterInMeters(self) -> Decimal:
+        return self._fzp.zonePlateDiameterInMeters
 
     def setOutermostZoneWidthInMeters(self, value: Decimal) -> None:
         if self._custom.outermostZoneWidthInMeters != value:
             self._custom = FresnelZonePlate(
-                zonePlateRadiusInMeters=self._custom.zonePlateRadiusInMeters,
+                zonePlateDiameterInMeters=self._custom.zonePlateDiameterInMeters,
                 outermostZoneWidthInMeters=value,
                 centralBeamstopDiameterInMeters=self._custom.centralBeamstopDiameterInMeters,
             )
@@ -208,7 +207,7 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
     def setCentralBeamstopDiameterInMeters(self, value: Decimal) -> None:
         if self._custom.centralBeamstopDiameterInMeters != value:
             self._custom = FresnelZonePlate(
-                zonePlateRadiusInMeters=self._custom.zonePlateRadiusInMeters,
+                zonePlateDiameterInMeters=self._custom.zonePlateDiameterInMeters,
                 outermostZoneWidthInMeters=self._custom.outermostZoneWidthInMeters,
                 centralBeamstopDiameterInMeters=value,
             )

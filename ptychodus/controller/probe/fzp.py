@@ -42,8 +42,8 @@ class FresnelZonePlateProbeViewController(Observer):
             self._view.presetsComboBox.addItem(presets)
 
         self._view.presetsComboBox.textActivated.connect(initializer.setPresets)
-        self._view.zonePlateRadiusWidget.lengthChanged.connect(
-            initializer.setZonePlateRadiusInMeters)
+        self._view.zonePlateDiameterWidget.lengthChanged.connect(
+            initializer.setZonePlateDiameterInMeters)
         self._view.outermostZoneWidthWidget.lengthChanged.connect(
             initializer.setOutermostZoneWidthInMeters)
         self._view.beamstopDiameterWidget.lengthChanged.connect(
@@ -59,9 +59,9 @@ class FresnelZonePlateProbeViewController(Observer):
             arePresetsCustomized = (presets == FresnelZonePlateProbeInitializer.CUSTOM_PRESET)
 
             self._view.presetsComboBox.setCurrentText(presets)
-            self._view.zonePlateRadiusWidget.setEnabled(arePresetsCustomized)
-            self._view.zonePlateRadiusWidget.setLengthInMeters(
-                self._initializer.getZonePlateRadiusInMeters())
+            self._view.zonePlateDiameterWidget.setEnabled(arePresetsCustomized)
+            self._view.zonePlateDiameterWidget.setLengthInMeters(
+                self._initializer.getZonePlateDiameterInMeters())
             self._view.outermostZoneWidthWidget.setEnabled(arePresetsCustomized)
             self._view.outermostZoneWidthWidget.setLengthInMeters(
                 self._initializer.getOutermostZoneWidthInMeters())
