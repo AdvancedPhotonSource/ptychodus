@@ -197,5 +197,5 @@ class ProbeCore(StatefulCore[ProbeStateData]):
         self.probeAPI.insertItemIntoRepositoryFromArray(name='Restart',
                                                         array=stateData.array,
                                                         filePath=stateFilePath,
-                                                        fileType=stateFilePath.suffix,
+                                                        fileType=stateFilePath.suffix[1:],
                                                         selectItem=True)

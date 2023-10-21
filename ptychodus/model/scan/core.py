@@ -200,5 +200,5 @@ class ScanCore(StatefulCore[ScanStateData]):
         self.scanAPI.insertItemIntoRepositoryFromScan(name='Restart',
                                                       scan=TabularScan(pointMap),
                                                       filePath=stateFilePath,
-                                                      fileType=stateFilePath.suffix,
+                                                      fileType=stateFilePath.suffix[1:],
                                                       selectItem=True)

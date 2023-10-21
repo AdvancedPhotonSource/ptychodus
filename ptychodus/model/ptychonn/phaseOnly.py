@@ -56,7 +56,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         self._trainingSettings = trainingSettings
         self._objectAPI = objectAPI
         self._diffractionPatternBuffer = CircularBuffer.createZeroSized()
-        self._objectPhasePatchBuffer = CircularBuffer.createZeroSized()
+        self._objectPatchBuffer = CircularBuffer.createZeroSized()
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -107,9 +107,9 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         )
 
         logger.debug('Inferring...')
-        tester.setTestData(binnedData, batch_size=self._settings.batchSize.value)
+        tester.setTestData(binnedData.astype(numpy.float32), batch_size=self._settings.batchSize.value)
         npzSavePath = None  # TODO self._trainingSettings.outputPath.value / 'preds.npz'
-        objectPhasePatches = tester.predictTestData(npz_save_path=npzSavePath)
+        objectPatches = tester.predictTestData(npz_save_path=npzSavePath)
 
         logger.debug('Stitching...')
         objectInterpolator = parameters.objectInterpolator
@@ -119,12 +119,12 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
 
         patchExtent = ImageExtent(
-            width=objectPhasePatches.shape[-1],
-            height=objectPhasePatches.shape[-2],
+            width=objectPatches.shape[-1],
+            height=objectPatches.shape[-2],
         )
 
-        for scanPoint, objectPhasePatch in zip(parameters.scan.values(), objectPhasePatches):
-            objectPatch = 0.5 * numpy.exp(1j * objectPhasePatch)
+        for scanPoint, objectPatch in zip(parameters.scan.values(), objectPatches):
+            objectPatch = 0.5 * numpy.exp(1j * objectPatch)
 
             patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
             patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
@@ -132,6 +132,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             pixelCentersX = patchAxisX.getObjectPixelCenters()
             pixelCentersY = patchAxisY.getObjectPixelCenters()
 
+            print(objectPatch.shape) # FIXME
             xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
             patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
 
@@ -159,12 +160,12 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
 
             self._diffractionPatternBuffer = CircularBuffer(diffractionPatternExtent, maximumSize)
-            self._objectPhasePatchBuffer = CircularBuffer(diffractionPatternExtent, maximumSize)
+            self._objectPatchBuffer = CircularBuffer(diffractionPatternExtent, maximumSize)
 
         for scanIndex, scanPoint in parameters.scan.items():
             objectPatch = objectInterpolator.getPatch(scanPoint, parameters.probeExtent)
-            objectPhasePatch = numpy.angle(objectPatch.array).astype(numpy.float32)
-            self._objectPhasePatchBuffer.append(objectPhasePatch)
+            objectPatch = numpy.angle(objectPatch.array).astype(numpy.float32)
+            self._objectPatchBuffer.append(objectPatch)
 
         for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
             self._diffractionPatternBuffer.append(pattern)
@@ -192,9 +193,25 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             output_suffix=self._trainingSettings.outputSuffix.value,
         )
 
+        X_train_full = self._diffractionPatternBuffer.getBuffer()
+        logger.debug(f'X: {X_train_full.dtype}{X_train_full.shape}')
+
+        if numpy.all(numpy.isfinite(X_train_full)):
+            logger.debug('X is finite')
+        else:
+            logger.debug('X is not finite')
+
+        Y_ph_train_full = numpy.expand_dims(self._objectPatchBuffer.getBuffer(), 1)
+        logger.debug(f'Y: {Y_ph_train_full.dtype}{Y_ph_train_full.shape}')
+
+        if numpy.all(numpy.isfinite(Y_ph_train_full)):
+            logger.debug('Y is finite')
+        else:
+            logger.debug('Y is not finite')
+
         trainer.setTrainingData(
-            X_train_full=self._diffractionPatternBuffer.getBuffer(),
-            Y_ph_train_full=numpy.expand_dims(self._objectPhasePatchBuffer.getBuffer(), 1),
+            X_train_full=X_train_full,
+            Y_ph_train_full=Y_ph_train_full,
             valid_data_ratio=float(self._trainingSettings.validationSetFractionalSize.value),
         )
         trainer.setOptimizationParams(
@@ -216,11 +233,11 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
 
     def reset(self) -> None:
         self._diffractionPatternBuffer = CircularBuffer.createZeroSized()
-        self._objectPhasePatchBuffer = CircularBuffer.createZeroSized()
+        self._objectPatchBuffer = CircularBuffer.createZeroSized()
 
     def saveTrainingData(self, filePath: Path) -> None:
         trainingData = {
             'diffractionPatterns': self._diffractionPatternBuffer.getBuffer(),
-            'objectPhasePatches': self._objectPhasePatchBuffer.getBuffer(),
+            'objectPatches': self._objectPatchBuffer.getBuffer(),
         }
         numpy.savez(filePath, **trainingData)
