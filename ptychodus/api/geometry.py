@@ -18,6 +18,12 @@ class Point2D(Generic[T]):
     y: T
 
 
+@dataclass(frozen=True)
+class Line2D(Generic[T]):
+    point1: Point2D[T]
+    point2: Point2D[T]
+
+
 class Interval(Generic[T]):
 
     def __init__(self, lower: T, upper: T) -> None:

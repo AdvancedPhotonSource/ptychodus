@@ -141,7 +141,7 @@ class ObjectRepositoryItem(Observable, Observer):
         return numpy.prod(self._array, axis=-3)
 
     def getLayerDistanceInMeters(self, number: int) -> Decimal:
-        return Decimal('10e-9')  # FIXME from settings
+        return Decimal('10e-9') if number > 0 else Decimal()  # FIXME from settings
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

@@ -1,6 +1,7 @@
 from __future__ import annotations
+import logging
 
-from PyQt5.QtCore import QStringListModel
+from PyQt5.QtCore import QLineF, QRectF, QStringListModel
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QButtonGroup
 
@@ -11,6 +12,8 @@ from ..model.image import ImagePresenter
 from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageMouseTool,
                           ImageToolsGroupBox, ImageView, ImageWidget)
 from .data import FileDialogFactory
+
+logger = logging.getLogger(__name__)
 
 
 class ImageToolsController:
@@ -30,11 +33,13 @@ class ImageToolsController:
         view.moveButton.setChecked(True)
         view.rulerButton.setCheckable(True)
         view.rectangleButton.setCheckable(True)
+        view.lineCutButton.setCheckable(True)
 
         mouseToolButtonGroup = QButtonGroup()
         mouseToolButtonGroup.addButton(view.moveButton, ImageMouseTool.MOVE_TOOL.value)
         mouseToolButtonGroup.addButton(view.rulerButton, ImageMouseTool.RULER_TOOL.value)
         mouseToolButtonGroup.addButton(view.rectangleButton, ImageMouseTool.RECTANGLE_TOOL.value)
+        mouseToolButtonGroup.addButton(view.lineCutButton, ImageMouseTool.LINE_CUT_TOOL.value)
 
         controller = cls(view, imageWidget, fileDialogFactory, mouseToolButtonGroup)
         view.homeButton.clicked.connect(imageWidget.zoomToFit)
@@ -177,15 +182,51 @@ class ImageController(Observer):
     def createInstance(cls, presenter: ImagePresenter, view: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ImageController:
         controller = cls(presenter, view, fileDialogFactory)
+        view.imageWidget.rectangleFinished.connect(controller._handleRectangle)
+        view.imageWidget.lineCutFinished.connect(controller._handleLineCut)
         controller._syncModelToView()
         presenter.addObserver(controller)
         return controller
+
+    def _handleRectangle(self, rect: QRectF) -> None:
+        print(rect)  # FIXME use for crop
+
+    def _handleLineCut(self, line: QLineF) -> None:
+        line2D = f(line)  # FIXME
+        plot2D = self._presenter.plotLineCut(line2D)
+        axisX = plot2D.axisX
+        axisY = plot2D.axisY
+
+        ax = self._view.lineCutDialog.axes
+        ax.clear()
+
+        if len(axisX.series) == len(axisY.series):
+            for sx, sy in zip(axisX.series, axisY.series):
+                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
+        elif len(axisX.series) == 1:
+            sx = axisX.series[0]
+
+            for sy in axisY.series:
+                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
+        else:
+            logger.error('Failed to broadcast plot series!')
+
+        ax.set_xlabel(axisX.label)
+        ax.set_ylabel(axisY.label)
+        ax.grid(True)
+
+        if len(axisX.series) > 0:
+            ax.legend(loc='upper right')
+
+        self._view.lineCutDialog.figureCanvas.draw()
+        self._view.lineCutDialog.open()
 
     def _syncModelToView(self) -> None:
         realImage = self._presenter.getImage()
         qpixmap = QPixmap()
 
         if realImage is not None and numpy.size(realImage) > 0:
+            # FIXME crash when !isfinite(realImage)?
             # NOTE .copy() ensures integerImage is not a view
             integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8).copy()
 

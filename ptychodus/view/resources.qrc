@@ -6,6 +6,7 @@
         <file alias="dataset">Font-Awesome-6.4.2/svgs/solid/database.svg</file>
         <file alias="detector">Font-Awesome-6.4.2/svgs/solid/table-cells.svg</file>
         <file alias="home">Font-Awesome-6.4.2/svgs/solid/house-chimney.svg</file>
+        <file alias="line-cut">Font-Awesome-6.4.2/svgs/solid/chart-line.svg</file>
         <file alias="monitor">Font-Awesome-6.4.2/svgs/solid/display.svg</file>
         <file alias="move">Font-Awesome-6.4.2/svgs/solid/arrows-up-down-left-right.svg</file>
         <file alias="object">Font-Awesome-6.4.2/svgs/solid/cube.svg</file>

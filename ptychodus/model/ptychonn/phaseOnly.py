@@ -107,7 +107,8 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         )
 
         logger.debug('Inferring...')
-        tester.setTestData(binnedData.astype(numpy.float32), batch_size=self._settings.batchSize.value)
+        tester.setTestData(binnedData.astype(numpy.float32),
+                           batch_size=self._settings.batchSize.value)
         npzSavePath = None  # TODO self._trainingSettings.outputPath.value / 'preds.npz'
         objectPatches = tester.predictTestData(npz_save_path=npzSavePath)
 
@@ -132,7 +133,7 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             pixelCentersX = patchAxisX.getObjectPixelCenters()
             pixelCentersY = patchAxisY.getObjectPixelCenters()
 
-            print(objectPatch.shape) # FIXME
+            print(objectPatch.shape)  # FIXME
             xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
             patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
 
@@ -164,8 +165,8 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
 
         for scanIndex, scanPoint in parameters.scan.items():
             objectPatch = objectInterpolator.getPatch(scanPoint, parameters.probeExtent)
-            objectPatch = numpy.angle(objectPatch.array).astype(numpy.float32)
-            self._objectPatchBuffer.append(objectPatch)
+            objectPhasePatch = numpy.angle(objectPatch.array).astype(numpy.float32)
+            self._objectPatchBuffer.append(objectPhasePatch)
 
         for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
             self._diffractionPatternBuffer.append(pattern)

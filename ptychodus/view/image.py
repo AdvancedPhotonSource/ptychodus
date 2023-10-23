@@ -4,7 +4,8 @@ from decimal import Decimal
 from enum import auto, Enum
 from typing import Optional
 
-from PyQt5.QtCore import Qt, QPoint, QPointF, QLineF, QRect, QRectF, QSize, QSizeF
+from PyQt5.QtCore import (pyqtSignal, Qt, QObject, QPoint, QPointF, QLineF, QRect, QRectF, QSize,
+                          QSizeF)
 from PyQt5.QtGui import (QColor, QConicalGradient, QIcon, QLinearGradient, QPainter, QPen, QPixmap,
                          QWheelEvent)
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
@@ -12,6 +13,10 @@ from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox,
                              QGraphicsScene, QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent,
                              QGraphicsView, QGridLayout, QHBoxLayout, QPushButton, QSizePolicy,
                              QSpinBox, QStatusBar, QToolButton, QVBoxLayout, QWidget)
+
+from matplotlib.backends.backend_qt5agg import FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
 
 from ..api.image import RealArrayType
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
@@ -62,6 +67,7 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         self.moveButton = QToolButton()
         self.rulerButton = QToolButton()
         self.rectangleButton = QToolButton()
+        self.lineCutButton = QToolButton()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageToolsGroupBox:
@@ -87,14 +93,17 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         view.rectangleButton.setIconSize(QSize(32, 32))
         view.rectangleButton.setToolTip('Rectangle')
 
+        view.lineCutButton.setIcon(QIcon(':/icons/line-cut'))
+        view.lineCutButton.setIconSize(QSize(32, 32))
+        view.lineCutButton.setToolTip('Line-Cut Profile')
+
         layout = QGridLayout()
-        layout.addWidget(view.homeButton, 0, 0, 1, 3)
-        layout.setAlignment(view.homeButton, Qt.AlignHCenter)
-        layout.addWidget(view.saveButton, 0, 3, 1, 3)
-        layout.setAlignment(view.saveButton, Qt.AlignHCenter)
-        layout.addWidget(view.moveButton, 1, 0, 1, 2)
-        layout.addWidget(view.rulerButton, 1, 2, 1, 2)
-        layout.addWidget(view.rectangleButton, 1, 4, 1, 2)
+        layout.addWidget(view.homeButton, 0, 0)
+        layout.addWidget(view.saveButton, 0, 1)
+        layout.addWidget(view.moveButton, 0, 2)
+        layout.addWidget(view.rulerButton, 1, 0)
+        layout.addWidget(view.rectangleButton, 1, 1)
+        layout.addWidget(view.lineCutButton, 1, 2)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
@@ -219,16 +228,23 @@ class ImageMouseTool(Enum):
     MOVE_TOOL = auto()
     RULER_TOOL = auto()
     RECTANGLE_TOOL = auto()
+    LINE_CUT_TOOL = auto()
+
+
+class ImageItemEvents(QObject):
+    rectangleFinished = pyqtSignal(QRectF)
+    lineCutFinished = pyqtSignal(QLineF)
 
 
 class ImageItem(QGraphicsPixmapItem):
 
-    def __init__(self, statusBar: QStatusBar) -> None:
+    def __init__(self, events: ImageItemEvents, statusBar: QStatusBar) -> None:
         super().__init__()
+        self._events = events
         self._statusBar = statusBar
         self._mouseTool = ImageMouseTool.MOVE_TOOL
-        self._rulerItem = QGraphicsLineItem(self)
-        self._rulerItem.hide()
+        self._lineItem = QGraphicsLineItem(self)
+        self._lineItem.hide()
         self._rectangleItem = QGraphicsRectItem(self)
         self._rectangleItem.hide()
         self._rectangleOrigin = QPointF()
@@ -279,23 +295,31 @@ class ImageItem(QGraphicsPixmapItem):
         elif self._mouseTool == ImageMouseTool.RULER_TOOL:
             line = QLineF(event.pos(), event.pos())
             self.prepareGeometryChange()
-            self._rulerItem.setLine(line)
-            self._rulerItem.show()
+            self._lineItem.setLine(line)
+            self._lineItem.setPen(QPen(Qt.cyan))
+            self._lineItem.show()
         elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
             self._rectangleOrigin = event.pos()
             rect = QRectF(self._rectangleOrigin, QSizeF())
             self.prepareGeometryChange()
             self._rectangleItem.setRect(rect)
+            self._rectangleItem.setPen(QPen(Qt.cyan))
             self._rectangleItem.show()
+        elif self._mouseTool == ImageMouseTool.LINE_CUT_TOOL:
+            line = QLineF(event.pos(), event.pos())
+            self.prepareGeometryChange()
+            self._lineItem.setLine(line)
+            self._lineItem.setPen(QPen(Qt.magenta))
+            self._lineItem.show()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self._mouseTool == ImageMouseTool.MOVE_TOOL:
             self.setPos(self.scenePos() + event.scenePos() - event.lastScenePos())
         elif self._mouseTool == ImageMouseTool.RULER_TOOL:
-            origin = self._rulerItem.line().p1()
+            origin = self._lineItem.line().p1()
             line = QLineF(origin, event.pos())
             self.prepareGeometryChange()
-            self._rulerItem.setLine(line)
+            self._lineItem.setLine(line)
             message1 = f'{line.length():.1f} pixels, {line.angle():.2f}\u00b0'
             message2 = f'{line.dx():.1f} \u00d7 {line.dy():.1f}'
             self._statusBar.showMessage(f'{message1} ({message2})')
@@ -307,19 +331,34 @@ class ImageItem(QGraphicsPixmapItem):
             message1 = f'{rect.width():.1f} \u00d7 {rect.height():.1f}'
             message2 = f'{center.x():.1f}, {center.y():.1f}'
             self._statusBar.showMessage(f'Rectangle: {message1} (Center: {message2})')
+        elif self._mouseTool == ImageMouseTool.LINE_CUT_TOOL:
+            origin = self._lineItem.line().p1()
+            line = QLineF(origin, event.pos())
+            self.prepareGeometryChange()
+            self._lineItem.setLine(line)
+            message1 = f'{line.length():.1f} pixels, {line.angle():.2f}\u00b0'
+            message2 = f'{line.dx():.1f} \u00d7 {line.dy():.1f}'
+            self._statusBar.showMessage(f'{message1} ({message2})')
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self._mouseTool == ImageMouseTool.MOVE_TOOL:
             self._changeOverrideCursor(Qt.OpenHandCursor)
         elif self._mouseTool == ImageMouseTool.RULER_TOOL:
-            self._rulerItem.setLine(QLineF())
-            self._rulerItem.hide()
+            self._lineItem.setLine(QLineF())
+            self._lineItem.hide()
         elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
+            self._events.rectangleFinished.emit(self._rectangleItem.rect())
             self._rectangleItem.setRect(QRectF())
             self._rectangleItem.hide()
+        elif self._mouseTool == ImageMouseTool.LINE_CUT_TOOL:
+            self._events.lineCutFinished.emit(self._lineItem.line())
+            self._lineItem.setLine(QLineF())
+            self._lineItem.hide()
 
 
 class ImageWidget(QGraphicsView):
+    rectangleFinished = pyqtSignal(QRectF)
+    lineCutFinished = pyqtSignal(QLineF)
 
     def __init__(self, imageItem: ImageItem, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
@@ -339,10 +378,14 @@ class ImageWidget(QGraphicsView):
     def createInstance(cls,
                        statusBar: QStatusBar,
                        parent: Optional[QWidget] = None) -> ImageWidget:
-        imageItem = ImageItem(statusBar)
+        imageItemEvents = ImageItemEvents()
+        imageItem = ImageItem(imageItemEvents, statusBar)
         widget = cls(imageItem, parent)
         widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         widget.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        imageItemEvents.rectangleFinished.connect(widget.rectangleFinished)
+        imageItemEvents.lineCutFinished.connect(widget.lineCutFinished)
 
         scene = QGraphicsScene()
         scene.addItem(imageItem)
@@ -403,9 +446,7 @@ class ImageWidget(QGraphicsView):
 
         fgPainter = QPainter(self.viewport())
 
-        # cosmetic pens have the same thickness at different scale factors
         pen = QPen()
-        pen.setCosmetic(True)
         pen.setWidth(3)
         fgPainter.setPen(pen)
 
@@ -465,12 +506,37 @@ class ImageWidget(QGraphicsView):
         self.translate(deltaPosition.x(), deltaPosition.y())
 
 
+class LineCutDialog(QDialog):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.figure = Figure()
+        self.figureCanvas = FigureCanvas(self.figure)
+        self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
+        self.axes = self.figure.add_subplot(111)
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> LineCutDialog:
+        title = 'Line-Cut Dialog'
+        view = cls(parent)
+        view.setWindowTitle(title)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.navigationToolbar)
+        layout.addWidget(view.figureCanvas)
+        view.setLayout(layout)
+
+        return view
+
+
 class ImageView(QWidget):
 
     def __init__(self, statusBar: QStatusBar, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.imageRibbon = ImageRibbon.createInstance()
         self.imageWidget = ImageWidget.createInstance(statusBar)
+        self.lineCutDialog = LineCutDialog.createInstance()
 
     @classmethod
     def createInstance(cls, statusBar: QStatusBar, parent: Optional[QWidget] = None) -> ImageView:
