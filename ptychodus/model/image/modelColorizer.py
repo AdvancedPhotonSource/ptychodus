@@ -147,9 +147,11 @@ class CylindricalColorModelColorizer(Colorizer):
         return True
 
     def getDataArray(self) -> RealArrayType:
+        return self._array.getAmplitude()
+
+    def getTransformedDataArray(self) -> RealArrayType:
         transform = self._transformChooser.currentPlugin.strategy
-        values = self._array.getAmplitude()
-        return transform(values)
+        return transform(self.getDataArray())
 
     def __call__(self) -> RealArrayType:
         if self._displayRange.getUpper() <= self._displayRange.getLower():
@@ -161,7 +163,7 @@ class CylindricalColorModelColorizer(Colorizer):
 
         model = numpy.vectorize(self._variantChooser.currentPlugin.strategy)
         h = (self._array.getPhaseInRadians() + numpy.pi) / (2 * numpy.pi)
-        x = norm(self.getDataArray())
+        x = norm(self.getTransformedDataArray())
         r, g, b, a = model(h, x)
 
         return numpy.stack((r, g, b, a), axis=-1)

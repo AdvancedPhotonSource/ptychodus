@@ -1,9 +1,10 @@
 from __future__ import annotations
 from collections.abc import Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 import logging
 
-from ...api.geometry import Interval
+from ...api.geometry import Interval, Point2D
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
@@ -14,6 +15,12 @@ from .modelColorizer import CylindricalColorModelColorizer
 from .visarray import NumericArrayType, VisualizationArray
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class LineCut:
+    distance: Sequence[float]
+    value: Sequence[float]
 
 
 class ImagePresenter(Observable, Observer):
@@ -90,7 +97,7 @@ class ImagePresenter(Observable, Observer):
         self._displayRange.setUpper(value)
 
     def setDisplayRangeToDataRange(self) -> None:
-        values = self._colorizer.getDataArray()
+        values = self._colorizer.getTransformedDataArray()
         lower = Decimal.from_float(values.min())
         upper = Decimal.from_float(values.max())
         dataRange = Interval[Decimal](lower, upper)
@@ -130,6 +137,14 @@ class ImagePresenter(Observable, Observer):
 
         self._image = image
         self.notifyObservers()
+
+    def getLineCut(self, start: Point2D[float], end: Point2D[float]) -> LineCut:
+        values = self._colorizer.getDataArray()
+        # FIXME find alpha values for vertical and horizontal pixel crossings
+        # FIXME clip to edges of array
+        distance # FIXME distance along line at midpoint of each alpha interval in physical units
+        value # FIXME pixel value
+        return LineCut(distance, value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._colorizerChooser:

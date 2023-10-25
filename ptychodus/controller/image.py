@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import QButtonGroup
 
 import numpy
 
+from ..api.geometry import Point2D
 from ..api.observer import Observable, Observer
 from ..model.image import ImagePresenter
 from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageMouseTool,
@@ -192,32 +193,16 @@ class ImageController(Observer):
         print(rect)  # FIXME use for crop
 
     def _handleLineCut(self, line: QLineF) -> None:
-        line2D = f(line)  # FIXME
-        plot2D = self._presenter.plotLineCut(line2D)
-        axisX = plot2D.axisX
-        axisY = plot2D.axisY
+        p1 = Point2D[float](line.x1(), line.y1())
+        p2 = Point2D[float](line.x2(), line.y2())
+        lineCut = self._presenter.getLineCut(p1, p2)
 
         ax = self._view.lineCutDialog.axes
         ax.clear()
-
-        if len(axisX.series) == len(axisY.series):
-            for sx, sy in zip(axisX.series, axisY.series):
-                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
-        elif len(axisX.series) == 1:
-            sx = axisX.series[0]
-
-            for sy in axisY.series:
-                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
-        else:
-            logger.error('Failed to broadcast plot series!')
-
-        ax.set_xlabel(axisX.label)
-        ax.set_ylabel(axisY.label)
+        ax.plot(lineCut.distance, lineCut.value, '-', linewidth=1.5)
+        ax.set_xlabel('Distance [px]') # FIXME physical distance
+        ax.set_ylabel('Value') # FIXME use name
         ax.grid(True)
-
-        if len(axisX.series) > 0:
-            ax.legend(loc='upper right')
-
         self._view.lineCutDialog.figureCanvas.draw()
         self._view.lineCutDialog.open()
 
