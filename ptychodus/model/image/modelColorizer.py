@@ -154,7 +154,9 @@ class CylindricalColorModelColorizer(Colorizer):
         return transform(self.getDataArray())
 
     def __call__(self) -> RealArrayType:
-        if self._displayRange.getUpper() <= self._displayRange.getLower():
+        if self._array.size == 0:
+            return numpy.zeros((0, 0, 4))
+        elif self._displayRange.getUpper() <= self._displayRange.getLower():
             return numpy.zeros((*self._array.shape, 4))
 
         norm = Normalize(vmin=float(self._displayRange.getLower()),

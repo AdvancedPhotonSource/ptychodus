@@ -30,7 +30,10 @@ class VisualizationArray(Observable):
         return numpy.absolute(self._array).astype(numpy.float_)
 
     def getIntensity(self) -> RealArrayType:
-        return numpy.square(self.getAmplitude())
+        if issubclass(self._array.dtype.type, numpy.integer):
+            return self._array.astype(numpy.float_)
+        else:
+            return numpy.square(self.getAmplitude())
 
     def getPhaseInRadians(self) -> RealArrayType:
         return numpy.angle(self._array).astype(numpy.float_)
@@ -41,6 +44,10 @@ class VisualizationArray(Observable):
     @property
     def shape(self) -> tuple[int, ...]:
         return self._array.shape
+
+    @property
+    def size(self) -> int:
+        return self._array.size
 
     def clearArray(self) -> None:
         self._array = numpy.zeros((0, 0))

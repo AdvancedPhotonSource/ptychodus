@@ -146,12 +146,8 @@ class RandomObjectInitializer(ObjectInitializer):
             self._numberOfLayers = number
             self.notifyObservers()
 
-    def getLayerDistanceLimitsInMeters(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))
-
     def getLayerDistanceInMeters(self) -> Decimal:
-        limits = self.getLayerDistanceLimitsInMeters()
-        return limits.clamp(self._layerDistanceInMeters)
+        return self._layerDistanceInMeters
 
     def setLayerDistanceInMeters(self, number: Decimal) -> None:
         if self._layerDistanceInMeters != number:

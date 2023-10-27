@@ -15,7 +15,7 @@ class RandomObjectViewController(Observer):
     def __init__(self, presenter: ObjectRepositoryItemPresenter, parent: QWidget) -> None:
         super().__init__()
         self._item = presenter.item
-        self._view = RandomObjectView.createInstance()  # FIXME layer distance
+        self._view = RandomObjectView.createInstance()
         self._dialog = ObjectEditorDialog.createInstance(presenter.name, self._view, parent)
         self._initializer: RandomObjectInitializer | None = None
 
@@ -26,7 +26,7 @@ class RandomObjectViewController(Observer):
         controller._syncModelToView()
         presenter.item.addObserver(controller)
         controller._dialog.open()
-        presenter.item.removeObserver(controller)
+        presenter.item.removeObserver(controller)  # FIXME use context manager
 
     def _updateInitializer(self) -> None:
         initializer = self._item.getInitializer()
@@ -38,6 +38,7 @@ class RandomObjectViewController(Observer):
             return
 
         self._view.numberOfLayersSpinBox.valueChanged.connect(initializer.setNumberOfLayers)
+        self._view.layerDistanceWidget.lengthChanged.connect(initializer.setLayerDistanceInMeters)
         self._view.extraPaddingXSpinBox.valueChanged.connect(initializer.setExtraPaddingX)
         self._view.extraPaddingYSpinBox.valueChanged.connect(initializer.setExtraPaddingY)
 
@@ -55,6 +56,9 @@ class RandomObjectViewController(Observer):
                 self._initializer.getNumberOfLayersLimits().upper)
             self._view.numberOfLayersSpinBox.setValue(self._initializer.getNumberOfLayers())
             self._view.numberOfLayersSpinBox.blockSignals(False)
+
+            self._view.layerDistanceWidget.setLengthInMeters(
+                self._initializer.getLayerDistanceInMeters())
 
             self._view.extraPaddingXSpinBox.blockSignals(True)
             self._view.extraPaddingXSpinBox.setRange(
