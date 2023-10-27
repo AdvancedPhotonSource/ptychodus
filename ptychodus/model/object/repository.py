@@ -1,13 +1,9 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from decimal import Decimal
-from typing import Final, Optional
+from typing import Final
 import logging
 
-import numpy
-
-from ...api.image import ImageExtent
-from ...api.object import ObjectArrayType
+from ...api.object import Object
 from ...api.observer import Observable, Observer
 from ..itemRepository import ItemRepository
 from .settings import ObjectSettings
@@ -41,7 +37,7 @@ class ObjectInitializer(ABC, Observable):
         pass
 
     @abstractmethod
-    def __call__(self) -> ObjectArrayType:
+    def __call__(self) -> Object:
         '''produces an initial object guess'''
         pass
 
@@ -51,54 +47,38 @@ class ObjectRepositoryItem(Observable, Observer):
     SIMPLE_NAME: Final[str] = 'FromMemory'
     DISPLAY_NAME: Final[str] = 'From Memory'
 
-    def __init__(self, nameHint: str, array: Optional[ObjectArrayType] = None) -> None:
+    def __init__(self, nameHint: str) -> None:
         super().__init__()
         self._nameHint = nameHint
-        self._array = numpy.zeros((1, 0, 0), dtype=complex)
-        self._initializer: Optional[ObjectInitializer] = None
-
-        if array is not None:
-            self._setArray(array)
+        self._object = Object()
+        self._initializer: ObjectInitializer | None = None
 
     @property
     def nameHint(self) -> str:
         '''returns a name hint that is appropriate for a settings file'''
         return self._nameHint
 
-    def getArray(self) -> ObjectArrayType:
-        '''returns the array data'''
-        return self._array
+    def getObject(self) -> Object:
+        return self._object
 
-    def _setArray(self, array: ObjectArrayType) -> None:
-        if not numpy.iscomplexobj(array):
-            raise TypeError('Object must be a complex-valued ndarray')
-
-        if array.ndim == 2:
-            self._array = array[numpy.newaxis, ...]
-        elif array.ndim == 3:
-            self._array = array
-        else:
-            raise ValueError('Object must be 2- or 3-dimensional ndarray.')
-
+    def setObject(self, object_: Object) -> None:
+        self._initializer = None
+        self._object = object_
         self.notifyObservers()
 
-    def setArray(self, array: ObjectArrayType) -> None:
-        self._initializer = None
-        self._setArray(array)
-
     def reinitialize(self) -> None:
-        '''reinitializes the object array'''
         if self._initializer is None:
             logger.error('Missing object initializer!')
             return
 
         try:
-            array = self._initializer()
+            object_ = self._initializer()
         except Exception:
             logger.exception('Failed to reinitialize object!')
             return
 
-        self._setArray(array)
+        self._object = object_
+        self.notifyObservers()
 
     def getInitializerSimpleName(self) -> str:
         return self.SIMPLE_NAME if self._initializer is None else self._initializer.simpleName
@@ -106,42 +86,16 @@ class ObjectRepositoryItem(Observable, Observer):
     def getInitializerDisplayName(self) -> str:
         return self.DISPLAY_NAME if self._initializer is None else self._initializer.displayName
 
-    def getInitializer(self) -> Optional[ObjectInitializer]:
-        '''returns the initializer'''
+    def getInitializer(self) -> ObjectInitializer | None:
         return self._initializer
 
     def setInitializer(self, initializer: ObjectInitializer) -> None:
-        '''sets the initializer'''
         if self._initializer is not None:
             self._initializer.removeObserver(self)
 
         self._initializer = initializer
         initializer.addObserver(self)
         self.reinitialize()
-
-    def getDataType(self) -> str:
-        '''returns the array data type'''
-        return str(self._array.dtype)
-
-    def getExtentInPixels(self) -> ImageExtent:
-        '''returns the array width and height'''
-        return ImageExtent(width=self._array.shape[-1], height=self._array.shape[-2])
-
-    def getSizeInBytes(self) -> int:
-        '''returns the array size in bytes'''
-        return self._array.nbytes
-
-    def getNumberOfLayers(self) -> int:
-        return self._array.shape[-3]
-
-    def getLayer(self, number: int) -> ObjectArrayType:
-        return self._array[number, :, :]
-
-    def getLayersFlattened(self) -> ObjectArrayType:
-        return numpy.prod(self._array, axis=-3)
-
-    def getLayerDistanceInMeters(self, number: int) -> Decimal:
-        return Decimal('10e-9') if number > 0 else Decimal()  # FIXME from settings
 
     def update(self, observable: Observable) -> None:
         if observable is self._initializer:

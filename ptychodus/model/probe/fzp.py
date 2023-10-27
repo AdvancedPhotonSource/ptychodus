@@ -7,7 +7,7 @@ import numpy
 import numpy.typing
 
 from ...api.apparatus import FresnelZonePlate
-from ...api.probe import ProbeArrayType
+from ...api.probe import Probe
 from .apparatus import Apparatus
 from .repository import ProbeInitializer
 from .settings import ProbeSettings
@@ -139,9 +139,9 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
     def displayName(self) -> str:
         return self.DISPLAY_NAME
 
-    def __call__(self) -> ProbeArrayType:
-        probeExtent = self._sizer.getExtentInPixels()
-        probe = numpy.zeros(probeExtent.shape, dtype=complex)
+    def __call__(self) -> Probe:
+        arrayExtent = self._sizer.getExtentInPixels()
+        array = numpy.zeros(arrayExtent.shape, dtype=complex)
 
         # central wavelength
         lambda0 = self._apparatus.getProbeWavelengthInMeters()
@@ -149,7 +149,7 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         # pixel size on sample plane (TODO non-square pixels are unsupported)
         dx = self._apparatus.getObjectPlanePixelGeometry().widthInMeters
 
-        T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters, probeExtent.width,
+        T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters, arrayExtent.width,
                                        dx, self._custom)
 
         nprobe = fresnel_propagation(T, float(dx_fzp),
@@ -158,9 +158,9 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
 
         # return probe sorted by the spectrum
         # return scale is the wavelength dependent pixel scaling factor
-        probe = nprobe / (numpy.sqrt(numpy.sum(numpy.abs(nprobe)**2)))
+        array = nprobe / (numpy.sqrt(numpy.sum(numpy.abs(nprobe)**2)))
 
-        return probe
+        return Probe(array)
 
     def getPresetsList(self) -> Sequence[str]:
         return [self.CUSTOM_PRESET, *self._fzpDict.keys()]

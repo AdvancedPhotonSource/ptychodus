@@ -3,29 +3,30 @@ from pathlib import Path
 import scipy.io
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
+from ptychodus.api.probe import Probe, ProbeFileReader, ProbeFileWriter
 
 
 class MATProbeFileReader(ProbeFileReader):
 
-    def read(self, filePath: Path) -> ProbeArrayType:
+    def read(self, filePath: Path) -> Probe:
         matDict = scipy.io.loadmat(filePath)
-        probes = matDict['probe']
+        array = matDict['probe']
 
-        if probes.ndim == 4:
-            # probes[width, height, num_shared_modes, num_varying_modes]
-            probes = probes[..., 0]
+        if array.ndim == 4:
+            # array[width, height, num_shared_modes, num_varying_modes]
+            array = array[..., 0]
 
-        if probes.ndim == 3:
-            # probes[width, height, num_shared_modes]
-            probes = probes.transpose(2, 0, 1)
+        if array.ndim == 3:
+            # array[width, height, num_shared_modes]
+            array = array.transpose(2, 0, 1)
 
-        return probes
+        return Probe(array)
 
 
 class MATProbeFileWriter(ProbeFileWriter):
 
-    def write(self, filePath: Path, array: ProbeArrayType) -> None:
+    def write(self, filePath: Path, probe: Probe) -> None:
+        array = probe.getArray()
         matDict = {'probe': array.transpose(1, 2, 0)}
         scipy.io.savemat(filePath, matDict)
 

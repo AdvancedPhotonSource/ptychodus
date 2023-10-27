@@ -12,10 +12,10 @@ from ...model.probe import ProbeRepositoryItemPresenter
 class ProbeTreeNode:
 
     def __init__(self, parentNode: ProbeTreeNode | None,
-                 presenter: ProbeRepositoryItemPresenter | None, probeMode: int) -> None:
+                 presenter: ProbeRepositoryItemPresenter | None, mode: int) -> None:
         self.parentNode = parentNode
         self.presenter = presenter
-        self.probeMode = probeMode
+        self.mode = mode
         self.children: list[ProbeTreeNode] = list()
 
     @classmethod
@@ -28,8 +28,8 @@ class ProbeTreeNode:
 
         self.children.clear()
 
-        for probeMode in range(self.presenter.item.getNumberOfModes()):
-            childNode = ProbeTreeNode(self, self.presenter, probeMode)
+        for mode in range(self.presenter.item.getProbe().getNumberOfModes()):
+            childNode = ProbeTreeNode(self, self.presenter, mode)
             self.children.append(childNode)
 
     def createChild(self, presenter: ProbeRepositoryItemPresenter) -> ProbeTreeNode:
@@ -54,46 +54,50 @@ class ProbeTreeNode:
         if self.presenter is None:
             return str()
 
-        return self.presenter.item.getDataType()
+        return str(self.presenter.item.getProbe().getDataType())
 
     def getNumberOfModes(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getNumberOfModes()
+        return self.presenter.item.getProbe().getNumberOfModes()
 
     def getWidthInPixels(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getExtentInPixels().width
+        return self.presenter.item.getProbe().getExtentInPixels().width
 
     def getHeightInPixels(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getExtentInPixels().height
+        return self.presenter.item.getProbe().getExtentInPixels().height
 
     def getSizeInBytes(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getSizeInBytes()
+        return self.presenter.item.getProbe().getSizeInBytes()
 
     def getArray(self) -> ProbeArrayType:
         if self.presenter is None:
             return numpy.zeros((0, 0, 0), dtype=complex)
-        elif self.probeMode < 0:
-            return self.presenter.item.getModesFlattened()
+        elif self.mode < 0:
+            return self.presenter.item.getProbe().getModesFlattened()
 
-        return self.presenter.item.getMode(self.probeMode)
+        return self.presenter.item.getProbe().getMode(self.mode)
 
     def getRelativePowerPercent(self) -> int:
-        if self.presenter is None or self.probeMode < 0:
+        if self.presenter is None or self.mode < 0:
             return -1
 
-        relativePower = self.presenter.item.getModeRelativePower(self.probeMode)
-        return int((100 * relativePower).to_integral_value())
+        relativePower = self.presenter.item.getProbe().getModeRelativePower(self.mode)
+
+        if numpy.isfinite(relativePower):
+            return int(100. * relativePower)
+
+        return 0
 
     def row(self) -> int:
         if self.parentNode:
@@ -202,7 +206,7 @@ class ProbeTreeModel(QAbstractItemModel):
             node = index.internalPointer()
 
             if role == Qt.DisplayRole:
-                if node.probeMode < 0:
+                if node.mode < 0:
                     if index.column() == 0:
                         value = QVariant(node.getName())
                     elif index.column() == 2:
@@ -216,7 +220,7 @@ class ProbeTreeModel(QAbstractItemModel):
                     elif index.column() == 6:
                         value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
                 elif index.column() == 0:
-                    value = QVariant(f'Mode {node.probeMode}')
+                    value = QVariant(f'Mode {node.mode}')
             elif role == Qt.UserRole and index.column() == 1:
                 value = QVariant(node.getRelativePowerPercent())
 

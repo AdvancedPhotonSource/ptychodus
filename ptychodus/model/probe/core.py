@@ -2,14 +2,13 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 import logging
 
 import numpy
 
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
-from ...api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
+from ...api.probe import Probe, ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry
 from ...api.state import ProbeStateData, StatefulCore
 from ..data import DiffractionPatternSizer
@@ -65,7 +64,7 @@ class ProbeRepositoryPresenter(Observable, Observer):
     def getInitializerDisplayNameList(self) -> Sequence[str]:
         return self._itemFactory.getInitializerDisplayNameList()
 
-    def initializeProbe(self, displayName: str) -> Optional[str]:
+    def initializeProbe(self, displayName: str) -> str | None:
         return self._probeAPI.insertItemIntoRepositoryFromInitializerName(displayName)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
@@ -94,7 +93,7 @@ class ProbeRepositoryPresenter(Observable, Observer):
         fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.currentPlugin.strategy
-        writer.write(filePath, item.getArray())
+        writer.write(filePath, item.getProbe())
 
         if item.getInitializer() is None:
             initializer = self._itemFactory.createFileInitializer(filePath, fileType)
@@ -127,15 +126,15 @@ class ProbePresenter(Observable, Observer):
         return presenter
 
     def isSelectedProbeValid(self) -> bool:
-        selectedProbe = self._probe.getSelectedItem()
+        selectedItem = self._probe.getSelectedItem()
 
-        if selectedProbe is None:
+        if selectedItem is None:
             return False
 
-        actualExtent = selectedProbe.getExtentInPixels()
+        probe = selectedItem.getProbe()
+        actualExtent = probe.getExtentInPixels()
         expectedExtent = self._sizer.getExtentInPixels()
-        hasComplexDataType = numpy.iscomplexobj(selectedProbe.getArray())
-        return (actualExtent == expectedExtent and hasComplexDataType)
+        return (actualExtent == expectedExtent)
 
     def selectProbe(self, name: str) -> None:
         self._probe.selectItem(name)
@@ -144,12 +143,22 @@ class ProbePresenter(Observable, Observer):
         return self._probe.getSelectedName()
 
     def getNumberOfProbeModes(self) -> int:
-        selectedProbe = self._probe.getSelectedItem()
-        return 0 if selectedProbe is None else selectedProbe.getNumberOfModes()
+        selectedItem = self._probe.getSelectedItem()
 
-    def getSelectedProbeFlattenedArray(self) -> Optional[ProbeArrayType]:
-        selectedProbe = self._probe.getSelectedItem()
-        return None if selectedProbe is None else selectedProbe.getModesFlattened()
+        if selectedItem is None:
+            return 0
+
+        probe = selectedItem.getProbe()
+        return probe.getNumberOfModes()
+
+    def getSelectedProbeFlattenedArray(self) -> ProbeArrayType | None:
+        selectedItem = self._probe.getSelectedItem()
+
+        if selectedItem is None:
+            return None
+
+        probe = selectedItem.getProbe()
+        return probe.getModesFlattened()
 
     def getSelectableNames(self) -> Sequence[str]:
         return self._probe.getSelectableNames()
@@ -187,15 +196,17 @@ class ProbeCore(StatefulCore[ProbeStateData]):
 
     def getStateData(self) -> ProbeStateData:
         pixelGeometry = self.apparatus.getObjectPlanePixelGeometry()
+        probe = self.probeAPI.getSelectedProbe()
         return ProbeStateData(
             pixelSizeXInMeters=float(pixelGeometry.widthInMeters),
             pixelSizeYInMeters=float(pixelGeometry.heightInMeters),
-            array=self.probeAPI.getSelectedProbeArray(),
+            array=probe.getArray(),
         )
 
     def setStateData(self, stateData: ProbeStateData, stateFilePath: Path) -> None:
-        self.probeAPI.insertItemIntoRepositoryFromArray(name='Restart',
-                                                        array=stateData.array,
-                                                        filePath=stateFilePath,
-                                                        fileType=stateFilePath.suffix[1:],
-                                                        selectItem=True)
+        probe = Probe(stateData.array)
+        self.probeAPI.insertItemIntoRepository(name='Restart',
+                                               probe=probe,
+                                               filePath=stateFilePath,
+                                               fileType=stateFilePath.suffix[1:],
+                                               selectItem=True)

@@ -42,7 +42,6 @@ class ImagePresenter(Observable, Observer):
         colorizerChooser.currentPlugin.strategy.addObserver(presenter)
         return presenter
 
-    # TODO do this via dependency injection
     def setArray(self, array: NumericArrayType) -> None:
         self._array.setArray(array)
 
@@ -138,12 +137,41 @@ class ImagePresenter(Observable, Observer):
         self._image = image
         self.notifyObservers()
 
+    @staticmethod
+    def _intersect(x0: float, x1: float, dx: float, n: int) -> Interval[float]:
+        eps = 1.e-6
+        delta = x1 - x0
+
+        if abs(delta) < eps * dx:
+            return Interval[float](0., 1.)
+        else:
+            alpha0 = (0 * dx - x0) / delta
+            alphaN = (n * dx - x0) / delta
+
+            if alpha0 < alphaN:
+                return Interval[float](alpha0, alphaN)
+            else:
+                return Interval[float](alphaN, alpha0)
+
     def getLineCut(self, start: Point2D[float], end: Point2D[float]) -> LineCut:
-        values = self._colorizer.getDataArray()
-        # FIXME find alpha values for vertical and horizontal pixel crossings
-        # FIXME clip to edges of array
-        distance # FIXME distance along line at midpoint of each alpha interval in physical units
-        value # FIXME pixel value
+        pixelGeometry = PixelGeometry()  # FIXME
+
+        # clip to edges of array
+        alphaX = self._intersect(start.x, end.x, float(pixelGeometry.widthInMeters),
+                                 self._array.shape[-1])
+        alphaY = self._intersect(start.y, end.y, float(pixelGeometry.heightInMeters),
+                                 self._array.shape[-2])
+        alpha = Interval[float](
+            lower=max(0., max(alphaX.lower, alphaY.lower)),
+            upper=min(1., min(alphaX.upper, alphaY.upper)),
+        )
+
+        values = self._colorizer.getDataArray()  # FIXME
+        # FIXME calculate alpha values for vertical and horizontal pixel crossings
+        distance = [
+            0., 1.
+        ]  # FIXME distance along line at midpoint of each alpha interval in physical units
+        value = [0., 1.]  # FIXME pixel value
         return LineCut(distance, value)
 
     def update(self, observable: Observable) -> None:

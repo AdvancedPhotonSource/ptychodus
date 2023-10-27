@@ -12,10 +12,10 @@ from ...model.object import ObjectRepositoryItemPresenter
 class ObjectTreeNode:
 
     def __init__(self, parentNode: ObjectTreeNode | None,
-                 presenter: ObjectRepositoryItemPresenter | None, objectLayer: int) -> None:
+                 presenter: ObjectRepositoryItemPresenter | None, layer: int) -> None:
         self.parentNode = parentNode
         self.presenter = presenter
-        self.objectLayer = objectLayer
+        self.layer = layer
         self.children: list[ObjectTreeNode] = list()
 
     @classmethod
@@ -28,8 +28,8 @@ class ObjectTreeNode:
 
         self.children.clear()
 
-        for objectLayer in range(self.presenter.item.getNumberOfLayers()):
-            childNode = ObjectTreeNode(self, self.presenter, objectLayer)
+        for layer in range(self.presenter.item.getObject().getNumberOfLayers()):
+            childNode = ObjectTreeNode(self, self.presenter, layer)
             self.children.append(childNode)
 
     def createChild(self, presenter: ObjectRepositoryItemPresenter) -> ObjectTreeNode:
@@ -54,45 +54,45 @@ class ObjectTreeNode:
         if self.presenter is None:
             return str()
 
-        return self.presenter.item.getDataType()
+        return str(self.presenter.item.getObject().getDataType())
 
     def getNumberOfLayers(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getNumberOfLayers()
+        return self.presenter.item.getObject().getNumberOfLayers()
 
     def getWidthInPixels(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getExtentInPixels().width
+        return self.presenter.item.getObject().getExtentInPixels().width
 
     def getHeightInPixels(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getExtentInPixels().height
+        return self.presenter.item.getObject().getExtentInPixels().height
 
     def getSizeInBytes(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getSizeInBytes()
+        return self.presenter.item.getObject().getSizeInBytes()
 
     def getArray(self) -> ObjectArrayType:
         if self.presenter is None:
             return numpy.zeros((0, 0, 0), dtype=complex)
-        elif self.objectLayer < 0:
-            return self.presenter.item.getLayersFlattened()
+        elif self.layer < 0:
+            return self.presenter.item.getObject().getLayersFlattened()
 
-        return self.presenter.item.getLayer(self.objectLayer)
+        return self.presenter.item.getObject().getLayer(self.layer)
 
     def getLayerDistanceInMeters(self) -> float:
-        if self.presenter is None or self.objectLayer < 0:
+        if self.presenter is None or self.layer < 0:
             return 0.
 
-        distanceInMeters = self.presenter.item.getLayerDistanceInMeters(self.objectLayer)
+        distanceInMeters = self.presenter.item.getObject().getLayerDistanceInMeters(self.layer)
         return float(distanceInMeters)
 
     def row(self) -> int:
@@ -201,7 +201,7 @@ class ObjectTreeModel(QAbstractItemModel):
         if index.isValid() and role == Qt.DisplayRole:
             node = index.internalPointer()
 
-            if node.objectLayer < 0:
+            if node.layer < 0:
                 if index.column() == 0:
                     value = QVariant(node.getName())
                 elif index.column() == 2:
@@ -215,7 +215,7 @@ class ObjectTreeModel(QAbstractItemModel):
                 elif index.column() == 6:
                     value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
             elif index.column() == 0:
-                value = QVariant(f'Layer {node.objectLayer}')
+                value = QVariant(f'Layer {node.layer}')
             elif index.column() == 1:
                 value = QVariant(node.getLayerDistanceInMeters())
 

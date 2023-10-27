@@ -5,7 +5,7 @@ import logging
 
 import numpy
 
-from ...api.object import ObjectArrayType
+from ...api.object import Object
 from ...api.observer import Observable, Observer
 from .repository import ObjectInitializer, ObjectRepositoryItem
 from .settings import ObjectSettings
@@ -44,15 +44,16 @@ class CompareObjectInitializer(ObjectInitializer, Observer):
     def syncToSettings(self, settings: ObjectSettings) -> None:
         pass
 
-    def __call__(self) -> ObjectArrayType:
-        array1 = self._item1.getArray()
-        array2 = self._item2.getArray()
+    def __call__(self) -> Object:
+        object1 = self._item1.getObject()
+        object2 = self._item2.getObject()
 
-        if array1.shape != array2.shape:
-            logger.warning(f'Shape mismatch: {array1.shape} vs {array2.shape}!')
-            return array1
+        if not object1.hasSameShape(object2):
+            logger.warning('Shape mismatch!')
 
-        return array1 - array2
+        difference = object2.copy()
+        difference.setArray(object1.getArray() - object2.getArray())
+        return difference
 
     def getComparableNames(self) -> Sequence[str]:
         return [name for name, item in self._repository.items() \

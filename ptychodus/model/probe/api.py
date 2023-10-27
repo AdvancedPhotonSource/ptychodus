@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Optional
 import logging
 
-from ...api.probe import ProbeArrayType
+from ...api.probe import Probe
 from .factory import ProbeRepositoryItemFactory
 from .repository import ProbeRepository
 from .selected import SelectedProbe
@@ -26,19 +26,19 @@ class ProbeAPI:
 
         return self._repository.insertItem(item)
 
-    def insertItemIntoRepositoryFromArray(self,
-                                          name: str,
-                                          array: ProbeArrayType,
-                                          *,
-                                          filePath: Optional[Path] = None,
-                                          fileType: str = '',
-                                          replaceItem: bool = False,
-                                          selectItem: bool = False) -> Optional[str]:
-        item = self._factory.createItemFromArray(name, array, filePath=filePath, fileType=fileType)
+    def insertItemIntoRepository(self,
+                                 name: str,
+                                 probe: Probe,
+                                 *,
+                                 filePath: Optional[Path] = None,
+                                 fileType: str = '',
+                                 replaceItem: bool = False,
+                                 selectItem: bool = False) -> Optional[str]:
+        item = self._factory.createItem(name, probe, filePath=filePath, fileType=fileType)
         itemName = self._repository.insertItem(item, name=name if replaceItem else None)
 
         if itemName is None:
-            logger.error(f'Failed to insert probe array \"{name}\"!')
+            logger.error(f'Failed to insert probe \"{name}\"!')
         elif selectItem:
             self._probe.selectItem(itemName)
 
@@ -48,10 +48,10 @@ class ProbeAPI:
         item = self._factory.createItemFromInitializerName(name)
         return self._repository.insertItem(item)
 
-    def getSelectedProbeArray(self) -> ProbeArrayType:
+    def getSelectedProbe(self) -> Probe:
         selectedItem = self._probe.getSelectedItem()
 
         if selectedItem is None:
             raise ValueError('No probe is selected!')
 
-        return selectedItem.getArray()
+        return selectedItem.getProbe()

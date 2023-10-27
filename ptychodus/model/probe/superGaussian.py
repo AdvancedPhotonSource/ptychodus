@@ -4,7 +4,7 @@ from typing import Final
 
 import numpy
 
-from ...api.probe import ProbeArrayType
+from ...api.probe import Probe
 from .apparatus import Apparatus
 from .repository import ProbeInitializer
 from .settings import ProbeSettings
@@ -42,7 +42,7 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
         settings.sgProbeWidthInMeters.value = self._probeWidthInMeters
         settings.sgOrderParameter.value = self._orderParameter
 
-    def __call__(self) -> ProbeArrayType:
+    def __call__(self) -> Probe:
         extent = self._sizer.getExtentInPixels()
         pixelGeometry = self._apparatus.getObjectPlanePixelGeometry()
         cellCentersX = numpy.arange(extent.width) - (extent.width - 1) / 2
@@ -58,7 +58,8 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
 
         array = numpy.exp(-numpy.log(2) * ZP) + 0j
         array /= numpy.sqrt(numpy.sum(numpy.abs(array)**2))
-        return array
+
+        return Probe(array)
 
     def getAnnularRadiusInMeters(self) -> Decimal:
         return self._annularRadiusInMeters

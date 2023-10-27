@@ -200,8 +200,8 @@ class ImageController(Observer):
         ax = self._view.lineCutDialog.axes
         ax.clear()
         ax.plot(lineCut.distance, lineCut.value, '-', linewidth=1.5)
-        ax.set_xlabel('Distance [px]') # FIXME physical distance
-        ax.set_ylabel('Value') # FIXME use name
+        ax.set_xlabel('Distance [px]')  # FIXME physical distance
+        ax.set_ylabel('Value')  # FIXME use name
         ax.grid(True)
         self._view.lineCutDialog.figureCanvas.draw()
         self._view.lineCutDialog.open()
@@ -211,6 +211,7 @@ class ImageController(Observer):
         qpixmap = QPixmap()
 
         if realImage is not None and numpy.size(realImage) > 0:
+            # FIXME verify that image invalidates when image.size == 0
             # FIXME crash when !isfinite(realImage)?
             # NOTE .copy() ensures integerImage is not a view
             integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8).copy()

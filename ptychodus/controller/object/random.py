@@ -15,7 +15,7 @@ class RandomObjectViewController(Observer):
     def __init__(self, presenter: ObjectRepositoryItemPresenter, parent: QWidget) -> None:
         super().__init__()
         self._item = presenter.item
-        self._view = RandomObjectView.createInstance()
+        self._view = RandomObjectView.createInstance()  # FIXME layer distance
         self._dialog = ObjectEditorDialog.createInstance(presenter.name, self._view, parent)
         self._initializer: RandomObjectInitializer | None = None
 

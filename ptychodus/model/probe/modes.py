@@ -7,7 +7,7 @@ import logging
 import numpy
 import scipy.linalg
 
-from ...api.probe import ProbeArrayType
+from ...api.probe import Probe, ProbeArrayType
 
 logger = logging.getLogger(__name__)
 
@@ -85,12 +85,12 @@ class MultimodalProbeFactory:
 
         return adjustedProbe
 
-    def build(self, initialProbe: ProbeArrayType, numberOfModes: int,
-              orthogonalizeModesEnabled: bool, modeDecayType: ProbeModeDecayType,
-              modeDecayRatio: Decimal) -> ProbeArrayType:
-        probe = self._initializeModes(initialProbe, numberOfModes)
+    def build(self, initialProbe: Probe, numberOfModes: int, orthogonalizeModesEnabled: bool,
+              modeDecayType: ProbeModeDecayType, modeDecayRatio: Decimal) -> Probe:
+        array = self._initializeModes(initialProbe.getArray(), numberOfModes)
 
         if orthogonalizeModesEnabled:
-            probe = self._orthogonalizeModes(probe)
+            array = self._orthogonalizeModes(array)
 
-        return self._adjustRelativePower(probe, numberOfModes, modeDecayType, modeDecayRatio)
+        array = self._adjustRelativePower(array, numberOfModes, modeDecayType, modeDecayRatio)
+        return Probe(array)

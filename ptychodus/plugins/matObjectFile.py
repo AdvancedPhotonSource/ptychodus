@@ -2,27 +2,31 @@ from pathlib import Path
 
 import scipy.io
 
-from ptychodus.api.object import ObjectArrayType, ObjectFileReader, ObjectFileWriter
+from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.plugins import PluginRegistry
 
 
 class MATObjectFileReader(ObjectFileReader):
 
-    def read(self, filePath: Path) -> ObjectArrayType:
+    def read(self, filePath: Path) -> Object:
         matDict = scipy.io.loadmat(filePath)
-        object_ = matDict['object']
+        array = matDict['object']
 
-        if object_.ndim == 3:
-            # object_[width, height, num_layers]
-            object_ = object_.transpose(2, 0, 1)
+        if array.ndim == 3:
+            # array[width, height, num_layers]
+            array = array.transpose(2, 0, 1)
 
+        object_ = Object(array)
+        # FIXME layer distance from p.z_distance
         return object_
 
 
 class MATObjectFileWriter(ObjectFileWriter):
 
-    def write(self, filePath: Path, array: ObjectArrayType) -> None:
+    def write(self, filePath: Path, object_: Object) -> None:
+        array = object_.getArray()
         matDict = {'object': array.transpose(1, 2, 0)}
+        # FIXME layer distance from p.z_distance
         scipy.io.savemat(filePath, matDict)
 
 

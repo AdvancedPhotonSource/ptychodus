@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Final
 import logging
 
-from ...api.object import ObjectArrayType, ObjectFileReader
+from ...api.object import Object, ObjectFileReader
 from .repository import ObjectInitializer
 from .settings import ObjectSettings
 
@@ -35,7 +35,7 @@ class FromFileObjectInitializer(ObjectInitializer):
         settings.inputFileType.value = self._fileType
         settings.inputFilePath.value = self._filePath
 
-    def __call__(self) -> ObjectArrayType:
+    def __call__(self) -> Object:
         logger.debug(f'Reading \"{self._filePath}\" as \"{self._fileType}\"')
 
         try:

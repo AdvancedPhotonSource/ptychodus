@@ -4,7 +4,7 @@ from typing import Final
 
 import numpy
 
-from ...api.probe import ProbeArrayType
+from ...api.probe import Probe
 from .apparatus import Apparatus
 from .repository import ProbeInitializer
 from .settings import ProbeSettings
@@ -37,7 +37,7 @@ class DiskProbeInitializer(ProbeInitializer):
     def syncToSettings(self, settings: ProbeSettings) -> None:
         settings.diskDiameterInMeters.value = self._diameterInMeters
 
-    def __call__(self) -> ProbeArrayType:
+    def __call__(self) -> Probe:
         extent = self._sizer.getExtentInPixels()
         pixelGeometry = self._apparatus.getObjectPlanePixelGeometry()
         cellCentersX = numpy.arange(extent.width) - (extent.width - 1) / 2
@@ -47,16 +47,17 @@ class DiskProbeInitializer(ProbeInitializer):
         if self._isTestPattern:
             Rmax_px = min(extent.width, extent.height) / 2
             R_px = numpy.hypot(X_px, Y_px)
-            return numpy.where(R_px < Rmax_px, X_px + 1j * Y_px, 0j)
+            array = numpy.where(R_px < Rmax_px, X_px + 1j * Y_px, 0j)
+        else:
+            Rmax_m = self._diameterInMeters / 2
+            X_m = X_px * float(pixelGeometry.widthInMeters)
+            Y_m = Y_px * float(pixelGeometry.heightInMeters)
+            R_m = numpy.hypot(X_m, Y_m)
 
-        Rmax_m = self._diameterInMeters / 2
-        X_m = X_px * float(pixelGeometry.widthInMeters)
-        Y_m = Y_px * float(pixelGeometry.heightInMeters)
-        R_m = numpy.hypot(X_m, Y_m)
+            array = numpy.where(R_m < Rmax_m, 1 + 0j, 0j)
+            array /= numpy.sqrt(numpy.sum(numpy.abs(array)**2))
 
-        array = numpy.where(R_m < Rmax_m, 1 + 0j, 0j)
-        array /= numpy.sqrt(numpy.sum(numpy.abs(array)**2))
-        return array
+        return Probe(array)
 
     def getDiameterInMeters(self) -> Decimal:
         return self._diameterInMeters

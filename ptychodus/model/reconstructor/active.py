@@ -5,9 +5,11 @@ import time
 
 import numpy
 
+from ...api.object import Object
 from ...api.observer import Observable, Observer
 from ...api.plot import Plot2D
 from ...api.plugins import PluginChooser
+from ...api.probe import Probe
 from ...api.reconstructor import (ReconstructInput, ReconstructOutput, Reconstructor,
                                   ReconstructorLibrary, TrainableReconstructor)
 from ...api.scan import TabularScan
@@ -75,7 +77,7 @@ class ActiveReconstructor(Observable, Observer):
         return ReconstructInput(
             diffractionPatternArray=diffractionPatternArray,
             scan=TabularScan(pointMap),
-            probeArray=self._probeAPI.getSelectedProbeArray(),
+            probeArray=self._probeAPI.getSelectedProbe().getArray(),
             # TODO vvv generalize when able vvv
             objectInterpolator=self._objectAPI.getSelectedThinObjectInterpolator(),
         )
@@ -97,14 +99,14 @@ class ActiveReconstructor(Observable, Observer):
             self._scanAPI.insertItemIntoRepositoryFromScan(name, result.scan, selectItem=True)
 
         if result.probeArray is not None:
-            self._probeAPI.insertItemIntoRepositoryFromArray(name,
-                                                             result.probeArray,
-                                                             selectItem=True)
+            self._probeAPI.insertItemIntoRepository(name,
+                                                    Probe(result.probeArray),
+                                                    selectItem=True)
 
         if result.objectArray is not None:
-            self._objectAPI.insertItemIntoRepositoryFromArray(name,
-                                                              result.objectArray,
-                                                              selectItem=True)
+            self._objectAPI.insertItemIntoRepository(name,
+                                                     Object(result.objectArray),
+                                                     selectItem=True)
 
         return result
 

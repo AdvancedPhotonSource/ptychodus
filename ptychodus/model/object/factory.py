@@ -5,7 +5,7 @@ import logging
 
 import numpy
 
-from ...api.object import ObjectArrayType, ObjectFileReader
+from ...api.object import Object, ObjectFileReader
 from ...api.plugins import PluginChooser
 from .compare import CompareObjectInitializer
 from .file import FromFileObjectInitializer
@@ -76,13 +76,14 @@ class ObjectRepositoryItemFactory:
 
         return item
 
-    def createItemFromArray(self,
-                            nameHint: str,
-                            array: ObjectArrayType,
-                            *,
-                            filePath: Optional[Path] = None,
-                            fileType: str = '') -> ObjectRepositoryItem:
-        item = ObjectRepositoryItem(nameHint, array)
+    def createItem(self,
+                   nameHint: str,
+                   object_: Object,
+                   *,
+                   filePath: Optional[Path] = None,
+                   fileType: str = '') -> ObjectRepositoryItem:
+        item = ObjectRepositoryItem(nameHint)
+        item.setObject(object_)
 
         if filePath is not None:
             if filePath.is_file():

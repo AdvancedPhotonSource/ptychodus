@@ -13,10 +13,89 @@ from .geometry import Point2D
 from .image import ImageExtent
 from .scan import ScanPoint
 
-ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
-
 # object point coordinates are conventionally in pixel units
 ObjectPoint: TypeAlias = Point2D[float]
+ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+
+
+class Object:
+
+    def __init__(self, array: ObjectArrayType | None = None) -> None:
+        self._array = numpy.zeros((1, 0, 0), dtype=complex)
+        self._layerDistanceInMeters = [numpy.inf]
+        self._centerXInMeters = 0.
+        self._centerYInMeters = 0.
+
+        if array is not None:
+            self.setArray(array)
+
+    def copy(self) -> Object:
+        clone = Object()
+        clone._array = self._array.copy()
+        clone._layerDistanceInMeters = self._layerDistanceInMeters.copy()
+        clone._centerXInMeters = float(self._centerXInMeters)
+        clone._centerYInMeters = float(self._centerYInMeters)
+        return clone
+
+    def getArray(self) -> ObjectArrayType:
+        return self._array
+
+    def setArray(self, array: ObjectArrayType) -> None:
+        if not numpy.iscomplexobj(array):
+            raise TypeError('Object must be a complex-valued ndarray')
+
+        if array.ndim == 2:
+            self._array = array[numpy.newaxis, :, :]
+        elif array.ndim == 3:
+            self._array = array
+        else:
+            raise ValueError('Object must be 2- or 3-dimensional ndarray.')
+
+        numberOfAddedLayers = self._array.shape[-3] - len(self._layerDistanceInMeters)
+
+        if numberOfAddedLayers > 0:
+            self._layerDistanceInMeters[-1] = 0.
+            self._layerDistanceInMeters.extend([0.] * numberOfAddedLayers)
+            self._layerDistanceInMeters[-1] = numpy.inf
+
+    def getDataType(self) -> numpy.dtype:
+        return self._array.dtype
+
+    def getExtentInPixels(self) -> ImageExtent:
+        return ImageExtent(width=self._array.shape[-1], height=self._array.shape[-2])
+
+    def getSizeInBytes(self) -> int:
+        return self._array.nbytes
+
+    def getNumberOfLayers(self) -> int:
+        return self._array.shape[-3]
+
+    def getLayer(self, number: int) -> ObjectArrayType:
+        return self._array[number, :, :]
+
+    def getLayersFlattened(self) -> ObjectArrayType:
+        return numpy.prod(self._array, axis=-3)
+
+    def getLayerDistancesInMeters(self) -> Sequence[float]:
+        return self._layerDistanceInMeters
+
+    def getLayerDistanceInMeters(self, number: int) -> float:
+        return self._layerDistanceInMeters[number]
+
+    def setLayerDistanceInMeters(self, layer: int, distance: float) -> None:
+        if 0 <= layer and layer < self.getNumberOfLayers() - 1:
+            self._layerDistanceInMeters[layer] = distance
+
+    def getCenter(self) -> ScanPoint:
+        return ScanPoint(self._centerXInMeters, self._centerYInMeters)
+
+    def setCenter(self, center: ScanPoint) -> None:
+        self._centerXInMeters = center.x
+        self._centerYInMeters = center.y
+
+    def hasSameShape(self, other: Object) -> bool:
+        return (self._array.shape == other._array.shape
+                and self._layerDistanceInMeters == other._layerDistanceInMeters)
 
 
 @dataclass(frozen=True)
@@ -159,7 +238,7 @@ class ObjectPhaseCenteringStrategy(ABC):
 class ObjectFileReader(ABC):
 
     @abstractmethod
-    def read(self, filePath: Path) -> ObjectArrayType:
+    def read(self, filePath: Path) -> Object:
         '''reads an object from file'''
         pass
 
@@ -167,6 +246,6 @@ class ObjectFileReader(ABC):
 class ObjectFileWriter(ABC):
 
     @abstractmethod
-    def write(self, filePath: Path, array: ObjectArrayType) -> None:
+    def write(self, filePath: Path, object_: Object) -> None:
         '''writes an object to file'''
         pass

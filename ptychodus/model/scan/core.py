@@ -185,9 +185,9 @@ class ScanCore(StatefulCore[ScanStateData]):
                 positionYInMeters.append(point.y)
 
         return ScanStateData(
-            indexes=numpy.array(indexes),
-            positionXInMeters=numpy.array(positionXInMeters),
-            positionYInMeters=numpy.array(positionYInMeters),
+            indexes=indexes,
+            positionXInMeters=positionXInMeters,
+            positionYInMeters=positionYInMeters,
         )
 
     def setStateData(self, stateData: ScanStateData, stateFilePath: Path) -> None:

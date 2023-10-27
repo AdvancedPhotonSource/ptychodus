@@ -18,7 +18,7 @@ class VisualizationArray(Observable):
 
     def __init__(self) -> None:
         super().__init__()
-        self._array: NumericArrayType = numpy.zeros((1, 1))
+        self._array: NumericArrayType = numpy.zeros((0, 0))
 
     def getRealPart(self) -> RealArrayType:
         return numpy.real(self._array).astype(numpy.float_)
@@ -43,16 +43,9 @@ class VisualizationArray(Observable):
         return self._array.shape
 
     def clearArray(self) -> None:
-        self._array = numpy.zeros((1, 1))  # FIXME invalidate
+        self._array = numpy.zeros((0, 0))
+        self.notifyObservers()
 
     def setArray(self, array: NumericArrayType) -> None:
-        if array is None:
-            logger.error('Refusing to assign null array!')
-            self.clearArray()
-        elif numpy.size(array) < 1:
-            logger.error('Refusing to assign empty array!')
-            self.clearArray()
-        else:
-            self._array = array
-
+        self._array = array
         self.notifyObservers()
