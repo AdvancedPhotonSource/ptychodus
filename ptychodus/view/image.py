@@ -289,6 +289,14 @@ class ImageItem(QGraphicsPixmapItem):
         if app:
             app.changeOverrideCursor(cursor)  # type: ignore
 
+    @staticmethod
+    def _createPen(color: Qt.GlobalColor) -> QPen:
+        pen = QPen(color)
+        pen.setCapStyle(Qt.FlatCap)
+        pen.setJoinStyle(Qt.MiterJoin)
+        pen.setCosmetic(True)  # FIXME
+        return pen
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self._mouseTool == ImageMouseTool.MOVE_TOOL:
             self._changeOverrideCursor(Qt.ClosedHandCursor)
@@ -296,20 +304,20 @@ class ImageItem(QGraphicsPixmapItem):
             line = QLineF(event.pos(), event.pos())
             self.prepareGeometryChange()
             self._lineItem.setLine(line)
-            self._lineItem.setPen(QPen(Qt.cyan))
+            self._lineItem.setPen(self._createPen(Qt.cyan))
             self._lineItem.show()
         elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
             self._rectangleOrigin = event.pos()
             rect = QRectF(self._rectangleOrigin, QSizeF())
             self.prepareGeometryChange()
             self._rectangleItem.setRect(rect)
-            self._rectangleItem.setPen(QPen(Qt.cyan))
+            self._rectangleItem.setPen(self._createPen(Qt.cyan))
             self._rectangleItem.show()
         elif self._mouseTool == ImageMouseTool.LINE_CUT_TOOL:
             line = QLineF(event.pos(), event.pos())
             self.prepareGeometryChange()
             self._lineItem.setLine(line)
-            self._lineItem.setPen(QPen(Qt.magenta))
+            self._lineItem.setPen(self._createPen(Qt.magenta))
             self._lineItem.show()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:

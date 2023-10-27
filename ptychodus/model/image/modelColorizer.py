@@ -88,9 +88,12 @@ class CylindricalColorModelColorizer(Colorizer):
         self._variantChooser.addObserver(self)
 
     @classmethod
-    def createColorizerVariants(
-            cls, array: VisualizationArray, displayRange: DisplayRange,
-            transformChooser: PluginChooser[ScalarTransformation]) -> Sequence[Colorizer]:
+    def createColorizerVariants(cls, array: VisualizationArray, displayRange: DisplayRange,
+                                transformChooser: PluginChooser[ScalarTransformation], *,
+                                isComplex: bool) -> Sequence[Colorizer]:
+        if not isComplex:
+            return []
+
         variantChooser = PluginChooser[CylindricalColorModel]()
         variantChooser.registerPlugin(
             HSVSaturationColorModel(),

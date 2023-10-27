@@ -82,6 +82,9 @@ class PluginChooser(Generic[T], Observable):
 
         raise KeyError(f'Invalid plugin name \"{name}\"')
 
+    def __bool__(self) -> bool:
+        return bool(self._entryList)
+
     def copy(self) -> PluginChooser[T]:
         clone = PluginChooser[T]()
         clone._entryList = self._entryList.copy()

@@ -28,9 +28,9 @@ class MappedColorizer(Colorizer):
         self._isCyclic = isCyclic
 
     @classmethod
-    def createColorizerVariants(
-            cls, array: VisualizationArray, displayRange: DisplayRange,
-            transformChooser: PluginChooser[ScalarTransformation]) -> Sequence[Colorizer]:
+    def createColorizerVariants(cls, array: VisualizationArray, displayRange: DisplayRange,
+                                transformChooser: PluginChooser[ScalarTransformation], *,
+                                isComplex: bool) -> Sequence[Colorizer]:
         # See https://matplotlib.org/stable/gallery/color/colormap_reference.html
         cyclicColormapNames = ['hsv', 'twilight', 'twilight_shifted']
 
@@ -44,7 +44,7 @@ class MappedColorizer(Colorizer):
                 acyclicColormapChooser.registerPlugin(cmap, simpleName=name)
 
         cyclicColormapChooser.setCurrentPluginByName('hsv')
-        acyclicColormapChooser.setCurrentPluginByName('viridis')
+        acyclicColormapChooser.setCurrentPluginByName('gray')
 
         intensity = cls(array,
                         displayRange,
@@ -53,43 +53,47 @@ class MappedColorizer(Colorizer):
                         array.getIntensity,
                         acyclicColormapChooser,
                         isCyclic=False)
-        amplitude = cls(array,
+        variants: list[Colorizer] = [intensity]
+
+        if isComplex:
+            amplitude = cls(array,
+                            displayRange,
+                            transformChooser,
+                            'Amplitude',
+                            array.getAmplitude,
+                            acyclicColormapChooser,
+                            isCyclic=False)
+            phase = cls(array,
                         displayRange,
                         transformChooser,
-                        'Amplitude',
-                        array.getAmplitude,
-                        acyclicColormapChooser,
-                        isCyclic=False)
-        phase = cls(array,
-                    displayRange,
-                    transformChooser,
-                    'Phase',
-                    array.getPhaseInRadians,
-                    cyclicColormapChooser,
-                    isCyclic=True)
-        phaseUnwrapped = cls(array,
-                             displayRange,
-                             transformChooser,
-                             'Phase (Unwrapped)',
-                             array.getPhaseUnwrappedInRadians,
-                             acyclicColormapChooser,
-                             isCyclic=False)
-        real = cls(array,
-                   displayRange,
-                   transformChooser,
-                   'Real',
-                   array.getRealPart,
-                   acyclicColormapChooser,
-                   isCyclic=False)
-        imag = cls(array,
-                   displayRange,
-                   transformChooser,
-                   'Imaginary',
-                   array.getImaginaryPart,
-                   acyclicColormapChooser,
-                   isCyclic=False)
+                        'Phase',
+                        array.getPhaseInRadians,
+                        cyclicColormapChooser,
+                        isCyclic=True)
+            phaseUnwrapped = cls(array,
+                                 displayRange,
+                                 transformChooser,
+                                 'Phase (Unwrapped)',
+                                 array.getPhaseUnwrappedInRadians,
+                                 acyclicColormapChooser,
+                                 isCyclic=False)
+            real = cls(array,
+                       displayRange,
+                       transformChooser,
+                       'Real',
+                       array.getRealPart,
+                       acyclicColormapChooser,
+                       isCyclic=False)
+            imag = cls(array,
+                       displayRange,
+                       transformChooser,
+                       'Imaginary',
+                       array.getImaginaryPart,
+                       acyclicColormapChooser,
+                       isCyclic=False)
+            variants.extend([amplitude, phase, phaseUnwrapped, real, imag])
 
-        return [intensity, amplitude, phase, phaseUnwrapped, real, imag]
+        return variants
 
     @property
     def name(self) -> str:

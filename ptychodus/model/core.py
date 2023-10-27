@@ -83,7 +83,8 @@ class ModelCore:
         self._detector = Detector.createInstance(self._detectorSettings)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings,
                                                                   self._detector)
-        self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations)
+        self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations,
+                                            isComplex=False)
 
         self._dataCore = DataCore(self.settingsRegistry, self._detector,
                                   self._pluginRegistry.diffractionFileReaders)
@@ -94,13 +95,15 @@ class ModelCore:
                                     self._dataCore.patternSizer,
                                     self._pluginRegistry.probeFileReaders,
                                     self._pluginRegistry.probeFileWriters)
-        self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy())
+        self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
+                                         isComplex=True)
         self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
                                       self._scanCore.sizer, self._probeCore.sizer,
                                       self._pluginRegistry.objectPhaseCenteringStrategies,
                                       self._pluginRegistry.objectFileReaders,
                                       self._pluginRegistry.objectFileWriters)
-        self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy())
+        self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
+                                          isComplex=True)
         self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.dataset,
                                                                   self._detectorSettings,
                                                                   self._dataCore.patternSettings,

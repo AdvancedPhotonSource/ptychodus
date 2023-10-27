@@ -14,7 +14,10 @@ ProbeArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]
 class Probe:
 
     def __init__(self, array: ProbeArrayType | None = None) -> None:
-        self._array = numpy.zeros((1, 0, 0), dtype=complex) if array is None else array
+        self._array = numpy.zeros((1, 0, 0), dtype=complex)
+
+        if array is not None:
+            self.setArray(array)
 
     def copy(self) -> Probe:
         clone = Probe()
@@ -51,7 +54,10 @@ class Probe:
         return self._array[number, :, :]
 
     def getModesFlattened(self) -> ProbeArrayType:
-        return self._array.transpose((1, 0, 2)).reshape(self._array.shape[-2], -1)
+        if self._array.size > 0:
+            return self._array.transpose((1, 0, 2)).reshape(self._array.shape[-2], -1)
+        else:
+            return self._array
 
     def getModeRelativePower(self, number: int) -> float:
         probe = self._array

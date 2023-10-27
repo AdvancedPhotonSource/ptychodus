@@ -183,17 +183,19 @@ class ImagePresenter(Observable, Observer):
 
 class ImageCore:
 
-    def __init__(self, transformChooser: PluginChooser[ScalarTransformation]) -> None:
+    def __init__(self, transformChooser: PluginChooser[ScalarTransformation], *,
+                 isComplex: bool) -> None:
         self._array = VisualizationArray()
         self._displayRange = DisplayRange()
         self._colorizerChooser = PluginChooser[Colorizer]()
 
         cargs = (self._array, self._displayRange, transformChooser)
 
-        for colorizer in CylindricalColorModelColorizer.createColorizerVariants(*cargs):
+        for colorizer in CylindricalColorModelColorizer.createColorizerVariants(
+                *cargs, isComplex=isComplex):
             self._colorizerChooser.registerPlugin(colorizer, simpleName=colorizer.name)
 
-        for colorizer in MappedColorizer.createColorizerVariants(*cargs):
+        for colorizer in MappedColorizer.createColorizerVariants(*cargs, isComplex=isComplex):
             self._colorizerChooser.registerPlugin(colorizer, simpleName=colorizer.name)
 
         self.presenter = ImagePresenter.createInstance(self._array, self._displayRange,

@@ -10,8 +10,8 @@ from ...api.observer import Observable, Observer
 from ...api.plot import Plot2D
 from ...api.plugins import PluginChooser
 from ...api.probe import Probe
-from ...api.reconstructor import (ReconstructInput, ReconstructOutput, Reconstructor,
-                                  ReconstructorLibrary, TrainableReconstructor)
+from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,
+                                  Reconstructor, ReconstructorLibrary, TrainableReconstructor)
 from ...api.scan import TabularScan
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
@@ -26,7 +26,8 @@ class ActiveReconstructor(Observable, Observer):
 
     def __init__(self, settings: ReconstructorSettings,
                  diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                 probeAPI: ProbeAPI, objectAPI: ObjectAPI, reinitObservable: Observable) -> None:
+                 probeAPI: ProbeAPI, objectAPI: ObjectAPI, reinitObservable: Observable,
+                 pluginChooser: PluginChooser[Reconstructor]) -> None:
         super().__init__()
         self._settings = settings
         self._diffractionDataset = diffractionDataset
@@ -34,7 +35,7 @@ class ActiveReconstructor(Observable, Observer):
         self._probeAPI = probeAPI
         self._objectAPI = objectAPI
         self._reinitObservable = reinitObservable
-        self._pluginChooser = PluginChooser[Reconstructor]()
+        self._pluginChooser = pluginChooser
 
     @classmethod
     def createInstance(cls, settings: ReconstructorSettings,
@@ -42,16 +43,20 @@ class ActiveReconstructor(Observable, Observer):
                        probeAPI: ProbeAPI, objectAPI: ObjectAPI,
                        libraries: Iterable[ReconstructorLibrary],
                        reinitObservable: Observable) -> ActiveReconstructor:
-        activeReconstructor = cls(settings, diffractionDataset, scanAPI, probeAPI, objectAPI,
-                                  reinitObservable)
+        pluginChooser = PluginChooser[Reconstructor]()
 
         for library in libraries:
             for reconstructor in library:
-                activeReconstructor._pluginChooser.registerPlugin(
+                pluginChooser.registerPlugin(
                     reconstructor,
                     simpleName=f'{library.name}/{reconstructor.name}',
                 )
 
+        if not pluginChooser:
+            pluginChooser.registerPlugin(NullReconstructor('None'), simpleName='None/None')
+
+        activeReconstructor = cls(settings, diffractionDataset, scanAPI, probeAPI, objectAPI,
+                                  reinitObservable, pluginChooser)
         reinitObservable.addObserver(activeReconstructor)
         activeReconstructor._syncFromSettings()
         return activeReconstructor
