@@ -1,4 +1,5 @@
 from __future__ import annotations
+from decimal import Decimal
 from typing import Callable, Final
 import logging
 
@@ -44,8 +45,10 @@ class ObjectParametersController(Observer):
 
     def _syncModelToView(self) -> None:
         pixelGeometry = self._presenter.getObjectPlanePixelGeometry()
-        self._view.pixelSizeXWidget.setLengthInMeters(pixelGeometry.widthInMeters)
-        self._view.pixelSizeYWidget.setLengthInMeters(pixelGeometry.heightInMeters)
+        self._view.pixelSizeXWidget.setLengthInMeters(
+            Decimal.from_float(pixelGeometry.widthInMeters))
+        self._view.pixelSizeYWidget.setLengthInMeters(
+            Decimal.from_float(pixelGeometry.heightInMeters))
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

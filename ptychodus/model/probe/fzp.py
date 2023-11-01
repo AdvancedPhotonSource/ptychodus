@@ -24,9 +24,8 @@ def gaussian_spectrum(lambda0: float, bandwidth: float, energy: int) -> numpy.ty
     return spectrum
 
 
-def fzp_calculate(
-        wavelength: Decimal, dis_defocus: Decimal, probeSize: int, dx: Decimal,
-        zonePlate: FresnelZonePlate) -> tuple[numpy.typing.NDArray[Any], Decimal, Decimal]:
+def fzp_calculate(wavelength: float, dis_defocus: float, probeSize: int, dx: float,
+                  zonePlate: FresnelZonePlate) -> tuple[numpy.typing.NDArray[Any], float, float]:
     """
     this function can calculate the transfer function of zone plate
     return the transfer function, and the pixel sizes
@@ -103,32 +102,35 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         self._sizer = sizer
         self._apparatus = apparatus
         self._fzpDict: Mapping[str, FresnelZonePlate] = {
-            'Velociprobe': FresnelZonePlate(Decimal('180e-6'), Decimal('50e-9'), Decimal('60e-6')),
-            '2-ID-D': FresnelZonePlate(Decimal('160e-6'), Decimal('70e-9'), Decimal('60e-6')),
-            'LYNX': FresnelZonePlate(Decimal('114.8e-6'), Decimal('60e-9'), Decimal('40e-6')),
-            'HXN': FresnelZonePlate(Decimal('160e-6'), Decimal('30e-9'), Decimal('80e-6')),
+            'Velociprobe': FresnelZonePlate(180e-6, 50e-9, 60e-6),
+            '2-ID-D': FresnelZonePlate(160e-6, 70e-9, 60e-6),
+            'LYNX': FresnelZonePlate(114.8e-6, 60e-9, 40e-6),
+            'HXN': FresnelZonePlate(160e-6, 30e-9, 80e-6),
         }
         self._presets = self.CUSTOM_PRESET
-        self._custom = FresnelZonePlate(Decimal('90e-6'), Decimal('50e-9'), Decimal('60e-6'))
-        self._defocusDistanceInMeters = Decimal('800e-6')  # from sample to the focal plane
+        self._custom = FresnelZonePlate(180e-6, 50e-9, 60e-6)
+        self._defocusDistanceInMeters = 800e-6  # from sample to the focal plane
 
     def syncFromSettings(self, settings: ProbeSettings) -> None:
         self._presets = settings.zonePlate.value
         self._custom = FresnelZonePlate(
-            zonePlateDiameterInMeters=settings.zonePlateDiameterInMeters.value,
-            outermostZoneWidthInMeters=settings.outermostZoneWidthInMeters.value,
-            centralBeamstopDiameterInMeters=settings.centralBeamstopDiameterInMeters.value,
+            zonePlateDiameterInMeters=float(settings.zonePlateDiameterInMeters.value),
+            outermostZoneWidthInMeters=float(settings.outermostZoneWidthInMeters.value),
+            centralBeamstopDiameterInMeters=float(settings.centralBeamstopDiameterInMeters.value),
         )
-        self._defocusDistanceInMeters = settings.defocusDistanceInMeters.value
+        self._defocusDistanceInMeters = float(settings.defocusDistanceInMeters.value)
         super().syncFromSettings(settings)
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
         settings.zonePlate.value = self._presets
-        settings.zonePlateDiameterInMeters.value = self._custom.zonePlateDiameterInMeters
-        settings.outermostZoneWidthInMeters.value = self._custom.outermostZoneWidthInMeters
+        settings.zonePlateDiameterInMeters.value = \
+                Decimal.from_float(self._custom.zonePlateDiameterInMeters)
+        settings.outermostZoneWidthInMeters.value = \
+                Decimal.from_float(self._custom.outermostZoneWidthInMeters)
         settings.centralBeamstopDiameterInMeters.value = \
-                self._custom.centralBeamstopDiameterInMeters
-        settings.defocusDistanceInMeters.value = self._defocusDistanceInMeters
+                Decimal.from_float(self._custom.centralBeamstopDiameterInMeters)
+        settings.defocusDistanceInMeters.value = \
+                Decimal.from_float(self._defocusDistanceInMeters)
         super().syncToSettings(settings)
 
     @property
@@ -183,43 +185,43 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
     def setZonePlateDiameterInMeters(self, value: Decimal) -> None:
         if self._custom.zonePlateDiameterInMeters != value:
             self._custom = FresnelZonePlate(
-                zonePlateDiameterInMeters=value,
+                zonePlateDiameterInMeters=float(value),
                 outermostZoneWidthInMeters=self._custom.outermostZoneWidthInMeters,
                 centralBeamstopDiameterInMeters=self._custom.centralBeamstopDiameterInMeters,
             )
             self.notifyObservers()
 
     def getZonePlateDiameterInMeters(self) -> Decimal:
-        return self._fzp.zonePlateDiameterInMeters
+        return Decimal.from_float(self._fzp.zonePlateDiameterInMeters)
 
     def setOutermostZoneWidthInMeters(self, value: Decimal) -> None:
         if self._custom.outermostZoneWidthInMeters != value:
             self._custom = FresnelZonePlate(
                 zonePlateDiameterInMeters=self._custom.zonePlateDiameterInMeters,
-                outermostZoneWidthInMeters=value,
+                outermostZoneWidthInMeters=float(value),
                 centralBeamstopDiameterInMeters=self._custom.centralBeamstopDiameterInMeters,
             )
             self.notifyObservers()
 
     def getOutermostZoneWidthInMeters(self) -> Decimal:
-        return self._fzp.outermostZoneWidthInMeters
+        return Decimal.from_float(self._fzp.outermostZoneWidthInMeters)
 
     def setCentralBeamstopDiameterInMeters(self, value: Decimal) -> None:
         if self._custom.centralBeamstopDiameterInMeters != value:
             self._custom = FresnelZonePlate(
                 zonePlateDiameterInMeters=self._custom.zonePlateDiameterInMeters,
                 outermostZoneWidthInMeters=self._custom.outermostZoneWidthInMeters,
-                centralBeamstopDiameterInMeters=value,
+                centralBeamstopDiameterInMeters=float(value),
             )
             self.notifyObservers()
 
     def getCentralBeamstopDiameterInMeters(self) -> Decimal:
-        return self._fzp.centralBeamstopDiameterInMeters
+        return Decimal.from_float(self._fzp.centralBeamstopDiameterInMeters)
 
     def setDefocusDistanceInMeters(self, value: Decimal) -> None:
         if self._defocusDistanceInMeters != value:
-            self._defocusDistanceInMeters = value
+            self._defocusDistanceInMeters = float(value)
             self.notifyObservers()
 
     def getDefocusDistanceInMeters(self) -> Decimal:
-        return self._defocusDistanceInMeters
+        return Decimal.from_float(self._defocusDistanceInMeters)

@@ -71,6 +71,7 @@ class DetectorController(Observer):
         view.dataView.buttonBox.inspectButton.clicked.connect(
             controller._inspectDatasetController.inspectDataset)
         view.dataView.buttonBox.closeButton.clicked.connect(controller._closeDataset)
+        view.dataView.buttonBox.closeButton.setEnabled(False)  # TODO
         datasetPresenter.addObserver(controller)
 
         controller._syncModelToView()
@@ -105,7 +106,7 @@ class DetectorController(Observer):
         if button != QMessageBox.Yes:
             return
 
-        logger.error('Close not implemented!')  # FIXME
+        logger.error('Close not implemented!')  # TODO
 
     def _syncModelToView(self) -> None:
         rootNode = DatasetTreeNode.createRoot()

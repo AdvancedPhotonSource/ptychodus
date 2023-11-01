@@ -4,6 +4,12 @@ from collections.abc import Sequence
 
 
 @dataclass(frozen=True)
+class LineCut:
+    distance: Sequence[float]
+    value: Sequence[float]
+
+
+@dataclass(frozen=True)
 class PlotSeries:
     label: str
     values: Sequence[float]

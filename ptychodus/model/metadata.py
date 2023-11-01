@@ -1,4 +1,5 @@
 from __future__ import annotations
+from decimal import Decimal
 
 from ..api.data import DiffractionDataset, DiffractionMetadata
 from ..api.observer import Observable, Observer
@@ -50,9 +51,9 @@ class MetadataPresenter(Observable, Observer):
     def syncDetectorPixelSize(self) -> None:
         if self._metadata.detectorPixelGeometry:
             self._detectorSettings.pixelSizeXInMeters.value = \
-                self._metadata.detectorPixelGeometry.widthInMeters
+                Decimal.from_float(self._metadata.detectorPixelGeometry.widthInMeters)
             self._detectorSettings.pixelSizeYInMeters.value = \
-                self._metadata.detectorPixelGeometry.heightInMeters
+                Decimal.from_float(self._metadata.detectorPixelGeometry.heightInMeters)
 
     def canSyncDetectorBitDepth(self) -> bool:
         return (self._metadata.detectorBitDepth is not None)
@@ -67,7 +68,7 @@ class MetadataPresenter(Observable, Observer):
     def syncDetectorDistance(self) -> None:
         if self._metadata.detectorDistanceInMeters:
             self._detectorSettings.detectorDistanceInMeters.value = \
-                self._metadata.detectorDistanceInMeters
+                Decimal.from_float(self._metadata.detectorDistanceInMeters)
 
     def canSyncPatternCropCenter(self) -> bool:
         return (self._metadata.cropCenterInPixels is not None \
@@ -113,7 +114,7 @@ class MetadataPresenter(Observable, Observer):
     def syncProbeEnergy(self) -> None:  # TODO to apparatusAPI or probeAPI
         if self._metadata.probeEnergyInElectronVolts:
             self._probeSettings.probeEnergyInElectronVolts.value = \
-                    self._metadata.probeEnergyInElectronVolts
+                    Decimal.from_float(self._metadata.probeEnergyInElectronVolts)
 
     def loadScanFile(self) -> None:  # TODO velociprobe only
         filePathMaster = self._metadata.filePath

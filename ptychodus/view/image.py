@@ -294,7 +294,7 @@ class ImageItem(QGraphicsPixmapItem):
         pen = QPen(color)
         pen.setCapStyle(Qt.FlatCap)
         pen.setJoinStyle(Qt.MiterJoin)
-        pen.setCosmetic(True)  # FIXME
+        pen.setCosmetic(True)
         return pen
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:

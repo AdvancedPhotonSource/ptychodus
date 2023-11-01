@@ -1,12 +1,13 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from dataclasses import dataclass
 from decimal import Decimal
 import logging
 
+from ...api.apparatus import PixelGeometry
 from ...api.geometry import Interval, Point2D
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
+from ...api.plot import LineCut
 from ...api.plugins import PluginChooser
 from .colorizer import Colorizer
 from .displayRange import DisplayRange
@@ -15,12 +16,6 @@ from .modelColorizer import CylindricalColorModelColorizer
 from .visarray import NumericArrayType, VisualizationArray
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class LineCut:
-    distance: Sequence[float]
-    value: Sequence[float]
 
 
 class ImagePresenter(Observable, Observer):

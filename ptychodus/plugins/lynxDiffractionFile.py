@@ -1,4 +1,3 @@
-from decimal import Decimal
 from pathlib import Path
 import logging
 
@@ -29,7 +28,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
                 try:
                     data = h5File[self._dataPath]
-                    pixelSize = Decimal(repr(data.attrs['Pixel_size'].item()))
+                    pixelSize = float(data.attrs['Pixel_size'].item())
                 except KeyError:
                     logger.debug('Unable to load data.')
                 else:

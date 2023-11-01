@@ -26,14 +26,14 @@ class Apparatus(Observable, Observer):
         probeSettings.addObserver(sizer)
         return sizer
 
-    def getProbeWavelengthInMeters(self) -> Decimal:
+    def getProbeWavelengthInMeters(self) -> float:
         # Source: https://physics.nist.gov/cuu/Constants/index.html
-        planckConstant_eV_per_Hz = Decimal('4.135667696e-15')
-        lightSpeedInMetersPerSecond = Decimal(299792458)
+        planckConstant_eV_per_Hz = 4.135667696e-15
+        lightSpeedInMetersPerSecond = 299792458
         hc_eVm = planckConstant_eV_per_Hz * lightSpeedInMetersPerSecond
-        return hc_eVm / self._probeSettings.probeEnergyInElectronVolts.value
+        return hc_eVm / float(self._probeSettings.probeEnergyInElectronVolts.value)
 
-    def getLambdaZInSquareMeters(self) -> Decimal:
+    def getLambdaZInSquareMeters(self) -> float:
         lambdaInMeters = self.getProbeWavelengthInMeters()
         zInMeters = self._detector.getDetectorDistanceInMeters()
         return lambdaInMeters * zInMeters
@@ -49,7 +49,7 @@ class Apparatus(Observable, Observer):
             heightInMeters=lambdaZInSquareMeters / extentYInMeters,
         )
 
-    def getFresnelNumber(self) -> Decimal:
+    def getFresnelNumber(self) -> float:
         extentXInMeters = self._diffractionPatternSizer.getExtentXInPixels() \
                 * self._detector.getPixelGeometry().widthInMeters
         return extentXInMeters**2 / self.getLambdaZInSquareMeters()
@@ -82,13 +82,13 @@ class ApparatusPresenter(Observable, Observer):
         return self._settings.probeEnergyInElectronVolts.value
 
     def getProbeWavelengthInMeters(self) -> Decimal:
-        return self._apparatus.getProbeWavelengthInMeters()
+        return Decimal.from_float(self._apparatus.getProbeWavelengthInMeters())
 
     def getObjectPlanePixelGeometry(self) -> PixelGeometry:
         return self._apparatus.getObjectPlanePixelGeometry()
 
     def getFresnelNumber(self) -> Decimal:
-        return self._apparatus.getFresnelNumber()
+        return Decimal.from_float(self._apparatus.getFresnelNumber())
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

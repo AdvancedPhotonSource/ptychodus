@@ -310,8 +310,8 @@ class DetectorDataView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Repository', parent)
         self.treeView = QTreeView()
-        self.buttonBox = DetectorButtonBox.createInstance()
         self.infoLabel = QLabel()
+        self.buttonBox = DetectorButtonBox.createInstance()
         self.openDatasetWizard = OpenDatasetWizard.createInstance(self)
         self.inspectDatasetDialog = InspectDatasetDialog.createInstance(self)
 
@@ -321,8 +321,8 @@ class DetectorDataView(QGroupBox):
 
         layout = QVBoxLayout()
         layout.addWidget(view.treeView)
-        layout.addWidget(view.buttonBox)
         layout.addWidget(view.infoLabel)
+        layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view

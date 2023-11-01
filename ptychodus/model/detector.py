@@ -53,15 +53,15 @@ class Detector(Observable, Observer):
 
     def getPixelGeometry(self) -> PixelGeometry:
         return PixelGeometry(
-            widthInMeters=max(Decimal(), self._settings.pixelSizeXInMeters.value),
-            heightInMeters=max(Decimal(), self._settings.pixelSizeYInMeters.value),
+            widthInMeters=max(0., float(self._settings.pixelSizeXInMeters.value)),
+            heightInMeters=max(0., float(self._settings.pixelSizeYInMeters.value)),
         )
 
     def getBitDepth(self) -> int:
         return max(1, self._settings.bitDepth.value)
 
-    def getDetectorDistanceInMeters(self) -> Decimal:
-        return max(Decimal(), self._settings.detectorDistanceInMeters.value)
+    def getDetectorDistanceInMeters(self) -> float:
+        return max(0., float(self._settings.detectorDistanceInMeters.value))
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
@@ -92,7 +92,7 @@ class DetectorPresenter(Observable, Observer):
         self._settings.numberOfPixelsX.value = value
 
     def getPixelSizeXInMeters(self) -> Decimal:
-        return self._detector.getPixelGeometry().widthInMeters
+        return Decimal.from_float(self._detector.getPixelGeometry().widthInMeters)
 
     def setPixelSizeXInMeters(self, value: Decimal) -> None:
         self._settings.pixelSizeXInMeters.value = value
@@ -107,7 +107,7 @@ class DetectorPresenter(Observable, Observer):
         self._settings.numberOfPixelsY.value = value
 
     def getPixelSizeYInMeters(self) -> Decimal:
-        return self._detector.getPixelGeometry().heightInMeters
+        return Decimal.from_float(self._detector.getPixelGeometry().heightInMeters)
 
     def setPixelSizeYInMeters(self, value: Decimal) -> None:
         self._settings.pixelSizeYInMeters.value = value
@@ -123,7 +123,7 @@ class DetectorPresenter(Observable, Observer):
         self._settings.bitDepth.value = value
 
     def getDetectorDistanceInMeters(self) -> Decimal:
-        return self._detector.getDetectorDistanceInMeters()
+        return Decimal.from_float(self._detector.getDetectorDistanceInMeters())
 
     def setDetectorDistanceInMeters(self, value: Decimal) -> None:
         self._settings.detectorDistanceInMeters.value = value
