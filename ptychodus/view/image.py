@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Generator
+from collections.abc import Iterator
 from decimal import Decimal
 from enum import auto, Enum
 from typing import Optional
@@ -443,7 +443,7 @@ class ImageWidget(QGraphicsView):
         self.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
 
     @property
-    def _colorLegendTicks(self) -> Generator[float, None, None]:
+    def _colorLegendTicks(self) -> Iterator[float]:
         for tick in range(self._colorLegendNumberOfTicks):
             a = tick / (self._colorLegendNumberOfTicks - 1)
             yield (1. - a) * self._colorLegendMinValue + a * self._colorLegendMaxValue

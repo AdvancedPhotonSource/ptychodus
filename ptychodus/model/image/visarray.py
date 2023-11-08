@@ -5,6 +5,7 @@ from skimage.restoration import unwrap_phase
 import numpy
 import numpy.typing
 
+from ...api.apparatus import PixelGeometry
 from ...api.image import RealArrayType
 from ...api.observer import Observable
 
@@ -19,6 +20,7 @@ class VisualizationArray(Observable):
     def __init__(self) -> None:
         super().__init__()
         self._array: NumericArrayType = numpy.zeros((0, 0))
+        self._pixelGeometry = PixelGeometry.createNull()
 
     def getRealPart(self) -> RealArrayType:
         return numpy.real(self._array).astype(numpy.float_)
@@ -49,10 +51,16 @@ class VisualizationArray(Observable):
     def size(self) -> int:
         return self._array.size
 
+    @property
+    def pixelGeometry(self) -> PixelGeometry:
+        return self._pixelGeometry
+
     def clearArray(self) -> None:
         self._array = numpy.zeros((0, 0))
+        self._pixelGeometry = PixelGeometry.createNull()
         self.notifyObservers()
 
-    def setArray(self, array: NumericArrayType) -> None:
+    def setArray(self, array: NumericArrayType, pixelGeometry: PixelGeometry) -> None:
         self._array = array
+        self._pixelGeometry = pixelGeometry
         self.notifyObservers()

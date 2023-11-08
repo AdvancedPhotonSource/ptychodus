@@ -1,7 +1,6 @@
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 from pathlib import Path
-from typing import Generator
 import queue
 
 from ...api.geometry import Interval

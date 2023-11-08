@@ -142,15 +142,6 @@ class ProbePresenter(Observable, Observer):
     def getSelectedProbe(self) -> str:
         return self._probe.getSelectedName()
 
-    def getNumberOfProbeModes(self) -> int:
-        selectedItem = self._probe.getSelectedItem()
-
-        if selectedItem is None:
-            return 0
-
-        probe = selectedItem.getProbe()
-        return probe.getNumberOfModes()
-
     def getSelectedProbeFlattenedArray(self) -> ProbeArrayType | None:
         selectedItem = self._probe.getSelectedItem()
 

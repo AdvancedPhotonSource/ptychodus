@@ -63,6 +63,7 @@ class ObjectController(Observer):
                  view: ObjectView, imageView: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
+        self._apparatusPresenter = apparatusPresenter
         self._repositoryPresenter = repositoryPresenter
         self._imagePresenter = imagePresenter
         self._view = view
@@ -181,7 +182,8 @@ class ObjectController(Observer):
 
         for index in selectionModel.selectedIndexes():
             node = index.internalPointer()
-            self._imagePresenter.setArray(node.getArray())
+            pixelGeometry = self._apparatusPresenter.getObjectPlanePixelGeometry()
+            self._imagePresenter.setArray(node.getArray(), pixelGeometry)
 
             return
 

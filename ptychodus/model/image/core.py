@@ -1,10 +1,13 @@
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from decimal import Decimal
+from typing import Final
 import logging
 
+import numpy
+
 from ...api.apparatus import PixelGeometry
-from ...api.geometry import Interval, Point2D
+from ...api.geometry import Interval, Line2D
 from ...api.image import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
 from ...api.plot import LineCut
@@ -19,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ImagePresenter(Observable, Observer):
+    EPS: Final[float] = 1.e-6
 
     def __init__(self, array: VisualizationArray, displayRange: DisplayRange,
                  colorizerChooser: PluginChooser[Colorizer]) -> None:
@@ -37,8 +41,8 @@ class ImagePresenter(Observable, Observer):
         colorizerChooser.currentPlugin.strategy.addObserver(presenter)
         return presenter
 
-    def setArray(self, array: NumericArrayType) -> None:
-        self._array.setArray(array)
+    def setArray(self, array: NumericArrayType, pixelGeometry: PixelGeometry) -> None:
+        self._array.setArray(array, pixelGeometry)
 
     def clearArray(self) -> None:
         self._array.clearArray()
@@ -133,40 +137,75 @@ class ImagePresenter(Observable, Observer):
         self.notifyObservers()
 
     @staticmethod
-    def _intersect(x0: float, x1: float, dx: float, n: int) -> Interval[float]:
-        eps = 1.e-6
-        delta = x1 - x0
+    def _intersectBoundingBox(begin: float, end: float, n: int) -> Interval[float]:
+        length = end - begin
 
-        if abs(delta) < eps * dx:
-            return Interval[float](0., 1.)
+        if abs(length) < ImagePresenter.EPS:
+            return Interval[float](-numpy.inf, numpy.inf)
         else:
-            alpha0 = (0 * dx - x0) / delta
-            alphaN = (n * dx - x0) / delta
+            return Interval[float].createProper(
+                (0 - begin) / length,
+                (n - begin) / length,
+            )
 
-            if alpha0 < alphaN:
-                return Interval[float](alpha0, alphaN)
-            else:
-                return Interval[float](alphaN, alpha0)
+    @staticmethod
+    def _intersectGridLines(begin: float, end: float,
+                            alphaLimits: Interval[float]) -> Iterator[float]:
+        ibegin = int(begin)
+        iend = int(end)
 
-    def getLineCut(self, start: Point2D[float], end: Point2D[float]) -> LineCut:
-        pixelGeometry = PixelGeometry()  # FIXME
+        if iend < ibegin:
+            ibegin, iend = iend, ibegin
 
-        # clip to edges of array
-        alphaX = self._intersect(start.x, end.x, float(pixelGeometry.widthInMeters),
-                                 self._array.shape[-1])
-        alphaY = self._intersect(start.y, end.y, float(pixelGeometry.heightInMeters),
-                                 self._array.shape[-2])
-        alpha = Interval[float](
-            lower=max(0., max(alphaX.lower, alphaY.lower)),
-            upper=min(1., min(alphaX.upper, alphaY.upper)),
+        length = end - begin
+
+        if abs(length) > ImagePresenter.EPS:
+            for idx in range(ibegin, iend + 1):
+                alpha = (idx - begin) / length
+
+                if alpha in alphaLimits:
+                    yield alpha
+
+    def _clipToBoundingBox(self, line: Line2D[float]) -> Interval[float]:
+        arrayShape = self._array.shape
+        alphaX = self._intersectBoundingBox(line.begin.x, line.end.x, arrayShape[-1])
+        alphaY = self._intersectBoundingBox(line.begin.y, line.end.y, arrayShape[-2])
+        return Interval[float].createProper(
+            max(0., max(alphaX.lower, alphaY.lower)),
+            min(1., min(alphaX.upper, alphaY.upper)),
         )
 
-        values = self._colorizer.getDataArray()  # FIXME
-        # FIXME calculate alpha values for vertical and horizontal pixel crossings
-        distance = [
-            0., 1.
-        ]  # FIXME distance along line at midpoint of each alpha interval in physical units
-        value = [0., 1.]  # FIXME pixel value
+    def _intersectGrid(self, line: Line2D[float]) -> Sequence[float]:
+        alphaLimits = self._clipToBoundingBox(line)
+        xIntersections = [
+            x for x in self._intersectGridLines(line.begin.x, line.end.x, alphaLimits)
+        ]
+        yIntersections = [
+            x for x in self._intersectGridLines(line.begin.y, line.end.y, alphaLimits)
+        ]
+
+        alpha = {alphaLimits.lower, alphaLimits.upper}
+        alpha = alpha.union(xIntersections)
+        alpha = alpha.union(yIntersections)
+        return sorted(alpha)
+
+    def getLineCut(self, line: Line2D[float]) -> LineCut:
+        intersections = self._intersectGrid(line)
+        array = self._colorizer.getDataArray()  # FIXME
+
+        pixelGeometry = self._array.pixelGeometry
+        dx = (line.end.x - line.begin.x) * pixelGeometry.widthInMeters
+        dy = (line.end.y - line.begin.y) * pixelGeometry.heightInMeters
+        lineLength = numpy.hypot(dx, dy)
+
+        distance: list[float] = list()
+
+        for alphaL, alphaR in zip(intersections[:-1], intersections[1:]):
+            alpha = (alphaL + alphaR) / 2.
+            distance.append(alpha * lineLength)
+
+        value = [0.] * len(distance)  # FIXME pixel value
+
         return LineCut(distance, value)
 
     def update(self, observable: Observable) -> None:

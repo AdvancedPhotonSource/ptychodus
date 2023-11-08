@@ -81,11 +81,11 @@ class ControllerCore:
             model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
             view.automationView, self._fileDialogFactory)
         self._monitorProbeController = ProbeImageController.createInstance(
-            model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
-            self._fileDialogFactory)
+            model.apparatusPresenter, model.probePresenter, model.probeImagePresenter,
+            view.monitorProbeView.imageView, self._fileDialogFactory)
         self._monitorObjectController = ObjectImageController.createInstance(
-            model.objectPresenter, model.objectImagePresenter, view.monitorObjectView.imageView,
-            self._fileDialogFactory)
+            model.apparatusPresenter, model.objectPresenter, model.objectImagePresenter,
+            view.monitorObjectView.imageView, self._fileDialogFactory)
         self._refreshDataTimer = QTimer()
         self._automationTimer = QTimer()
         self._processMessagesTimer = QTimer()

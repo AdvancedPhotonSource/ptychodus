@@ -33,6 +33,7 @@ class DetectorController(Observer):
                  view: DetectorView, imageView: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
+        self._detectorPresenter = detectorPresenter
         self._datasetPresenter = datasetPresenter
         self._ioPresenter = ioPresenter
         self._imagePresenter = imagePresenter
@@ -85,7 +86,8 @@ class DetectorController(Observer):
 
         for index in selected.indexes():
             node = index.internalPointer()
-            self._imagePresenter.setArray(node.data)
+            pixelGeometry = self._detectorPresenter.getPixelGeometry()
+            self._imagePresenter.setArray(node.data, pixelGeometry)
             break
 
     def _saveDataset(self) -> None:

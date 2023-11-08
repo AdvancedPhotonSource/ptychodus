@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QButtonGroup
 
 import numpy
 
-from ..api.geometry import Point2D
+from ..api.geometry import Line2D, Point2D
 from ..api.observer import Observable, Observer
 from ..model.image import ImagePresenter
 from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageMouseTool,
@@ -195,12 +195,13 @@ class ImageController(Observer):
     def _handleLineCut(self, line: QLineF) -> None:
         p1 = Point2D[float](line.x1(), line.y1())
         p2 = Point2D[float](line.x2(), line.y2())
-        lineCut = self._presenter.getLineCut(p1, p2)
+        line2D = Line2D[float](p1, p2)
+        lineCut = self._presenter.getLineCut(line2D)
 
         ax = self._view.lineCutDialog.axes
         ax.clear()
-        ax.plot(lineCut.distance, lineCut.value, '-', linewidth=1.5)
-        ax.set_xlabel('Distance [px]')  # FIXME physical distance
+        ax.plot(lineCut.distance, lineCut.value, '.-', linewidth=1.5)
+        ax.set_xlabel('Distance [m]')
         ax.set_ylabel('Value')  # FIXME use name
         ax.grid(True)
         self._view.lineCutDialog.figureCanvas.draw()

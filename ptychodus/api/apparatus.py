@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 
 
@@ -16,3 +17,7 @@ class FresnelZonePlate:
 class PixelGeometry:
     widthInMeters: float
     heightInMeters: float
+
+    @classmethod
+    def createNull(cls) -> PixelGeometry:
+        return cls(0., 0.)

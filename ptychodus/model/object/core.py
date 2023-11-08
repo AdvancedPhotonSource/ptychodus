@@ -145,14 +145,14 @@ class ObjectPresenter(Observable, Observer):
     def getSelectedObject(self) -> str:
         return self._object.getSelectedName()
 
-    def getSelectedObjectArray(self) -> ObjectArrayType | None:
+    def getSelectedObjectFlattenedArray(self) -> ObjectArrayType | None:
         selectedItem = self._object.getSelectedItem()
 
         if selectedItem is None:
             return None
 
         object_ = selectedItem.getObject()
-        return object_.getArray()
+        return object_.getLayersFlattened()
 
     def getSelectableNames(self) -> Sequence[str]:
         return self._object.getSelectableNames()

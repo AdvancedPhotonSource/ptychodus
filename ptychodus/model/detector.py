@@ -112,6 +112,9 @@ class DetectorPresenter(Observable, Observer):
     def setPixelSizeYInMeters(self, value: Decimal) -> None:
         self._settings.pixelSizeYInMeters.value = value
 
+    def getPixelGeometry(self) -> PixelGeometry:
+        return self._detector.getPixelGeometry()
+
     def getBitDepthLimits(self) -> Interval[int]:
         return Interval[int](1, 64)
 
