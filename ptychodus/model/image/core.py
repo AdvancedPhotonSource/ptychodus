@@ -191,22 +191,25 @@ class ImagePresenter(Observable, Observer):
 
     def getLineCut(self, line: Line2D[float]) -> LineCut:
         intersections = self._intersectGrid(line)
-        array = self._colorizer.getDataArray()  # FIXME
+        array = self._colorizer.getTransformedDataArray()
 
         pixelGeometry = self._array.pixelGeometry
         dx = (line.end.x - line.begin.x) * pixelGeometry.widthInMeters
         dy = (line.end.y - line.begin.y) * pixelGeometry.heightInMeters
         lineLength = numpy.hypot(dx, dy)
 
-        distance: list[float] = list()
+        distances: list[float] = list()
+        values: list[float] = list()
 
         for alphaL, alphaR in zip(intersections[:-1], intersections[1:]):
             alpha = (alphaL + alphaR) / 2.
-            distance.append(alpha * lineLength)
+            point = line.lerp(alpha)
+            value = array[int(point.y), int(point.x)]
 
-        value = [0.] * len(distance)  # FIXME pixel value
+            distances.append(alpha * lineLength)
+            values.append(value)
 
-        return LineCut(distance, value)
+        return LineCut(distances, values)
 
     def update(self, observable: Observable) -> None:
         if observable is self._colorizerChooser:
