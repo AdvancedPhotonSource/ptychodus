@@ -240,7 +240,7 @@ class ModelCore:
         self._stateDataRegistry.openStateData(filePath)
 
     def batchModeReconstruct(self, filePath: Path) -> int:
-        result = self._reconstructorCore.presenter.reconstruct()
+        result = self._reconstructorCore.reconstructorAPI.reconstruct()
         self.saveStateData(filePath, restartable=False)
         return result.result
 
@@ -248,9 +248,9 @@ class ModelCore:
         for filePath in directoryPath.glob('*.npz'):
             # TODO sort by filePath.stat().st_mtime
             self._stateDataRegistry.openStateData(filePath)
-            self._reconstructorCore.presenter.ingest()
+            self._reconstructorCore.reconstructorAPI.ingest()
 
-        self._reconstructorCore.presenter.train()
+        self._reconstructorCore.reconstructorAPI.train()
 
         someQualityMetric = 0.  # TODO
         return someQualityMetric

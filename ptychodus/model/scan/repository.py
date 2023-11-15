@@ -12,7 +12,6 @@ from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.scan import Scan, ScanPoint, TabularScan
 from ..itemRepository import ItemRepository
-from .indexFilter import SelectableScanIndexFilter
 from .settings import ScanSettings
 from .transform import SelectableScanPointTransform
 
@@ -61,8 +60,6 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self._initializer: Optional[ScanInitializer] = None
         self._transform = SelectableScanPointTransform()
         self._transform.addObserver(self)
-        self._indexFilter = SelectableScanIndexFilter()
-        self._indexFilter.addObserver(self)
         self._overrideCentroidXEnabled = False
         self._overrideCentroidXInMeters = Decimal()
         self._overrideCentroidYEnabled = False
@@ -140,7 +137,6 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self.reinitialize()
 
     def syncFromSettings(self, settings: ScanSettings) -> None:
-        self._indexFilter.selectFilterByName(settings.indexFilter.value)
         self._transform.selectTransformByName(settings.transform.value)
         self._jitterRadiusInMeters = settings.jitterRadiusInMeters.value
         self._overrideCentroidXEnabled = settings.overrideCentroidXEnabled.value
@@ -150,7 +146,6 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         self.notifyObservers()
 
     def syncToSettings(self, settings: ScanSettings) -> None:
-        settings.indexFilter.value = self._indexFilter.simpleName
         settings.transform.value = self._transform.simpleName
         settings.jitterRadiusInMeters.value = self._jitterRadiusInMeters
         settings.overrideCentroidXEnabled.value = self._overrideCentroidXEnabled
@@ -163,22 +158,10 @@ class ScanRepositoryItem(Scan, Observable, Observer):
         return self._scan
 
     def __iter__(self) -> Iterator[int]:
-        it = iter(self._scan)
-
-        while True:
-            try:
-                index = next(it)
-            except StopIteration:
-                break
-
-            if self._indexFilter(index):
-                yield index
+        return iter(self._scan)
 
     def __getitem__(self, index: int) -> ScanPoint:
         '''returns the jittered and transformed scan point'''
-        if not self._indexFilter(index):
-            raise KeyError
-
         point = self._transform(self._scan[index])
         posX = point.x
         posY = point.y
@@ -217,15 +200,6 @@ class ScanRepositoryItem(Scan, Observable, Observer):
 
     def getSizeInBytes(self) -> int:
         return self._cachedSizeInBytes
-
-    def getIndexFilterNameList(self) -> Sequence[str]:
-        return self._indexFilter.getSelectableFilters()
-
-    def getIndexFilterName(self) -> str:
-        return self._indexFilter.displayName
-
-    def setIndexFilterByName(self, name: str) -> None:
-        self._indexFilter.selectFilterByName(name)
 
     def getTransformNameList(self) -> Sequence[str]:
         return self._transform.getSelectableTransforms()
@@ -281,7 +255,7 @@ class ScanRepositoryItem(Scan, Observable, Observer):
             self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
-        if observable in (self._initializer, self._transform, self._indexFilter):
+        if observable in (self._initializer, self._transform):
             self.reinitialize()
 
 

@@ -150,7 +150,6 @@ class ScanTransformView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Transform', parent)
-        self.indexFilterComboBox = QComboBox()
         self.transformComboBox = QComboBox()
         self.jitterRadiusWidget = LengthWidget.createInstance()
         self.centroidXCheckBox = QCheckBox('Centroid X:')
@@ -163,7 +162,6 @@ class ScanTransformView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Index Filter:', view.indexFilterComboBox)
         layout.addRow('(x,y) \u2192', view.transformComboBox)
         layout.addRow('Jitter Radius:', view.jitterRadiusWidget)
         layout.addRow(view.centroidXCheckBox, view.centroidXWidget)

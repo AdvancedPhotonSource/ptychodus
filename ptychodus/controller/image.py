@@ -212,8 +212,6 @@ class ImageController(Observer):
         qpixmap = QPixmap()
 
         if realImage is not None and numpy.size(realImage) > 0:
-            # FIXME verify that image invalidates when image.size == 0
-            # FIXME crash when !isfinite(realImage)?
             # NOTE .copy() ensures integerImage is not a view
             integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8).copy()
 

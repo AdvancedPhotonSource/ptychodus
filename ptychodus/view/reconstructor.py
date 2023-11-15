@@ -25,6 +25,7 @@ class ReconstructorView(QGroupBox):
         self.objectComboBox = QComboBox()
         self.objectValidationLabel = QLabel()
         self.reconstructButton = QPushButton('Reconstruct')
+        self.reconstructSplitButton = QPushButton('Split')
         self.ingestButton = QPushButton('Ingest')
         self.trainButton = QPushButton('Train')
         self.resetButton = QPushButton('Reset')
@@ -32,6 +33,9 @@ class ReconstructorView(QGroupBox):
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorView:
         view = cls(parent)
+
+        view.reconstructButton.setToolTip('Reconstruct Full Dataset')
+        view.reconstructSplitButton.setToolTip('Reconstruct Odd/Even Split Dataset')
 
         layout = QGridLayout()
         layout.addWidget(view.algorithmLabel, 0, 0)
@@ -48,7 +52,8 @@ class ReconstructorView(QGroupBox):
         layout.addWidget(view.ingestButton, 4, 1)
         layout.addWidget(view.trainButton, 4, 2)
         layout.addWidget(view.resetButton, 4, 3)
-        layout.addWidget(view.reconstructButton, 5, 1, 1, 3)
+        layout.addWidget(view.reconstructButton, 5, 1, 1, 2)
+        layout.addWidget(view.reconstructSplitButton, 5, 3)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         layout.setColumnStretch(3, 1)

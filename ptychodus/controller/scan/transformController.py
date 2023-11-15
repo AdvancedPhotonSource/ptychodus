@@ -18,11 +18,6 @@ class ScanTransformController(Observer):
         controller = cls(item, view)
         item.addObserver(controller)
 
-        for name in item.getIndexFilterNameList():
-            view.indexFilterComboBox.addItem(name)
-
-        view.indexFilterComboBox.textActivated.connect(item.setIndexFilterByName)
-
         for name in item.getTransformNameList():
             view.transformComboBox.addItem(name)
 
@@ -40,7 +35,6 @@ class ScanTransformController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.indexFilterComboBox.setCurrentText(self._item.getIndexFilterName())
         self._view.transformComboBox.setCurrentText(self._item.getTransformName())
         self._view.jitterRadiusWidget.setLengthInMeters(self._item.getJitterRadiusInMeters())
 

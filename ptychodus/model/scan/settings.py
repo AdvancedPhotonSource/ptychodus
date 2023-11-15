@@ -38,7 +38,6 @@ class ScanSettings(Observable, Observer):
         self.numberOfShells = settingsGroup.createIntegerEntry('NumberOfShells', 5)
         self.numberOfPointsInFirstShell = settingsGroup.createIntegerEntry(
             'NumberOfPointsInFirstShell', 10)
-        self.indexFilter = settingsGroup.createStringEntry('IndexFilter', 'ALL')
         self.transform = settingsGroup.createStringEntry('Transform', '+X+Y')
         self.expandBoundingBox = settingsGroup.createBooleanEntry('ExpandBoundingBox', False)
         self.boundingBoxMinimumXInMeters = settingsGroup.createRealEntry(

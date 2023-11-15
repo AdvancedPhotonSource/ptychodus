@@ -8,7 +8,6 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QWidget
 
 from ..api.observer import Observable, Observer
-from ..api.reconstructor import ReconstructOutput
 from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPresenter
@@ -91,6 +90,7 @@ class ReconstructorParametersController(Observer):
         view.reconstructorView.objectComboBox.setModel(controller._objectListModel)
 
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
+        view.reconstructorView.reconstructSplitButton.clicked.connect(controller._reconstructSplit)
         view.reconstructorView.ingestButton.clicked.connect(controller._ingest)
         view.reconstructorView.trainButton.clicked.connect(controller._train)
         view.reconstructorView.resetButton.clicked.connect(controller._reset)
@@ -117,15 +117,18 @@ class ReconstructorParametersController(Observer):
         self._view.stackedWidget.addWidget(widget)
 
     def _reconstruct(self) -> None:
-        result = ReconstructOutput.createNull()
-
         try:
-            result = self._presenter.reconstruct()
+            self._presenter.reconstruct()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
 
-        logger.info(result.result)  # TODO
+    def _reconstructSplit(self) -> None:
+        try:
+            self._presenter.reconstructSplit()
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.showException('Split Reconstructor', err)
 
     def _ingest(self) -> None:
         try:
