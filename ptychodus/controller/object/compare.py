@@ -91,14 +91,26 @@ class CompareObjectPlotController(Observer):
         if self._initializer is None:
             logger.error('Null initializer!')
         else:
-            self._view.axes.clear()
+            plot2D = self._initializer.getFourierRingCorrelation().getPlot()
+            axisX = plot2D.axisX
+            axisY = plot2D.axisY
 
-            sf = self._initializer.getSpatialFrequency()  # FIXME units
-            frc = self._initializer.getFourierRingCorrelation()
-            self._view.axes.plot(sf, frc, '-', linewidth=1.5)
-            self._view.axes.grid(True)
-            self._view.axes.set_xlabel('Spatial Frequency')
-            self._view.axes.set_ylabel('Fourier Ring Correlation')
+            ax = self._view.axes
+            ax.clear()
+            ax.set_xlabel(axisX.label)
+            ax.set_ylabel(axisY.label)
+            ax.grid(True)
+
+            if len(axisX.series) == 1:
+                sx = axisX.series[0]
+
+                for sy in axisY.series:
+                    ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
+            else:
+                logger.error('Failed to broadcast plot series!')
+
+            if len(axisX.series) > 0:
+                ax.legend(loc='upper right')
 
             self._view.figureCanvas.draw()
 

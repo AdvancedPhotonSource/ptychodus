@@ -3,12 +3,12 @@ from collections.abc import Mapping, Sequence
 from typing import Final
 import logging
 
-import numpy
-
 from ...api.object import Object
 from ...api.observer import Observable, Observer
+from ...api.plot import FourierRingCorrelation
 from .repository import ObjectInitializer, ObjectRepositoryItem
 from .settings import ObjectSettings
+from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +17,9 @@ class CompareObjectInitializer(ObjectInitializer, Observer):
     SIMPLE_NAME: Final[str] = 'Compare'
     DISPLAY_NAME: Final[str] = 'Compare'
 
-    def __init__(self, repository: Mapping[str, ObjectRepositoryItem]) -> None:
+    def __init__(self, sizer: ObjectSizer, repository: Mapping[str, ObjectRepositoryItem]) -> None:
         super().__init__()
+        self._sizer = sizer
         self._repository = repository
         self._name1 = str()
         self._item1 = ObjectRepositoryItem('')
@@ -101,14 +102,13 @@ class CompareObjectInitializer(ObjectInitializer, Observer):
             self._item2.addObserver(self)
             self.notifyObservers()
 
-    def getSpatialFrequency(self) -> Sequence[float]:
-        n = 100
-        return [i / (n - 1) for i in range(n)]
-
-    def getFourierRingCorrelation(self) -> Sequence[float]:
-        x = self.getSpatialFrequency()
-        y = numpy.sin(2 * numpy.pi * numpy.array(x))  # FIXME
-        return list(y)
+    def getFourierRingCorrelation(self) -> FourierRingCorrelation:
+        # TODO support multiple layers
+        return FourierRingCorrelation.calculate(
+            self._item1.getObject().getLayer(0),
+            self._item2.getObject().getLayer(0),
+            self._sizer.getPixelGeometry(),
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._item1:

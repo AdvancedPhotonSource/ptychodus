@@ -110,7 +110,7 @@ class ObjectRepositoryItemFactory:
         return item
 
     def createCompareItem(self) -> ObjectRepositoryItem:
-        initializer = CompareObjectInitializer(self._repository)
+        initializer = CompareObjectInitializer(self._sizer, self._repository)
         item = ObjectRepositoryItem(initializer.simpleName)
         item.setInitializer(initializer)
         return item

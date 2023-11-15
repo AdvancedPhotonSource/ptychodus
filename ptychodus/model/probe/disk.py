@@ -40,9 +40,9 @@ class DiskProbeInitializer(ProbeInitializer):
     def __call__(self) -> Probe:
         extent = self._sizer.getExtentInPixels()
         pixelGeometry = self._apparatus.getObjectPlanePixelGeometry()
-        cellCentersX = numpy.arange(extent.width) - (extent.width - 1) / 2
-        cellCentersY = numpy.arange(extent.height) - (extent.height - 1) / 2
-        Y_px, X_px = numpy.meshgrid(cellCentersY, cellCentersX)
+        Y, X = numpy.mgrid[:extent.height, :extent.width]
+        X_px = X - (extent.width - 1) / 2
+        Y_px = Y - (extent.height - 1) / 2
 
         if self._isTestPattern:
             Rmax_px = min(extent.width, extent.height) / 2

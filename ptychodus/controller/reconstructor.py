@@ -192,6 +192,9 @@ class ReconstructorParametersController(Observer):
 
         ax = self._plotView.axes
         ax.clear()
+        ax.set_xlabel(axisX.label)
+        ax.set_ylabel(axisY.label)
+        ax.grid(True)
 
         if len(axisX.series) == len(axisY.series):
             for sx, sy in zip(axisX.series, axisY.series):
@@ -203,10 +206,6 @@ class ReconstructorParametersController(Observer):
                 ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
         else:
             logger.error('Failed to broadcast plot series!')
-
-        ax.set_xlabel(axisX.label)
-        ax.set_ylabel(axisY.label)
-        ax.grid(True)
 
         if len(axisX.series) > 0:
             ax.legend(loc='upper right')
