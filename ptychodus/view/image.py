@@ -271,7 +271,7 @@ class ImageItem(QGraphicsPixmapItem):
     def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         pos = event.pos()
         self._statusBar.showMessage(f'{pos.x():.1f}, {pos.y():.1f}')
-        # FIXME display value
+        # TODO display value
         super().hoverMoveEvent(event)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:

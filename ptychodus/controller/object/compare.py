@@ -109,7 +109,7 @@ class CompareObjectPlotController(Observer):
             else:
                 logger.error('Failed to broadcast plot series!')
 
-            if len(axisX.series) > 0:
+            if len(axisX.series) > 1:
                 ax.legend(loc='upper right')
 
             self._view.figureCanvas.draw()

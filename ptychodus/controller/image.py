@@ -190,7 +190,7 @@ class ImageController(Observer):
         return controller
 
     def _handleRectangle(self, rect: QRectF) -> None:
-        print(rect)  # FIXME use for crop
+        print(rect)  # TODO use for crop
 
     def _handleLineCut(self, line: QLineF) -> None:
         p1 = Point2D[float](line.x1(), line.y1())
