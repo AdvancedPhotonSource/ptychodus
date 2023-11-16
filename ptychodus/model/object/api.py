@@ -51,6 +51,15 @@ class ObjectAPI:
 
         return itemName
 
+    def insertComparisonIntoRepository(self, name1: str, name2: str) -> Optional[str]:
+        item = self._factory.createCompareItem(name1, name2)
+        itemName = self._repository.insertItem(item)
+
+        if itemName is None:
+            logger.error(f'Failed to compare \"{name1}\" to \"{name2}\"!')
+
+        return itemName
+
     def insertItemIntoRepositoryFromInitializerName(self, name: str) -> Optional[str]:
         item = self._factory.createItemFromInitializerName(name)
         return self._repository.insertItem(item)

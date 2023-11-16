@@ -97,6 +97,6 @@ class ReconstructorCore:
         self._activeReconstructor = ActiveReconstructor.createInstance(
             self.settings, diffractionDataset, scanAPI, probeAPI, objectAPI, libraryList,
             settingsRegistry)
-        self.reconstructorAPI = ReconstructorAPI(self._activeReconstructor)
+        self.reconstructorAPI = ReconstructorAPI(objectAPI, self._activeReconstructor)
         self.presenter = ReconstructorPresenter.createInstance(self._activeReconstructor,
                                                                self.reconstructorAPI)

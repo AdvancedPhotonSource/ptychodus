@@ -83,7 +83,7 @@ class FourierRingCorrelation:
 
         x_rm = scipy.fft.fftfreq(image1.shape[-1], d=pixelGeometry.widthInMeters)
         y_rm = scipy.fft.fftfreq(image1.shape[-2], d=pixelGeometry.heightInMeters)
-        radialBinSize_rm = max(x_rm.max(), y_rm.max())
+        radialBinSize_rm = max(x_rm[1], y_rm[1])
 
         xx_rm, yy_rm = numpy.meshgrid(x_rm, y_rm)
         rr_rm = numpy.hypot(xx_rm, yy_rm)
@@ -102,7 +102,8 @@ class FourierRingCorrelation:
 
         # TODO replace NaNs with interpolated values
 
-        return cls(spatialFrequency_rm, correlation)
+        rnyquist = numpy.min(image1.shape) // 2 + 1
+        return cls(spatialFrequency_rm[:rnyquist], correlation[:rnyquist])
 
     def getResolutionInMeters(self, threshold: float) -> float:
         # TODO threshold from bits

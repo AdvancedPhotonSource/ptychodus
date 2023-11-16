@@ -109,8 +109,17 @@ class ObjectRepositoryItemFactory:
         item.setInitializer(initializer)
         return item
 
-    def createCompareItem(self) -> ObjectRepositoryItem:
+    def createCompareItem(self,
+                          name1: str | None = None,
+                          name2: str | None = None) -> ObjectRepositoryItem:
         initializer = CompareObjectInitializer(self._sizer, self._repository)
+
+        if name1 is not None:
+            initializer.setName1(name1)
+
+        if name2 is not None:
+            initializer.setName2(name2)
+
         item = ObjectRepositoryItem(initializer.simpleName)
         item.setInitializer(initializer)
         return item
