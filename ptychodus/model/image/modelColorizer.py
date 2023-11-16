@@ -149,12 +149,13 @@ class CylindricalColorModelColorizer(Colorizer):
     def isCyclic(self) -> bool:
         return True
 
-    def getDataArray(self) -> RealArrayType:
-        return self._array.getAmplitude()
-
-    def getTransformedDataArray(self) -> RealArrayType:
+    def getDataLabel(self) -> str:
         transform = self._transformChooser.currentPlugin.strategy
-        return transform(self.getDataArray())
+        return transform.decorateText('Amplitude')
+
+    def getDataArray(self) -> RealArrayType:
+        transform = self._transformChooser.currentPlugin.strategy
+        return transform(self._array.getAmplitude())
 
     def __call__(self) -> RealArrayType:
         if self._array.size == 0:
@@ -168,7 +169,7 @@ class CylindricalColorModelColorizer(Colorizer):
 
         model = numpy.vectorize(self._variantChooser.currentPlugin.strategy)
         h = (self._array.getPhaseInRadians() + numpy.pi) / (2 * numpy.pi)
-        x = norm(self.getTransformedDataArray())
+        x = norm(self.getDataArray())
         r, g, b, a = model(h, x)
 
         return numpy.stack((r, g, b, a), axis=-1)

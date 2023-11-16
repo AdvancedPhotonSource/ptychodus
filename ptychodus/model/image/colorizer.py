@@ -55,11 +55,11 @@ class Colorizer(Observable, Observer, ABC):
         pass
 
     @abstractmethod
-    def getDataArray(self) -> RealArrayType:
+    def getDataLabel(self) -> str:
         pass
 
     @abstractmethod
-    def getTransformedDataArray(self) -> RealArrayType:
+    def getDataArray(self) -> RealArrayType:
         pass
 
     @abstractmethod

@@ -41,8 +41,9 @@ class Plot2D:
 
 @dataclass(frozen=True)
 class LineCut:
-    distance_m: Sequence[float]
+    distanceInMeters: Sequence[float]
     value: Sequence[float]
+    valueLabel: str
 
 
 @dataclass(frozen=True)

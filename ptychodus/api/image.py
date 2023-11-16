@@ -69,6 +69,10 @@ class ScalarTransformation(ABC):
     '''interface for real-valued transformations of a real array'''
 
     @abstractmethod
+    def decorateText(self, text: str) -> str:
+        pass
+
+    @abstractmethod
     def __call__(self, array: RealArrayType) -> RealArrayType:
         '''returns the transformed input array'''
         pass

@@ -200,9 +200,9 @@ class ImageController(Observer):
 
         ax = self._view.lineCutDialog.axes
         ax.clear()
-        ax.plot(lineCut.distance_m, lineCut.value, '.-', linewidth=1.5)
+        ax.plot(lineCut.distanceInMeters, lineCut.value, '.-', linewidth=1.5)
         ax.set_xlabel('Distance [m]')
-        ax.set_ylabel('Value')  # FIXME use name
+        ax.set_ylabel(lineCut.valueLabel)
         ax.grid(True)
         self._view.lineCutDialog.figureCanvas.draw()
         self._view.lineCutDialog.open()

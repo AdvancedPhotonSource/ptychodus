@@ -95,19 +95,22 @@ class ImagePresenter(Observable, Observer):
         self._displayRange.setUpper(value)
 
     def setDisplayRangeToDataRange(self) -> None:
-        values = self._colorizer.getTransformedDataArray()
-        lower = Decimal.from_float(values.min())
-        upper = Decimal.from_float(values.max())
-        dataRange = Interval[Decimal](lower, upper)
+        dataRange = Interval[Decimal](Decimal(0), Decimal(1))
+        values = self._colorizer.getDataArray()
 
-        if dataRange.lower.is_nan() or dataRange.upper.is_nan():
-            logger.debug('Visualization array component includes one or more NaNs.')
-            dataRange = Interval[Decimal](Decimal(0), Decimal(1))
-        elif dataRange.lower == dataRange.upper:
-            logger.debug('Visualization array component values are uniform.')
-            half = Decimal('0.5')
-            dataRange.lower -= half
-            dataRange.upper += half
+        if numpy.size(values) > 0:
+            lower = Decimal.from_float(values.min())
+            upper = Decimal.from_float(values.max())
+            dataRange = Interval[Decimal](lower, upper)
+
+            if dataRange.lower.is_nan() or dataRange.upper.is_nan():
+                logger.debug('Visualization array component includes one or more NaNs.')
+                dataRange = Interval[Decimal](Decimal(0), Decimal(1))
+            elif dataRange.lower == dataRange.upper:
+                logger.debug('Visualization array component values are uniform.')
+                half = Decimal('0.5')
+                dataRange.lower -= half
+                dataRange.upper += half
 
         self._displayRange.setRangeAndLimits(dataRange)
 
@@ -191,7 +194,8 @@ class ImagePresenter(Observable, Observer):
 
     def getLineCut(self, line: Line2D[float]) -> LineCut:
         intersections = self._intersectGrid(line)
-        array = self._colorizer.getTransformedDataArray()
+        dataLabel = self._colorizer.getDataLabel()
+        dataArray = self._colorizer.getDataArray()
 
         pixelGeometry = self._array.pixelGeometry
         dx = (line.end.x - line.begin.x) * pixelGeometry.widthInMeters
@@ -204,12 +208,12 @@ class ImagePresenter(Observable, Observer):
         for alphaL, alphaR in zip(intersections[:-1], intersections[1:]):
             alpha = (alphaL + alphaR) / 2.
             point = line.lerp(alpha)
-            value = array[int(point.y), int(point.x)]
+            value = dataArray[int(point.y), int(point.x)]
 
             distances.append(alpha * lineLength)
             values.append(value)
 
-        return LineCut(distances, values)
+        return LineCut(distances, values, dataLabel)
 
     def update(self, observable: Observable) -> None:
         if observable is self._colorizerChooser:

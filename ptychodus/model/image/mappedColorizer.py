@@ -115,12 +115,13 @@ class MappedColorizer(Colorizer):
     def isCyclic(self) -> bool:
         return self._isCyclic
 
-    def getDataArray(self) -> RealArrayType:
-        return self._arrayComponent()
-
-    def getTransformedDataArray(self) -> RealArrayType:
+    def getDataLabel(self) -> str:
         transform = self._transformChooser.currentPlugin.strategy
-        return transform(self.getDataArray())
+        return transform.decorateText(self._name)
+
+    def getDataArray(self) -> RealArrayType:
+        transform = self._transformChooser.currentPlugin.strategy
+        return transform(self._arrayComponent())
 
     def __call__(self) -> RealArrayType:
         if self._displayRange.getUpper() <= self._displayRange.getLower():
@@ -134,7 +135,7 @@ class MappedColorizer(Colorizer):
         cmap = self._variantChooser.currentPlugin.strategy
         scalarMappable = ScalarMappable(norm, cmap)
 
-        return scalarMappable.to_rgba(self.getTransformedDataArray())
+        return scalarMappable.to_rgba(self.getDataArray())
 
     def update(self, observable: Observable) -> None:
         if observable is self._variantChooser:

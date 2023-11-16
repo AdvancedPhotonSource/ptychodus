@@ -6,11 +6,17 @@ from ptychodus.api.plugins import PluginRegistry
 
 class IdentityScalarTransformation(ScalarTransformation):
 
+    def decorateText(self, text: str) -> str:
+        return text
+
     def __call__(self, array: RealArrayType) -> RealArrayType:
         return array
 
 
 class SquareRootScalarTransformation(ScalarTransformation):
+
+    def decorateText(self, text: str) -> str:
+        return f'$\\sqrt{{\mathrm{{{text}}}}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -19,6 +25,9 @@ class SquareRootScalarTransformation(ScalarTransformation):
 
 class Log2ScalarTransformation(ScalarTransformation):
 
+    def decorateText(self, text: str) -> str:
+        return f'$\\log_2{{\\left(\mathrm{{{text}}}\\right)}}$'
+
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
         return numpy.log2(array, out=nil, where=(array > 0))
@@ -26,12 +35,18 @@ class Log2ScalarTransformation(ScalarTransformation):
 
 class LogScalarTransformation(ScalarTransformation):
 
+    def decorateText(self, text: str) -> str:
+        return f'$\\ln{{\\left(\mathrm{{{text}}}\\right)}}$'
+
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
         return numpy.log(array, out=nil, where=(array > 0))
 
 
 class Log10ScalarTransformation(ScalarTransformation):
+
+    def decorateText(self, text: str) -> str:
+        return f'$\\log_{{10}}{{\\left(\mathrm{{{text}}}\\right)}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
