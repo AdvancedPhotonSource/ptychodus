@@ -1,15 +1,24 @@
 from __future__ import annotations
-import math
+from collections.abc import Iterator
 from decimal import Decimal
+from enum import auto, Enum
 from typing import Optional
 
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon, QPixmap, QWheelEvent, QMouseEvent
+from PyQt5.QtCore import (pyqtSignal, Qt, QObject, QPoint, QPointF, QLineF, QRect, QRectF, QSize,
+                          QSizeF)
+from PyQt5.QtGui import (QColor, QConicalGradient, QIcon, QLinearGradient, QPainter, QPen, QPixmap,
+                         QWheelEvent)
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGraphicsPixmapItem, QGraphicsScene, QGraphicsSceneHoverEvent,
-                             QGraphicsSceneMouseEvent, QGraphicsView, QHBoxLayout, QPushButton,
-                             QSizePolicy, QSpinBox, QToolButton, QVBoxLayout, QWidget, QStatusBar)
+                             QGraphicsLineItem, QGraphicsPixmapItem, QGraphicsRectItem,
+                             QGraphicsScene, QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent,
+                             QGraphicsView, QGridLayout, QHBoxLayout, QPushButton, QSizePolicy,
+                             QSpinBox, QStatusBar, QToolButton, QVBoxLayout, QWidget)
 
+from matplotlib.backends.backend_qt5agg import FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+
+from ..api.image import RealArrayType
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
@@ -49,23 +58,52 @@ class ImageDisplayRangeDialog(QDialog):
         return dialog
 
 
-class ImageFileGroupBox(BottomTitledGroupBox):
+class ImageToolsGroupBox(BottomTitledGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('File', parent)
+        super().__init__('Tools', parent)
+        self.homeButton = QToolButton()
         self.saveButton = QToolButton()
+        self.moveButton = QToolButton()
+        self.rulerButton = QToolButton()
+        self.rectangleButton = QToolButton()
+        self.lineCutButton = QToolButton()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageFileGroupBox:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageToolsGroupBox:
         view = cls(parent)
+
+        view.homeButton.setIcon(QIcon(':/icons/home'))
+        view.homeButton.setIconSize(QSize(32, 32))
+        view.homeButton.setToolTip('Home')
 
         view.saveButton.setIcon(QIcon(':/icons/save'))
         view.saveButton.setIconSize(QSize(32, 32))
         view.saveButton.setToolTip('Save Image')
 
-        layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 35)
-        layout.addWidget(view.saveButton)
+        view.moveButton.setIcon(QIcon(':/icons/move'))
+        view.moveButton.setIconSize(QSize(32, 32))
+        view.moveButton.setToolTip('Move')
+
+        view.rulerButton.setIcon(QIcon(':/icons/ruler'))
+        view.rulerButton.setIconSize(QSize(32, 32))
+        view.rulerButton.setToolTip('Ruler')
+
+        view.rectangleButton.setIcon(QIcon(':/icons/rectangle'))
+        view.rectangleButton.setIconSize(QSize(32, 32))
+        view.rectangleButton.setToolTip('Rectangle')
+
+        view.lineCutButton.setIcon(QIcon(':/icons/line-cut'))
+        view.lineCutButton.setIconSize(QSize(32, 32))
+        view.lineCutButton.setToolTip('Line-Cut Profile')
+
+        layout = QGridLayout()
+        layout.addWidget(view.homeButton, 0, 0)
+        layout.addWidget(view.saveButton, 0, 1)
+        layout.addWidget(view.moveButton, 0, 2)
+        layout.addWidget(view.rulerButton, 1, 0)
+        layout.addWidget(view.rectangleButton, 1, 1)
+        layout.addWidget(view.lineCutButton, 1, 2)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
@@ -108,7 +146,8 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.autoButton = QPushButton('Auto')
-        self.setButton = QPushButton('Set')
+        self.editButton = QPushButton('Edit')
+        self.colorLegendButton = QPushButton('Color Legend')
         self.displayRangeDialog = ImageDisplayRangeDialog.createInstance(self)
 
     @classmethod
@@ -118,12 +157,14 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         view.minDisplayValueSlider.setToolTip('Minimum Display Value')
         view.maxDisplayValueSlider.setToolTip('Maximum Display Value')
         view.autoButton.setToolTip('Rescale to Data Range')
-        view.setButton.setToolTip('Rescale to Custom Range')
+        view.editButton.setToolTip('Rescale to Custom Range')
+        view.colorLegendButton.setToolTip('Toggle Color Legend Visibility')
 
         buttonLayout = QHBoxLayout()
         buttonLayout.setContentsMargins(0, 0, 0, 0)
         buttonLayout.addWidget(view.autoButton)
-        buttonLayout.addWidget(view.setButton)
+        buttonLayout.addWidget(view.editButton)
+        buttonLayout.addWidget(view.colorLegendButton)
 
         layout = QFormLayout()
         layout.setContentsMargins(10, 10, 10, 35)
@@ -163,7 +204,7 @@ class ImageRibbon(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.imageFileGroupBox = ImageFileGroupBox.createInstance()
+        self.imageToolsGroupBox = ImageToolsGroupBox.createInstance()
         self.colormapGroupBox = ImageColorizerGroupBox.createInstance()
         self.dataRangeGroupBox = ImageDataRangeGroupBox.createInstance()
 
@@ -173,7 +214,7 @@ class ImageRibbon(QWidget):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.imageFileGroupBox)
+        layout.addWidget(view.imageToolsGroupBox)
         layout.addWidget(view.colormapGroupBox)
         layout.addWidget(view.dataRangeGroupBox)
         view.setLayout(layout)
@@ -183,18 +224,55 @@ class ImageRibbon(QWidget):
         return view
 
 
+class ImageMouseTool(Enum):
+    MOVE_TOOL = auto()
+    RULER_TOOL = auto()
+    RECTANGLE_TOOL = auto()
+    LINE_CUT_TOOL = auto()
+
+
+class ImageItemEvents(QObject):
+    rectangleFinished = pyqtSignal(QRectF)
+    lineCutFinished = pyqtSignal(QLineF)
+
+
 class ImageItem(QGraphicsPixmapItem):
 
-    def __init__(self) -> None:
+    def __init__(self, events: ImageItemEvents, statusBar: QStatusBar) -> None:
         super().__init__()
+        self._events = events
+        self._statusBar = statusBar
+        self._mouseTool = ImageMouseTool.MOVE_TOOL
+        self._lineItem = QGraphicsLineItem(self)
+        self._lineItem.hide()
+        self._rectangleItem = QGraphicsRectItem(self)
+        self._rectangleItem.hide()
+        self._rectangleOrigin = QPointF()
         self.setTransformationMode(Qt.FastTransformation)
+        self.setAcceptedMouseButtons(Qt.LeftButton)
         self.setAcceptHoverEvents(True)
+
+    def setMouseTool(self, mouseTool: ImageMouseTool) -> None:
+        self._mouseTool = mouseTool
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         app = QApplication.instance()
 
         if app:
-            app.setOverrideCursor(Qt.OpenHandCursor)  # type: ignore
+            cursor = Qt.CrossCursor
+
+            if self._mouseTool == ImageMouseTool.MOVE_TOOL:
+                cursor = Qt.OpenHandCursor
+
+            app.setOverrideCursor(cursor)  # type: ignore
+
+        super().hoverEnterEvent(event)
+
+    def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
+        pos = event.pos()
+        self._statusBar.showMessage(f'{pos.x():.1f}, {pos.y():.1f}')
+        # TODO display value
+        super().hoverMoveEvent(event)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         app = QApplication.instance()
@@ -202,40 +280,226 @@ class ImageItem(QGraphicsPixmapItem):
         if app:
             app.restoreOverrideCursor()  # type: ignore
 
+        self._statusBar.clearMessage()
+        super().hoverLeaveEvent(event)
+
+    def _changeOverrideCursor(self, cursor: Qt.CursorShape) -> None:
+        app = QApplication.instance()
+
+        if app:
+            app.changeOverrideCursor(cursor)  # type: ignore
+
+    @staticmethod
+    def _createPen(color: Qt.GlobalColor) -> QPen:
+        pen = QPen(color)
+        pen.setCapStyle(Qt.FlatCap)
+        pen.setJoinStyle(Qt.MiterJoin)
+        pen.setCosmetic(True)
+        return pen
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        pass
+        if self._mouseTool == ImageMouseTool.MOVE_TOOL:
+            self._changeOverrideCursor(Qt.ClosedHandCursor)
+        elif self._mouseTool == ImageMouseTool.RULER_TOOL:
+            line = QLineF(event.pos(), event.pos())
+            self.prepareGeometryChange()
+            self._lineItem.setLine(line)
+            self._lineItem.setPen(self._createPen(Qt.cyan))
+            self._lineItem.show()
+        elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
+            self._rectangleOrigin = event.pos()
+            rect = QRectF(self._rectangleOrigin, QSizeF())
+            self.prepareGeometryChange()
+            self._rectangleItem.setRect(rect)
+            self._rectangleItem.setPen(self._createPen(Qt.cyan))
+            self._rectangleItem.show()
+        elif self._mouseTool == ImageMouseTool.LINE_CUT_TOOL:
+            line = QLineF(event.pos(), event.pos())
+            self.prepareGeometryChange()
+            self._lineItem.setLine(line)
+            self._lineItem.setPen(self._createPen(Qt.magenta))
+            self._lineItem.show()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        self.setPos(self.scenePos() + event.scenePos() - event.lastScenePos())
+        if self._mouseTool == ImageMouseTool.MOVE_TOOL:
+            self.setPos(self.scenePos() + event.scenePos() - event.lastScenePos())
+        elif self._mouseTool == ImageMouseTool.RULER_TOOL:
+            origin = self._lineItem.line().p1()
+            line = QLineF(origin, event.pos())
+            self.prepareGeometryChange()
+            self._lineItem.setLine(line)
+            message1 = f'{line.length():.1f} pixels, {line.angle():.2f}\u00b0'
+            message2 = f'{line.dx():.1f} \u00d7 {line.dy():.1f}'
+            self._statusBar.showMessage(f'{message1} ({message2})')
+        elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
+            rect = QRectF(self._rectangleOrigin, event.pos()).normalized()
+            center = rect.center()
+            self.prepareGeometryChange()
+            self._rectangleItem.setRect(rect)
+            message1 = f'{rect.width():.1f} \u00d7 {rect.height():.1f}'
+            message2 = f'{center.x():.1f}, {center.y():.1f}'
+            self._statusBar.showMessage(f'Rectangle: {message1} (Center: {message2})')
+        elif self._mouseTool == ImageMouseTool.LINE_CUT_TOOL:
+            origin = self._lineItem.line().p1()
+            line = QLineF(origin, event.pos())
+            self.prepareGeometryChange()
+            self._lineItem.setLine(line)
+            message1 = f'{line.length():.1f} pixels, {line.angle():.2f}\u00b0'
+            message2 = f'{line.dx():.1f} \u00d7 {line.dy():.1f}'
+            self._statusBar.showMessage(f'{message1} ({message2})')
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
-        pass
+        if self._mouseTool == ImageMouseTool.MOVE_TOOL:
+            self._changeOverrideCursor(Qt.OpenHandCursor)
+        elif self._mouseTool == ImageMouseTool.RULER_TOOL:
+            self._lineItem.setLine(QLineF())
+            self._lineItem.hide()
+        elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
+            self._events.rectangleFinished.emit(self._rectangleItem.rect())
+            self._rectangleItem.setRect(QRectF())
+            self._rectangleItem.hide()
+        elif self._mouseTool == ImageMouseTool.LINE_CUT_TOOL:
+            self._events.lineCutFinished.emit(self._lineItem.line())
+            self._lineItem.setLine(QLineF())
+            self._lineItem.hide()
 
 
 class ImageWidget(QGraphicsView):
+    rectangleFinished = pyqtSignal(QRectF)
+    lineCutFinished = pyqtSignal(QLineF)
 
-    def __init__(self, statusbar: QStatusBar, parent: Optional[QWidget]) -> None:
+    def __init__(self, imageItem: ImageItem, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self._pixmapItem = ImageItem()
-        self._statusbar = statusbar
+        self._imageItem = imageItem
+        self._colorLegendMinValue = 0.
+        self._colorLegendMaxValue = 1.
+        self._colorLegendStopPoints: list[tuple[float, QColor]] = [
+            (0.0, QColor(Qt.green)),
+            (0.5, QColor(Qt.yellow)),
+            (1.0, QColor(Qt.red)),
+        ]
+        self._colorLegendNumberOfTicks = 5  # TODO
+        self._isColorLegendVisible = False
+        self._isColorLegendCyclic = False
 
     @classmethod
     def createInstance(cls,
-                       statusbar: QStatusBar,
+                       statusBar: QStatusBar,
                        parent: Optional[QWidget] = None) -> ImageWidget:
-        widget = cls(statusbar, parent)
+        imageItemEvents = ImageItemEvents()
+        imageItem = ImageItem(imageItemEvents, statusBar)
+        widget = cls(imageItem, parent)
+        widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        widget.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        imageItemEvents.rectangleFinished.connect(widget.rectangleFinished)
+        imageItemEvents.lineCutFinished.connect(widget.lineCutFinished)
 
         scene = QGraphicsScene()
-        scene.addItem(widget._pixmapItem)
+        scene.addItem(imageItem)
         widget.setScene(scene)
 
         return widget
 
     def setPixmap(self, pixmap: QPixmap) -> None:
-        self._pixmapItem.setPixmap(pixmap)
+        self._imageItem.setPixmap(pixmap)
 
     def getPixmap(self) -> QPixmap:
-        return self._pixmapItem.pixmap()
+        return self._imageItem.pixmap()
+
+    def setMouseTool(self, mouseTool: ImageMouseTool) -> None:
+        self._imageItem.setMouseTool(mouseTool)
+
+    def _forceRedraw(self) -> None:
+        self.scene().update()
+
+    def setColorLegendColors(self, xArray: RealArrayType, rgbaArray: RealArrayType,
+                             isCyclic: bool) -> None:
+        colorLegendStopPoints: list[tuple[float, QColor]] = list()
+
+        for x, rgba in zip(xArray, rgbaArray):
+            color = QColor()
+            color.setRgbF(rgba[0], rgba[1], rgba[2], rgba[3])
+            colorLegendStopPoints.append((x, color))
+
+        self._colorLegendStopPoints = colorLegendStopPoints
+        self._isColorLegendCyclic = isCyclic
+        self._forceRedraw()
+
+    def setColorLegendRange(self, minValue: float, maxValue: float) -> None:
+        self._colorLegendMinValue = minValue
+        self._colorLegendMaxValue = maxValue
+        self._forceRedraw()
+
+    def setColorLegendVisible(self, visible: bool):
+        self._isColorLegendVisible = visible
+        self._forceRedraw()
+
+    def zoomToFit(self) -> None:
+        self._imageItem.setPos(0, 0)
+        scene = self.scene()
+        boundingRect = scene.itemsBoundingRect()
+        scene.setSceneRect(boundingRect)
+        self.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
+
+    @property
+    def _colorLegendTicks(self) -> Iterator[float]:
+        for tick in range(self._colorLegendNumberOfTicks):
+            a = tick / (self._colorLegendNumberOfTicks - 1)
+            yield (1. - a) * self._colorLegendMinValue + a * self._colorLegendMaxValue
+
+    def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
+        if not self._isColorLegendVisible:
+            return
+
+        fgPainter = QPainter(self.viewport())
+
+        pen = QPen()
+        pen.setWidth(3)
+        fgPainter.setPen(pen)
+
+        fontMetrics = fgPainter.fontMetrics()
+        dx = fontMetrics.horizontalAdvance('m')
+        dy = fontMetrics.lineSpacing()
+
+        widgetRect = self.viewport().rect()
+
+        if self._isColorLegendCyclic:
+            legendDiameter = 6 * dx
+            legendMargin = 2 * dx
+
+            legendRect = QRect(0, 0, legendDiameter, legendDiameter)
+            legendRect.moveRight(widgetRect.right() - legendMargin)
+            legendRect.moveBottom(widgetRect.height() - legendMargin)
+
+            cgradient = QConicalGradient(legendRect.center(), 90.)
+            cgradient.setStops(self._colorLegendStopPoints)
+            fgPainter.setBrush(cgradient)
+            fgPainter.drawEllipse(legendRect)
+        else:
+            tickLabels = [f'{tick:5g}' for tick in self._colorLegendTicks]
+            tickLabelWidth = max(fontMetrics.width(label) for label in tickLabels)
+
+            legendWidth = 2 * dx
+            legendHeight = (2 * len(tickLabels) - 1) * dy
+            legendMargin = tickLabelWidth + 2 * dx
+
+            legendRect = QRect(0, 0, legendWidth, legendHeight)
+            legendRect.moveRight(widgetRect.right() - legendMargin)
+            legendRect.moveTop((widgetRect.height() - legendHeight) // 2)
+
+            lgradient = QLinearGradient(legendRect.bottomLeft(), legendRect.topLeft())
+            lgradient.setStops(self._colorLegendStopPoints)
+            fgPainter.setBrush(lgradient)
+            fgPainter.drawRect(legendRect)
+
+            tickX0 = legendRect.right() + dx
+            tickY0 = legendRect.bottom() + fontMetrics.strikeOutPos()
+
+            for tickIndex, tickLabel in enumerate(tickLabels):
+                tickDY = (tickIndex * legendRect.height()) // (len(tickLabels) - 1)
+                viewportPoint = QPoint(tickX0, tickY0 - tickDY)
+                fgPainter.drawText(viewportPoint, tickLabel)
 
     def wheelEvent(self, event: QWheelEvent) -> None:
         oldPosition = self.mapToScene(event.pos())
@@ -249,27 +513,42 @@ class ImageWidget(QGraphicsView):
         deltaPosition = newPosition - oldPosition
         self.translate(deltaPosition.x(), deltaPosition.y())
 
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        scene_pos = self.mapToScene(event.pos())
-        item = self.itemAt(scene_pos.toPoint())
-        if isinstance(item, QGraphicsPixmapItem):
-            pixel_coords = item.mapFromScene(scene_pos)
-            self._statusbar.showMessage(
-                'Mouse click coordinates: '
-                f'{math.floor(pixel_coords.x())},{math.floor(pixel_coords.y())}')
-        super().mousePressEvent(event)
+
+class LineCutDialog(QDialog):
+
+    def __init__(self, parent: Optional[QWidget]) -> None:
+        super().__init__(parent)
+        self.figure = Figure()
+        self.figureCanvas = FigureCanvas(self.figure)
+        self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
+        self.axes = self.figure.add_subplot(111)
+
+    @classmethod
+    def createInstance(cls, parent: Optional[QWidget] = None) -> LineCutDialog:
+        title = 'Line-Cut Dialog'
+        view = cls(parent)
+        view.setWindowTitle(title)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.navigationToolbar)
+        layout.addWidget(view.figureCanvas)
+        view.setLayout(layout)
+
+        return view
 
 
 class ImageView(QWidget):
 
-    def __init__(self, statusbar: QStatusBar, parent: Optional[QWidget]) -> None:
+    def __init__(self, statusBar: QStatusBar, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.imageRibbon = ImageRibbon.createInstance()
-        self.imageWidget = ImageWidget.createInstance(statusbar)
+        self.imageWidget = ImageWidget.createInstance(statusBar)
+        self.lineCutDialog = LineCutDialog.createInstance()
 
     @classmethod
-    def createInstance(cls, statusbar: QStatusBar, parent: Optional[QWidget] = None) -> ImageView:
-        view = cls(statusbar, parent)
+    def createInstance(cls, statusBar: QStatusBar, parent: Optional[QWidget] = None) -> ImageView:
+        view = cls(statusBar, parent)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

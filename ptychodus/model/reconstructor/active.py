@@ -5,12 +5,14 @@ import time
 
 import numpy
 
+from ...api.object import Object
 from ...api.observer import Observable, Observer
 from ...api.plot import Plot2D
 from ...api.plugins import PluginChooser
-from ...api.reconstructor import (ReconstructInput, ReconstructOutput, Reconstructor,
-                                  ReconstructorLibrary, TrainableReconstructor)
-from ...api.scan import TabularScan
+from ...api.probe import Probe
+from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,
+                                  Reconstructor, ReconstructorLibrary, TrainableReconstructor)
+from ...api.scan import ScanIndexFilter, TabularScan
 from ..data import ActiveDiffractionDataset
 from ..object import ObjectAPI
 from ..probe import ProbeAPI
@@ -24,7 +26,8 @@ class ActiveReconstructor(Observable, Observer):
 
     def __init__(self, settings: ReconstructorSettings,
                  diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                 probeAPI: ProbeAPI, objectAPI: ObjectAPI, reinitObservable: Observable) -> None:
+                 probeAPI: ProbeAPI, objectAPI: ObjectAPI, reinitObservable: Observable,
+                 pluginChooser: PluginChooser[Reconstructor]) -> None:
         super().__init__()
         self._settings = settings
         self._diffractionDataset = diffractionDataset
@@ -32,7 +35,7 @@ class ActiveReconstructor(Observable, Observer):
         self._probeAPI = probeAPI
         self._objectAPI = objectAPI
         self._reinitObservable = reinitObservable
-        self._pluginChooser = PluginChooser[Reconstructor]()
+        self._pluginChooser = pluginChooser
 
     @classmethod
     def createInstance(cls, settings: ReconstructorSettings,
@@ -40,16 +43,20 @@ class ActiveReconstructor(Observable, Observer):
                        probeAPI: ProbeAPI, objectAPI: ObjectAPI,
                        libraries: Iterable[ReconstructorLibrary],
                        reinitObservable: Observable) -> ActiveReconstructor:
-        activeReconstructor = cls(settings, diffractionDataset, scanAPI, probeAPI, objectAPI,
-                                  reinitObservable)
+        pluginChooser = PluginChooser[Reconstructor]()
 
         for library in libraries:
             for reconstructor in library:
-                activeReconstructor._pluginChooser.registerPlugin(
+                pluginChooser.registerPlugin(
                     reconstructor,
                     simpleName=f'{library.name}/{reconstructor.name}',
                 )
 
+        if not pluginChooser:
+            pluginChooser.registerPlugin(NullReconstructor('None'), simpleName='None/None')
+
+        activeReconstructor = cls(settings, diffractionDataset, scanAPI, probeAPI, objectAPI,
+                                  reinitObservable, pluginChooser)
         reinitObservable.addObserver(activeReconstructor)
         activeReconstructor._syncFromSettings()
         return activeReconstructor
@@ -57,14 +64,14 @@ class ActiveReconstructor(Observable, Observer):
     def getReconstructorList(self) -> Sequence[str]:
         return self._pluginChooser.getDisplayNameList()
 
-    def _prepareInputData(self) -> ReconstructInput:
+    def _prepareInputData(self, indexFilter: ScanIndexFilter) -> ReconstructInput:
         selectedScan = self._scanAPI.getSelectedScan()
 
         if selectedScan is None:
             raise ValueError('No scan is selected!')
 
         dataIndexes = self._diffractionDataset.getAssembledIndexes()
-        scanIndexes = selectedScan.keys()
+        scanIndexes = [index for index in selectedScan.keys() if indexFilter(index)]
         commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))
 
         diffractionPatternArray = numpy.take(self._diffractionDataset.getAssembledData(),
@@ -75,17 +82,19 @@ class ActiveReconstructor(Observable, Observer):
         return ReconstructInput(
             diffractionPatternArray=diffractionPatternArray,
             scan=TabularScan(pointMap),
-            probeArray=self._probeAPI.getSelectedProbeArray(),
-            objectInterpolator=self._objectAPI.getSelectedObjectInterpolator(),
+            probeArray=self._probeAPI.getSelectedProbe().getArray(),
+            # TODO vvv generalize when able vvv
+            objectInterpolator=self._objectAPI.getSelectedThinObjectInterpolator(),
         )
 
     @property
     def name(self) -> str:
         return self._pluginChooser.currentPlugin.displayName
 
-    def reconstruct(self, name: str) -> ReconstructOutput:
+    def reconstruct(self, label: str, indexFilter: ScanIndexFilter, *,
+                    selectResults: bool) -> ReconstructOutput:
         reconstructor = self._pluginChooser.currentPlugin.strategy
-        parameters = self._prepareInputData()
+        parameters = self._prepareInputData(indexFilter)
 
         tic = time.perf_counter()
         result = reconstructor.reconstruct(parameters)
@@ -93,17 +102,19 @@ class ActiveReconstructor(Observable, Observer):
         logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')
 
         if result.scan is not None:
-            self._scanAPI.insertItemIntoRepositoryFromScan(name, result.scan, selectItem=True)
+            self._scanAPI.insertItemIntoRepositoryFromScan(label,
+                                                           result.scan,
+                                                           selectItem=selectResults)
 
         if result.probeArray is not None:
-            self._probeAPI.insertItemIntoRepositoryFromArray(name,
-                                                             result.probeArray,
-                                                             selectItem=True)
+            self._probeAPI.insertItemIntoRepository(label,
+                                                    Probe(result.probeArray),
+                                                    selectItem=selectResults)
 
         if result.objectArray is not None:
-            self._objectAPI.insertItemIntoRepositoryFromArray(name,
-                                                              result.objectArray,
-                                                              selectItem=True)
+            self._objectAPI.insertItemIntoRepository(label,
+                                                     Object(result.objectArray),
+                                                     selectItem=selectResults)
 
         return result
 
@@ -118,7 +129,7 @@ class ActiveReconstructor(Observable, Observer):
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Preparing input data...')
             tic = time.perf_counter()
-            parameters = self._prepareInputData()
+            parameters = self._prepareInputData(ScanIndexFilter.ALL)
             toc = time.perf_counter()
             logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
 

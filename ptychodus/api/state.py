@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Generic, TypeVar
@@ -10,7 +11,6 @@ import numpy.typing
 from .data import DiffractionPatternArrayType, DiffractionPatternIndexes
 from .object import ObjectArrayType
 from .probe import ProbeArrayType
-from .scan import CoordinateArrayType, ScanIndexes
 
 T = TypeVar('T')
 
@@ -25,9 +25,9 @@ class DiffractionPatternStateData:
 
 @dataclass(frozen=True)
 class ScanStateData:
-    indexes: ScanIndexes
-    positionXInMeters: CoordinateArrayType
-    positionYInMeters: CoordinateArrayType
+    indexes: Sequence[int]
+    positionXInMeters: Sequence[float]
+    positionYInMeters: Sequence[float]
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,7 @@ class ProbeStateData:
 class ObjectStateData:
     centerXInMeters: float
     centerYInMeters: float
+    layerDistanceInMeters: Sequence[float]
     array: ObjectArrayType
 
 
@@ -77,6 +78,7 @@ class StateDataRegistry:
     PROBE_ARRAY: Final[str] = 'probe'
     OBJECT_CENTER_X: Final[str] = 'objectCenterXInMeters'
     OBJECT_CENTER_Y: Final[str] = 'objectCenterYInMeters'
+    OBJECT_LAYER_DISTANCE: Final[str] = 'objectLayerDistanceInMeters'
     OBJECT_ARRAY: Final[str] = 'object'
 
     def __init__(self, dataCore: StatefulCore[DiffractionPatternStateData],
@@ -128,6 +130,7 @@ class StateDataRegistry:
             objectState = ObjectStateData(
                 centerXInMeters=float(stateData[self.OBJECT_CENTER_X]),
                 centerYInMeters=float(stateData[self.OBJECT_CENTER_Y]),
+                layerDistanceInMeters=stateData[self.OBJECT_LAYER_DISTANCE],
                 array=stateData[self.OBJECT_ARRAY],
             )
         except KeyError:
@@ -154,9 +157,9 @@ class StateDataRegistry:
         except ValueError:
             logger.error('Failed to save scan state.')
         else:
-            stateData[self.POSITION_INDEXES] = scanState.indexes
-            stateData[self.POSITION_X] = scanState.positionXInMeters
-            stateData[self.POSITION_Y] = scanState.positionYInMeters
+            stateData[self.POSITION_INDEXES] = numpy.array(scanState.indexes)
+            stateData[self.POSITION_X] = numpy.array(scanState.positionXInMeters)
+            stateData[self.POSITION_Y] = numpy.array(scanState.positionYInMeters)
 
         try:
             probeState = self._probeCore.getStateData()

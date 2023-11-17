@@ -29,6 +29,7 @@ class LissajousScanController(Observer):
         controller._syncModelToView()
         presenter.item.addObserver(controller)
         controller._dialog.open()
+        presenter.item.removeObserver(controller)
 
     def _updateInitializer(self) -> None:
         initializer = self._item.getInitializer()

@@ -3,6 +3,7 @@ from __future__ import annotations
 from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.object import ObjectPresenter
+from ...model.probe import ApparatusPresenter
 from ...view.image import ImageView
 from ..data import FileDialogFactory
 from ..image import ImageController
@@ -10,9 +11,11 @@ from ..image import ImageController
 
 class ObjectImageController(Observer):
 
-    def __init__(self, presenter: ObjectPresenter, imagePresenter: ImagePresenter,
-                 imageView: ImageView, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, apparatusPresenter: ApparatusPresenter, presenter: ObjectPresenter,
+                 imagePresenter: ImagePresenter, imageView: ImageView,
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
+        self._apparatusPresenter = apparatusPresenter
         self._presenter = presenter
         self._imagePresenter = imagePresenter
         self._imageView = imageView
@@ -20,22 +23,27 @@ class ObjectImageController(Observer):
                                                                fileDialogFactory)
 
     @classmethod
-    def createInstance(cls, presenter: ObjectPresenter, imagePresenter: ImagePresenter,
-                       imageView: ImageView,
+    def createInstance(cls, apparatusPresenter: ApparatusPresenter, presenter: ObjectPresenter,
+                       imagePresenter: ImagePresenter, imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ObjectImageController:
-        controller = cls(presenter, imagePresenter, imageView, fileDialogFactory)
+        controller = cls(apparatusPresenter, presenter, imagePresenter, imageView,
+                         fileDialogFactory)
+        apparatusPresenter.addObserver(controller)
         presenter.addObserver(controller)
         controller._syncModelToView()
         return controller
 
     def _syncModelToView(self) -> None:
-        array = self._presenter.getSelectedObjectArray()
+        array = self._presenter.getSelectedObjectFlattenedArray()
 
         if array is None:
             self._imagePresenter.clearArray()
         else:
-            self._imagePresenter.setArray(array)
+            pixelGeometry = self._apparatusPresenter.getObjectPlanePixelGeometry()
+            self._imagePresenter.setArray(array, pixelGeometry)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._apparatusPresenter:
+            self._syncModelToView()
+        elif observable is self._presenter:
             self._syncModelToView()

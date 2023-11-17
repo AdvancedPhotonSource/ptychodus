@@ -26,6 +26,7 @@ from .data import (DataCore, DiffractionDatasetPresenter, DiffractionDatasetInpu
                    DiffractionPatternPresenter)
 from .detector import Detector, DetectorPresenter, DetectorSettings
 from .image import ImageCore, ImagePresenter
+from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
 from .probe import ApparatusPresenter, ProbeCore, ProbePresenter, ProbeRepositoryPresenter
@@ -48,7 +49,7 @@ def configureLogger() -> None:
                         encoding='utf-8',
                         level=logging.DEBUG)
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
-    logging.getLogger('tike').setLevel(logging.WARNING)
+    logging.getLogger('tike').setLevel(logging.INFO)
 
     logger.info(f'Ptychodus {version("ptychodus")}')
     logger.info(f'NumPy {version("numpy")}')
@@ -76,12 +77,14 @@ class ModelCore:
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
+        self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
         self._detector = Detector.createInstance(self._detectorSettings)
         self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings,
                                                                   self._detector)
-        self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations)
+        self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations,
+                                            isComplex=False)
 
         self._dataCore = DataCore(self.settingsRegistry, self._detector,
                                   self._pluginRegistry.diffractionFileReaders)
@@ -92,13 +95,15 @@ class ModelCore:
                                     self._dataCore.patternSizer,
                                     self._pluginRegistry.probeFileReaders,
                                     self._pluginRegistry.probeFileWriters)
-        self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy())
+        self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
+                                         isComplex=True)
         self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
                                       self._scanCore.sizer, self._probeCore.sizer,
                                       self._pluginRegistry.objectPhaseCenteringStrategies,
                                       self._pluginRegistry.objectFileReaders,
                                       self._pluginRegistry.objectFileWriters)
-        self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy())
+        self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
+                                          isComplex=True)
         self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.dataset,
                                                                   self._detectorSettings,
                                                                   self._dataCore.patternSettings,
@@ -235,7 +240,7 @@ class ModelCore:
         self._stateDataRegistry.openStateData(filePath)
 
     def batchModeReconstruct(self, filePath: Path) -> int:
-        result = self._reconstructorCore.presenter.reconstruct()
+        result = self._reconstructorCore.reconstructorAPI.reconstruct()
         self.saveStateData(filePath, restartable=False)
         return result.result
 
@@ -243,9 +248,9 @@ class ModelCore:
         for filePath in directoryPath.glob('*.npz'):
             # TODO sort by filePath.stat().st_mtime
             self._stateDataRegistry.openStateData(filePath)
-            self._reconstructorCore.presenter.ingest()
+            self._reconstructorCore.reconstructorAPI.ingest()
 
-        self._reconstructorCore.presenter.train()
+        self._reconstructorCore.reconstructorAPI.train()
 
         someQualityMetric = 0.  # TODO
         return someQualityMetric

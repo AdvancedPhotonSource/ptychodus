@@ -1,27 +1,17 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any, Final
 
 import numpy
 import numpy.typing
 
-from ...api.probe import ProbeArrayType
+from ...api.apparatus import FresnelZonePlate
+from ...api.probe import Probe
 from .apparatus import Apparatus
 from .repository import ProbeInitializer
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
-
-
-@dataclass
-class FresnelZonePlate:
-    zonePlateRadiusInMeters: Decimal
-    outermostZoneWidthInMeters: Decimal
-    centralBeamstopDiameterInMeters: Decimal
-
-    def focalLengthInMeters(self, centralWavelengthInMeters: Decimal) -> Decimal:
-        return 2 * self.zonePlateRadiusInMeters * self.outermostZoneWidthInMeters \
-                / centralWavelengthInMeters
 
 
 def gaussian_spectrum(lambda0: float, bandwidth: float, energy: int) -> numpy.typing.NDArray[Any]:
@@ -34,9 +24,8 @@ def gaussian_spectrum(lambda0: float, bandwidth: float, energy: int) -> numpy.ty
     return spectrum
 
 
-def fzp_calculate(
-        wavelength: Decimal, dis_defocus: Decimal, probeSize: int, dx: Decimal,
-        zonePlate: FresnelZonePlate) -> tuple[numpy.typing.NDArray[Any], Decimal, Decimal]:
+def fzp_calculate(wavelength: float, dis_defocus: float, probeSize: int, dx: float,
+                  zonePlate: FresnelZonePlate) -> tuple[numpy.typing.NDArray[Any], float, float]:
     """
     this function can calculate the transfer function of zone plate
     return the transfer function, and the pixel sizes
@@ -55,7 +44,7 @@ def fzp_calculate(
 
     # transmission function of FZP
     T = numpy.exp(-1j * 2 * numpy.pi / float(wavelength) * (XX_FZP**2 + YY_FZP**2) / 2 / float(FL))
-    C = numpy.sqrt(XX_FZP**2 + YY_FZP**2) <= zonePlate.zonePlateRadiusInMeters
+    C = numpy.sqrt(XX_FZP**2 + YY_FZP**2) <= zonePlate.zonePlateDiameterInMeters / 2
     H = numpy.sqrt(XX_FZP**2 + YY_FZP**2) >= zonePlate.centralBeamstopDiameterInMeters / 2
 
     return T * C * H, dx_fzp, FL
@@ -106,32 +95,42 @@ def fresnel_propagation(input: numpy.typing.NDArray[Any], dxy: float, z: float,
 class FresnelZonePlateProbeInitializer(ProbeInitializer):
     SIMPLE_NAME: Final[str] = 'FresnelZonePlate'
     DISPLAY_NAME: Final[str] = 'Fresnel Zone Plate'
+    CUSTOM_PRESET: Final[str] = 'Custom'
 
     def __init__(self, sizer: ProbeSizer, apparatus: Apparatus) -> None:
         super().__init__()
         self._sizer = sizer
         self._apparatus = apparatus
-        self._zonePlate = FresnelZonePlate(
-            Decimal('90e-6'),
-            Decimal('50e-9'),
-            Decimal('60e-6'),
-        )
-        self._defocusDistanceInMeters = Decimal('800e-6')  # from sample to the focal plane
+        self._fzpDict: Mapping[str, FresnelZonePlate] = {
+            'Velociprobe': FresnelZonePlate(180e-6, 50e-9, 60e-6),
+            '2-ID-D': FresnelZonePlate(160e-6, 70e-9, 60e-6),
+            'LYNX': FresnelZonePlate(114.8e-6, 60e-9, 40e-6),
+            'HXN': FresnelZonePlate(160e-6, 30e-9, 80e-6),
+        }
+        self._presets = self.CUSTOM_PRESET
+        self._custom = FresnelZonePlate(180e-6, 50e-9, 60e-6)
+        self._defocusDistanceInMeters = 800e-6  # from sample to the focal plane
 
     def syncFromSettings(self, settings: ProbeSettings) -> None:
-        self._zonePlate.zonePlateRadiusInMeters = settings.zonePlateRadiusInMeters.value
-        self._zonePlate.outermostZoneWidthInMeters = settings.outermostZoneWidthInMeters.value
-        self._zonePlate.centralBeamstopDiameterInMeters = \
-                settings.centralBeamstopDiameterInMeters.value
-        self._defocusDistanceInMeters = settings.defocusDistanceInMeters.value
+        self._presets = settings.zonePlate.value
+        self._custom = FresnelZonePlate(
+            zonePlateDiameterInMeters=float(settings.zonePlateDiameterInMeters.value),
+            outermostZoneWidthInMeters=float(settings.outermostZoneWidthInMeters.value),
+            centralBeamstopDiameterInMeters=float(settings.centralBeamstopDiameterInMeters.value),
+        )
+        self._defocusDistanceInMeters = float(settings.defocusDistanceInMeters.value)
         super().syncFromSettings(settings)
 
     def syncToSettings(self, settings: ProbeSettings) -> None:
-        settings.zonePlateRadiusInMeters.value = self._zonePlate.zonePlateRadiusInMeters
-        settings.outermostZoneWidthInMeters.value = self._zonePlate.outermostZoneWidthInMeters
+        settings.zonePlate.value = self._presets
+        settings.zonePlateDiameterInMeters.value = \
+                Decimal.from_float(self._custom.zonePlateDiameterInMeters)
+        settings.outermostZoneWidthInMeters.value = \
+                Decimal.from_float(self._custom.outermostZoneWidthInMeters)
         settings.centralBeamstopDiameterInMeters.value = \
-                self._zonePlate.centralBeamstopDiameterInMeters
-        settings.defocusDistanceInMeters.value = self._defocusDistanceInMeters
+                Decimal.from_float(self._custom.centralBeamstopDiameterInMeters)
+        settings.defocusDistanceInMeters.value = \
+                Decimal.from_float(self._defocusDistanceInMeters)
         super().syncToSettings(settings)
 
     @property
@@ -142,26 +141,9 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
     def displayName(self) -> str:
         return self.DISPLAY_NAME
 
-    def __call__(self) -> ProbeArrayType:
-        # velo = FresnelZonePlate(
-        #         zonePlateRadiusInMeters = 90e-6,
-        #         outermostZoneWidthInMeters = 50e-9,
-        #         centralBeamstopDiameterInMeters = 60e-6)
-        # 2idd = FresnelZonePlate(
-        #         zonePlateRadiusInMeters = 80e-6,
-        #         outermostZoneWidthInMeters = 70e-9,
-        #         centralBeamstopDiameterInMeters = 60e-6)
-        # lamni = FresnelZonePlate(
-        #         zonePlateRadiusInMeters = 114.8e-6 / 2,
-        #         outermostZoneWidthInMeters = 60e-9,
-        #         centralBeamstopDiameterInMeters = 40e-6)
-        # hxn   = FresnelZonePlate(
-        #         zonePlateRadiusInMeters = 160e-6,
-        #         outermostZoneWidthInMeters = 30e-9,
-        #         centralBeamstopDiameterInMeters = 80e-6)
-
-        probeExtent = self._sizer.getExtentInPixels()
-        probe = numpy.zeros(probeExtent.shape, dtype=complex)
+    def __call__(self) -> Probe:
+        arrayExtent = self._sizer.getExtentInPixels()
+        array = numpy.zeros(arrayExtent.shape, dtype=complex)
 
         # central wavelength
         lambda0 = self._apparatus.getProbeWavelengthInMeters()
@@ -169,8 +151,8 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         # pixel size on sample plane (TODO non-square pixels are unsupported)
         dx = self._apparatus.getObjectPlanePixelGeometry().widthInMeters
 
-        T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters, probeExtent.width,
-                                       dx, self._zonePlate)
+        T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters, arrayExtent.width,
+                                       dx, self._custom)
 
         nprobe = fresnel_propagation(T, float(dx_fzp),
                                      (float(FL0) + float(self._defocusDistanceInMeters)),
@@ -178,38 +160,68 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
 
         # return probe sorted by the spectrum
         # return scale is the wavelength dependent pixel scaling factor
-        probe = nprobe / (numpy.sqrt(numpy.sum(numpy.abs(nprobe)**2)))
+        array = nprobe / (numpy.sqrt(numpy.sum(numpy.abs(nprobe)**2)))
 
-        return probe
+        return Probe(array)
 
-    def setZonePlateRadiusInMeters(self, value: Decimal) -> None:
-        if self._zonePlate.zonePlateRadiusInMeters != value:
-            self._zonePlate.zonePlateRadiusInMeters = value
+    def getPresetsList(self) -> Sequence[str]:
+        return [self.CUSTOM_PRESET, *self._fzpDict.keys()]
+
+    def setPresets(self, presets: str) -> None:
+        if self._presets != presets:
+            self._presets = presets
             self.notifyObservers()
 
-    def getZonePlateRadiusInMeters(self) -> Decimal:
-        return self._zonePlate.zonePlateRadiusInMeters
+    def getPresets(self) -> str:
+        return self._presets if self._presets in self._fzpDict else self.CUSTOM_PRESET
+
+    @property
+    def _fzp(self) -> FresnelZonePlate:
+        try:
+            return self._fzpDict[self._presets]
+        except KeyError:
+            return self._custom
+
+    def setZonePlateDiameterInMeters(self, value: Decimal) -> None:
+        if self._custom.zonePlateDiameterInMeters != value:
+            self._custom = FresnelZonePlate(
+                zonePlateDiameterInMeters=float(value),
+                outermostZoneWidthInMeters=self._custom.outermostZoneWidthInMeters,
+                centralBeamstopDiameterInMeters=self._custom.centralBeamstopDiameterInMeters,
+            )
+            self.notifyObservers()
+
+    def getZonePlateDiameterInMeters(self) -> Decimal:
+        return Decimal.from_float(self._fzp.zonePlateDiameterInMeters)
 
     def setOutermostZoneWidthInMeters(self, value: Decimal) -> None:
-        if self._zonePlate.outermostZoneWidthInMeters != value:
-            self._zonePlate.outermostZoneWidthInMeters = value
+        if self._custom.outermostZoneWidthInMeters != value:
+            self._custom = FresnelZonePlate(
+                zonePlateDiameterInMeters=self._custom.zonePlateDiameterInMeters,
+                outermostZoneWidthInMeters=float(value),
+                centralBeamstopDiameterInMeters=self._custom.centralBeamstopDiameterInMeters,
+            )
             self.notifyObservers()
 
     def getOutermostZoneWidthInMeters(self) -> Decimal:
-        return self._zonePlate.outermostZoneWidthInMeters
+        return Decimal.from_float(self._fzp.outermostZoneWidthInMeters)
 
     def setCentralBeamstopDiameterInMeters(self, value: Decimal) -> None:
-        if self._zonePlate.centralBeamstopDiameterInMeters != value:
-            self._zonePlate.centralBeamstopDiameterInMeters = value
+        if self._custom.centralBeamstopDiameterInMeters != value:
+            self._custom = FresnelZonePlate(
+                zonePlateDiameterInMeters=self._custom.zonePlateDiameterInMeters,
+                outermostZoneWidthInMeters=self._custom.outermostZoneWidthInMeters,
+                centralBeamstopDiameterInMeters=float(value),
+            )
             self.notifyObservers()
 
     def getCentralBeamstopDiameterInMeters(self) -> Decimal:
-        return self._zonePlate.centralBeamstopDiameterInMeters
+        return Decimal.from_float(self._fzp.centralBeamstopDiameterInMeters)
 
     def setDefocusDistanceInMeters(self, value: Decimal) -> None:
         if self._defocusDistanceInMeters != value:
-            self._defocusDistanceInMeters = value
+            self._defocusDistanceInMeters = float(value)
             self.notifyObservers()
 
     def getDefocusDistanceInMeters(self) -> Decimal:
-        return self._defocusDistanceInMeters
+        return Decimal.from_float(self._defocusDistanceInMeters)

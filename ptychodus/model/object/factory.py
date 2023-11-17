@@ -5,11 +5,12 @@ import logging
 
 import numpy
 
-from ...api.object import ObjectArrayType, ObjectFileReader
+from ...api.object import Object, ObjectFileReader
 from ...api.plugins import PluginChooser
+from .compare import CompareObjectInitializer
 from .file import FromFileObjectInitializer
 from .random import RandomObjectInitializer
-from .repository import ObjectRepositoryItem
+from .repository import ObjectRepository, ObjectRepositoryItem
 from .settings import ObjectSettings
 from .sizer import ObjectSizer
 
@@ -21,10 +22,12 @@ InitializerFactory: TypeAlias = Callable[[], Optional[ObjectRepositoryItem]]
 class ObjectRepositoryItemFactory:
 
     def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings, sizer: ObjectSizer,
+                 repository: ObjectRepository,
                  fileReaderChooser: PluginChooser[ObjectFileReader]) -> None:
         self._rng = rng
         self._settings = settings
         self._sizer = sizer
+        self._repository = repository
         self._fileReaderChooser = fileReaderChooser
         self._initializers = PluginChooser[InitializerFactory]()
         self._initializers.registerPlugin(
@@ -36,6 +39,11 @@ class ObjectRepositoryItemFactory:
             self.createRandomItem,
             simpleName=RandomObjectInitializer.SIMPLE_NAME,
             displayName=RandomObjectInitializer.DISPLAY_NAME,
+        )
+        self._initializers.registerPlugin(
+            self.createCompareItem,
+            simpleName=CompareObjectInitializer.SIMPLE_NAME,
+            displayName=CompareObjectInitializer.DISPLAY_NAME,
         )
 
     def getOpenFileFilterList(self) -> Sequence[str]:
@@ -68,13 +76,14 @@ class ObjectRepositoryItemFactory:
 
         return item
 
-    def createItemFromArray(self,
-                            nameHint: str,
-                            array: ObjectArrayType,
-                            *,
-                            filePath: Optional[Path] = None,
-                            fileType: str = '') -> ObjectRepositoryItem:
-        item = ObjectRepositoryItem(nameHint, array)
+    def createItem(self,
+                   nameHint: str,
+                   object_: Object,
+                   *,
+                   filePath: Optional[Path] = None,
+                   fileType: str = '') -> ObjectRepositoryItem:
+        item = ObjectRepositoryItem(nameHint)
+        item.setObject(object_)
 
         if filePath is not None:
             if filePath.is_file():
@@ -96,6 +105,21 @@ class ObjectRepositoryItemFactory:
 
     def createRandomItem(self) -> ObjectRepositoryItem:
         initializer = RandomObjectInitializer(self._rng, self._sizer)
+        item = ObjectRepositoryItem(initializer.simpleName)
+        item.setInitializer(initializer)
+        return item
+
+    def createCompareItem(self,
+                          name1: str | None = None,
+                          name2: str | None = None) -> ObjectRepositoryItem:
+        initializer = CompareObjectInitializer(self._sizer, self._repository)
+
+        if name1 is not None:
+            initializer.setName1(name1)
+
+        if name2 is not None:
+            initializer.setName2(name2)
+
         item = ObjectRepositoryItem(initializer.simpleName)
         item.setInitializer(initializer)
         return item

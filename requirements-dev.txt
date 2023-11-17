@@ -3,6 +3,7 @@ hdf5plugin
 matplotlib
 mypy
 numpy
+psutil
 pylint
 pyqt
 pytest

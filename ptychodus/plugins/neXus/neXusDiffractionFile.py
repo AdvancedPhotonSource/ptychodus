@@ -1,7 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
-from decimal import Decimal
 from pathlib import Path
 from typing import overload, Union
 import logging
@@ -65,7 +64,7 @@ class DataGroup:
 class DetectorSpecificGroup:
     nimages: int
     ntrigger: int
-    photonEnergyInElectronVolts: Decimal
+    photonEnergyInElectronVolts: float
     xPixelsInDetector: int
     yPixelsInDetector: int
 
@@ -84,7 +83,7 @@ class DetectorSpecificGroup:
         return cls(
             int(nimages[()]),
             int(ntrigger[()]),
-            Decimal(repr(photonEnergy[()])),
+            float(photonEnergy[()]),
             int(xPixelsInDetector[()]),
             int(yPixelsInDetector[()]),
         )
@@ -93,12 +92,12 @@ class DetectorSpecificGroup:
 @dataclass(frozen=True)
 class DetectorGroup:
     detectorSpecific: DetectorSpecificGroup
-    detectorDistanceInMeters: Decimal
+    detectorDistanceInMeters: float
     beamCenterXInPixels: int
     beamCenterYInPixels: int
     bitDepthReadout: int
-    xPixelSizeInMeters: Decimal
-    yPixelSizeInMeters: Decimal
+    xPixelSizeInMeters: float
+    yPixelSizeInMeters: float
 
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorGroup:
@@ -116,12 +115,12 @@ class DetectorGroup:
         assert h5YPixelSize.attrs['units'] == b'm'
         return cls(
             detectorSpecific,
-            Decimal(repr(h5DetectorDistance[()])),
+            float(h5DetectorDistance[()]),
             int(h5BeamCenterX[()]),
             int(h5BeamCenterY[()]),
             int(h5BitDepthReadout[()]),
-            Decimal(repr(h5XPixelSize[()])),
-            Decimal(repr(h5YPixelSize[()])),
+            float(h5XPixelSize[()]),
+            float(h5YPixelSize[()]),
         )
 
 

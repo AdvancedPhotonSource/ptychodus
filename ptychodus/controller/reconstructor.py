@@ -3,13 +3,11 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 import logging
 
-from PyQt5.QtCore import QStringListModel
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QStringListModel
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QWidget
 
 from ..api.observer import Observable, Observer
-from ..api.reconstructor import ReconstructOutput
 from ..model.object import ObjectPresenter
 from ..model.probe import ProbePresenter
 from ..model.reconstructor import ReconstructorPresenter
@@ -78,22 +76,21 @@ class ReconstructorParametersController(Observer):
         for name in presenter.getReconstructorList():
             controller._addReconstructor(name)
 
-        view.reconstructorView.algorithmComboBox.currentTextChanged.connect(
-            presenter.setReconstructor)
+        view.reconstructorView.algorithmComboBox.textActivated.connect(presenter.setReconstructor)
         view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex)
 
-        view.reconstructorView.scanComboBox.currentTextChanged.connect(scanPresenter.selectScan)
+        view.reconstructorView.scanComboBox.textActivated.connect(scanPresenter.selectScan)
         view.reconstructorView.scanComboBox.setModel(controller._scanListModel)
 
-        view.reconstructorView.probeComboBox.currentTextChanged.connect(probePresenter.selectProbe)
+        view.reconstructorView.probeComboBox.textActivated.connect(probePresenter.selectProbe)
         view.reconstructorView.probeComboBox.setModel(controller._probeListModel)
 
-        view.reconstructorView.objectComboBox.currentTextChanged.connect(
-            objectPresenter.selectObject)
+        view.reconstructorView.objectComboBox.textActivated.connect(objectPresenter.selectObject)
         view.reconstructorView.objectComboBox.setModel(controller._objectListModel)
 
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
+        view.reconstructorView.reconstructSplitButton.clicked.connect(controller._reconstructSplit)
         view.reconstructorView.ingestButton.clicked.connect(controller._ingest)
         view.reconstructorView.trainButton.clicked.connect(controller._train)
         view.reconstructorView.resetButton.clicked.connect(controller._reset)
@@ -120,15 +117,18 @@ class ReconstructorParametersController(Observer):
         self._view.stackedWidget.addWidget(widget)
 
     def _reconstruct(self) -> None:
-        result = ReconstructOutput.createNull()
-
         try:
-            result = self._presenter.reconstruct()
+            self._presenter.reconstruct()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
 
-        logger.info(result.result)  # TODO
+    def _reconstructSplit(self) -> None:
+        try:
+            self._presenter.reconstructSplit()
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.showException('Split Reconstructor', err)
 
     def _ingest(self) -> None:
         try:
@@ -195,6 +195,9 @@ class ReconstructorParametersController(Observer):
 
         ax = self._plotView.axes
         ax.clear()
+        ax.set_xlabel(axisX.label)
+        ax.set_ylabel(axisY.label)
+        ax.grid(True)
 
         if len(axisX.series) == len(axisY.series):
             for sx, sy in zip(axisX.series, axisY.series):
@@ -206,10 +209,6 @@ class ReconstructorParametersController(Observer):
                 ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
         else:
             logger.error('Failed to broadcast plot series!')
-
-        ax.set_xlabel(axisX.label)
-        ax.set_ylabel(axisY.label)
-        ax.grid(True)
 
         if len(axisX.series) > 0:
             ax.legend(loc='upper right')

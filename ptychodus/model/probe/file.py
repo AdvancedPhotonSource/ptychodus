@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Final
 import logging
 
-from ...api.probe import ProbeArrayType, ProbeFileReader
+from ...api.probe import Probe, ProbeFileReader
 from .repository import ProbeInitializer
 from .settings import ProbeSettings
 
@@ -35,12 +35,12 @@ class FromFileProbeInitializer(ProbeInitializer):
         settings.inputFileType.value = self._fileType
         settings.inputFilePath.value = self._filePath
 
-    def __call__(self) -> ProbeArrayType:
+    def __call__(self) -> Probe:
         logger.debug(f'Reading \"{self._filePath}\" as \"{self._fileType}\"')
 
         try:
-            array = self._fileReader.read(self._filePath)
+            probe = self._fileReader.read(self._filePath)
         except Exception as exc:
             raise RuntimeError(f'Failed to read \"{self._filePath}\"') from exc
 
-        return array
+        return probe

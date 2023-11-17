@@ -14,6 +14,8 @@ class ObjectSettings(Observable, Observer):
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/object.npy'))
+        self.numberOfLayers = settingsGroup.createIntegerEntry('NumberOfLayers', 1)
+        self.layerDistanceInMeters = settingsGroup.createRealEntry('LayerDistanceInMeters', '1e-6')
         self.amplitudeMean = settingsGroup.createRealEntry('AmplitudeMean', '0.5')
         self.amplitudeDeviation = settingsGroup.createRealEntry('AmplitudeDeviation', '0')
         self.phaseDeviation = settingsGroup.createRealEntry('PhaseDeviation', '0')

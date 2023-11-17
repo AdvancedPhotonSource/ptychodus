@@ -1,8 +1,23 @@
+from __future__ import annotations
 from dataclasses import dataclass
-from decimal import Decimal
+
+
+@dataclass(frozen=True)
+class FresnelZonePlate:
+    zonePlateDiameterInMeters: float
+    outermostZoneWidthInMeters: float
+    centralBeamstopDiameterInMeters: float
+
+    def focalLengthInMeters(self, centralWavelengthInMeters: float) -> float:
+        return self.zonePlateDiameterInMeters * self.outermostZoneWidthInMeters \
+                / centralWavelengthInMeters
 
 
 @dataclass(frozen=True)
 class PixelGeometry:
-    widthInMeters: Decimal
-    heightInMeters: Decimal
+    widthInMeters: float
+    heightInMeters: float
+
+    @classmethod
+    def createNull(cls) -> PixelGeometry:
+        return cls(0., 0.)

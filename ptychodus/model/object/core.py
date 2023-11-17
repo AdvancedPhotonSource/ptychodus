@@ -2,15 +2,15 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 import logging
 
 import numpy
 
-from ...api.object import (ObjectArrayType, ObjectFileReader, ObjectFileWriter,
+from ...api.object import (Object, ObjectArrayType, ObjectFileReader, ObjectFileWriter,
                            ObjectPhaseCenteringStrategy)
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
+from ...api.scan import ScanPoint
 from ...api.settings import SettingsRegistry
 from ...api.state import ObjectStateData, StatefulCore
 from ..probe import Apparatus, ProbeSizer
@@ -65,7 +65,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
     def getInitializerDisplayNameList(self) -> Sequence[str]:
         return self._itemFactory.getInitializerDisplayNameList()
 
-    def initializeObject(self, displayName: str) -> Optional[str]:
+    def initializeObject(self, displayName: str) -> str | None:
         return self._objectAPI.insertItemIntoRepositoryFromInitializerName(displayName)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
@@ -94,7 +94,7 @@ class ObjectRepositoryPresenter(Observable, Observer):
         fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.currentPlugin.strategy
-        writer.write(filePath, item.getArray())
+        writer.write(filePath, item.getObject())
 
         if item.getInitializer() is None:
             initializer = self._itemFactory.createFileInitializer(filePath, fileType)
@@ -127,17 +127,17 @@ class ObjectPresenter(Observable, Observer):
         return presenter
 
     def isSelectedObjectValid(self) -> bool:
-        selectedObject = self._object.getSelectedItem()
+        selectedItem = self._object.getSelectedItem()
 
-        if selectedObject is None:
+        if selectedItem is None:
             return False
 
-        actualExtent = selectedObject.getExtentInPixels()
+        object_ = selectedItem.getObject()
+        actualExtent = object_.getExtentInPixels()
         expectedExtent = self._sizer.getObjectExtentInPixels()
         widthIsBigEnough = (actualExtent.width >= expectedExtent.width)
         heightIsBigEnough = (actualExtent.height >= expectedExtent.height)
-        hasComplexDataType = numpy.iscomplexobj(selectedObject.getArray())
-        return (widthIsBigEnough and heightIsBigEnough and hasComplexDataType)
+        return (widthIsBigEnough and heightIsBigEnough)
 
     def selectObject(self, name: str) -> None:
         self._object.selectItem(name)
@@ -145,9 +145,14 @@ class ObjectPresenter(Observable, Observer):
     def getSelectedObject(self) -> str:
         return self._object.getSelectedName()
 
-    def getSelectedObjectArray(self) -> Optional[ObjectArrayType]:
-        selectedObject = self._object.getSelectedItem()
-        return None if selectedObject is None else selectedObject.getArray()
+    def getSelectedObjectFlattenedArray(self) -> ObjectArrayType | None:
+        selectedItem = self._object.getSelectedItem()
+
+        if selectedItem is None:
+            return None
+
+        object_ = selectedItem.getObject()
+        return object_.getLayersFlattened()
 
     def getSelectableNames(self) -> Sequence[str]:
         return self._object.getSelectableNames()
@@ -168,9 +173,9 @@ class ObjectCore(StatefulCore[ObjectStateData]):
                  fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
         self._settings = ObjectSettings.createInstance(settingsRegistry)
         self.sizer = ObjectSizer.createInstance(self._settings, apparatus, scanSizer, probeSizer)
-        self._itemFactory = ObjectRepositoryItemFactory(rng, self._settings, self.sizer,
-                                                        fileReaderChooser)
         self._repository = ObjectRepository()
+        self._itemFactory = ObjectRepositoryItemFactory(rng, self._settings, self.sizer,
+                                                        self._repository, fileReaderChooser)
         self._itemSettingsDelegate = ObjectRepositoryItemSettingsDelegate(
             self._settings, self._itemFactory, self._repository)
         self._object = SelectedObject.createInstance(self._repository, self._itemSettingsDelegate,
@@ -184,17 +189,24 @@ class ObjectCore(StatefulCore[ObjectStateData]):
         self.presenter = ObjectPresenter.createInstance(self.sizer, self._object, self.objectAPI)
 
     def getStateData(self) -> ObjectStateData:
-        centerInMeters = self.sizer.getMidpointInMeters()
-
+        object_ = self.objectAPI.getSelectedObject()
+        center = object_.getCenter()
         return ObjectStateData(
-            centerXInMeters=centerInMeters.x,
-            centerYInMeters=centerInMeters.y,
-            array=self.objectAPI.getSelectedObjectArray(),
+            centerXInMeters=center.x,
+            centerYInMeters=center.y,
+            layerDistanceInMeters=object_.getLayerDistancesInMeters(),
+            array=object_.getArray(),
         )
 
     def setStateData(self, stateData: ObjectStateData, stateFilePath: Path) -> None:
-        self.objectAPI.insertItemIntoRepositoryFromArray(name='Restart',
-                                                         array=stateData.array,
-                                                         filePath=stateFilePath,
-                                                         fileType=stateFilePath.suffix,
-                                                         selectItem=True)
+        object_ = Object(stateData.array)
+        object_.setCenter(ScanPoint(x=stateData.centerXInMeters, y=stateData.centerYInMeters))
+
+        for layer, distance in enumerate(stateData.layerDistanceInMeters):
+            object_.setLayerDistanceInMeters(layer, distance)
+
+        self.objectAPI.insertItemIntoRepository(name='Restart',
+                                                object_=object_,
+                                                filePath=stateFilePath,
+                                                fileType=stateFilePath.suffix[1:],
+                                                selectItem=True)

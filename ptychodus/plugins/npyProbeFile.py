@@ -3,18 +3,20 @@ from pathlib import Path
 import numpy
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import ProbeArrayType, ProbeFileReader, ProbeFileWriter
+from ptychodus.api.probe import Probe, ProbeFileReader, ProbeFileWriter
 
 
 class NPYProbeFileReader(ProbeFileReader):
 
-    def read(self, filePath: Path) -> ProbeArrayType:
-        return numpy.load(filePath)
+    def read(self, filePath: Path) -> Probe:
+        array = numpy.load(filePath)
+        return Probe(array)
 
 
 class NPYProbeFileWriter(ProbeFileWriter):
 
-    def write(self, filePath: Path, array: ProbeArrayType) -> None:
+    def write(self, filePath: Path, probe: Probe) -> None:
+        array = probe.getArray()
         numpy.save(filePath, array)
 
 

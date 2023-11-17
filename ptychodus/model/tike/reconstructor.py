@@ -109,14 +109,26 @@ class TikeReconstructor:
 
     def _plotCosts(self, costs: Sequence[Sequence[float]]) -> Plot2D:
         plot = Plot2D.createNull()
+        numIterations = len(costs)
 
-        if len(costs) > 0:
-            seriesX = PlotSeries(label='Iteration', values=[*range(len(costs))])
+        if numIterations > 0:
+            seriesX = PlotSeries(label='Iteration', values=[*range(numIterations)])
+            minCost: list[float] = list()
+            midCost: list[float] = list()
+            maxCost: list[float] = list()
+
             seriesYList: list[PlotSeries] = list()
 
-            for batch in range(len(costs[0])):
-                seriesY = PlotSeries(label=f'Batch {batch}', values=[c[batch] for c in costs])
-                seriesYList.append(seriesY)
+            for values in costs:
+                minCost.append(min(values))
+                midCost.append(float(numpy.median(values)))
+                maxCost.append(max(values))
+
+            seriesYList = [
+                PlotSeries(label='Minimum', values=minCost),
+                PlotSeries(label='Median', values=midCost),
+                PlotSeries(label='Maximum', values=maxCost),
+            ]
 
             plot = Plot2D(
                 axisX=PlotAxis(label='Iteration', series=[seriesX]),

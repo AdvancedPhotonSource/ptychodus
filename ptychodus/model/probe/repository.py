@@ -1,15 +1,12 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Final, Optional
+from typing import Final
 import logging
 
-import numpy
-
 from ...api.geometry import Interval
-from ...api.image import ImageExtent
 from ...api.observer import Observable, Observer
-from ...api.probe import ProbeArrayType
+from ...api.probe import Probe
 from ..itemRepository import ItemRepository
 from .modes import MultimodalProbeFactory, ProbeModeDecayType
 from .settings import ProbeSettings
@@ -43,7 +40,7 @@ class ProbeInitializer(ABC, Observable):
         pass
 
     @abstractmethod
-    def __call__(self) -> ProbeArrayType:
+    def __call__(self) -> Probe:
         '''produces an initial probe guess'''
         pass
 
@@ -54,67 +51,48 @@ class ProbeRepositoryItem(Observable, Observer):
     DISPLAY_NAME: Final[str] = 'From Memory'
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self,
-                 modesFactory: MultimodalProbeFactory,
-                 nameHint: str,
-                 array: Optional[ProbeArrayType] = None) -> None:
+    def __init__(self, modesFactory: MultimodalProbeFactory, nameHint: str) -> None:
         super().__init__()
         self._modesFactory = modesFactory
         self._nameHint = nameHint
-        self._array = numpy.zeros((1, 0, 0), dtype=complex)
-        self._initializer: Optional[ProbeInitializer] = None
+        self._probe = Probe()
+        self._initializer: ProbeInitializer | None = None
         self._numberOfModes = 0
         self._orthogonalizeModesEnabled = False
         self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
         self._modeDecayRatio = Decimal(1)
-
-        if array is not None:
-            self._setArray(array)
 
     @property
     def nameHint(self) -> str:
         '''returns a name hint that is appropriate for a settings file'''
         return self._nameHint
 
-    def getArray(self) -> ProbeArrayType:
-        '''returns the array data'''
-        return self._array
+    def getProbe(self) -> Probe:
+        return self._probe
 
-    def _setArray(self, array: ProbeArrayType) -> None:
-        if not numpy.iscomplexobj(array):
-            raise TypeError('Probe must be a complex-valued ndarray')
-
-        if array.ndim == 2:
-            self._array = array[numpy.newaxis, ...]
-        elif array.ndim == 3:
-            self._array = array
-        else:
-            raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
-
+    def setProbe(self, probe_: Probe) -> None:
+        self._initializer = None
+        self._probe = probe_
         self.notifyObservers()
 
-    def setArray(self, array: ProbeArrayType) -> None:
-        self._initializer = None
-        self._setArray(array)
-
     def reinitialize(self) -> None:
-        '''reinitializes the probe array'''
         if self._initializer is None:
             logger.error('Missing probe initializer!')
             return
 
         try:
-            array = self._initializer()
+            probe = self._initializer()
         except Exception:
             logger.exception('Failed to reinitialize probe!')
             return
 
         if self._numberOfModes > 0:
-            array = self._modesFactory.build(array, self._numberOfModes,
+            probe = self._modesFactory.build(probe, self._numberOfModes,
                                              self._orthogonalizeModesEnabled, self._modeDecayType,
                                              self._modeDecayRatio)
 
-        self._setArray(array)
+        self._probe = probe
+        self.notifyObservers()
 
     def getInitializerSimpleName(self) -> str:
         return self.SIMPLE_NAME if self._initializer is None else self._initializer.simpleName
@@ -122,12 +100,10 @@ class ProbeRepositoryItem(Observable, Observer):
     def getInitializerDisplayName(self) -> str:
         return self.DISPLAY_NAME if self._initializer is None else self._initializer.displayName
 
-    def getInitializer(self) -> Optional[ProbeInitializer]:
-        '''returns the initializer'''
+    def getInitializer(self) -> ProbeInitializer | None:
         return self._initializer
 
     def setInitializer(self, initializer: ProbeInitializer) -> None:
-        '''sets the initializer'''
         if self._initializer is not None:
             self._initializer.removeObserver(self)
 
@@ -155,23 +131,11 @@ class ProbeRepositoryItem(Observable, Observer):
         settings.modeDecayType.value = self._modeDecayType.name
         settings.modeDecayRatio.value = self._modeDecayRatio
 
-    def getDataType(self) -> str:
-        '''returns the array data type'''
-        return str(self._array.dtype)
-
-    def getExtentInPixels(self) -> ImageExtent:
-        '''returns the array width and height'''
-        return ImageExtent(width=self._array.shape[-1], height=self._array.shape[-2])
-
-    def getSizeInBytes(self) -> int:
-        '''returns the array size in bytes'''
-        return self._array.nbytes
-
     def getNumberOfModesLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getNumberOfModes(self) -> int:
-        return self._array.shape[-3]
+        return self._probe.getNumberOfModes()
 
     def setNumberOfModes(self, number: int) -> None:
         if self._numberOfModes != number:
@@ -206,26 +170,6 @@ class ProbeRepositoryItem(Observable, Observer):
         if self._modeDecayRatio != value:
             self._modeDecayRatio = value
             self.reinitialize()
-
-    def getMode(self, mode: int) -> ProbeArrayType:
-        return self._array[mode, :, :]
-
-    def getModesFlattened(self) -> ProbeArrayType:
-        return self._array.transpose((1, 0, 2)).reshape(self._array.shape[-2], -1)
-
-    def getModeRelativePower(self, mode: int) -> Decimal:
-        if numpy.isnan(self._array).any():
-            logger.error('Probe contains NaN value(s)!')
-            return Decimal()
-
-        probe = self._array
-        power = numpy.sum((probe * probe.conj()).real, axis=(-2, -1))
-        powersum = power.sum()
-
-        if powersum > 0.:
-            power /= powersum
-
-        return Decimal.from_float(float(power[mode]))
 
     def update(self, observable: Observable) -> None:
         if observable is self._modesFactory:

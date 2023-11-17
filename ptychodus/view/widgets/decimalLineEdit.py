@@ -95,9 +95,7 @@ class DecimalLineEdit(QWidget):
             self._emitValueChanged()
 
     def _setValueToLineEditAndEmitValueChanged(self) -> None:
-        self._lineEdit.blockSignals(True)
         self._lineEdit.setText(str(self.getValue()))
-        self._lineEdit.blockSignals(False)
         self._emitValueChanged()
 
     def _emitValueChanged(self) -> None:

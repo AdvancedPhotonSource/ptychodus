@@ -5,7 +5,7 @@ import numpy
 
 from ...api.geometry import Interval
 from ...api.image import ImageExtent
-from ...api.object import ObjectArrayType
+from ...api.object import Object
 from .repository import ObjectInitializer
 from .settings import ObjectSettings
 from .sizer import ObjectSizer
@@ -14,6 +14,7 @@ from .sizer import ObjectSizer
 class RandomObjectInitializer(ObjectInitializer):
     SIMPLE_NAME: Final[str] = 'Random'
     DISPLAY_NAME: Final[str] = 'Random'
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, rng: numpy.random.Generator, sizer: ObjectSizer) -> None:
         super().__init__()
@@ -24,6 +25,8 @@ class RandomObjectInitializer(ObjectInitializer):
         self._amplitudeMean = Decimal(1) / 2
         self._amplitudeDeviation = Decimal()
         self._phaseDeviation = Decimal()
+        self._numberOfLayers = 1
+        self._layerDistanceInMeters = Decimal()
 
     @property
     def simpleName(self) -> str:
@@ -39,6 +42,8 @@ class RandomObjectInitializer(ObjectInitializer):
         self._amplitudeMean = settings.amplitudeMean.value
         self._amplitudeDeviation = settings.amplitudeDeviation.value
         self._phaseDeviation = settings.phaseDeviation.value
+        self._numberOfLayers = settings.numberOfLayers.value
+        self._layerDistanceInMeters = settings.layerDistanceInMeters.value
         self.notifyObservers()
 
     def syncToSettings(self, settings: ObjectSettings) -> None:
@@ -47,31 +52,49 @@ class RandomObjectInitializer(ObjectInitializer):
         settings.amplitudeMean.value = self._amplitudeMean
         settings.amplitudeDeviation.value = self._amplitudeDeviation
         settings.phaseDeviation.value = self._phaseDeviation
+        settings.numberOfLayers.value = self._numberOfLayers
+        settings.layerDistanceInMeters.value = self._layerDistanceInMeters
 
-    def __call__(self) -> ObjectArrayType:
+    def __call__(self) -> Object:
         extraPaddingExtent = ImageExtent(2 * self._extraPaddingX, 2 * self._extraPaddingY)
         paddedObjectExtent = self._sizer.getObjectExtentInPixels() + extraPaddingExtent
+        objectShape = self.getNumberOfLayers(), *paddedObjectExtent.shape
 
         amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),
-                                     paddedObjectExtent.shape)
-        phase = self._rng.normal(0., float(self._phaseDeviation), paddedObjectExtent.shape)
+                                     objectShape)
+        phase = self._rng.normal(0., float(self._phaseDeviation), objectShape)
 
-        return numpy.clip(amplitude, 0., 1.) * numpy.exp(1j * phase)
+        array = numpy.clip(amplitude, 0., 1.) * numpy.exp(1j * phase)
+        distanceInMeters = float(self.getLayerDistanceInMeters())
+        object_ = Object(array)
+
+        for layer in range(object_.getNumberOfLayers()):
+            object_.setLayerDistanceInMeters(layer, distanceInMeters)
+
+        return object_
+
+    def getExtraPaddingXLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
 
     def getExtraPaddingX(self) -> int:
-        return self._extraPaddingX
+        limits = self.getExtraPaddingXLimits()
+        return limits.clamp(self._extraPaddingX)
 
-    def setExtraPaddingX(self, value: int) -> None:
-        if self._extraPaddingX != value:
-            self._extraPaddingX = value
+    def setExtraPaddingX(self, amount: int) -> None:
+        if self._extraPaddingX != amount:
+            self._extraPaddingX = amount
             self.notifyObservers()
 
-    def getExtraPaddingY(self) -> int:
-        return self._extraPaddingY
+    def getExtraPaddingYLimits(self) -> Interval[int]:
+        return Interval[int](0, self.MAX_INT)
 
-    def setExtraPaddingY(self, value: int) -> None:
-        if self._extraPaddingY != value:
-            self._extraPaddingY = value
+    def getExtraPaddingY(self) -> int:
+        limits = self.getExtraPaddingYLimits()
+        return limits.clamp(self._extraPaddingY)
+
+    def setExtraPaddingY(self, amount: int) -> None:
+        if self._extraPaddingY != amount:
+            self._extraPaddingY = amount
             self.notifyObservers()
 
     def getAmplitudeMeanLimits(self) -> Interval[Decimal]:
@@ -109,4 +132,24 @@ class RandomObjectInitializer(ObjectInitializer):
     def setPhaseDeviation(self, stddev: Decimal) -> None:
         if self._phaseDeviation != stddev:
             self._phaseDeviation = stddev
+            self.notifyObservers()
+
+    def getNumberOfLayersLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getNumberOfLayers(self) -> int:
+        limits = self.getNumberOfLayersLimits()
+        return limits.clamp(self._numberOfLayers)
+
+    def setNumberOfLayers(self, number: int) -> None:
+        if self._numberOfLayers != number:
+            self._numberOfLayers = number
+            self.notifyObservers()
+
+    def getLayerDistanceInMeters(self) -> Decimal:
+        return self._layerDistanceInMeters
+
+    def setLayerDistanceInMeters(self, number: Decimal) -> None:
+        if self._layerDistanceInMeters != number:
+            self._layerDistanceInMeters = number
             self.notifyObservers()

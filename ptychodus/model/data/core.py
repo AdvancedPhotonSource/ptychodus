@@ -97,10 +97,6 @@ class DiffractionDatasetPresenter(Observable, Observer):
     def getContentsTree(self) -> SimpleTreeNode:
         return self._dataset.getContentsTree()
 
-    def getDatasetLabel(self) -> str:
-        filePath = self._dataset.getMetadata().filePath
-        return filePath.stem if filePath else 'Unknown'
-
     def openArray(self, dataPath: str) -> Any:  # TODO generalize for other file formats
         filePath = self._dataset.getMetadata().filePath
         data = None
@@ -134,7 +130,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.notifyObservers
+            self.notifyObservers()
         elif observable is self._dataset:
             self.notifyObservers()
 

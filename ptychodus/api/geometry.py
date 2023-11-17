@@ -18,11 +18,30 @@ class Point2D(Generic[T]):
     y: T
 
 
+@dataclass(frozen=True)
+class Line2D(Generic[T]):
+    begin: Point2D[T]
+    end: Point2D[T]
+
+    def lerp(self, alpha: T) -> Point2D[T]:
+        beta = 1 - alpha
+        x = beta * self.begin.x + alpha * self.end.x
+        y = beta * self.begin.y + alpha * self.end.y
+        return Point2D[T](x, y)
+
+
 class Interval(Generic[T]):
 
     def __init__(self, lower: T, upper: T) -> None:
         self.lower: T = lower
         self.upper: T = upper
+
+    @classmethod
+    def createProper(self, a: T, b: T) -> Interval[T]:
+        if b < a:
+            return Interval[T](b, a)
+        else:
+            return Interval[T](a, b)
 
     @property
     def isEmpty(self) -> bool:

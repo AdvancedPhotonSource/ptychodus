@@ -2,8 +2,9 @@ from __future__ import annotations
 from typing import Generic, Optional, TypeVar
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QHBoxLayout, QRadioButton, QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFormLayout, QGroupBox, QHBoxLayout, QRadioButton, QSpinBox,
+                             QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, DecimalSlider, EnergyWidget, LengthWidget, RepositoryTreeView
 
@@ -79,7 +80,8 @@ class FresnelZonePlateProbeView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.zonePlateRadiusWidget = LengthWidget.createInstance()
+        self.presetsComboBox = QComboBox()
+        self.zonePlateDiameterWidget = LengthWidget.createInstance()
         self.outermostZoneWidthWidget = LengthWidget.createInstance()
         self.beamstopDiameterWidget = LengthWidget.createInstance()
         self.defocusDistanceWidget = LengthWidget.createInstance()
@@ -89,7 +91,8 @@ class FresnelZonePlateProbeView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Zone Plate Radius:', view.zonePlateRadiusWidget)
+        layout.addRow('Presets:', view.presetsComboBox)
+        layout.addRow('Zone Plate Diameter:', view.zonePlateDiameterWidget)
         layout.addRow('Outermost Zone Width:', view.outermostZoneWidthWidget)
         layout.addRow('Beamstop Diameter:', view.beamstopDiameterWidget)
         layout.addRow('Defocus Distance:', view.defocusDistanceWidget)

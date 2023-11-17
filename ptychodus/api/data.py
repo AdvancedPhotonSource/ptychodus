@@ -2,7 +2,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from enum import Enum, auto
 from pathlib import Path
 from typing import overload, Any, Optional, TypeAlias, Union
@@ -83,12 +82,12 @@ class DiffractionMetadata:
     numberOfPatternsPerArray: int
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype[numpy.integer[Any]]
-    detectorDistanceInMeters: Optional[Decimal] = None
+    detectorDistanceInMeters: Optional[float] = None
     detectorExtentInPixels: Optional[ImageExtent] = None
     detectorPixelGeometry: Optional[PixelGeometry] = None
     detectorBitDepth: Optional[int] = None
     cropCenterInPixels: Optional[Array2D[int]] = None
-    probeEnergyInElectronVolts: Optional[Decimal] = None
+    probeEnergyInElectronVolts: Optional[float] = None
     filePath: Optional[Path] = None
 
     @classmethod

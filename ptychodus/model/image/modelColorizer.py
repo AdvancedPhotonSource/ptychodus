@@ -19,11 +19,18 @@ class CylindricalColorModel(ABC):
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         pass
 
+    @abstractmethod
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        pass
+
 
 class HSVSaturationColorModel(CylindricalColorModel):
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, x, 1.0), 1.0
+
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
 
 
 class HSVValueColorModel(CylindricalColorModel):
@@ -31,11 +38,17 @@ class HSVValueColorModel(CylindricalColorModel):
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, x), 1.0
 
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
+
 
 class HSVAlphaColorModel(CylindricalColorModel):
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, 1.0), x
+
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
 
 
 class HLSLightnessColorModel(CylindricalColorModel):
@@ -43,17 +56,26 @@ class HLSLightnessColorModel(CylindricalColorModel):
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, x, 1.0), 1.0
 
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 0.5)
+
 
 class HLSSaturationColorModel(CylindricalColorModel):
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, x), 1.0
 
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
+
 
 class HLSAlphaColorModel(CylindricalColorModel):
 
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, 1.0), x
+
+    def getHue(self, h: float) -> tuple[float, float, float, float]:
+        return self(h, 1.0)
 
 
 class CylindricalColorModelColorizer(Colorizer):
@@ -66,9 +88,12 @@ class CylindricalColorModelColorizer(Colorizer):
         self._variantChooser.addObserver(self)
 
     @classmethod
-    def createColorizerVariants(
-            cls, array: VisualizationArray, displayRange: DisplayRange,
-            transformChooser: PluginChooser[ScalarTransformation]) -> Sequence[Colorizer]:
+    def createColorizerVariants(cls, array: VisualizationArray, displayRange: DisplayRange,
+                                transformChooser: PluginChooser[ScalarTransformation], *,
+                                isComplex: bool) -> Sequence[Colorizer]:
+        if not isComplex:
+            return []
+
         variantChooser = PluginChooser[CylindricalColorModel]()
         variantChooser.registerPlugin(
             HSVSaturationColorModel(),
@@ -116,13 +141,26 @@ class CylindricalColorModelColorizer(Colorizer):
     def setVariantByName(self, name: str) -> None:
         self._variantChooser.setCurrentPluginByName(name)
 
+    def getColorSamples(self, normalizedValues: RealArrayType) -> RealArrayType:
+        model = numpy.vectorize(self._variantChooser.currentPlugin.strategy.getHue)
+        r, g, b, a = model(normalizedValues)
+        return numpy.stack((r, g, b, a), axis=-1)
+
+    def isCyclic(self) -> bool:
+        return True
+
+    def getDataLabel(self) -> str:
+        transform = self._transformChooser.currentPlugin.strategy
+        return transform.decorateText('Amplitude')
+
     def getDataArray(self) -> RealArrayType:
         transform = self._transformChooser.currentPlugin.strategy
-        values = self._array.getAmplitude()
-        return transform(values)
+        return transform(self._array.getAmplitude())
 
     def __call__(self) -> RealArrayType:
-        if self._displayRange.getUpper() <= self._displayRange.getLower():
+        if self._array.size == 0:
+            return numpy.zeros((0, 0, 4))
+        elif self._displayRange.getUpper() <= self._displayRange.getLower():
             return numpy.zeros((*self._array.shape, 4))
 
         norm = Normalize(vmin=float(self._displayRange.getLower()),

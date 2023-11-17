@@ -5,36 +5,36 @@ import numpy
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
 
-from ...api.probe import ProbeArrayType
-from ...model.probe import ProbeRepositoryItemPresenter
+from ...api.object import ObjectArrayType
+from ...model.object import ObjectRepositoryItemPresenter
 
 
-class ProbeTreeNode:
+class ObjectTreeNode:
 
-    def __init__(self, parentNode: ProbeTreeNode | None,
-                 presenter: ProbeRepositoryItemPresenter | None, mode: int) -> None:
+    def __init__(self, parentNode: ObjectTreeNode | None,
+                 presenter: ObjectRepositoryItemPresenter | None, layer: int) -> None:
         self.parentNode = parentNode
         self.presenter = presenter
-        self.mode = mode
-        self.children: list[ProbeTreeNode] = list()
+        self.layer = layer
+        self.children: list[ObjectTreeNode] = list()
 
     @classmethod
-    def createRoot(cls) -> ProbeTreeNode:
+    def createRoot(cls) -> ObjectTreeNode:
         return cls(None, None, -1)
 
-    def populateModes(self) -> None:
+    def populateLayers(self) -> None:
         if self.presenter is None:
             return
 
         self.children.clear()
 
-        for mode in range(self.presenter.item.getProbe().getNumberOfModes()):
-            childNode = ProbeTreeNode(self, self.presenter, mode)
+        for layer in range(self.presenter.item.getObject().getNumberOfLayers()):
+            childNode = ObjectTreeNode(self, self.presenter, layer)
             self.children.append(childNode)
 
-    def createChild(self, presenter: ProbeRepositoryItemPresenter) -> ProbeTreeNode:
-        childNode = ProbeTreeNode(self, presenter, -1)
-        childNode.populateModes()
+    def createChild(self, presenter: ObjectRepositoryItemPresenter) -> ObjectTreeNode:
+        childNode = ObjectTreeNode(self, presenter, -1)
+        childNode.populateLayers()
         self.children.append(childNode)
         return childNode
 
@@ -54,50 +54,46 @@ class ProbeTreeNode:
         if self.presenter is None:
             return str()
 
-        return str(self.presenter.item.getProbe().getDataType())
+        return str(self.presenter.item.getObject().getDataType())
 
-    def getNumberOfModes(self) -> int:
+    def getNumberOfLayers(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getProbe().getNumberOfModes()
+        return self.presenter.item.getObject().getNumberOfLayers()
 
     def getWidthInPixels(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getProbe().getExtentInPixels().width
+        return self.presenter.item.getObject().getExtentInPixels().width
 
     def getHeightInPixels(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getProbe().getExtentInPixels().height
+        return self.presenter.item.getObject().getExtentInPixels().height
 
     def getSizeInBytes(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getProbe().getSizeInBytes()
+        return self.presenter.item.getObject().getSizeInBytes()
 
-    def getArray(self) -> ProbeArrayType:
+    def getArray(self) -> ObjectArrayType:
         if self.presenter is None:
             return numpy.zeros((0, 0, 0), dtype=complex)
-        elif self.mode < 0:
-            return self.presenter.item.getProbe().getModesFlattened()
+        elif self.layer < 0:
+            return self.presenter.item.getObject().getLayersFlattened()
 
-        return self.presenter.item.getProbe().getMode(self.mode)
+        return self.presenter.item.getObject().getLayer(self.layer)
 
-    def getRelativePowerPercent(self) -> int:
-        if self.presenter is None or self.mode < 0:
-            return -1
+    def getLayerDistanceInMeters(self) -> float:
+        if self.presenter is None or self.layer < 0:
+            return 0.
 
-        relativePower = self.presenter.item.getProbe().getModeRelativePower(self.mode)
-
-        if numpy.isfinite(relativePower):
-            return int(100. * relativePower)
-
-        return 0
+        distanceInMeters = self.presenter.item.getObject().getLayerDistanceInMeters(self.layer)
+        return float(distanceInMeters)
 
     def row(self) -> int:
         if self.parentNode:
@@ -106,41 +102,41 @@ class ProbeTreeNode:
         return 0
 
 
-class ProbeTreeModel(QAbstractItemModel):
+class ObjectTreeModel(QAbstractItemModel):
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._rootNode = ProbeTreeNode.createRoot()
+        self._rootNode = ObjectTreeNode.createRoot()
         self._header = [
-            'Name', 'Relative Power', 'Initializer', 'Data Type', 'Width [px]', 'Height [px]',
+            'Name', 'Distance [m]', 'Initializer', 'Data Type', 'Width [px]', 'Height [px]',
             'Size [MB]'
         ]
 
-    def setRootNode(self, rootNode: ProbeTreeNode) -> None:
+    def setRootNode(self, rootNode: ObjectTreeNode) -> None:
         self.beginResetModel()
         self._rootNode = rootNode
         self.endResetModel()
 
-    def refreshProbe(self, row: int) -> None:
+    def refreshObject(self, row: int) -> None:
         topLeft = self.index(row, 0)
         bottomRight = self.index(row, len(self._header))
         self.dataChanged.emit(topLeft, bottomRight)
 
         node = self._rootNode.children[row]
-        numModesOld = len(node.children)
-        numModesNew = node.getNumberOfModes()
+        numLayersOld = len(node.children)
+        numLayersNew = node.getNumberOfLayers()
 
-        if numModesOld < numModesNew:
-            self.beginInsertRows(topLeft, numModesOld, numModesNew)
-            node.populateModes()
+        if numLayersOld < numLayersNew:
+            self.beginInsertRows(topLeft, numLayersOld, numLayersNew)
+            node.populateLayers()
             self.endInsertRows()
         else:
-            self.beginRemoveRows(topLeft, numModesNew, numModesOld)
-            node.populateModes()
+            self.beginRemoveRows(topLeft, numLayersNew, numLayersOld)
+            node.populateLayers()
             self.endRemoveRows()
 
         childTopLeft = self.index(0, 0, topLeft)
-        childBottomRight = self.index(numModesNew, len(self._header), topLeft)
+        childBottomRight = self.index(numLayersNew, len(self._header), topLeft)
         self.dataChanged.emit(childTopLeft, childBottomRight)
 
     @overload
@@ -202,27 +198,26 @@ class ProbeTreeModel(QAbstractItemModel):
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
         value = QVariant()
 
-        if index.isValid():
+        if index.isValid() and role == Qt.DisplayRole:
             node = index.internalPointer()
 
-            if role == Qt.DisplayRole:
-                if node.mode < 0:
-                    if index.column() == 0:
-                        value = QVariant(node.getName())
-                    elif index.column() == 2:
-                        value = QVariant(node.getInitializerName())
-                    elif index.column() == 3:
-                        value = QVariant(node.getDataType())
-                    elif index.column() == 4:
-                        value = QVariant(node.getWidthInPixels())
-                    elif index.column() == 5:
-                        value = QVariant(node.getHeightInPixels())
-                    elif index.column() == 6:
-                        value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
-                elif index.column() == 0:
-                    value = QVariant(f'Mode {node.mode}')
-            elif role == Qt.UserRole and index.column() == 1:
-                value = QVariant(node.getRelativePowerPercent())
+            if node.layer < 0:
+                if index.column() == 0:
+                    value = QVariant(node.getName())
+                elif index.column() == 2:
+                    value = QVariant(node.getInitializerName())
+                elif index.column() == 3:
+                    value = QVariant(node.getDataType())
+                elif index.column() == 4:
+                    value = QVariant(node.getWidthInPixels())
+                elif index.column() == 5:
+                    value = QVariant(node.getHeightInPixels())
+                elif index.column() == 6:
+                    value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
+            elif index.column() == 0:
+                value = QVariant(f'Layer {node.layer}')
+            elif index.column() == 1:
+                value = QVariant(node.getLayerDistanceInMeters())
 
         return value
 

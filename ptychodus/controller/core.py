@@ -8,6 +8,7 @@ from ..view import ViewCore
 from .automation import AutomationController
 from .data import DataParametersController, FileDialogFactory
 from .detector import DetectorController
+from .memory import MemoryController
 from .object import ObjectImageController, ObjectController
 from .probe import ProbeImageController, ProbeController
 from .ptychonn import PtychoNNViewControllerFactory
@@ -25,6 +26,8 @@ class ControllerCore:
         self.model = model
         self.view = view
 
+        self._memoryController = MemoryController.createInstance(model.memoryPresenter,
+                                                                 view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
 
         self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(
@@ -38,7 +41,9 @@ class ControllerCore:
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
-            model.detectorPresenter, model.apparatusPresenter, model.diffractionDatasetPresenter,
+            model.detectorPresenter, model.apparatusPresenter,
+            model.diffractionDatasetInputOutputPresenter, model.metadataPresenter,
+            model.diffractionDatasetPresenter, model.patternPresenter,
             model.detectorImagePresenter, view.detectorView, view.detectorImageView,
             self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepositoryPresenter,
@@ -53,9 +58,9 @@ class ControllerCore:
             model.apparatusPresenter, model.objectRepositoryPresenter, model.objectImagePresenter,
             view.objectView, view.objectImageView, self._fileDialogFactory)
         self._dataParametersController = DataParametersController.createInstance(
-            model.settingsRegistry, model.diffractionDatasetInputOutputPresenter,
-            model.diffractionDatasetPresenter, model.metadataPresenter, model.patternPresenter,
-            view.dataParametersView, view.dataTableView, self._fileDialogFactory)
+            model.diffractionDatasetInputOutputPresenter, model.diffractionDatasetPresenter,
+            model.metadataPresenter, model.patternPresenter, view.dataParametersView,
+            view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter,
             model.scanPresenter,
@@ -76,11 +81,11 @@ class ControllerCore:
             model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
             view.automationView, self._fileDialogFactory)
         self._monitorProbeController = ProbeImageController.createInstance(
-            model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView,
-            self._fileDialogFactory)
+            model.apparatusPresenter, model.probePresenter, model.probeImagePresenter,
+            view.monitorProbeView.imageView, self._fileDialogFactory)
         self._monitorObjectController = ObjectImageController.createInstance(
-            model.objectPresenter, model.objectImagePresenter, view.monitorObjectView.imageView,
-            self._fileDialogFactory)
+            model.apparatusPresenter, model.objectPresenter, model.objectImagePresenter,
+            view.monitorObjectView.imageView, self._fileDialogFactory)
         self._refreshDataTimer = QTimer()
         self._automationTimer = QTimer()
         self._processMessagesTimer = QTimer()

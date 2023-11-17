@@ -1,4 +1,3 @@
-from decimal import Decimal
 from pathlib import Path
 import logging
 
@@ -35,15 +34,15 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
                     detectorExtentInPixels = ImageExtent(detectorWidth, detectorHeight)
-                    detectorDistanceInMeters = Decimal(
-                        repr(h5File['/entry_1/instrument_1/detector_1/distance'][()]))
+                    detectorDistanceInMeters = float(
+                        h5File['/entry_1/instrument_1/detector_1/distance'][()])
                     detectorPixelGeometry = PixelGeometry(
-                        Decimal(repr(h5File['/entry_1/instrument_1/detector_1/x_pixel_size'][()])),
-                        Decimal(repr(h5File['/entry_1/instrument_1/detector_1/y_pixel_size'][()])),
+                        float(h5File['/entry_1/instrument_1/detector_1/x_pixel_size'][()]),
+                        float(h5File['/entry_1/instrument_1/detector_1/y_pixel_size'][()]),
                     )
-                    probeEnergyInJoules = Decimal(
-                        repr(h5File['/entry_1/instrument_1/source_1/energy'][()]))
-                    oneJouleInElectronVolts = Decimal('6.241509074e18')
+                    probeEnergyInJoules = float(
+                        h5File['/entry_1/instrument_1/source_1/energy'][()])
+                    oneJouleInElectronVolts = 6.241509074e18
                     probeEnergyInElectronVolts = probeEnergyInJoules * oneJouleInElectronVolts
 
                     metadata = DiffractionMetadata(

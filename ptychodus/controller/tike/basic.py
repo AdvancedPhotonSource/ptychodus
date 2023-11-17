@@ -28,14 +28,14 @@ class TikeBasicParametersController(Observer):
         for model in presenter.getNoiseModelList():
             view.noiseModelComboBox.addItem(model)
 
-        view.noiseModelComboBox.currentTextChanged.connect(presenter.setNoiseModel)
+        view.noiseModelComboBox.textActivated.connect(presenter.setNoiseModel)
 
         view.numBatchSpinBox.valueChanged.connect(presenter.setNumBatch)
 
         for method in presenter.getBatchMethodList():
             view.batchMethodComboBox.addItem(method)
 
-        view.batchMethodComboBox.currentTextChanged.connect(presenter.setBatchMethod)
+        view.batchMethodComboBox.textActivated.connect(presenter.setBatchMethod)
 
         view.numIterSpinBox.valueChanged.connect(presenter.setNumIter)
         view.convergenceWindowSpinBox.valueChanged.connect(presenter.setConvergenceWindow)
@@ -47,7 +47,7 @@ class TikeBasicParametersController(Observer):
         for model in presenter.getLogLevelList():
             view.logLevelComboBox.addItem(model)
 
-        view.logLevelComboBox.currentTextChanged.connect(presenter.setLogLevel)
+        view.logLevelComboBox.textActivated.connect(presenter.setLogLevel)
 
         controller._syncModelToView()
 

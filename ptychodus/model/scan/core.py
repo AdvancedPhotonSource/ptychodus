@@ -185,9 +185,9 @@ class ScanCore(StatefulCore[ScanStateData]):
                 positionYInMeters.append(point.y)
 
         return ScanStateData(
-            indexes=numpy.array(indexes),
-            positionXInMeters=numpy.array(positionXInMeters),
-            positionYInMeters=numpy.array(positionYInMeters),
+            indexes=indexes,
+            positionXInMeters=positionXInMeters,
+            positionYInMeters=positionYInMeters,
         )
 
     def setStateData(self, stateData: ScanStateData, stateFilePath: Path) -> None:
@@ -200,5 +200,5 @@ class ScanCore(StatefulCore[ScanStateData]):
         self.scanAPI.insertItemIntoRepositoryFromScan(name='Restart',
                                                       scan=TabularScan(pointMap),
                                                       filePath=stateFilePath,
-                                                      fileType=stateFilePath.suffix,
+                                                      fileType=stateFilePath.suffix[1:],
                                                       selectItem=True)

@@ -66,7 +66,6 @@ class LengthWidget(QWidget):
                 self.unitsComboBox.setCurrentIndex(index)
 
         self._updateDisplay()
-        self.lengthChanged.emit(self.getLengthInMeters())
 
     @property
     def _scaleToMeters(self) -> Decimal:

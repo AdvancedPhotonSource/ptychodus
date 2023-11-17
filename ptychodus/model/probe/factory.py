@@ -4,7 +4,7 @@ from typing import Optional, TypeAlias
 import logging
 
 from ...api.plugins import PluginChooser
-from ...api.probe import ProbeArrayType, ProbeFileReader
+from ...api.probe import Probe, ProbeFileReader
 from .apparatus import Apparatus
 from .disk import DiskProbeInitializer
 from .file import FromFileProbeInitializer
@@ -81,13 +81,14 @@ class ProbeRepositoryItemFactory:
 
         return item
 
-    def createItemFromArray(self,
-                            nameHint: str,
-                            array: ProbeArrayType,
-                            *,
-                            filePath: Optional[Path] = None,
-                            fileType: str = '') -> ProbeRepositoryItem:
-        item = ProbeRepositoryItem(self._modesFactory, nameHint, array)
+    def createItem(self,
+                   nameHint: str,
+                   probe: Probe,
+                   *,
+                   filePath: Optional[Path] = None,
+                   fileType: str = '') -> ProbeRepositoryItem:
+        item = ProbeRepositoryItem(self._modesFactory, nameHint)
+        item.setProbe(probe)
 
         if filePath is not None:
             if filePath.is_file():

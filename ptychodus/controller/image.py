@@ -1,40 +1,65 @@
 from __future__ import annotations
+import logging
 
-from PyQt5.QtCore import QStringListModel
+from PyQt5.QtCore import QLineF, QRectF, QStringListModel
 from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import QButtonGroup
 
 import numpy
 
+from ..api.geometry import Line2D, Point2D
 from ..api.observer import Observable, Observer
 from ..model.image import ImagePresenter
-from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageFileGroupBox,
-                          ImageView, ImageWidget)
+from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageMouseTool,
+                          ImageToolsGroupBox, ImageView, ImageWidget)
 from .data import FileDialogFactory
 
+logger = logging.getLogger(__name__)
 
-class ImageFileController:
+
+class ImageToolsController:
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
-    def __init__(self, view: ImageFileGroupBox, imageWidget: ImageWidget,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, view: ImageToolsGroupBox, imageWidget: ImageWidget,
+                 fileDialogFactory: FileDialogFactory, mouseToolButtonGroup: QButtonGroup) -> None:
         self._view = view
         self._imageWidget = imageWidget
         self._fileDialogFactory = fileDialogFactory
+        self._mouseToolButtonGroup = mouseToolButtonGroup
 
     @classmethod
-    def createInstance(cls, view: ImageFileGroupBox, imageWidget: ImageWidget,
-                       fileDialogFactory: FileDialogFactory) -> ImageFileController:
-        controller = cls(view, imageWidget, fileDialogFactory)
+    def createInstance(cls, view: ImageToolsGroupBox, imageWidget: ImageWidget,
+                       fileDialogFactory: FileDialogFactory) -> ImageToolsController:
+        view.moveButton.setCheckable(True)
+        view.moveButton.setChecked(True)
+        view.rulerButton.setCheckable(True)
+        view.rectangleButton.setCheckable(True)
+        view.lineCutButton.setCheckable(True)
+
+        mouseToolButtonGroup = QButtonGroup()
+        mouseToolButtonGroup.addButton(view.moveButton, ImageMouseTool.MOVE_TOOL.value)
+        mouseToolButtonGroup.addButton(view.rulerButton, ImageMouseTool.RULER_TOOL.value)
+        mouseToolButtonGroup.addButton(view.rectangleButton, ImageMouseTool.RECTANGLE_TOOL.value)
+        mouseToolButtonGroup.addButton(view.lineCutButton, ImageMouseTool.LINE_CUT_TOOL.value)
+
+        controller = cls(view, imageWidget, fileDialogFactory, mouseToolButtonGroup)
+        view.homeButton.clicked.connect(imageWidget.zoomToFit)
         view.saveButton.clicked.connect(controller._saveImage)
+        mouseToolButtonGroup.idToggled.connect(controller._setMouseTool)
         return controller
 
     def _saveImage(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view, 'Save Image', mimeTypeFilters=ImageFileController.MIME_TYPES)
+            self._view, 'Save Image', mimeTypeFilters=ImageToolsController.MIME_TYPES)
 
         if filePath:
             pixmap = self._imageWidget.getPixmap()
             pixmap.save(str(filePath))
+
+    def _setMouseTool(self, toolId: int, checked: bool) -> None:
+        if checked:
+            mouseTool = ImageMouseTool(toolId)
+            self._imageWidget.setMouseTool(mouseTool)
 
 
 class ImageColorizerController(Observer):
@@ -59,10 +84,9 @@ class ImageColorizerController(Observer):
         controller._syncModelToView()
         presenter.addObserver(controller)
 
-        view.colorizerComboBox.currentTextChanged.connect(presenter.setColorizerByName)
-        view.scalarTransformComboBox.currentTextChanged.connect(
-            presenter.setScalarTransformationByName)
-        view.variantComboBox.currentTextChanged.connect(presenter.setVariantByName)
+        view.colorizerComboBox.textActivated.connect(presenter.setColorizerByName)
+        view.scalarTransformComboBox.textActivated.connect(presenter.setScalarTransformationByName)
+        view.variantComboBox.textActivated.connect(presenter.setVariantByName)
 
         return controller
 
@@ -90,14 +114,16 @@ class ImageColorizerController(Observer):
 
 class ImageDataRangeController(Observer):
 
-    def __init__(self, presenter: ImagePresenter, view: ImageDataRangeGroupBox) -> None:
+    def __init__(self, presenter: ImagePresenter, view: ImageDataRangeGroupBox,
+                 imageWidget: ImageWidget) -> None:
         self._presenter = presenter
         self._view = view
+        self._imageWidget = imageWidget
 
     @classmethod
-    def createInstance(cls, presenter: ImagePresenter,
-                       view: ImageDataRangeGroupBox) -> ImageDataRangeController:
-        controller = cls(presenter, view)
+    def createInstance(cls, presenter: ImagePresenter, view: ImageDataRangeGroupBox,
+                       imageWidget: ImageWidget) -> ImageDataRangeController:
+        controller = cls(presenter, view, imageWidget)
 
         controller._syncModelToView()
         presenter.addObserver(controller)
@@ -105,11 +131,15 @@ class ImageDataRangeController(Observer):
         view.minDisplayValueSlider.valueChanged.connect(presenter.setMinDisplayValue)
         view.maxDisplayValueSlider.valueChanged.connect(presenter.setMaxDisplayValue)
         view.autoButton.clicked.connect(presenter.setDisplayRangeToDataRange)
-        view.setButton.clicked.connect(controller._setCustomDisplayRange)
+        view.editButton.clicked.connect(controller._editDisplayRange)
+
+        view.colorLegendButton.setCheckable(True)
+        imageWidget.setColorLegendVisible(view.colorLegendButton.isChecked())
+        view.colorLegendButton.toggled.connect(imageWidget.setColorLegendVisible)
 
         return controller
 
-    def _setCustomDisplayRange(self) -> None:
+    def _editDisplayRange(self) -> None:
         if self._view.displayRangeDialog.exec_():
             minValue = self._view.displayRangeDialog.minValue()
             maxValue = self._view.displayRangeDialog.maxValue()
@@ -117,13 +147,19 @@ class ImageDataRangeController(Observer):
 
     def _syncModelToView(self) -> None:
         displayRangeLimits = self._presenter.getDisplayRangeLimits()
+        minDisplayValue = self._presenter.getMinDisplayValue()
+        maxDisplayValue = self._presenter.getMaxDisplayValue()
 
-        self._view.minDisplayValueSlider.setValueAndRange(self._presenter.getMinDisplayValue(),
-                                                          displayRangeLimits)
-        self._view.maxDisplayValueSlider.setValueAndRange(self._presenter.getMaxDisplayValue(),
-                                                          displayRangeLimits)
+        self._view.minDisplayValueSlider.setValueAndRange(minDisplayValue, displayRangeLimits)
+        self._view.maxDisplayValueSlider.setValueAndRange(maxDisplayValue, displayRangeLimits)
         self._view.displayRangeDialog.setMinAndMaxValues(displayRangeLimits.lower,
                                                          displayRangeLimits.upper)
+        self._imageWidget.setColorLegendRange(float(minDisplayValue), float(maxDisplayValue))
+
+        xArray = numpy.linspace(0., 1., 256)
+        rgbaArray = self._presenter.getColorSamples(xArray)
+        self._imageWidget.setColorLegendColors(xArray, rgbaArray,
+                                               self._presenter.isColorizerCyclic())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -136,27 +172,48 @@ class ImageController(Observer):
                  fileDialogFactory: FileDialogFactory) -> None:
         self._presenter = presenter
         self._view = view
-        self._fileController = ImageFileController.createInstance(
-            view.imageRibbon.imageFileGroupBox, view.imageWidget, fileDialogFactory)
+        self._toolsController = ImageToolsController.createInstance(
+            view.imageRibbon.imageToolsGroupBox, view.imageWidget, fileDialogFactory)
         self._colorizerController = ImageColorizerController.createInstance(
             presenter, view.imageRibbon.colormapGroupBox)
         self._dataRangeController = ImageDataRangeController.createInstance(
-            presenter, view.imageRibbon.dataRangeGroupBox)
+            presenter, view.imageRibbon.dataRangeGroupBox, view.imageWidget)
 
     @classmethod
     def createInstance(cls, presenter: ImagePresenter, view: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ImageController:
         controller = cls(presenter, view, fileDialogFactory)
+        view.imageWidget.rectangleFinished.connect(controller._handleRectangle)
+        view.imageWidget.lineCutFinished.connect(controller._handleLineCut)
         controller._syncModelToView()
         presenter.addObserver(controller)
         return controller
+
+    def _handleRectangle(self, rect: QRectF) -> None:
+        print(rect)  # TODO use for crop
+
+    def _handleLineCut(self, line: QLineF) -> None:
+        p1 = Point2D[float](line.x1(), line.y1())
+        p2 = Point2D[float](line.x2(), line.y2())
+        line2D = Line2D[float](p1, p2)
+        lineCut = self._presenter.getLineCut(line2D)
+
+        ax = self._view.lineCutDialog.axes
+        ax.clear()
+        ax.plot(lineCut.distanceInMeters, lineCut.value, '.-', linewidth=1.5)
+        ax.set_xlabel('Distance [m]')
+        ax.set_ylabel(lineCut.valueLabel)
+        ax.grid(True)
+        self._view.lineCutDialog.figureCanvas.draw()
+        self._view.lineCutDialog.open()
 
     def _syncModelToView(self) -> None:
         realImage = self._presenter.getImage()
         qpixmap = QPixmap()
 
         if realImage is not None and numpy.size(realImage) > 0:
-            integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8)
+            # NOTE .copy() ensures integerImage is not a view
+            integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8).copy()
 
             qimage = QImage(integerImage.data, integerImage.shape[1], integerImage.shape[0],
                             integerImage.strides[0], QImage.Format_RGBA8888)
