@@ -37,7 +37,7 @@ class TikeReconstructor:
         self._objectCorrectionSettings = objectCorrectionSettings
 
         tikeVersion = version('tike')
-        logger.info(f'\tTike {tikeVersion}')
+        logger.info(f'\tTike {tikeVersion}') # FIXME update interface
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings

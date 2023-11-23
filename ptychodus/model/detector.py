@@ -92,7 +92,7 @@ class DetectorPresenter(Observable, Observer):
         self._settings.numberOfPixelsX.value = value
 
     def getPixelSizeXInMeters(self) -> Decimal:
-        return Decimal.from_float(self._detector.getPixelGeometry().widthInMeters)
+        return Decimal.from_float(self._detector.getPixelGeometry().widthInMeters) # FIXME from_float -> repr
 
     def setPixelSizeXInMeters(self, value: Decimal) -> None:
         self._settings.pixelSizeXInMeters.value = value

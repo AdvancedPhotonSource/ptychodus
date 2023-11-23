@@ -6,8 +6,8 @@ from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonB
                              QGridLayout, QGroupBox, QLabel, QSizePolicy, QSpinBox, QVBoxLayout,
                              QWidget)
 
-from matplotlib.backends.backend_qt5agg import FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 from .widgets import DecimalSlider, LengthWidget, RepositoryTreeView
@@ -101,7 +101,7 @@ class CompareObjectPlotView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.figure = Figure()
-        self.figureCanvas = FigureCanvas(self.figure)
+        self.figureCanvas = FigureCanvasQTAgg(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
 

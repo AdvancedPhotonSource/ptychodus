@@ -90,6 +90,7 @@ def main() -> int:
             verifyAllArgumentsParsed(parser, unparsedArgs)
             return model.batchModeReconstruct(resultsFilePath)
 
+        # FIXME pass if no Qt
         from PyQt5.QtWidgets import QApplication
         # QApplication expects the first argument to be the program name
         app = QApplication(sys.argv[:1] + unparsedArgs)

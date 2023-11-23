@@ -4,8 +4,8 @@ from typing import Optional
 from PyQt5.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QLabel, QPushButton, QScrollArea,
                              QStackedWidget, QVBoxLayout, QWidget)
 
-from matplotlib.backends.backend_qt5agg import FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 
@@ -92,7 +92,7 @@ class ReconstructorPlotView(QWidget):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.figure = Figure()
-        self.figureCanvas = FigureCanvas(self.figure)
+        self.figureCanvas = FigureCanvasQTAgg(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
 

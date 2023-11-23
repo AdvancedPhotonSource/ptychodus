@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox,
                              QGraphicsView, QGridLayout, QHBoxLayout, QPushButton, QSizePolicy,
                              QSpinBox, QStatusBar, QToolButton, QVBoxLayout, QWidget)
 
-from matplotlib.backends.backend_qt5agg import FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 from ..api.image import RealArrayType
@@ -519,7 +519,7 @@ class LineCutDialog(QDialog):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.figure = Figure()
-        self.figureCanvas = FigureCanvas(self.figure)
+        self.figureCanvas = FigureCanvasQTAgg(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
 

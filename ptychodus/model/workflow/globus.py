@@ -164,7 +164,7 @@ class GlobusWorkflowThread(threading.Thread):
 
         logger.info('\tGlobus SDK ' + version('globus-sdk'))
         logger.info('\tFair Research Login ' + version('fair-research-login'))
-        logger.info('\tGladier ' + version('gladier'))
+        logger.info('\tGladier ' + version('gladier')) # FIXME update interface
 
         self.__gladierClient: Optional[gladier.GladierBaseClient] = None
 
