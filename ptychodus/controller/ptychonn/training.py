@@ -117,7 +117,7 @@ class PtychoNNTrainingParametersController(Observer):
                 self._presenter.saveTrainingData(filePath)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File writer', err)
+                ExceptionDialog.showException('File Writer', err)
 
     def _syncModelToView(self) -> None:
         self._view.validationSetFractionalSizeSlider.setValueAndRange(

@@ -5,9 +5,10 @@ from PyQt5.QtCore import QItemSelection
 from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ...api.observer import Observable, Observer
-from ...model import DetectorPresenter, MetadataPresenter
+from ...model import MetadataPresenter
 from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
                            DiffractionPatternPresenter)
+from ...model.experiment import DetectorPresenter
 from ...model.image import ImagePresenter
 from ...model.probe import ApparatusPresenter
 from ...view.detector import DetectorView

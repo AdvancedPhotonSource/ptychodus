@@ -135,8 +135,8 @@ class ObjectPresenter(Observable, Observer):
         object_ = selectedItem.getObject()
         actualExtent = object_.getExtentInPixels()
         expectedExtent = self._sizer.getObjectExtentInPixels()
-        widthIsBigEnough = (actualExtent.width >= expectedExtent.width)
-        heightIsBigEnough = (actualExtent.height >= expectedExtent.height)
+        widthIsBigEnough = (actualExtent.widthInPixels >= expectedExtent.widthInPixels)
+        heightIsBigEnough = (actualExtent.heightInPixels >= expectedExtent.heightInPixels)
         return (widthIsBigEnough and heightIsBigEnough)
 
     def selectObject(self, name: str) -> None:

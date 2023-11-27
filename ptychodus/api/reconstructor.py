@@ -4,12 +4,12 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .apparatus import ImageExtent
 from .data import DiffractionPatternArrayType
-from .image import ImageExtent
 from .object import ObjectArrayType, ObjectInterpolator
-from .plot import Plot2D
 from .probe import ProbeArrayType
 from .scan import Scan
+from .visualize import Plot2D
 
 
 @dataclass(frozen=True)
@@ -22,15 +22,15 @@ class ReconstructInput:
     @property
     def diffractionPatternExtent(self) -> ImageExtent:
         return ImageExtent(
-            width=self.diffractionPatternArray.shape[-1],
-            height=self.diffractionPatternArray.shape[-2],
+            widthInPixels=self.diffractionPatternArray.shape[-1],
+            heightInPixels=self.diffractionPatternArray.shape[-2],
         )
 
     @property
     def probeExtent(self) -> ImageExtent:
         return ImageExtent(
-            width=self.probeArray.shape[-1],
-            height=self.probeArray.shape[-2],
+            widthInPixels=self.probeArray.shape[-1],
+            heightInPixels=self.probeArray.shape[-2],
         )
 
     @property
@@ -40,8 +40,8 @@ class ReconstructInput:
     @property
     def objectExtent(self) -> ImageExtent:
         return ImageExtent(
-            width=self.objectArray.shape[-1],
-            height=self.objectArray.shape[-2],
+            widthInPixels=self.objectArray.shape[-1],
+            heightInPixels=self.objectArray.shape[-2],
         )
 
 

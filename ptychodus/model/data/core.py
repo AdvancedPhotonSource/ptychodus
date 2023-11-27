@@ -15,7 +15,7 @@ from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry
 from ...api.state import DiffractionPatternStateData, StatefulCore
 from ...api.tree import SimpleTreeNode
-from ..detector import Detector
+from ..experiment import Detector
 from .active import ActiveDiffractionDataset
 from .api import DiffractionDataAPI
 from .builder import ActiveDiffractionDatasetBuilder

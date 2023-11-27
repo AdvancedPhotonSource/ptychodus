@@ -45,9 +45,9 @@ class SuperGaussianProbeInitializer(ProbeInitializer):
     def __call__(self) -> Probe:
         extent = self._sizer.getExtentInPixels()
         pixelGeometry = self._apparatus.getObjectPlanePixelGeometry()
-        Y, X = numpy.mgrid[:extent.height, :extent.width]
-        X_px = X - (extent.width - 1) / 2
-        Y_px = Y - (extent.height - 1) / 2
+        Y, X = numpy.mgrid[:extent.heightInPixels, :extent.widthInPixels]
+        X_px = X - (extent.widthInPixels - 1) / 2
+        Y_px = Y - (extent.heightInPixels - 1) / 2
 
         X_m = X_px * float(pixelGeometry.widthInMeters)
         Y_m = Y_px * float(pixelGeometry.heightInMeters)

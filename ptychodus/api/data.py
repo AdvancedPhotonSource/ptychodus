@@ -4,14 +4,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
-from typing import overload, Any, Optional, TypeAlias, Union
+from typing import overload, Any, TypeAlias, Union
 
 import numpy
 import numpy.typing
 
-from .apparatus import PixelGeometry
+from .apparatus import ImageExtent, PixelGeometry
 from .geometry import Array2D
-from .image import ImageExtent
 from .observer import Observable
 from .tree import SimpleTreeNode
 
@@ -82,16 +81,16 @@ class DiffractionMetadata:
     numberOfPatternsPerArray: int
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype[numpy.integer[Any]]
-    detectorDistanceInMeters: Optional[float] = None
-    detectorExtentInPixels: Optional[ImageExtent] = None
-    detectorPixelGeometry: Optional[PixelGeometry] = None
-    detectorBitDepth: Optional[int] = None
-    cropCenterInPixels: Optional[Array2D[int]] = None
-    probeEnergyInElectronVolts: Optional[float] = None
-    filePath: Optional[Path] = None
+    detectorDistanceInMeters: float | None = None
+    detectorExtentInPixels: ImageExtent | None = None
+    detectorPixelGeometry: PixelGeometry | None = None
+    detectorBitDepth: int | None = None
+    cropCenterInPixels: Array2D[int] | None = None
+    probeEnergyInElectronVolts: float | None = None
+    filePath: Path | None = None
 
     @classmethod
-    def createNullInstance(cls, filePath: Optional[Path] = None) -> DiffractionMetadata:
+    def createNullInstance(cls, filePath: Path | None = None) -> DiffractionMetadata:
         return cls(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
 
 
@@ -116,7 +115,7 @@ class SimpleDiffractionDataset(DiffractionDataset):
         self._arrayList = arrayList
 
     @classmethod
-    def createNullInstance(cls, filePath: Optional[Path] = None) -> SimpleDiffractionDataset:
+    def createNullInstance(cls, filePath: Path | None = None) -> SimpleDiffractionDataset:
         metadata = DiffractionMetadata.createNullInstance(filePath)
         contentsTree = SimpleTreeNode.createRoot(list())
         arrayList: list[DiffractionPatternArray] = list()

@@ -4,7 +4,7 @@ from decimal import Decimal
 from ...api.apparatus import PixelGeometry
 from ...api.observer import Observable, Observer
 from ..data import DiffractionPatternSizer
-from ..detector import Detector
+from ..experiment import Detector
 from .settings import ProbeSettings
 
 

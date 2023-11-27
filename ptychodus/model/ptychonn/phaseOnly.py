@@ -9,10 +9,10 @@ from scipy.ndimage import map_coordinates
 import numpy
 import numpy.typing
 
-from ...api.image import ImageExtent
+from ...api.apparatus import ImageExtent
 from ...api.object import ObjectPatchAxis
-from ...api.plot import Plot2D, PlotAxis, PlotSeries
 from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
+from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ..object import ObjectAPI
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
@@ -120,15 +120,15 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
 
         patchExtent = ImageExtent(
-            width=objectPatches.shape[-1],
-            height=objectPatches.shape[-2],
+            widthInPixels=objectPatches.shape[-1],
+            heightInPixels=objectPatches.shape[-2],
         )
 
         for scanPoint, objectPatchReals in zip(parameters.scan.values(), objectPatches):
             objectPatch = 0.5 * numpy.exp(1j * objectPatchReals[0])
 
-            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
-            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
+            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.widthInPixels)
+            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.heightInPixels)
 
             pixelCentersX = patchAxisX.getObjectPixelCenters()
             pixelCentersY = patchAxisY.getObjectPixelCenters()

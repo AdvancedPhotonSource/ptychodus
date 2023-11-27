@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import numpy
 
-from ...api.apparatus import PixelGeometry
-from ...api.image import ImageExtent
+from ...api.apparatus import ImageExtent, PixelGeometry
 from ...api.observer import Observable, Observer
 from ...api.scan import ScanPoint
 from ..probe import Apparatus, ProbeSizer
@@ -47,13 +46,18 @@ class ObjectSizer(Observable, Observer):
             extentX = int(numpy.ceil(bbox.rangeX.width / float(pixelGeometry.widthInMeters)))
             extentY = int(numpy.ceil(bbox.rangeY.width / float(pixelGeometry.heightInMeters)))
 
-        return ImageExtent(width=extentX, height=extentY)
+        return ImageExtent(widthInPixels=extentX, heightInPixels=extentY)
 
     def getProbeExtentInPixels(self) -> ImageExtent:
         return self._probeSizer.getExtentInPixels()
 
     def getObjectExtentInPixels(self) -> ImageExtent:
-        return self.getScanExtentInPixels() + self.getProbeExtentInPixels()
+        scanExtent = self.getScanExtentInPixels()
+        probeExtent = self.getProbeExtentInPixels()
+        return ImageExtent(
+            widthInPixels=scanExtent.widthInPixels + probeExtent.widthInPixels,
+            heightInPixels=scanExtent.heightInPixels + probeExtent.heightInPixels,
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._apparatus:

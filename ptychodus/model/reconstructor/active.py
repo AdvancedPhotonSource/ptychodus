@@ -7,7 +7,7 @@ import numpy
 
 from ...api.object import Object
 from ...api.observer import Observable, Observer
-from ...api.plot import Plot2D
+from ...api.visualize import Plot2D
 from ...api.plugins import PluginChooser
 from ...api.probe import Probe
 from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,

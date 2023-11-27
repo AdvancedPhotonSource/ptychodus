@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...model import DetectorPresenter
+from ...model.experiment import DetectorPresenter
 from ...model.probe import ApparatusPresenter
 from ...view.detector import DetectorParametersView
 
@@ -22,11 +22,6 @@ class DetectorParametersController(Observer):
         presenter.addObserver(controller)
         apparatusPresenter.addObserver(controller)
 
-        view.numberOfPixelsXSpinBox.valueChanged.connect(presenter.setNumberOfPixelsX)
-        view.numberOfPixelsYSpinBox.valueChanged.connect(presenter.setNumberOfPixelsY)
-        view.pixelSizeXWidget.lengthChanged.connect(presenter.setPixelSizeXInMeters)
-        view.pixelSizeYWidget.lengthChanged.connect(presenter.setPixelSizeYInMeters)
-        view.bitDepthSpinBox.valueChanged.connect(presenter.setBitDepth)
         view.detectorDistanceWidget.lengthChanged.connect(presenter.setDetectorDistanceInMeters)
 
         controller._syncModelToView()
@@ -34,29 +29,6 @@ class DetectorParametersController(Observer):
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.numberOfPixelsXSpinBox.blockSignals(True)
-        self._view.numberOfPixelsXSpinBox.setRange(
-            self._presenter.getNumberOfPixelsXLimits().lower,
-            self._presenter.getNumberOfPixelsXLimits().upper)
-        self._view.numberOfPixelsXSpinBox.setValue(self._presenter.getNumberOfPixelsX())
-        self._view.numberOfPixelsXSpinBox.blockSignals(False)
-
-        self._view.numberOfPixelsYSpinBox.blockSignals(True)
-        self._view.numberOfPixelsYSpinBox.setRange(
-            self._presenter.getNumberOfPixelsYLimits().lower,
-            self._presenter.getNumberOfPixelsYLimits().upper)
-        self._view.numberOfPixelsYSpinBox.setValue(self._presenter.getNumberOfPixelsY())
-        self._view.numberOfPixelsYSpinBox.blockSignals(False)
-
-        self._view.pixelSizeXWidget.setLengthInMeters(self._presenter.getPixelSizeXInMeters())
-        self._view.pixelSizeYWidget.setLengthInMeters(self._presenter.getPixelSizeYInMeters())
-
-        self._view.bitDepthSpinBox.blockSignals(True)
-        self._view.bitDepthSpinBox.setRange(self._presenter.getBitDepthLimits().lower,
-                                            self._presenter.getBitDepthLimits().upper)
-        self._view.bitDepthSpinBox.setValue(self._presenter.getBitDepth())
-        self._view.bitDepthSpinBox.blockSignals(False)
-
         self._view.detectorDistanceWidget.setLengthInMeters(
             self._presenter.getDetectorDistanceInMeters())
 

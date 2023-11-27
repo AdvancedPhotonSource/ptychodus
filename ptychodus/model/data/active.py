@@ -8,10 +8,10 @@ import threading
 import numpy
 import numpy.typing
 
+from ...api.apparatus import ImageExtent
 from ...api.data import (DiffractionDataset, DiffractionMetadata, DiffractionPatternArray,
                          DiffractionPatternArrayType, DiffractionPatternIndexes,
                          DiffractionPatternState, SimpleDiffractionPatternArray)
-from ...api.image import ImageExtent
 from ...api.tree import SimpleTreeNode
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
 from .sizer import DiffractionPatternSizer

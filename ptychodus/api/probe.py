@@ -6,7 +6,7 @@ from typing import Any, TypeAlias
 import numpy
 import numpy.typing
 
-from .image import ImageExtent
+from .apparatus import ImageExtent
 
 ProbeArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
@@ -42,7 +42,10 @@ class Probe:
         return self._array.dtype
 
     def getExtentInPixels(self) -> ImageExtent:
-        return ImageExtent(width=self._array.shape[-1], height=self._array.shape[-2])
+        return ImageExtent(
+            widthInPixels=self._array.shape[-1],
+            heightInPixels=self._array.shape[-2],
+        )
 
     def getSizeInBytes(self) -> int:
         return self._array.nbytes

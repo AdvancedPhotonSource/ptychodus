@@ -8,11 +8,12 @@ import logging
 import pkgutil
 
 from .data import DiffractionFileReader
-from .image import ScalarTransformation
+from .experiment import ExperimentFileReader, ExperimentFileWriter
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .probe import ProbeFileReader, ProbeFileWriter
 from .scan import ScanFileReader, ScanFileWriter
+from .visualize import ScalarTransformation
 
 __all__ = [
     'PluginEntry',
@@ -104,6 +105,8 @@ class PluginRegistry:
         self.objectPhaseCenteringStrategies = PluginChooser[ObjectPhaseCenteringStrategy]()
         self.objectFileReaders = PluginChooser[ObjectFileReader]()
         self.objectFileWriters = PluginChooser[ObjectFileWriter]()
+        self.experimentFileReaders = PluginChooser[ExperimentFileReader]()
+        self.experimentFileWriters = PluginChooser[ExperimentFileWriter]()
 
     @classmethod
     def loadPlugins(cls) -> PluginRegistry:

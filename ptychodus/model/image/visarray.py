@@ -6,7 +6,7 @@ import numpy
 import numpy.typing
 
 from ...api.apparatus import PixelGeometry
-from ...api.image import RealArrayType
+from ...api.visualize import RealArrayType
 from ...api.observer import Observable
 
 NumericDTypes = Union[numpy.integer[Any], numpy.floating[Any], numpy.complexfloating[Any, Any]]

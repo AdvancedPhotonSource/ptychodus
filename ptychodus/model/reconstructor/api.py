@@ -1,6 +1,6 @@
 import logging
 
-from ...api.plot import Plot2D
+from ...api.visualize import Plot2D
 from ...api.reconstructor import ReconstructOutput
 from ...api.scan import ScanIndexFilter
 from ..object.api import ObjectAPI

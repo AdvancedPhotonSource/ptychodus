@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import logging
 
 from ...api.observer import Observable, Observer
-from ...api.plot import Plot2D, PlotAxis, PlotSeries
+from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ...api.reconstructor import ReconstructorLibrary
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset

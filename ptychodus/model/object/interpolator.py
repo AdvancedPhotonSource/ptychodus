@@ -5,7 +5,7 @@ import logging
 from scipy.ndimage import map_coordinates
 import numpy
 
-from ...api.image import ImageExtent
+from ...api.apparatus import ImageExtent
 from ...api.object import (ObjectArrayType, ObjectGrid, ObjectInterpolator, ObjectPatch,
                            ObjectPatchGrid, ObjectPhaseCenteringStrategy)
 from ...api.observer import Observable, Observer
@@ -62,8 +62,8 @@ class ObjectInterpolatorFactory(Observable, Observer):
                            objectCentroid: ScanPoint) -> ObjectInterpolator:
         centerPhase = self._phaseCenteringStrategyChooser.currentPlugin.strategy
         objectExtent = ImageExtent(
-            width=objectArray.shape[-1],
-            height=objectArray.shape[-2],
+            widthInPixels=objectArray.shape[-1],
+            heightInPixels=objectArray.shape[-2],
         )
         pixelGeometry = self._sizer.getPixelGeometry()
         objectGrid = ObjectGrid.createInstance(objectCentroid, objectExtent, pixelGeometry)

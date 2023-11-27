@@ -6,8 +6,9 @@ from PyQt5.QtWidgets import QAction
 from ..model import ModelCore
 from ..view import ViewCore
 from .automation import AutomationController
-from .data import DataParametersController, FileDialogFactory
+from .data import FileDialogFactory
 from .detector import DetectorController
+from .experiment import ExperimentController
 from .memory import MemoryController
 from .object import ObjectImageController, ObjectController
 from .probe import ProbeImageController, ProbeController
@@ -40,6 +41,10 @@ class ControllerCore:
                                                                      view.settingsParametersView,
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
+        self._experimentController = ExperimentController(model.detectorPresenter,
+                                                          model.experimentRepositoryPresenter,
+                                                          view.experimentView,
+                                                          self._fileDialogFactory)
         self._detectorController = DetectorController.createInstance(
             model.detectorPresenter, model.apparatusPresenter,
             model.diffractionDatasetInputOutputPresenter, model.metadataPresenter,
@@ -57,10 +62,6 @@ class ControllerCore:
         self._objectController = ObjectController.createInstance(
             model.apparatusPresenter, model.objectRepositoryPresenter, model.objectImagePresenter,
             view.objectView, view.objectImageView, self._fileDialogFactory)
-        self._dataParametersController = DataParametersController.createInstance(
-            model.diffractionDatasetInputOutputPresenter, model.diffractionDatasetPresenter,
-            model.metadataPresenter, model.patternPresenter, view.dataParametersView,
-            view.dataTableView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorParametersController.createInstance(
             model.reconstructorPresenter,
             model.scanPresenter,

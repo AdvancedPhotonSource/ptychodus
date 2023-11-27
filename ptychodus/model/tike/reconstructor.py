@@ -11,7 +11,7 @@ import tike.ptycho
 
 from ...api.object import ObjectArrayType
 from ...api.object import ObjectPoint
-from ...api.plot import Plot2D, PlotAxis, PlotSeries
+from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ...api.probe import ProbeArrayType
 from ...api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ...api.scan import Scan, ScanPoint, TabularScan
@@ -37,7 +37,7 @@ class TikeReconstructor:
         self._objectCorrectionSettings = objectCorrectionSettings
 
         tikeVersion = version('tike')
-        logger.info(f'\tTike {tikeVersion}') # FIXME update interface
+        logger.info(f'\tTike {tikeVersion}')  # FIXME update interface
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings

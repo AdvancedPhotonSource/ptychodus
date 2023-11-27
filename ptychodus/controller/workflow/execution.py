@@ -30,5 +30,5 @@ class WorkflowExecutionController:
         return controller
 
     def _execute(self) -> None:
-        flowLabel = self._view.labelLineEdit.text()
+        flowLabel = self._view.labelLineEdit.text()  # FIXME from experiment name
         self._executionPresenter.runFlow(flowLabel=flowLabel)

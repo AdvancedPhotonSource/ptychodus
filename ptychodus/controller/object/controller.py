@@ -141,7 +141,7 @@ class ObjectController(Observer):
                     self._repositoryPresenter.saveObject(name, filePath, nameFilter)
                 except Exception as err:
                     logger.exception(err)
-                    ExceptionDialog.showException('File writer', err)
+                    ExceptionDialog.showException('File Writer', err)
         else:
             logger.error('No items are selected!')
 

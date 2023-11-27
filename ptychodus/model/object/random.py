@@ -3,8 +3,8 @@ from typing import Final
 
 import numpy
 
+from ...api.apparatus import ImageExtent
 from ...api.geometry import Interval
-from ...api.image import ImageExtent
 from ...api.object import Object
 from .repository import ObjectInitializer
 from .settings import ObjectSettings
@@ -56,8 +56,12 @@ class RandomObjectInitializer(ObjectInitializer):
         settings.layerDistanceInMeters.value = self._layerDistanceInMeters
 
     def __call__(self) -> Object:
+        objectExtent = self._sizer.getObjectExtentInPixels()
         extraPaddingExtent = ImageExtent(2 * self._extraPaddingX, 2 * self._extraPaddingY)
-        paddedObjectExtent = self._sizer.getObjectExtentInPixels() + extraPaddingExtent
+        paddedObjectExtent = ImageExtent(
+            widthInPixels=objectExtent.widthInPixels + extraPaddingExtent.widthInPixels,
+            heightInPixels=objectExtent.heightInPixels + extraPaddingExtent.heightInPixels,
+        )
         objectShape = self.getNumberOfLayers(), *paddedObjectExtent.shape
 
         amplitude = self._rng.normal(float(self._amplitudeMean), float(self._amplitudeDeviation),

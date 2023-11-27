@@ -5,9 +5,9 @@ import re
 
 import h5py
 
+from ptychodus.api.apparatus import ImageExtent
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 DiffractionPatternArray, SimpleDiffractionDataset)
-from ptychodus.api.image import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 from .h5DiffractionFile import H5DiffractionPatternArray

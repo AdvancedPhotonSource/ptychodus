@@ -151,8 +151,8 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         # pixel size on sample plane (TODO non-square pixels are unsupported)
         dx = self._apparatus.getObjectPlanePixelGeometry().widthInMeters
 
-        T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters, arrayExtent.width,
-                                       dx, self._custom)
+        T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters,
+                                       arrayExtent.widthInPixels, dx, self._custom)
 
         nprobe = fresnel_propagation(T, float(dx_fzp),
                                      (float(FL0) + float(self._defocusDistanceInMeters)),

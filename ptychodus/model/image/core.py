@@ -8,9 +8,9 @@ import numpy
 
 from ...api.apparatus import PixelGeometry
 from ...api.geometry import Interval, Line2D
-from ...api.image import RealArrayType, ScalarTransformation
+from ...api.visualize import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
-from ...api.plot import LineCut
+from ...api.visualize import LineCut
 from ...api.plugins import PluginChooser
 from .colorizer import Colorizer
 from .displayRange import DisplayRange

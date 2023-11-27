@@ -3,10 +3,9 @@ import logging
 
 import h5py
 
-from ptychodus.api.apparatus import PixelGeometry
+from ptychodus.api.apparatus import ImageExtent, PixelGeometry
 from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                 SimpleDiffractionDataset)
-from ptychodus.api.image import ImageExtent
 from ptychodus.api.plugins import PluginRegistry
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 

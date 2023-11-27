@@ -66,13 +66,13 @@ class ProbeTreeNode:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getProbe().getExtentInPixels().width
+        return self.presenter.item.getProbe().getExtentInPixels().widthInPixels
 
     def getHeightInPixels(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getProbe().getExtentInPixels().height
+        return self.presenter.item.getProbe().getExtentInPixels().heightInPixels
 
     def getSizeInBytes(self) -> int:
         if self.presenter is None:

@@ -9,8 +9,8 @@ from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QProgressB
 
 from . import resources
 from .automation import AutomationView
-from .data import DataParametersView
 from .detector import DetectorView
+from .experiment import ExperimentView
 from .image import ImageView
 from .monitor import MonitorObjectView, MonitorProbeView
 from .object import ObjectView
@@ -41,9 +41,10 @@ class ViewCore(QMainWindow):
         self.settingsParametersView = SettingsParametersView.createInstance()
         self.settingsEntryView = QTableView()
 
-        self.dataAction = self.navigationToolBar.addAction(QIcon(':/icons/dataset'), 'Dataset')
-        self.dataParametersView = DataParametersView.createInstance()
-        self.dataTableView = QTableView()
+        self.experimentAction = self.navigationToolBar.addAction(QIcon(':/icons/experiment'),
+                                                                 'Experiment')
+        self.experimentView = ExperimentView.createInstance()
+        self.experimentDiagramView = QWidget()
 
         self.detectorAction = self.navigationToolBar.addAction(QIcon(':/icons/detector'),
                                                                'Detector')
@@ -103,7 +104,7 @@ class ViewCore(QMainWindow):
 
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsParametersView)
-        view.parametersWidget.addWidget(view.dataParametersView)
+        view.parametersWidget.addWidget(view.experimentView)
         view.parametersWidget.addWidget(view.detectorView)
         view.parametersWidget.addWidget(view.scanView)
         view.parametersWidget.addWidget(view.probeView)
@@ -117,7 +118,7 @@ class ViewCore(QMainWindow):
 
         # maintain same order as navigationToolBar buttons
         view.contentsWidget.addWidget(view.settingsEntryView)
-        view.contentsWidget.addWidget(view.dataTableView)
+        view.contentsWidget.addWidget(view.experimentDiagramView)
         view.contentsWidget.addWidget(view.detectorImageView)
         view.contentsWidget.addWidget(view.scanPlotView)
         view.contentsWidget.addWidget(view.probeImageView)

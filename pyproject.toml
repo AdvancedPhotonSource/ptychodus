@@ -21,6 +21,7 @@ module = [
     "pvaccess",
     "pvapy.*",
     "scipy.*",
+    "tifffile",
     "tike.*",
 ]
 ignore_missing_imports = true

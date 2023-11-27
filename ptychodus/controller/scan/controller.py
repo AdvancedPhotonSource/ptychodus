@@ -112,7 +112,7 @@ class ScanController(Observer):
                     self._repositoryPresenter.saveScan(itemPresenter.name, filePath, nameFilter)
                 except Exception as err:
                     logger.exception(err)
-                    ExceptionDialog.showException('File writer', err)
+                    ExceptionDialog.showException('File Writer', err)
 
     def _editSelectedScan(self) -> None:
         itemPresenter = self._getCurrentItemPresenter()

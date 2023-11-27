@@ -13,11 +13,6 @@ class DetectorParametersView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Parameters', parent)
-        self.numberOfPixelsXSpinBox = QSpinBox()
-        self.numberOfPixelsYSpinBox = QSpinBox()
-        self.pixelSizeXWidget = LengthWidget.createInstance()
-        self.pixelSizeYWidget = LengthWidget.createInstance()
-        self.bitDepthSpinBox = QSpinBox()
         self.detectorDistanceWidget = LengthWidget.createInstance()
         self.fresnelNumberWidget = DecimalLineEdit.createInstance()
 
@@ -26,11 +21,6 @@ class DetectorParametersView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Number of Pixels X:', view.numberOfPixelsXSpinBox)
-        layout.addRow('Number of Pixels Y:', view.numberOfPixelsYSpinBox)
-        layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
-        layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
-        layout.addRow('Bit Depth:', view.bitDepthSpinBox)
         layout.addRow('Detector-Object Distance:', view.detectorDistanceWidget)
         layout.addRow('Fresnel Number:', view.fresnelNumberWidget)
         view.setLayout(layout)

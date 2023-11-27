@@ -24,7 +24,7 @@ from ..api.state import StateDataRegistry
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .data import (DataCore, DiffractionDatasetPresenter, DiffractionDatasetInputOutputPresenter,
                    DiffractionPatternPresenter)
-from .detector import Detector, DetectorPresenter, DetectorSettings
+from .experiment import DetectorPresenter, ExperimentCore, ExperimentRepositoryPresenter
 from .image import ImageCore, ImagePresenter
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
@@ -79,19 +79,18 @@ class ModelCore:
 
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
-        self._detectorSettings = DetectorSettings.createInstance(self.settingsRegistry)
-        self._detector = Detector.createInstance(self._detectorSettings)
-        self.detectorPresenter = DetectorPresenter.createInstance(self._detectorSettings,
-                                                                  self._detector)
+        self._experimentCore = ExperimentCore(self.settingsRegistry,
+                                              self._pluginRegistry.experimentFileReaders,
+                                              self._pluginRegistry.experimentFileWriters)
         self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations,
                                             isComplex=False)
 
-        self._dataCore = DataCore(self.settingsRegistry, self._detector,
+        self._dataCore = DataCore(self.settingsRegistry, self._experimentCore.detector,
                                   self._pluginRegistry.diffractionFileReaders)
         self._scanCore = ScanCore(self.rng, self.settingsRegistry, self._dataCore.dataset,
                                   self._pluginRegistry.scanFileReaders,
                                   self._pluginRegistry.scanFileWriters)
-        self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._detector,
+        self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._experimentCore.detector,
                                     self._dataCore.patternSizer,
                                     self._pluginRegistry.probeFileReaders,
                                     self._pluginRegistry.probeFileWriters)
@@ -104,11 +103,9 @@ class ModelCore:
                                       self._pluginRegistry.objectFileWriters)
         self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
                                           isComplex=True)
-        self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.dataset,
-                                                                  self._detectorSettings,
-                                                                  self._dataCore.patternSettings,
-                                                                  self._probeCore.settings,
-                                                                  self._scanCore.scanAPI)
+        self.metadataPresenter = MetadataPresenter.createInstance(
+            self._dataCore.dataset, self._experimentCore.detectorSettings,
+            self._dataCore.patternSettings, self._probeCore.settings, self._scanCore.scanAPI)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
@@ -254,6 +251,14 @@ class ModelCore:
 
         someQualityMetric = 0.  # TODO
         return someQualityMetric
+
+    @property
+    def detectorPresenter(self) -> DetectorPresenter:
+        return self._experimentCore.detectorPresenter
+
+    @property
+    def experimentRepositoryPresenter(self) -> ExperimentRepositoryPresenter:
+        return self._experimentCore.repositoryPresenter
 
     @property
     def scanPresenter(self) -> ScanPresenter:

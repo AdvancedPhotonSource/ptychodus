@@ -8,9 +8,8 @@ from typing import Any, TypeAlias
 import numpy
 import numpy.typing
 
-from .apparatus import PixelGeometry
+from .apparatus import ImageExtent, PixelGeometry
 from .geometry import Point2D
-from .image import ImageExtent
 from .scan import ScanPoint
 
 # object point coordinates are conventionally in pixel units
@@ -62,7 +61,10 @@ class Object:
         return self._array.dtype
 
     def getExtentInPixels(self) -> ImageExtent:
-        return ImageExtent(width=self._array.shape[-1], height=self._array.shape[-2])
+        return ImageExtent(
+            widthInPixels=self._array.shape[-1],
+            heightInPixels=self._array.shape[-2],
+        )
 
     def getSizeInBytes(self) -> int:
         return self._array.nbytes
@@ -128,12 +130,12 @@ class ObjectGrid:
         return cls(
             axisX=ObjectAxis(
                 centerInMeters=midpoint.x,
-                numberOfPixels=extent.width,
+                numberOfPixels=extent.widthInPixels,
                 pixelSizeInMeters=float(pixelGeometry.widthInMeters),
             ),
             axisY=ObjectAxis(
                 centerInMeters=midpoint.y,
-                numberOfPixels=extent.height,
+                numberOfPixels=extent.heightInPixels,
                 pixelSizeInMeters=float(pixelGeometry.heightInMeters),
             ),
         )
@@ -197,8 +199,8 @@ class ObjectPatchGrid:
     def createInstance(cls, parent: ObjectGrid, patchCenter: ScanPoint,
                        patchExtent: ImageExtent) -> ObjectPatchGrid:
         return cls(
-            axisX=ObjectPatchAxis(parent.axisX, patchCenter.x, patchExtent.width),
-            axisY=ObjectPatchAxis(parent.axisY, patchCenter.y, patchExtent.height),
+            axisX=ObjectPatchAxis(parent.axisX, patchCenter.x, patchExtent.widthInPixels),
+            axisY=ObjectPatchAxis(parent.axisY, patchCenter.y, patchExtent.heightInPixels),
         )
 
 

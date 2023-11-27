@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 
 from PyQt5.QtWidgets import (QGroupBox, QHBoxLayout, QMenu, QPushButton, QTableView, QTreeView,
                              QVBoxLayout, QWidget)
@@ -7,7 +6,7 @@ from PyQt5.QtWidgets import (QGroupBox, QHBoxLayout, QMenu, QPushButton, QTableV
 
 class RepositoryButtonBox(QWidget):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.insertMenu = QMenu()
         self.insertButton = QPushButton('Insert')
@@ -16,7 +15,7 @@ class RepositoryButtonBox(QWidget):
         self.removeButton = QPushButton('Remove')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> RepositoryButtonBox:
+    def createInstance(cls, parent: QWidget | None = None) -> RepositoryButtonBox:
         view = cls(parent)
 
         view.insertButton.setMenu(view.insertMenu)
@@ -34,13 +33,13 @@ class RepositoryButtonBox(QWidget):
 
 class RepositoryTableView(QGroupBox):
 
-    def __init__(self, title: str, parent: Optional[QWidget]) -> None:
+    def __init__(self, title: str, parent: QWidget | None) -> None:
         super().__init__(title, parent)
         self.tableView = QTableView()
         self.buttonBox = RepositoryButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, title: str, parent: Optional[QWidget] = None) -> RepositoryTableView:
+    def createInstance(cls, title: str, parent: QWidget | None = None) -> RepositoryTableView:
         view = cls(title, parent)
 
         layout = QVBoxLayout()
@@ -53,13 +52,13 @@ class RepositoryTableView(QGroupBox):
 
 class RepositoryTreeView(QGroupBox):
 
-    def __init__(self, title: str, parent: Optional[QWidget]) -> None:
+    def __init__(self, title: str, parent: QWidget | None) -> None:
         super().__init__(title, parent)
         self.treeView = QTreeView()
         self.buttonBox = RepositoryButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, title: str, parent: Optional[QWidget] = None) -> RepositoryTreeView:
+    def createInstance(cls, title: str, parent: QWidget | None = None) -> RepositoryTreeView:
         view = cls(title, parent)
 
         layout = QVBoxLayout()

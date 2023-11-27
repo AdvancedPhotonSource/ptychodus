@@ -12,7 +12,7 @@ from ...api.probe import Probe, ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry
 from ...api.state import ProbeStateData, StatefulCore
 from ..data import DiffractionPatternSizer
-from ..detector import Detector
+from ..experiment import Detector
 from .api import ProbeAPI
 from .apparatus import Apparatus, ApparatusPresenter
 from .factory import ProbeRepositoryItemFactory

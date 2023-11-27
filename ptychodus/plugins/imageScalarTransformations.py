@@ -1,6 +1,6 @@
 import numpy
 
-from ptychodus.api.image import ScalarTransformation, RealArrayType
+from ptychodus.api.visualize import ScalarTransformation, RealArrayType
 from ptychodus.api.plugins import PluginRegistry
 
 

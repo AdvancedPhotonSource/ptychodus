@@ -4,7 +4,7 @@ from decimal import Decimal
 from ..api.data import DiffractionDataset, DiffractionMetadata
 from ..api.observer import Observable, Observer
 from .data import DiffractionPatternSettings
-from .detector import DetectorSettings
+from .experiment import DetectorSettings
 from .probe import ProbeSettings
 from .scan import ScanAPI
 
@@ -41,9 +41,9 @@ class MetadataPresenter(Observable, Observer):
     def syncDetectorPixelCount(self) -> None:
         if self._metadata.detectorExtentInPixels:
             self._detectorSettings.numberOfPixelsX.value = \
-                self._metadata.detectorExtentInPixels.width
+                self._metadata.detectorExtentInPixels.widthInPixels
             self._detectorSettings.numberOfPixelsY.value = \
-                self._metadata.detectorExtentInPixels.height
+                self._metadata.detectorExtentInPixels.heightInPixels
 
     def canSyncDetectorPixelSize(self) -> bool:
         return (self._metadata.detectorPixelGeometry is not None)
@@ -86,16 +86,16 @@ class MetadataPresenter(Observable, Observer):
                         self._metadata.cropCenterInPixels.y
             elif self._metadata.detectorExtentInPixels:
                 self._patternSettings.cropCenterXInPixels.value = \
-                        int(self._metadata.detectorExtentInPixels.width) // 2
+                        int(self._metadata.detectorExtentInPixels.widthInPixels) // 2
                 self._patternSettings.cropCenterYInPixels.value = \
-                        int(self._metadata.detectorExtentInPixels.height) // 2
+                        int(self._metadata.detectorExtentInPixels.heightInPixels) // 2
 
         if syncExtent and self._metadata.detectorExtentInPixels:
             centerX = self._patternSettings.cropCenterXInPixels.value
             centerY = self._patternSettings.cropCenterYInPixels.value
 
-            extentX = int(self._metadata.detectorExtentInPixels.width)
-            extentY = int(self._metadata.detectorExtentInPixels.height)
+            extentX = int(self._metadata.detectorExtentInPixels.widthInPixels)
+            extentY = int(self._metadata.detectorExtentInPixels.heightInPixels)
 
             maxRadiusX = min(centerX, extentX - centerX)
             maxRadiusY = min(centerY, extentY - centerY)

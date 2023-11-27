@@ -2,11 +2,10 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Final
 
-from ..api.apparatus import PixelGeometry
-from ..api.geometry import Interval
-from ..api.image import ImageExtent
-from ..api.observer import Observable, Observer
-from ..api.settings import SettingsRegistry, SettingsGroup
+from ...api.apparatus import ImageExtent, PixelGeometry
+from ...api.geometry import Interval
+from ...api.observer import Observable, Observer
+from ...api.settings import SettingsRegistry, SettingsGroup
 
 
 class DetectorSettings(Observable, Observer):
@@ -47,8 +46,8 @@ class Detector(Observable, Observer):
 
     def getExtentInPixels(self) -> ImageExtent:
         return ImageExtent(
-            width=max(0, self._settings.numberOfPixelsX.value),
-            height=max(0, self._settings.numberOfPixelsY.value),
+            widthInPixels=max(0, self._settings.numberOfPixelsX.value),
+            heightInPixels=max(0, self._settings.numberOfPixelsY.value),
         )
 
     def getPixelGeometry(self) -> PixelGeometry:
@@ -86,13 +85,13 @@ class DetectorPresenter(Observable, Observer):
         return Interval[int](0, self.MAX_INT)
 
     def getNumberOfPixelsX(self) -> int:
-        return self._detector.getExtentInPixels().width
+        return self._detector.getExtentInPixels().widthInPixels
 
     def setNumberOfPixelsX(self, value: int) -> None:
         self._settings.numberOfPixelsX.value = value
 
     def getPixelSizeXInMeters(self) -> Decimal:
-        return Decimal.from_float(self._detector.getPixelGeometry().widthInMeters) # FIXME from_float -> repr
+        return Decimal(repr(self._detector.getPixelGeometry().widthInMeters))
 
     def setPixelSizeXInMeters(self, value: Decimal) -> None:
         self._settings.pixelSizeXInMeters.value = value
@@ -101,13 +100,13 @@ class DetectorPresenter(Observable, Observer):
         return Interval[int](0, self.MAX_INT)
 
     def getNumberOfPixelsY(self) -> int:
-        return self._detector.getExtentInPixels().height
+        return self._detector.getExtentInPixels().heightInPixels
 
     def setNumberOfPixelsY(self, value: int) -> None:
         self._settings.numberOfPixelsY.value = value
 
     def getPixelSizeYInMeters(self) -> Decimal:
-        return Decimal.from_float(self._detector.getPixelGeometry().heightInMeters)
+        return Decimal(repr(self._detector.getPixelGeometry().heightInMeters))
 
     def setPixelSizeYInMeters(self, value: Decimal) -> None:
         self._settings.pixelSizeYInMeters.value = value
@@ -126,7 +125,8 @@ class DetectorPresenter(Observable, Observer):
         self._settings.bitDepth.value = value
 
     def getDetectorDistanceInMeters(self) -> Decimal:
-        return Decimal.from_float(self._detector.getDetectorDistanceInMeters())
+        # FIXME from_float -> repr
+        return Decimal(repr(self._detector.getDetectorDistanceInMeters()))
 
     def setDetectorDistanceInMeters(self, value: Decimal) -> None:
         self._settings.detectorDistanceInMeters.value = value

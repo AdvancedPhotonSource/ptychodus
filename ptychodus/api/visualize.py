@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypeAlias
@@ -11,6 +12,20 @@ from .apparatus import PixelGeometry
 
 ComplexArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 IntegerArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
+
+
+class ScalarTransformation(ABC):
+    '''interface for real-valued transformations of a real array'''
+
+    @abstractmethod
+    def decorateText(self, text: str) -> str:
+        pass
+
+    @abstractmethod
+    def __call__(self, array: RealArrayType) -> RealArrayType:
+        '''returns the transformed input array'''
+        pass
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ import logging
 
 from ...api.object import Object
 from ...api.observer import Observable, Observer
-from ...api.plot import FourierRingCorrelation
+from ...api.visualize import FourierRingCorrelation
 from .repository import ObjectInitializer, ObjectRepositoryItem
 from .settings import ObjectSettings
 from .sizer import ObjectSizer

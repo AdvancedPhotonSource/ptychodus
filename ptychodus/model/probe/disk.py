@@ -40,12 +40,12 @@ class DiskProbeInitializer(ProbeInitializer):
     def __call__(self) -> Probe:
         extent = self._sizer.getExtentInPixels()
         pixelGeometry = self._apparatus.getObjectPlanePixelGeometry()
-        Y, X = numpy.mgrid[:extent.height, :extent.width]
-        X_px = X - (extent.width - 1) / 2
-        Y_px = Y - (extent.height - 1) / 2
+        Y, X = numpy.mgrid[:extent.heightInPixels, :extent.widthInPixels]
+        X_px = X - (extent.widthInPixels - 1) / 2
+        Y_px = Y - (extent.heightInPixels - 1) / 2
 
         if self._isTestPattern:
-            Rmax_px = min(extent.width, extent.height) / 2
+            Rmax_px = min(extent.widthInPixels, extent.heightInPixels) / 2
             R_px = numpy.hypot(X_px, Y_px)
             array = numpy.where(R_px < Rmax_px, X_px + 1j * Y_px, 0j)
         else:
