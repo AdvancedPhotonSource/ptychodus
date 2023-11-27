@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
-                             QHBoxLayout, QLineEdit, QMenu, QPushButton, QSpinBox, QTableView,
-                             QVBoxLayout, QWidget)
+                             QHBoxLayout, QMenu, QPushButton, QSpinBox, QTableView, QVBoxLayout,
+                             QWidget)
 
-from .widgets import EnergyWidget, LengthWidget
+from .widgets import LengthWidget
 
 
 class DetectorView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Detector', parent)
-        self.numberOfPixelsXSpinBox = QSpinBox()
-        self.numberOfPixelsYSpinBox = QSpinBox()
-        self.pixelSizeXWidget = LengthWidget.createInstance()
-        self.pixelSizeYWidget = LengthWidget.createInstance()
+        self.widthInPixelsSpinBox = QSpinBox()
+        self.heightInPixelsSpinBox = QSpinBox()
+        self.pixelWidthWidget = LengthWidget.createInstance()
+        self.pixelHeightWidget = LengthWidget.createInstance()
         self.bitDepthSpinBox = QSpinBox()
 
     @classmethod
@@ -22,10 +22,10 @@ class DetectorView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Number of Pixels X:', view.numberOfPixelsXSpinBox)
-        layout.addRow('Number of Pixels Y:', view.numberOfPixelsYSpinBox)
-        layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
-        layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
+        layout.addRow('Detector Width [px]:', view.widthInPixelsSpinBox)
+        layout.addRow('Detector Height [px]:', view.heightInPixelsSpinBox)
+        layout.addRow('Pixel Width:', view.pixelWidthWidget)
+        layout.addRow('Pixel Height:', view.pixelHeightWidget)
         layout.addRow('Bit Depth:', view.bitDepthSpinBox)
         view.setLayout(layout)
 
@@ -36,26 +36,19 @@ class ExperimentEditorDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.nameLabel = QLineEdit()
-        self.energyWidget = EnergyWidget.createInstance()
-        self.detectorDistanceWidget = LengthWidget.createInstance()
         self.tableView = QTableView()
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ExperimentEditorDialog:
         view = cls(parent)
-        view.setWindowTitle('Edit Experiment')
 
         view.buttonBox.addButton(QDialogButtonBox.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
-        layout = QFormLayout()
-        layout.addRow('Name:', view.nameLabel)
-        layout.addRow('Probe Energy:', view.energyWidget)
-        layout.addRow('Detector-Object Distance:', view.detectorDistanceWidget)
-        layout.addRow(view.tableView)
-        layout.addRow(view.buttonBox)
+        layout = QVBoxLayout()
+        layout.addWidget(view.tableView)
+        layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view

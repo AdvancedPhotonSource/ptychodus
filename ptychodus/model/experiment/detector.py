@@ -67,7 +67,7 @@ class Detector(Observable, Observer):
             self.notifyObservers()
 
 
-class DetectorPresenter(Observable, Observer):
+class DetectorPresenter(Observable, Observer):  # FIXME change method names to match api/view
     MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: DetectorSettings, detector: Detector) -> None:

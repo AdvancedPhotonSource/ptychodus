@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
+import sys
 
 from .observer import Observable
 
@@ -14,30 +15,38 @@ class Experiment(Observable):
         self._detectorObjectDistanceInMeters = 1.
         # FIXME validate data/scan/probe/object consistency for recon
         # FIXME sync to/from settings; perhaps from reconstructor
+        # FIXME validate values (filter <0, inf, nan, etc.)
 
     def getName(self) -> str:
         return self._name
 
     def setName(self, name: str) -> None:
-        self._name = name
-        self.notifyObservers()
+        if self._name != name:
+            self._name = name
+            self.notifyObservers()
 
     def getProbeEnergyInElectronVolts(self) -> float:
         return self._probeEnergyInElectronVolts
 
     def setProbeEnergyInElectronVolts(self, energyInElectronVolts: float) -> None:
-        self._probeEnergyInElectronVolts = energyInElectronVolts
-        self.notifyObservers()
+        if self._probeEnergyInElectronVolts != energyInElectronVolts:
+            self._probeEnergyInElectronVolts = energyInElectronVolts
+            self.notifyObservers()
 
     def getDetectorObjectDistanceInMeters(self) -> float:
         return self._detectorObjectDistanceInMeters
 
     def setDetectorObjectDistanceInMeters(self, distanceInMeters: float) -> None:
-        self._detectorObjectDistanceInMeters = distanceInMeters
-        self.notifyObservers()
+        if self._detectorObjectDistanceInMeters != distanceInMeters:
+            self._detectorObjectDistanceInMeters = distanceInMeters
+            self.notifyObservers()
 
     def getSizeInBytes(self) -> int:
-        return 0  # FIXME total bytes in experiment
+        sizeInBytes = 0
+        sizeInBytes += sys.getsizeof(self._name)
+        sizeInBytes += sys.getsizeof(self._probeEnergyInElectronVolts)
+        sizeInBytes += sys.getsizeof(self._detectorObjectDistanceInMeters)
+        return sizeInBytes
 
 
 class ExperimentFileReader(ABC):

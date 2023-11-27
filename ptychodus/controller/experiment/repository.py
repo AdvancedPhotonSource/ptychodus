@@ -7,9 +7,10 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import SequenceObserver
 from ...model.experiment import ExperimentRepositoryPresenter
-from ...view.experiment import ExperimentEditorDialog, ExperimentRepositoryView
+from ...view.experiment import ExperimentRepositoryView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
+from .editor import ExperimentEditorViewController
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,17 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
             'Pixel\nHeight\n[nm]',
             'Size\n[MB]',
         ]
-        # FIXME probe wavelength, fresnel number, reconstruction pixel size x/y, ptycho gain x/y
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        value = Qt.ItemFlags()
+
+        if index.isValid():
+            value = super().flags(index)
+
+            if index.column() < 3:
+                value |= Qt.ItemIsEditable
+
+        return value
 
     def headerData(self,
                    section: int,
@@ -48,7 +59,7 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
         if index.isValid():
             experiment = self._presenter[index.row()]
 
-            if role == Qt.DisplayRole:
+            if role == Qt.DisplayRole or role == Qt.EditRole:
                 if index.column() == 0:
                     value = QVariant(experiment.getName())
                 elif index.column() == 1:
@@ -63,6 +74,31 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
                     value = QVariant(f'{experiment.getSizeInBytes() / (1024 * 1024):.2f}')
 
         return value
+
+    def setData(self, index: QModelIndex, value: str, role: int = Qt.EditRole) -> bool:
+        if index.isValid() and role == Qt.EditRole:
+            experiment = self._presenter[index.row()]
+
+            if index.column() == 0:
+                experiment.setName(value)
+                self.dataChanged.emit(index, index)
+                return True
+            elif index.column() == 1:
+                try:
+                    energyInKiloElectronVolts = float(value)
+                except ValueError:
+                    pass
+                else:
+                    experiment.setProbeEnergyInElectronVolts(energyInKiloElectronVolts * 1000)
+            elif index.column() == 2:
+                try:
+                    distanceInMeters = float(value)
+                except ValueError:
+                    pass
+                else:
+                    experiment.setDetectorObjectDistanceInMeters(distanceInMeters)
+
+        return False
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._presenter)
@@ -81,7 +117,6 @@ class ExperimentRepositoryController(SequenceObserver):
         self._view = view
         self._fileDialogFactory = fileDialogFactory
         self._tableModel = tableModel
-
         self._tableProxyModel = tableProxyModel
 
     @classmethod
@@ -127,11 +162,10 @@ class ExperimentRepositoryController(SequenceObserver):
             self._presenter.openExperiment(filePath, nameFilter)
 
     def _insertExperiment(self) -> None:
-        name = 'Unnamed'  # FIXME IMPROVE?
-        self._presenter.insertExperiment(name)
+        self._presenter.insertExperiment()
 
     def _saveSelectedExperiment(self) -> None:
-        current = self._view.tableView.currentIndex()
+        current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
@@ -150,18 +184,16 @@ class ExperimentRepositoryController(SequenceObserver):
             logger.error('No items are selected!')
 
     def _editSelectedExperiment(self) -> None:
-        current = self._view.tableView.currentIndex()
+        current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
             experiment = self._presenter[current.row()]
-            # FIXME EditExperimentViewController.editParameters(experiment, self._view)
-            dialog = ExperimentEditorDialog.createInstance(self._view)
-            dialog.open()  # FIXME edit "experiment"
+            ExperimentEditorViewController.editParameters(experiment, self._view)
         else:
             logger.error('No items are selected!')
 
     def _removeSelectedExperiment(self) -> None:
-        current = self._view.tableView.currentIndex()
+        current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
             self._presenter.removeExperiment(current.row())

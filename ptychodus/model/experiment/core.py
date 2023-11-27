@@ -71,7 +71,7 @@ class ExperimentRepositoryPresenter(ObservableSequence[Experiment], Observer):
         writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, experiment)
 
-    def insertExperiment(self, name: str) -> None:
+    def insertExperiment(self, name: str = 'Unnamed') -> None:
         existingNames = {experiment.getName() for experiment in self._experimentList}
         uniqueName = name
         index = 0
