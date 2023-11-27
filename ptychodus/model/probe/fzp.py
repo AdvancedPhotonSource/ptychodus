@@ -142,8 +142,8 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         return self.DISPLAY_NAME
 
     def __call__(self) -> Probe:
-        arrayExtent = self._sizer.getExtentInPixels()
-        array = numpy.zeros(arrayExtent.shape, dtype=complex)
+        extent = self._sizer.getImageExtent()
+        array = numpy.zeros(extent.shape, dtype=complex)
 
         # central wavelength
         lambda0 = self._apparatus.getProbeWavelengthInMeters()
@@ -152,7 +152,7 @@ class FresnelZonePlateProbeInitializer(ProbeInitializer):
         dx = self._apparatus.getObjectPlanePixelGeometry().widthInMeters
 
         T, dx_fzp, FL0 = fzp_calculate(lambda0, self._defocusDistanceInMeters,
-                                       arrayExtent.widthInPixels, dx, self._custom)
+                                       extent.widthInPixels, dx, self._custom)
 
         nprobe = fresnel_propagation(T, float(dx_fzp),
                                      (float(FL0) + float(self._defocusDistanceInMeters)),

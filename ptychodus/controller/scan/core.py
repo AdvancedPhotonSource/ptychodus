@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import QAbstractItemView
 from ...api.observer import Observable, Observer
 from ...model.scan import (ScanRepositoryItem, ScanRepositoryItemPresenter,
                            ScanRepositoryPresenter)
-from ...view.scan import ScanView, ScanPlotView
-from ...view.widgets import ExceptionDialog
+from ...view.scan import ScanPlotView
+from ...view.widgets import ExceptionDialog, RepositoryTableView
 from ..data import FileDialogFactory
 from .cartesian import CartesianScanController
 from .concentric import ConcentricScanController
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class ScanController(Observer):
     OPEN_FILE: Final[str] = 'Open File...'  # TODO clean up
 
-    def __init__(self, repositoryPresenter: ScanRepositoryPresenter, view: ScanView,
+    def __init__(self, repositoryPresenter: ScanRepositoryPresenter, view: RepositoryTableView,
                  plotView: ScanPlotView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._repositoryPresenter = repositoryPresenter
@@ -35,29 +35,28 @@ class ScanController(Observer):
         self._proxyModel = QSortFilterProxyModel()
 
     @classmethod
-    def createInstance(cls, repositoryPresenter: ScanRepositoryPresenter, view: ScanView,
-                       plotView: ScanPlotView,
+    def createInstance(cls, repositoryPresenter: ScanRepositoryPresenter,
+                       view: RepositoryTableView, plotView: ScanPlotView,
                        fileDialogFactory: FileDialogFactory) -> ScanController:
         controller = cls(repositoryPresenter, view, plotView, fileDialogFactory)
         repositoryPresenter.addObserver(controller)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
-        view.repositoryView.tableView.setModel(controller._proxyModel)
-        view.repositoryView.tableView.setSortingEnabled(True)
-        view.repositoryView.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        view.repositoryView.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
-        view.repositoryView.tableView.selectionModel().selectionChanged.connect(
-            controller._updateView)
-        view.repositoryView.tableView.horizontalHeader().sectionClicked.connect(
+        view.tableView.setModel(controller._proxyModel)
+        view.tableView.setSortingEnabled(True)
+        view.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
+        view.tableView.selectionModel().selectionChanged.connect(controller._updateView)
+        view.tableView.horizontalHeader().sectionClicked.connect(
             lambda logicalIndex: controller._redrawPlot())
 
         for name in repositoryPresenter.getInitializerDisplayNameList():
-            insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
+            insertAction = view.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 
-        view.repositoryView.buttonBox.editButton.clicked.connect(controller._editSelectedScan)
-        view.repositoryView.buttonBox.saveButton.clicked.connect(controller._saveSelectedScan)
-        view.repositoryView.buttonBox.removeButton.clicked.connect(controller._removeSelectedScan)
+        view.buttonBox.editButton.clicked.connect(controller._editSelectedScan)
+        view.buttonBox.saveButton.clicked.connect(controller._saveSelectedScan)
+        view.buttonBox.removeButton.clicked.connect(controller._removeSelectedScan)
 
         controller._proxyModel.dataChanged.connect(
             lambda topLeft, bottomRight, roles: controller._redrawPlot())
@@ -77,7 +76,7 @@ class ScanController(Observer):
 
     def _openScan(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view.repositoryView,
+            self._view,
             'Open Scan',
             nameFilters=self._repositoryPresenter.getOpenFileFilterList(),
             selectedNameFilter=self._repositoryPresenter.getOpenFileFilter())
@@ -87,7 +86,7 @@ class ScanController(Observer):
 
     def _getCurrentItemPresenter(self) -> ScanRepositoryItemPresenter | None:
         itemPresenter: ScanRepositoryItemPresenter | None = None
-        proxyIndex = self._view.repositoryView.tableView.currentIndex()
+        proxyIndex = self._view.tableView.currentIndex()
 
         if proxyIndex.isValid():
             index = self._proxyModel.mapToSource(proxyIndex)
@@ -102,7 +101,7 @@ class ScanController(Observer):
 
         if itemPresenter is not None:
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-                self._view.repositoryView,
+                self._view,
                 'Save Scan',
                 nameFilters=self._repositoryPresenter.getSaveFileFilterList(),
                 selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
@@ -170,12 +169,12 @@ class ScanController(Observer):
         self._plotView.figureCanvas.draw()
 
     def _setButtonsEnabled(self) -> None:
-        selectionModel = self._view.repositoryView.tableView.selectionModel()
+        selectionModel = self._view.tableView.selectionModel()
         hasSelection = selectionModel.hasSelection()
 
-        self._view.repositoryView.buttonBox.saveButton.setEnabled(hasSelection)
-        self._view.repositoryView.buttonBox.editButton.setEnabled(hasSelection)
-        self._view.repositoryView.buttonBox.removeButton.setEnabled(hasSelection)
+        self._view.buttonBox.saveButton.setEnabled(hasSelection)
+        self._view.buttonBox.editButton.setEnabled(hasSelection)
+        self._view.buttonBox.removeButton.setEnabled(hasSelection)
 
     def _updateView(self) -> None:
         self._setButtonsEnabled()

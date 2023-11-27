@@ -4,30 +4,28 @@ from decimal import Decimal
 from ..api.data import DiffractionDataset, DiffractionMetadata
 from ..api.observer import Observable, Observer
 from .data import DiffractionPatternSettings
-from .experiment import DetectorSettings
+from .experiment import Detector
 from .probe import ProbeSettings
 from .scan import ScanAPI
 
 
 class MetadataPresenter(Observable, Observer):
 
-    def __init__(self, diffractionDataset: DiffractionDataset, detectorSettings: DetectorSettings,
+    def __init__(self, diffractionDataset: DiffractionDataset, detector: Detector,
                  patternSettings: DiffractionPatternSettings, probeSettings: ProbeSettings,
                  scanAPI: ScanAPI) -> None:
         super().__init__()
         self._diffractionDataset = diffractionDataset
-        self._detectorSettings = detectorSettings
+        self._detector = detector
         self._patternSettings = patternSettings
         self._probeSettings = probeSettings
         self._scanAPI = scanAPI
 
     @classmethod
-    def createInstance(cls, diffractionDataset: DiffractionDataset,
-                       detectorSettings: DetectorSettings,
+    def createInstance(cls, diffractionDataset: DiffractionDataset, detector: Detector,
                        patternSettings: DiffractionPatternSettings, probeSettings: ProbeSettings,
                        scanAPI: ScanAPI) -> MetadataPresenter:
-        presenter = cls(diffractionDataset, detectorSettings, patternSettings, probeSettings,
-                        scanAPI)
+        presenter = cls(diffractionDataset, detector, patternSettings, probeSettings, scanAPI)
         diffractionDataset.addObserver(presenter)
         return presenter
 
@@ -40,9 +38,9 @@ class MetadataPresenter(Observable, Observer):
 
     def syncDetectorPixelCount(self) -> None:
         if self._metadata.detectorExtentInPixels:
-            self._detectorSettings.numberOfPixelsX.value = \
+            self._detector.widthInPixels.value = \
                 self._metadata.detectorExtentInPixels.widthInPixels
-            self._detectorSettings.numberOfPixelsY.value = \
+            self._detector.heightInPixels.value = \
                 self._metadata.detectorExtentInPixels.heightInPixels
 
     def canSyncDetectorPixelSize(self) -> bool:
@@ -50,25 +48,25 @@ class MetadataPresenter(Observable, Observer):
 
     def syncDetectorPixelSize(self) -> None:
         if self._metadata.detectorPixelGeometry:
-            self._detectorSettings.pixelSizeXInMeters.value = \
-                Decimal.from_float(self._metadata.detectorPixelGeometry.widthInMeters)
-            self._detectorSettings.pixelSizeYInMeters.value = \
-                Decimal.from_float(self._metadata.detectorPixelGeometry.heightInMeters)
+            self._detector.pixelWidthInMeters.value = \
+                Decimal(repr(self._metadata.detectorPixelGeometry.widthInMeters))
+            self._detector.pixelHeightInMeters.value = \
+                Decimal(repr(self._metadata.detectorPixelGeometry.heightInMeters))
 
     def canSyncDetectorBitDepth(self) -> bool:
         return (self._metadata.detectorBitDepth is not None)
 
     def syncDetectorBitDepth(self) -> None:
         if self._metadata.detectorBitDepth:
-            self._detectorSettings.bitDepth.value = self._metadata.detectorBitDepth
+            self._detector.bitDepth.value = self._metadata.detectorBitDepth
 
     def canSyncDetectorDistance(self) -> bool:
         return (self._metadata.detectorDistanceInMeters is not None)
 
     def syncDetectorDistance(self) -> None:
         if self._metadata.detectorDistanceInMeters:
-            self._detectorSettings.detectorDistanceInMeters.value = \
-                Decimal.from_float(self._metadata.detectorDistanceInMeters)
+            self._detector.detectorDistanceInMeters.value = \
+                Decimal(repr(self._metadata.detectorDistanceInMeters))
 
     def canSyncPatternCropCenter(self) -> bool:
         return (self._metadata.cropCenterInPixels is not None \
@@ -114,7 +112,7 @@ class MetadataPresenter(Observable, Observer):
     def syncProbeEnergy(self) -> None:  # TODO to apparatusAPI or probeAPI
         if self._metadata.probeEnergyInElectronVolts:
             self._probeSettings.probeEnergyInElectronVolts.value = \
-                    Decimal.from_float(self._metadata.probeEnergyInElectronVolts)
+                    Decimal(repr(self._metadata.probeEnergyInElectronVolts))
 
     def loadScanFile(self) -> None:  # TODO velociprobe only
         filePathMaster = self._metadata.filePath

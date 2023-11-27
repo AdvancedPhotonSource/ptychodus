@@ -66,13 +66,13 @@ class ObjectTreeNode:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getObject().getExtentInPixels().widthInPixels
+        return self.presenter.item.getObject().getImageExtent().widthInPixels
 
     def getHeightInPixels(self) -> int:
         if self.presenter is None:
             return 0
 
-        return self.presenter.item.getObject().getExtentInPixels().heightInPixels
+        return self.presenter.item.getObject().getImageExtent().heightInPixels
 
     def getSizeInBytes(self) -> int:
         if self.presenter is None:

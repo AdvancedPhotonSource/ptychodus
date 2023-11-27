@@ -10,35 +10,14 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from .widgets import DecimalSlider, LengthWidget, RepositoryTreeView
+from .widgets import DecimalSlider, LengthWidget
 
 __all__ = [
     'ObjectEditorDialog',
-    'ObjectParametersView',
-    'ObjectView',
     'RandomObjectView',
 ]
 
 T = TypeVar('T', bound=QWidget)
-
-
-class ObjectParametersView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Parameters', parent)
-        self.pixelSizeXWidget = LengthWidget.createInstance()
-        self.pixelSizeYWidget = LengthWidget.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectParametersView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Pixel Size X:', view.pixelSizeXWidget)
-        layout.addRow('Pixel Size Y:', view.pixelSizeYWidget)
-        view.setLayout(layout)
-
-        return view
 
 
 class RandomObjectView(QGroupBox):
@@ -168,22 +147,3 @@ class ObjectEditorDialog(Generic[T], QDialog):
             self.accept()
         else:
             self.reject()
-
-
-class ObjectView(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.parametersView = ObjectParametersView.createInstance()
-        self.repositoryView = RepositoryTreeView.createInstance('Repository')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ObjectView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.parametersView)
-        layout.addWidget(view.repositoryView)
-        view.setLayout(layout)
-
-        return view

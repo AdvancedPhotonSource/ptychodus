@@ -1,5 +1,4 @@
 from __future__ import annotations
-from decimal import Decimal
 from typing import Callable, Final
 import logging
 
@@ -10,8 +9,7 @@ from ...model.image import ImagePresenter
 from ...model.object import ObjectRepositoryItem, ObjectRepositoryPresenter
 from ...model.probe import ApparatusPresenter
 from ...view.image import ImageView
-from ...view.object import ObjectParametersView, ObjectView
-from ...view.widgets import ExceptionDialog
+from ...view.widgets import ExceptionDialog, RepositoryTreeView
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .compare import CompareObjectViewController
@@ -21,46 +19,12 @@ from .treeModel import ObjectTreeModel, ObjectTreeNode
 logger = logging.getLogger(__name__)
 
 
-class ObjectParametersController(Observer):
-
-    def __init__(self, presenter: ApparatusPresenter, view: ObjectParametersView) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-
-    @classmethod
-    def createInstance(cls, presenter: ApparatusPresenter,
-                       view: ObjectParametersView) -> ObjectParametersController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-
-        # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
-
-        view.pixelSizeXWidget.setReadOnly(True)
-        view.pixelSizeYWidget.setReadOnly(True)
-
-        controller._syncModelToView()
-
-        return controller
-
-    def _syncModelToView(self) -> None:
-        pixelGeometry = self._presenter.getObjectPlanePixelGeometry()
-        self._view.pixelSizeXWidget.setLengthInMeters(
-            Decimal.from_float(pixelGeometry.widthInMeters))
-        self._view.pixelSizeYWidget.setLengthInMeters(
-            Decimal.from_float(pixelGeometry.heightInMeters))
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
-
-
 class ObjectController(Observer):
     OPEN_FILE: Final[str] = 'Open File...'  # TODO clean up
 
     def __init__(self, apparatusPresenter: ApparatusPresenter,
                  repositoryPresenter: ObjectRepositoryPresenter, imagePresenter: ImagePresenter,
-                 view: ObjectView, imageView: ImageView,
+                 view: RepositoryTreeView, imageView: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._apparatusPresenter = apparatusPresenter
@@ -69,8 +33,6 @@ class ObjectController(Observer):
         self._view = view
         self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
-        self._parametersController = ObjectParametersController.createInstance(
-            apparatusPresenter, view.parametersView)
         self._treeModel = ObjectTreeModel()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
@@ -78,7 +40,8 @@ class ObjectController(Observer):
     @classmethod
     def createInstance(cls, apparatusPresenter: ApparatusPresenter,
                        repositoryPresenter: ObjectRepositoryPresenter,
-                       imagePresenter: ImagePresenter, view: ObjectView, imageView: ImageView,
+                       imagePresenter: ImagePresenter, view: RepositoryTreeView,
+                       imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
         controller = cls(apparatusPresenter, repositoryPresenter, imagePresenter, view, imageView,
                          fileDialogFactory)
@@ -86,19 +49,17 @@ class ObjectController(Observer):
 
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
 
-        view.repositoryView.treeView.setModel(controller._treeModel)
-        view.repositoryView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        view.repositoryView.treeView.selectionModel().selectionChanged.connect(
-            controller._updateView)
+        view.treeView.setModel(controller._treeModel)
+        view.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.treeView.selectionModel().selectionChanged.connect(controller._updateView)
 
         for name in repositoryPresenter.getInitializerDisplayNameList():
-            insertAction = view.repositoryView.buttonBox.insertMenu.addAction(name)
+            insertAction = view.buttonBox.insertMenu.addAction(name)
             insertAction.triggered.connect(controller._createItemLambda(name))
 
-        view.repositoryView.buttonBox.editButton.clicked.connect(controller._editSelectedObject)
-        view.repositoryView.buttonBox.saveButton.clicked.connect(controller._saveSelectedObject)
-        view.repositoryView.buttonBox.removeButton.clicked.connect(
-            controller._removeSelectedObject)
+        view.buttonBox.editButton.clicked.connect(controller._editSelectedObject)
+        view.buttonBox.saveButton.clicked.connect(controller._saveSelectedObject)
+        view.buttonBox.removeButton.clicked.connect(controller._removeSelectedObject)
 
         controller._syncModelToView()
 
@@ -116,7 +77,7 @@ class ObjectController(Observer):
 
     def _openObject(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view.repositoryView,
+            self._view,
             'Open Object',
             nameFilters=self._repositoryPresenter.getOpenFileFilterList(),
             selectedNameFilter=self._repositoryPresenter.getOpenFileFilter())
@@ -125,11 +86,11 @@ class ObjectController(Observer):
             self._repositoryPresenter.openObject(filePath, nameFilter)
 
     def _saveSelectedObject(self) -> None:
-        current = self._view.repositoryView.treeView.currentIndex()
+        current = self._view.treeView.currentIndex()
 
         if current.isValid():
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-                self._view.repositoryView,
+                self._view,
                 'Save Object',
                 nameFilters=self._repositoryPresenter.getSaveFileFilterList(),
                 selectedNameFilter=self._repositoryPresenter.getSaveFileFilter())
@@ -146,7 +107,7 @@ class ObjectController(Observer):
             logger.error('No items are selected!')
 
     def _editSelectedObject(self) -> None:
-        current = self._view.repositoryView.treeView.currentIndex()
+        current = self._view.treeView.currentIndex()
 
         if current.isValid():
             itemPresenter = current.internalPointer().presenter  # TODO do this cleaner
@@ -164,7 +125,7 @@ class ObjectController(Observer):
             logger.error('No items are selected!')
 
     def _removeSelectedObject(self) -> None:
-        current = self._view.repositoryView.treeView.currentIndex()
+        current = self._view.treeView.currentIndex()
 
         if current.isValid():
             name = current.internalPointer().getName()
@@ -173,12 +134,12 @@ class ObjectController(Observer):
             logger.error('No items are selected!')
 
     def _updateView(self) -> None:
-        selectionModel = self._view.repositoryView.treeView.selectionModel()
+        selectionModel = self._view.treeView.selectionModel()
         hasSelection = selectionModel.hasSelection()
 
-        self._view.repositoryView.buttonBox.saveButton.setEnabled(hasSelection)
-        self._view.repositoryView.buttonBox.editButton.setEnabled(hasSelection)
-        self._view.repositoryView.buttonBox.removeButton.setEnabled(hasSelection)
+        self._view.buttonBox.saveButton.setEnabled(hasSelection)
+        self._view.buttonBox.editButton.setEnabled(hasSelection)
+        self._view.buttonBox.removeButton.setEnabled(hasSelection)
 
         for index in selectionModel.selectedIndexes():
             node = index.internalPointer()

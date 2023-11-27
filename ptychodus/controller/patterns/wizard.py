@@ -10,7 +10,7 @@ from ...api.observer import Observable, Observer
 from ...model import MetadataPresenter
 from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
                            DiffractionPatternPresenter)
-from ...view.detector import (OpenDatasetWizard, OpenDatasetWizardFilesPage,
+from ...view.patterns import (OpenDatasetWizard, OpenDatasetWizardFilesPage,
                               OpenDatasetWizardMetadataPage, OpenDatasetWizardPatternsPage,
                               OpenDatasetWizardPatternCropView, OpenDatasetWizardPatternLoadView,
                               OpenDatasetWizardPatternMemoryMapView,

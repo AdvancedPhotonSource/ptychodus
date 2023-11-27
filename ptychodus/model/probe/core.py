@@ -132,8 +132,8 @@ class ProbePresenter(Observable, Observer):
             return False
 
         probe = selectedItem.getProbe()
-        actualExtent = probe.getExtentInPixels()
-        expectedExtent = self._sizer.getExtentInPixels()
+        actualExtent = probe.getImageExtent()
+        expectedExtent = self._sizer.getImageExtent()
         return (actualExtent == expectedExtent)
 
     def selectProbe(self, name: str) -> None:

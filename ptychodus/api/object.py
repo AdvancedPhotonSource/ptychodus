@@ -60,7 +60,7 @@ class Object:
     def getDataType(self) -> numpy.dtype:
         return self._array.dtype
 
-    def getExtentInPixels(self) -> ImageExtent:
+    def getImageExtent(self) -> ImageExtent:
         return ImageExtent(
             widthInPixels=self._array.shape[-1],
             heightInPixels=self._array.shape[-2],

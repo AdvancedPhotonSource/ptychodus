@@ -6,34 +6,13 @@ from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDi
                              QFormLayout, QGroupBox, QHBoxLayout, QRadioButton, QSpinBox,
                              QVBoxLayout, QWidget)
 
-from .widgets import DecimalLineEdit, DecimalSlider, EnergyWidget, LengthWidget, RepositoryTreeView
+from .widgets import DecimalLineEdit, DecimalSlider, LengthWidget
 
 __all__ = [
     'ProbeEditorDialog',
-    'ProbeParametersView',
-    'ProbeView',
 ]
 
 T = TypeVar('T', bound=QGroupBox)
-
-
-class ProbeParametersView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Parameters', parent)
-        self.energyWidget = EnergyWidget.createInstance()
-        self.wavelengthWidget = LengthWidget.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeParametersView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Energy:', view.energyWidget)
-        layout.addRow('Wavelength:', view.wavelengthWidget)
-        view.setLayout(layout)
-
-        return view
 
 
 class DiskProbeView(QGroupBox):
@@ -162,22 +141,3 @@ class ProbeEditorDialog(Generic[T], QDialog):
             self.accept()
         else:
             self.reject()
-
-
-class ProbeView(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.parametersView = ProbeParametersView.createInstance()
-        self.repositoryView = RepositoryTreeView.createInstance('Repository')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.parametersView)
-        layout.addWidget(view.repositoryView)
-        view.setLayout(layout)
-
-        return view

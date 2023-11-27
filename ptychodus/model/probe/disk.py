@@ -38,7 +38,7 @@ class DiskProbeInitializer(ProbeInitializer):
         settings.diskDiameterInMeters.value = self._diameterInMeters
 
     def __call__(self) -> Probe:
-        extent = self._sizer.getExtentInPixels()
+        extent = self._sizer.getImageExtent()
         pixelGeometry = self._apparatus.getObjectPlanePixelGeometry()
         Y, X = numpy.mgrid[:extent.heightInPixels, :extent.widthInPixels]
         X_px = X - (extent.widthInPixels - 1) / 2

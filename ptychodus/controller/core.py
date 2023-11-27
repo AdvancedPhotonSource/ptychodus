@@ -7,10 +7,10 @@ from ..model import ModelCore
 from ..view import ViewCore
 from .automation import AutomationController
 from .data import FileDialogFactory
-from .detector import DetectorController
 from .experiment import ExperimentController
 from .memory import MemoryController
 from .object import ObjectImageController, ObjectController
+from .patterns import PatternsController
 from .probe import ProbeImageController, ProbeController
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
@@ -45,11 +45,10 @@ class ControllerCore:
                                                           model.experimentRepositoryPresenter,
                                                           view.experimentView,
                                                           self._fileDialogFactory)
-        self._detectorController = DetectorController.createInstance(
-            model.detectorPresenter, model.apparatusPresenter,
-            model.diffractionDatasetInputOutputPresenter, model.metadataPresenter,
-            model.diffractionDatasetPresenter, model.patternPresenter,
-            model.detectorImagePresenter, view.detectorView, view.detectorImageView,
+        self._detectorController = PatternsController.createInstance(
+            model.detectorPresenter, model.diffractionDatasetInputOutputPresenter,
+            model.metadataPresenter, model.diffractionDatasetPresenter, model.patternPresenter,
+            model.detectorImagePresenter, view.patternsView, view.patternsImageView,
             self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepositoryPresenter,
                                                              view.scanView, view.scanPlotView,

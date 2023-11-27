@@ -2,10 +2,11 @@ from pathlib import Path
 import logging
 
 import h5py
+import numpy
 
 from ptychodus.api.apparatus import ImageExtent
 from ptychodus.api.data import (DiffractionPatternArrayType, DiffractionDataset,
-                                DiffractionFileReader, DiffractionMetadata,
+                                DiffractionFileReader, DiffractionFileWriter, DiffractionMetadata,
                                 DiffractionPatternArray, DiffractionPatternState,
                                 SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
@@ -162,6 +163,18 @@ class H5DiffractionFileReader(DiffractionFileReader):
         return dataset
 
 
+class H5DiffractionFileWriter(DiffractionFileWriter):
+
+    def __init__(self, dataPath: str) -> None:
+        self._dataPath = dataPath
+
+    def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
+        data = numpy.concatenate([array.getData() for array in dataset])
+
+        with h5py.File(filePath, 'w') as h5File:
+            h5File.create_dataset(self._dataPath, data=data, compression='gzip')
+
+
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/entry/data/data'),
@@ -170,6 +183,11 @@ def registerPlugins(registry: PluginRegistry) -> None:
     )
     registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/dp'),
+        simpleName='PtychoShelves',
+        displayName='PtychoShelves Diffraction Data Files (*.h5 *.hdf5)',
+    )
+    registry.diffractionFileWriters.registerPlugin(
+        H5DiffractionFileWriter(dataPath='/dp'),
         simpleName='PtychoShelves',
         displayName='PtychoShelves Diffraction Data Files (*.h5 *.hdf5)',
     )

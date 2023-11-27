@@ -10,7 +10,7 @@ from ...model.experiment import ExperimentRepositoryPresenter
 from ...view.experiment import ExperimentRepositoryView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from .editor import ExperimentEditorViewController
+from .info import ExperimentInfoViewController
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +24,10 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
         self._presenter = presenter
         self._header = [
             'Name',
-            'Probe\nEnergy\n[keV]',
-            'Detector\nDistance\n[m]',
-            'Pixel\nWidth\n[nm]',
-            'Pixel\nHeight\n[nm]',
+            'Probe Energy\n[keV]',
+            'Detector-Object\nDistance [m]',
+            'Pixel Width\n[nm]',
+            'Pixel Height\n[nm]',
             'Size\n[MB]',
         ]
 
@@ -143,10 +143,11 @@ class ExperimentRepositoryController(SequenceObserver):
         createNewAction = view.buttonBox.insertMenu.addAction('Create New')
         createNewAction.triggered.connect(controller._insertExperiment)
 
-        view.buttonBox.editButton.clicked.connect(controller._editSelectedExperiment)
+        view.buttonBox.infoButton.clicked.connect(controller._openSelectedExperimentInfo)
         view.buttonBox.saveButton.clicked.connect(controller._saveSelectedExperiment)
         view.buttonBox.removeButton.clicked.connect(controller._removeSelectedExperiment)
 
+        controller._syncModelToView()
         controller._setButtonsEnabled(False)
 
         return controller
@@ -183,12 +184,12 @@ class ExperimentRepositoryController(SequenceObserver):
         else:
             logger.error('No items are selected!')
 
-    def _editSelectedExperiment(self) -> None:
+    def _openSelectedExperimentInfo(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
             experiment = self._presenter[current.row()]
-            ExperimentEditorViewController.editParameters(experiment, self._view)
+            ExperimentInfoViewController.showInfo(experiment, self._view)
         else:
             logger.error('No items are selected!')
 
@@ -202,24 +203,31 @@ class ExperimentRepositoryController(SequenceObserver):
 
     def _setButtonsEnabled(self, enabled: bool) -> None:
         self._view.buttonBox.saveButton.setEnabled(enabled)
-        self._view.buttonBox.editButton.setEnabled(enabled)
+        self._view.buttonBox.infoButton.setEnabled(enabled)
         self._view.buttonBox.removeButton.setEnabled(enabled)
 
     def _updateEnabledButtons(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         self._setButtonsEnabled(not selected.isEmpty())
 
+    def _syncModelToView(self) -> None:
+        infoText = self._presenter.getInfoText()
+        self._view.infoLabel.setText(infoText)
+
     def handleItemInserted(self, index: int) -> None:
         parent = QModelIndex()
         self._tableModel.beginInsertRows(parent, index, index)
         self._tableModel.endInsertRows()
+        self._syncModelToView()
 
     def handleItemChanged(self, index: int) -> None:
         numberOfColumns = self._tableModel.columnCount()
         topLeft = self._tableModel.index(index, 0)
         bottomRight = self._tableModel.index(index, numberOfColumns - 1)
         self._tableModel.dataChanged.emit(topLeft, bottomRight, [Qt.DisplayRole])
+        self._syncModelToView()
 
     def handleItemRemoved(self, index: int) -> None:
         parent = QModelIndex()
         self._tableModel.beginRemoveRows(parent, index, index)
         self._tableModel.endRemoveRows()
+        self._syncModelToView()

@@ -8,7 +8,7 @@ from ...api.experiment import Experiment, ExperimentFileReader, ExperimentFileWr
 from ...api.observer import Observable, ObservableSequence, Observer
 from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry
-from .detector import Detector, DetectorPresenter, DetectorSettings
+from .detector import Detector, DetectorPresenter
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,23 @@ class ExperimentRepositoryPresenter(ObservableSequence[Experiment], Observer):
     def __len__(self) -> int:
         return len(self._experimentList)
 
+    def _generateUniqueName(self, nameHint: str) -> str:
+        existingNames = {experiment.getName() for experiment in self._experimentList}
+        uniqueName = nameHint
+        index = 0
+
+        while uniqueName in existingNames:
+            index += 1
+            uniqueName = f'{nameHint}-{index}'
+
+        return uniqueName
+
+    def _appendExperiment(self, experiment: Experiment) -> None:
+        experiment.addObserver(self)
+        index = len(self._experimentList)
+        self._experimentList.append(experiment)
+        self.notifyObserversItemInserted(index)
+
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
@@ -50,7 +67,22 @@ class ExperimentRepositoryPresenter(ObservableSequence[Experiment], Observer):
         return self._fileReaderChooser.currentPlugin.displayName
 
     def openExperiment(self, filePath: Path, fileFilter: str) -> None:
-        pass  # FIXME
+        if filePath.is_file():
+            self._fileReaderChooser.setCurrentPluginByName(fileFilter)
+            fileType = self._fileReaderChooser.currentPlugin.simpleName
+            logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
+            fileReader = self._fileReaderChooser.currentPlugin.strategy
+
+            try:
+                experiment = fileReader.read(filePath)
+            except Exception as exc:
+                raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
+            else:
+                uniqueName = self._generateUniqueName(experiment.getName())
+                experiment.setName(uniqueName)
+                self._appendExperiment(experiment)
+        else:
+            logger.debug(f'Refusing to create experiment with invalid file path \"{filePath}\"')
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()
@@ -71,20 +103,10 @@ class ExperimentRepositoryPresenter(ObservableSequence[Experiment], Observer):
         writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, experiment)
 
-    def insertExperiment(self, name: str = 'Unnamed') -> None:
-        existingNames = {experiment.getName() for experiment in self._experimentList}
-        uniqueName = name
-        index = 0
-
-        while uniqueName in existingNames:
-            index += 1
-            uniqueName = f'{name}-{index}'
-
+    def insertExperiment(self, nameHint: str = 'Unnamed') -> None:
+        uniqueName = self._generateUniqueName(nameHint)
         experiment = Experiment(uniqueName)
-        experiment.addObserver(self)
-        index = len(self._experimentList)
-        self._experimentList.append(experiment)
-        self.notifyObserversItemInserted(index)
+        self._appendExperiment(experiment)
 
     def removeExperiment(self, index: int) -> None:
         try:
@@ -94,6 +116,10 @@ class ExperimentRepositoryPresenter(ObservableSequence[Experiment], Observer):
         else:
             experiment.removeObserver(self)
             self.notifyObserversItemRemoved(index)
+
+    def getInfoText(self) -> str:
+        sizeInMB = sum(exp.getSizeInBytes() for exp in self._experimentList) / (1024 * 1024)
+        return f'Total: {len(self)} [{sizeInMB:.2f}MB]'
 
     def update(self, observable: Observable) -> None:
         if isinstance(observable, Experiment):
@@ -112,9 +138,7 @@ class ExperimentCore:
     def __init__(self, settingsRegistry: SettingsRegistry,
                  fileReaderChooser: PluginChooser[ExperimentFileReader],
                  fileWriterChooser: PluginChooser[ExperimentFileWriter]) -> None:
-        self.detectorSettings = DetectorSettings.createInstance(settingsRegistry)
-        self.detector = Detector.createInstance(self.detectorSettings)
-        self.detectorPresenter = DetectorPresenter.createInstance(self.detectorSettings,
-                                                                  self.detector)
+        self.detector = Detector.createInstance(settingsRegistry)
+        self.detectorPresenter = DetectorPresenter.createInstance(self.detector)
         self.repositoryPresenter = ExperimentRepositoryPresenter.createInstance(
             fileReaderChooser, fileWriterChooser)

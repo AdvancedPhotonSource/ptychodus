@@ -36,7 +36,7 @@ class ObjectSizer(Observable, Observer):
         bbox = self._scanSizer.getBoundingBoxInMeters()
         return ScanPoint(0., 0.) if bbox is None else bbox.midpoint
 
-    def getScanExtentInPixels(self) -> ImageExtent:
+    def getScanImageExtent(self) -> ImageExtent:
         bbox = self._scanSizer.getBoundingBoxInMeters()
         pixelGeometry = self.getPixelGeometry()
         extentX = 0
@@ -48,12 +48,12 @@ class ObjectSizer(Observable, Observer):
 
         return ImageExtent(widthInPixels=extentX, heightInPixels=extentY)
 
-    def getProbeExtentInPixels(self) -> ImageExtent:
-        return self._probeSizer.getExtentInPixels()
+    def getProbeImageExtent(self) -> ImageExtent:
+        return self._probeSizer.getImageExtent()
 
-    def getObjectExtentInPixels(self) -> ImageExtent:
-        scanExtent = self.getScanExtentInPixels()
-        probeExtent = self.getProbeExtentInPixels()
+    def getObjectImageExtent(self) -> ImageExtent:
+        scanExtent = self.getScanImageExtent()
+        probeExtent = self.getProbeImageExtent()
         return ImageExtent(
             widthInPixels=scanExtent.widthInPixels + probeExtent.widthInPixels,
             heightInPixels=scanExtent.heightInPixels + probeExtent.heightInPixels,

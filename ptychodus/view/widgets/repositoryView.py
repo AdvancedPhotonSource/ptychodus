@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QGroupBox, QHBoxLayout, QMenu, QPushButton, QTableView, QTreeView,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QHBoxLayout, QMenu, QPushButton, QTableView, QTreeView, QVBoxLayout,
+                             QWidget)
 
 
 class RepositoryButtonBox(QWidget):
@@ -31,16 +32,16 @@ class RepositoryButtonBox(QWidget):
         return view
 
 
-class RepositoryTableView(QGroupBox):
+class RepositoryTableView(QWidget):
 
-    def __init__(self, title: str, parent: QWidget | None) -> None:
-        super().__init__(title, parent)
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__(parent)
         self.tableView = QTableView()
         self.buttonBox = RepositoryButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, title: str, parent: QWidget | None = None) -> RepositoryTableView:
-        view = cls(title, parent)
+    def createInstance(cls, parent: QWidget | None = None) -> RepositoryTableView:
+        view = cls(parent)
 
         layout = QVBoxLayout()
         layout.addWidget(view.tableView)
@@ -50,16 +51,17 @@ class RepositoryTableView(QGroupBox):
         return view
 
 
-class RepositoryTreeView(QGroupBox):
+class RepositoryTreeView(QWidget):
 
-    def __init__(self, title: str, parent: QWidget | None) -> None:
-        super().__init__(title, parent)
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__(parent)
         self.treeView = QTreeView()
         self.buttonBox = RepositoryButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, title: str, parent: QWidget | None = None) -> RepositoryTreeView:
-        view = cls(title, parent)
+    def createInstance(cls, parent: QWidget | None = None) -> RepositoryTreeView:
+        view = cls(parent)
+        view.treeView.header().setDefaultAlignment(Qt.AlignCenter)
 
         layout = QVBoxLayout()
         layout.addWidget(view.treeView)

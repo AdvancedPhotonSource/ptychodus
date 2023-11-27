@@ -6,46 +6,25 @@ from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDi
                              QPushButton, QSpinBox, QTableView, QTreeView, QVBoxLayout, QWidget,
                              QWizard, QWizardPage)
 
-from .widgets import DecimalLineEdit, LengthWidget
 
-
-class DetectorParametersView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Parameters', parent)
-        self.detectorDistanceWidget = LengthWidget.createInstance()
-        self.fresnelNumberWidget = DecimalLineEdit.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> DetectorParametersView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Detector-Object Distance:', view.detectorDistanceWidget)
-        layout.addRow('Fresnel Number:', view.fresnelNumberWidget)
-        view.setLayout(layout)
-
-        return view
-
-
-class DetectorButtonBox(QWidget):
+class PatternsButtonBox(QWidget):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.openButton = QPushButton('Open')
         self.saveButton = QPushButton('Save')
-        self.inspectButton = QPushButton('Inspect')
+        self.infoButton = QPushButton('Info')
         self.closeButton = QPushButton('Close')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> DetectorButtonBox:
+    def createInstance(cls, parent: QWidget | None = None) -> PatternsButtonBox:
         view = cls(parent)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.openButton)
         layout.addWidget(view.saveButton)
-        layout.addWidget(view.inspectButton)
+        layout.addWidget(view.infoButton)
         layout.addWidget(view.closeButton)
         view.setLayout(layout)
 
@@ -266,7 +245,7 @@ class OpenDatasetWizard(QWizard):
         return view
 
 
-class InspectDatasetDialog(QDialog):
+class PatternsInfoDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
@@ -274,9 +253,9 @@ class InspectDatasetDialog(QDialog):
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> InspectDatasetDialog:
+    def createInstance(cls, parent: QWidget | None = None) -> PatternsInfoDialog:
         view = cls(parent)
-        view.setWindowTitle('Inspect Dataset')
+        view.treeView.header().setDefaultAlignment(Qt.AlignCenter)
 
         view.buttonBox.addButton(QDialogButtonBox.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
@@ -295,43 +274,24 @@ class InspectDatasetDialog(QDialog):
             self.reject()
 
 
-class DetectorDataView(QGroupBox):
+class PatternsView(QWidget):
 
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Repository', parent)
+        super().__init__(parent)
         self.treeView = QTreeView()
         self.infoLabel = QLabel()
-        self.buttonBox = DetectorButtonBox.createInstance()
+        self.buttonBox = PatternsButtonBox.createInstance()
         self.openDatasetWizard = OpenDatasetWizard.createInstance(self)
-        self.inspectDatasetDialog = InspectDatasetDialog.createInstance(self)
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> DetectorDataView:
+    def createInstance(cls, parent: QWidget | None = None) -> PatternsView:
         view = cls(parent)
+        view.treeView.header().setDefaultAlignment(Qt.AlignCenter)
 
         layout = QVBoxLayout()
         layout.addWidget(view.treeView)
         layout.addWidget(view.infoLabel)
         layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-
-class DetectorView(QWidget):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.parametersView = DetectorParametersView.createInstance()
-        self.dataView = DetectorDataView.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> DetectorView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.parametersView)
-        layout.addWidget(view.dataView)
         view.setLayout(layout)
 
         return view

@@ -103,9 +103,11 @@ class ModelCore:
                                       self._pluginRegistry.objectFileWriters)
         self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
                                           isComplex=True)
-        self.metadataPresenter = MetadataPresenter.createInstance(
-            self._dataCore.dataset, self._experimentCore.detectorSettings,
-            self._dataCore.patternSettings, self._probeCore.settings, self._scanCore.scanAPI)
+        self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.dataset,
+                                                                  self._experimentCore.detector,
+                                                                  self._dataCore.patternSettings,
+                                                                  self._probeCore.settings,
+                                                                  self._scanCore.scanAPI)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)

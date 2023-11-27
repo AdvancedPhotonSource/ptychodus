@@ -7,7 +7,7 @@ import importlib
 import logging
 import pkgutil
 
-from .data import DiffractionFileReader
+from .data import DiffractionFileReader, DiffractionFileWriter
 from .experiment import ExperimentFileReader, ExperimentFileWriter
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
@@ -97,6 +97,7 @@ class PluginRegistry:
 
     def __init__(self) -> None:
         self.diffractionFileReaders = PluginChooser[DiffractionFileReader]()
+        self.diffractionFileWriters = PluginChooser[DiffractionFileWriter]()
         self.scalarTransformations = PluginChooser[ScalarTransformation]()
         self.scanFileReaders = PluginChooser[ScanFileReader]()
         self.scanFileWriters = PluginChooser[ScanFileWriter]()

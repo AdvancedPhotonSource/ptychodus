@@ -1,4 +1,4 @@
-from .controller import ObjectController
+from .core import ObjectController
 from .image import ObjectImageController
 
 __all__ = [

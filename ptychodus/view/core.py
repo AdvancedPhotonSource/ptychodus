@@ -9,15 +9,14 @@ from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QProgressB
 
 from . import resources
 from .automation import AutomationView
-from .detector import DetectorView
 from .experiment import ExperimentView
 from .image import ImageView
 from .monitor import MonitorObjectView, MonitorProbeView
-from .object import ObjectView
-from .probe import ProbeView
+from .patterns import PatternsView
 from .reconstructor import ReconstructorParametersView, ReconstructorPlotView
-from .scan import ScanView, ScanPlotView
+from .scan import ScanPlotView
 from .settings import SettingsParametersView
+from .widgets import RepositoryTableView, RepositoryTreeView
 from .workflow import WorkflowParametersView
 
 logger = logging.getLogger(__name__)
@@ -46,21 +45,21 @@ class ViewCore(QMainWindow):
         self.experimentView = ExperimentView.createInstance()
         self.experimentDiagramView = QWidget()
 
-        self.detectorAction = self.navigationToolBar.addAction(QIcon(':/icons/detector'),
-                                                               'Detector')
-        self.detectorView = DetectorView.createInstance()
-        self.detectorImageView = ImageView.createInstance(self.statusBar())
+        self.patternsAction = self.navigationToolBar.addAction(QIcon(':/icons/patterns'),
+                                                               'Patterns')
+        self.patternsView = PatternsView.createInstance()
+        self.patternsImageView = ImageView.createInstance(self.statusBar())
 
         self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
-        self.scanView = ScanView.createInstance()
+        self.scanView = RepositoryTableView.createInstance()
         self.scanPlotView = ScanPlotView.createInstance()
 
         self.probeAction = self.navigationToolBar.addAction(QIcon(':/icons/probe'), 'Probe')
-        self.probeView = ProbeView.createInstance()
+        self.probeView = RepositoryTreeView.createInstance()
         self.probeImageView = ImageView.createInstance(self.statusBar())
 
         self.objectAction = self.navigationToolBar.addAction(QIcon(':/icons/object'), 'Object')
-        self.objectView = ObjectView.createInstance()
+        self.objectView = RepositoryTreeView.createInstance()
         self.objectImageView = ImageView.createInstance(self.statusBar())
 
         self.reconstructorAction = self.navigationToolBar.addAction(QIcon(':/icons/reconstructor'),
@@ -105,7 +104,7 @@ class ViewCore(QMainWindow):
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsParametersView)
         view.parametersWidget.addWidget(view.experimentView)
-        view.parametersWidget.addWidget(view.detectorView)
+        view.parametersWidget.addWidget(view.patternsView)
         view.parametersWidget.addWidget(view.scanView)
         view.parametersWidget.addWidget(view.probeView)
         view.parametersWidget.addWidget(view.objectView)
@@ -119,7 +118,7 @@ class ViewCore(QMainWindow):
         # maintain same order as navigationToolBar buttons
         view.contentsWidget.addWidget(view.settingsEntryView)
         view.contentsWidget.addWidget(view.experimentDiagramView)
-        view.contentsWidget.addWidget(view.detectorImageView)
+        view.contentsWidget.addWidget(view.patternsImageView)
         view.contentsWidget.addWidget(view.scanPlotView)
         view.contentsWidget.addWidget(view.probeImageView)
         view.contentsWidget.addWidget(view.objectImageView)

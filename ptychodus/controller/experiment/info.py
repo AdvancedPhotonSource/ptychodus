@@ -1,15 +1,10 @@
-from __future__ import annotations
-import logging
-
 from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel,
                           QVariant)
 from PyQt5.QtWidgets import QWidget
 
 from ...api.experiment import Experiment
 from ...api.observer import Observable, Observer
-from ...view.experiment import ExperimentEditorDialog
-
-logger = logging.getLogger(__name__)
+from ...view.experiment import ExperimentInfoDialog
 
 
 class ExperimentPropertyTableModel(QAbstractTableModel):
@@ -55,31 +50,27 @@ class ExperimentPropertyTableModel(QAbstractTableModel):
         return len(self._header)
 
 
-class ExperimentEditorViewController(Observer):
+class ExperimentInfoViewController(Observer):
 
-    def __init__(self, experiment: Experiment, dialog: ExperimentEditorDialog,
-                 tableModel: ExperimentPropertyTableModel) -> None:
+    def __init__(self, experiment: Experiment, tableModel: ExperimentPropertyTableModel) -> None:
         super().__init__()
         self._experiment = experiment
-        self._dialog = dialog
         self._tableModel = tableModel
 
     @classmethod
-    def editParameters(cls, experiment: Experiment, parent: QWidget) -> None:
+    def showInfo(cls, experiment: Experiment, parent: QWidget) -> None:
         tableModel = ExperimentPropertyTableModel(experiment)
+        controller = cls(experiment, tableModel)
+        experiment.addObserver(controller)
+
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
-        name = experiment.getName()
-        dialog = ExperimentEditorDialog.createInstance(parent)
-        dialog.setWindowTitle(f'Edit Experiment: {name}')
+        dialog = ExperimentInfoDialog.createInstance(parent)
+        dialog.setWindowTitle(f'Edit Experiment: {experiment.getName()}')
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)
         dialog.tableView.verticalHeader().hide()
-
-        controller = cls(experiment, dialog, tableModel)
-        experiment.addObserver(controller)
-
         dialog.finished.connect(controller._finish)
 
         controller._syncModelToView()

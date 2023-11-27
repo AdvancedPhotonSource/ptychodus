@@ -1,4 +1,4 @@
-from .controller import ProbeController
+from .core import ProbeController
 from .image import ProbeImageController
 
 __all__ = [

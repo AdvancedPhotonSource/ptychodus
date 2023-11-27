@@ -133,8 +133,8 @@ class ObjectPresenter(Observable, Observer):
             return False
 
         object_ = selectedItem.getObject()
-        actualExtent = object_.getExtentInPixels()
-        expectedExtent = self._sizer.getObjectExtentInPixels()
+        actualExtent = object_.getImageExtent()
+        expectedExtent = self._sizer.getObjectImageExtent()
         widthIsBigEnough = (actualExtent.widthInPixels >= expectedExtent.widthInPixels)
         heightIsBigEnough = (actualExtent.heightInPixels >= expectedExtent.heightInPixels)
         return (widthIsBigEnough and heightIsBigEnough)

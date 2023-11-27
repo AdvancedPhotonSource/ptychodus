@@ -56,7 +56,7 @@ class RandomObjectInitializer(ObjectInitializer):
         settings.layerDistanceInMeters.value = self._layerDistanceInMeters
 
     def __call__(self) -> Object:
-        objectExtent = self._sizer.getObjectExtentInPixels()
+        objectExtent = self._sizer.getObjectImageExtent()
         extraPaddingExtent = ImageExtent(2 * self._extraPaddingX, 2 * self._extraPaddingY)
         paddedObjectExtent = ImageExtent(
             widthInPixels=objectExtent.widthInPixels + extraPaddingExtent.widthInPixels,

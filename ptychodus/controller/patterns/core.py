@@ -10,28 +10,25 @@ from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDa
                            DiffractionPatternPresenter)
 from ...model.experiment import DetectorPresenter
 from ...model.image import ImagePresenter
-from ...model.probe import ApparatusPresenter
-from ...view.detector import DetectorView
 from ...view.image import ImageView
+from ...view.patterns import PatternsView
 from ..data import FileDialogFactory
 from ..image import ImageController
-from .inspect import InspectDatasetController
-from .parameters import DetectorParametersController
+from .info import PatternsInfoViewController
 from .treeModel import DatasetTreeModel, DatasetTreeNode
 from .wizard import OpenDatasetWizardController
 
 logger = logging.getLogger(__name__)
 
 
-class DetectorController(Observer):
+class PatternsController(Observer):
 
     def __init__(self, detectorPresenter: DetectorPresenter,
-                 apparatusPresenter: ApparatusPresenter,
                  ioPresenter: DiffractionDatasetInputOutputPresenter,
                  metadataPresenter: MetadataPresenter,
                  datasetPresenter: DiffractionDatasetPresenter,
                  patternPresenter: DiffractionPatternPresenter, imagePresenter: ImagePresenter,
-                 view: DetectorView, imageView: ImageView,
+                 view: PatternsView, imageView: ImageView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._detectorPresenter = detectorPresenter
@@ -42,38 +39,30 @@ class DetectorController(Observer):
         self._fileDialogFactory = fileDialogFactory
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
-        self._parametersController = DetectorParametersController.createInstance(
-            detectorPresenter, apparatusPresenter, view.parametersView)
         self._wizardController = OpenDatasetWizardController.createInstance(
             ioPresenter, metadataPresenter, datasetPresenter, patternPresenter,
-            view.dataView.openDatasetWizard, fileDialogFactory)
-        self._inspectDatasetController = InspectDatasetController.createInstance(
-            datasetPresenter, view.dataView.inspectDatasetDialog)
+            view.openDatasetWizard, fileDialogFactory)
         self._treeModel = DatasetTreeModel()
 
     @classmethod
     def createInstance(cls, detectorPresenter: DetectorPresenter,
-                       apparatusPresenter: ApparatusPresenter,
                        ioPresenter: DiffractionDatasetInputOutputPresenter,
                        metadataPresenter: MetadataPresenter,
                        datasetPresenter: DiffractionDatasetPresenter,
                        patternPresenter: DiffractionPatternPresenter,
-                       imagePresenter: ImagePresenter, view: DetectorView, imageView: ImageView,
-                       fileDialogFactory: FileDialogFactory) -> DetectorController:
-        controller = cls(detectorPresenter, apparatusPresenter, ioPresenter, metadataPresenter,
-                         datasetPresenter, patternPresenter, imagePresenter, view, imageView,
-                         fileDialogFactory)
+                       imagePresenter: ImagePresenter, view: PatternsView, imageView: ImageView,
+                       fileDialogFactory: FileDialogFactory) -> PatternsController:
+        controller = cls(detectorPresenter, ioPresenter, metadataPresenter, datasetPresenter,
+                         patternPresenter, imagePresenter, view, imageView, fileDialogFactory)
 
-        view.dataView.treeView.setModel(controller._treeModel)
-        view.dataView.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        view.dataView.treeView.selectionModel().selectionChanged.connect(controller._updateView)
-        view.dataView.buttonBox.openButton.clicked.connect(
-            controller._wizardController.openDataset)
-        view.dataView.buttonBox.saveButton.clicked.connect(controller._saveDataset)
-        view.dataView.buttonBox.inspectButton.clicked.connect(
-            controller._inspectDatasetController.inspectDataset)
-        view.dataView.buttonBox.closeButton.clicked.connect(controller._closeDataset)
-        view.dataView.buttonBox.closeButton.setEnabled(False)  # TODO
+        view.treeView.setModel(controller._treeModel)
+        view.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.treeView.selectionModel().selectionChanged.connect(controller._updateView)
+        view.buttonBox.openButton.clicked.connect(controller._wizardController.openDataset)
+        view.buttonBox.saveButton.clicked.connect(controller._saveDataset)
+        view.buttonBox.infoButton.clicked.connect(controller._openPatternsInfo)
+        view.buttonBox.closeButton.clicked.connect(controller._closeDataset)
+        view.buttonBox.closeButton.setEnabled(False)  # TODO
         datasetPresenter.addObserver(controller)
 
         controller._syncModelToView()
@@ -101,6 +90,9 @@ class DetectorController(Observer):
         if filePath:
             self._ioPresenter.saveDiffractionFile(filePath)
 
+    def _openPatternsInfo(self) -> None:
+        PatternsInfoViewController.showInfo(self._datasetPresenter, self._view)
+
     def _closeDataset(self) -> None:
         button = QMessageBox.question(
             self._view, 'Confirm Close',
@@ -120,7 +112,7 @@ class DetectorController(Observer):
         self._treeModel.setRootNode(rootNode)
 
         infoText = self._datasetPresenter.getInfoText()
-        self._view.dataView.infoLabel.setText(infoText)
+        self._view.infoLabel.setText(infoText)
 
     def update(self, observable: Observable) -> None:
         if observable is self._datasetPresenter:

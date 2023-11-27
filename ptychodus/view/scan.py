@@ -8,7 +8,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from .widgets import AngleWidget, LengthWidget, RepositoryTableView
+from .widgets import AngleWidget, LengthWidget
 
 __all__ = [
     'CartesianScanView',
@@ -17,7 +17,6 @@ __all__ = [
     'ScanEditorDialog',
     'ScanPlotView',
     'ScanTransformView',
-    'ScanView',
     'SpiralScanView',
     'TabularScanView',
 ]
@@ -203,23 +202,6 @@ class ScanEditorDialog(Generic[T], QDialog):
             self.accept()
         else:
             self.reject()
-
-
-class ScanView(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.repositoryView = RepositoryTableView.createInstance('Repository')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ScanView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.repositoryView)
-        view.setLayout(layout)
-
-        return view
 
 
 class ScanPlotView(QWidget):

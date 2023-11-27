@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
-                             QHBoxLayout, QMenu, QPushButton, QSpinBox, QTableView, QVBoxLayout,
-                             QWidget)
+                             QHBoxLayout, QLabel, QMenu, QPushButton, QSpinBox, QTableView,
+                             QVBoxLayout, QWidget)
 
 from .widgets import LengthWidget
 
@@ -32,7 +32,7 @@ class DetectorView(QGroupBox):
         return view
 
 
-class ExperimentEditorDialog(QDialog):
+class ExperimentInfoDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
@@ -40,7 +40,7 @@ class ExperimentEditorDialog(QDialog):
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ExperimentEditorDialog:
+    def createInstance(cls, parent: QWidget | None = None) -> ExperimentInfoDialog:
         view = cls(parent)
 
         view.buttonBox.addButton(QDialogButtonBox.Ok)
@@ -67,7 +67,7 @@ class ExperimentButtonBox(QWidget):
         self.insertMenu = QMenu()
         self.insertButton = QPushButton('Insert')
         self.saveButton = QPushButton('Save')
-        self.editButton = QPushButton('Edit')
+        self.infoButton = QPushButton('Info')
         self.removeButton = QPushButton('Remove')
 
     @classmethod
@@ -80,7 +80,7 @@ class ExperimentButtonBox(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.insertButton)
         layout.addWidget(view.saveButton)
-        layout.addWidget(view.editButton)
+        layout.addWidget(view.infoButton)
         layout.addWidget(view.removeButton)
         view.setLayout(layout)
 
@@ -92,6 +92,7 @@ class ExperimentRepositoryView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Repository', parent)
         self.tableView = QTableView()
+        self.infoLabel = QLabel()
         self.buttonBox = ExperimentButtonBox.createInstance()
 
     @classmethod
@@ -100,6 +101,7 @@ class ExperimentRepositoryView(QGroupBox):
 
         layout = QVBoxLayout()
         layout.addWidget(view.tableView)
+        layout.addWidget(view.infoLabel)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
