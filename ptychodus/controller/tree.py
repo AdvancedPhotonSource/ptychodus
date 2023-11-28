@@ -44,21 +44,16 @@ class SimpleTreeModel(QAbstractItemModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = None
 
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             value = self._rootNode.data(section)
 
         return QVariant(value)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = Qt.ItemFlags()
-
-        if index.isValid():
-            value = super().flags(index)
-
-        return value
+        return super().flags(index)
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         value = QModelIndex()
@@ -72,10 +67,10 @@ class SimpleTreeModel(QAbstractItemModel):
 
         return value
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
-        if index.isValid() and role == Qt.DisplayRole:
+        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             node = index.internalPointer()
             value = node.data(index.column())
 

@@ -49,7 +49,7 @@ class ProbeController(Observer):
         delegate = ProgressBarItemDelegate(view.treeView)
         view.treeView.setItemDelegateForColumn(1, delegate)
         view.treeView.setModel(controller._treeModel)
-        view.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.treeView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.treeView.selectionModel().selectionChanged.connect(controller._updateView)
 
         for name in repositoryPresenter.getInitializerDisplayNameList():

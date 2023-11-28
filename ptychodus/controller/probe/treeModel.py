@@ -171,21 +171,16 @@ class ProbeTreeModel(QAbstractItemModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             value = QVariant(self._header[section])
 
         return value
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = Qt.ItemFlags()
-
-        if index.isValid():
-            value = super().flags(index)
-
-        return value
+        return super().flags(index)
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         value = QModelIndex()
@@ -199,13 +194,13 @@ class ProbeTreeModel(QAbstractItemModel):
 
         return value
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
         if index.isValid():
             node = index.internalPointer()
 
-            if role == Qt.DisplayRole:
+            if role == Qt.ItemDataRole.DisplayRole:
                 if node.mode < 0:
                     if index.column() == 0:
                         value = QVariant(node.getName())
@@ -221,7 +216,7 @@ class ProbeTreeModel(QAbstractItemModel):
                         value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
                 elif index.column() == 0:
                     value = QVariant(f'Mode {node.mode}')
-            elif role == Qt.UserRole and index.column() == 1:
+            elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 value = QVariant(node.getRelativePowerPercent())
 
         return value

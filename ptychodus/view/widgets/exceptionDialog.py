@@ -9,8 +9,8 @@ class ExceptionDialog(QMessageBox):
     def showException(cls, actor: str, exception: Exception) -> None:
         dialog = cls()
         dialog.setWindowTitle('Exception Dialog')
-        dialog.setIcon(QMessageBox.Critical)
+        dialog.setIcon(QMessageBox.Icon.Critical)
         dialog.setText(f'{actor} raised a {exception.__class__.__name__}!')
         dialog.setInformativeText(str(exception))
         dialog.setDetailedText(traceback.format_exc())
-        _ = dialog.exec_()
+        _ = dialog.exec()

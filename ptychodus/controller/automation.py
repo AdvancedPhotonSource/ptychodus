@@ -122,14 +122,14 @@ class AutomationProcessingListModel(QAbstractListModel):
         super().__init__(parent)
         self._presenter = presenter
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
         if index.isValid():
-            if role == Qt.DisplayRole:
+            if role == Qt.ItemDataRole.DisplayRole:
                 label = self._presenter.getDatasetLabel(index.row())
                 value = QVariant(label)
-            elif role == Qt.FontRole:
+            elif role == Qt.ItemDataRole.FontRole:
                 font = QFont()
                 state = self._presenter.getDatasetState(index.row())
 

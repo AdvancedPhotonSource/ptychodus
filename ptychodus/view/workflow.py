@@ -16,16 +16,16 @@ class WorkflowAuthorizationDialog(QDialog):
         self.label = QLabel()
         self.lineEdit = QLineEdit()
         self.buttonBox = QDialogButtonBox()
-        self.okButton = self.buttonBox.addButton(QDialogButtonBox.Ok)
-        self.cancelButton = self.buttonBox.addButton(QDialogButtonBox.Cancel)
+        self.okButton = self.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.cancelButton = self.buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> WorkflowAuthorizationDialog:
         view = cls(parent)
 
         view.setWindowTitle('Authorize Workflow')
-        view.label.setTextFormat(Qt.RichText)
-        view.label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        view.label.setTextFormat(Qt.TextFormat.RichText)
+        view.label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         view.label.setOpenExternalLinks(True)
 
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
@@ -39,7 +39,7 @@ class WorkflowAuthorizationDialog(QDialog):
         return view
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()

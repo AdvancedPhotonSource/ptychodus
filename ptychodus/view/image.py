@@ -44,9 +44,9 @@ class ImageDisplayRangeDialog(QDialog):
     def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDisplayRangeDialog:
         dialog = cls(parent)
         dialog.setWindowTitle('Set Display Range')
-        dialog.buttonBox.addButton(QDialogButtonBox.Ok)
+        dialog.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         dialog.buttonBox.accepted.connect(dialog.accept)
-        dialog.buttonBox.addButton(QDialogButtonBox.Cancel)
+        dialog.buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
         dialog.buttonBox.rejected.connect(dialog.reject)
 
         layout = QFormLayout()
@@ -106,7 +106,7 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         layout.addWidget(view.lineCutButton, 1, 2)
         view.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
 
         return view
 
@@ -134,7 +134,7 @@ class ImageColorizerGroupBox(BottomTitledGroupBox):
         layout.addWidget(view.variantComboBox)
         view.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
 
         return view
 
@@ -143,8 +143,8 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Data Range', parent)
-        self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
         self.autoButton = QPushButton('Auto')
         self.editButton = QPushButton('Edit')
         self.colorLegendButton = QPushButton('Color Legend')
@@ -173,7 +173,7 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         layout.addRow(buttonLayout)
         view.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
         return view
 
@@ -195,7 +195,7 @@ class IndexGroupBox(BottomTitledGroupBox):
         layout.addWidget(view.indexSpinBox)
         view.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
 
         return view
 
@@ -219,7 +219,7 @@ class ImageRibbon(QWidget):
         layout.addWidget(view.dataRangeGroupBox)
         view.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         return view
 
@@ -248,8 +248,8 @@ class ImageItem(QGraphicsPixmapItem):
         self._rectangleItem = QGraphicsRectItem(self)
         self._rectangleItem.hide()
         self._rectangleOrigin = QPointF()
-        self.setTransformationMode(Qt.FastTransformation)
-        self.setAcceptedMouseButtons(Qt.LeftButton)
+        self.setTransformationMode(Qt.TransformationMode.FastTransformation)
+        self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
         self.setAcceptHoverEvents(True)
 
     def setMouseTool(self, mouseTool: ImageMouseTool) -> None:
@@ -259,10 +259,10 @@ class ImageItem(QGraphicsPixmapItem):
         app = QApplication.instance()
 
         if app:
-            cursor = Qt.CrossCursor
+            cursor = Qt.CursorShape.CrossCursor
 
             if self._mouseTool == ImageMouseTool.MOVE_TOOL:
-                cursor = Qt.OpenHandCursor
+                cursor = Qt.CursorShape.OpenHandCursor
 
             app.setOverrideCursor(cursor)  # type: ignore
 
@@ -292,32 +292,32 @@ class ImageItem(QGraphicsPixmapItem):
     @staticmethod
     def _createPen(color: Qt.GlobalColor) -> QPen:
         pen = QPen(color)
-        pen.setCapStyle(Qt.FlatCap)
-        pen.setJoinStyle(Qt.MiterJoin)
+        pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         pen.setCosmetic(True)
         return pen
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self._mouseTool == ImageMouseTool.MOVE_TOOL:
-            self._changeOverrideCursor(Qt.ClosedHandCursor)
+            self._changeOverrideCursor(Qt.CursorShape.ClosedHandCursor)
         elif self._mouseTool == ImageMouseTool.RULER_TOOL:
             line = QLineF(event.pos(), event.pos())
             self.prepareGeometryChange()
             self._lineItem.setLine(line)
-            self._lineItem.setPen(self._createPen(Qt.cyan))
+            self._lineItem.setPen(self._createPen(Qt.GlobalColor.cyan))
             self._lineItem.show()
         elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
             self._rectangleOrigin = event.pos()
             rect = QRectF(self._rectangleOrigin, QSizeF())
             self.prepareGeometryChange()
             self._rectangleItem.setRect(rect)
-            self._rectangleItem.setPen(self._createPen(Qt.cyan))
+            self._rectangleItem.setPen(self._createPen(Qt.GlobalColor.cyan))
             self._rectangleItem.show()
         elif self._mouseTool == ImageMouseTool.LINE_CUT_TOOL:
             line = QLineF(event.pos(), event.pos())
             self.prepareGeometryChange()
             self._lineItem.setLine(line)
-            self._lineItem.setPen(self._createPen(Qt.magenta))
+            self._lineItem.setPen(self._createPen(Qt.GlobalColor.magenta))
             self._lineItem.show()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
@@ -350,7 +350,7 @@ class ImageItem(QGraphicsPixmapItem):
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self._mouseTool == ImageMouseTool.MOVE_TOOL:
-            self._changeOverrideCursor(Qt.OpenHandCursor)
+            self._changeOverrideCursor(Qt.CursorShape.OpenHandCursor)
         elif self._mouseTool == ImageMouseTool.RULER_TOOL:
             self._lineItem.setLine(QLineF())
             self._lineItem.hide()
@@ -374,9 +374,9 @@ class ImageWidget(QGraphicsView):
         self._colorLegendMinValue = 0.
         self._colorLegendMaxValue = 1.
         self._colorLegendStopPoints: list[tuple[float, QColor]] = [
-            (0.0, QColor(Qt.green)),
-            (0.5, QColor(Qt.yellow)),
-            (1.0, QColor(Qt.red)),
+            (0.0, QColor(Qt.GlobalColor.green)),
+            (0.5, QColor(Qt.GlobalColor.yellow)),
+            (1.0, QColor(Qt.GlobalColor.red)),
         ]
         self._colorLegendNumberOfTicks = 5  # TODO
         self._isColorLegendVisible = False
@@ -389,8 +389,8 @@ class ImageWidget(QGraphicsView):
         imageItemEvents = ImageItemEvents()
         imageItem = ImageItem(imageItemEvents, statusBar)
         widget = cls(imageItem, parent)
-        widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        widget.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         imageItemEvents.rectangleFinished.connect(widget.rectangleFinished)
         imageItemEvents.lineCutFinished.connect(widget.lineCutFinished)
@@ -440,7 +440,7 @@ class ImageWidget(QGraphicsView):
         scene = self.scene()
         boundingRect = scene.itemsBoundingRect()
         scene.setSceneRect(boundingRect)
-        self.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
+        self.fitInView(scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     @property
     def _colorLegendTicks(self) -> Iterator[float]:
@@ -556,6 +556,6 @@ class ImageView(QWidget):
         layout.addWidget(view.imageWidget)
         view.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
         return view

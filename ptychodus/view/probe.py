@@ -88,7 +88,7 @@ class ProbeModesView(QGroupBox):
         self.orthogonalizeModesCheckBox = QCheckBox('Orthogonalize Modes')
         self.polynomialDecayButton = QRadioButton('Polynomial')
         self.exponentialDecayButton = QRadioButton('Exponential')
-        self.decayRatioSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.decayRatioSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeModesView:
@@ -125,7 +125,7 @@ class ProbeEditorDialog(Generic[T], QDialog):
         view.setWindowTitle(title)
         editorView.setTitle('Primary Mode')
 
-        view.buttonBox.addButton(QDialogButtonBox.Ok)
+        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
@@ -137,7 +137,7 @@ class ProbeEditorDialog(Generic[T], QDialog):
         return view
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()

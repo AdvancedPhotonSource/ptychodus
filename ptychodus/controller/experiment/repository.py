@@ -32,34 +32,31 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
         ]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = Qt.ItemFlags()
+        value = super().flags(index)
 
-        if index.isValid():
-            value = super().flags(index)
-
-            if index.column() < 3:
-                value |= Qt.ItemIsEditable
+        if index.isValid() and index.column() < 3:
+            value |= Qt.ItemFlag.ItemIsEditable
 
         return value
 
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         result = QVariant()
 
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             result = QVariant(self._header[section])
 
         return result
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
         if index.isValid():
             experiment = self._presenter[index.row()]
 
-            if role == Qt.DisplayRole or role == Qt.EditRole:
+            if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
                     value = QVariant(experiment.getName())
                 elif index.column() == 1:
@@ -75,8 +72,11 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
 
         return value
 
-    def setData(self, index: QModelIndex, value: str, role: int = Qt.EditRole) -> bool:
-        if index.isValid() and role == Qt.EditRole:
+    def setData(self,
+                index: QModelIndex,
+                value: str,
+                role: int = Qt.ItemDataRole.EditRole) -> bool:
+        if index.isValid() and role == Qt.ItemDataRole.EditRole:
             experiment = self._presenter[index.row()]
 
             if index.column() == 0:
@@ -132,9 +132,9 @@ class ExperimentRepositoryController(SequenceObserver):
 
         view.tableView.setModel(tableProxyModel)
         view.tableView.setSortingEnabled(True)
-        view.tableView.sortByColumn(0, Qt.AscendingOrder)
+        view.tableView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         view.tableView.verticalHeader().hide()
-        view.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.tableView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.tableView.selectionModel().selectionChanged.connect(controller._updateEnabledButtons)
 
         openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
@@ -223,7 +223,7 @@ class ExperimentRepositoryController(SequenceObserver):
         numberOfColumns = self._tableModel.columnCount()
         topLeft = self._tableModel.index(index, 0)
         bottomRight = self._tableModel.index(index, numberOfColumns - 1)
-        self._tableModel.dataChanged.emit(topLeft, bottomRight, [Qt.DisplayRole])
+        self._tableModel.dataChanged.emit(topLeft, bottomRight, [Qt.ItemDataRole.DisplayRole])
         self._syncModelToView()
 
     def handleItemRemoved(self, index: int) -> None:

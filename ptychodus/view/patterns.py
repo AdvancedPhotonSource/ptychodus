@@ -168,8 +168,8 @@ class OpenDatasetWizardPatternTransformView(QGroupBox):
         layout.addWidget(view.valueUpperBoundCheckBox, 1, 0)
         layout.addWidget(view.valueUpperBoundSpinBox, 1, 1, 1, 2)
         layout.addWidget(view.axesLabel, 2, 0)
-        layout.addWidget(view.flipXCheckBox, 2, 1, Qt.AlignHCenter)
-        layout.addWidget(view.flipYCheckBox, 2, 2, Qt.AlignHCenter)
+        layout.addWidget(view.flipXCheckBox, 2, 1, Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(view.flipYCheckBox, 2, 2, Qt.AlignmentFlag.AlignHCenter)
         layout.setColumnStretch(2, 1)
         layout.setColumnStretch(3, 1)
         view.setLayout(layout)
@@ -255,9 +255,9 @@ class PatternsInfoDialog(QDialog):
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> PatternsInfoDialog:
         view = cls(parent)
-        view.treeView.header().setDefaultAlignment(Qt.AlignCenter)
+        view.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        view.buttonBox.addButton(QDialogButtonBox.Ok)
+        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
@@ -268,7 +268,7 @@ class PatternsInfoDialog(QDialog):
         return view
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()
@@ -286,7 +286,7 @@ class PatternsView(QWidget):
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> PatternsView:
         view = cls(parent)
-        view.treeView.header().setDefaultAlignment(Qt.AlignCenter)
+        view.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
         layout.addWidget(view.treeView)

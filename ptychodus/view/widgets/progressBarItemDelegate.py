@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QApplication, QStyle, QStyleOptionProgressBar, QSty
 class ProgressBarItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
-        progress = index.data(Qt.UserRole)
+        progress = index.data(Qt.ItemDataRole.UserRole)
 
         if progress >= 0:
             opt = QStyleOptionProgressBar()
@@ -17,4 +17,4 @@ class ProgressBarItemDelegate(QStyledItemDelegate):
             opt.progress = progress
             opt.text = f'{progress}%'
             opt.textVisible = True
-            QApplication.style().drawControl(QStyle.CE_ProgressBar, opt, painter)
+            QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)

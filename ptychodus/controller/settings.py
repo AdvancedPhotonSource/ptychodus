@@ -20,10 +20,10 @@ class SettingsGroupListModel(QAbstractListModel):
         self.beginResetModel()
         self.endResetModel()
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
-        if index.isValid() and role == Qt.DisplayRole:
+        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             settingsGroup = self._settingsRegistry[index.row()]
             value = QVariant(settingsGroup.name)
 
@@ -42,10 +42,10 @@ class SettingsEntryTableModel(QAbstractTableModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             if section == 0:
                 value = QVariant('Name')
             elif section == 1:
@@ -53,13 +53,13 @@ class SettingsEntryTableModel(QAbstractTableModel):
 
         return value
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
         if self._settingsGroup is None:
             return value
 
-        if index.isValid() and role == Qt.DisplayRole:
+        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             settingsEntry = self._settingsGroup[index.row()]
 
             if index.column() == 0:

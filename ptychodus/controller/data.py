@@ -26,8 +26,8 @@ class FileDialogFactory:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self.getOpenWorkingDirectory()))
-        dialog.setAcceptMode(QFileDialog.AcceptOpen)
-        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
 
         if nameFilters is not None:
             dialog.setNameFilters(nameFilters)
@@ -38,7 +38,7 @@ class FileDialogFactory:
         if selectedNameFilter is not None:
             dialog.selectNameFilter(selectedNameFilter)
 
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             fileNameList = dialog.selectedFiles()
             fileName = fileNameList[0]
 
@@ -57,8 +57,8 @@ class FileDialogFactory:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._saveWorkingDirectory))
-        dialog.setAcceptMode(QFileDialog.AcceptSave)
-        dialog.setFileMode(QFileDialog.AnyFile)
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dialog.setFileMode(QFileDialog.FileMode.AnyFile)
 
         if nameFilters is not None:
             dialog.setNameFilters(nameFilters)
@@ -69,7 +69,7 @@ class FileDialogFactory:
         if selectedNameFilter is not None:
             dialog.selectNameFilter(selectedNameFilter)
 
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             fileNameList = dialog.selectedFiles()
             fileName = fileNameList[0]
 
@@ -84,7 +84,7 @@ class FileDialogFactory:
 
         dirName = QFileDialog.getExistingDirectory(
             parent, caption, str(self.getOpenWorkingDirectory()),
-            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
+            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks)
 
         if dirName:
             dirPath = Path(dirName)

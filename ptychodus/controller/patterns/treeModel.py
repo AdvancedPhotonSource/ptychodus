@@ -115,41 +115,40 @@ class DatasetTreeModel(QAbstractItemModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         result = QVariant()
 
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             result = QVariant(self._header[section])
 
         return result
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = Qt.ItemFlags()
+        value = super().flags(index)
 
         if index.isValid():
             node = index.internalPointer()
-            value = super().flags(index)
 
             if node.state != DiffractionPatternState.LOADED:
-                value &= ~Qt.ItemIsSelectable
-                value &= ~Qt.ItemIsEnabled
+                value &= ~Qt.ItemFlag.ItemIsSelectable
+                value &= ~Qt.ItemFlag.ItemIsEnabled
 
         return value
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
         if index.isValid():
             node = index.internalPointer()
 
-            if role == Qt.DisplayRole:
+            if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
                     value = QVariant(node.label)
                 elif index.column() == 1:
                     value = QVariant(node.numberOfFrames)
                 elif index.column() == 2:
                     value = QVariant(f'{node.sizeInBytes / (1024 * 1024):.2f}')
-            elif role == Qt.FontRole:
+            elif role == Qt.ItemDataRole.FontRole:
                 font = QFont()
                 font.setItalic(node.state == DiffractionPatternState.FOUND)
                 value = QVariant(font)

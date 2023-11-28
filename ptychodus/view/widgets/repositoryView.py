@@ -61,7 +61,7 @@ class RepositoryTreeView(QWidget):
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> RepositoryTreeView:
         view = cls(parent)
-        view.treeView.header().setDefaultAlignment(Qt.AlignCenter)
+        view.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
         layout.addWidget(view.treeView)

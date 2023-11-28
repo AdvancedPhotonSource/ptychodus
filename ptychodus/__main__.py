@@ -90,8 +90,11 @@ def main() -> int:
             verifyAllArgumentsParsed(parser, unparsedArgs)
             return model.batchModeReconstruct(resultsFilePath)
 
-        # FIXME pass if no Qt
-        from PyQt5.QtWidgets import QApplication
+        try:
+            from PyQt5.QtWidgets import QApplication
+        except ModuleNotFoundError:
+            return 0
+
         # QApplication expects the first argument to be the program name
         app = QApplication(sys.argv[:1] + unparsedArgs)
         verifyAllArgumentsParsed(parser, app.arguments()[1:])
@@ -103,7 +106,7 @@ def main() -> int:
         controller = ControllerCore.createInstance(model, view)
         controller.showMainWindow(versionString())
 
-        return app.exec_()
+        return app.exec()
 
 
 sys.exit(main())

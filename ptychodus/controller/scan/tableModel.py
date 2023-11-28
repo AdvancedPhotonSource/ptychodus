@@ -18,29 +18,29 @@ class ScanTableModel(QAbstractTableModel):
         value = super().flags(index)
 
         if index.isValid() and index.column() == 0:
-            value = int(value) | Qt.ItemIsUserCheckable
+            value |= Qt.ItemFlag.ItemIsUserCheckable
 
         return value
 
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         result = QVariant()
 
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             result = QVariant(self._header[section])
 
         return result
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
         if index.isValid():
             itemPresenter = self._presenter[index.row()]
             item = itemPresenter.item
 
-            if role == Qt.DisplayRole:
+            if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
                     value = QVariant(itemPresenter.name)
                 elif index.column() == 1:
@@ -51,18 +51,21 @@ class ScanTableModel(QAbstractTableModel):
                     value = QVariant(f'{item.getLengthInMeters():.6f}')
                 elif index.column() == 4:
                     value = QVariant(f'{item.getSizeInBytes() / (1024 * 1024):.2f}')
-            elif role == Qt.CheckStateRole:
+            elif role == Qt.ItemDataRole.CheckStateRole:
                 if index.column() == 0:
-                    value = QVariant(Qt.Checked if itemPresenter.name in
-                                     self._checkedNames else Qt.Unchecked)
+                    value = QVariant(Qt.CheckState.Checked if itemPresenter.name in
+                                     self._checkedNames else Qt.CheckState.Unchecked)
 
         return value
 
-    def setData(self, index: QModelIndex, value: QVariant, role: int = Qt.EditRole) -> bool:
-        if index.isValid() and index.column() == 0 and role == Qt.CheckStateRole:
+    def setData(self,
+                index: QModelIndex,
+                value: QVariant,
+                role: int = Qt.ItemDataRole.EditRole) -> bool:
+        if index.isValid() and index.column() == 0 and role == Qt.ItemDataRole.CheckStateRole:
             item = self._presenter[index.row()]
 
-            if value == QVariant(Qt.Checked):
+            if value == QVariant(Qt.CheckState.Checked):
                 self._checkedNames.add(item.name)
             else:
                 self._checkedNames.discard(item.name)

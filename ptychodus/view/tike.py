@@ -19,8 +19,8 @@ class TikeBasicParametersView(QGroupBox):
         self.numIterSpinBox = QSpinBox()
         self.convergenceWindowSpinBox = QSpinBox()
         self.cgIterSpinBox = QSpinBox()
-        self.alphaSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.stepLengthSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.alphaSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self.stepLengthSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
         self.logLevelComboBox = QComboBox()
 
     @classmethod
@@ -76,8 +76,8 @@ class TikeAdaptiveMomentView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Adaptive Moment', parent)
-        self.mdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.vdecaySlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.mdecaySlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self.vdecaySlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikeAdaptiveMomentView:
@@ -143,7 +143,7 @@ class TikeProbeSupportView(QGroupBox):
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Finite Probe Support', parent)
         self.weightLineEdit = DecimalLineEdit.createInstance()
-        self.radiusSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.radiusSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
         self.degreeLineEdit = DecimalLineEdit.createInstance()
 
     @classmethod
@@ -167,7 +167,7 @@ class TikeProbeCorrectionView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Probe Correction', parent)
-        self.forceSparsitySlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.forceSparsitySlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
         self.forceOrthogonalityCheckBox = QCheckBox('Force Orthogonality')
         self.forceCenteredIntensityCheckBox = QCheckBox('Force Centered Intensity')
         self.probeSupportView = TikeProbeSupportView.createInstance()
@@ -202,8 +202,8 @@ class TikeObjectCorrectionView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Object Correction', parent)
-        self.positivityConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.smoothnessConstraintSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.positivityConstraintSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self.smoothnessConstraintSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
         self.useMagnitudeClippingCheckBox = QCheckBox('Magnitude Clipping')
 

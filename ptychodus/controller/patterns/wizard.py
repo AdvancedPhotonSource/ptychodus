@@ -43,7 +43,7 @@ class OpenDatasetWizardFilesController(Observer):
                        fileDialogFactory: FileDialogFactory) -> OpenDatasetWizardFilesController:
         fileSystemModel = QFileSystemModel()
         fileSystemProxyModel = QSortFilterProxyModel()
-        fileSystemModel.setFilter(QDir.AllEntries | QDir.AllDirs)
+        fileSystemModel.setFilter(QDir.Filter.AllEntries | QDir.Filter.AllDirs)
         fileSystemModel.setNameFilterDisables(False)
         fileSystemProxyModel.setSourceModel(fileSystemModel)
 
@@ -57,9 +57,10 @@ class OpenDatasetWizardFilesController(Observer):
 
         page.fileSystemTableView.setModel(controller._fileSystemProxyModel)
         page.fileSystemTableView.setSortingEnabled(True)
-        page.fileSystemTableView.sortByColumn(0, Qt.AscendingOrder)
+        page.fileSystemTableView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         page.fileSystemTableView.verticalHeader().hide()
-        page.fileSystemTableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        page.fileSystemTableView.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows)
         page.fileSystemTableView.doubleClicked.connect(
             controller._handleFileSystemTableDoubleClicked)
         page.fileSystemTableView.selectionModel().currentChanged.connect(
@@ -439,8 +440,10 @@ class OpenDatasetWizardController:
                        fileDialogFactory: FileDialogFactory) -> OpenDatasetWizardController:
         controller = cls(ioPresenter, metadataPresenter, datasetPresenter, patternPresenter,
                          wizard, fileDialogFactory)
-        wizard.button(QWizard.NextButton).clicked.connect(controller._executeNextButtonAction)
-        wizard.button(QWizard.FinishButton).clicked.connect(controller._executeFinishButtonAction)
+        wizard.button(QWizard.WizardButton.NextButton).clicked.connect(
+            controller._executeNextButtonAction)
+        wizard.button(QWizard.WizardButton.FinishButton).clicked.connect(
+            controller._executeFinishButtonAction)
         return controller
 
     def _executeNextButtonAction(self) -> None:

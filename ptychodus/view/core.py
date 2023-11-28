@@ -30,7 +30,7 @@ class ViewCore(QMainWindow):
         self.navigationToolBar = QToolBar()
         self.navigationActionGroup = QActionGroup(self.navigationToolBar)
 
-        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.parametersWidget = QStackedWidget()
         self.contentsWidget = QStackedWidget()
         self.memoryProgressBar = QProgressBar()
@@ -89,9 +89,9 @@ class ViewCore(QMainWindow):
         logger.info(f'Qt {QT_VERSION_STR}')
 
         view = cls(parent)
-        view.navigationToolBar.setContextMenuPolicy(Qt.PreventContextMenu)
-        view.addToolBar(Qt.LeftToolBarArea, view.navigationToolBar)
-        view.navigationToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        view.navigationToolBar.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
+        view.addToolBar(Qt.ToolBarArea.LeftToolBarArea, view.navigationToolBar)
+        view.navigationToolBar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         view.navigationToolBar.setIconSize(QSize(32, 32))
 
         for index, action in enumerate(view.navigationToolBar.actions()):
@@ -112,7 +112,7 @@ class ViewCore(QMainWindow):
         view.parametersWidget.addWidget(view.workflowParametersView)
         view.parametersWidget.addWidget(view.automationView)
         view.parametersWidget.addWidget(view.monitorProbeView)
-        view.parametersWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        view.parametersWidget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         view.splitter.addWidget(view.parametersWidget)
 
         # maintain same order as navigationToolBar buttons
@@ -126,7 +126,7 @@ class ViewCore(QMainWindow):
         view.contentsWidget.addWidget(view.workflowTableView)
         view.contentsWidget.addWidget(view.automationWidget)
         view.contentsWidget.addWidget(view.monitorObjectView)
-        view.contentsWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        view.contentsWidget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         view.splitter.addWidget(view.contentsWidget)
 
         view.setCentralWidget(view.splitter)
@@ -139,7 +139,8 @@ class ViewCore(QMainWindow):
         preferredWidth = min(desktopSize.width() * 2 // 3, 2 * preferredHeight)
         view.resize(preferredWidth, preferredHeight)
 
-        view.memoryProgressBar.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+        view.memoryProgressBar.setSizePolicy(QSizePolicy.Policy.Minimum,
+                                             QSizePolicy.Policy.Preferred)
         view.statusBar().addPermanentWidget(view.memoryProgressBar)
         view.statusBar().showMessage('Ready')
 

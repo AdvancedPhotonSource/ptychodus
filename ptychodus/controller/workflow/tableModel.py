@@ -21,24 +21,24 @@ class WorkflowTableModel(QAbstractTableModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
-        if role == Qt.DisplayRole:
-            if orientation == Qt.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
                 value = QVariant(self._sectionHeaders[section])
-            elif orientation == Qt.Vertical:
+            elif orientation == Qt.Orientation.Vertical:
                 value = QVariant(section)
 
         return value
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
         value = QVariant()
 
         if index.isValid():
             flowRun = self._presenter[index.row()]
 
-            if role == Qt.DisplayRole:
+            if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
                     value = QVariant(flowRun.label)
                 elif index.column() == 1:
@@ -52,16 +52,16 @@ class WorkflowTableModel(QAbstractTableModel):
                 elif index.column() == 5:
                     value = QVariant(flowRun.runID)
             elif index.column() == 5:
-                if role == Qt.ToolTipRole:
+                if role == Qt.ItemDataRole.ToolTipRole:
                     value = QVariant(flowRun.runURL)
-                elif role == Qt.FontRole:
+                elif role == Qt.ItemDataRole.FontRole:
                     font = QFont()
                     font.setUnderline(True)
                     value = QVariant(font)
-                elif role == Qt.ForegroundRole:
-                    color = QColor(Qt.blue)
+                elif role == Qt.ItemDataRole.ForegroundRole:
+                    color = QColor(Qt.GlobalColor.blue)
                     value = QVariant(color)
-                elif role == Qt.UserRole:
+                elif role == Qt.ItemDataRole.UserRole:
                     value = QVariant(QUrl(flowRun.runURL))
 
         return value

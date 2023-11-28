@@ -56,7 +56,7 @@ class PatternsController(Observer):
                          patternPresenter, imagePresenter, view, imageView, fileDialogFactory)
 
         view.treeView.setModel(controller._treeModel)
-        view.treeView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        view.treeView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.treeView.selectionModel().selectionChanged.connect(controller._updateView)
         view.buttonBox.openButton.clicked.connect(controller._wizardController.openDataset)
         view.buttonBox.saveButton.clicked.connect(controller._saveDataset)
@@ -98,7 +98,7 @@ class PatternsController(Observer):
             self._view, 'Confirm Close',
             'This will free the diffraction data from memory. Do you want to continue?')
 
-        if button != QMessageBox.Yes:
+        if button != QMessageBox.StandardButton.Yes:
             return
 
         logger.error('Close not implemented!')  # TODO

@@ -186,7 +186,7 @@ class ScanEditorDialog(Generic[T], QDialog):
         view = cls(editorView, parent)
         view.setWindowTitle(title)
 
-        view.buttonBox.addButton(QDialogButtonBox.Ok)
+        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
@@ -198,7 +198,7 @@ class ScanEditorDialog(Generic[T], QDialog):
         return view
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()

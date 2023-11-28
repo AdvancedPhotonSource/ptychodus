@@ -28,7 +28,7 @@ class DecimalSlider(QWidget):
         widget = cls(orientation, parent)
 
         widget._slider.setRange(0, 1000)
-        widget._slider.setTickPosition(QSlider.TicksBelow)
+        widget._slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         widget._slider.setTickInterval(100)
         widget._slider.valueChanged.connect(lambda value: widget._setValueFromSlider())
         widget.setValueAndRange(Decimal(1) / 2, Interval[Decimal](Decimal(0), Decimal(1)))

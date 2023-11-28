@@ -140,7 +140,7 @@ class ImageDataRangeController(Observer):
         return controller
 
     def _editDisplayRange(self) -> None:
-        if self._view.displayRangeDialog.exec_():
+        if self._view.displayRangeDialog.exec():
             minValue = self._view.displayRangeDialog.minValue()
             maxValue = self._view.displayRangeDialog.maxValue()
             self._presenter.setCustomDisplayRange(minValue, maxValue)
@@ -216,7 +216,7 @@ class ImageController(Observer):
             integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8).copy()
 
             qimage = QImage(integerImage.data, integerImage.shape[1], integerImage.shape[0],
-                            integerImage.strides[0], QImage.Format_RGBA8888)
+                            integerImage.strides[0], QImage.Format.Format_RGBA8888)
             qpixmap = QPixmap.fromImage(qimage)
 
         self._view.imageWidget.setPixmap(qpixmap)

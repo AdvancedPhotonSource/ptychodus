@@ -43,7 +43,7 @@ class ExperimentInfoDialog(QDialog):
     def createInstance(cls, parent: QWidget | None = None) -> ExperimentInfoDialog:
         view = cls(parent)
 
-        view.buttonBox.addButton(QDialogButtonBox.Ok)
+        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
@@ -54,7 +54,7 @@ class ExperimentInfoDialog(QDialog):
         return view
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()

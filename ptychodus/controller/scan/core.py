@@ -44,8 +44,8 @@ class ScanController(Observer):
         controller._proxyModel.setSourceModel(controller._tableModel)
         view.tableView.setModel(controller._proxyModel)
         view.tableView.setSortingEnabled(True)
-        view.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        view.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
+        view.tableView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        view.tableView.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         view.tableView.selectionModel().selectionChanged.connect(controller._updateView)
         view.tableView.horizontalHeader().sectionClicked.connect(
             lambda logicalIndex: controller._redrawPlot())
@@ -147,7 +147,7 @@ class ScanController(Observer):
         for row in range(self._proxyModel.rowCount()):
             index = self._proxyModel.index(row, 0)
 
-            if index.data(Qt.CheckStateRole) != Qt.Checked:
+            if index.data(Qt.ItemDataRole.CheckStateRole) != Qt.CheckState.Checked:
                 continue
 
             name = index.data()

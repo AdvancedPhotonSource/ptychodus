@@ -28,9 +28,9 @@ class RandomObjectView(QGroupBox):
         self.layerDistanceWidget = LengthWidget.createInstance()
         self.extraPaddingXSpinBox = QSpinBox()
         self.extraPaddingYSpinBox = QSpinBox()
-        self.amplitudeMeanSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.amplitudeDeviationSlider = DecimalSlider.createInstance(Qt.Horizontal)
-        self.phaseDeviationSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.amplitudeMeanSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self.amplitudeDeviationSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self.phaseDeviationSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> RandomObjectView:
@@ -61,7 +61,7 @@ class CompareObjectParametersView(QGroupBox):
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> CompareObjectParametersView:
         view = cls(parent)
-        view.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         layout = QGridLayout()
         layout.addWidget(view.name1Label, 0, 0)
@@ -132,7 +132,7 @@ class ObjectEditorDialog(Generic[T], QDialog):
         view = cls(editorView, parent)
         view.setWindowTitle(title)
 
-        view.buttonBox.addButton(QDialogButtonBox.Ok)
+        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
@@ -143,7 +143,7 @@ class ObjectEditorDialog(Generic[T], QDialog):
         return view
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()
