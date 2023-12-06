@@ -59,11 +59,11 @@ class WorkflowParametersPresenter(Observable, Observer):
     def getInputDataPosixPath(self) -> Path:
         return self._inputDataLocator.getPosixPath()
 
-    def setComputeFuncXEndpointID(self, endpointID: UUID) -> None:
-        self._settings.computeFuncXEndpointID.value = endpointID
+    def setComputeEndpointID(self, endpointID: UUID) -> None:
+        self._settings.computeEndpointID.value = endpointID
 
-    def getComputeFuncXEndpointID(self) -> UUID:
-        return self._settings.computeFuncXEndpointID.value
+    def getComputeEndpointID(self) -> UUID:
+        return self._settings.computeEndpointID.value
 
     def setComputeDataEndpointID(self, endpointID: UUID) -> None:
         self._computeDataLocator.setEndpointID(endpointID)

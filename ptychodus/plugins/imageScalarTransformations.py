@@ -16,7 +16,7 @@ class IdentityScalarTransformation(ScalarTransformation):
 class SquareRootScalarTransformation(ScalarTransformation):
 
     def decorateText(self, text: str) -> str:
-        return f'$\\sqrt{{\mathrm{{{text}}}}}$'
+        return f'$\\sqrt{{\\mathrm{{{text}}}}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -26,7 +26,7 @@ class SquareRootScalarTransformation(ScalarTransformation):
 class Log2ScalarTransformation(ScalarTransformation):
 
     def decorateText(self, text: str) -> str:
-        return f'$\\log_2{{\\left(\mathrm{{{text}}}\\right)}}$'
+        return f'$\\log_2{{\\left(\\mathrm{{{text}}}\\right)}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -36,7 +36,7 @@ class Log2ScalarTransformation(ScalarTransformation):
 class LogScalarTransformation(ScalarTransformation):
 
     def decorateText(self, text: str) -> str:
-        return f'$\\ln{{\\left(\mathrm{{{text}}}\\right)}}$'
+        return f'$\\ln{{\\left(\\mathrm{{{text}}}\\right)}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -46,7 +46,7 @@ class LogScalarTransformation(ScalarTransformation):
 class Log10ScalarTransformation(ScalarTransformation):
 
     def decorateText(self, text: str) -> str:
-        return f'$\\log_{{10}}{{\\left(\mathrm{{{text}}}\\right)}}$'
+        return f'$\\log_{{10}}{{\\left(\\mathrm{{{text}}}\\right)}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)

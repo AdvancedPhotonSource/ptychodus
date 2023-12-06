@@ -44,7 +44,7 @@ def ptychodus_reconstruct(**data: str) -> None:
 
 @gladier.generate_flow_definition
 class PtychodusReconstruct(gladier.GladierBaseTool):
-    funcx_functions = [ptychodus_reconstruct]
+    compute_functions = [ptychodus_reconstruct]
     required_input = [
         'ptychodus_restart_file',
         'ptychodus_settings_file',
