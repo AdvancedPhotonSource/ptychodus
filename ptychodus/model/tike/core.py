@@ -172,8 +172,6 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
         core = cls(settingsRegistry)
 
         try:
-            from .reconstructor import AdaptiveMomentGradientDescentReconstructor
-            from .reconstructor import ConjugateGradientReconstructor
             from .reconstructor import DifferenceMapReconstructor
             from .reconstructor import IterativeLeastSquaresReconstructor
             from .reconstructor import RegularizedPIEReconstructor
@@ -183,8 +181,6 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
 
             if isDeveloperModeEnabled:
                 core.reconstructorList.append(NullReconstructor('rpie'))
-                core.reconstructorList.append(NullReconstructor('adam_grad'))
-                core.reconstructorList.append(NullReconstructor('cgrad'))
                 core.reconstructorList.append(NullReconstructor('lstsq_grad'))
                 core.reconstructorList.append(NullReconstructor('dm'))
         else:
@@ -193,9 +189,6 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                                                   core._probeCorrectionSettings,
                                                   core._objectCorrectionSettings)
             core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
-            core.reconstructorList.append(
-                AdaptiveMomentGradientDescentReconstructor(tikeReconstructor))
-            core.reconstructorList.append(ConjugateGradientReconstructor(tikeReconstructor))
             core.reconstructorList.append(IterativeLeastSquaresReconstructor(tikeReconstructor))
             core.reconstructorList.append(DifferenceMapReconstructor(tikeReconstructor))
 
