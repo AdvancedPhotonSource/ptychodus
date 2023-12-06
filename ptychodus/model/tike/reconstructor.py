@@ -252,56 +252,6 @@ class RegularizedPIEReconstructor(Reconstructor):
         return self._tikeReconstructor(parameters, self._algorithmOptions)
 
 
-class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
-
-    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
-        super().__init__()
-        self._algorithmOptions = tike.ptycho.solvers.AdamOptions()
-        self._tikeReconstructor = tikeReconstructor
-
-    @property
-    def name(self) -> str:
-        return self._algorithmOptions.name
-
-    @property
-    def _settings(self) -> TikeSettings:
-        return self._tikeReconstructor._settings
-
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        self._algorithmOptions.num_batch = self._settings.numBatch.value
-        self._algorithmOptions.batch_method = self._settings.batchMethod.value
-        self._algorithmOptions.num_iter = self._settings.numIter.value
-        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
-        self._algorithmOptions.alpha = float(self._settings.alpha.value)
-        self._algorithmOptions.step_length = float(self._settings.stepLength.value)
-        return self._tikeReconstructor(parameters, self._algorithmOptions)
-
-
-class ConjugateGradientReconstructor(Reconstructor):
-
-    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
-        super().__init__()
-        self._algorithmOptions = tike.ptycho.solvers.CgradOptions()
-        self._tikeReconstructor = tikeReconstructor
-
-    @property
-    def name(self) -> str:
-        return self._algorithmOptions.name
-
-    @property
-    def _settings(self) -> TikeSettings:
-        return self._tikeReconstructor._settings
-
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        self._algorithmOptions.num_batch = self._settings.numBatch.value
-        self._algorithmOptions.batch_method = self._settings.batchMethod.value
-        self._algorithmOptions.num_iter = self._settings.numIter.value
-        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
-        self._algorithmOptions.cg_iter = self._settings.cgIter.value
-        self._algorithmOptions.step_length = float(self._settings.stepLength.value)
-        return self._tikeReconstructor(parameters, self._algorithmOptions)
-
-
 class IterativeLeastSquaresReconstructor(Reconstructor):
 
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
