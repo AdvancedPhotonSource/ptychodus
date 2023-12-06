@@ -166,6 +166,12 @@ class TikeReconstructor:
         logger.debug(f'object shape={psi.shape}')
         logger.debug(f'num_gpu={numGpus}')
 
+        exitwave_options = tike.ptycho.ExitWaveOptions(
+            # FIXME: Use a user supplied `measured_pixels` instead
+            measured_pixels=numpy.ones(probe.shape[-2:], dtype=numpy.bool_),
+            noise_model=self._settings.noiseModel.value,
+        )
+
         ptychoParameters = tike.ptycho.solvers.PtychoParameters(
             probe=probe,
             psi=psi,
@@ -173,13 +179,14 @@ class TikeReconstructor:
             algorithm_options=algorithmOptions,
             probe_options=self.getProbeOptions(),
             object_options=self.getObjectOptions(),
-            position_options=self.getPositionOptions(scan))
+            position_options=self.getPositionOptions(scan),
+            exitwave_options=exitwave_options,
+        )
 
         if self._multigridSettings.useMultigrid.value:
             result = tike.ptycho.reconstruct_multigrid(
                 data=data,
                 parameters=ptychoParameters,
-                model=self._settings.noiseModel.value,
                 num_gpu=numGpus,
                 use_mpi=False,
                 num_levels=self._multigridSettings.numLevels.value,
@@ -190,7 +197,6 @@ class TikeReconstructor:
             with tike.ptycho.Reconstruction(
                     data=data,
                     parameters=ptychoParameters,
-                    model=self._settings.noiseModel.value,
                     num_gpu=numGpus,
                     use_mpi=False,
             ) as context:
