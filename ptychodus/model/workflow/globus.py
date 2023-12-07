@@ -181,8 +181,8 @@ class GlobusWorkflowThread(threading.Thread):
 
         try:
             clientSecret = os.environ['CLIENT_SECRET']
-        except KeyError:
-            raise ValueError('Required environment variables: CLIENT_ID or CLIENT_SECRET')
+        except KeyError as ex:
+            raise KeyError('CLIENT_ID requires a CLIENT_SECRET environment variable.') from ex
 
         try:
             flowID = os.environ['FLOW_ID']
