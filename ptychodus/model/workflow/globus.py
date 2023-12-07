@@ -170,27 +170,27 @@ class GlobusWorkflowThread(threading.Thread):
         self.__gladierClient: Optional[gladier.GladierBaseClient] = None
 
     @classmethod
-    def createNativeInstance(cls, authorizer: WorkflowAuthorizer,
-                             statusRepository: WorkflowStatusRepository,
-                             executor: WorkflowExecutor) -> GlobusWorkflowThread:
-        clientBuilder = NativePtychodusClientBuilder(authorizer)
-        return cls(authorizer, statusRepository, executor, clientBuilder)
+    def createInstance(cls, authorizer: WorkflowAuthorizer,
+                       statusRepository: WorkflowStatusRepository,
+                       executor: WorkflowExecutor) -> GlobusWorkflowThread:
+        try:
+            clientID = os.environ['CLIENT_ID']
+        except KeyError:
+            clientBuilder: PtychodusClientBuilder = NativePtychodusClientBuilder(authorizer)
+            return cls(authorizer, statusRepository, executor, clientBuilder)
 
-    @classmethod
-    def createConfidentialInstance(cls, authorizer: WorkflowAuthorizer,
-                                   statusRepository: WorkflowStatusRepository,
-                                   executor: WorkflowExecutor) -> GlobusWorkflowThread:
-        clientID = os.getenv('CLIENT_ID')
-        clientSecret = os.getenv('CLIENT_SECRET')
-        flowID = os.getenv('FLOW_ID')
-
-        if not clientID or not clientSecret:
+        try:
+            clientSecret = os.environ['CLIENT_SECRET']
+        except KeyError:
             raise ValueError('Required environment variables: CLIENT_ID or CLIENT_SECRET')
 
-        if not flowID:
+        try:
+            flowID = os.environ['FLOW_ID']
+        except KeyError:
             # This isn't necessarily bad, but CCs like regular users only get one flow
             # to play with. They probably don't need more than one, but this will ensure
             # there aren't errors due to tracking mismatch in the Glaider config
+            flowID = ''
             logger.warning('No flow ID enforced. Recommend setting FLOW_ID environment variable.')
 
         clientBuilder = ConfidentialPtychodusClientBuilder(clientID, clientSecret, flowID)
