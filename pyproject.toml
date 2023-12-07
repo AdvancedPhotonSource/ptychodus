@@ -13,7 +13,6 @@ module = [
     "fair_research_login",
     "funcx_endpoint.*",
     "gladier.*",
-    "globus_sdk",
     "h5py",
     "hdf5plugin",
     "matplotlib.*",

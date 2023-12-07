@@ -110,7 +110,7 @@ class OpenDatasetWizardFilesController(Observer):
         self._page._setComplete(fileInfo.isFile())
 
     def _setNameFiltersInFileSystemModel(self, currentText: str) -> None:
-        z = re.search('\((.+)\)', currentText)
+        z = re.search(r'\((.+)\)', currentText)
 
         if z:
             nameFilters = z.group(1).split()

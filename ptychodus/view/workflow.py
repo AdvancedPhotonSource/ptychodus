@@ -93,7 +93,7 @@ class WorkflowComputeView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Compute', parent)
-        self.funcXEndpointIDLineEdit = UUIDLineEdit()
+        self.computeEndpointIDLineEdit = UUIDLineEdit()
         self.dataEndpointIDLineEdit = UUIDLineEdit()
         self.dataGlobusPathLineEdit = QLineEdit()
         self.dataPosixPathLineEdit = QLineEdit()
@@ -103,7 +103,7 @@ class WorkflowComputeView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('FuncX Endpoint ID:', view.funcXEndpointIDLineEdit)
+        layout.addRow('Compute Endpoint ID:', view.computeEndpointIDLineEdit)
         layout.addRow('Data Endpoint ID:', view.dataEndpointIDLineEdit)
         layout.addRow('Data Globus Path:', view.dataGlobusPathLineEdit)
         layout.addRow('Data POSIX Path:', view.dataPosixPathLineEdit)

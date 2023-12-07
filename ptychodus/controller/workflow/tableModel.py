@@ -17,6 +17,7 @@ class WorkflowTableModel(QAbstractTableModel):
             'Action',
             'Run ID',
         ]
+        self._dtFormat = '%Y-%m-%d %H:%M:%S'
 
     def headerData(self,
                    section: int,
@@ -42,9 +43,10 @@ class WorkflowTableModel(QAbstractTableModel):
                 if index.column() == 0:
                     value = QVariant(flowRun.label)
                 elif index.column() == 1:
-                    value = QVariant(flowRun.startTime)
+                    value = QVariant(flowRun.startTime.strftime(self._dtFormat))
                 elif index.column() == 2:
-                    value = QVariant(flowRun.completionTime)
+                    if flowRun.completionTime is not None:
+                        value = QVariant(flowRun.completionTime.strftime(self._dtFormat))
                 elif index.column() == 3:
                     value = QVariant(flowRun.status)
                 elif index.column() == 4:
