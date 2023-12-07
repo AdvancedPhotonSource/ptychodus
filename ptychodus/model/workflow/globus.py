@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
+from datetime import datetime
 from importlib.metadata import version
 from pprint import pformat
 from typing import Final, Optional, Union
@@ -218,7 +219,7 @@ class GlobusWorkflowThread(threading.Thread):
                 elif det.get('details') and det['details'].get('output'):
                     action = list(det['details']['output'].keys())[0]
                 elif det.get('action_statuses'):
-                    action = det['action_statuses'][0]['state_name']
+                    action = det['action_statuses'][0].get('state_name')
                 elif det.get('code') == 'FlowStarting':
                     pass
 
@@ -229,21 +230,34 @@ class GlobusWorkflowThread(threading.Thread):
         flowsManager = self._gladierClient.flows_manager
         flowID = flowsManager.get_flow_id()
         flowsClient = flowsManager.flows_client
-        response = flowsClient.list_flow_runs(flowID)
+        response = flowsClient.list_runs(filter_flow_id=flowID)
         runDictList = response['runs']
 
         while response['has_next_page']:
-            response = flowsClient.list_flow_runs(flowID, marker=response['marker'])
+            response = flowsClient.list_runs(filter_flow_id=flowID, marker=response['marker'])
             runDictList.extend(response['runs'])
 
         for runDict in runDictList:
             runID = runDict.get('run_id', '')
             action = self._getCurrentAction(runID)
+            startTimeStr = runDict.get('start_time', '')
+            completionTimeStr = runDict.get('completion_time', '')
+
+            try:
+                startTime = datetime.fromisoformat(startTimeStr)
+            except ValueError:
+                logger.warning(f'Failed to parse startTime \"{startTimeStr}\"!')
+                startTime = datetime(1, 1, 1)
+
+            try:
+                completionTime = datetime.fromisoformat(completionTimeStr)
+            except ValueError:
+                completionTime = None
 
             run = WorkflowStatus(
                 label=runDict.get('label', ''),
-                startTime=runDict.get('start_time', ''),
-                completionTime=runDict.get('completion_time', ''),
+                startTime=startTime,
+                completionTime=completionTime,
                 status=runDict.get('status', ''),
                 action=action,
                 runID=runID,

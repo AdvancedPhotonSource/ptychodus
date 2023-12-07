@@ -8,8 +8,8 @@ import threading
 @dataclass(frozen=True)
 class WorkflowStatus:
     label: str
-    startTime: str
-    completionTime: str
+    startTime: datetime
+    completionTime: datetime | None
     status: str
     action: str
     runID: str

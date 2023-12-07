@@ -177,6 +177,7 @@ class StateDataRegistry:
         else:
             stateData[self.OBJECT_CENTER_X] = numpy.array(objectState.centerXInMeters)
             stateData[self.OBJECT_CENTER_Y] = numpy.array(objectState.centerYInMeters)
+            stateData[self.OBJECT_LAYER_DISTANCE] = numpy.array(objectState.layerDistanceInMeters)
             stateData[self.OBJECT_ARRAY] = objectState.array
 
         numpy.savez(filePath, **stateData)
