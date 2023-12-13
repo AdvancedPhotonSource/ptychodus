@@ -166,6 +166,12 @@ class TikeReconstructor:
         logger.debug(f'object shape={psi.shape}')
         logger.debug(f'num_gpu={numGpus}')
 
+        exitwave_options = tike.ptycho.ExitWaveOptions(
+            # FIXME: Use a user supplied `measured_pixels` instead
+            measured_pixels=numpy.ones(probe.shape[-2:], dtype=numpy.bool_),
+            noise_model=self._settings.noiseModel.value,
+        )
+
         ptychoParameters = tike.ptycho.solvers.PtychoParameters(
             probe=probe,
             psi=psi,
@@ -173,13 +179,14 @@ class TikeReconstructor:
             algorithm_options=algorithmOptions,
             probe_options=self.getProbeOptions(),
             object_options=self.getObjectOptions(),
-            position_options=self.getPositionOptions(scan))
+            position_options=self.getPositionOptions(scan),
+            exitwave_options=exitwave_options,
+        )
 
         if self._multigridSettings.useMultigrid.value:
             result = tike.ptycho.reconstruct_multigrid(
                 data=data,
                 parameters=ptychoParameters,
-                model=self._settings.noiseModel.value,
                 num_gpu=numGpus,
                 use_mpi=False,
                 num_levels=self._multigridSettings.numLevels.value,
@@ -190,7 +197,6 @@ class TikeReconstructor:
             with tike.ptycho.Reconstruction(
                     data=data,
                     parameters=ptychoParameters,
-                    model=self._settings.noiseModel.value,
                     num_gpu=numGpus,
                     use_mpi=False,
             ) as context:
@@ -249,56 +255,6 @@ class RegularizedPIEReconstructor(Reconstructor):
         self._algorithmOptions.num_iter = self._settings.numIter.value
         self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
         self._algorithmOptions.alpha = float(self._settings.alpha.value)
-        return self._tikeReconstructor(parameters, self._algorithmOptions)
-
-
-class AdaptiveMomentGradientDescentReconstructor(Reconstructor):
-
-    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
-        super().__init__()
-        self._algorithmOptions = tike.ptycho.solvers.AdamOptions()
-        self._tikeReconstructor = tikeReconstructor
-
-    @property
-    def name(self) -> str:
-        return self._algorithmOptions.name
-
-    @property
-    def _settings(self) -> TikeSettings:
-        return self._tikeReconstructor._settings
-
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        self._algorithmOptions.num_batch = self._settings.numBatch.value
-        self._algorithmOptions.batch_method = self._settings.batchMethod.value
-        self._algorithmOptions.num_iter = self._settings.numIter.value
-        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
-        self._algorithmOptions.alpha = float(self._settings.alpha.value)
-        self._algorithmOptions.step_length = float(self._settings.stepLength.value)
-        return self._tikeReconstructor(parameters, self._algorithmOptions)
-
-
-class ConjugateGradientReconstructor(Reconstructor):
-
-    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
-        super().__init__()
-        self._algorithmOptions = tike.ptycho.solvers.CgradOptions()
-        self._tikeReconstructor = tikeReconstructor
-
-    @property
-    def name(self) -> str:
-        return self._algorithmOptions.name
-
-    @property
-    def _settings(self) -> TikeSettings:
-        return self._tikeReconstructor._settings
-
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        self._algorithmOptions.num_batch = self._settings.numBatch.value
-        self._algorithmOptions.batch_method = self._settings.batchMethod.value
-        self._algorithmOptions.num_iter = self._settings.numIter.value
-        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.value
-        self._algorithmOptions.cg_iter = self._settings.cgIter.value
-        self._algorithmOptions.step_length = float(self._settings.stepLength.value)
         return self._tikeReconstructor(parameters, self._algorithmOptions)
 
 

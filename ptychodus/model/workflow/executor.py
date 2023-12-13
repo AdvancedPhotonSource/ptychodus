@@ -69,8 +69,8 @@ class WorkflowExecutor:
             True,
             'input_data_transfer_sync_level':
             transferSyncLevel,
-            'funcx_endpoint_compute':
-            str(self._settings.computeFuncXEndpointID.value),
+            'compute_endpoint':
+            str(self._settings.computeEndpointID.value),
             'ptychodus_restart_file':
             str(computeDataPosixPath / restartFileName),
             'ptychodus_settings_file':

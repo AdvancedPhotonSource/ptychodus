@@ -10,7 +10,7 @@ class WorkflowSettings(Observable, Observer):
     def __init__(self, group: SettingsGroup) -> None:
         super().__init__()
         self.group = group
-        self.computeFuncXEndpointID = group.createUUIDEntry('ComputeFuncXEndpointID', UUID(int=0))
+        self.computeEndpointID = group.createUUIDEntry('ComputeEndpointID', UUID(int=0))
         self.statusRefreshIntervalInSeconds = group.createIntegerEntry(
             'StatusRefreshIntervalInSeconds', 10)
 

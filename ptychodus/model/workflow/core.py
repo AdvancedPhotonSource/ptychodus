@@ -59,11 +59,11 @@ class WorkflowParametersPresenter(Observable, Observer):
     def getInputDataPosixPath(self) -> Path:
         return self._inputDataLocator.getPosixPath()
 
-    def setComputeFuncXEndpointID(self, endpointID: UUID) -> None:
-        self._settings.computeFuncXEndpointID.value = endpointID
+    def setComputeEndpointID(self, endpointID: UUID) -> None:
+        self._settings.computeEndpointID.value = endpointID
 
-    def getComputeFuncXEndpointID(self) -> UUID:
-        return self._settings.computeFuncXEndpointID.value
+    def getComputeEndpointID(self) -> UUID:
+        return self._settings.computeEndpointID.value
 
     def setComputeDataEndpointID(self, endpointID: UUID) -> None:
         self._computeDataLocator.setEndpointID(endpointID)
@@ -204,11 +204,9 @@ class WorkflowCore:
         except ModuleNotFoundError:
             logger.info('Globus not found.')
         else:
-            self._thread = GlobusWorkflowThread.createNativeInstance(self._authorizer,
-                                                                     self._statusRepository,
-                                                                     self._executor)
-            # TODO self._thread = GlobusWorkflowThread.createConfidentialInstance(
-            # TODO    self._authorizer, self._statusRepository, self._executor)
+            self._thread = GlobusWorkflowThread.createInstance(self._authorizer,
+                                                               self._statusRepository,
+                                                               self._executor)
 
         self.parametersPresenter = WorkflowParametersPresenter.createInstance(
             self._settings, self._inputDataLocator, self._computeDataLocator,
