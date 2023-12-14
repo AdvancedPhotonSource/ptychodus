@@ -164,8 +164,13 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             height=objectPatches.shape[-2],
         )
 
-        for scanPoint, objectPatchReals in zip(parameters.scan.values(), objectPatches):
-            objectPatch = 0.5 * numpy.exp(1j * objectPatchReals[0])
+        for scanPoint, objectPatchChannels in zip(parameters.scan.values(), objectPatches):
+            objectPatch = numpy.exp(1j * objectPatchChannels[0])
+
+            if objectPatchChannels.shape[0] == 2:
+                objectPatch *= objectPatchChannels[1]
+            else:
+                objectPatch *= 0.5
 
             patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
             patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
