@@ -105,7 +105,7 @@ class PtychoNNTrainingParametersController(Observer):
 
         return controller
 
-    def _saveTrainingData(self) -> None:
+    def _saveTrainingData(self) -> None:  # FIXME
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Training Data',

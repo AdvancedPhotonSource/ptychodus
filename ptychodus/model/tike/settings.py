@@ -15,7 +15,6 @@ class TikeSettings(Observable, Observer):
         self.batchMethod = settingsGroup.createStringEntry('BatchMethod', 'wobbly_center')
         self.numIter = settingsGroup.createIntegerEntry('NumIter', 1)
         self.convergenceWindow = settingsGroup.createIntegerEntry('ConvergenceWindow', 0)
-        self.cgIter = settingsGroup.createIntegerEntry('CgIter', 2)
         self.alpha = settingsGroup.createRealEntry('Alpha', '0.05')
         self.stepLength = settingsGroup.createRealEntry('StepLength', '1')
 

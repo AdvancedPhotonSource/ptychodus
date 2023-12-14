@@ -85,16 +85,6 @@ class TikePresenter(Observable, Observer):
     def setConvergenceWindow(self, value: int) -> None:
         self._settings.convergenceWindow.value = value
 
-    def getCgIterLimits(self) -> Interval[int]:
-        return Interval[int](1, 64)
-
-    def getCgIter(self) -> int:
-        limits = self.getCgIterLimits()
-        return limits.clamp(self._settings.cgIter.value)
-
-    def setCgIter(self, value: int) -> None:
-        self._settings.cgIter.value = value
-
     def getAlphaLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 

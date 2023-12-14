@@ -21,21 +21,13 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
         view = None
 
         if reconstructorName == 'rpie':
-            view = TikeParametersView.createInstance(showCgIter=False,
-                                                     showAlpha=True,
-                                                     showStepLength=False)
+            view = TikeParametersView.createInstance(showAlpha=True, showStepLength=False)
         elif reconstructorName == 'lstsq_grad':
-            view = TikeParametersView.createInstance(showCgIter=False,
-                                                     showAlpha=False,
-                                                     showStepLength=False)
+            view = TikeParametersView.createInstance(showAlpha=False, showStepLength=False)
         elif reconstructorName == 'dm':
-            view = TikeParametersView.createInstance(showCgIter=False,
-                                                     showAlpha=False,
-                                                     showStepLength=False)
+            view = TikeParametersView.createInstance(showAlpha=False, showStepLength=False)
         else:
-            view = TikeParametersView.createInstance(showCgIter=True,
-                                                     showAlpha=True,
-                                                     showStepLength=True)
+            view = TikeParametersView.createInstance(showAlpha=True, showStepLength=True)
 
         controller = TikeParametersController.createInstance(self._model, view)
         self._controllerList.append(controller)
