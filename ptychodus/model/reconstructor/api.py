@@ -1,3 +1,4 @@
+from pathlib import Path
 import logging
 
 from ...api.plot import Plot2D
@@ -38,11 +39,14 @@ class ReconstructorAPI:
 
         return resultOdd, resultEven
 
-    def ingest(self) -> None:
-        self._activeReconstructor.ingest()
+    def ingestTrainingData(self) -> None:
+        self._activeReconstructor.ingestTrainingData()
+
+    def saveTrainingData(self, filePath: Path) -> None:
+        self._activeReconstructor.saveTrainingData(filePath)
 
     def train(self) -> Plot2D:
         return self._activeReconstructor.train()
 
-    def reset(self) -> None:
-        self._activeReconstructor.reset()
+    def clearTrainingData(self) -> None:
+        self._activeReconstructor.clearTrainingData()

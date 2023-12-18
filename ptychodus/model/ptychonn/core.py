@@ -79,7 +79,6 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def __init__(self, settings: PtychoNNTrainingSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
 
     @classmethod
     def createInstance(cls, settings: PtychoNNTrainingSettings) -> PtychoNNTrainingPresenter:
@@ -164,12 +163,6 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
     def setStatusIntervalInEpochs(self, value: int) -> None:
         self._settings.statusIntervalInEpochs.value = value
-
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
-
-    def getSaveFileFilter(self) -> str:
-        return self._fileFilterList[0]
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

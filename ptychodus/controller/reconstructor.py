@@ -14,6 +14,7 @@ from ..model.reconstructor import ReconstructorPresenter
 from ..model.scan import ScanPresenter
 from ..view.reconstructor import ReconstructorParametersView, ReconstructorPlotView
 from ..view.widgets import ExceptionDialog
+from .data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +33,11 @@ class ReconstructorViewControllerFactory(ABC):
 
 class ReconstructorParametersController(Observer):
 
-    def __init__(
-        self,
-        presenter: ReconstructorPresenter,
-        scanPresenter: ScanPresenter,
-        probePresenter: ProbePresenter,
-        objectPresenter: ObjectPresenter,
-        view: ReconstructorParametersView,
-        plotView: ReconstructorPlotView,
-        viewControllerFactoryList: Iterable[ReconstructorViewControllerFactory],
-    ) -> None:
+    def __init__(self, presenter: ReconstructorPresenter, scanPresenter: ScanPresenter,
+                 probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
+                 view: ReconstructorParametersView, plotView: ReconstructorPlotView,
+                 fileDialogFactory: FileDialogFactory,
+                 viewControllerFactoryList: Iterable[ReconstructorViewControllerFactory]) -> None:
         super().__init__()
         self._presenter = presenter
         self._scanPresenter = scanPresenter
@@ -49,6 +45,7 @@ class ReconstructorParametersController(Observer):
         self._objectPresenter = objectPresenter
         self._view = view
         self._plotView = plotView
+        self._fileDialogFactory = fileDialogFactory
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = \
                 { vcf.backendName: vcf for vcf in viewControllerFactoryList }
         self._scanListModel = QStringListModel()
@@ -57,17 +54,14 @@ class ReconstructorParametersController(Observer):
 
     @classmethod
     def createInstance(
-        cls,
-        presenter: ReconstructorPresenter,
-        scanPresenter: ScanPresenter,
-        probePresenter: ProbePresenter,
-        objectPresenter: ObjectPresenter,
-        view: ReconstructorParametersView,
-        plotView: ReconstructorPlotView,
-        viewControllerFactoryList: list[ReconstructorViewControllerFactory],
+        cls, presenter: ReconstructorPresenter, scanPresenter: ScanPresenter,
+        probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
+        view: ReconstructorParametersView, plotView: ReconstructorPlotView,
+        fileDialogFactory: FileDialogFactory,
+        viewControllerFactoryList: list[ReconstructorViewControllerFactory]
     ) -> ReconstructorParametersController:
         controller = cls(presenter, scanPresenter, probePresenter, objectPresenter, view, plotView,
-                         viewControllerFactoryList)
+                         fileDialogFactory, viewControllerFactoryList)
         presenter.addObserver(controller)
         scanPresenter.addObserver(controller)
         probePresenter.addObserver(controller)
@@ -91,9 +85,10 @@ class ReconstructorParametersController(Observer):
 
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
         view.reconstructorView.reconstructSplitButton.clicked.connect(controller._reconstructSplit)
-        view.reconstructorView.ingestButton.clicked.connect(controller._ingest)
+        view.reconstructorView.ingestButton.clicked.connect(controller._ingestTrainingData)
+        view.reconstructorView.saveButton.clicked.connect(controller._saveTrainingData)
         view.reconstructorView.trainButton.clicked.connect(controller._train)
-        view.reconstructorView.resetButton.clicked.connect(controller._reset)
+        view.reconstructorView.clearButton.clicked.connect(controller._clearTrainingData)
 
         controller._syncModelToView()
         controller._syncScanToView()
@@ -130,12 +125,26 @@ class ReconstructorParametersController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Split Reconstructor', err)
 
-    def _ingest(self) -> None:
+    def _ingestTrainingData(self) -> None:
         try:
-            self._presenter.ingest()
+            self._presenter.ingestTrainingData()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Ingester', err)
+
+    def _saveTrainingData(self) -> None:
+        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+            self._view,
+            'Save Training Data',
+            nameFilters=self._presenter.getSaveFileFilterList(),
+            selectedNameFilter=self._presenter.getSaveFileFilter())
+
+        if filePath:
+            try:
+                self._presenter.saveTrainingData(filePath)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException('File writer', err)
 
     def _train(self) -> None:
         try:
@@ -144,12 +153,12 @@ class ReconstructorParametersController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Trainer', err)
 
-    def _reset(self) -> None:
+    def _clearTrainingData(self) -> None:
         try:
-            self._presenter.reset()
+            self._presenter.clearTrainingData()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Reset', err)
+            ExceptionDialog.showException('Clear', err)
 
     def _syncScanToView(self) -> None:
         self._view.reconstructorView.scanComboBox.blockSignals(True)
@@ -221,8 +230,9 @@ class ReconstructorParametersController(Observer):
 
         isTrainable = self._presenter.isTrainable
         self._view.reconstructorView.ingestButton.setVisible(isTrainable)
+        self._view.reconstructorView.saveButton.setVisible(isTrainable)
         self._view.reconstructorView.trainButton.setVisible(isTrainable)
-        self._view.reconstructorView.resetButton.setVisible(isTrainable)
+        self._view.reconstructorView.clearButton.setVisible(isTrainable)
 
         self._redrawPlot()
 

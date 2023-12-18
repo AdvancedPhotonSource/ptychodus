@@ -79,7 +79,6 @@ class PtychoNNTrainingParametersView(QGroupBox):
         self.trainingEpochsSpinBox = QSpinBox()
         self.statusIntervalSpinBox = QSpinBox()
         self.outputParametersView = PtychoNNOutputParametersView.createInstance()
-        self.saveTrainingDataButton = QPushButton("Save Training Data")
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNTrainingParametersView:
@@ -94,7 +93,6 @@ class PtychoNNTrainingParametersView(QGroupBox):
         layout.addRow('Training Epochs:', view.trainingEpochsSpinBox)
         layout.addRow('Status Interval:', view.statusIntervalSpinBox)
         layout.addRow(view.outputParametersView)
-        layout.addRow(view.saveTrainingDataButton)
         view.setLayout(layout)
 
         return view

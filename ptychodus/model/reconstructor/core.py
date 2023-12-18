@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
+from pathlib import Path
 import logging
 
 from ...api.observer import Observable, Observer
@@ -72,15 +73,24 @@ class ReconstructorPresenter(Observable, Observer):
     def isTrainable(self) -> bool:
         return self._activeReconstructor.isTrainable
 
-    def ingest(self) -> None:
-        self._reconstructorAPI.ingest()
+    def ingestTrainingData(self) -> None:
+        self._reconstructorAPI.ingestTrainingData()
+
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return self._activeReconstructor.getSaveFileFilterList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._activeReconstructor.getSaveFileFilter()
+
+    def saveTrainingData(self, filePath: Path) -> None:
+        self._reconstructorAPI.saveTrainingData(filePath)
 
     def train(self) -> None:
         self._plot2D = self._reconstructorAPI.train()
         self.notifyObservers()
 
-    def reset(self) -> None:
-        self._reconstructorAPI.reset()
+    def clearTrainingData(self) -> None:
+        self._reconstructorAPI.clearTrainingData()
 
     def update(self, observable: Observable) -> None:
         if observable is self._activeReconstructor:

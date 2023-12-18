@@ -68,6 +68,7 @@ class ControllerCore:
             model.objectPresenter,
             view.reconstructorParametersView,
             view.reconstructorPlotView,
+            self._fileDialogFactory,
             [
                 self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory,
                 self._tikeViewControllerFactory

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Mapping, TypeAlias
@@ -96,6 +97,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
         self._enableAmplitude = enableAmplitude
+        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -197,7 +199,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             result=0,
         )
 
-    def ingest(self, parameters: ReconstructInput) -> None:
+    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         objectInterpolator = parameters.objectInterpolator
 
         if self._patternBuffer.isZeroSized:
@@ -227,6 +229,20 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             axisX=PlotAxis(label='Epoch', series=[seriesX]),
             axisY=PlotAxis(label='Loss', series=[trainingLossSeries, validationLossSeries]),
         )
+
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return self._fileFilterList
+
+    def getSaveFileFilter(self) -> str:
+        return self._fileFilterList[0]
+
+    def saveTrainingData(self, filePath: Path) -> None:
+        logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
+        trainingData = {
+            'diffractionPatterns': self._patternBuffer.getBuffer(),
+            'objectPatches': self._objectPatchBuffer.getBuffer(),
+        }
+        numpy.savez(filePath, **trainingData)
 
     def train(self) -> Plot2D:
         outputPath = self._trainingSettings.outputPath.value \
@@ -261,14 +277,6 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         return self._plotMetrics(trainer.metrics)
 
-    def reset(self) -> None:
+    def clearTrainingData(self) -> None:
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
-
-    def saveTrainingData(self, filePath: Path) -> None:
-        logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
-        trainingData = {
-            'diffractionPatterns': self._patternBuffer.getBuffer(),
-            'objectPatches': self._objectPatchBuffer.getBuffer(),
-        }
-        numpy.savez(filePath, **trainingData)
