@@ -39,7 +39,6 @@ class TikeBasicParametersController(Observer):
 
         view.numIterSpinBox.valueChanged.connect(presenter.setNumIter)
         view.convergenceWindowSpinBox.valueChanged.connect(presenter.setConvergenceWindow)
-        view.cgIterSpinBox.valueChanged.connect(presenter.setCgIter)
 
         view.alphaSlider.valueChanged.connect(presenter.setAlpha)
         view.stepLengthSlider.valueChanged.connect(presenter.setStepLength)
@@ -80,12 +79,6 @@ class TikeBasicParametersController(Observer):
             self._presenter.getConvergenceWindowLimits().upper)
         self._view.convergenceWindowSpinBox.setValue(self._presenter.getConvergenceWindow())
         self._view.convergenceWindowSpinBox.blockSignals(False)
-
-        self._view.cgIterSpinBox.blockSignals(True)
-        self._view.cgIterSpinBox.setRange(self._presenter.getCgIterLimits().lower,
-                                          self._presenter.getCgIterLimits().upper)
-        self._view.cgIterSpinBox.setValue(self._presenter.getCgIter())
-        self._view.cgIterSpinBox.blockSignals(False)
 
         self._view.alphaSlider.setValueAndRange(self._presenter.getAlpha(),
                                                 self._presenter.getAlphaLimits(),

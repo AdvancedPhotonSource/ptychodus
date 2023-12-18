@@ -24,8 +24,8 @@ class PtychoNNModelParametersController(Observer):
 
         view.modelStateLineEdit.editingFinished.connect(controller._syncModelStateFilePathToModel)
         view.modelStateBrowseButton.clicked.connect(controller._openModelState)
-        view.numberOfConvolutionChannelsSpinBox.valueChanged.connect(
-            presenter.setNumberOfConvolutionChannels)
+        view.numberOfConvolutionKernelsSpinBox.valueChanged.connect(
+            presenter.setNumberOfConvolutionKernels)
         view.batchSizeSpinBox.valueChanged.connect(presenter.setBatchSize)
         view.useBatchNormalizationCheckBox.toggled.connect(presenter.setBatchNormalizationEnabled)
 
@@ -54,13 +54,13 @@ class PtychoNNModelParametersController(Observer):
         else:
             self._view.modelStateLineEdit.clear()
 
-        self._view.numberOfConvolutionChannelsSpinBox.blockSignals(True)
-        self._view.numberOfConvolutionChannelsSpinBox.setRange(
-            self._presenter.getNumberOfConvolutionChannelsLimits().lower,
-            self._presenter.getNumberOfConvolutionChannelsLimits().upper)
-        self._view.numberOfConvolutionChannelsSpinBox.setValue(
-            self._presenter.getNumberOfConvolutionChannels())
-        self._view.numberOfConvolutionChannelsSpinBox.blockSignals(False)
+        self._view.numberOfConvolutionKernelsSpinBox.blockSignals(True)
+        self._view.numberOfConvolutionKernelsSpinBox.setRange(
+            self._presenter.getNumberOfConvolutionKernelsLimits().lower,
+            self._presenter.getNumberOfConvolutionKernelsLimits().upper)
+        self._view.numberOfConvolutionKernelsSpinBox.setValue(
+            self._presenter.getNumberOfConvolutionKernels())
+        self._view.numberOfConvolutionKernelsSpinBox.blockSignals(False)
 
         self._view.batchSizeSpinBox.blockSignals(True)
         self._view.batchSizeSpinBox.setRange(self._presenter.getBatchSizeLimits().lower,

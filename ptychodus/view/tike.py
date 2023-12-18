@@ -18,14 +18,12 @@ class TikeBasicParametersView(QGroupBox):
         self.batchMethodComboBox = QComboBox()
         self.numIterSpinBox = QSpinBox()
         self.convergenceWindowSpinBox = QSpinBox()
-        self.cgIterSpinBox = QSpinBox()
         self.alphaSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.stepLengthSlider = DecimalSlider.createInstance(Qt.Horizontal)
         self.logLevelComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls,
-                       showCgIter: bool,
                        showAlpha: bool,
                        showStepLength: bool,
                        parent: Optional[QWidget] = None) -> TikeBasicParametersView:
@@ -42,8 +40,6 @@ class TikeBasicParametersView(QGroupBox):
         view.convergenceWindowSpinBox.setToolTip(
             'The number of epochs to consider for convergence monitoring. '
             'Set to any value less than 2 to disable.')
-        view.cgIterSpinBox.setToolTip(
-            'The number of conjugate directions to search for each update.')
         view.alphaSlider.setToolTip('RPIE becomes EPIE when this parameter is 1.')
         view.stepLengthSlider.setToolTip(
             'Scales the inital search directions before the line search.')
@@ -55,9 +51,6 @@ class TikeBasicParametersView(QGroupBox):
         layout.addRow('Batch Method:', view.batchMethodComboBox)
         layout.addRow('Number of Iterations:', view.numIterSpinBox)
         layout.addRow('Convergence Window:', view.convergenceWindowSpinBox)
-
-        if showCgIter:
-            layout.addRow('CG Search Directions:', view.cgIterSpinBox)
 
         if showAlpha:
             layout.addRow('Alpha:', view.alphaSlider)
@@ -225,11 +218,10 @@ class TikeObjectCorrectionView(QGroupBox):
 
 class TikeParametersView(QWidget):
 
-    def __init__(self, showCgIter: bool, showAlpha: bool, showStepLength: bool,
-                 parent: Optional[QWidget]) -> None:
+    def __init__(self, showAlpha: bool, showStepLength: bool, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.basicParametersView = TikeBasicParametersView.createInstance(
-            showCgIter, showAlpha, showStepLength)
+            showAlpha, showStepLength)
         self.multigridView = TikeMultigridView.createInstance()
         self.positionCorrectionView = TikePositionCorrectionView.createInstance()
         self.probeCorrectionView = TikeProbeCorrectionView.createInstance()
@@ -237,11 +229,10 @@ class TikeParametersView(QWidget):
 
     @classmethod
     def createInstance(cls,
-                       showCgIter: bool,
                        showAlpha: bool,
                        showStepLength: bool,
                        parent: Optional[QWidget] = None) -> TikeParametersView:
-        view = cls(showCgIter, showAlpha, showStepLength, parent)
+        view = cls(showAlpha, showStepLength, parent)
 
         layout = QVBoxLayout()
         layout.addWidget(view.basicParametersView)

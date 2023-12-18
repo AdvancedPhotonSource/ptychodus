@@ -74,7 +74,19 @@ class Reconstructor(ABC):
 class TrainableReconstructor(Reconstructor):
 
     @abstractmethod
-    def ingest(self, parameters: ReconstructInput) -> None:
+    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
+        pass
+
+    @abstractmethod
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        pass
+
+    @abstractmethod
+    def getSaveFileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def saveTrainingData(self, filePath: Path) -> None:
         pass
 
     @abstractmethod
@@ -82,11 +94,7 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def reset(self) -> None:
-        pass
-
-    @abstractmethod
-    def saveTrainingData(self, filePath: Path) -> None:
+    def clearTrainingData(self) -> None:
         pass
 
 
@@ -109,16 +117,22 @@ class NullReconstructor(TrainableReconstructor):
             result=0,
         )
 
-    def ingest(self, parameters: ReconstructInput) -> None:
+    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
+        pass
+
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return list()
+
+    def getSaveFileFilter(self) -> str:
+        return str()
+
+    def saveTrainingData(self, filePath: Path) -> None:
         pass
 
     def train(self) -> Plot2D:
         return Plot2D.createNull()
 
-    def reset(self) -> None:
-        pass
-
-    def saveTrainingData(self, filePath: Path) -> None:
+    def clearTrainingData(self) -> None:
         pass
 
 
