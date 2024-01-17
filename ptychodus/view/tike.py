@@ -52,7 +52,6 @@ class TikeBasicParametersView(QGroupBox):
         layout.addRow('Number of Iterations:', view.numIterSpinBox)
         layout.addRow('Convergence Window:', view.convergenceWindowSpinBox)
 
-
         if showAlpha:
             layout.addRow('Alpha:', view.alphaSlider)
 

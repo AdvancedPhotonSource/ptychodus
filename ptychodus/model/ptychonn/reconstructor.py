@@ -238,6 +238,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             'objectPatches': self._objectPatchBuffer.getBuffer(),
         }
         numpy.savez(filePath, **trainingData)
+
     def train(self) -> Plot2D:
         outputPath = self._trainingSettings.outputPath.value \
                 if self._trainingSettings.saveTrainingArtifacts.value else None
@@ -248,7 +249,6 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             output_path=outputPath,
             output_suffix=self._trainingSettings.outputSuffix.value,
         )
-
 
         trainer.setTrainingData(
             X_train_full=self._patternBuffer.getBuffer(),

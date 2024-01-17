@@ -3,8 +3,8 @@ from pathlib import Path
 import logging
 
 from ...api.plugins import PluginChooser
-from ...api.scan import Scan, ScanFileReader, ScanFileWriter, ScanPoint
-from .builder import FromFileScanBuilder, FromMemoryScanBuilder, ScanBuilder
+from ...api.scan import Scan, ScanFileReader, ScanFileWriter
+from .builder import FromFileScanBuilder, ScanBuilder
 from .cartesian import CartesianScanBuilder
 from .concentric import ConcentricScanBuilder
 from .lissajous import LissajousScanBuilder
@@ -19,10 +19,10 @@ class ScanBuilderFactory(Mapping[str, ScanBuilder]):
     def __init__(self, settings: ScanSettings, fileReaderChooser: PluginChooser[ScanFileReader],
                  fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
         super().__init__()
-        self._settings = settings # FIXME use this
+        self._settings = settings  # FIXME use this
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
-        self._builders = {
+        self._builders: dict[str, Callable[[], ScanBuilder]] = {
             'Raster': lambda: CartesianScanBuilder(snake=False, centered=False),
             'Snake': lambda: CartesianScanBuilder(snake=True, centered=False),
             'Centered Raster': lambda: CartesianScanBuilder(snake=False, centered=True),

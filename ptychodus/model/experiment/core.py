@@ -1,34 +1,25 @@
-from abc import abstractmethod
-from collections.abc import Sequence
-from pathlib import Path
-from typing import overload
-import logging
-import sys
-import threading
-
-from ...api.experiment import ExperimentFileReader, ExperimentFileWriter, ExperimentMetadata
-from ...api.geometry import Box2D
-from ...api.observer import Observable, ObservableSequence, Observer
-from ...api.parametric import ParametricBase
+from ...api.experiment import ExperimentFileReader, ExperimentFileWriter
 from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry
-from ..object import ObjectBuilderFactory, ObjectRepositoryItem
+from ..object import ObjectBuilderFactory
 from ..patterns import PatternSizer
-from ..probe import ProbeBuilderFactory, ProbeRepositoryItem
-from ..scan import ScanBuilderFactory, ScanRepositoryItem
+from ..probe import ProbeBuilderFactory
+from ..scan import ScanBuilderFactory
 from .metadata import MetadataRepository
-from .repository import ExperimentRepository, ExperimentRepositoryObserver
+from .object import ObjectRepository
+from .probe import ProbeRepository
+from .repository import ExperimentRepository
+from .scan import ScanRepository
 from .settings import ExperimentSettings
 
 
 class ExperimentCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, patternSizer: PatternSizer,
-            scanBuilderFactory: ScanBuilderFactory,
-            probeBuilderFactory: ProbeBuilderFactory,
-            objectBuilderFactory: ObjectBuilderFactory,
-            fileReaderChooser: PluginChooser[ExperimentFileReader],
-            fileWriterChooser: PluginChooser[ExperimentFileWriter]) -> None:
+                 scanBuilderFactory: ScanBuilderFactory, probeBuilderFactory: ProbeBuilderFactory,
+                 objectBuilderFactory: ObjectBuilderFactory,
+                 fileReaderChooser: PluginChooser[ExperimentFileReader],
+                 fileWriterChooser: PluginChooser[ExperimentFileWriter]) -> None:
         self.settings = ExperimentSettings.createInstance(settingsRegistry)
         self._repository = ExperimentRepository(patternSizer, fileReaderChooser, fileWriterChooser)
         self.metadataRepository = MetadataRepository(self._repository)

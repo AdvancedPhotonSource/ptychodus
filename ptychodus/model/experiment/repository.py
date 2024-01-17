@@ -8,7 +8,7 @@ import logging
 from ...api.experiment import (Experiment, ExperimentFileReader, ExperimentFileWriter,
                                ExperimentMetadata)
 from ...api.object import Object
-from ...api.observer import Observable, ObservableSequence, Observer
+from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.probe import Probe
 from ...api.scan import Scan

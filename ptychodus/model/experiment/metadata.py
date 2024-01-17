@@ -29,7 +29,8 @@ class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ExperimentR
     def __getitem__(self, index: slice) -> Sequence[MetadataRepositoryItem]:
         ...
 
-    def __getitem__(self, index: int | slice) -> MetadataRepositoryItem | Sequence[MetadataRepositoryItem]:
+    def __getitem__(
+            self, index: int | slice) -> MetadataRepositoryItem | Sequence[MetadataRepositoryItem]:
         if isinstance(index, slice):
             return [item.getMetadata() for item in self._repository[index]]
         else:

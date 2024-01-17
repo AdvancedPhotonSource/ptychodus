@@ -1,15 +1,9 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from decimal import Decimal
-from typing import Final
 import logging
 
-from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.probe import Probe
-from ..itemRepository import ItemRepository
-from .modes import MultimodalProbeFactory, ProbeModeDecayType
-from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
 

@@ -2,10 +2,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import overload
 import logging
-import sys
 
 from ...api.observer import ObservableSequence
-from ...api.plugins import PluginChooser
 from ..metadata import MetadataRepositoryItem
 from ..object import ObjectBuilderFactory, ObjectRepositoryItem
 from ..probe import ProbeRepositoryItem
@@ -32,7 +30,8 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ExperimentRepos
     def __getitem__(self, index: slice) -> Sequence[ObjectRepositoryItem]:
         ...
 
-    def __getitem__(self, index: int | slice) -> ObjectRepositoryItem | Sequence[ObjectRepositoryItem]:
+    def __getitem__(self,
+                    index: int | slice) -> ObjectRepositoryItem | Sequence[ObjectRepositoryItem]:
         if isinstance(index, slice):
             return [item.getObject() for item in self._repository[index]]
         else:

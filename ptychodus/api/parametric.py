@@ -150,7 +150,7 @@ class ParametricBase(Mapping[str, Any], Observable, Observer):
                 logger.debug(f'Parameter \"{key}\" not found!')
             else:
                 logger.debug(f'Parameter \"{key}\": {parameter.getValue()} -> {value}')
-                parameter.setValue(value, notify=False) # FIXME check value type?
+                parameter.setValue(value, notify=False)  # FIXME check value type?
 
         self.notifyObservers()
 

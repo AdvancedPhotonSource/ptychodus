@@ -2,10 +2,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import overload
 import logging
-import sys
 
 from ...api.observer import ObservableSequence
-from ...api.plugins import PluginChooser
 from ..metadata import MetadataRepositoryItem
 from ..object import ObjectRepositoryItem
 from ..probe import ProbeRepositoryItem
