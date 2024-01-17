@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .object import Object
-from .observer import Observable
 from .probe import Probe
 from .scan import Scan
 

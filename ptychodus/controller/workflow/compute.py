@@ -20,8 +20,8 @@ class WorkflowComputeController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        view.funcXEndpointIDLineEdit.editingFinished.connect(
-            controller._syncFuncXEndpointIDToModel)
+        view.computeEndpointIDLineEdit.editingFinished.connect(
+            controller._syncComputeEndpointIDToModel)
         view.dataEndpointIDLineEdit.editingFinished.connect(controller._syncDataEndpointIDToModel)
         view.dataGlobusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
         view.dataPosixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
@@ -30,9 +30,9 @@ class WorkflowComputeController(Observer):
 
         return controller
 
-    def _syncFuncXEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._view.funcXEndpointIDLineEdit.text())
-        self._presenter.setComputeFuncXEndpointID(endpointID)
+    def _syncComputeEndpointIDToModel(self) -> None:
+        endpointID = UUID(self._view.computeEndpointIDLineEdit.text())
+        self._presenter.setComputeEndpointID(endpointID)
 
     def _syncDataEndpointIDToModel(self) -> None:
         endpointID = UUID(self._view.dataEndpointIDLineEdit.text())
@@ -47,8 +47,7 @@ class WorkflowComputeController(Observer):
         self._presenter.setComputeDataPosixPath(dataPath)
 
     def _syncModelToView(self) -> None:
-        self._view.funcXEndpointIDLineEdit.setText(str(
-            self._presenter.getComputeFuncXEndpointID()))
+        self._view.computeEndpointIDLineEdit.setText(str(self._presenter.getComputeEndpointID()))
         self._view.dataEndpointIDLineEdit.setText(str(self._presenter.getComputeDataEndpointID()))
         self._view.dataGlobusPathLineEdit.setText(str(self._presenter.getComputeDataGlobusPath()))
         self._view.dataPosixPathLineEdit.setText(str(self._presenter.getComputeDataPosixPath()))

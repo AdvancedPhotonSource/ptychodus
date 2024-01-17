@@ -3,7 +3,6 @@ from typing import Final
 import logging
 
 import h5py
-import numpy
 
 from ptychodus.api.experiment import (Experiment, ExperimentFileReader, ExperimentFileWriter,
                                       ExperimentMetadata)

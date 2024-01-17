@@ -24,7 +24,6 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ExperimentRepositor
         self._repository.addObserver(self)
         self._factory = factory
 
-
     @overload
     def __getitem__(self, index: int) -> ScanRepositoryItem:
         ...
