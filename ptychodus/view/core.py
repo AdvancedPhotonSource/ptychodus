@@ -40,15 +40,15 @@ class ViewCore(QMainWindow):
         self.settingsParametersView = SettingsParametersView.createInstance()
         self.settingsEntryView = QTableView()
 
-        self.experimentAction = self.navigationToolBar.addAction(QIcon(':/icons/experiment'),
-                                                                 'Experiment')
-        self.experimentView = ExperimentView.createInstance()
-        self.experimentDiagramView = QWidget()
-
         self.patternsAction = self.navigationToolBar.addAction(QIcon(':/icons/patterns'),
                                                                'Patterns')
         self.patternsView = PatternsView.createInstance()
         self.patternsImageView = ImageView.createInstance(self.statusBar())
+
+        self.experimentAction = self.navigationToolBar.addAction(QIcon(':/icons/experiment'),
+                                                                 'Experiment')
+        self.experimentView = ExperimentView.createInstance()
+        self.experimentDiagramView = QWidget()
 
         self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
         self.scanView = RepositoryTableView.createInstance()
@@ -103,8 +103,8 @@ class ViewCore(QMainWindow):
 
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsParametersView)
-        view.parametersWidget.addWidget(view.experimentView)
         view.parametersWidget.addWidget(view.patternsView)
+        view.parametersWidget.addWidget(view.experimentView)
         view.parametersWidget.addWidget(view.scanView)
         view.parametersWidget.addWidget(view.probeView)
         view.parametersWidget.addWidget(view.objectView)
@@ -117,8 +117,8 @@ class ViewCore(QMainWindow):
 
         # maintain same order as navigationToolBar buttons
         view.contentsWidget.addWidget(view.settingsEntryView)
-        view.contentsWidget.addWidget(view.experimentDiagramView)
         view.contentsWidget.addWidget(view.patternsImageView)
+        view.contentsWidget.addWidget(view.experimentDiagramView)
         view.contentsWidget.addWidget(view.scanPlotView)
         view.contentsWidget.addWidget(view.probeImageView)
         view.contentsWidget.addWidget(view.objectImageView)

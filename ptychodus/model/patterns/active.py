@@ -8,13 +8,12 @@ import threading
 import numpy
 import numpy.typing
 
-from ...api.apparatus import ImageExtent
-from ...api.data import (DiffractionDataset, DiffractionMetadata, DiffractionPatternArray,
-                         DiffractionPatternArrayType, DiffractionPatternIndexes,
-                         DiffractionPatternState, SimpleDiffractionPatternArray)
+from ...api.patterns import (DiffractionDataset, DiffractionMetadata, DiffractionPatternArray,
+                             DiffractionPatternArrayType, DiffractionPatternIndexes,
+                             DiffractionPatternState, ImageExtent, SimpleDiffractionPatternArray)
 from ...api.tree import SimpleTreeNode
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
-from .sizer import DiffractionPatternSizer
+from .sizer import PatternSizer
 
 __all__ = [
     'ActiveDiffractionDataset',
@@ -27,7 +26,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     def __init__(self, datasetSettings: DiffractionDatasetSettings,
                  patternSettings: DiffractionPatternSettings,
-                 diffractionPatternSizer: DiffractionPatternSizer) -> None:
+                 diffractionPatternSizer: PatternSizer) -> None:
         super().__init__()
         self._datasetSettings = datasetSettings
         self._patternSettings = patternSettings
@@ -82,8 +81,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
     def realloc(self) -> None:
         shape = (
             self._metadata.numberOfPatternsTotal,
-            self._diffractionPatternSizer.getExtentYInPixels(),
-            self._diffractionPatternSizer.getExtentXInPixels(),
+            self._diffractionPatternSizer.getHeightInPixels(),
+            self._diffractionPatternSizer.getWidthInPixels(),
         )
 
         with self._arrayListLock:
@@ -163,7 +162,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
                 numberOfPatternsPerArray=numberOfPatterns,
                 numberOfPatternsTotal=numberOfPatterns,
                 patternDataType=arrayData.dtype,
-                detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
+                detectorExtent=ImageExtent(detectorWidth, detectorHeight),
             )
 
             self._contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])

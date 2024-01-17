@@ -5,7 +5,7 @@ import h5py
 import numpy
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class PtychoShelvesScanFileReader(ScanFileReader):
 
     def read(self, filePath: Path) -> Scan:
-        pointList = list()
+        pointList: list[ScanPoint] = list()
 
         try:
             with h5py.File(filePath, 'r') as h5File:
@@ -28,13 +28,13 @@ class PtychoShelvesScanFileReader(ScanFileReader):
                     else:
                         raise ScanPointParseError('Coordinate array shape mismatch!')
 
-                    for x, y in zip(ppX, ppY):
-                        point = ScanPoint(x, y)
+                    for idx, (x, y) in enumerate(zip(ppX, ppY)):
+                        point = ScanPoint(idx, x, y)
                         pointList.append(point)
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 
-        return TabularScan.createFromPointIterable(pointList)
+        return Scan(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

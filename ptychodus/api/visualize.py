@@ -8,7 +8,7 @@ import numpy
 import numpy.typing
 import scipy.fft
 
-from .apparatus import PixelGeometry
+from .patterns import PixelGeometry
 
 ComplexArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 IntegerArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]

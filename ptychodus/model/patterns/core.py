@@ -8,21 +8,21 @@ import logging
 import h5py
 import numpy
 
-from ...api.data import DiffractionFileReader, DiffractionPatternArrayType, DiffractionPatternState
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
+from ...api.patterns import DiffractionFileReader, DiffractionPatternArrayType, DiffractionPatternState
 from ...api.plugins import PluginChooser
 from ...api.settings import SettingsRegistry
 from ...api.state import DiffractionPatternStateData, StatefulCore
 from ...api.tree import SimpleTreeNode
-from ..experiment import Detector
 from .active import ActiveDiffractionDataset
 from .api import DiffractionDataAPI
 from .builder import ActiveDiffractionDatasetBuilder
+from .detector import Detector, DetectorPresenter
 from .io import DiffractionDatasetInputOutputPresenter
 from .patterns import DiffractionPatternPresenter
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
-from .sizer import DiffractionPatternSizer
+from .sizer import PatternSizer
 
 logger = logging.getLogger(__name__)
 
@@ -135,17 +135,19 @@ class DiffractionDatasetPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class DataCore(StatefulCore[DiffractionPatternStateData]):
+class PatternsCore(StatefulCore[DiffractionPatternStateData]):
 
-    def __init__(self, settingsRegistry: SettingsRegistry, detector: Detector,
+    def __init__(self, settingsRegistry: SettingsRegistry,
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
+        self.detector = Detector.createInstance(settingsRegistry)
+        self.detectorPresenter = DetectorPresenter.createInstance(self.detector)
         self._datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
         self.patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
 
-        fileReaderChooser.setCurrentPluginByName(
-            self._datasetSettings.fileType.value)  # TODO refactor
+        # TODO vvv refactor vvv
+        fileReaderChooser.setCurrentPluginByName(self._datasetSettings.fileType.value)
 
-        self.patternSizer = DiffractionPatternSizer.createInstance(self.patternSettings, detector)
+        self.patternSizer = PatternSizer.createInstance(self.patternSettings, self.detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
             self.patternSettings, self.patternSizer)
 

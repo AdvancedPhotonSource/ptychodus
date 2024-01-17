@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import QAbstractItemView, QFileSystemModel, QWizard
 
 from ...api.observer import Observable, Observer
 from ...model import MetadataPresenter
-from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
-                           DiffractionPatternPresenter)
+from ...model.patterns import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
+                               DiffractionPatternPresenter)
 from ...view.patterns import (OpenDatasetWizard, OpenDatasetWizardFilesPage,
                               OpenDatasetWizardMetadataPage, OpenDatasetWizardPatternsPage,
                               OpenDatasetWizardPatternCropView, OpenDatasetWizardPatternLoadView,
@@ -296,8 +296,8 @@ class PatternCropController(Observer):
 
         view.centerXSpinBox.valueChanged.connect(presenter.setCropCenterXInPixels)
         view.centerYSpinBox.valueChanged.connect(presenter.setCropCenterYInPixels)
-        view.extentXSpinBox.valueChanged.connect(presenter.setCropExtentXInPixels)
-        view.extentYSpinBox.valueChanged.connect(presenter.setCropExtentYInPixels)
+        view.extentXSpinBox.valueChanged.connect(presenter.setCropWidthInPixels)
+        view.extentYSpinBox.valueChanged.connect(presenter.setCropHeightInPixels)
 
         controller._syncModelToView()
 
@@ -319,15 +319,15 @@ class PatternCropController(Observer):
         self._view.centerYSpinBox.blockSignals(False)
 
         self._view.extentXSpinBox.blockSignals(True)
-        self._view.extentXSpinBox.setRange(self._presenter.getCropExtentXLimitsInPixels().lower,
-                                           self._presenter.getCropExtentXLimitsInPixels().upper)
-        self._view.extentXSpinBox.setValue(self._presenter.getCropExtentXInPixels())
+        self._view.extentXSpinBox.setRange(self._presenter.getCropWidthLimitsInPixels().lower,
+                                           self._presenter.getCropWidthLimitsInPixels().upper)
+        self._view.extentXSpinBox.setValue(self._presenter.getCropWidthInPixels())
         self._view.extentXSpinBox.blockSignals(False)
 
         self._view.extentYSpinBox.blockSignals(True)
-        self._view.extentYSpinBox.setRange(self._presenter.getCropExtentYLimitsInPixels().lower,
-                                           self._presenter.getCropExtentYLimitsInPixels().upper)
-        self._view.extentYSpinBox.setValue(self._presenter.getCropExtentYInPixels())
+        self._view.extentYSpinBox.setRange(self._presenter.getCropHeightLimitsInPixels().lower,
+                                           self._presenter.getCropHeightLimitsInPixels().upper)
+        self._view.extentYSpinBox.setValue(self._presenter.getCropHeightInPixels())
         self._view.extentYSpinBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:

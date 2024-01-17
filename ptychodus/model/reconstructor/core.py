@@ -3,11 +3,11 @@ from collections.abc import Sequence
 import logging
 
 from ...api.observer import Observable, Observer
-from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ...api.reconstructor import ReconstructorLibrary
 from ...api.settings import SettingsRegistry
-from ..data import ActiveDiffractionDataset
+from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ..object import ObjectAPI
+from ..patterns import ActiveDiffractionDataset
 from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from .active import ActiveReconstructor

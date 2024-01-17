@@ -12,9 +12,9 @@ from ...api.plugins import PluginChooser
 from ...api.probe import Probe
 from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,
                                   Reconstructor, ReconstructorLibrary, TrainableReconstructor)
-from ...api.scan import ScanIndexFilter, TabularScan
-from ..data import ActiveDiffractionDataset
+from ...api.scan import ScanIndexFilter, ScanPoint
 from ..object import ObjectAPI
+from ..patterns import ActiveDiffractionDataset
 from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from .settings import ReconstructorSettings
@@ -71,17 +71,29 @@ class ActiveReconstructor(Observable, Observer):
             raise ValueError('No scan is selected!')
 
         dataIndexes = self._diffractionDataset.getAssembledIndexes()
-        scanIndexes = [index for index in selectedScan.keys() if indexFilter(index)]
+        scanIndexes = [point.index for point in selectedScan if indexFilter(point.index)]
         commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))
 
-        diffractionPatternArray = numpy.take(self._diffractionDataset.getAssembledData(),
-                                             commonIndexes,
-                                             axis=0)
-        pointMap = {index: selectedScan[index] for index in commonIndexes}
+        diffractionPatternArray = numpy.take(
+            self._diffractionDataset.getAssembledData(),
+            commonIndexes,
+            axis=0,
+        )
+
+        pointList: list[ScanPoint] = list()
+        pointIter = iter(selectedScan)
+
+        for index in commonIndexes:
+            while True:
+                point = next(pointIter)
+
+                if point.index == index:
+                    pointList.append(point)
+                    break
 
         return ReconstructInput(
             diffractionPatternArray=diffractionPatternArray,
-            scan=TabularScan(pointMap),
+            scan=pointList,
             probeArray=self._probeAPI.getSelectedProbe().getArray(),
             # TODO vvv generalize when able vvv
             objectInterpolator=self._objectAPI.getSelectedThinObjectInterpolator(),

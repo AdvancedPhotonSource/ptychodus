@@ -3,9 +3,9 @@ from typing import Final
 
 import numpy
 
-from ...api.apparatus import ImageExtent
 from ...api.geometry import Interval
 from ...api.object import Object
+from ...api.patterns import ImageExtent
 from .repository import ObjectInitializer
 from .settings import ObjectSettings
 from .sizer import ObjectSizer

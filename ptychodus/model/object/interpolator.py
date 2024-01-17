@@ -5,12 +5,12 @@ import logging
 from scipy.ndimage import map_coordinates
 import numpy
 
-from ...api.apparatus import ImageExtent
+from ...api.geometry import Point2D
 from ...api.object import (ObjectArrayType, ObjectGrid, ObjectInterpolator, ObjectPatch,
                            ObjectPatchGrid, ObjectPhaseCenteringStrategy)
 from ...api.observer import Observable, Observer
+from ...api.patterns import ImageExtent
 from ...api.plugins import PluginChooser
-from ...api.scan import ScanPoint
 from .settings import ObjectSettings
 from .sizer import ObjectSizer
 
@@ -29,7 +29,7 @@ class ObjectLinearInterpolator(ObjectInterpolator):
     def getArray(self) -> ObjectArrayType:
         return self._array
 
-    def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> ObjectPatch:
+    def getPatch(self, patchCenter: Point2D, patchExtent: ImageExtent) -> ObjectPatch:
         grid = ObjectPatchGrid.createInstance(self._grid, patchCenter, patchExtent)
         yy, xx = numpy.meshgrid(grid.axisY.getObjectCoordinates(),
                                 grid.axisX.getObjectCoordinates(),
@@ -59,7 +59,7 @@ class ObjectInterpolatorFactory(Observable, Observer):
         return factory
 
     def createInterpolator(self, objectArray: ObjectArrayType,
-                           objectCentroid: ScanPoint) -> ObjectInterpolator:
+                           objectCentroid: Point2D) -> ObjectInterpolator:
         centerPhase = self._phaseCenteringStrategyChooser.currentPlugin.strategy
         objectExtent = ImageExtent(
             widthInPixels=objectArray.shape[-1],

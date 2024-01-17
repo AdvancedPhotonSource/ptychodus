@@ -10,7 +10,7 @@ class ScanSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.initializer = settingsGroup.createStringEntry('Initializer', 'Snake')
+        self.builder = settingsGroup.createStringEntry('Builder', 'Snake')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/scan.csv'))
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'CSV')
@@ -39,15 +39,6 @@ class ScanSettings(Observable, Observer):
         self.numberOfPointsInFirstShell = settingsGroup.createIntegerEntry(
             'NumberOfPointsInFirstShell', 10)
         self.transform = settingsGroup.createStringEntry('Transform', '+X+Y')
-        self.expandBoundingBox = settingsGroup.createBooleanEntry('ExpandBoundingBox', False)
-        self.boundingBoxMinimumXInMeters = settingsGroup.createRealEntry(
-            'BoundingBoxMinimumXInMeters', '0')
-        self.boundingBoxMaximumXInMeters = settingsGroup.createRealEntry(
-            'BoundingBoxMaximumXInMeters', '1e-5')
-        self.boundingBoxMinimumYInMeters = settingsGroup.createRealEntry(
-            'BoundingBoxMinimumYInMeters', '0')
-        self.boundingBoxMaximumYInMeters = settingsGroup.createRealEntry(
-            'BoundingBoxMaximumYInMeters', '1e-5')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> ScanSettings:

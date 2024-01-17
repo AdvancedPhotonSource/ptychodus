@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import TypeVar
+from typing import Generic, TypeVar
 
 __all__ = [
     'Observer',
@@ -40,44 +40,44 @@ class Observable:
             observer.update(self)
 
 
-class SequenceObserver(ABC):
+class SequenceObserver(Generic[T], ABC):
 
     @abstractmethod
-    def handleItemInserted(self, index: int) -> None:
+    def handleItemInserted(self, index: int, item: T) -> None:
         pass
 
     @abstractmethod
-    def handleItemChanged(self, index: int) -> None:
+    def handleItemChanged(self, index: int, item: T) -> None:
         pass
 
     @abstractmethod
-    def handleItemRemoved(self, index: int) -> None:
+    def handleItemRemoved(self, index: int, item: T) -> None:
         pass
 
 
 class ObservableSequence(Sequence[T]):
 
     def __init__(self) -> None:
-        self._observerList: list[SequenceObserver] = list()
+        self._observerList: list[SequenceObserver[T]] = list()
 
-    def addObserver(self, observer: SequenceObserver) -> None:
+    def addObserver(self, observer: SequenceObserver[T]) -> None:
         if observer not in self._observerList:
             self._observerList.append(observer)
 
-    def removeObserver(self, observer: SequenceObserver) -> None:
+    def removeObserver(self, observer: SequenceObserver[T]) -> None:
         try:
             self._observerList.remove(observer)
         except ValueError:
             pass
 
-    def notifyObserversItemInserted(self, index: int) -> None:
+    def notifyObserversItemInserted(self, index: int, item: T) -> None:
         for observer in self._observerList:
-            observer.handleItemInserted(index)
+            observer.handleItemInserted(index, item)
 
-    def notifyObserversItemChanged(self, index: int) -> None:
+    def notifyObserversItemChanged(self, index: int, item: T) -> None:
         for observer in self._observerList:
-            observer.handleItemChanged(index)
+            observer.handleItemChanged(index, item)
 
-    def notifyObserversItemRemoved(self, index: int) -> None:
+    def notifyObserversItemRemoved(self, index: int, item: T) -> None:
         for observer in self._observerList:
-            observer.handleItemRemoved(index)
+            observer.handleItemRemoved(index, item)

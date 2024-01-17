@@ -14,168 +14,188 @@ from .settings import ProbeSettings
 logger = logging.getLogger(__name__)
 
 
-class ProbeInitializer(ABC, Observable):
-    '''ABC for plugins that can initialize probes'''
-
-    @property
-    @abstractmethod
-    def simpleName(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
-        pass
-
-    @property
-    @abstractmethod
-    def displayName(self) -> str:
-        '''returns a unique name that is prettified for visual display'''
-        pass
+class ProbeBuilder(ABC, Observable):
 
     @abstractmethod
-    def syncFromSettings(self, settings: ProbeSettings) -> None:
-        '''synchronizes initializer state from settings'''
-        pass
-
-    @abstractmethod
-    def syncToSettings(self, settings: ProbeSettings) -> None:
-        '''synchronizes initializer state to settings'''
-        pass
-
-    @abstractmethod
-    def __call__(self) -> Probe:
-        '''produces an initial probe guess'''
+    def build(self) -> Probe:
         pass
 
 
 class ProbeRepositoryItem(Observable, Observer):
-    '''container for items that can be stored in a probe repository'''
-    SIMPLE_NAME: Final[str] = 'FromMemory'
-    DISPLAY_NAME: Final[str] = 'From Memory'
-    MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, modesFactory: MultimodalProbeFactory, nameHint: str) -> None:
+    def __init__(self, probe: Probe) -> None:
         super().__init__()
-        self._modesFactory = modesFactory
-        self._nameHint = nameHint
-        self._probe = Probe()
-        self._initializer: ProbeInitializer | None = None
-        self._numberOfModes = 0
-        self._orthogonalizeModesEnabled = False
-        self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
-        self._modeDecayRatio = Decimal(1)
-
-    @property
-    def nameHint(self) -> str:
-        '''returns a name hint that is appropriate for a settings file'''
-        return self._nameHint
+        self._probe = probe  # FIXME handle pixel size = 0
+        self._builder: ProbeBuilder | None = None
 
     def getProbe(self) -> Probe:
         return self._probe
 
-    def setProbe(self, probe_: Probe) -> None:
-        self._initializer = None
-        self._probe = probe_
+    def setProbe(self, probe: Probe) -> None:
+        self._probe = probe
+        self._builder = None
         self.notifyObservers()
 
-    def reinitialize(self) -> None:
-        if self._initializer is None:
-            logger.error('Missing probe initializer!')
+    def rebuild(self) -> None:
+        if self._builder is None:
+            logger.error('Missing probe builder!')
             return
 
         try:
-            probe = self._initializer()
+            probe = self._builder.build()
         except Exception:
             logger.exception('Failed to reinitialize probe!')
-            return
+        else:
+            self._probe = probe
+            self.notifyObservers()
 
-        if self._numberOfModes > 0:
-            probe = self._modesFactory.build(probe, self._numberOfModes,
-                                             self._orthogonalizeModesEnabled, self._modeDecayType,
-                                             self._modeDecayRatio)
+    def getBuilder(self) -> ProbeBuilder | None:
+        return self._builder
 
-        self._probe = probe
-        self.notifyObservers()
+    def setBuilder(self, builder: ProbeBuilder) -> None:
+        if self._builder is not None:
+            self._builder.removeObserver(self)
 
-    def getInitializerSimpleName(self) -> str:
-        return self.SIMPLE_NAME if self._initializer is None else self._initializer.simpleName
-
-    def getInitializerDisplayName(self) -> str:
-        return self.DISPLAY_NAME if self._initializer is None else self._initializer.displayName
-
-    def getInitializer(self) -> ProbeInitializer | None:
-        return self._initializer
-
-    def setInitializer(self, initializer: ProbeInitializer) -> None:
-        if self._initializer is not None:
-            self._initializer.removeObserver(self)
-
-        self._initializer = initializer
-        initializer.addObserver(self)
-        self.reinitialize()
-
-    def syncFromSettings(self, settings: ProbeSettings) -> None:
-        '''synchronizes item state from settings'''
-        self._numberOfModes = settings.numberOfModes.value
-        self._orthogonalizeModesEnabled = settings.orthogonalizeModesEnabled.value
-
-        try:
-            self._modeDecayType = ProbeModeDecayType[settings.modeDecayType.value.upper()]
-        except KeyError:
-            self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
-
-        self._modeDecayRatio = settings.modeDecayRatio.value
-        self.reinitialize()
-
-    def syncToSettings(self, settings: ProbeSettings) -> None:
-        '''synchronizes item state to settings'''
-        settings.numberOfModes.value = self._numberOfModes
-        settings.orthogonalizeModesEnabled.value = self._orthogonalizeModesEnabled
-        settings.modeDecayType.value = self._modeDecayType.name
-        settings.modeDecayRatio.value = self._modeDecayRatio
-
-    def getNumberOfModesLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getNumberOfModes(self) -> int:
-        return self._probe.getNumberOfModes()
-
-    def setNumberOfModes(self, number: int) -> None:
-        if self._numberOfModes != number:
-            self._numberOfModes = number
-            self.reinitialize()
-
-    @property
-    def isOrthogonalizeModesEnabled(self) -> bool:
-        return self._orthogonalizeModesEnabled
-
-    def setOrthogonalizeModesEnabled(self, value: bool) -> None:
-        if self._orthogonalizeModesEnabled != value:
-            self._orthogonalizeModesEnabled = value
-            self.reinitialize()
-
-    def getModeDecayType(self) -> ProbeModeDecayType:
-        return self._modeDecayType
-
-    def setModeDecayType(self, value: ProbeModeDecayType) -> None:
-        if self._modeDecayType != value:
-            self._modeDecayType = value
-            self.reinitialize()
-
-    def getModeDecayRatioLimits(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))
-
-    def getModeDecayRatio(self) -> Decimal:
-        limits = self.getModeDecayRatioLimits()
-        return limits.clamp(self._modeDecayRatio)
-
-    def setModeDecayRatio(self, value: Decimal) -> None:
-        if self._modeDecayRatio != value:
-            self._modeDecayRatio = value
-            self.reinitialize()
+        self._builder = builder
+        builder.addObserver(self)
+        self.rebuild()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._modesFactory:
-            self.reinitialize()
-        elif observable is self._initializer:
-            self.reinitialize()
+        if observable is self._builder:
+            self.rebuild()
 
 
-ProbeRepository = ItemRepository[ProbeRepositoryItem]
+# TODO class ProbeRepositoryItem(Observable, Observer):
+# TODO     '''container for items that can be stored in a probe repository'''
+# TODO     SIMPLE_NAME: Final[str] = 'FromMemory'
+# TODO     DISPLAY_NAME: Final[str] = 'From Memory'
+# TODO     MAX_INT: Final[int] = 0x7FFFFFFF
+# TODO
+# TODO     def __init__(self, modesFactory: MultimodalProbeFactory, nameHint: str) -> None:
+# TODO         super().__init__()
+# TODO         self._modesFactory = modesFactory
+# TODO         self._nameHint = nameHint
+# TODO         self._probe = Probe()
+# TODO         self._initializer: ProbeBuilder | None = None
+# TODO         self._numberOfModes = 0
+# TODO         self._orthogonalizeModesEnabled = False
+# TODO         self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
+# TODO         self._modeDecayRatio = Decimal(1)
+# TODO
+# TODO     @property
+# TODO     def nameHint(self) -> str:
+# TODO         '''returns a name hint that is appropriate for a settings file'''
+# TODO         return self._nameHint
+# TODO
+# TODO     def getProbe(self) -> Probe:
+# TODO         return self._probe
+# TODO
+# TODO     def setProbe(self, probe_: Probe) -> None:
+# TODO         self._initializer = None
+# TODO         self._probe = probe_
+# TODO         self.notifyObservers()
+# TODO
+# TODO     def reinitialize(self) -> None:
+# TODO         if self._initializer is None:
+# TODO             logger.error('Missing probe initializer!')
+# TODO             return
+# TODO
+# TODO         try:
+# TODO             probe = self._initializer()
+# TODO         except Exception:
+# TODO             logger.exception('Failed to reinitialize probe!')
+# TODO             return
+# TODO
+# TODO         if self._numberOfModes > 0:
+# TODO             probe = self._modesFactory.build(probe, self._numberOfModes,
+# TODO                                              self._orthogonalizeModesEnabled, self._modeDecayType,
+# TODO                                              self._modeDecayRatio)
+# TODO
+# TODO         self._probe = probe
+# TODO         self.notifyObservers()
+# TODO
+# TODO     def getBuilderSimpleName(self) -> str:
+# TODO         return self.SIMPLE_NAME if self._initializer is None else self._initializer.simpleName
+# TODO
+# TODO     def getBuilderDisplayName(self) -> str:
+# TODO         return self.DISPLAY_NAME if self._initializer is None else self._initializer.displayName
+# TODO
+# TODO     def getBuilder(self) -> ProbeBuilder | None:
+# TODO         return self._initializer
+# TODO
+# TODO     def setBuilder(self, initializer: ProbeBuilder) -> None:
+# TODO         if self._initializer is not None:
+# TODO             self._initializer.removeObserver(self)
+# TODO
+# TODO         self._initializer = initializer
+# TODO         initializer.addObserver(self)
+# TODO         self.reinitialize()
+# TODO
+# TODO     def syncFromSettings(self, settings: ProbeSettings) -> None:
+# TODO         '''synchronizes item state from settings'''
+# TODO         self._numberOfModes = settings.numberOfModes.value
+# TODO         self._orthogonalizeModesEnabled = settings.orthogonalizeModesEnabled.value
+# TODO
+# TODO         try:
+# TODO             self._modeDecayType = ProbeModeDecayType[settings.modeDecayType.value.upper()]
+# TODO         except KeyError:
+# TODO             self._modeDecayType = ProbeModeDecayType.POLYNOMIAL
+# TODO
+# TODO         self._modeDecayRatio = settings.modeDecayRatio.value
+# TODO         self.reinitialize()
+# TODO
+# TODO     def syncToSettings(self, settings: ProbeSettings) -> None:
+# TODO         '''synchronizes item state to settings'''
+# TODO         settings.numberOfModes.value = self._numberOfModes
+# TODO         settings.orthogonalizeModesEnabled.value = self._orthogonalizeModesEnabled
+# TODO         settings.modeDecayType.value = self._modeDecayType.name
+# TODO         settings.modeDecayRatio.value = self._modeDecayRatio
+# TODO
+# TODO     def getNumberOfModesLimits(self) -> Interval[int]:
+# TODO         return Interval[int](1, self.MAX_INT)
+# TODO
+# TODO     def getNumberOfModes(self) -> int:
+# TODO         return self._probe.getNumberOfModes()
+# TODO
+# TODO     def setNumberOfModes(self, number: int) -> None:
+# TODO         if self._numberOfModes != number:
+# TODO             self._numberOfModes = number
+# TODO             self.reinitialize()
+# TODO
+# TODO     @property
+# TODO     def isOrthogonalizeModesEnabled(self) -> bool:
+# TODO         return self._orthogonalizeModesEnabled
+# TODO
+# TODO     def setOrthogonalizeModesEnabled(self, value: bool) -> None:
+# TODO         if self._orthogonalizeModesEnabled != value:
+# TODO             self._orthogonalizeModesEnabled = value
+# TODO             self.reinitialize()
+# TODO
+# TODO     def getModeDecayType(self) -> ProbeModeDecayType:
+# TODO         return self._modeDecayType
+# TODO
+# TODO     def setModeDecayType(self, value: ProbeModeDecayType) -> None:
+# TODO         if self._modeDecayType != value:
+# TODO             self._modeDecayType = value
+# TODO             self.reinitialize()
+# TODO
+# TODO     def getModeDecayRatioLimits(self) -> Interval[Decimal]:
+# TODO         return Interval[Decimal](Decimal(0), Decimal(1))
+# TODO
+# TODO     def getModeDecayRatio(self) -> Decimal:
+# TODO         limits = self.getModeDecayRatioLimits()
+# TODO         return limits.clamp(self._modeDecayRatio)
+# TODO
+# TODO     def setModeDecayRatio(self, value: Decimal) -> None:
+# TODO         if self._modeDecayRatio != value:
+# TODO             self._modeDecayRatio = value
+# TODO             self.reinitialize()
+# TODO
+# TODO     def update(self, observable: Observable) -> None:
+# TODO         if observable is self._modesFactory:
+# TODO             self.reinitialize()
+# TODO         elif observable is self._initializer:
+# TODO             self.reinitialize()
+# TODO
+# TODO
+# TODO ProbeRepository = ItemRepository[ProbeRepositoryItem]

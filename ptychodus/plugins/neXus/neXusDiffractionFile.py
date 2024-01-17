@@ -7,10 +7,9 @@ import logging
 
 import h5py
 
-from ptychodus.api.apparatus import ImageExtent, PixelGeometry
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, SimpleDiffractionDataset)
-from ptychodus.api.geometry import Array2D
+from ptychodus.api.patterns import (CropCenter, DiffractionDataset, DiffractionFileReader,
+                                    DiffractionMetadata, DiffractionPatternArray, ImageExtent,
+                                    PixelGeometry, SimpleDiffractionDataset)
 from ptychodus.api.tree import SimpleTreeNode
 from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
@@ -91,7 +90,7 @@ class DetectorSpecificGroup:
 @dataclass(frozen=True)
 class DetectorGroup:
     detectorSpecific: DetectorSpecificGroup
-    detectorDistanceInMeters: float
+    detectorObjectDistanceInMeters: float
     beamCenterXInPixels: int
     beamCenterYInPixels: int
     bitDepthReadout: int
@@ -236,13 +235,13 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         detector.xPixelSizeInMeters,
                         detector.yPixelSizeInMeters,
                     )
-                    cropCenterInPixels = Array2D[int](
+                    cropCenter = CropCenter(
                         detector.beamCenterXInPixels,
                         detector.beamCenterYInPixels,
                     )
 
                     detectorSpecific = detector.detectorSpecific
-                    detectorExtentInPixels = ImageExtent(
+                    detectorExtent = ImageExtent(
                         detectorSpecific.xPixelsInDetector,
                         detectorSpecific.yPixelsInDetector,
                     )
@@ -252,11 +251,11 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=h5Dataset.shape[0],
                         numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
                         patternDataType=h5Dataset.dtype,
-                        detectorDistanceInMeters=detector.detectorDistanceInMeters,
-                        detectorExtentInPixels=detectorExtentInPixels,
+                        detectorObjectDistanceInMeters=detector.detectorObjectDistanceInMeters,
+                        detectorExtent=detectorExtent,
                         detectorPixelGeometry=detectorPixelGeometry,
                         detectorBitDepth=detector.bitDepthReadout,
-                        cropCenterInPixels=cropCenterInPixels,
+                        cropCenter=cropCenter,
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
                     )

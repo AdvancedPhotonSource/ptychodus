@@ -1,52 +1,27 @@
-from __future__ import annotations
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
-import sys
 
+from .object import Object
 from .observer import Observable
+from .probe import Probe
+from .scan import Scan
 
 
-class Experiment(Observable):
+@dataclass(frozen=True)
+class ExperimentMetadata:
+    name: str
+    comments: str = ''
+    probeEnergyInElectronVolts: float = 10000.
+    detectorObjectDistanceInMeters: float = 1.
 
-    def __init__(self, name: str) -> None:
-        super().__init__()
-        self._name = name
-        self._probeEnergyInElectronVolts = 10000.
-        self._detectorObjectDistanceInMeters = 1.
-        # FIXME validate data/scan/probe/object consistency for recon
-        # FIXME sync to/from settings; perhaps from reconstructor
-        # FIXME validate values (filter <0, inf, nan, etc.)
 
-    def getName(self) -> str:
-        return self._name
-
-    def setName(self, name: str) -> None:
-        if self._name != name:
-            self._name = name
-            self.notifyObservers()
-
-    def getProbeEnergyInElectronVolts(self) -> float:
-        return self._probeEnergyInElectronVolts
-
-    def setProbeEnergyInElectronVolts(self, energyInElectronVolts: float) -> None:
-        if self._probeEnergyInElectronVolts != energyInElectronVolts:
-            self._probeEnergyInElectronVolts = energyInElectronVolts
-            self.notifyObservers()
-
-    def getDetectorObjectDistanceInMeters(self) -> float:
-        return self._detectorObjectDistanceInMeters
-
-    def setDetectorObjectDistanceInMeters(self, distanceInMeters: float) -> None:
-        if self._detectorObjectDistanceInMeters != distanceInMeters:
-            self._detectorObjectDistanceInMeters = distanceInMeters
-            self.notifyObservers()
-
-    def getSizeInBytes(self) -> int:
-        sizeInBytes = 0
-        sizeInBytes += sys.getsizeof(self._name)
-        sizeInBytes += sys.getsizeof(self._probeEnergyInElectronVolts)
-        sizeInBytes += sys.getsizeof(self._detectorObjectDistanceInMeters)
-        return sizeInBytes
+@dataclass(frozen=True)
+class Experiment:
+    metadata: ExperimentMetadata
+    scan: Scan
+    probe: Probe
+    object_: Object
 
 
 class ExperimentFileReader(ABC):
@@ -60,6 +35,6 @@ class ExperimentFileReader(ABC):
 class ExperimentFileWriter(ABC):
 
     @abstractmethod
-    def write(self, filePath: Path, experiment_: Experiment) -> None:
+    def write(self, filePath: Path, experiment: Experiment) -> None:
         '''writes an experiment to file'''
         pass

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import sys
 
 from PyQt5.QtCore import (Qt, QAbstractTableModel, QItemSelection, QModelIndex, QObject,
                           QSortFilterProxyModel, QVariant)
@@ -68,7 +69,7 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
                 elif index.column() == 4:
                     value = QVariant('0')  # FIXME objectPlanePixelHeightInMeters
                 elif index.column() == 5:
-                    value = QVariant(f'{experiment.getSizeInBytes() / (1024 * 1024):.2f}')
+                    value = QVariant(f'{sys.getsizeof(experiment) / (1024 * 1024):.2f}')
 
         return value
 

@@ -14,8 +14,6 @@ class ProbeSettings(Observable, Observer):
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/probe.npy'))
-        self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
-            'ProbeEnergyInElectronVolts', '10000')
         self.numberOfModes = settingsGroup.createIntegerEntry('NumberOfModes', 1)
         self.orthogonalizeModesEnabled = settingsGroup.createBooleanEntry(
             'OrthogonalizeModesEnabled', True)

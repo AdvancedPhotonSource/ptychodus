@@ -9,13 +9,57 @@ from typing import overload, Any, TypeAlias, Union
 import numpy
 import numpy.typing
 
-from .apparatus import ImageExtent, PixelGeometry
-from .geometry import Array2D
 from .observer import Observable
 from .tree import SimpleTreeNode
 
 DiffractionPatternArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 DiffractionPatternIndexes = numpy.typing.NDArray[numpy.integer[Any]]
+
+
+@dataclass(frozen=True)
+class PixelGeometry:
+    widthInMeters: float
+    heightInMeters: float
+
+    @classmethod
+    def createNull(cls) -> PixelGeometry:
+        return cls(0., 0.)
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})'
+
+
+@dataclass(frozen=True)
+class ImageExtent:
+    widthInPixels: int
+    heightInPixels: int
+
+    @property
+    def size(self) -> int:
+        '''returns the number of pixels in the image'''
+        return self.widthInPixels * self.heightInPixels
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        '''returns the image shape (heightInPixels, widthInPixels) tuple'''
+        return self.heightInPixels, self.widthInPixels
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ImageExtent):
+            hasSameWidth = (self.widthInPixels == other.widthInPixels)
+            hasSameHeight = (self.heightInPixels == other.heightInPixels)
+            return (hasSameWidth and hasSameHeight)
+
+        return False
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.widthInPixels}, {self.heightInPixels})'
+
+
+@dataclass(frozen=True)
+class CropCenter:
+    positionXInPixels: int
+    positionYInPixels: int
 
 
 class DiffractionPatternState(Enum):
@@ -81,11 +125,11 @@ class DiffractionMetadata:
     numberOfPatternsPerArray: int
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype[numpy.integer[Any]]
-    detectorDistanceInMeters: float | None = None
-    detectorExtentInPixels: ImageExtent | None = None
+    detectorObjectDistanceInMeters: float | None = None
+    detectorExtent: ImageExtent | None = None
     detectorPixelGeometry: PixelGeometry | None = None
     detectorBitDepth: int | None = None
-    cropCenterInPixels: Array2D[int] | None = None
+    cropCenter: CropCenter | None = None
     probeEnergyInElectronVolts: float | None = None
     filePath: Path | None = None
 

@@ -3,7 +3,7 @@ import csv
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import (Scan, ScanFileReader, ScanFileWriter, ScanPoint,
-                                ScanPointParseError, TabularScan)
+                                ScanPointParseError)
 
 
 class DelimitedScanFileReader(ScanFileReader):
@@ -13,7 +13,7 @@ class DelimitedScanFileReader(ScanFileReader):
         self._swapXY = swapXY
 
     def read(self, filePath: Path) -> Scan:
-        pointList = list()
+        pointList: list[ScanPoint] = list()
 
         if self._swapXY:
             xcol = 1
@@ -25,17 +25,17 @@ class DelimitedScanFileReader(ScanFileReader):
         with filePath.open(newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=self._delimiter)
 
-            for row in csvReader:
+            for idx, row in enumerate(csvReader):
                 if row[0].startswith('#'):
                     continue
 
                 if len(row) < 2:
                     raise ScanPointParseError('Bad number of columns!')
 
-                point = ScanPoint(x=float(row[xcol]), y=float(row[ycol]))
+                point = ScanPoint(idx, float(row[xcol]), float(row[ycol]))
                 pointList.append(point)
 
-        return TabularScan.createFromPointIterable(pointList)
+        return Scan(pointList)
 
 
 class DelimitedScanFileWriter(ScanFileWriter):
@@ -46,9 +46,11 @@ class DelimitedScanFileWriter(ScanFileWriter):
 
     def write(self, filePath: Path, scan: Scan) -> None:
         with filePath.open(mode='wt') as csvFile:
-            for index, point in scan.items():
-                line = f'{point.y}{self._delimiter}{point.x}\n' if self._swapXY \
-                        else f'{point.x}{self._delimiter}{point.y}\n'
+            for point in scan:
+                x = point.positionXInMeters
+                y = point.positionYInMeters
+                line = f'{y}{self._delimiter}{x}\n' if self._swapXY \
+                        else f'{x}{self._delimiter}{y}\n'
                 csvFile.write(line)
 
 

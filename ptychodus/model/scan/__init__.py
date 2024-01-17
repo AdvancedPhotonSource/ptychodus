@@ -1,24 +1,20 @@
-from .api import ScanAPI
-from .cartesian import CartesianScanInitializer
-from .concentric import ConcentricScanInitializer
-from .core import ScanCore, ScanPresenter, ScanRepositoryItemPresenter, ScanRepositoryPresenter
-from .file import FromFileScanInitializer
-from .lissajous import LissajousScanInitializer
-from .repository import ScanRepositoryItem
-from .sizer import ScanSizer
-from .spiral import SpiralScanInitializer
+from .builder import FromFileScanBuilder, FromMemoryScanBuilder
+from .cartesian import CartesianScanBuilder
+from .concentric import ConcentricScanBuilder
+from .core import ScanCore
+from .factory import ScanBuilderFactory
+from .item import ScanRepositoryItem
+from .lissajous import LissajousScanBuilder
+from .spiral import SpiralScanBuilder
 
 __all__ = [
-    'CartesianScanInitializer',
-    'ConcentricScanInitializer',
-    'FromFileScanInitializer',
-    'LissajousScanInitializer',
-    'ScanAPI',
+    'CartesianScanBuilder',
+    'ConcentricScanBuilder',
+    'FromFileScanBuilder',
+    'FromMemoryScanBuilder',
+    'LissajousScanBuilder',
+    'ScanBuilderFactory',
     'ScanCore',
-    'ScanPresenter',
     'ScanRepositoryItem',
-    'ScanRepositoryItemPresenter',
-    'ScanRepositoryPresenter',
-    'ScanSizer',
-    'SpiralScanInitializer',
+    'SpiralScanBuilder',
 ]

@@ -6,8 +6,8 @@ import queue
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
-from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
+from ..patterns import DiffractionDataAPI
 from ..probe import ProbeAPI
 from ..scan import ScanAPI
 from ..workflow import WorkflowCore

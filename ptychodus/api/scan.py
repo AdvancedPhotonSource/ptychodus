@@ -1,82 +1,41 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator, Mapping
-from enum import auto, Enum
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from statistics import median
-from typing import Any, TypeAlias
-
-import numpy
-import numpy.typing
-
-from .geometry import Point2D
-
-CoordinateArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
-ScanIndexes = numpy.typing.NDArray[numpy.integer[Any]]
+from typing import overload
+import sys
 
 
-class ScanIndexFilter(Enum):
-    '''filters scan points by index'''
-    ALL = auto()
-    ODD = auto()
-    EVEN = auto()
-
-    @property
-    def simpleName(self) -> str:
-        '''returns a unique name that is appropriate for a settings file'''
-        return self.name
-
-    @property
-    def displayName(self) -> str:
-        '''returns a unique name that is prettified for visual display'''
-        return self.name.title()
-
-    def __call__(self, index: int) -> bool:
-        '''include scan point if true, exclude otherwise'''
-        if self is ScanIndexFilter.ODD:
-            return (index % 2 != 0)
-        elif self is ScanIndexFilter.EVEN:
-            return (index % 2 == 0)
-
-        return True
+@dataclass(frozen=True)
+class ScanPoint:
+    index: int
+    positionXInMeters: float
+    positionYInMeters: float
 
 
-# scan point coordinates are conventionally in meters
-ScanPoint: TypeAlias = Point2D[float]
-Scan: TypeAlias = Mapping[int, ScanPoint]
+class Scan(Sequence[ScanPoint]):
 
+    def __init__(self, pointSeq: Sequence[ScanPoint] | None = None) -> None:
+        self._pointSeq: Sequence[ScanPoint] = [] if pointSeq is None else pointSeq
 
-class TabularScan(Scan):
-
-    def __init__(self, pointMap: Mapping[int, ScanPoint]) -> None:
-        super().__init__()
-        self._data = dict(pointMap)
-
-    @classmethod
-    def createFromPointIterable(cls, pointIterable: Iterable[ScanPoint]) -> TabularScan:
-        return cls({index: point for index, point in enumerate(pointIterable)})
-
-    @classmethod
-    def createFromMappedPointIterable(
-            cls, pointIterableMap: Mapping[int, Iterable[ScanPoint]]) -> TabularScan:
-        pointMap: dict[int, ScanPoint] = dict()
-
-        for index, pointIterable in pointIterableMap.items():
-            pointMap[index] = ScanPoint(
-                x=median(point.x for point in pointIterable),
-                y=median(point.y for point in pointIterable),
-            )
-
-        return cls(pointMap)
-
-    def __iter__(self) -> Iterator[int]:
-        return iter(self._data)
-
+    @overload
     def __getitem__(self, index: int) -> ScanPoint:
-        return self._data[index]
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[ScanPoint]:
+        ...
+
+    def __getitem__(self, index: int | slice) -> ScanPoint | Sequence[ScanPoint]:
+        return self._pointSeq[index]
 
     def __len__(self) -> int:
-        return len(self._data)
+        return len(self._pointSeq)
+
+    @property
+    def sizeInBytes(self) -> int:
+        return sys.getsizeof(self._pointSeq)
 
 
 class ScanPointParseError(Exception):

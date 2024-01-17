@@ -1,17 +1,28 @@
 from __future__ import annotations
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Final
 
 import numpy
 import numpy.typing
 
-from ...api.apparatus import FresnelZonePlate
 from ...api.probe import Probe
 from .apparatus import Apparatus
 from .repository import ProbeInitializer
 from .settings import ProbeSettings
 from .sizer import ProbeSizer
+
+
+@dataclass(frozen=True)
+class FresnelZonePlate:
+    zonePlateDiameterInMeters: float
+    outermostZoneWidthInMeters: float
+    centralBeamstopDiameterInMeters: float
+
+    def getFocalLengthInMeters(self, centralWavelengthInMeters: float) -> float:
+        return self.zonePlateDiameterInMeters * self.outermostZoneWidthInMeters \
+                / centralWavelengthInMeters
 
 
 def gaussian_spectrum(lambda0: float, bandwidth: float, energy: int) -> numpy.typing.NDArray[Any]:
@@ -31,7 +42,7 @@ def fzp_calculate(wavelength: float, dis_defocus: float, probeSize: int, dx: flo
     return the transfer function, and the pixel sizes
     """
 
-    FL = zonePlate.focalLengthInMeters(wavelength)
+    FL = zonePlate.getFocalLengthInMeters(wavelength)
 
     # pixel size on FZP plane
     dx_fzp = wavelength * (FL + dis_defocus) / probeSize / dx

@@ -1,71 +1,50 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import Optional, TypeAlias
 import logging
 
-import numpy
-
 from ...api.plugins import PluginChooser
-from ...api.scan import Scan, ScanFileReader
-from .cartesian import CartesianScanInitializer
-from .concentric import ConcentricScanInitializer
-from .file import FromFileScanInitializer
-from .lissajous import LissajousScanInitializer
-from .repository import ScanRepositoryItem
+from ...api.scan import Scan, ScanFileReader, ScanFileWriter, ScanPoint
+from .builder import FromFileScanBuilder, FromMemoryScanBuilder, ScanBuilder
+from .cartesian import CartesianScanBuilder
+from .concentric import ConcentricScanBuilder
+from .lissajous import LissajousScanBuilder
 from .settings import ScanSettings
-from .spiral import SpiralScanInitializer
+from .spiral import SpiralScanBuilder
 
 logger = logging.getLogger(__name__)
 
-InitializerFactory: TypeAlias = Callable[[], Optional[ScanRepositoryItem]]
 
+class ScanBuilderFactory(Mapping[str, ScanBuilder]):
 
-class ScanRepositoryItemFactory:
-
-    def __init__(self, rng: numpy.random.Generator, settings: ScanSettings,
-                 fileReaderChooser: PluginChooser[ScanFileReader]) -> None:
-        self._rng = rng
-        self._settings = settings
+    def __init__(self, settings: ScanSettings, fileReaderChooser: PluginChooser[ScanFileReader],
+                 fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
+        super().__init__()
+        self._settings = settings # FIXME use this
         self._fileReaderChooser = fileReaderChooser
-        self._initializers = PluginChooser[InitializerFactory]()
-        self._initializers.registerPlugin(
-            self.createItemFromFile,
-            simpleName=FromFileScanInitializer.SIMPLE_NAME,
-            displayName=FromFileScanInitializer.DISPLAY_NAME,
-        )
-        self._initializers.registerPlugin(
-            self.createRasterItem,
-            simpleName='Raster',
-        )
-        self._initializers.registerPlugin(
-            self.createSnakeItem,
-            simpleName='Snake',
-        )
-        self._initializers.registerPlugin(
-            self.createCenteredRasterItem,
-            simpleName='CenteredRaster',
-            displayName='Centered Raster',
-        )
-        self._initializers.registerPlugin(
-            self.createCenteredSnakeItem,
-            simpleName='CenteredSnake',
-            displayName='Centered Snake',
-        )
-        self._initializers.registerPlugin(
-            self.createConcentricItem,
-            simpleName=ConcentricScanInitializer.SIMPLE_NAME,
-            displayName=ConcentricScanInitializer.DISPLAY_NAME,
-        )
-        self._initializers.registerPlugin(
-            self.createSpiralItem,
-            simpleName=SpiralScanInitializer.SIMPLE_NAME,
-            displayName=SpiralScanInitializer.DISPLAY_NAME,
-        )
-        self._initializers.registerPlugin(
-            self.createLissajousItem,
-            simpleName=LissajousScanInitializer.SIMPLE_NAME,
-            displayName=LissajousScanInitializer.DISPLAY_NAME,
-        )
+        self._fileWriterChooser = fileWriterChooser
+        self._builders = {
+            'Raster': lambda: CartesianScanBuilder(snake=False, centered=False),
+            'Snake': lambda: CartesianScanBuilder(snake=True, centered=False),
+            'Centered Raster': lambda: CartesianScanBuilder(snake=False, centered=True),
+            'Centered Snake': lambda: CartesianScanBuilder(snake=True, centered=True),
+            'Concentric': lambda: ConcentricScanBuilder(),
+            'Spiral': lambda: SpiralScanBuilder(),
+            'Lissajous': lambda: LissajousScanBuilder(),
+        }
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._builders)
+
+    def __getitem__(self, name: str) -> ScanBuilder:
+        try:
+            factory = self._builders[name]
+        except KeyError as exc:
+            raise KeyError(f'Unknown scan builder \"{name}\"!') from exc
+
+        return factory()
+
+    def __len__(self) -> int:
+        return len(self._builders)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -73,108 +52,21 @@ class ScanRepositoryItemFactory:
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.currentPlugin.displayName
 
-    def createFileInitializer(self, filePath: Path,
-                              fileType: str) -> Optional[FromFileScanInitializer]:
-        self._fileReaderChooser.setCurrentPluginByName(fileType)
+    def createScanFromFile(self, filePath: Path, fileFilter: str) -> ScanBuilder:
+        self._fileReaderChooser.setCurrentPluginByName(fileFilter)
+        fileType = self._fileReaderChooser.currentPlugin.simpleName
         fileReader = self._fileReaderChooser.currentPlugin.strategy
-        return FromFileScanInitializer(filePath, self._fileReaderChooser.currentPlugin.simpleName,
-                                       fileReader)
+        return FromFileScanBuilder(filePath, fileType, fileReader)
 
-    def openItemFromFile(self, filePath: Path, fileType: str) -> Optional[ScanRepositoryItem]:
-        item: Optional[ScanRepositoryItem] = None
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return self._fileWriterChooser.getDisplayNameList()
 
-        if filePath.is_file():
-            initializer = self.createFileInitializer(filePath, fileType)
+    def getSaveFileFilter(self) -> str:
+        return self._fileWriterChooser.currentPlugin.displayName
 
-            if initializer is None:
-                logger.error('Refusing to create item without initializer!')
-            else:
-                item = ScanRepositoryItem(self._rng, filePath.stem)
-                item.setInitializer(initializer)
-        else:
-            logger.debug(f'Refusing to create item with invalid file path \"{filePath}\"')
-
-        return item
-
-    def createItemFromScan(self,
-                           nameHint: str,
-                           scan: Scan,
-                           *,
-                           filePath: Optional[Path] = None,
-                           fileType: str = '') -> ScanRepositoryItem:
-        item = ScanRepositoryItem(self._rng, nameHint, scan)
-
-        if filePath is not None:
-            if filePath.is_file():
-                initializer = self.createFileInitializer(filePath, fileType)
-
-                if initializer is None:
-                    logger.error('Refusing to add null initializer!')
-                else:
-                    item.setInitializer(initializer)
-            else:
-                logger.debug(f'Refusing to add initializer with invalid file path \"{filePath}\"')
-
-        return item
-
-    def createItemFromFile(self) -> Optional[ScanRepositoryItem]:
-        filePath = self._settings.inputFilePath.value
-        fileType = self._settings.inputFileType.value
-        return self.openItemFromFile(filePath, fileType)
-
-    def createRasterItem(self) -> ScanRepositoryItem:
-        initializer = CartesianScanInitializer(snake=False, centered=False)
-        item = ScanRepositoryItem(self._rng, initializer.simpleName)
-        item.setInitializer(initializer)
-        return item
-
-    def createSnakeItem(self) -> ScanRepositoryItem:
-        initializer = CartesianScanInitializer(snake=True, centered=False)
-        item = ScanRepositoryItem(self._rng, initializer.simpleName)
-        item.setInitializer(initializer)
-        return item
-
-    def createCenteredRasterItem(self) -> ScanRepositoryItem:
-        initializer = CartesianScanInitializer(snake=False, centered=True)
-        item = ScanRepositoryItem(self._rng, initializer.simpleName)
-        item.setInitializer(initializer)
-        return item
-
-    def createCenteredSnakeItem(self) -> ScanRepositoryItem:
-        initializer = CartesianScanInitializer(snake=True, centered=True)
-        item = ScanRepositoryItem(self._rng, initializer.simpleName)
-        item.setInitializer(initializer)
-        return item
-
-    def createConcentricItem(self) -> ScanRepositoryItem:
-        initializer = ConcentricScanInitializer()
-        item = ScanRepositoryItem(self._rng, initializer.simpleName)
-        item.setInitializer(initializer)
-        return item
-
-    def createSpiralItem(self) -> ScanRepositoryItem:
-        initializer = SpiralScanInitializer()
-        item = ScanRepositoryItem(self._rng, initializer.simpleName)
-        item.setInitializer(initializer)
-        return item
-
-    def createLissajousItem(self) -> ScanRepositoryItem:
-        initializer = LissajousScanInitializer()
-        item = ScanRepositoryItem(self._rng, initializer.simpleName)
-        item.setInitializer(initializer)
-        return item
-
-    def getInitializerDisplayNameList(self) -> Sequence[str]:
-        return self._initializers.getDisplayNameList()
-
-    def createItemFromInitializerName(self, name: str) -> Optional[ScanRepositoryItem]:
-        item: Optional[ScanRepositoryItem] = None
-
-        try:
-            plugin = self._initializers[name]
-        except KeyError:
-            logger.error(f'Unknown scan initializer \"{name}\"!')
-        else:
-            item = plugin.strategy()
-
-        return item
+    def saveScan(self, filePath: Path, fileFilter: str, scan: Scan) -> None:
+        self._fileWriterChooser.setCurrentPluginByName(fileFilter)
+        fileType = self._fileWriterChooser.currentPlugin.simpleName
+        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        fileWriter = self._fileWriterChooser.currentPlugin.strategy
+        fileWriter.write(filePath, scan)

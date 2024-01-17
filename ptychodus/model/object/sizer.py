@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy
 
-from ...api.apparatus import ImageExtent, PixelGeometry
 from ...api.observer import Observable, Observer
+from ...api.patterns import ImageExtent, PixelGeometry
 from ...api.scan import ScanPoint
 from ..probe import Apparatus, ProbeSizer
 from ..scan import ScanSizer

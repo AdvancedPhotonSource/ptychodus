@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from ...api.observer import Observable, Observer
-from ...model.experiment import DetectorPresenter
-from ...view.experiment import DetectorView
+from ...model.patterns import DetectorPresenter
+from ...view.patterns import DetectorView
 
 
 class DetectorController(Observer):

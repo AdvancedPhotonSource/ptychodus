@@ -6,11 +6,12 @@ from typing import Generic, TypeVar
 import importlib
 import logging
 import pkgutil
+import re
 
-from .data import DiffractionFileReader, DiffractionFileWriter
 from .experiment import ExperimentFileReader, ExperimentFileWriter
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
+from .patterns import DiffractionFileReader, DiffractionFileWriter
 from .probe import ProbeFileReader, ProbeFileWriter
 from .scan import ScanFileReader, ScanFileWriter
 from .visualize import ScalarTransformation
@@ -46,9 +47,9 @@ class PluginChooser(Generic[T], Observable):
     def getDisplayNameList(self) -> Sequence[str]:
         return [entry.displayName for entry in self._entryList]
 
-    def registerPlugin(self, strategy: T, *, simpleName: str, displayName: str = '') -> None:
-        if not displayName:
-            displayName = simpleName
+    def registerPlugin(self, strategy: T, *, displayName: str, simpleName: str = '') -> None:
+        if not simpleName:
+            simpleName = re.sub(r'\W+', '', displayName)
 
         entry = PluginEntry[T](strategy, simpleName, displayName)
         self._entryList.append(entry)

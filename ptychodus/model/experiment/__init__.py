@@ -1,9 +1,7 @@
-from .core import ExperimentCore, ExperimentRepositoryPresenter
-from .detector import Detector, DetectorPresenter
+from .core import ExperimentCore
+from .settings import ExperimentSettings
 
 __all__ = [
-    'Detector',
-    'DetectorPresenter',
     'ExperimentCore',
-    'ExperimentRepositoryPresenter',
+    'ExperimentSettings',
 ]

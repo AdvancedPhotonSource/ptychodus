@@ -7,27 +7,21 @@ T = TypeVar('T', int, float, Decimal)
 
 
 @dataclass(frozen=True)
-class Array2D(Generic[T]):  # TODO remove
-    x: T
-    y: T
+class Point2D:
+    x: float
+    y: float
 
 
 @dataclass(frozen=True)
-class Point2D(Generic[T]):
-    x: T
-    y: T
+class Line2D:
+    begin: Point2D
+    end: Point2D
 
-
-@dataclass(frozen=True)
-class Line2D(Generic[T]):
-    begin: Point2D[T]
-    end: Point2D[T]
-
-    def lerp(self, alpha: T) -> Point2D[T]:
+    def lerp(self, alpha: float) -> Point2D:
         beta = 1 - alpha
         x = beta * self.begin.x + alpha * self.end.x
         y = beta * self.begin.y + alpha * self.end.y
-        return Point2D[T](x, y)
+        return Point2D(x, y)
 
 
 class Interval(Generic[T]):
@@ -73,13 +67,13 @@ class Interval(Generic[T]):
 
 
 @dataclass(frozen=True)
-class Box2D(Generic[T]):
-    rangeX: Interval[T]
-    rangeY: Interval[T]
+class Box2D:
+    rangeX: Interval[float]
+    rangeY: Interval[float]
 
     @property
-    def midpoint(self) -> Point2D[T]:
-        return Point2D[T](self.rangeX.midrange, self.rangeY.midrange)
+    def midpoint(self) -> Point2D:
+        return Point2D(self.rangeX.midrange, self.rangeY.midrange)
 
-    def hull(self, x: T, y: T) -> Box2D[T]:
-        return Box2D[T](self.rangeX.hull(x), self.rangeY.hull(y))
+    def hull(self, x: float, y: float) -> Box2D:
+        return Box2D(self.rangeX.hull(x), self.rangeY.hull(y))

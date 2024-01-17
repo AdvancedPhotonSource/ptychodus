@@ -39,9 +39,9 @@ class MappedColorizer(Colorizer):
 
         for name, cmap in matplotlib.colormaps.items():
             if name in cyclicColormapNames:
-                cyclicColormapChooser.registerPlugin(cmap, simpleName=name)
+                cyclicColormapChooser.registerPlugin(cmap, displayName=name)
             else:
-                acyclicColormapChooser.registerPlugin(cmap, simpleName=name)
+                acyclicColormapChooser.registerPlugin(cmap, displayName=name)
 
         cyclicColormapChooser.setCurrentPluginByName('hsv')
         acyclicColormapChooser.setCurrentPluginByName('gray')

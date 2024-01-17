@@ -98,7 +98,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         numberOfPatternsPerArray = configDict.get('nPatternsPerArray', 1)
         patternDataType = configDict.get('PatternDataType', 'uint16')
 
-        metadata = ptychodus.api.data.DiffractionMetadata(
+        metadata = ptychodus.api.patterns.DiffractionMetadata(
             numberOfPatternsPerArray=int(numberOfPatternsPerArray),
             numberOfPatternsTotal=int(numberOfPatternsTotal),
             patternDataType=numpy.dtype(patternDataType),
@@ -117,11 +117,11 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         else:
             self.logger.debug(f'Frame id {frameId} time stamp {frameTimeStamp}')
             image3d = image[numpy.newaxis, :, :].copy()
-            array = ptychodus.api.data.SimpleDiffractionPatternArray(
+            array = ptychodus.api.patterns.SimpleDiffractionPatternArray(
                 label=f'Frame{frameId}',
                 index=frameId,
                 data=image3d,
-                state=ptychodus.api.data.DiffractionPatternState.LOADED,
+                state=ptychodus.api.patterns.DiffractionPatternState.LOADED,
             )
             self._ptychodus.assembleDiffractionPattern(array, frameTimeStamp)
 

@@ -56,7 +56,7 @@ class Log10ScalarTransformation(ScalarTransformation):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.scalarTransformations.registerPlugin(
         IdentityScalarTransformation(),
-        simpleName='Identity',
+        displayName='Identity',
     )
     registry.scalarTransformations.registerPlugin(
         SquareRootScalarTransformation(),

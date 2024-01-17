@@ -1,19 +1,14 @@
 from __future__ import annotations
-from collections.abc import Sequence
-from enum import Enum
-import logging
+from enum import IntEnum
 
-from ...api.observer import Observable
+import numpy
+
+from ...api.parametric import ParametricBase
 from ...api.scan import ScanPoint
-
-__all__ = [
-    'SelectableScanPointTransform',
-]
-
-logger = logging.getLogger(__name__)
+from .metrics import ScanMetrics
 
 
-class ScanPointTransform(Enum):
+class ScanPointTransform(IntEnum):
     '''transformations to negate or swap scan point coordinates'''
     PXPY = 0x0
     MXPY = 0x1
@@ -55,41 +50,56 @@ class ScanPointTransform(Enum):
 
     def __call__(self, point: ScanPoint) -> ScanPoint:
         '''transforms a scan point'''
-        xp = -point.x if self.negateX else point.x
-        yp = -point.y if self.negateY else point.y
-        return ScanPoint(yp, xp) if self.swapXY else ScanPoint(xp, yp)
+        xp = -point.positionXInMeters if self.negateX else point.positionXInMeters
+        yp = -point.positionYInMeters if self.negateY else point.positionYInMeters
+        return ScanPoint(point.index, yp, xp) if self.swapXY else ScanPoint(point.index, xp, yp)
 
 
-class SelectableScanPointTransform(Observable):
+class ScanTransformer(ParametricBase):
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._transform = ScanPointTransform.PXPY
+    def __init__(self, rng: numpy.random.Generator, metrics: ScanMetrics) -> None:
+        super().__init__('Transform')
+        self._rng = rng
+        self._metrics = metrics
+        self.transform = ScanPointTransform.PXPY  # FIXME -> parameter
+        self.isOverrideCentroidXEnabled = self._registerBooleanParameter(
+            'IsOverrideCentroidXEnabled', False)
+        self.overrideCentroidXInMeters = self._registerRealParameter(
+            'OverrideCentroidXInMeters',
+            0.,
+        )
+        self.isOverrideCentroidYEnabled = self._registerBooleanParameter(
+            'IsOverrideCentroidYEnabled', False)
+        self.overrideCentroidYInMeters = self._registerRealParameter(
+            'OverrideCentroidYInMeters',
+            0.,
+        )
+        self.jitterRadiusInMeters = self._registerRealParameter(
+            'JitterRadiusInMeters',
+            0.,
+            minimum=0.,
+        )
 
-    def getSelectableTransforms(self) -> Sequence[str]:
-        return [transform.displayName for transform in ScanPointTransform]
+    def __call__(self, point: ScanPoint) -> ScanPoint:  # FIXME
+        midpoint = self._metrics.getMidpointInMeters()
+        transformedPoint = self.transform(point)
+        posX = transformedPoint.positionXInMeters
+        posY = transformedPoint.positionYInMeters
+        jitterRadiusInMeters = self.jitterRadiusInMeters.getValue()
 
-    def selectTransformByName(self, name: str) -> None:
-        namecf = name.casefold()
+        if self.isOverrideCentroidXEnabled:
+            posX += self.overrideCentroidXInMeters.getValue() - midpoint.x
 
-        for transform in ScanPointTransform:
-            simpleMatch = (namecf == transform.simpleName.casefold())
-            displayMatch = (namecf == transform.displayName.casefold())
+        if self.isOverrideCentroidYEnabled:
+            posY += self.overrideCentroidYInMeters.getValue() - midpoint.y
 
-            if simpleMatch or displayMatch:
-                self._transform = transform
-                self.notifyObservers()
-                return
+        if jitterRadiusInMeters > 0.:
+            rad = self._rng.uniform()
+            dirX = self._rng.normal()
+            dirY = self._rng.normal()
 
-        logger.error(f'Unknown scan point transform \"{name}\"!')
+            scalar = jitterRadiusInMeters * numpy.sqrt(rad / (dirX**2 + dirY**2))
+            posX += scalar * dirX
+            posY += scalar * dirY
 
-    @property
-    def simpleName(self) -> str:
-        return self._transform.simpleName
-
-    @property
-    def displayName(self) -> str:
-        return self._transform.displayName
-
-    def __call__(self, point: ScanPoint) -> ScanPoint:
-        return self._transform(point)
+        return ScanPoint(point.index, posX, posY)

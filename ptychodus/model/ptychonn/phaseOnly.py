@@ -9,8 +9,9 @@ from scipy.ndimage import map_coordinates
 import numpy
 import numpy.typing
 
-from ...api.apparatus import ImageExtent
+from ...api.geometry import Point2D
 from ...api.object import ObjectPatchAxis
+from ...api.patterns import ImageExtent
 from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
 from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ..object import ObjectAPI
@@ -124,11 +125,13 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             heightInPixels=objectPatches.shape[-2],
         )
 
-        for scanPoint, objectPatchReals in zip(parameters.scan.values(), objectPatches):
+        for scanPoint, objectPatchReals in zip(parameters.scan, objectPatches):
             objectPatch = 0.5 * numpy.exp(1j * objectPatchReals[0])
 
-            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.widthInPixels)
-            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.heightInPixels)
+            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.positionXInMeters,
+                                         patchExtent.widthInPixels)
+            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.positionYInMeters,
+                                         patchExtent.heightInPixels)
 
             pixelCentersX = patchAxisX.getObjectPixelCenters()
             pixelCentersY = patchAxisY.getObjectPixelCenters()
@@ -162,8 +165,9 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             self._diffractionPatternBuffer = CircularBuffer(diffractionPatternExtent, maximumSize)
             self._objectPatchBuffer = CircularBuffer(diffractionPatternExtent, maximumSize)
 
-        for scanIndex, scanPoint in parameters.scan.items():
-            objectPatch = objectInterpolator.getPatch(scanPoint, parameters.probeExtent)
+        for scanPoint in parameters.scan:
+            point = Point2D(scanPoint.positionXInMeters, scanPoint.positionYInMeters)
+            objectPatch = objectInterpolator.getPatch(point, parameters.probeExtent)
             objectPhasePatch = numpy.angle(objectPatch.array).astype(numpy.float32)
             self._objectPatchBuffer.append(objectPhasePatch)
 

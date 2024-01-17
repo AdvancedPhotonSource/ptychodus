@@ -18,7 +18,7 @@ class ExperimentPropertyTableModel(QAbstractTableModel):
             'Fresnel Number',
             'Object Plane Pixel Width [nm]',
             'Object Plane Pixel Height [nm]',
-            'ptycho gain x/y',
+            'Resolution Gain',  # FIXME
         ]
 
     def headerData(self,
@@ -39,7 +39,11 @@ class ExperimentPropertyTableModel(QAbstractTableModel):
             if index.column() == 0:
                 value = QVariant(self._properties[index.row()])
             elif index.column() == 1:
-                value = QVariant(index.row())  # FIXME
+                if index.row() == 0:
+                    probeEnergy = self._experiment.getProbeEnergyInElectronVolts()
+                    value = QVariant(f'{probeEnergy / 1000:.1f}')
+                else:
+                    value = QVariant(index.row())  # FIXME
 
         return value
 

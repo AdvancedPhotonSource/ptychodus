@@ -1,12 +1,52 @@
+from __future__ import annotations
 from bisect import bisect
 from collections import defaultdict
 from collections.abc import Sequence
 from statistics import median
+import logging
 
-from ...api.scan import ScanPoint, TabularScan
+from ...api.scan import Scan, ScanPoint
+
+logger = logging.getLogger(__name__)
+
+# TODO class PositionStream:
+# TODO
+# TODO     def __init__(self) -> None:
+# TODO         self._indexes: list[int] = list()
+# TODO         self._positions: list[float] = list()
+# TODO         self._minimum = +numpy.inf
+# TODO         self._maximum = -numpy.inf
+# TODO         self._uniqueness = 0
+# TODO
+# TODO     @property
+# TODO     def minimum(self) -> float:
+# TODO         return self._minimum
+# TODO
+# TODO     @property
+# TODO     def maximum(self) -> float:
+# TODO         return self._maximum
+# TODO
+# TODO     def append(self, index: int, position: float) -> None:
+# TODO         lastIndex = self._indexes[-1]
+# TODO
+# TODO         if index > lastIndex:
+# TODO             self._uniqueness = 0
+# TODO             self._indexes.append(index)
+# TODO             self._positions.append(position)
+# TODO         elif index == lastIndex:  # online mean
+# TODO             self._uniqueness += 1
+# TODO             self._positions[-1] += (position - self._positions[-1]) / self._uniqueness
+# TODO         else:  # index < lastIndex
+# TODO             logger.warning(f'Discarding non-monotonic {index=}!')
+# TODO
+# TODO         if position < self._minimum:
+# TODO             self._minimum = position
+# TODO
+# TODO         if position > self._maximum:
+# TODO             self._maximum = position
 
 
-class PositionStream:
+class PositionStream:  # FIXME clean up
 
     def __init__(self) -> None:
         self.valuesInMeters: list[float] = list()
@@ -65,17 +105,15 @@ class StreamingScanBuilder:
                                timeStamps: Sequence[float]) -> None:
         self._streamY.assemble(valuesInMeters, timeStamps)
 
-    def build(self) -> TabularScan:
+    def build(self) -> Scan:
         posX = self._streamX.getMedianPositions(self._arrayTimeStamps)
         posY = self._streamY.getMedianPositions(self._arrayTimeStamps)
 
         arrayIndexSet = set(self._arrayTimeStamps) & set(posX) & set(posY)
-        pointMap: dict[int, ScanPoint] = dict()
+        pointList: list[ScanPoint] = list()
 
         for index in arrayIndexSet:
-            pointMap[index] = ScanPoint(
-                x=posX[index],
-                y=posY[index],
-            )
+            point = ScanPoint(index, posX[index], posY[index])
+            pointList.append(point)
 
-        return TabularScan(pointMap)
+        return Scan(pointList)

@@ -193,9 +193,9 @@ class ImageController(Observer):
         print(rect)  # TODO use for crop
 
     def _handleLineCut(self, line: QLineF) -> None:
-        p1 = Point2D[float](line.x1(), line.y1())
-        p2 = Point2D[float](line.x2(), line.y2())
-        line2D = Line2D[float](p1, p2)
+        p1 = Point2D(line.x1(), line.y1())
+        p2 = Point2D(line.x2(), line.y2())
+        line2D = Line2D(p1, p2)
         lineCut = self._presenter.getLineCut(line2D)
 
         ax = self._view.lineCutDialog.axes

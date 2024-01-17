@@ -6,6 +6,33 @@ from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDi
                              QPushButton, QSpinBox, QTableView, QTreeView, QVBoxLayout, QWidget,
                              QWizard, QWizardPage)
 
+from .widgets import LengthWidget
+
+
+class DetectorView(QGroupBox):
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__('Detector', parent)
+        self.widthInPixelsSpinBox = QSpinBox()
+        self.heightInPixelsSpinBox = QSpinBox()
+        self.pixelWidthWidget = LengthWidget.createInstance()
+        self.pixelHeightWidget = LengthWidget.createInstance()
+        self.bitDepthSpinBox = QSpinBox()
+
+    @classmethod
+    def createInstance(cls, parent: QWidget | None = None) -> DetectorView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow('Detector Width [px]:', view.widthInPixelsSpinBox)
+        layout.addRow('Detector Height [px]:', view.heightInPixelsSpinBox)
+        layout.addRow('Pixel Width:', view.pixelWidthWidget)
+        layout.addRow('Pixel Height:', view.pixelHeightWidget)
+        layout.addRow('Bit Depth:', view.bitDepthSpinBox)
+        view.setLayout(layout)
+
+        return view
+
 
 class PatternsButtonBox(QWidget):
 
@@ -278,6 +305,7 @@ class PatternsView(QWidget):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
+        self.detectorView = DetectorView.createInstance()
         self.treeView = QTreeView()
         self.infoLabel = QLabel()
         self.buttonBox = PatternsButtonBox.createInstance()
@@ -289,6 +317,7 @@ class PatternsView(QWidget):
         view.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
+        layout.addWidget(view.detectorView)
         layout.addWidget(view.treeView)
         layout.addWidget(view.infoLabel)
         layout.addWidget(view.buttonBox)

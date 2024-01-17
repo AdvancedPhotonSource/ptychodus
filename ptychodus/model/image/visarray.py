@@ -5,9 +5,9 @@ from skimage.restoration import unwrap_phase
 import numpy
 import numpy.typing
 
-from ...api.apparatus import PixelGeometry
-from ...api.visualize import RealArrayType
 from ...api.observer import Observable
+from ...api.patterns import PixelGeometry
+from ...api.visualize import RealArrayType
 
 NumericDTypes = Union[numpy.integer[Any], numpy.floating[Any], numpy.complexfloating[Any, Any]]
 NumericArrayType = numpy.typing.NDArray[NumericDTypes]

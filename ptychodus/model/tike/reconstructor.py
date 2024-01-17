@@ -9,12 +9,12 @@ import numpy.typing
 
 import tike.ptycho
 
-from ...api.object import ObjectArrayType
-from ...api.object import ObjectPoint
-from ...api.visualize import Plot2D, PlotAxis, PlotSeries
+from ...api.geometry import Point2D
+from ...api.object import ObjectArrayType, ObjectPoint
 from ...api.probe import ProbeArrayType
 from ...api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
-from ...api.scan import Scan, ScanPoint, TabularScan
+from ...api.scan import Scan, ScanPoint
+from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from .multigrid import TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionSettings
@@ -149,8 +149,9 @@ class TikeReconstructor:
         ux = -probe.shape[-1] / 2
         uy = -probe.shape[-2] / 2
 
-        for scanPoint in parameters.scan.values():
-            objectPoint = objectGrid.mapScanPointToObjectPoint(scanPoint)
+        for scanPoint in parameters.scan:
+            point = Point2D(scanPoint.positionXInMeters, scanPoint.positionYInMeters)
+            objectPoint = objectGrid.mapScanPointToObjectPoint(point)
             coordinateList.append(objectPoint.y + uy)
             coordinateList.append(objectPoint.x + ux)
 
@@ -204,13 +205,15 @@ class TikeReconstructor:
         objectOutputArray: ObjectArrayType | None = None
 
         if self._positionCorrectionSettings.usePositionCorrection.value:
-            pointDict: dict[int, ScanPoint] = dict()
+            pointList: list[ScanPoint] = list()
 
-            for index, xy in zip(parameters.scan, result.scan):
+            for uncorrectedPoint, xy in zip(parameters.scan, result.scan):
                 objectPoint = ObjectPoint(x=xy[1], y=xy[0])
-                pointDict[index] = objectGrid.mapObjectPointToScanPoint(objectPoint)
+                point = objectGrid.mapObjectPointToScanPoint(objectPoint)
+                scanPoint = ScanPoint(uncorrectedPoint.index, point.x, point.y)
+                pointList.append(scanPoint)
 
-            scanOutput = TabularScan(pointDict)
+            scanOutput = Scan(pointList)
 
         if self._probeCorrectionSettings.useProbeCorrection.value:
             probeOutputArray = result.probe[0, 0]

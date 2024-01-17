@@ -87,7 +87,7 @@ class MultimodalProbeFactory:
 
     def build(self, initialProbe: Probe, numberOfModes: int, orthogonalizeModesEnabled: bool,
               modeDecayType: ProbeModeDecayType, modeDecayRatio: Decimal) -> Probe:
-        array = self._initializeModes(initialProbe.getArray(), numberOfModes)
+        array = self._initializeModes(initialProbe.array, numberOfModes)
 
         if orthogonalizeModesEnabled:
             array = self._orthogonalizeModes(array)

@@ -4,21 +4,20 @@ from typing import Final
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from .settings import DiffractionPatternSettings
-from .sizer import DiffractionPatternSizer
+from .sizer import PatternSizer
 
 
 class DiffractionPatternPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, settings: DiffractionPatternSettings,
-                 sizer: DiffractionPatternSizer) -> None:
+    def __init__(self, settings: DiffractionPatternSettings, sizer: PatternSizer) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
 
     @classmethod
     def createInstance(cls, settings: DiffractionPatternSettings,
-                       sizer: DiffractionPatternSizer) -> DiffractionPatternPresenter:
+                       sizer: PatternSizer) -> DiffractionPatternPresenter:
         presenter = cls(settings, sizer)
         sizer.addObserver(presenter)
         return presenter
@@ -47,23 +46,23 @@ class DiffractionPatternPresenter(Observable, Observer):
     def setCropCenterYInPixels(self, value: int) -> None:
         self._settings.cropCenterYInPixels.value = value
 
-    def getCropExtentXLimitsInPixels(self) -> Interval[int]:
-        return self._sizer.getExtentXLimitsInPixels()
+    def getCropWidthLimitsInPixels(self) -> Interval[int]:
+        return self._sizer.getWidthLimitsInPixels()
 
-    def getCropExtentXInPixels(self) -> int:
-        return self._sizer.getExtentXInPixels()
+    def getCropWidthInPixels(self) -> int:
+        return self._sizer.getWidthInPixels()
 
-    def setCropExtentXInPixels(self, value: int) -> None:
-        self._settings.cropExtentXInPixels.value = value
+    def setCropWidthInPixels(self, value: int) -> None:
+        self._settings.cropWidthInPixels.value = value
 
-    def getCropExtentYLimitsInPixels(self) -> Interval[int]:
-        return self._sizer.getExtentYLimitsInPixels()
+    def getCropHeightLimitsInPixels(self) -> Interval[int]:
+        return self._sizer.getHeightLimitsInPixels()
 
-    def getCropExtentYInPixels(self) -> int:
-        return self._sizer.getExtentYInPixels()
+    def getCropHeightInPixels(self) -> int:
+        return self._sizer.getHeightInPixels()
 
-    def setCropExtentYInPixels(self, value: int) -> None:
-        self._settings.cropExtentYInPixels.value = value
+    def setCropHeightInPixels(self, value: int) -> None:
+        self._settings.cropHeightInPixels.value = value
 
     def isFlipXEnabled(self) -> bool:
         return self._settings.flipXEnabled.value

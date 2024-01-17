@@ -6,12 +6,11 @@ import logging
 
 import numpy
 
-from ...api.apparatus import PixelGeometry
 from ...api.geometry import Interval, Line2D
-from ...api.visualize import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
-from ...api.visualize import LineCut
+from ...api.patterns import PixelGeometry
 from ...api.plugins import PluginChooser
+from ...api.visualize import LineCut, RealArrayType, ScalarTransformation
 from .colorizer import Colorizer
 from .displayRange import DisplayRange
 from .mappedColorizer import MappedColorizer
@@ -169,7 +168,7 @@ class ImagePresenter(Observable, Observer):
                 if alpha in alphaLimits:
                     yield alpha
 
-    def _clipToBoundingBox(self, line: Line2D[float]) -> Interval[float]:
+    def _clipToBoundingBox(self, line: Line2D) -> Interval[float]:
         arrayShape = self._array.shape
         alphaX = self._intersectBoundingBox(line.begin.x, line.end.x, arrayShape[-1])
         alphaY = self._intersectBoundingBox(line.begin.y, line.end.y, arrayShape[-2])
@@ -178,7 +177,7 @@ class ImagePresenter(Observable, Observer):
             min(1., min(alphaX.upper, alphaY.upper)),
         )
 
-    def _intersectGrid(self, line: Line2D[float]) -> Sequence[float]:
+    def _intersectGrid(self, line: Line2D) -> Sequence[float]:
         alphaLimits = self._clipToBoundingBox(line)
         xIntersections = [
             x for x in self._intersectGridLines(line.begin.x, line.end.x, alphaLimits)
@@ -192,7 +191,7 @@ class ImagePresenter(Observable, Observer):
         alpha = alpha.union(yIntersections)
         return sorted(alpha)
 
-    def getLineCut(self, line: Line2D[float]) -> LineCut:
+    def getLineCut(self, line: Line2D) -> LineCut:
         intersections = self._intersectGrid(line)
         dataLabel = self._colorizer.getDataLabel()
         dataArray = self._colorizer.getDataArray()
@@ -234,10 +233,10 @@ class ImageCore:
 
         for colorizer in CylindricalColorModelColorizer.createColorizerVariants(
                 *cargs, isComplex=isComplex):
-            self._colorizerChooser.registerPlugin(colorizer, simpleName=colorizer.name)
+            self._colorizerChooser.registerPlugin(colorizer, displayName=colorizer.name)
 
         for colorizer in MappedColorizer.createColorizerVariants(*cargs, isComplex=isComplex):
-            self._colorizerChooser.registerPlugin(colorizer, simpleName=colorizer.name)
+            self._colorizerChooser.registerPlugin(colorizer, displayName=colorizer.name)
 
         self.presenter = ImagePresenter.createInstance(self._array, self._displayRange,
                                                        self._colorizerChooser)

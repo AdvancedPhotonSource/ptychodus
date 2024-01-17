@@ -6,14 +6,14 @@ from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ...api.observer import Observable, Observer
 from ...model import MetadataPresenter
-from ...model.data import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
-                           DiffractionPatternPresenter)
-from ...model.experiment import DetectorPresenter
 from ...model.image import ImagePresenter
+from ...model.patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
+                               DiffractionDatasetPresenter, DiffractionPatternPresenter)
 from ...view.image import ImageView
 from ...view.patterns import PatternsView
 from ..data import FileDialogFactory
 from ..image import ImageController
+from .detector import DetectorController
 from .info import PatternsInfoViewController
 from .treeModel import DatasetTreeModel, DatasetTreeNode
 from .wizard import OpenDatasetWizardController
@@ -37,6 +37,8 @@ class PatternsController(Observer):
         self._imagePresenter = imagePresenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
+        self._detectorController = DetectorController.createInstance(detectorPresenter,
+                                                                     view.detectorView)
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
         self._wizardController = OpenDatasetWizardController.createInstance(

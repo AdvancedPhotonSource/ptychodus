@@ -4,8 +4,8 @@ import logging
 import re
 
 from ...api.state import StateDataRegistry
-from ..data import DiffractionDataAPI
 from ..object import ObjectAPI
+from ..patterns import DiffractionDataAPI
 from ..probe import ProbeAPI
 from ..reconstructor import ReconstructorAPI
 from ..scan import ScanAPI

@@ -4,8 +4,8 @@ from typing import overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
 from PyQt5.QtGui import QFont
 
-from ...api.data import DiffractionPatternArrayType, DiffractionPatternState
-from ...model.data import DiffractionPatternArrayPresenter
+from ...api.patterns import DiffractionPatternArrayType, DiffractionPatternState
+from ...model.patterns import DiffractionPatternArrayPresenter
 
 
 class DatasetTreeNode:

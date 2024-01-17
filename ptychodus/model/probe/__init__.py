@@ -1,5 +1,4 @@
 from .api import ProbeAPI
-from .apparatus import Apparatus, ApparatusPresenter
 from .core import (ProbeCore, ProbePresenter, ProbeRepositoryItemPresenter,
                    ProbeRepositoryPresenter)
 from .disk import DiskProbeInitializer
@@ -11,8 +10,6 @@ from .sizer import ProbeSizer
 from .superGaussian import SuperGaussianProbeInitializer
 
 __all__ = [
-    'Apparatus',
-    'ApparatusPresenter',
     'DiskProbeInitializer',
     'FresnelZonePlateProbeInitializer',
     'FromFileProbeInitializer',

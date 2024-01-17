@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from ...api.apparatus import ImageExtent
 from ...api.observer import Observable, Observer
-from ..data import DiffractionPatternSizer
+from ...api.patterns import ImageExtent
+from ..patterns import DiffractionPatternSizer
 
 
 class ProbeSizer(Observable, Observer):

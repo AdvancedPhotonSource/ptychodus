@@ -10,7 +10,7 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.probe import Probe, ProbeArrayType, ProbeFileReader, ProbeFileWriter
 from ...api.settings import SettingsRegistry
-from ...api.state import ProbeStateData, StatefulCore
+from ...api.state import ProbeStateData, NoLongerStatefulCore
 from ..data import DiffractionPatternSizer
 from ..experiment import Detector
 from .api import ProbeAPI
@@ -161,7 +161,7 @@ class ProbePresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class ProbeCore(StatefulCore[ProbeStateData]):
+class ProbeCore(NoLongerStatefulCore[ProbeStateData]):
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
                  detector: Detector, diffractionPatternSizer: DiffractionPatternSizer,

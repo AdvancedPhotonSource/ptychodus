@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Optional
 import logging
 
-from ...api.data import (DiffractionFileReader, DiffractionMetadata, DiffractionPatternArray,
-                         SimpleDiffractionDataset)
+from ...api.patterns import (DiffractionFileReader, DiffractionMetadata, DiffractionPatternArray,
+                             SimpleDiffractionDataset)
 from ...api.plugins import PluginChooser
 from ...api.tree import SimpleTreeNode
 from .builder import ActiveDiffractionDatasetBuilder

@@ -16,7 +16,7 @@ class NPYObjectFileReader(ObjectFileReader):
 class NPYObjectFileWriter(ObjectFileWriter):
 
     def write(self, filePath: Path, object_: Object) -> None:
-        array = object_.getArray()
+        array = object_.array
         numpy.save(filePath, array)
 
 

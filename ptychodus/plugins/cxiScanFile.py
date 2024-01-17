@@ -4,7 +4,7 @@ import logging
 import h5py
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class CXIScanFileReader(ScanFileReader):
 
     def read(self, filePath: Path) -> Scan:
-        pointList = list()
+        pointList: list[ScanPoint] = list()
 
         with h5py.File(filePath, 'r') as h5File:
             try:
@@ -20,16 +20,16 @@ class CXIScanFileReader(ScanFileReader):
             except KeyError:
                 logger.exception('Unable to load scan.')
             else:
-                for xyz in xyzArray:
+                for idx, xyz in enumerate(xyzArray):
                     try:
                         x, y, z = xyz
                     except ValueError:
-                        logger.exception('Unable to load scan.')
+                        logger.exception(f'Unable to load scan point {xyz=}.')
                     else:
-                        point = ScanPoint(x, y)
+                        point = ScanPoint(idx, x, y)
                         pointList.append(point)
 
-        return TabularScan.createFromPointIterable(pointList)
+        return Scan(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

@@ -1,35 +1,7 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QMenu, QPushButton, QSpinBox, QTableView,
-                             QVBoxLayout, QWidget)
-
-from .widgets import LengthWidget
-
-
-class DetectorView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Detector', parent)
-        self.widthInPixelsSpinBox = QSpinBox()
-        self.heightInPixelsSpinBox = QSpinBox()
-        self.pixelWidthWidget = LengthWidget.createInstance()
-        self.pixelHeightWidget = LengthWidget.createInstance()
-        self.bitDepthSpinBox = QSpinBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> DetectorView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Detector Width [px]:', view.widthInPixelsSpinBox)
-        layout.addRow('Detector Height [px]:', view.heightInPixelsSpinBox)
-        layout.addRow('Pixel Width:', view.pixelWidthWidget)
-        layout.addRow('Pixel Height:', view.pixelHeightWidget)
-        layout.addRow('Bit Depth:', view.bitDepthSpinBox)
-        view.setLayout(layout)
-
-        return view
+from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
+                             QLabel, QMenu, QPushButton, QTableView, QVBoxLayout, QWidget)
 
 
 class ExperimentInfoDialog(QDialog):
@@ -112,7 +84,6 @@ class ExperimentView(QWidget):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.detectorView = DetectorView.createInstance()
         self.repositoryView = ExperimentRepositoryView.createInstance()
 
     @classmethod
@@ -120,7 +91,6 @@ class ExperimentView(QWidget):
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.detectorView)
         layout.addWidget(view.repositoryView)
         view.setLayout(layout)
 

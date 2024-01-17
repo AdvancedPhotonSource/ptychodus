@@ -17,19 +17,19 @@ except ModuleNotFoundError:
 import h5py
 import numpy
 
-from ..api.data import DiffractionMetadata, DiffractionPatternArray
+from ..api.patterns import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
 from ..api.state import StateDataRegistry
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
-from .data import (DataCore, DiffractionDatasetPresenter, DiffractionDatasetInputOutputPresenter,
-                   DiffractionPatternPresenter)
-from .experiment import DetectorPresenter, ExperimentCore, ExperimentRepositoryPresenter
+from .experiment import ExperimentCore, ExperimentRepositoryPresenter
 from .image import ImageCore, ImagePresenter
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
-from .probe import ApparatusPresenter, ProbeCore, ProbePresenter, ProbeRepositoryPresenter
+from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
+                       DiffractionDatasetPresenter, DiffractionPatternPresenter, PatternsCore)
+from .probe import ProbeCore, ProbePresenter, ProbeRepositoryPresenter
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
@@ -79,19 +79,20 @@ class ModelCore:
 
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
+        self._patternsCore = PatternsCore(self.settingsRegistry,
+                                          self._pluginRegistry.diffractionFileReaders)
         self._experimentCore = ExperimentCore(self.settingsRegistry,
+                                              self._patternsCore.patternSizer,
                                               self._pluginRegistry.experimentFileReaders,
                                               self._pluginRegistry.experimentFileWriters)
         self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations,
                                             isComplex=False)
 
-        self._dataCore = DataCore(self.settingsRegistry, self._experimentCore.detector,
-                                  self._pluginRegistry.diffractionFileReaders)
-        self._scanCore = ScanCore(self.rng, self.settingsRegistry, self._dataCore.dataset,
+        self._scanCore = ScanCore(self.rng, self.settingsRegistry, self._patternsCore.dataset,
                                   self._pluginRegistry.scanFileReaders,
                                   self._pluginRegistry.scanFileWriters)
-        self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._experimentCore.detector,
-                                    self._dataCore.patternSizer,
+        self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._patternsCore.detector,
+                                    self._patternsCore.patternSizer,
                                     self._pluginRegistry.probeFileReaders,
                                     self._pluginRegistry.probeFileWriters)
         self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
@@ -103,11 +104,9 @@ class ModelCore:
                                       self._pluginRegistry.objectFileWriters)
         self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
                                           isComplex=True)
-        self.metadataPresenter = MetadataPresenter.createInstance(self._dataCore.dataset,
-                                                                  self._experimentCore.detector,
-                                                                  self._dataCore.patternSettings,
-                                                                  self._probeCore.settings,
-                                                                  self._scanCore.scanAPI)
+        self.metadataPresenter = MetadataPresenter.createInstance(
+            self._patternsCore.dataset, self._patternsCore.detector,
+            self._patternsCore.patternSettings, self._experimentCore.settings)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
@@ -117,7 +116,7 @@ class ModelCore:
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
-            self._dataCore.dataset,
+            self._patternsCore.dataset,
             self._scanCore.scanAPI,
             self._probeCore.probeAPI,
             self._objectCore.objectAPI,
@@ -128,10 +127,10 @@ class ModelCore:
             ],
         )
 
-        self._stateDataRegistry = StateDataRegistry(self._dataCore, self._scanCore,
+        self._stateDataRegistry = StateDataRegistry(self._patternsCore, self._scanCore,
                                                     self._probeCore, self._objectCore)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
-        self._automationCore = AutomationCore(self.settingsRegistry, self._dataCore.dataAPI,
+        self._automationCore = AutomationCore(self.settingsRegistry, self._patternsCore.dataAPI,
                                               self._scanCore.scanAPI, self._probeCore.probeAPI,
                                               self._objectCore.objectAPI, self._workflowCore)
 
@@ -150,14 +149,14 @@ class ModelCore:
         if self._modelArgs.restartFilePath:
             self.openStateData(self._modelArgs.restartFilePath)
 
-        if self._dataCore.dataAPI.getAssemblyQueueSize() > 0:
-            self._dataCore.dataAPI.startAssemblingDiffractionPatterns()
-            self._dataCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
+        if self._patternsCore.dataAPI.getAssemblyQueueSize() > 0:
+            self._patternsCore.dataAPI.startAssemblingDiffractionPatterns()
+            self._patternsCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
 
         if self.rpcMessageService:
             self.rpcMessageService.start()
 
-        self._dataCore.start()
+        self._patternsCore.start()
         self._workflowCore.start()
         self._automationCore.start()
 
@@ -176,7 +175,7 @@ class ModelCore:
                  exception_value: BaseException | None, traceback: TracebackType | None) -> None:
         self._automationCore.stop()
         self._workflowCore.stop()
-        self._dataCore.stop()
+        self._patternsCore.stop()
 
         if self.rpcMessageService:
             self.rpcMessageService.stop()
@@ -186,28 +185,24 @@ class ModelCore:
         return self._detectorImageCore.presenter
 
     @property
-    def apparatusPresenter(self) -> ApparatusPresenter:
-        return self._probeCore.apparatusPresenter
-
-    @property
     def patternPresenter(self) -> DiffractionPatternPresenter:
-        return self._dataCore.patternPresenter
+        return self._patternsCore.patternPresenter
 
     @property
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
-        return self._dataCore.datasetPresenter
+        return self._patternsCore.datasetPresenter
 
     @property
     def diffractionDatasetInputOutputPresenter(self) -> DiffractionDatasetInputOutputPresenter:
-        return self._dataCore.datasetInputOutputPresenter
+        return self._patternsCore.datasetInputOutputPresenter
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self._dataCore.dataAPI.initializeStreaming(metadata)
-        self._dataCore.dataAPI.startAssemblingDiffractionPatterns()
+        self._patternsCore.dataAPI.initializeStreaming(metadata)
+        self._patternsCore.dataAPI.startAssemblingDiffractionPatterns()
         self._scanCore.scanAPI.initializeStreamingScan()
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
-        self._dataCore.dataAPI.assemble(array)
+        self._patternsCore.dataAPI.assemble(array)
         self._scanCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)
 
     def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
@@ -220,14 +215,14 @@ class ModelCore:
 
     def finalizeStreamingWorkflow(self) -> None:
         self._scanCore.scanAPI.finalizeStreamingScan()
-        self._dataCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
+        self._patternsCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
         self._objectCore.objectAPI.selectNewItemFromInitializerSimpleName('Random')
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
-        return self._dataCore.dataAPI.getAssemblyQueueSize()
+        return self._patternsCore.dataAPI.getAssemblyQueueSize()
 
     def refreshActiveDataset(self) -> None:
-        self._dataCore.dataset.notifyObserversIfDatasetChanged()
+        self._patternsCore.dataset.notifyObserversIfDatasetChanged()
 
     def refreshAutomationDatasets(self) -> None:
         self._automationCore.repository.notifyObserversIfRepositoryChanged()
@@ -256,7 +251,7 @@ class ModelCore:
 
     @property
     def detectorPresenter(self) -> DetectorPresenter:
-        return self._experimentCore.detectorPresenter
+        return self._patternsCore.detectorPresenter
 
     @property
     def experimentRepositoryPresenter(self) -> ExperimentRepositoryPresenter:

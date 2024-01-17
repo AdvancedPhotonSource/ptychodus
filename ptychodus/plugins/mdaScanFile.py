@@ -13,7 +13,7 @@ import yaml
 import numpy
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
 
 T = TypeVar('T')
 
@@ -438,7 +438,7 @@ class MDAScanFileReader(ScanFileReader):
     MICRONS_TO_METERS: Final[float] = 1.e-6
 
     def read(self, filePath: Path) -> Scan:
-        pointList = list()
+        pointList: list[ScanPoint] = list()
 
         mdaFile = MDAFile.read(filePath)
 
@@ -450,12 +450,13 @@ class MDAScanFileReader(ScanFileReader):
 
             for x in xarray:
                 point = ScanPoint(
-                    x=x * self.MICRONS_TO_METERS,
-                    y=y * self.MICRONS_TO_METERS,
+                    index=len(pointList),
+                    positionXInMeters=x * self.MICRONS_TO_METERS,
+                    positionYInMeters=y * self.MICRONS_TO_METERS,
                 )
                 pointList.append(point)
 
-        return TabularScan.createFromPointIterable(pointList)
+        return Scan(pointList)
 
 
 class HXNScanFileReader(ScanFileReader):
@@ -469,14 +470,15 @@ class HXNScanFileReader(ScanFileReader):
         xarray = mdaFile.scan.data.readback_array[0, :]
         yarray = mdaFile.scan.data.readback_array[1, :]
 
-        for x, y in zip(xarray, yarray):
+        for idx, (x, y) in enumerate(zip(xarray, yarray)):
             point = ScanPoint(
-                x=x * self.MICRONS_TO_METERS,
-                y=y * self.MICRONS_TO_METERS,
+                index=idx,
+                positionXInMeters=x * self.MICRONS_TO_METERS,
+                positionYInMeters=y * self.MICRONS_TO_METERS,
             )
             pointList.append(point)
 
-        return TabularScan.createFromPointIterable(pointList)
+        return Scan(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

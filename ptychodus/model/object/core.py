@@ -12,7 +12,7 @@ from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.scan import ScanPoint
 from ...api.settings import SettingsRegistry
-from ...api.state import ObjectStateData, StatefulCore
+from ...api.state import ObjectStateData, NoLongerStatefulCore
 from ..probe import Apparatus, ProbeSizer
 from ..scan import ScanSizer
 from .api import ObjectAPI
@@ -164,7 +164,7 @@ class ObjectPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class ObjectCore(StatefulCore[ObjectStateData]):
+class ObjectCore(NoLongerStatefulCore[ObjectStateData]):
 
     def __init__(self, rng: numpy.random.Generator, settingsRegistry: SettingsRegistry,
                  apparatus: Apparatus, scanSizer: ScanSizer, probeSizer: ProbeSizer,

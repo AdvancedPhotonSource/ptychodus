@@ -6,8 +6,8 @@ import threading
 
 import numpy
 
-from ...api.data import (DiffractionDataset, DiffractionPatternArray, DiffractionPatternState,
-                         SimpleDiffractionPatternArray)
+from ...api.patterns import (DiffractionDataset, DiffractionPatternArray, DiffractionPatternState,
+                             SimpleDiffractionPatternArray)
 from .active import ActiveDiffractionDataset
 from .settings import DiffractionDatasetSettings
 

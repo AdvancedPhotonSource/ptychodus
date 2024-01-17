@@ -4,59 +4,27 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from .apparatus import ImageExtent
-from .data import DiffractionPatternArrayType
-from .object import ObjectArrayType, ObjectInterpolator
-from .probe import ProbeArrayType
-from .scan import Scan
+from .experiment import Experiment
+from .patterns import DiffractionPatternArrayType
 from .visualize import Plot2D
 
 
 @dataclass(frozen=True)
 class ReconstructInput:
-    diffractionPatternArray: DiffractionPatternArrayType
-    scan: Scan
-    probeArray: ProbeArrayType
-    objectInterpolator: ObjectInterpolator
-
-    @property
-    def diffractionPatternExtent(self) -> ImageExtent:
-        return ImageExtent(
-            widthInPixels=self.diffractionPatternArray.shape[-1],
-            heightInPixels=self.diffractionPatternArray.shape[-2],
-        )
-
-    @property
-    def probeExtent(self) -> ImageExtent:
-        return ImageExtent(
-            widthInPixels=self.probeArray.shape[-1],
-            heightInPixels=self.probeArray.shape[-2],
-        )
-
-    @property
-    def objectArray(self) -> ObjectArrayType:
-        return self.objectInterpolator.getArray()
-
-    @property
-    def objectExtent(self) -> ImageExtent:
-        return ImageExtent(
-            widthInPixels=self.objectArray.shape[-1],
-            heightInPixels=self.objectArray.shape[-2],
-        )
+    patterns: DiffractionPatternArrayType
+    experiment: Experiment
 
 
 @dataclass(frozen=True)
 class ReconstructOutput:
-    scan: Scan | None
-    probeArray: ProbeArrayType | None
-    objectArray: ObjectArrayType | None
+    experiment: Experiment
     objective: Sequence[Sequence[float]]
     plot2D: Plot2D
     result: int
 
     @classmethod
-    def createNull(cls) -> ReconstructOutput:
-        return cls(None, None, None, [[]], Plot2D.createNull(), 0)
+    def createNull(cls, experiment: Experiment) -> ReconstructOutput:
+        return cls(experiment, [[]], Plot2D.createNull(), 0)
 
 
 class Reconstructor(ABC):
@@ -101,9 +69,7 @@ class NullReconstructor(TrainableReconstructor):
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput(
-            scan=parameters.scan,
-            probeArray=parameters.probeArray,
-            objectArray=parameters.objectInterpolator.getArray(),
+            experiment=parameters.experiment,
             objective=[[]],
             plot2D=Plot2D.createNull(),
             result=0,

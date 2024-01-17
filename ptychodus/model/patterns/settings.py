@@ -36,8 +36,8 @@ class DiffractionPatternSettings(Observable, Observer):
         self.cropEnabled = settingsGroup.createBooleanEntry('CropEnabled', True)
         self.cropCenterXInPixels = settingsGroup.createIntegerEntry('CropCenterXInPixels', 32)
         self.cropCenterYInPixels = settingsGroup.createIntegerEntry('CropCenterYInPixels', 32)
-        self.cropExtentXInPixels = settingsGroup.createIntegerEntry('CropExtentXInPixels', 64)
-        self.cropExtentYInPixels = settingsGroup.createIntegerEntry('CropExtentYInPixels', 64)
+        self.cropWidthInPixels = settingsGroup.createIntegerEntry('CropWidthInPixels', 64)
+        self.cropHeightInPixels = settingsGroup.createIntegerEntry('CropHeightInPixels', 64)
         self.flipXEnabled = settingsGroup.createBooleanEntry('FlipXEnabled', False)
         self.flipYEnabled = settingsGroup.createBooleanEntry('FlipYEnabled', False)
         self.valueLowerBoundEnabled = settingsGroup.createBooleanEntry(
