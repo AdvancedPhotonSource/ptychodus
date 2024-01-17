@@ -19,15 +19,15 @@ logger = logging.getLogger(__name__)
 class PtychoNNModelPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, modelSettings: PtychoNNModelSettings) -> None:
+    def __init__(self, settings: PtychoNNModelSettings) -> None:
         super().__init__()
-        self._modelSettings = modelSettings
+        self._settings = settings
         self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
 
     @classmethod
-    def createInstance(cls, modelSettings: PtychoNNModelSettings) -> PtychoNNModelPresenter:
-        presenter = cls(modelSettings)
-        modelSettings.addObserver(presenter)
+    def createInstance(cls, settings: PtychoNNModelSettings) -> PtychoNNModelPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
         return presenter
 
     def getStateFileFilterList(self) -> Sequence[str]:
@@ -37,56 +37,53 @@ class PtychoNNModelPresenter(Observable, Observer):
         return self._fileFilterList[0]
 
     def getStateFilePath(self) -> Path:
-        return self._modelSettings.stateFilePath.value
+        return self._settings.stateFilePath.value
 
     def setStateFilePath(self, directory: Path) -> None:
-        self._modelSettings.stateFilePath.value = directory
+        self._settings.stateFilePath.value = directory
 
-    def getNumberOfConvolutionChannelsLimits(self) -> Interval[int]:
+    def getNumberOfConvolutionKernelsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
-    def getNumberOfConvolutionChannels(self) -> int:
-        limits = self.getNumberOfConvolutionChannelsLimits()
-        return limits.clamp(self._modelSettings.numberOfConvolutionChannels.value)
+    def getNumberOfConvolutionKernels(self) -> int:
+        limits = self.getNumberOfConvolutionKernelsLimits()
+        return limits.clamp(self._settings.numberOfConvolutionKernels.value)
 
-    def setNumberOfConvolutionChannels(self, value: int) -> None:
-        self._modelSettings.numberOfConvolutionChannels.value = value
+    def setNumberOfConvolutionKernels(self, value: int) -> None:
+        self._settings.numberOfConvolutionKernels.value = value
 
     def getBatchSizeLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getBatchSize(self) -> int:
         limits = self.getBatchSizeLimits()
-        return limits.clamp(self._modelSettings.batchSize.value)
+        return limits.clamp(self._settings.batchSize.value)
 
     def setBatchSize(self, value: int) -> None:
-        self._modelSettings.batchSize.value = value
+        self._settings.batchSize.value = value
 
     def isBatchNormalizationEnabled(self) -> bool:
-        return self._modelSettings.useBatchNormalization.value
+        return self._settings.useBatchNormalization.value
 
     def setBatchNormalizationEnabled(self, enabled: bool) -> None:
-        self._modelSettings.useBatchNormalization.value = enabled
+        self._settings.useBatchNormalization.value = enabled
 
     def update(self, observable: Observable) -> None:
-        if observable is self._modelSettings:
+        if observable is self._settings:
             self.notifyObservers()
 
 
 class PtychoNNTrainingPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, modelSettings: PtychoNNTrainingSettings,
-                 trainer: TrainableReconstructor) -> None:
+    def __init__(self, settings: PtychoNNTrainingSettings) -> None:
         super().__init__()
-        self._modelSettings = modelSettings
-        self._trainer = trainer
+        self._settings = settings
 
     @classmethod
-    def createInstance(cls, modelSettings: PtychoNNTrainingSettings,
-                       trainer: TrainableReconstructor) -> PtychoNNTrainingPresenter:
-        presenter = cls(modelSettings, trainer)
-        modelSettings.addObserver(presenter)
+    def createInstance(cls, settings: PtychoNNTrainingSettings) -> PtychoNNTrainingPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
         return presenter
 
     def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
@@ -94,94 +91,81 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
     def getValidationSetFractionalSize(self) -> Decimal:
         limits = self.getValidationSetFractionalSizeLimits()
-        return limits.clamp(self._modelSettings.validationSetFractionalSize.value)
+        return limits.clamp(self._settings.validationSetFractionalSize.value)
 
     def setValidationSetFractionalSize(self, value: Decimal) -> None:
-        self._modelSettings.validationSetFractionalSize.value = value
+        self._settings.validationSetFractionalSize.value = value
 
     def getOptimizationEpochsPerHalfCycleLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getOptimizationEpochsPerHalfCycle(self) -> int:
         limits = self.getOptimizationEpochsPerHalfCycleLimits()
-        return limits.clamp(self._modelSettings.optimizationEpochsPerHalfCycle.value)
+        return limits.clamp(self._settings.optimizationEpochsPerHalfCycle.value)
 
     def setOptimizationEpochsPerHalfCycle(self, value: int) -> None:
-        self._modelSettings.optimizationEpochsPerHalfCycle.value = value
+        self._settings.optimizationEpochsPerHalfCycle.value = value
 
     def getMaximumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMaximumLearningRate(self) -> Decimal:
         limits = self.getMaximumLearningRateLimits()
-        return limits.clamp(self._modelSettings.maximumLearningRate.value)
+        return limits.clamp(self._settings.maximumLearningRate.value)
 
     def setMaximumLearningRate(self, value: Decimal) -> None:
-        self._modelSettings.maximumLearningRate.value = value
+        self._settings.maximumLearningRate.value = value
 
     def getMinimumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMinimumLearningRate(self) -> Decimal:
         limits = self.getMinimumLearningRateLimits()
-        return limits.clamp(self._modelSettings.minimumLearningRate.value)
+        return limits.clamp(self._settings.minimumLearningRate.value)
 
     def setMinimumLearningRate(self, value: Decimal) -> None:
-        self._modelSettings.minimumLearningRate.value = value
+        self._settings.minimumLearningRate.value = value
 
     def getTrainingEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getTrainingEpochs(self) -> int:
         limits = self.getTrainingEpochsLimits()
-        return limits.clamp(self._modelSettings.trainingEpochs.value)
+        return limits.clamp(self._settings.trainingEpochs.value)
 
     def setTrainingEpochs(self, value: int) -> None:
-        self._modelSettings.trainingEpochs.value = value
+        self._settings.trainingEpochs.value = value
 
     def isSaveTrainingArtifactsEnabled(self) -> bool:
-        return self._modelSettings.saveTrainingArtifacts.value
+        return self._settings.saveTrainingArtifacts.value
 
     def setSaveTrainingArtifactsEnabled(self, enabled: bool) -> None:
-        self._modelSettings.saveTrainingArtifacts.value = enabled
+        self._settings.saveTrainingArtifacts.value = enabled
 
     def getOutputPath(self) -> Path:
-        return self._modelSettings.outputPath.value
+        return self._settings.outputPath.value
 
     def setOutputPath(self, directory: Path) -> None:
-        self._modelSettings.outputPath.value = directory
+        self._settings.outputPath.value = directory
 
     def getOutputSuffix(self) -> str:
-        return self._modelSettings.outputSuffix.value
+        return self._settings.outputSuffix.value
 
     def setOutputSuffix(self, suffix: str) -> None:
-        self._modelSettings.outputSuffix.value = suffix
+        self._settings.outputSuffix.value = suffix
 
     def getStatusIntervalInEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getStatusIntervalInEpochs(self) -> int:
         limits = self.getStatusIntervalInEpochsLimits()
-        return limits.clamp(self._modelSettings.statusIntervalInEpochs.value)
+        return limits.clamp(self._settings.statusIntervalInEpochs.value)
 
     def setStatusIntervalInEpochs(self, value: int) -> None:
-        self._modelSettings.statusIntervalInEpochs.value = value
-
-    def train(self) -> None:
-        self._trainer.train()
-
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return [self.getSaveFileFilter()]
-
-    def getSaveFileFilter(self) -> str:
-        return 'NumPy Zipped Archive (*.npz)'
-
-    def saveTrainingData(self, filePath: Path) -> None:
-        logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
-        self._trainer.saveTrainingData(filePath)
+        self._settings.statusIntervalInEpochs.value = value
 
     def update(self, observable: Observable) -> None:
-        if observable is self._modelSettings:
+        if observable is self._settings:
             self.notifyObservers()
 
 
@@ -189,14 +173,12 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
     def __init__(self, modelSettings: PtychoNNModelSettings,
                  trainingSettings: PtychoNNTrainingSettings,
-                 phaseOnlyTrainableReconstructor: TrainableReconstructor,
                  reconstructors: Sequence[Reconstructor]) -> None:
         super().__init__()
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self.modelPresenter = PtychoNNModelPresenter.createInstance(modelSettings)
-        self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(
-            trainingSettings, phaseOnlyTrainableReconstructor)
+        self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(trainingSettings)
         self._reconstructors = reconstructors
 
     @classmethod
@@ -204,23 +186,31 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
                        isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
         modelSettings = PtychoNNModelSettings.createInstance(settingsRegistry)
         trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
-        phaseOnlyTrainableReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
+        phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
+        amplitudePhaseReconstructor: TrainableReconstructor = NullReconstructor('AmplitudePhase')
         reconstructors: list[TrainableReconstructor] = list()
 
         try:
-            from .phaseOnly import PtychoNNPhaseOnlyTrainableReconstructor
+            from .reconstructor import PtychoNNTrainableReconstructor
         except ModuleNotFoundError:
             logger.info('PtychoNN not found.')
 
             if isDeveloperModeEnabled:
-                reconstructors.append(phaseOnlyTrainableReconstructor)
+                reconstructors.append(phaseOnlyReconstructor)
+                reconstructors.append(amplitudePhaseReconstructor)
         else:
-            phaseOnlyTrainableReconstructor = PtychoNNPhaseOnlyTrainableReconstructor(
-                modelSettings, trainingSettings, objectAPI)
-            reconstructors.append(phaseOnlyTrainableReconstructor)
+            phaseOnlyReconstructor = PtychoNNTrainableReconstructor(modelSettings,
+                                                                    trainingSettings,
+                                                                    objectAPI,
+                                                                    enableAmplitude=False)
+            amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(modelSettings,
+                                                                         trainingSettings,
+                                                                         objectAPI,
+                                                                         enableAmplitude=True)
+            reconstructors.append(phaseOnlyReconstructor)
+            reconstructors.append(amplitudePhaseReconstructor)
 
-        return cls(modelSettings, trainingSettings, phaseOnlyTrainableReconstructor,
-                   reconstructors)
+        return cls(modelSettings, trainingSettings, reconstructors)
 
     @property
     def name(self) -> str:

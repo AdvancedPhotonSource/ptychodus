@@ -247,7 +247,7 @@ class ModelCore:
         for filePath in directoryPath.glob('*.npz'):
             # TODO sort by filePath.stat().st_mtime
             self._stateDataRegistry.openStateData(filePath)
-            self._reconstructorCore.reconstructorAPI.ingest()
+            self._reconstructorCore.reconstructorAPI.ingestTrainingData()
 
         self._reconstructorCore.reconstructorAPI.train()
 

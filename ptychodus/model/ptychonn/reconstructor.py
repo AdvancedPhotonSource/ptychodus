@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Mapping, TypeAlias
@@ -10,7 +11,7 @@ import numpy
 import numpy.typing
 
 from ...api.apparatus import ImageExtent
-from ...api.object import ObjectPatchAxis
+from ...api.object import ObjectArrayType, ObjectPatchAxis
 from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
 from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ..object import ObjectAPI
@@ -21,15 +22,18 @@ FloatArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]
 logger = logging.getLogger(__name__)
 
 
-class CircularBuffer:
+class PatternCircularBuffer:
 
     def __init__(self, extent: ImageExtent, maxSize: int) -> None:
-        self._buffer: FloatArrayType = numpy.zeros((maxSize, *extent.shape), dtype=numpy.float32)
+        self._buffer: FloatArrayType = numpy.zeros(
+            (maxSize, *extent.shape),
+            dtype=numpy.float32,
+        )
         self._pos = 0
         self._full = False
 
     @classmethod
-    def createZeroSized(cls) -> CircularBuffer:
+    def createZeroSized(cls) -> PatternCircularBuffer:
         return cls(ImageExtent(0, 0), 0)
 
     @property
@@ -48,28 +52,66 @@ class CircularBuffer:
         return self._buffer if self._full else self._buffer[:self._pos]
 
 
-class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
+class ObjectPatchCircularBuffer:
 
-    def __init__(self, settings: PtychoNNModelSettings, trainingSettings: PtychoNNTrainingSettings,
-                 objectAPI: ObjectAPI) -> None:
-        self._settings = settings
+    def __init__(self, extent: ImageExtent, channels: int, maxSize: int) -> None:
+        self._buffer: FloatArrayType = numpy.zeros(
+            (maxSize, channels, *extent.shape),
+            dtype=numpy.float32,
+        )
+        self._pos = 0
+        self._full = False
+
+    @classmethod
+    def createZeroSized(cls) -> ObjectPatchCircularBuffer:
+        return cls(ImageExtent(0, 0), 0, 0)
+
+    @property
+    def isZeroSized(self) -> bool:
+        return (self._buffer.size == 0)
+
+    def append(self, array: ObjectArrayType) -> None:
+        self._buffer[self._pos, 0, :, :] = numpy.angle(array).astype(numpy.float32)
+
+        if self._buffer.shape[1] > 1:
+            self._buffer[self._pos, 1, :, :] = numpy.absolute(array).astype(numpy.float32)
+
+        self._pos += 1
+
+        if self._pos == self._buffer.shape[0]:
+            self._pos = 0
+            self._full = True
+
+    def getBuffer(self) -> FloatArrayType:
+        return self._buffer if self._full else self._buffer[:self._pos]
+
+
+class PtychoNNTrainableReconstructor(TrainableReconstructor):
+
+    def __init__(self, modelSettings: PtychoNNModelSettings,
+                 trainingSettings: PtychoNNTrainingSettings, objectAPI: ObjectAPI, *,
+                 enableAmplitude: bool) -> None:
+        self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._objectAPI = objectAPI
-        self._diffractionPatternBuffer = CircularBuffer.createZeroSized()
-        self._objectPatchBuffer = CircularBuffer.createZeroSized()
+        self._patternBuffer = PatternCircularBuffer.createZeroSized()
+        self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
+        self._enableAmplitude = enableAmplitude
+        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
 
     @property
     def name(self) -> str:
-        return 'PhaseOnly'
+        return 'AmplitudePhase' if self._enableAmplitude else 'PhaseOnly'
 
     def _createModel(self) -> ReconSmallModel:
         logger.debug('Building model...')
         return ReconSmallModel(
-            nconv=self._settings.numberOfConvolutionChannels.value,
-            use_batch_norm=self._settings.useBatchNormalization.value,
+            nconv=self._modelSettings.numberOfConvolutionKernels.value,
+            use_batch_norm=self._modelSettings.useBatchNormalization.value,
+            enable_amplitude=self._enableAmplitude,
         )
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
@@ -103,12 +145,12 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
         logger.debug('Loading model state...')
         tester = Tester(
             model=self._createModel(),
-            model_params_path=self._settings.stateFilePath.value,
+            model_params_path=self._modelSettings.stateFilePath.value,
         )
 
         logger.debug('Inferring...')
         tester.setTestData(binnedData.astype(numpy.float32),
-                           batch_size=self._settings.batchSize.value)
+                           batch_size=self._modelSettings.batchSize.value)
         npzSavePath = None  # TODO self._trainingSettings.outputPath.value / 'preds.npz'
         objectPatches = tester.predictTestData(npz_save_path=npzSavePath)
 
@@ -124,8 +166,13 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             heightInPixels=objectPatches.shape[-2],
         )
 
-        for scanPoint, objectPatchReals in zip(parameters.scan.values(), objectPatches):
-            objectPatch = 0.5 * numpy.exp(1j * objectPatchReals[0])
+        for scanPoint, objectPatchChannels in zip(parameters.scan.values(), objectPatches):
+            objectPatch = numpy.exp(1j * objectPatchChannels[0])
+
+            if objectPatchChannels.shape[0] == 2:
+                objectPatch *= objectPatchChannels[1]
+            else:
+                objectPatch *= 0.5
 
             patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.widthInPixels)
             patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.heightInPixels)
@@ -152,23 +199,24 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             result=0,
         )
 
-    def ingest(self, parameters: ReconstructInput) -> None:
+    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         objectInterpolator = parameters.objectInterpolator
 
-        if self._diffractionPatternBuffer.isZeroSized:
+        if self._patternBuffer.isZeroSized:
             diffractionPatternExtent = parameters.diffractionPatternExtent
             maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
 
-            self._diffractionPatternBuffer = CircularBuffer(diffractionPatternExtent, maximumSize)
-            self._objectPatchBuffer = CircularBuffer(diffractionPatternExtent, maximumSize)
+            channels = 2 if self._enableAmplitude else 1
+            self._patternBuffer = PatternCircularBuffer(diffractionPatternExtent, maximumSize)
+            self._objectPatchBuffer = ObjectPatchCircularBuffer(diffractionPatternExtent, channels,
+                                                                maximumSize)
 
         for scanIndex, scanPoint in parameters.scan.items():
             objectPatch = objectInterpolator.getPatch(scanPoint, parameters.probeExtent)
-            objectPhasePatch = numpy.angle(objectPatch.array).astype(numpy.float32)
-            self._objectPatchBuffer.append(objectPhasePatch)
+            self._objectPatchBuffer.append(objectPatch.array)
 
         for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
-            self._diffractionPatternBuffer.append(pattern)
+            self._patternBuffer.append(pattern)
 
     def _plotMetrics(self, metrics: Mapping[str, Any]) -> Plot2D:
         trainingLoss = [losses[0] for losses in metrics['losses']]
@@ -182,23 +230,34 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
             axisY=PlotAxis(label='Loss', series=[trainingLossSeries, validationLossSeries]),
         )
 
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return self._fileFilterList
+
+    def getSaveFileFilter(self) -> str:
+        return self._fileFilterList[0]
+
+    def saveTrainingData(self, filePath: Path) -> None:
+        logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
+        trainingData = {
+            'diffractionPatterns': self._patternBuffer.getBuffer(),
+            'objectPatches': self._objectPatchBuffer.getBuffer(),
+        }
+        numpy.savez(filePath, **trainingData)
     def train(self) -> Plot2D:
         outputPath = self._trainingSettings.outputPath.value \
                 if self._trainingSettings.saveTrainingArtifacts.value else None
 
         trainer = Trainer(
             model=self._createModel(),
-            batch_size=self._settings.batchSize.value,
+            batch_size=self._modelSettings.batchSize.value,
             output_path=outputPath,
             output_suffix=self._trainingSettings.outputSuffix.value,
         )
 
-        X_train_full = self._diffractionPatternBuffer.getBuffer()
-        Y_ph_train_full = numpy.expand_dims(self._objectPatchBuffer.getBuffer(), 1)
 
         trainer.setTrainingData(
-            X_train_full=X_train_full,
-            Y_ph_train_full=Y_ph_train_full,
+            X_train_full=self._patternBuffer.getBuffer(),
+            Y_ph_train_full=self._objectPatchBuffer.getBuffer(),
             valid_data_ratio=float(self._trainingSettings.validationSetFractionalSize.value),
         )
         trainer.setOptimizationParams(
@@ -218,13 +277,6 @@ class PtychoNNPhaseOnlyTrainableReconstructor(TrainableReconstructor):
 
         return self._plotMetrics(trainer.metrics)
 
-    def reset(self) -> None:
-        self._diffractionPatternBuffer = CircularBuffer.createZeroSized()
-        self._objectPatchBuffer = CircularBuffer.createZeroSized()
-
-    def saveTrainingData(self, filePath: Path) -> None:
-        trainingData = {
-            'diffractionPatterns': self._diffractionPatternBuffer.getBuffer(),
-            'objectPatches': self._objectPatchBuffer.getBuffer(),
-        }
-        numpy.savez(filePath, **trainingData)
+    def clearTrainingData(self) -> None:
+        self._patternBuffer = PatternCircularBuffer.createZeroSized()
+        self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
