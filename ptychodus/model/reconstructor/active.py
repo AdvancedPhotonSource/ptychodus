@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterable, Sequence
+from pathlib import Path
 import logging
 import time
 
@@ -135,7 +136,7 @@ class ActiveReconstructor(Observable, Observer):
         reconstructor = self._pluginChooser.currentPlugin.strategy
         return isinstance(reconstructor, TrainableReconstructor)
 
-    def ingest(self) -> None:
+    def ingestTrainingData(self) -> None:
         reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
@@ -147,11 +148,43 @@ class ActiveReconstructor(Observable, Observer):
 
             logger.info('Ingesting...')
             tic = time.perf_counter()
-            reconstructor.ingest(parameters)
+            reconstructor.ingestTrainingData(parameters)
             toc = time.perf_counter()
             logger.info(f'Ingest time {toc - tic:.4f} seconds.')
         else:
-            logger.error('Reconstructor is not trainable!')
+            logger.warning('Reconstructor is not trainable!')
+
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        reconstructor = self._pluginChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.getSaveFileFilterList()
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+        return list()
+
+    def getSaveFileFilter(self) -> str:
+        reconstructor = self._pluginChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.getSaveFileFilter()
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+        return str()
+
+    def saveTrainingData(self, filePath: Path) -> None:
+        reconstructor = self._pluginChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            logger.info('Saving...')
+            tic = time.perf_counter()
+            reconstructor.saveTrainingData(filePath)
+            toc = time.perf_counter()
+            logger.info(f'Save time {toc - tic:.4f} seconds.')
+        else:
+            logger.warning('Reconstructor is not trainable!')
 
     def train(self) -> Plot2D:
         reconstructor = self._pluginChooser.currentPlugin.strategy
@@ -164,21 +197,21 @@ class ActiveReconstructor(Observable, Observer):
             toc = time.perf_counter()
             logger.info(f'Training time {toc - tic:.4f} seconds.')
         else:
-            logger.error('Reconstructor is not trainable!')
+            logger.warning('Reconstructor is not trainable!')
 
         return plot2D
 
-    def reset(self) -> None:
+    def clearTrainingData(self) -> None:
         reconstructor = self._pluginChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Resetting...')
             tic = time.perf_counter()
-            reconstructor.reset()
+            reconstructor.clearTrainingData()
             toc = time.perf_counter()
             logger.info(f'Reset time {toc - tic:.4f} seconds.')
         else:
-            logger.error('Reconstructor is not trainable!')
+            logger.warning('Reconstructor is not trainable!')
 
     def selectReconstructor(self, name: str) -> None:
         self._pluginChooser.setCurrentPluginByName(name)

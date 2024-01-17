@@ -15,8 +15,8 @@ class PtychoNNModelParametersView(QGroupBox):
         self.modelStateLabel = QLabel('Model State:')
         self.modelStateLineEdit = QLineEdit()
         self.modelStateBrowseButton = QPushButton('Browse')
-        self.numberOfConvolutionChannelsLabel = QLabel('Convolution Channels:')
-        self.numberOfConvolutionChannelsSpinBox = QSpinBox()
+        self.numberOfConvolutionKernelsLabel = QLabel('Convolution Kernels:')
+        self.numberOfConvolutionKernelsSpinBox = QSpinBox()
         self.batchSizeLabel = QLabel('Batch Size:')
         self.batchSizeSpinBox = QSpinBox()
         self.useBatchNormalizationCheckBox = QCheckBox('Use Batch Normalization')
@@ -29,8 +29,8 @@ class PtychoNNModelParametersView(QGroupBox):
         layout.addWidget(view.modelStateLabel, 0, 0)
         layout.addWidget(view.modelStateLineEdit, 0, 1)
         layout.addWidget(view.modelStateBrowseButton, 0, 2)
-        layout.addWidget(view.numberOfConvolutionChannelsLabel, 1, 0)
-        layout.addWidget(view.numberOfConvolutionChannelsSpinBox, 1, 1, 1, 2)
+        layout.addWidget(view.numberOfConvolutionKernelsLabel, 1, 0)
+        layout.addWidget(view.numberOfConvolutionKernelsSpinBox, 1, 1, 1, 2)
         layout.addWidget(view.batchSizeLabel, 2, 0)
         layout.addWidget(view.batchSizeSpinBox, 2, 1, 1, 2)
         layout.addWidget(view.useBatchNormalizationCheckBox, 3, 0, 1, 3)
@@ -80,7 +80,6 @@ class PtychoNNTrainingParametersView(QGroupBox):
         self.trainingEpochsSpinBox = QSpinBox()
         self.statusIntervalSpinBox = QSpinBox()
         self.outputParametersView = PtychoNNOutputParametersView.createInstance()
-        self.saveTrainingDataButton = QPushButton("Save Training Data")
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNTrainingParametersView:
@@ -95,7 +94,6 @@ class PtychoNNTrainingParametersView(QGroupBox):
         layout.addRow('Training Epochs:', view.trainingEpochsSpinBox)
         layout.addRow('Status Interval:', view.statusIntervalSpinBox)
         layout.addRow(view.outputParametersView)
-        layout.addRow(view.saveTrainingDataButton)
         view.setLayout(layout)
 
         return view

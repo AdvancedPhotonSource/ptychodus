@@ -10,7 +10,7 @@ Ptychodus
 Standard Installation
 ---------------------
 
-1. Install `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_.
+1. Install `miniforge <https://github.com/conda-forge/miniforge>`_, the conda disribution that uses faster default settings than the Anaconda installer.
 
 2. Install ptychodus.
 

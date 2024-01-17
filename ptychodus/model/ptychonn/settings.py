@@ -12,16 +12,17 @@ class PtychoNNModelSettings(Observable, Observer):
         self._settingsGroup = settingsGroup
         self.stateFilePath = settingsGroup.createPathEntry('StateFilePath',
                                                            Path('/path/to/best_model.pth'))
-        self.numberOfConvolutionChannels = settingsGroup.createIntegerEntry(
-            'NumberOfConvolutionChannels', 16)
+        self.numberOfConvolutionKernels = settingsGroup.createIntegerEntry(
+            'NumberOfConvolutionKernels', 16)
         self.batchSize = settingsGroup.createIntegerEntry('BatchSize', 64)
         self.useBatchNormalization = settingsGroup.createBooleanEntry(
             'UseBatchNormalization', False)
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoNNModelSettings:
-        settings = cls(settingsRegistry.createGroup('PtychoNN'))
-        settings._settingsGroup.addObserver(settings)
+        settingsGroup = settingsRegistry.createGroup('PtychoNN')
+        settings = cls(settingsGroup)
+        settingsGroup.addObserver(settings)
         return settings
 
     def update(self, observable: Observable) -> None:
@@ -51,8 +52,9 @@ class PtychoNNTrainingSettings(Observable, Observer):
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoNNTrainingSettings:
-        settings = cls(settingsRegistry.createGroup('PtychoNNTraining'))
-        settings._settingsGroup.addObserver(settings)
+        settingsGroup = settingsRegistry.createGroup('PtychoNNTraining')
+        settings = cls(settingsGroup)
+        settingsGroup.addObserver(settings)
         return settings
 
     def update(self, observable: Observable) -> None:

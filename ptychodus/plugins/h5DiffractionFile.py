@@ -58,9 +58,12 @@ class H5DiffractionFileTreeBuilder:
     def _addAttributes(self, treeNode: SimpleTreeNode,
                        attributeManager: h5py.AttributeManager) -> None:
         for name, value in attributeManager.items():
-            stringInfo = h5py.check_string_dtype(value.dtype)
-            itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"' if stringInfo \
-                    else f'SCALAR {value.dtype} = {value}'
+            if isinstance(value, str):
+                itemDetails = f'STRING = "{value}"'
+            else:
+                stringInfo = h5py.check_string_dtype(value.dtype)
+                itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"' if stringInfo \
+                        else f'SCALAR {value.dtype} = {value}'
 
             treeNode.createChild([str(name), 'Attribute', itemDetails])
 
@@ -183,7 +186,12 @@ def registerPlugins(registry: PluginRegistry) -> None:
     registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/dp'),
         simpleName='PtychoShelves',
-        displayName='PtychoShelves Diffraction Data Files (*.h5 *.hdf5)',
+        displayName='PtychoShelves Diffraction Files (*.h5 *.hdf5)',
+    )
+    registry.diffractionFileReaders.registerPlugin(
+        H5DiffractionFileReader(dataPath='/entry/measurement/Eiger/data'),
+        simpleName='NanoMax',
+        displayName='NanoMax DiffractionEndStation Files (*.h5 *.hdf5)',
     )
     registry.diffractionFileWriters.registerPlugin(
         H5DiffractionFileWriter(dataPath='/dp'),

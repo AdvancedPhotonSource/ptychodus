@@ -85,5 +85,5 @@ class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
     def execute(self, filePath: Path) -> None:
         # TODO watch for ptychodus NPZ files
         self._registry.openStateData(filePath)
-        self._reconstructorAPI.ingest()
+        self._reconstructorAPI.ingestTrainingData()
         self._reconstructorAPI.train()
