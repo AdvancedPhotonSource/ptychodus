@@ -9,10 +9,6 @@ class ExperimentSettings(Observable, Observer):  # FIXME do we need this?
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.detectorObjectDistanceInMeters = settingsGroup.createRealEntry(
-            'DetectorObjectDistanceInMeters', '2')
-        self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
-            'ProbeEnergyInElectronVolts', '10000')
         # vvv FIXME USE IN SIZER vvv
         self.expandScanBoundingBox = settingsGroup.createBooleanEntry(
             'ExpandScanBoundingBox', False)

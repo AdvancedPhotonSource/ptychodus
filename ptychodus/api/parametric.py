@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any, Generic, TypeVar
@@ -6,7 +7,7 @@ import logging
 from .observer import Observable, Observer
 
 __all__ = [
-    'ParametricBase',
+    'ParameterRepository',
 ]
 
 logger = logging.getLogger(__name__)
@@ -87,13 +88,27 @@ class RealParameter(Parameter[float]):
         return value
 
 
-class ParametricBase(Mapping[str, Any], Observable, Observer):
+class ParameterRepository(Mapping[str, Any], Observable, Observer):
 
-    def __init__(self, name: str) -> None:
-        self._parameters: dict[str, Parameter[Any]] = dict()
+    def __init__(self, name: str, parent: ParameterRepository | None = None) -> None:
+        self._parameterList: dict[str, Parameter[Any]] = dict()
+        self._repositoryList: list[ParameterRepository] = list()
+
+        if parent is not None:
+            parent._addParameterRepository(self)
+
+    def _addParameterRepository(self, repository: ParameterRepository) -> None:
+        if repository not in self._repositoryList:
+            self._repositoryList.append(repository)
+
+    def _removeParameterRepository(self, repository: ParameterRepository) -> None:
+        try:
+            self._repositoryList.remove(repository)
+        except ValueError:
+            pass
 
     def _registerParameter(self, name: str, parameter: Parameter[Any]) -> None:
-        if self._parameters.setdefault(name, parameter) == parameter:
+        if self._parameterList.setdefault(name, parameter) == parameter:
             parameter.addObserver(self)
         else:
             raise ValueError('Name already exists!')
@@ -134,26 +149,32 @@ class ParametricBase(Mapping[str, Any], Observable, Observer):
         return parameter
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._parameters)
+        return iter(self._parameterList)
 
     def __getitem__(self, name: str) -> Any:
-        return self._parameters[name]
+        return self._parameterList[name]
 
     def __len__(self) -> int:
-        return len(self._parameters)
+        return len(self._parameterList)
 
-    def setParameters(self, parameters: Mapping[str, Any]) -> None:
-        for key, value in parameters.items():
+    def setParameters(self, parameterList: Mapping[str, Any]) -> None:
+        for key, value in parameterList.items():
             try:
-                parameter = self._parameters[key]
+                parameter = self._parameterList[key]
             except KeyError:
                 logger.debug(f'Parameter \"{key}\" not found!')
             else:
-                logger.debug(f'Parameter \"{key}\": {parameter.getValue()} -> {value}')
-                parameter.setValue(value, notify=False)  # FIXME check value type?
+                valueOld = parameter.getValue()
+                logger.debug(f'Parameter \"{key}\": {valueOld} -> {value}')
+
+                if type(value) is type(valueOld):
+                    parameter.setValue(value, notify=False)
+                else:
+                    raise ValueError(
+                        f'Parameter \"{key}\" type mismatch! {type(valueOld)} != {type(value)}')
 
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
-        if observable in self._parameters.values():
+        if observable in self._parameterList.values():
             self.notifyObservers()

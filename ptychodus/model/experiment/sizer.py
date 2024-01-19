@@ -25,7 +25,7 @@ class ExperimentSizer(Observable, Observer):
     @property
     def _lambdaZInSquareMeters(self) -> float:
         lambdaInMeters = self._metadata.getProbeWavelengthInMeters()
-        zInMeters = self._metadata.getDetectorObjectDistanceInMeters()
+        zInMeters = self._metadata.detectorObjectDistanceInMeters.getValue()
         return lambdaInMeters * zInMeters
 
     def getObjectPlanePixelGeometry(self) -> PixelGeometry:

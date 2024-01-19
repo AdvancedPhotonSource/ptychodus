@@ -1,22 +1,17 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from pathlib import Path
 from typing import overload
 import logging
 
-from ...api.experiment import (Experiment, ExperimentFileReader, ExperimentFileWriter,
-                               ExperimentMetadata)
-from ...api.object import Object
-from ...api.observer import Observable, Observer
-from ...api.plugins import PluginChooser
-from ...api.probe import Probe
-from ...api.scan import Scan
+from ...api.experiment import Experiment
+from ...api.observer import Observable
+from ...api.parametric import ParameterRepository
 from ..metadata import MetadataRepositoryItem
-from ..object import ObjectRepositoryItem
+from ..object import ObjectRepositoryItem, ObjectRepositoryItemFactory
 from ..patterns import PatternSizer
-from ..probe import ProbeRepositoryItem
-from ..scan import ScanRepositoryItem
+from ..probe import ProbeRepositoryItem, ProbeRepositoryItemFactory
+from ..scan import ScanRepositoryItem, ScanRepositoryItemFactory
 from .sizer import ExperimentSizer
 
 logger = logging.getLogger(__name__)
@@ -41,18 +36,25 @@ class ExperimentRepositoryItemObserver(ABC):
         pass
 
 
-class ExperimentRepositoryItem(Observer):
+class ExperimentRepositoryItem(ParameterRepository):
 
     def __init__(self, parent: ExperimentRepositoryItemObserver, privateIndex: int,
-                 experiment: Experiment, patternSizer: PatternSizer) -> None:
-        super().__init__()
+                 metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
+                 probe: ProbeRepositoryItem, object_: ObjectRepositoryItem,
+                 patternSizer: PatternSizer) -> None:
+        super().__init__('Experiment')
         self._parent = parent
         self._privateIndex = privateIndex
-        self._metadata = MetadataRepositoryItem(experiment.metadata)
-        self._scan = ScanRepositoryItem(experiment.scan)
-        self._sizer = ExperimentSizer(self._metadata, self._scan, patternSizer)
-        self._probe = ProbeRepositoryItem(experiment.probe)
-        self._object = ObjectRepositoryItem(experiment.object_)
+        self._metadata = metadata
+        self._scan = scan
+        self._probe = probe
+        self._object = object_
+        self._sizer = ExperimentSizer(metadata, scan, patternSizer)
+
+        self._addParameterRepository(self._metadata)
+        self._addParameterRepository(self._scan)
+        self._addParameterRepository(self._probe)
+        self._addParameterRepository(self._object)
 
         self._metadata.addObserver(self)
         self._scan.addObserver(self)
@@ -120,12 +122,14 @@ class ExperimentRepositoryObserver(ABC):
 class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentRepositoryItemObserver):
 
     def __init__(self, patternSizer: PatternSizer,
-                 fileReaderChooser: PluginChooser[ExperimentFileReader],
-                 fileWriterChooser: PluginChooser[ExperimentFileWriter]) -> None:
+                 scanRepositoryItemFactory: ScanRepositoryItemFactory,
+                 probeRepositoryItemFactory: ProbeRepositoryItemFactory,
+                 objectRepositoryItemFactory: ObjectRepositoryItemFactory) -> None:
         super().__init__()
+        self._scanRepositoryItemFactory = scanRepositoryItemFactory
+        self._probeRepositoryItemFactory = probeRepositoryItemFactory
+        self._objectRepositoryItemFactory = objectRepositoryItemFactory
         self._patternSizer = patternSizer
-        self._fileReaderChooser = fileReaderChooser
-        self._fileWriterChooser = fileWriterChooser
         self._itemList: list[ExperimentRepositoryItem] = list()
         self._observerList: list[ExperimentRepositoryObserver] = list()
 
@@ -145,54 +149,22 @@ class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentReposit
     def __len__(self) -> int:
         return len(self._itemList)
 
-    def _insertExperiment(self, experiment: Experiment) -> None:
+    def insertExperiment(self, experiment: Experiment) -> int:
         index = len(self._itemList)
-        item = ExperimentRepositoryItem(self, index, experiment, self._patternSizer)
+        item = ExperimentRepositoryItem(
+            parent=self,
+            privateIndex=index,
+            metadata=MetadataRepositoryItem(experiment.metadata),
+            scan=self._scanRepositoryItemFactory.create(experiment.scan),
+            probe=self._probeRepositoryItemFactory.create(experiment.probe),
+            object_=self._objectRepositoryItemFactory.create(experiment.object_),
+            patternSizer=self._patternSizer)
         self._itemList.append(item)
 
         for observer in self._observerList:
             observer.handleItemInserted(index, item)
 
-    def getOpenFileFilterList(self) -> Sequence[str]:
-        return self._fileReaderChooser.getDisplayNameList()
-
-    def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.currentPlugin.displayName
-
-    def openExperiment(self, filePath: Path, fileFilter: str) -> None:
-        if filePath.is_file():
-            self._fileReaderChooser.setCurrentPluginByName(fileFilter)
-            fileType = self._fileReaderChooser.currentPlugin.simpleName
-            logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
-            fileReader = self._fileReaderChooser.currentPlugin.strategy
-
-            try:
-                experiment = fileReader.read(filePath)
-            except Exception as exc:
-                raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
-            else:
-                self._insertExperiment(experiment)
-        else:
-            logger.debug(f'Refusing to create experiment with invalid file path \"{filePath}\"')
-
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileWriterChooser.getDisplayNameList()
-
-    def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.currentPlugin.displayName
-
-    def saveExperiment(self, index: int, filePath: Path, fileFilter: str) -> None:
-        try:
-            item = self._itemList[index]
-        except IndexError:
-            logger.debug(f'Failed to save experiment {index}!')
-            return
-
-        self._fileWriterChooser.setCurrentPluginByName(fileFilter)
-        fileType = self._fileWriterChooser.currentPlugin.simpleName
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
-        writer = self._fileWriterChooser.currentPlugin.strategy
-        writer.write(filePath, item.getExperiment())
+        return index
 
     def addObserver(self, observer: ExperimentRepositoryObserver) -> None:
         if observer not in self._observerList:
@@ -203,16 +175,6 @@ class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentReposit
             self._observerList.remove(observer)
         except ValueError:
             pass
-
-    def insertExperiment(self, name: str) -> None:
-        # FIXME extract to factory; populate defaults from settings/metadata
-        experiment = Experiment(
-            metadata=ExperimentMetadata(name),
-            scan=Scan(),
-            probe=Probe(),
-            object_=Object(),
-        )
-        self._insertExperiment(experiment)
 
     def handleMetadataChanged(self, item: ExperimentRepositoryItem) -> None:
         index = item._privateIndex

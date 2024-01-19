@@ -1,10 +1,16 @@
 from collections.abc import Sequence
+from pathlib import Path
 from typing import overload
 import logging
 import sys
 
+from ...api.experiment import Experiment, ExperimentFileReader, ExperimentFileWriter
+from ...api.object import Object
 from ...api.observer import ObservableSequence
-from ..metadata import MetadataRepositoryItem
+from ...api.plugins import PluginChooser
+from ...api.probe import Probe
+from ...api.scan import Scan
+from ..metadata import MetadataBuilder, MetadataRepositoryItem
 from ..object import ObjectRepositoryItem
 from ..probe import ProbeRepositoryItem
 from ..scan import ScanRepositoryItem
@@ -16,10 +22,15 @@ logger = logging.getLogger(__name__)
 
 class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ExperimentRepositoryObserver):
 
-    def __init__(self, repository: ExperimentRepository) -> None:
+    def __init__(self, repository: ExperimentRepository, metadataBuilder: MetadataBuilder,
+                 fileReaderChooser: PluginChooser[ExperimentFileReader],
+                 fileWriterChooser: PluginChooser[ExperimentFileWriter]) -> None:
         super().__init__()
         self._repository = repository
         self._repository.addObserver(self)
+        self._metadataBuilder = metadataBuilder
+        self._fileReaderChooser = fileReaderChooser
+        self._fileWriterChooser = fileWriterChooser
 
     @overload
     def __getitem__(self, index: int) -> MetadataRepositoryItem:
@@ -38,6 +49,56 @@ class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ExperimentR
 
     def __len__(self) -> int:
         return len(self._repository)
+
+    def insertExperiment(self, name: str) -> None:
+        experiment = Experiment(
+            metadata=self._metadataBuilder.build(name),
+            scan=Scan(),
+            probe=Probe(),
+            object_=Object(),
+        )
+        self._repository.insertExperiment(experiment)
+
+    def getOpenFileFilterList(self) -> Sequence[str]:
+        return self._fileReaderChooser.getDisplayNameList()
+
+    def getOpenFileFilter(self) -> str:
+        return self._fileReaderChooser.currentPlugin.displayName
+
+    def openExperiment(self, filePath: Path, fileFilter: str) -> None:
+        if filePath.is_file():
+            self._fileReaderChooser.setCurrentPluginByName(fileFilter)
+            fileType = self._fileReaderChooser.currentPlugin.simpleName
+            logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
+            fileReader = self._fileReaderChooser.currentPlugin.strategy
+
+            try:
+                experiment = fileReader.read(filePath)
+            except Exception as exc:
+                raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
+            else:
+                self._repository.insertExperiment(experiment)
+        else:
+            logger.debug(f'Refusing to create experiment with invalid file path \"{filePath}\"')
+
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return self._fileWriterChooser.getDisplayNameList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._fileWriterChooser.currentPlugin.displayName
+
+    def saveExperiment(self, index: int, filePath: Path, fileFilter: str) -> None:
+        try:
+            item = self._repository[index]
+        except IndexError:
+            logger.debug(f'Failed to save experiment {index}!')
+            return
+
+        self._fileWriterChooser.setCurrentPluginByName(fileFilter)
+        fileType = self._fileWriterChooser.currentPlugin.simpleName
+        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        writer = self._fileWriterChooser.currentPlugin.strategy
+        writer.write(filePath, item.getExperiment())
 
     def handleItemInserted(self, index: int, item: ExperimentRepositoryItem) -> None:
         self.notifyObserversItemInserted(index, item.getMetadata())

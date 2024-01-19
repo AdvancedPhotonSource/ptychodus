@@ -1,28 +1,33 @@
 from ...api.experiment import ExperimentFileReader, ExperimentFileWriter
 from ...api.plugins import PluginChooser
-from ...api.settings import SettingsRegistry
-from ..object import ObjectBuilderFactory
+from ..metadata import MetadataBuilder
+from ..object import ObjectBuilderFactory, ObjectRepositoryItemFactory
 from ..patterns import PatternSizer
-from ..probe import ProbeBuilderFactory
-from ..scan import ScanBuilderFactory
+from ..probe import ProbeBuilderFactory, ProbeRepositoryItemFactory
+from ..scan import ScanBuilderFactory, ScanRepositoryItemFactory
 from .metadata import MetadataRepository
 from .object import ObjectRepository
 from .probe import ProbeRepository
 from .repository import ExperimentRepository
 from .scan import ScanRepository
-from .settings import ExperimentSettings
 
 
 class ExperimentCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry, patternSizer: PatternSizer,
-                 scanBuilderFactory: ScanBuilderFactory, probeBuilderFactory: ProbeBuilderFactory,
+    def __init__(self, patternSizer: PatternSizer, metadataBuilder: MetadataBuilder,
+                 scanRepositoryItemFactory: ScanRepositoryItemFactory,
+                 scanBuilderFactory: ScanBuilderFactory,
+                 objectRepositoryItemFactory: ObjectRepositoryItemFactory,
                  objectBuilderFactory: ObjectBuilderFactory,
+                 probeRepositoryItemFactory: ProbeRepositoryItemFactory,
+                 probeBuilderFactory: ProbeBuilderFactory,
                  fileReaderChooser: PluginChooser[ExperimentFileReader],
                  fileWriterChooser: PluginChooser[ExperimentFileWriter]) -> None:
-        self.settings = ExperimentSettings.createInstance(settingsRegistry)
-        self._repository = ExperimentRepository(patternSizer, fileReaderChooser, fileWriterChooser)
-        self.metadataRepository = MetadataRepository(self._repository)
+        self._repository = ExperimentRepository(patternSizer, scanRepositoryItemFactory,
+                                                probeRepositoryItemFactory,
+                                                objectRepositoryItemFactory)
+        self.metadataRepository = MetadataRepository(self._repository, metadataBuilder,
+                                                     fileReaderChooser, fileWriterChooser)
         self.scanRepository = ScanRepository(self._repository, scanBuilderFactory)
         self.probeRepository = ProbeRepository(self._repository, probeBuilderFactory)
         self.objectRepository = ObjectRepository(self._repository, objectBuilderFactory)

@@ -3,44 +3,52 @@ from collections.abc import Sequence
 from pathlib import Path
 import logging
 
-from ...api.parametric import ParametricBase
+from ...api.parametric import ParameterRepository
 from ...api.scan import Scan, ScanFileReader, ScanPoint
+from .metrics import ScanMetrics
 
 logger = logging.getLogger(__name__)
 
 
-class ScanBuilder(ParametricBase):
+class ScanBuilder(ParameterRepository):
+
+    def __init__(self) -> None:
+        super().__init__('Builder')
 
     @abstractmethod
     def build(self) -> Scan:
         pass
 
+    @abstractmethod
+    def getScanMetrics(self) -> ScanMetrics:
+        pass
+
 
 class FromMemoryScanBuilder(ScanBuilder):
 
-    def __init__(self, pointSeq: Sequence[ScanPoint]) -> None:
+    def __init__(self, points: Sequence[ScanPoint]) -> None:
         super().__init__('From Memory')
-        self._pointList = list(pointSeq)
-
-    def append(self, point: ScanPoint) -> None:
-        self._pointList.append(point)
+        self._scan = Scan(points)
+        self._metrics = ScanMetrics.createFromPoints(points)
 
     def build(self) -> Scan:
-        self._pointList.sort(key=lambda point: point.index)
-        return Scan(self._pointList)
+        return self._scan
+
+    def getScanMetrics(self) -> ScanMetrics:
+        return self._metrics
 
 
 class FromFileScanBuilder(ScanBuilder):
 
     def __init__(self, filePath: Path, fileType: str, fileReader: ScanFileReader) -> None:
         super().__init__('From File')
-        self._filePath = self._registerPathParameter('FilePath', filePath)
-        self._fileType = self._registerStringParameter('FileType', fileType)
+        self.filePath = self._registerPathParameter('FilePath', filePath)
+        self.fileType = self._registerStringParameter('FileType', fileType)
         self._fileReader = fileReader
 
     def build(self) -> Scan:
-        filePath = self._filePath.getValue()
-        fileType = self._fileType.getValue()
+        filePath = self.filePath.getValue()
+        fileType = self.fileType.getValue()
         logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
 
         try:

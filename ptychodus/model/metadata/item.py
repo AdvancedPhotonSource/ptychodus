@@ -1,59 +1,29 @@
 from ...api.experiment import ExperimentMetadata
-from ...api.observer import Observable
+from ...api.parametric import ParameterRepository
 
 
-class MetadataRepositoryItem(Observable):
+class MetadataRepositoryItem(ParameterRepository):
 
     def __init__(self, metadata: ExperimentMetadata) -> None:
-        super().__init__()
-        self._name = metadata.name
-        self._comments = metadata.comments
-        self._probeEnergyInElectronVolts = metadata.probeEnergyInElectronVolts
-        self._detectorObjectDistanceInMeters = metadata.detectorObjectDistanceInMeters
-
-    def setName(self, name: str) -> None:
-        if self._name != name:
-            self._name = name
-            self.notifyObservers()
-
-    def getName(self) -> str:
-        return self._name
-
-    def setComments(self, comments: str) -> None:
-        if self._comments != comments:
-            self._comments = comments
-            self.notifyObservers()
-
-    def getComments(self) -> str:
-        return self._comments
-
-    def setDetectorObjectDistanceInMeters(self, distanceInMeters: float) -> None:
-        if self._detectorObjectDistanceInMeters != distanceInMeters:
-            self._detectorObjectDistanceInMeters = distanceInMeters
-            self.notifyObservers()
-
-    def getDetectorObjectDistanceInMeters(self) -> float:
-        return max(0., self._detectorObjectDistanceInMeters)
-
-    def setProbeEnergyInElectronVolts(self, energyInElectronVolts: float) -> None:
-        if self._probeEnergyInElectronVolts != energyInElectronVolts:
-            self._probeEnergyInElectronVolts = energyInElectronVolts
-            self.notifyObservers()
-
-    def getProbeEnergyInElectronVolts(self) -> float:
-        return max(0., self._probeEnergyInElectronVolts)
+        super().__init__('Metadata')
+        self.name = self._registerStringParameter('Name', metadata.name)
+        self.comments = self._registerStringParameter('Comments', metadata.comments)
+        self.probeEnergyInElectronVolts = self._registerRealParameter(
+            'ProbeEnergyInElectronVolts', metadata.probeEnergyInElectronVolts, minimum=0.)
+        self.detectorObjectDistanceInMeters = self._registerRealParameter(
+            'DetectorObjectDistanceInMeters', metadata.detectorObjectDistanceInMeters, minimum=0.)
 
     def getProbeWavelengthInMeters(self) -> float:
         # Source: https://physics.nist.gov/cuu/Constants/index.html
         planckConstant_eV_per_Hz = 4.135667696e-15
         lightSpeedInMetersPerSecond = 299792458
         hc_eVm = planckConstant_eV_per_Hz * lightSpeedInMetersPerSecond
-        return hc_eVm / self.getProbeEnergyInElectronVolts()
+        return hc_eVm / self.probeEnergyInElectronVolts.getValue()
 
     def getMetadata(self) -> ExperimentMetadata:
         return ExperimentMetadata(
-            name=self._name,
-            comments=self._comments,
-            probeEnergyInElectronVolts=self._probeEnergyInElectronVolts,
-            detectorObjectDistanceInMeters=self._detectorObjectDistanceInMeters,
+            name=self.name.getValue(),
+            comments=self.comments.getValue(),
+            probeEnergyInElectronVolts=self.probeEnergyInElectronVolts.getValue(),
+            detectorObjectDistanceInMeters=self.detectorObjectDistanceInMeters.getValue(),
         )

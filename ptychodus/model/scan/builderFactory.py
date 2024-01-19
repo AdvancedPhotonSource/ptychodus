@@ -8,7 +8,6 @@ from .builder import FromFileScanBuilder, ScanBuilder
 from .cartesian import CartesianScanBuilder
 from .concentric import ConcentricScanBuilder
 from .lissajous import LissajousScanBuilder
-from .settings import ScanSettings
 from .spiral import SpiralScanBuilder
 
 logger = logging.getLogger(__name__)
@@ -16,13 +15,12 @@ logger = logging.getLogger(__name__)
 
 class ScanBuilderFactory(Mapping[str, ScanBuilder]):
 
-    def __init__(self, settings: ScanSettings, fileReaderChooser: PluginChooser[ScanFileReader],
+    def __init__(self, fileReaderChooser: PluginChooser[ScanFileReader],
                  fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
         super().__init__()
-        self._settings = settings  # FIXME use this
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
-        self._builders: dict[str, Callable[[], ScanBuilder]] = {
+        self._builders: Mapping[str, Callable[[], ScanBuilder]] = {
             'Raster': lambda: CartesianScanBuilder(snake=False, centered=False),
             'Snake': lambda: CartesianScanBuilder(snake=True, centered=False),
             'Centered Raster': lambda: CartesianScanBuilder(snake=False, centered=True),

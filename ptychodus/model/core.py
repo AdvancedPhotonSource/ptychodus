@@ -81,8 +81,7 @@ class ModelCore:
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._patternsCore = PatternsCore(self.settingsRegistry,
                                           self._pluginRegistry.diffractionFileReaders)
-        self._experimentCore = ExperimentCore(self.settingsRegistry,
-                                              self._patternsCore.patternSizer,
+        self._experimentCore = ExperimentCore(self._patternsCore.patternSizer,
                                               self._pluginRegistry.experimentFileReaders,
                                               self._pluginRegistry.experimentFileWriters)
         self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations,

@@ -1,19 +1,21 @@
-from .api import ObjectAPI
-from .compare import CompareObjectInitializer
-from .core import (ObjectCore, ObjectPresenter, ObjectRepositoryItemPresenter,
-                   ObjectRepositoryPresenter)
-from .file import FromFileObjectInitializer
-from .random import RandomObjectInitializer
-from .repository import ObjectRepositoryItem
+from .builder import ObjectBuilder
+from .builderFactory import ObjectBuilderFactory
+from .compare import CompareObjectBuilder
+from .core import ObjectCore
+from .file import FromFileObjectBuilder
+from .item import ObjectRepositoryItem
+from .itemFactory import ObjectRepositoryItemFactory
+from .random import RandomObjectBuilder
 
 __all__ = [
-    'CompareObjectInitializer',
-    'FromFileObjectInitializer',
-    'ObjectAPI',
+    'CompareObjectBuilder',
+    'FromFileObjectBuilder',
+    'ObjectBuilder',
+    'ObjectBuilderFactory',
     'ObjectCore',
     'ObjectPresenter',
     'ObjectRepositoryItem',
-    'ObjectRepositoryItemPresenter',
+    'ObjectRepositoryItemFactory',
     'ObjectRepositoryPresenter',
-    'RandomObjectInitializer',
+    'RandomObjectBuilder',
 ]

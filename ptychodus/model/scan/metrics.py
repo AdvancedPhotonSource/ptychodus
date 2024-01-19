@@ -1,14 +1,14 @@
+from __future__ import annotations
 from collections.abc import Iterable
 import sys
 
 import numpy
 
 from ...api.geometry import Box2D, Interval, Point2D
-from ...api.observer import Observable
 from ...api.scan import ScanPoint
 
 
-class ScanMetrics(Observable):
+class ScanMetrics:
 
     def __init__(self) -> None:
         self._xmin = +numpy.inf
@@ -19,15 +19,14 @@ class ScanMetrics(Observable):
         self._sizeInBytes = 0
         self._previousPoint: ScanPoint | None = None
 
-    def reset(self) -> None:
-        self._xmin = +numpy.inf
-        self._xmax = -numpy.inf
-        self._ymin = +numpy.inf
-        self._ymax = -numpy.inf
-        self._lengthInMeters = 0.
-        self._sizeInBytes = 0
-        self._previousPoint = None
-        self.notifyObservers()
+    @classmethod
+    def createFromPoints(cls, points: Iterable[ScanPoint]) -> ScanMetrics:
+        metrics = cls()
+
+        for point in points:
+            metrics.process(point)
+
+        return metrics
 
     def process(self, point: ScanPoint, *, notify=True) -> None:
         if point.positionXInMeters < self._xmin:
@@ -50,15 +49,6 @@ class ScanMetrics(Observable):
             self._lengthInMeters += numpy.hypot(dx, dy)
 
         self._sizeInBytes += sys.getsizeof(point)
-
-        if notify:
-            self.notifyObservers()
-
-    def processAll(self, iterable: Iterable[ScanPoint]) -> None:
-        for point in iterable:
-            self.process(point, notify=False)
-
-        self.notifyObservers()
 
     def getMidpointInMeters(self) -> Point2D:
         return Point2D(

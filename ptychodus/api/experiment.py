@@ -10,9 +10,9 @@ from .scan import Scan
 @dataclass(frozen=True)
 class ExperimentMetadata:
     name: str
-    comments: str = ''
-    probeEnergyInElectronVolts: float = 10000.
-    detectorObjectDistanceInMeters: float = 1.
+    comments: str
+    probeEnergyInElectronVolts: float
+    detectorObjectDistanceInMeters: float
 
 
 @dataclass(frozen=True)
