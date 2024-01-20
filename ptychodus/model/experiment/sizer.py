@@ -1,19 +1,19 @@
 import numpy
 
-from ...api.observer import Observable, Observer
+from ...api.geometry import Box2D, Interval
+from ...api.observer import Observable
+from ...api.parametric import ParameterRepository
 from ...api.patterns import ImageExtent, PixelGeometry
 from ..metadata import MetadataRepositoryItem
 from ..patterns import PatternSizer
 from ..scan import ScanRepositoryItem
 
 
-class ExperimentSizer(Observable, Observer):
+class ExperimentSizer(ParameterRepository):
 
     def __init__(self, metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
                  patternSizer: PatternSizer) -> None:
-        super().__init__()
-        # FIXME pull defaults from settings; how to use diffraction pattern metadata?
-        # FIXME getters/setters for expand bounding box
+        super().__init__('Sizer')
         self._metadata = metadata
         self._scan = scan
         self._patternSizer = patternSizer
@@ -21,6 +21,17 @@ class ExperimentSizer(Observable, Observer):
         self._metadata.addObserver(self)
         self._scan.addObserver(self)
         self._patternSizer.addObserver(self)
+
+        # FIXME to GUI
+        self.expandScanBoundingBox = self._registerBooleanParameter('ExpandScanBoundingBox', False)
+        self.scanBoundingBoxMinimumXInMeters = self._registerRealParameter(
+            'ScanBoundingBoxMinimumXInMeters', 0.)
+        self.scanBoundingBoxMaximumXInMeters = self._registerRealParameter(
+            'ScanBoundingBoxMaximumXInMeters', 1.e-5)
+        self.scanBoundingBoxMinimumYInMeters = self._registerRealParameter(
+            'ScanBoundingBoxMinimumYInMeters', 0.)
+        self.scanBoundingBoxMaximumYInMeters = self._registerRealParameter(
+            'ScanBoundingBoxMaximumYInMeters', 1.e-5)
 
     @property
     def _lambdaZInSquareMeters(self) -> float:
@@ -36,34 +47,61 @@ class ExperimentSizer(Observable, Observer):
         )
 
     def getFresnelNumber(self) -> float:
-        # TODO support non-square pixels
         widthInMeters = self._patternSizer.getWidthInMeters()
-        return widthInMeters**2 / self._lambdaZInSquareMeters
+        heightInMeters = self._patternSizer.getHeightInMeters()
+        sizeInMeters = max(widthInMeters, heightInMeters)
+        return sizeInMeters**2 / self._lambdaZInSquareMeters
 
-    def getScanImageExtent(self) -> ImageExtent:
+    def getScanExtent(self) -> ImageExtent:
         bbox = self._scan.getBoundingBoxInMeters()
         widthInPixels = 0
         heightInPixels = 0
 
+        if self.expandScanBoundingBox.getValue():
+            rangeX = Interval[float](
+                self.scanBoundingBoxMinimumXInMeters.getValue(),
+                self.scanBoundingBoxMaximumXInMeters.getValue(),
+            )
+            rangeY = Interval[float](
+                self.scanBoundingBoxMinimumYInMeters.getValue(),
+                self.scanBoundingBoxMaximumYInMeters.getValue(),
+            )
+
+            if bbox is None:
+                bbox = Box2D(rangeX, rangeY)
+            else:
+                bbox = bbox.hull(rangeX, rangeY)
+
         if bbox is not None:
             pixelWidthInMeters = self._patternSizer.getPixelWidthInMeters()
-            widthInPixels = int(numpy.ceil(bbox.rangeX.width / float(pixelWidthInMeters)))
             pixelHeightInMeters = self._patternSizer.getPixelHeightInMeters()
-            heightInPixels = int(numpy.ceil(bbox.rangeY.width / float(pixelHeightInMeters)))
+
+            widthInPixels = int(numpy.ceil(bbox.rangeX.length / pixelWidthInMeters))
+            heightInPixels = int(numpy.ceil(bbox.rangeY.length / pixelHeightInMeters))
 
         return ImageExtent(widthInPixels, heightInPixels)
 
-    def getProbeImageExtent(self) -> ImageExtent:
+    def getProbeExtent(self) -> ImageExtent:
         return self._patternSizer.getImageExtent()
 
-    def getObjectImageExtent(self) -> ImageExtent:
-        scanExtent = self.getScanImageExtent()
-        probeExtent = self.getProbeImageExtent()
+    def isProbeExtentValid(self, extent: ImageExtent) -> bool:
+        expectedExtent = self.getProbeExtent()
+        return (extent == expectedExtent)
+
+    def getObjectExtent(self) -> ImageExtent:
+        scanExtent = self.getScanExtent()
+        probeExtent = self.getProbeExtent()
 
         return ImageExtent(
             widthInPixels=scanExtent.widthInPixels + probeExtent.widthInPixels,
             heightInPixels=scanExtent.heightInPixels + probeExtent.heightInPixels,
         )
+
+    def isObjectExtentValid(self, extent: ImageExtent) -> bool:
+        expectedExtent = self.getObjectExtent()
+        widthIsBigEnough = (extent.widthInPixels >= expectedExtent.widthInPixels)
+        heightIsBigEnough = (extent.heightInPixels >= expectedExtent.heightInPixels)
+        return (widthIsBigEnough and heightIsBigEnough)
 
     def update(self, observable: Observable) -> None:
         if observable is self._metadata:

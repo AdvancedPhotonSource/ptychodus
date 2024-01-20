@@ -44,11 +44,14 @@ class Interval(Generic[T]):
     def clamp(self, value: T) -> T:
         return max(self.lower, min(value, self.upper))
 
-    def hull(self, value: T) -> Interval[T]:
-        return Interval[T](min(self.lower, value), max(self.upper, value))
+    def hull(self, value: Interval[T] | T) -> Interval[T]:
+        if isinstance(value, Interval):
+            return Interval[T](min(self.lower, value.lower), max(self.upper, value.upper))
+        else:
+            return Interval[T](min(self.lower, value), max(self.upper, value))
 
     @property
-    def width(self) -> T:
+    def length(self) -> T:
         return self.upper - self.lower
 
     @property
@@ -75,5 +78,5 @@ class Box2D:
     def midpoint(self) -> Point2D:
         return Point2D(self.rangeX.midrange, self.rangeY.midrange)
 
-    def hull(self, x: float, y: float) -> Box2D:
+    def hull(self, x: Interval[float] | float, y: Interval[float] | float) -> Box2D:
         return Box2D(self.rangeX.hull(x), self.rangeY.hull(y))

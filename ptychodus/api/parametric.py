@@ -91,6 +91,7 @@ class RealParameter(Parameter[float]):
 class ParameterRepository(Mapping[str, Any], Observable, Observer):
 
     def __init__(self, name: str, parent: ParameterRepository | None = None) -> None:
+        super().__init__()
         self._parameterList: dict[str, Parameter[Any]] = dict()
         self._repositoryList: list[ParameterRepository] = list()
 

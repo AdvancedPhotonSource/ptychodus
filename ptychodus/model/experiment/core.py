@@ -2,7 +2,7 @@ from ...api.experiment import ExperimentFileReader, ExperimentFileWriter
 from ...api.plugins import PluginChooser
 from ..metadata import MetadataBuilder
 from ..object import ObjectBuilderFactory, ObjectRepositoryItemFactory
-from ..patterns import PatternSizer
+from ..patterns import PatternSizer, ActiveDiffractionDataset
 from ..probe import ProbeBuilderFactory, ProbeRepositoryItemFactory
 from ..scan import ScanBuilderFactory, ScanRepositoryItemFactory
 from .metadata import MetadataRepository
@@ -14,7 +14,8 @@ from .scan import ScanRepository
 
 class ExperimentCore:
 
-    def __init__(self, patternSizer: PatternSizer, metadataBuilder: MetadataBuilder,
+    def __init__(self, patternSizer: PatternSizer, patterns: ActiveDiffractionDataset,
+                 metadataBuilder: MetadataBuilder,
                  scanRepositoryItemFactory: ScanRepositoryItemFactory,
                  scanBuilderFactory: ScanBuilderFactory,
                  objectRepositoryItemFactory: ObjectRepositoryItemFactory,
@@ -23,7 +24,7 @@ class ExperimentCore:
                  probeBuilderFactory: ProbeBuilderFactory,
                  fileReaderChooser: PluginChooser[ExperimentFileReader],
                  fileWriterChooser: PluginChooser[ExperimentFileWriter]) -> None:
-        self._repository = ExperimentRepository(patternSizer, scanRepositoryItemFactory,
+        self._repository = ExperimentRepository(patternSizer, patterns, scanRepositoryItemFactory,
                                                 probeRepositoryItemFactory,
                                                 objectRepositoryItemFactory)
         self.metadataRepository = MetadataRepository(self._repository, metadataBuilder,

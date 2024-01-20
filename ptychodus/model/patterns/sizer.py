@@ -57,7 +57,7 @@ class PatternSizer(Observable, Observer):
         return float(self._detector.getPixelWidthInMeters())
 
     def getWidthInMeters(self) -> float:
-        return self.getWidthInPixels() * self.getPixelWidthInMeters()  # FIXME safe?
+        return self.getWidthInPixels() * self.getPixelWidthInMeters()
 
     def getHeightLimitsInPixels(self) -> Interval[int]:
         return Interval[int](1, self._detector.getImageExtent().heightInPixels)
@@ -85,7 +85,7 @@ class PatternSizer(Observable, Observer):
         return float(self._detector.getPixelHeightInMeters())
 
     def getHeightInMeters(self) -> float:
-        return self.getHeightInPixels() * self.getPixelHeightInMeters()  # FIXME safe?
+        return self.getHeightInPixels() * self.getPixelHeightInMeters()
 
     def getImageExtent(self) -> ImageExtent:
         return ImageExtent(

@@ -9,7 +9,7 @@ from ...api.observer import Observable
 from ...api.parametric import ParameterRepository
 from ..metadata import MetadataRepositoryItem
 from ..object import ObjectRepositoryItem, ObjectRepositoryItemFactory
-from ..patterns import PatternSizer
+from ..patterns import ActiveDiffractionDataset, PatternSizer
 from ..probe import ProbeRepositoryItem, ProbeRepositoryItemFactory
 from ..scan import ScanRepositoryItem, ScanRepositoryItemFactory
 from .sizer import ExperimentSizer
@@ -41,7 +41,7 @@ class ExperimentRepositoryItem(ParameterRepository):
     def __init__(self, parent: ExperimentRepositoryItemObserver, privateIndex: int,
                  metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
                  probe: ProbeRepositoryItem, object_: ObjectRepositoryItem,
-                 patternSizer: PatternSizer) -> None:
+                 patternSizer: PatternSizer, patterns: ActiveDiffractionDataset) -> None:
         super().__init__('Experiment')
         self._parent = parent
         self._privateIndex = privateIndex
@@ -50,16 +50,19 @@ class ExperimentRepositoryItem(ParameterRepository):
         self._probe = probe
         self._object = object_
         self._sizer = ExperimentSizer(metadata, scan, patternSizer)
+        self._patterns = patterns
 
         self._addParameterRepository(self._metadata)
         self._addParameterRepository(self._scan)
         self._addParameterRepository(self._probe)
         self._addParameterRepository(self._object)
+        self._addParameterRepository(self._sizer)
 
         self._metadata.addObserver(self)
         self._scan.addObserver(self)
         self._probe.addObserver(self)
         self._object.addObserver(self)
+        self._patterns.addObserver(self)
 
     def getMetadata(self) -> MetadataRepositoryItem:
         return self._metadata
@@ -67,11 +70,28 @@ class ExperimentRepositoryItem(ParameterRepository):
     def getScan(self) -> ScanRepositoryItem:
         return self._scan
 
+    def isScanValid(self) -> bool:
+        # FIXME self.notifyObservers() when isScanValid changes
+        scan = self._scan.getScan()
+        scanIndexes = set(point.index for point in scan)
+        patternIndexes = set(self._patterns.getAssembledIndexes())
+        return (not scanIndexes.isdisjoint(patternIndexes))
+
     def getProbe(self) -> ProbeRepositoryItem:
         return self._probe
 
+    def isProbeValid(self) -> bool:
+        # FIXME self.notifyObservers() when isProbeValid changes
+        probe = self._probe.getProbe()
+        return self._sizer.isProbeExtentValid(probe.getExtent())
+
     def getObject(self) -> ObjectRepositoryItem:
         return self._object
+
+    def isObjectValid(self) -> bool:
+        # FIXME self.notifyObservers() when isObjectValid changes
+        object_ = self._object.getObject()
+        return self._sizer.isObjectExtentValid(object_.getExtent())
 
     def getExperiment(self) -> Experiment:
         return Experiment(
@@ -90,6 +110,8 @@ class ExperimentRepositoryItem(ParameterRepository):
             self._parent.handleProbeChanged(self)
         elif observable is self._object:
             self._parent.handleObjectChanged(self)
+        elif observable is self._patterns:
+            self.notifyObservers()
 
 
 class ExperimentRepositoryObserver(ABC):
@@ -121,15 +143,16 @@ class ExperimentRepositoryObserver(ABC):
 
 class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentRepositoryItemObserver):
 
-    def __init__(self, patternSizer: PatternSizer,
+    def __init__(self, patternSizer: PatternSizer, patterns: ActiveDiffractionDataset,
                  scanRepositoryItemFactory: ScanRepositoryItemFactory,
                  probeRepositoryItemFactory: ProbeRepositoryItemFactory,
                  objectRepositoryItemFactory: ObjectRepositoryItemFactory) -> None:
         super().__init__()
+        self._patternSizer = patternSizer
+        self._patterns = patterns
         self._scanRepositoryItemFactory = scanRepositoryItemFactory
         self._probeRepositoryItemFactory = probeRepositoryItemFactory
         self._objectRepositoryItemFactory = objectRepositoryItemFactory
-        self._patternSizer = patternSizer
         self._itemList: list[ExperimentRepositoryItem] = list()
         self._observerList: list[ExperimentRepositoryObserver] = list()
 
@@ -158,7 +181,8 @@ class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentReposit
             scan=self._scanRepositoryItemFactory.create(experiment.scan),
             probe=self._probeRepositoryItemFactory.create(experiment.probe),
             object_=self._objectRepositoryItemFactory.create(experiment.object_),
-            patternSizer=self._patternSizer)
+            patternSizer=self._patternSizer,
+            patterns=self._patterns)
         self._itemList.append(item)
 
         for observer in self._observerList:

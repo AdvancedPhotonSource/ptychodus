@@ -12,8 +12,9 @@ logger = logging.getLogger(__name__)
 
 class ScanBuilder(ParameterRepository):
 
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
         super().__init__('Builder')
+        self._name = self._registerStringParameter('Name', name)
 
     @abstractmethod
     def build(self) -> Scan:
