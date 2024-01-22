@@ -1,9 +1,14 @@
+from itertools import pairwise
 import logging
+import sys
+
+import numpy
 
 from ...api.geometry import Box2D
 from ...api.observer import Observable
 from ...api.parametric import ParameterRepository
-from ...api.scan import Scan
+from ...api.scan import Scan, ScanPoint
+from .boundingBox import ScanBoundingBox
 from .builder import ScanBuilder
 from .transform import ScanPointTransform
 
@@ -16,23 +21,23 @@ class ScanRepositoryItem(ParameterRepository):
         super().__init__('Scan')
         self._builder = builder
         self._transform = transform
-        self._scan = builder.build()
-        self._metrics = builder.getScanMetrics()  # FIXME metrics should reflect transform
+
+        self._untransformedScan = Scan()
+        self._transformedScan = Scan()
+        self._boundingBox = ScanBoundingBox()
+        self._lengthInMeters = 0.
+        self._sizeInBytes = 0
 
         self._addParameterRepository(self._builder)
         self._addParameterRepository(self._transform)
 
         self._rebuild()
 
-    # FIXME getTransformed and getUntransformed
+    def getUntransformedScan(self) -> Scan:
+        return self._untransformedScan
+
     def getScan(self) -> Scan:
         return self._transformedScan
-
-    def _setScan(self, scan: Scan) -> None:
-        # FIXME apply transform (per point)
-        # FIXME calculate metrics (per point)
-        self._scan = scan
-        self.notifyObservers()
 
     def getBuilder(self) -> ScanBuilder:
         return self._builder
@@ -46,7 +51,35 @@ class ScanRepositoryItem(ParameterRepository):
         self._rebuild()
 
     def getBoundingBoxInMeters(self) -> Box2D | None:
-        return self._metrics.getBoundingBoxInMeters()
+        return self._boundingBox.getBoundingBoxInMeters()
+
+    def getLengthInMeters(self) -> float:
+        return self._lengthInMeters
+
+    def getSizeInBytes(self) -> int:
+        return self._sizeInBytes
+
+    def _transformScan(self) -> None:
+        transformedPoints: list[ScanPoint] = list()
+        boundingBox = ScanBoundingBox()
+        lengthInMeters = 0.
+
+        for untransformedPoint in self._untransformedScan:
+            point = self._transform(untransformedPoint)
+            transformedPoints.append(point)
+            boundingBox.hull(point)
+
+        for pointL, pointR in pairwise(transformedPoints):
+            dx = pointR.positionXInMeters - pointL.positionXInMeters
+            dy = pointR.positionYInMeters - pointL.positionYInMeters
+            lengthInMeters += numpy.hypot(dx, dy)
+
+        self._transformedScan = Scan(transformedPoints)
+        self._boundingBox = boundingBox
+        self._lengthInMeters = lengthInMeters
+        self._sizeInBytes = sys.getsizeof(self._untransformedScan) \
+                + sys.getsizeof(self._transformedScan)
+        self.notifyObservers()
 
     def _rebuild(self) -> None:
         try:
@@ -54,8 +87,11 @@ class ScanRepositoryItem(ParameterRepository):
         except Exception:
             logger.exception('Failed to reinitialize scan!')
         else:
-            self._setScan(scan)
+            self._untransformedScan = scan
+            self._transformScan()
 
     def update(self, observable: Observable) -> None:
         if observable is self._builder:
             self._rebuild()
+        elif observable is self._transform:
+            self._transformScan()

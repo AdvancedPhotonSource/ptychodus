@@ -5,7 +5,6 @@ import logging
 
 from ...api.parametric import ParameterRepository
 from ...api.scan import Scan, ScanFileReader, ScanPoint
-from .metrics import ScanMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -20,23 +19,15 @@ class ScanBuilder(ParameterRepository):
     def build(self) -> Scan:
         pass
 
-    @abstractmethod
-    def getScanMetrics(self) -> ScanMetrics:
-        pass
-
 
 class FromMemoryScanBuilder(ScanBuilder):
 
     def __init__(self, points: Sequence[ScanPoint]) -> None:
         super().__init__('From Memory')
         self._scan = Scan(points)
-        self._metrics = ScanMetrics.createFromPoints(points)
 
     def build(self) -> Scan:
         return self._scan
-
-    def getScanMetrics(self) -> ScanMetrics:
-        return self._metrics
 
 
 class FromFileScanBuilder(ScanBuilder):

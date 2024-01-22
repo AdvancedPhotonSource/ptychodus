@@ -33,9 +33,10 @@ class Scan(Sequence[ScanPoint]):
     def __len__(self) -> int:
         return len(self._pointSeq)
 
-    @property
-    def sizeInBytes(self) -> int:
-        return sys.getsizeof(self._pointSeq)
+    def __sizeof__(self) -> int:
+        numBytes = sys.getsizeof(self._pointSeq)
+        numBytes += sum(sys.getsizeof(point) for point in self._pointSeq)
+        return numBytes
 
 
 class ScanPointParseError(Exception):

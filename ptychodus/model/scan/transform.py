@@ -4,7 +4,6 @@ import numpy
 
 from ...api.parametric import ParameterRepository
 from ...api.scan import ScanPoint
-from .metrics import ScanMetrics
 
 
 class ScanPointTransform(ParameterRepository):
