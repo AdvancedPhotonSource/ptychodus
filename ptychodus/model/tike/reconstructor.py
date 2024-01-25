@@ -11,7 +11,7 @@ import tike.ptycho
 
 from ...api.object import ObjectArrayType
 from ...api.object import ObjectPoint
-from ...api.plot import Plot2D, PlotAxis, PlotSeries
+from ...api.plot import PlotUncertain2D, PlotUncertainAxis, PlotUncertainSeries, PlotAxis, PlotSeries
 from ...api.probe import ProbeArrayType
 from ...api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ...api.scan import Scan, ScanPoint, TabularScan
@@ -107,8 +107,8 @@ class TikeReconstructor:
 
         return 1
 
-    def _plotCosts(self, costs: Sequence[Sequence[float]]) -> Plot2D:
-        plot = Plot2D.createNull()
+    def _plotCosts(self, costs: Sequence[Sequence[float]]) -> PlotUncertain2D:
+        plot = PlotUncertain2D.createNull()
         numIterations = len(costs)
 
         if numIterations > 0:
@@ -117,7 +117,7 @@ class TikeReconstructor:
             midCost: list[float] = list()
             maxCost: list[float] = list()
 
-            seriesYList: list[PlotSeries] = list()
+            seriesYList: list[PlotUncertainSeries] = list()
 
             for values in costs:
                 minCost.append(min(values))
@@ -125,14 +125,17 @@ class TikeReconstructor:
                 maxCost.append(max(values))
 
             seriesYList = [
-                PlotSeries(label='Minimum', values=minCost),
-                PlotSeries(label='Median', values=midCost),
-                PlotSeries(label='Maximum', values=maxCost),
+                PlotUncertainSeries(
+                    label='Median',
+                    lo=minCost,
+                    values=midCost,
+                    hi=maxCost,
+                ),
             ]
 
-            plot = Plot2D(
+            plot = PlotUncertain2D(
                 axisX=PlotAxis(label='Iteration', series=[seriesX]),
-                axisY=PlotAxis(label='Cost', series=seriesYList),
+                axisY=PlotUncertainAxis(label='Cost', series=seriesYList),
             )
 
         return plot
