@@ -4,7 +4,7 @@ from pathlib import Path
 import logging
 
 from ...api.observer import Observable, Observer
-from ...api.plot import Plot2D, PlotAxis, PlotSeries
+from ...api.plot import Plot2D, PlotAxis, PlotSeries, PlotUncertain2D
 from ...api.reconstructor import ReconstructorLibrary
 from ...api.settings import SettingsRegistry
 from ..data import ActiveDiffractionDataset
@@ -66,7 +66,7 @@ class ReconstructorPresenter(Observable, Observer):
         )
         self.notifyObservers()
 
-    def getPlot(self) -> Plot2D:
+    def getPlot(self) -> Plot2D | PlotUncertain2D:
         return self._plot2D
 
     @property
