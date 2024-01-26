@@ -1,8 +1,5 @@
 from __future__ import annotations
-from bisect import bisect
-from collections import defaultdict
 from collections.abc import Sequence
-from statistics import median
 import logging
 
 from ...api.scan import Scan, ScanPoint

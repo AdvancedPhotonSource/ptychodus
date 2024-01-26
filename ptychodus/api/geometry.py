@@ -11,6 +11,9 @@ class Point2D:
     x: float
     y: float
 
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.x}, {self.y})'
+
 
 @dataclass(frozen=True)
 class Line2D:
@@ -22,6 +25,9 @@ class Line2D:
         x = beta * self.begin.x + alpha * self.end.x
         y = beta * self.begin.y + alpha * self.end.y
         return Point2D(x, y)
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.begin}, {self.end})'
 
 
 class Interval(Generic[T]):
@@ -67,16 +73,3 @@ class Interval(Generic[T]):
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.lower}, {self.upper})'
-
-
-@dataclass(frozen=True)
-class Box2D:
-    rangeX: Interval[float]
-    rangeY: Interval[float]
-
-    @property
-    def midpoint(self) -> Point2D:
-        return Point2D(self.rangeX.midrange, self.rangeY.midrange)
-
-    def hull(self, x: Interval[float] | float, y: Interval[float] | float) -> Box2D:
-        return Box2D(self.rangeX.hull(x), self.rangeY.hull(y))

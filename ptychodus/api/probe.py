@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeAlias
 
@@ -8,6 +9,43 @@ import numpy
 import numpy.typing
 
 ProbeArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+
+
+@dataclass(frozen=True)
+class ProbeGeometry:
+    widthInPixels: int
+    heightInPixels: int
+    pixelWidthInMeters: float
+    pixelHeightInMeters: float
+
+    @property
+    def widthInMeters(self) -> float:
+        return self.widthInPixels * self.pixelWidthInMeters
+
+    @property
+    def heightInMeters(self) -> float:
+        return self.heightInPixels * self.pixelHeightInMeters
+
+    def _asTuple(self) -> tuple[int, int, float, float]:
+        return (self.widthInPixels, self.heightInPixels, self.pixelWidthInMeters,
+                self.pixelHeightInMeters)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ProbeGeometry):
+            return (self._asTuple() == other._asTuple())
+
+        return False
+
+
+class ProbeGeometryProvider(ABC):
+
+    @abstractmethod
+    def getProbeWavelengthInMeters(self) -> float:
+        pass
+
+    @abstractmethod
+    def getProbeGeometry(self) -> ProbeGeometry:
+        pass
 
 
 class Probe:
@@ -46,24 +84,16 @@ class Probe:
         return self._array.shape[-3]
 
     @property
-    def heightInPixels(self) -> int:
-        return self._array.shape[-2]
-
-    @property
-    def widthInPixels(self) -> int:
-        return self._array.shape[-1]
-
-    @property
     def sizeInBytes(self) -> int:
         return self._array.nbytes
 
-    @property
-    def pixelWidthInMeters(self) -> float:
-        return self._pixelWidthInMeters
-
-    @property
-    def pixelHeightInMeters(self) -> float:
-        return self._pixelHeightInMeters
+    def getGeometry(self) -> ProbeGeometry:
+        return ProbeGeometry(
+            widthInPixels=self._array.shape[-1],
+            heightInPixels=self._array.shape[-2],
+            pixelWidthInMeters=self._pixelWidthInMeters,
+            pixelHeightInMeters=self._pixelHeightInMeters,
+        )
 
     def getMode(self, number: int) -> ProbeArrayType:
         return self._array[number, :, :]

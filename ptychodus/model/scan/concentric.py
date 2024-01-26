@@ -14,16 +14,9 @@ class ConcentricScanBuilder(ScanBuilder):
             1e-6,
             minimum=0.,
         )
-        self.numberOfShells = self._registerIntegerParameter(
-            'NumberOfShells',
-            5,
-            minimum=0,
-        )
+        self.numberOfShells = self._registerIntegerParameter('NumberOfShells', 5, minimum=0)
         self.numberOfPointsInFirstShell = self._registerIntegerParameter(
-            'NumberOfPointsInFirstShell',
-            10,
-            minimum=0,
-        )
+            'NumberOfPointsInFirstShell', 10, minimum=0)
 
     @property
     def _numberOfPoints(self) -> int:

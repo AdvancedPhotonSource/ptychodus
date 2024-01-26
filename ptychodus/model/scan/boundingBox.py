@@ -1,38 +1,40 @@
 import numpy
 
-from ...api.geometry import Box2D, Interval, Point2D
-from ...api.scan import ScanPoint
+from ...api.geometry import Point2D
+from ...api.scan import ScanBoundingBox, ScanPoint
 
 
-class ScanBoundingBox:
+class ScanBoundingBoxBuilder:
 
     def __init__(self) -> None:
-        self._xmin = +numpy.inf
-        self._xmax = -numpy.inf
-        self._ymin = +numpy.inf
-        self._ymax = -numpy.inf
+        self._minimumXInMeters = +numpy.inf
+        self._maximumXInMeters = -numpy.inf
+        self._minimumYInMeters = +numpy.inf
+        self._maximumYInMeters = -numpy.inf
 
     def hull(self, point: ScanPoint) -> None:
-        if point.positionXInMeters < self._xmin:
-            self._xmin = point.positionXInMeters
+        if point.positionXInMeters < self._minimumXInMeters:
+            self._minimumXInMeters = point.positionXInMeters
 
-        if self._xmax < point.positionXInMeters:
-            self._xmax = point.positionXInMeters
+        if self._maximumXInMeters < point.positionXInMeters:
+            self._maximumXInMeters = point.positionXInMeters
 
-        if point.positionYInMeters < self._ymin:
-            self._ymin = point.positionYInMeters
+        if point.positionYInMeters < self._minimumYInMeters:
+            self._minimumYInMeters = point.positionYInMeters
 
-        if self._ymax < point.positionYInMeters:
-            self._ymax = point.positionYInMeters
+        if self._maximumYInMeters < point.positionYInMeters:
+            self._maximumYInMeters = point.positionYInMeters
 
     def getMidpointInMeters(self) -> Point2D:
         return Point2D(
-            x=0.5 * (self._xmin + self._xmax),
-            y=0.5 * (self._ymin + self._ymax),
+            x=0.5 * (self._minimumXInMeters + self._maximumXInMeters),
+            y=0.5 * (self._minimumYInMeters + self._maximumYInMeters),
         )
 
-    def getBoundingBoxInMeters(self) -> Box2D | None:
-        return Box2D(
-            rangeX=Interval[float](self._xmin, self._xmax),
-            rangeY=Interval[float](self._ymin, self._ymax),
+    def getBoundingBox(self) -> ScanBoundingBox | None:
+        return ScanBoundingBox(
+            minimumXInMeters=self._minimumXInMeters,
+            maximumXInMeters=self._maximumXInMeters,
+            minimumYInMeters=self._minimumYInMeters,
+            maximumYInMeters=self._maximumYInMeters,
         )

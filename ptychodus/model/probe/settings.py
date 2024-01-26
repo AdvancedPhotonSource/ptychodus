@@ -10,15 +10,10 @@ class ProbeSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
-        self.initializer = settingsGroup.createStringEntry('Initializer', 'SuperGaussian')
+        self.initializer = settingsGroup.createStringEntry('Builder', 'SuperGaussian')
         self.inputFileType = settingsGroup.createStringEntry('InputFileType', 'NPY')
         self.inputFilePath = settingsGroup.createPathEntry('InputFilePath',
                                                            Path('/path/to/probe.npy'))
-        self.numberOfModes = settingsGroup.createIntegerEntry('NumberOfModes', 1)
-        self.orthogonalizeModesEnabled = settingsGroup.createBooleanEntry(
-            'OrthogonalizeModesEnabled', True)
-        self.modeDecayType = settingsGroup.createStringEntry('ModeDecayType', 'Polynomial')
-        self.modeDecayRatio = settingsGroup.createRealEntry('ModeDecayRatio', '1')
 
         self.diskDiameterInMeters = settingsGroup.createRealEntry('DiskDiameterInMeters', '400e-6')
 

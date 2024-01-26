@@ -5,7 +5,7 @@ from .builder import ScanBuilder
 class CartesianScanBuilder(ScanBuilder):
 
     def __init__(self, *, snake: bool, centered: bool) -> None:
-        super().__init__('Cartesian')
+        super().__init__('Cartesian')  # FIXME hex scan too
         nameList: list[str] = list()
 
         if centered:
@@ -17,28 +17,12 @@ class CartesianScanBuilder(ScanBuilder):
             nameList.append('Raster')
 
         super().__init__(' '.join(nameList))
-        self.stepSizeXInMeters = self._registerRealParameter(
-            'StepSizeXInMeters',
-            1e-6,
-            minimum=0.,
-        )
-        self.stepSizeYInMeters = self._registerRealParameter(
-            'StepSizeYInMeters',
-            1e-6,
-            minimum=0.,
-        )
-        self.numberOfPointsX = self._registerIntegerParameter(
-            'NumberOfPointsX',
-            10,
-            minimum=0,
-        )
-        self.numberOfPointsY = self._registerIntegerParameter(
-            'NumberOfPointsY',
-            10,
-            minimum=0,
-        )
-        self._snake = self._registerBooleanParameter('Snake', False)  # FIXME to GUI
-        self._centered = self._registerBooleanParameter('Centered', False)  # FIXME to GUI
+        self.stepSizeXInMeters = self._registerRealParameter('StepSizeXInMeters', 1e-6, minimum=0.)
+        self.stepSizeYInMeters = self._registerRealParameter('StepSizeYInMeters', 1e-6, minimum=0.)
+        self.numberOfPointsX = self._registerIntegerParameter('NumberOfPointsX', 10, minimum=0)
+        self.numberOfPointsY = self._registerIntegerParameter('NumberOfPointsY', 10, minimum=0)
+        self._snake = self._registerBooleanParameter('Snake', snake)
+        self._centered = self._registerBooleanParameter('Centered', centered)
 
     def build(self) -> Scan:
         nx = self.numberOfPointsX.getValue()

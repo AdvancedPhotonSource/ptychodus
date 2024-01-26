@@ -1,20 +1,17 @@
 from .builder import ProbeBuilder
 from .builderFactory import ProbeBuilderFactory
 from .core import ProbeCore
-from .disk import DiskProbeInitializer
-from .file import FromFileProbeInitializer
-from .fzp import FresnelZonePlateProbeInitializer
+from .disk import DiskProbeBuilder
+from .fzp import FresnelZonePlateProbeBuilder
 from .item import ProbeRepositoryItem
 from .itemFactory import ProbeRepositoryItemFactory
-from .repository import ProbeModeDecayType
+from .multimodal import ProbeModeDecayType
 from .settings import ProbeSettings
-from .sizer import ProbeSizer
-from .superGaussian import SuperGaussianProbeInitializer
+from .superGaussian import SuperGaussianProbeBuilder
 
 __all__ = [
-    'DiskProbeInitializer',
-    'FresnelZonePlateProbeInitializer',
-    'FromFileProbeInitializer',
+    'DiskProbeBuilder',
+    'FresnelZonePlateProbeBuilder',
     'ProbeBuilder',
     'ProbeBuilderFactory',
     'ProbeCore',
@@ -24,6 +21,5 @@ __all__ = [
     'ProbeRepositoryItemFactory',
     'ProbeRepositoryPresenter',
     'ProbeSettings',
-    'ProbeSizer',
-    'SuperGaussianProbeInitializer',
+    'SuperGaussianProbeBuilder',
 ]

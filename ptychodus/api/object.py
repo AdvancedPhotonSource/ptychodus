@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeAlias
 
@@ -11,6 +12,44 @@ from .geometry import Point2D
 from .patterns import ImageExtent
 
 ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+
+
+@dataclass(frozen=True)
+class ObjectGeometry:
+    widthInPixels: int
+    heightInPixels: int
+    pixelWidthInMeters: float
+    pixelHeightInMeters: float
+    centerXInMeters: float
+    centerYInMeters: float
+
+    @property
+    def _radiusX(self) -> float:
+        return self.widthInPixels / 2
+
+    @property
+    def _radiusY(self) -> float:
+        return self.heightInPixels / 2
+
+    def mapObjectPointToScanPoint(self, objectPoint: Point2D) -> Point2D:
+        x = self.centerXInMeters + self.pixelWidthInMeters * (objectPoint.x - self._radiusX)
+        y = self.centerYInMeters + self.pixelHeightInMeters * (objectPoint.y - self._radiusY)
+        return Point2D(x, y)
+
+    def mapScanPointToObjectPoint(self, scanPoint: Point2D) -> Point2D:
+        x = (scanPoint.x - self.centerXInMeters) / self.pixelWidthInMeters + self._radiusX
+        y = (scanPoint.y - self.centerYInMeters) / self.pixelHeightInMeters + self._radiusY
+        return Point2D(x, y)
+
+    def contains(self, geometry: ObjectGeometry) -> bool:
+        return False  # FIXME
+
+
+class ObjectGeometryProvider(ABC):
+
+    @abstractmethod
+    def getObjectGeometry(self) -> ObjectGeometry:
+        pass
 
 
 class Object:
@@ -65,24 +104,18 @@ class Object:
         return self._array.shape[-3]
 
     @property
-    def heightInPixels(self) -> int:
-        return self._array.shape[-2]
-
-    @property
-    def widthInPixels(self) -> int:
-        return self._array.shape[-1]
-
-    @property
     def sizeInBytes(self) -> int:
         return self._array.nbytes
 
-    @property
-    def pixelWidthInMeters(self) -> float:
-        return self._pixelWidthInMeters
-
-    @property
-    def pixelHeightInMeters(self) -> float:
-        return self._pixelHeightInMeters
+    def getGeometry(self) -> ObjectGeometry:
+        return ObjectGeometry(
+            widthInPixels=self._array.shape[-1],
+            heightInPixels=self._array.shape[-2],
+            pixelWidthInMeters=self._pixelWidthInMeters,
+            pixelHeightInMeters=self._pixelHeightInMeters,
+            centerXInMeters=self._centerXInMeters,
+            centerYInMeters=self._centerYInMeters,
+        )
 
     def getLayer(self, number: int) -> ObjectArrayType:
         return self._array[number, :, :]
@@ -96,35 +129,6 @@ class Object:
 
     def getLayerDistanceInMeters(self, number: int) -> float:
         return self._layerDistanceInMeters[number]
-
-    @property
-    def centerXInMeters(self) -> float:
-        return self._centerXInMeters
-
-    @property
-    def centerYInMeters(self) -> float:
-        return self._centerYInMeters
-
-    def getCenter(self) -> Point2D:
-        return Point2D(self._centerXInMeters, self._centerYInMeters)
-
-    @property
-    def _radiusX(self) -> float:
-        return self.widthInPixels / 2
-
-    @property
-    def _radiusY(self) -> float:
-        return self.heightInPixels / 2
-
-    def mapObjectPointToScanPoint(self, objectPoint: Point2D) -> Point2D:
-        x = self._centerXInMeters + self._pixelWidthInMeters * (objectPoint.x - self._radiusX)
-        y = self._centerYInMeters + self._pixelHeightInMeters * (objectPoint.y - self._radiusY)
-        return Point2D(x, y)
-
-    def mapScanPointToObjectPoint(self, scanPoint: Point2D) -> Point2D:
-        x = (scanPoint.x - self._centerXInMeters) / self._pixelWidthInMeters + self._radiusX
-        y = (scanPoint.y - self._centerYInMeters) / self._pixelHeightInMeters + self._radiusY
-        return Point2D(x, y)
 
 
 class ObjectInterpolator(ABC):

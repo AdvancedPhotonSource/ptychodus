@@ -14,6 +14,38 @@ class ScanPoint:
     positionYInMeters: float
 
 
+@dataclass(frozen=True)
+class ScanBoundingBox:
+    minimumXInMeters: float
+    maximumXInMeters: float
+    minimumYInMeters: float
+    maximumYInMeters: float
+
+    @property
+    def widthInMeters(self) -> float:
+        return self.maximumXInMeters - self.minimumXInMeters
+
+    @property
+    def heightInMeters(self) -> float:
+        return self.maximumYInMeters - self.minimumYInMeters
+
+    @property
+    def centerXInMeters(self) -> float:
+        return self.minimumXInMeters + self.widthInMeters / 2.
+
+    @property
+    def centerYInMeters(self) -> float:
+        return self.minimumYInMeters + self.heightInMeters / 2.
+
+    def hull(self, bbox: ScanBoundingBox) -> ScanBoundingBox:
+        return ScanBoundingBox(
+            minimumXInMeters=min(self.minimumXInMeters, bbox.minimumXInMeters),
+            maximumXInMeters=max(self.maximumXInMeters, bbox.maximumXInMeters),
+            minimumYInMeters=min(self.minimumYInMeters, bbox.minimumYInMeters),
+            maximumYInMeters=max(self.maximumYInMeters, bbox.maximumYInMeters),
+        )
+
+
 class Scan(Sequence[ScanPoint]):
 
     def __init__(self, pointSeq: Sequence[ScanPoint] | None = None) -> None:

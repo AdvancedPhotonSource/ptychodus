@@ -98,15 +98,23 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
         if parent is not None:
             parent._addParameterRepository(self)
 
-    def _addParameterRepository(self, repository: ParameterRepository) -> None:
+    def _addParameterRepository(self,
+                                repository: ParameterRepository,
+                                *,
+                                observe: bool = False) -> None:
         if repository not in self._repositoryList:
             self._repositoryList.append(repository)
+
+        if observe:
+            repository.addObserver(self)
 
     def _removeParameterRepository(self, repository: ParameterRepository) -> None:
         try:
             self._repositoryList.remove(repository)
         except ValueError:
             pass
+        else:
+            repository.removeObserver(self)
 
     def _registerParameter(self, name: str, parameter: Parameter[Any]) -> None:
         if self._parameterList.setdefault(name, parameter) == parameter:

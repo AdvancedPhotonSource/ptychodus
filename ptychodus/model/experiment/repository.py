@@ -12,7 +12,7 @@ from ..object import ObjectRepositoryItem, ObjectRepositoryItemFactory
 from ..patterns import ActiveDiffractionDataset, PatternSizer
 from ..probe import ProbeRepositoryItem, ProbeRepositoryItemFactory
 from ..scan import ScanRepositoryItem, ScanRepositoryItemFactory
-from .sizer import ExperimentSizer
+from .geometry import ExperimentGeometry
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ class ExperimentRepositoryItem(ParameterRepository):
 
     def __init__(self, parent: ExperimentRepositoryItemObserver, privateIndex: int,
                  metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
-                 probe: ProbeRepositoryItem, object_: ObjectRepositoryItem,
-                 patternSizer: PatternSizer, patterns: ActiveDiffractionDataset) -> None:
+                 geometry: ExperimentGeometry, probe: ProbeRepositoryItem,
+                 object_: ObjectRepositoryItem, patterns: ActiveDiffractionDataset) -> None:
         super().__init__('Experiment')
         self._parent = parent
         self._privateIndex = privateIndex
@@ -49,14 +49,14 @@ class ExperimentRepositoryItem(ParameterRepository):
         self._scan = scan
         self._probe = probe
         self._object = object_
-        self._sizer = ExperimentSizer(metadata, scan, patternSizer)
+        self._geometry = geometry
         self._patterns = patterns
 
         self._addParameterRepository(self._metadata)
         self._addParameterRepository(self._scan)
         self._addParameterRepository(self._probe)
         self._addParameterRepository(self._object)
-        self._addParameterRepository(self._sizer)
+        self._addParameterRepository(self._geometry)
 
         self._metadata.addObserver(self)
         self._scan.addObserver(self)
@@ -83,7 +83,7 @@ class ExperimentRepositoryItem(ParameterRepository):
     def isProbeValid(self) -> bool:
         # FIXME self.notifyObservers() when isProbeValid changes
         probe = self._probe.getProbe()
-        return self._sizer.isProbeExtentValid(probe.getExtent())
+        return self._geometry.isProbeGeometryValid(probe.getGeometry())
 
     def getObject(self) -> ObjectRepositoryItem:
         return self._object
@@ -91,7 +91,7 @@ class ExperimentRepositoryItem(ParameterRepository):
     def isObjectValid(self) -> bool:
         # FIXME self.notifyObservers() when isObjectValid changes
         object_ = self._object.getObject()
-        return self._sizer.isObjectExtentValid(object_.getExtent())
+        return self._geometry.isObjectGeometryValid(object_.getGeometry())
 
     def getExperiment(self) -> Experiment:
         return Experiment(
@@ -174,14 +174,19 @@ class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentReposit
 
     def insertExperiment(self, experiment: Experiment) -> int:
         index = len(self._itemList)
+
+        metadata = MetadataRepositoryItem(experiment.metadata)
+        scan = self._scanRepositoryItemFactory.create(experiment.scan)
+        geometry = ExperimentGeometry(metadata, scan, self._patternSizer)
+
         item = ExperimentRepositoryItem(
             parent=self,
             privateIndex=index,
-            metadata=MetadataRepositoryItem(experiment.metadata),
-            scan=self._scanRepositoryItemFactory.create(experiment.scan),
+            metadata=metadata,
+            scan=scan,
+            geometry=geometry,
             probe=self._probeRepositoryItemFactory.create(experiment.probe),
             object_=self._objectRepositoryItemFactory.create(experiment.object_),
-            patternSizer=self._patternSizer,
             patterns=self._patterns)
         self._itemList.append(item)
 
