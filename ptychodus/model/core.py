@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
 from types import TracebackType
-from typing import overload, Optional
+from typing import overload
 import logging
 import sys
 
@@ -61,9 +61,9 @@ def configureLogger() -> None:
 
 @dataclass(frozen=True)
 class ModelArgs:
-    restartFilePath: Optional[Path]
-    settingsFilePath: Optional[Path]
-    replacementPathPrefix: Optional[str] = None
+    restartFilePath: Path | None
+    settingsFilePath: Path | None
+    replacementPathPrefix: str | None = None
     rpcPort: int = -1
     autoExecuteRPCs: bool = False
     isDeveloperModeEnabled: bool = False
@@ -133,7 +133,7 @@ class ModelCore:
                                               self._scanCore.scanAPI, self._probeCore.probeAPI,
                                               self._objectCore.objectAPI, self._workflowCore)
 
-        self.rpcMessageService: Optional[RPCMessageService] = None
+        self.rpcMessageService: RPCMessageService | None = None
 
         if modelArgs.rpcPort >= 0:
             self.rpcMessageService = RPCMessageService(modelArgs.rpcPort,

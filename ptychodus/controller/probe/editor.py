@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 import logging
 
 from PyQt5.QtWidgets import QButtonGroup, QGroupBox, QWidget
@@ -64,7 +63,7 @@ class ProbeModesController(Observer):
 class ProbeEditorViewController:
 
     def __init__(self, presenter: ProbeRepositoryItemPresenter, editorView: QGroupBox,
-                 parent: Optional[QWidget]) -> None:
+                 parent: QWidget | None) -> None:
         self._dialog = ProbeEditorDialog.createInstance(presenter.name, editorView, parent)
         self._modesController = ProbeModesController.createInstance(presenter.item,
                                                                     self._dialog.modesView)
@@ -73,6 +72,6 @@ class ProbeEditorViewController:
     def editParameters(cls,
                        presenter: ProbeRepositoryItemPresenter,
                        editorView: QGroupBox,
-                       parent: Optional[QWidget] = None) -> None:
+                       parent: QWidget | None = None) -> None:
         vc = cls(presenter, editorView, parent)
         vc._dialog.open()

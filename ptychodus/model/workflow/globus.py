@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from importlib.metadata import version
 from pprint import pformat
-from typing import Final, Optional, Union
+from typing import Final, TypeAlias
 import json
 import logging
 import os
@@ -22,8 +22,8 @@ from .status import WorkflowStatus, WorkflowStatusRepository
 
 logger = logging.getLogger(__name__)
 
-AuthorizerTypes = Union[globus_sdk.AccessTokenAuthorizer, globus_sdk.RefreshTokenAuthorizer]
-ScopeAuthorizerMapping = Mapping[str, AuthorizerTypes]
+AuthorizerTypes: TypeAlias = globus_sdk.AccessTokenAuthorizer | globus_sdk.RefreshTokenAuthorizer
+ScopeAuthorizerMapping: TypeAlias = Mapping[str, AuthorizerTypes]
 
 PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
@@ -125,7 +125,7 @@ class NativePtychodusClientBuilder(PtychodusClientBuilder):
 
 class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
 
-    def __init__(self, clientID: str, clientSecret: str, flowID: Optional[str]) -> None:
+    def __init__(self, clientID: str, clientSecret: str, flowID: str | None) -> None:
         super().__init__()
         self._authClient = globus_sdk.ConfidentialAppAuthClient(
             client_id=clientID,
@@ -167,7 +167,7 @@ class GlobusWorkflowThread(threading.Thread):
         logger.info('\tFair Research Login ' + version('fair-research-login'))
         logger.info('\tGladier ' + version('gladier'))
 
-        self.__gladierClient: Optional[gladier.GladierBaseClient] = None
+        self.__gladierClient: gladier.GladierBaseClient | None = None
 
     @classmethod
     def createInstance(cls, authorizer: WorkflowAuthorizer,

@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Union, overload
+from typing import overload
 from uuid import UUID
 import logging
 import threading
@@ -159,8 +159,7 @@ class WorkflowStatusPresenter:
     def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]:
         ...
 
-    def __getitem__(self, index: Union[int, slice]) -> \
-            Union[WorkflowStatus, Sequence[WorkflowStatus]]:
+    def __getitem__(self, index: int | slice) -> WorkflowStatus | Sequence[WorkflowStatus]:
         return self._statusRepository[index]
 
     def __len__(self) -> int:
@@ -197,7 +196,7 @@ class WorkflowCore:
         self._executor = WorkflowExecutor(self._settings, self._inputDataLocator,
                                           self._computeDataLocator, self._outputDataLocator,
                                           settingsRegistry, stateDataRegistry)
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
 
         try:
             from .globus import GlobusWorkflowThread

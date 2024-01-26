@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any
 import logging
 
 from skimage.restoration import unwrap_phase
@@ -9,7 +9,7 @@ from ...api.observer import Observable
 from ...api.patterns import PixelGeometry
 from ...api.visualize import RealArrayType
 
-NumericDTypes = Union[numpy.integer[Any], numpy.floating[Any], numpy.complexfloating[Any, Any]]
+NumericDTypes = numpy.integer[Any] | numpy.floating[Any] | numpy.complexfloating[Any, Any]
 NumericArrayType = numpy.typing.NDArray[NumericDTypes]
 
 logger = logging.getLogger(__name__)

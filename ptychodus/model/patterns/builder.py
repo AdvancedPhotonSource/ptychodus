@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 import logging
 import queue
 import threading
@@ -25,7 +24,7 @@ class ActiveDiffractionDatasetBuilder:
         super().__init__()
         self._settings = settings
         self._dataset = dataset
-        self._unassembledDataset: Optional[DiffractionDataset] = None
+        self._unassembledDataset: DiffractionDataset | None = None
         self._arrayQueue: queue.Queue[DiffractionPatternArray] = queue.Queue()
         self._workers: list[threading.Thread] = list()
         self._stopWorkEvent = threading.Event()

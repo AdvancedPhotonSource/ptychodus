@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional
 import logging
 
 from ...api.patterns import (DiffractionFileReader, DiffractionMetadata, DiffractionPatternArray,
@@ -48,7 +47,7 @@ class DiffractionDataAPI:
                                filePath: Path,
                                fileType: str,
                                *,
-                               assemble: bool = True) -> Optional[str]:
+                               assemble: bool = True) -> str | None:
         self._fileReaderChooser.setCurrentPluginByName(fileType)
 
         if filePath.is_file():

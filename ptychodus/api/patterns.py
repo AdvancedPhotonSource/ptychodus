@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
-from typing import overload, Any, TypeAlias, Union
+from typing import overload, Any, TypeAlias
 
 import numpy
 import numpy.typing
@@ -13,7 +13,7 @@ from .observer import Observable
 from .tree import SimpleTreeNode
 
 DiffractionPatternArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
-DiffractionPatternIndexes = numpy.typing.NDArray[numpy.integer[Any]]
+DiffractionPatternIndexes: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 
 
 @dataclass(frozen=True)
@@ -179,8 +179,8 @@ class SimpleDiffractionDataset(DiffractionDataset):
     def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
         ...
 
-    def __getitem__(self, index: Union[int,slice]) -> \
-            Union[DiffractionPatternArray, Sequence[DiffractionPatternArray]]:
+    def __getitem__(self, index: int |slice) -> \
+            DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         return self._arrayList[index]
 
     def __len__(self) -> int:

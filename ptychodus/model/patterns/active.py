@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from typing import overload, Union
+from typing import overload
 import logging
 import tempfile
 import threading
@@ -61,8 +61,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
     def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
         ...
 
-    def __getitem__(self, index: Union[int, slice]) -> \
-            Union[DiffractionPatternArray, Sequence[DiffractionPatternArray]]:
+    def __getitem__(self, index: int | slice) -> \
+            DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         with self._arrayListLock:
             return self._arrayList[index]
 

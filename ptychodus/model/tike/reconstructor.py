@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from importlib.metadata import version
-from typing import Any, Union
+from typing import Any
 import logging
 import pprint
 
@@ -94,7 +94,7 @@ class TikeReconstructor:
 
         return options
 
-    def getNumGpus(self) -> Union[int, tuple[int, ...]]:
+    def getNumGpus(self) -> int | tuple[int, ...]:
         numGpus = self._settings.numGpus.value
         onlyDigitsAndCommas = all(c.isdigit() or c == ',' for c in numGpus)
         hasDigit = any(c.isdigit() for c in numGpus)

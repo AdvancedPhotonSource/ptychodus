@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional
 
 from PyQt5.QtWidgets import QDialog, QFileDialog, QWidget
 
@@ -20,9 +19,9 @@ class FileDialogFactory:
     def getOpenFilePath(self,
                         parent: QWidget,
                         caption: str,
-                        nameFilters: Optional[Sequence[str]] = None,
-                        mimeTypeFilters: Optional[Sequence[str]] = None,
-                        selectedNameFilter: Optional[str] = None) -> tuple[Optional[Path], str]:
+                        nameFilters: Sequence[str] | None = None,
+                        mimeTypeFilters: Sequence[str] | None = None,
+                        selectedNameFilter: str | None = None) -> tuple[Path | None, str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self.getOpenWorkingDirectory()))
@@ -51,9 +50,9 @@ class FileDialogFactory:
     def getSaveFilePath(self,
                         parent: QWidget,
                         caption: str,
-                        nameFilters: Optional[Sequence[str]] = None,
-                        mimeTypeFilters: Optional[Sequence[str]] = None,
-                        selectedNameFilter: Optional[str] = None) -> tuple[Optional[Path], str]:
+                        nameFilters: Sequence[str] | None = None,
+                        mimeTypeFilters: Sequence[str] | None = None,
+                        selectedNameFilter: str | None = None) -> tuple[Path | None, str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._saveWorkingDirectory))
@@ -79,7 +78,7 @@ class FileDialogFactory:
 
         return filePath, dialog.selectedNameFilter()
 
-    def getExistingDirectoryPath(self, parent: QWidget, caption: str) -> Optional[Path]:
+    def getExistingDirectoryPath(self, parent: QWidget, caption: str) -> Path | None:
         dirPath = None
 
         dirName = QFileDialog.getExistingDirectory(
