@@ -7,7 +7,7 @@ from pathlib import Path
 from .data import DiffractionPatternArrayType
 from .image import ImageExtent
 from .object import ObjectArrayType, ObjectInterpolator
-from .plot import Plot2D
+from .plot import Plot2D, PlotUncertain2D
 from .probe import ProbeArrayType
 from .scan import Scan
 
@@ -51,7 +51,7 @@ class ReconstructOutput:
     probeArray: ProbeArrayType | None
     objectArray: ObjectArrayType | None
     objective: Sequence[Sequence[float]]
-    plot2D: Plot2D
+    plot2D: Plot2D | PlotUncertain2D
     result: int
 
     @classmethod

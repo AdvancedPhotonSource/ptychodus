@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 import logging
+import itertools
 
 from PyQt5.QtCore import Qt, QStringListModel
 from PyQt5.QtGui import QPixmap
@@ -208,14 +209,14 @@ class ReconstructorParametersController(Observer):
         ax.set_ylabel(axisY.label)
         ax.grid(True)
 
-        if len(axisX.series) == len(axisY.series):
-            for sx, sy in zip(axisX.series, axisY.series):
+        if (
+            (len(axisX.series) == len(axisY.series)) or
+            (len(axisX.series) == 1 and len(axisY.series) >= 1)
+        ):
+            for sx, sy in zip(itertools.cycle(axisX.series), axisY.series):
                 ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
-        elif len(axisX.series) == 1:
-            sx = axisX.series[0]
-
-            for sy in axisY.series:
-                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
+                if hasattr(sy, 'hi') and hasattr(sy, 'lo'):
+                    ax.fill_between(sx.values, sy.lo, sy.hi, alpha=0.2)
         else:
             logger.error('Failed to broadcast plot series!')
 
