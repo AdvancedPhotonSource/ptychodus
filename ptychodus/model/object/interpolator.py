@@ -12,7 +12,6 @@ from ...api.observer import Observable, Observer
 from ...api.patterns import ImageExtent
 from ...api.plugins import PluginChooser
 from .settings import ObjectSettings
-from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
 
@@ -40,20 +39,19 @@ class ObjectLinearInterpolator(ObjectInterpolator):
 
 class ObjectInterpolatorFactory(Observable, Observer):
 
-    def __init__(self, settings: ObjectSettings, sizer: ObjectSizer,
+    def __init__(self, settings: ObjectSettings,
                  phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
                  reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
-        self._sizer = sizer
         self._phaseCenteringStrategyChooser = phaseCenteringStrategyChooser
         self._reinitObservable = reinitObservable
 
     @classmethod
-    def createInstance(cls, settings: ObjectSettings, sizer: ObjectSizer,
+    def createInstance(cls, settings: ObjectSettings,
                        phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
                        reinitObservable: Observable) -> ObjectInterpolatorFactory:
-        factory = cls(settings, sizer, phaseCenteringStrategyChooser, reinitObservable)
+        factory = cls(settings, phaseCenteringStrategyChooser, reinitObservable)
         reinitObservable.addObserver(factory)
         factory._syncFromSettings()
         return factory

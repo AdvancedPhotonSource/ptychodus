@@ -1,35 +1,32 @@
 from __future__ import annotations
 import logging
 
+from ...api.object import Object
 from ...api.observer import Observable
 from ...api.parametric import ParameterRepository
-from ...api.probe import Probe
-from .builder import ProbeBuilder
-from .multimodal import MultimodalProbeBuilder
+from .builder import ObjectBuilder
 
 logger = logging.getLogger(__name__)
 
 
-class ProbeRepositoryItem(ParameterRepository):
+class ObjectRepositoryItem(ParameterRepository):
 
-    def __init__(self, builder: ProbeBuilder, modesBuilder: MultimodalProbeBuilder) -> None:
-        super().__init__('Probe')
+    def __init__(self, builder: ObjectBuilder) -> None:
+        super().__init__('Object')
         self._builder = builder
-        self._modesBuilder = modesBuilder
-        self._probe = Probe()
+        self._object = Object()
 
         self._addParameterRepository(builder, observe=True)
-        self._addParameterRepository(modesBuilder, observe=True)
 
         self._rebuild()
 
-    def getProbe(self) -> Probe:
-        return self._probe
+    def getObject(self) -> Object:
+        return self._object
 
-    def getBuilder(self) -> ProbeBuilder:
+    def getBuilder(self) -> ObjectBuilder:
         return self._builder
 
-    def setBuilder(self, builder: ProbeBuilder) -> None:
+    def setBuilder(self, builder: ObjectBuilder) -> None:
         self._removeParameterRepository(self._builder)
         self._builder.removeObserver(self)
         self._builder = builder
@@ -39,18 +36,16 @@ class ProbeRepositoryItem(ParameterRepository):
 
     def _rebuild(self) -> None:
         try:
-            probe = self._builder.build()
+            object_ = self._builder.build()
         except Exception:
-            logger.exception('Failed to reinitialize probe!')
+            logger.exception('Failed to reinitialize object!')
             return
 
-        self._probe = self._modesBuilder.build(probe)
+        self._object = object_
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
         if observable is self._builder:
-            self._rebuild()
-        elif observable is self._modesBuilder:
             self._rebuild()
         else:
             super().update(observable)

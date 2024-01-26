@@ -6,7 +6,6 @@ from .fzp import FresnelZonePlateProbeBuilder
 from .item import ProbeRepositoryItem
 from .itemFactory import ProbeRepositoryItemFactory
 from .multimodal import ProbeModeDecayType
-from .settings import ProbeSettings
 from .superGaussian import SuperGaussianProbeBuilder
 
 __all__ = [
@@ -20,6 +19,5 @@ __all__ = [
     'ProbeRepositoryItem',
     'ProbeRepositoryItemFactory',
     'ProbeRepositoryPresenter',
-    'ProbeSettings',
     'SuperGaussianProbeBuilder',
 ]

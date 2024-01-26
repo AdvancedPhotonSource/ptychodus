@@ -6,20 +6,19 @@ import logging
 from ...api.object import Object
 from ...api.observer import Observable, Observer
 from ...api.visualize import FourierRingCorrelation
-from .repository import ObjectInitializer, ObjectRepositoryItem
+from .repository import ObjectRepositoryItem
+from .builder import ObjectBuilder
 from .settings import ObjectSettings
-from .sizer import ObjectSizer
 
 logger = logging.getLogger(__name__)
 
 
-class CompareObjectInitializer(ObjectInitializer, Observer):
+class CompareObjectBuilder(ObjectBuilder, Observer):
     SIMPLE_NAME: Final[str] = 'Compare'
     DISPLAY_NAME: Final[str] = 'Compare'
 
-    def __init__(self, sizer: ObjectSizer, repository: Mapping[str, ObjectRepositoryItem]) -> None:
+    def __init__(self, repository: Mapping[str, ObjectRepositoryItem]) -> None:
         super().__init__()
-        self._sizer = sizer
         self._repository = repository
         self._name1 = str()
         self._item1 = ObjectRepositoryItem('')
@@ -58,7 +57,7 @@ class CompareObjectInitializer(ObjectInitializer, Observer):
 
     def getComparableNames(self) -> Sequence[str]:
         return [name for name, item in self._repository.items() \
-                if not isinstance(item.getInitializer(), CompareObjectInitializer)]
+                if not isinstance(item.getBuilder(), CompareObjectBuilder)]
 
     def _getNameFallback(self) -> str:
         try:
