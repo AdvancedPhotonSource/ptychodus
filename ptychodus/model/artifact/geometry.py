@@ -11,7 +11,7 @@ from ..patterns import PatternSizer
 from ..scan import ScanRepositoryItem
 
 
-class ExperimentGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometryProvider):
+class ArtifactGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometryProvider):
 
     def __init__(self, metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
                  patternSizer: PatternSizer) -> None:

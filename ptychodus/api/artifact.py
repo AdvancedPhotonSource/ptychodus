@@ -8,7 +8,7 @@ from .scan import Scan
 
 
 @dataclass(frozen=True)
-class ExperimentMetadata:
+class ArtifactMetadata:
     name: str
     comments: str
     probeEnergyInElectronVolts: float
@@ -16,24 +16,24 @@ class ExperimentMetadata:
 
 
 @dataclass(frozen=True)
-class Experiment:
-    metadata: ExperimentMetadata
+class Artifact:
+    metadata: ArtifactMetadata
     scan: Scan
     probe: Probe
     object_: Object
 
 
-class ExperimentFileReader(ABC):
+class ArtifactFileReader(ABC):
 
     @abstractmethod
-    def read(self, filePath: Path) -> Experiment:
-        '''reads an experiment from file'''
+    def read(self, filePath: Path) -> Artifact:
+        '''reads an artifact from file'''
         pass
 
 
-class ExperimentFileWriter(ABC):
+class ArtifactFileWriter(ABC):
 
     @abstractmethod
-    def write(self, filePath: Path, experiment: Experiment) -> None:
-        '''writes an experiment to file'''
+    def write(self, filePath: Path, artifact: Artifact) -> None:
+        '''writes an artifact to file'''
         pass

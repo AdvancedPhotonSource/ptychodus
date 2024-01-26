@@ -7,19 +7,19 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QItemSelection, QModelIndex, 
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import SequenceObserver
-from ...model.experiment import ExperimentRepositoryPresenter
-from ...view.experiment import ExperimentRepositoryView
+from ...model.artifact import ArtifactRepositoryPresenter
+from ...view.artifact import ArtifactRepositoryView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from .info import ExperimentInfoViewController
+from .info import ArtifactInfoViewController
 
 logger = logging.getLogger(__name__)
 
 
-class ExperimentRepositoryTableModel(QAbstractTableModel):
+class ArtifactRepositoryTableModel(QAbstractTableModel):
 
     def __init__(self,
-                 presenter: ExperimentRepositoryPresenter,
+                 presenter: ArtifactRepositoryPresenter,
                  parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
@@ -55,21 +55,21 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
         value = QVariant()
 
         if index.isValid():
-            experiment = self._presenter[index.row()]
+            artifact = self._presenter[index.row()]
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
-                    value = QVariant(experiment.getName())
+                    value = QVariant(artifact.getName())
                 elif index.column() == 1:
-                    value = QVariant(f'{experiment.getProbeEnergyInElectronVolts() / 1000.:.1f}')
+                    value = QVariant(f'{artifact.getProbeEnergyInElectronVolts() / 1000.:.1f}')
                 elif index.column() == 2:
-                    value = QVariant(f'{experiment.getDetectorObjectDistanceInMeters():.3g}')
+                    value = QVariant(f'{artifact.getDetectorObjectDistanceInMeters():.3g}')
                 elif index.column() == 3:
                     value = QVariant('0')  # FIXME objectPlanePixelWidthInMeters
                 elif index.column() == 4:
                     value = QVariant('0')  # FIXME objectPlanePixelHeightInMeters
                 elif index.column() == 5:
-                    value = QVariant(f'{sys.getsizeof(experiment) / (1024 * 1024):.2f}')
+                    value = QVariant(f'{sys.getsizeof(artifact) / (1024 * 1024):.2f}')
 
         return value
 
@@ -78,10 +78,10 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
                 value: str,
                 role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
-            experiment = self._presenter[index.row()]
+            artifact = self._presenter[index.row()]
 
             if index.column() == 0:
-                experiment.setName(value)
+                artifact.setName(value)
                 self.dataChanged.emit(index, index)
                 return True
             elif index.column() == 1:
@@ -90,14 +90,14 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     pass
                 else:
-                    experiment.setProbeEnergyInElectronVolts(energyInKiloElectronVolts * 1000)
+                    artifact.setProbeEnergyInElectronVolts(energyInKiloElectronVolts * 1000)
             elif index.column() == 2:
                 try:
                     distanceInMeters = float(value)
                 except ValueError:
                     pass
                 else:
-                    experiment.setDetectorObjectDistanceInMeters(distanceInMeters)
+                    artifact.setDetectorObjectDistanceInMeters(distanceInMeters)
 
         return False
 
@@ -108,10 +108,10 @@ class ExperimentRepositoryTableModel(QAbstractTableModel):
         return len(self._header)
 
 
-class ExperimentRepositoryController(SequenceObserver):
+class ArtifactRepositoryController(SequenceObserver):
 
-    def __init__(self, presenter: ExperimentRepositoryPresenter, view: ExperimentRepositoryView,
-                 fileDialogFactory: FileDialogFactory, tableModel: ExperimentRepositoryTableModel,
+    def __init__(self, presenter: ArtifactRepositoryPresenter, view: ArtifactRepositoryView,
+                 fileDialogFactory: FileDialogFactory, tableModel: ArtifactRepositoryTableModel,
                  tableProxyModel: QSortFilterProxyModel) -> None:
         super().__init__()
         self._presenter = presenter
@@ -121,10 +121,9 @@ class ExperimentRepositoryController(SequenceObserver):
         self._tableProxyModel = tableProxyModel
 
     @classmethod
-    def createInstance(cls, presenter: ExperimentRepositoryPresenter,
-                       view: ExperimentRepositoryView,
-                       fileDialogFactory: FileDialogFactory) -> ExperimentRepositoryController:
-        tableModel = ExperimentRepositoryTableModel(presenter)
+    def createInstance(cls, presenter: ArtifactRepositoryPresenter, view: ArtifactRepositoryView,
+                       fileDialogFactory: FileDialogFactory) -> ArtifactRepositoryController:
+        tableModel = ArtifactRepositoryTableModel(presenter)
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
@@ -139,66 +138,66 @@ class ExperimentRepositoryController(SequenceObserver):
         view.tableView.selectionModel().selectionChanged.connect(controller._updateEnabledButtons)
 
         openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
-        openFileAction.triggered.connect(controller._openExperiment)
+        openFileAction.triggered.connect(controller._openArtifact)
 
         createNewAction = view.buttonBox.insertMenu.addAction('Create New')
-        createNewAction.triggered.connect(controller._insertExperiment)
+        createNewAction.triggered.connect(controller._insertArtifact)
 
-        view.buttonBox.infoButton.clicked.connect(controller._openSelectedExperimentInfo)
-        view.buttonBox.saveButton.clicked.connect(controller._saveSelectedExperiment)
-        view.buttonBox.removeButton.clicked.connect(controller._removeSelectedExperiment)
+        view.buttonBox.infoButton.clicked.connect(controller._openSelectedArtifactInfo)
+        view.buttonBox.saveButton.clicked.connect(controller._saveSelectedArtifact)
+        view.buttonBox.removeButton.clicked.connect(controller._removeSelectedArtifact)
 
         controller._syncModelToView()
         controller._setButtonsEnabled(False)
 
         return controller
 
-    def _openExperiment(self) -> None:
+    def _openArtifact(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
-            'Open Experiment',
+            'Open Artifact',
             nameFilters=self._presenter.getOpenFileFilterList(),
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openExperiment(filePath, nameFilter)
+            self._presenter.openArtifact(filePath, nameFilter)
 
-    def _insertExperiment(self) -> None:
-        self._presenter.insertExperiment()
+    def _insertArtifact(self) -> None:
+        self._presenter.insertArtifact()
 
-    def _saveSelectedExperiment(self) -> None:
+    def _saveSelectedArtifact(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
                 self._view,
-                'Save Experiment',
+                'Save Artifact',
                 nameFilters=self._presenter.getSaveFileFilterList(),
                 selectedNameFilter=self._presenter.getSaveFileFilter())
 
             if filePath:
                 try:
-                    self._presenter.saveExperiment(current.row(), filePath, nameFilter)
+                    self._presenter.saveArtifact(current.row(), filePath, nameFilter)
                 except Exception as err:
                     logger.exception(err)
                     ExceptionDialog.showException('File Writer', err)
         else:
             logger.error('No items are selected!')
 
-    def _openSelectedExperimentInfo(self) -> None:
+    def _openSelectedArtifactInfo(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
-            experiment = self._presenter[current.row()]
-            ExperimentInfoViewController.showInfo(experiment, self._view)
+            artifact = self._presenter[current.row()]
+            ArtifactInfoViewController.showInfo(artifact, self._view)
         else:
             logger.error('No items are selected!')
 
-    def _removeSelectedExperiment(self) -> None:
+    def _removeSelectedArtifact(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
-            self._presenter.removeExperiment(current.row())
+            self._presenter.removeArtifact(current.row())
         else:
             logger.error('No items are selected!')
 

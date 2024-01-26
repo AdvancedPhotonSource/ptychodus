@@ -1,4 +1,4 @@
-from ...api.experiment import ExperimentFileReader, ExperimentFileWriter
+from ...api.artifact import ArtifactFileReader, ArtifactFileWriter
 from ...api.plugins import PluginChooser
 from ..metadata import MetadataBuilder
 from ..object import ObjectBuilderFactory, ObjectRepositoryItemFactory
@@ -8,11 +8,11 @@ from ..scan import ScanBuilderFactory, ScanRepositoryItemFactory
 from .metadata import MetadataRepository
 from .object import ObjectRepository
 from .probe import ProbeRepository
-from .repository import ExperimentRepository
+from .repository import ArtifactRepository
 from .scan import ScanRepository
 
 
-class ExperimentCore:
+class ArtifactCore:
 
     def __init__(self, patternSizer: PatternSizer, patterns: ActiveDiffractionDataset,
                  metadataBuilder: MetadataBuilder,
@@ -22,11 +22,11 @@ class ExperimentCore:
                  objectBuilderFactory: ObjectBuilderFactory,
                  probeRepositoryItemFactory: ProbeRepositoryItemFactory,
                  probeBuilderFactory: ProbeBuilderFactory,
-                 fileReaderChooser: PluginChooser[ExperimentFileReader],
-                 fileWriterChooser: PluginChooser[ExperimentFileWriter]) -> None:
-        self._repository = ExperimentRepository(patternSizer, patterns, scanRepositoryItemFactory,
-                                                probeRepositoryItemFactory,
-                                                objectRepositoryItemFactory)
+                 fileReaderChooser: PluginChooser[ArtifactFileReader],
+                 fileWriterChooser: PluginChooser[ArtifactFileWriter]) -> None:
+        self._repository = ArtifactRepository(patternSizer, patterns, scanRepositoryItemFactory,
+                                              probeRepositoryItemFactory,
+                                              objectRepositoryItemFactory)
         self.metadataRepository = MetadataRepository(self._repository, metadataBuilder,
                                                      fileReaderChooser, fileWriterChooser)
         self.scanRepository = ScanRepository(self._repository, scanBuilderFactory)

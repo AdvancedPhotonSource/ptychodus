@@ -8,15 +8,14 @@ from ..metadata import MetadataRepositoryItem
 from ..object import ObjectRepositoryItem
 from ..probe import ProbeRepositoryItem
 from ..scan import ScanBuilderFactory, ScanRepositoryItem
-from .repository import (ExperimentRepository, ExperimentRepositoryItem,
-                         ExperimentRepositoryObserver)
+from .repository import ArtifactRepository, ArtifactRepositoryItem, ArtifactRepositoryObserver
 
 logger = logging.getLogger(__name__)
 
 
-class ScanRepository(ObservableSequence[ScanRepositoryItem], ExperimentRepositoryObserver):
+class ScanRepository(ObservableSequence[ScanRepositoryItem], ArtifactRepositoryObserver):
 
-    def __init__(self, repository: ExperimentRepository, factory: ScanBuilderFactory) -> None:
+    def __init__(self, repository: ArtifactRepository, factory: ScanBuilderFactory) -> None:
         super().__init__()
         self._repository = repository
         self._repository.addObserver(self)
@@ -57,7 +56,7 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ExperimentRepositor
         else:
             self._factory.saveScan(filePath, fileFilter, item.getScan())
 
-    def handleItemInserted(self, index: int, item: ExperimentRepositoryItem) -> None:
+    def handleItemInserted(self, index: int, item: ArtifactRepositoryItem) -> None:
         self.notifyObserversItemInserted(index, item.getScan())
 
     def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
@@ -72,5 +71,5 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ExperimentRepositor
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handleItemRemoved(self, index: int, item: ExperimentRepositoryItem) -> None:
+    def handleItemRemoved(self, index: int, item: ArtifactRepositoryItem) -> None:
         self.notifyObserversItemRemoved(index, item.getScan())

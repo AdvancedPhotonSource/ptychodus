@@ -1,4 +1,4 @@
-from ...api.experiment import ExperimentMetadata
+from ...api.artifact import ArtifactMetadata
 
 
 class MetadataBuilder:
@@ -13,8 +13,8 @@ class MetadataBuilder:
     def setDetectorObjectDistanceInMeters(self, distanceInMeters: float) -> None:
         self._detectorObjectDistanceInMeters = distanceInMeters
 
-    def build(self, name: str) -> ExperimentMetadata:
-        return ExperimentMetadata(
+    def build(self, name: str) -> ArtifactMetadata:
+        return ArtifactMetadata(
             name=name,
             comments='',
             probeEnergyInElectronVolts=self._probeEnergyInElectronVolts,

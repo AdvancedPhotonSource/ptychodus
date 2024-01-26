@@ -3,15 +3,15 @@ from typing import Any, Final
 
 import numpy
 
-from ptychodus.api.experiment import (Experiment, ExperimentFileReader, ExperimentFileWriter,
-                                      ExperimentMetadata)
+from ptychodus.api.artifact import (Artifact, ArtifactFileReader, ArtifactFileWriter,
+                                    ArtifactMetadata)
 from ptychodus.api.object import Object, ObjectFileReader
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileReader
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
 
 
-class NPZExperimentFileIO(ExperimentFileReader, ExperimentFileWriter):
+class NPZArtifactFileIO(ArtifactFileReader, ArtifactFileWriter):
     SIMPLE_NAME: Final[str] = 'NPZ'
     DISPLAY_NAME: Final[str] = 'NumPy Zipped Archive (*.npz)'
 
@@ -34,9 +34,9 @@ class NPZExperimentFileIO(ExperimentFileReader, ExperimentFileWriter):
     OBJECT_PIXEL_HEIGHT: Final[str] = 'object_pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'object_pixel_width_m'
 
-    def read(self, filePath: Path) -> Experiment:
+    def read(self, filePath: Path) -> Artifact:
         with numpy.load(filePath) as npzFile:
-            metadata = ExperimentMetadata(
+            metadata = ArtifactMetadata(
                 name=str(npzFile[self.NAME]),
                 comments=str(npzFile[self.COMMENTS]),
                 probeEnergyInElectronVolts=float(npzFile[self.PROBE_ENERGY]),
@@ -68,25 +68,25 @@ class NPZExperimentFileIO(ExperimentFileReader, ExperimentFileWriter):
             point = ScanPoint(idx, x_m, y_m)
             scanPointList.append(point)
 
-        return Experiment(
+        return Artifact(
             metadata=metadata,
             scan=Scan(scanPointList),
             probe=probe,
             object_=object_,
         )
 
-    def write(self, filePath: Path, experiment: Experiment) -> None:
+    def write(self, filePath: Path, artifact: Artifact) -> None:
         contents: dict[str, Any] = dict()
         scanIndexes: list[int] = list()
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
 
-        for point in experiment.scan:
+        for point in artifact.scan:
             scanIndexes.append(point.index)
             scanXInMeters.append(point.positionXInMeters)
             scanYInMeters.append(point.positionYInMeters)
 
-        metadata = experiment.metadata
+        metadata = artifact.metadata
         contents[self.NAME] = metadata.name
         contents[self.COMMENTS] = metadata.comments
         contents[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorObjectDistanceInMeters
@@ -96,17 +96,19 @@ class NPZExperimentFileIO(ExperimentFileReader, ExperimentFileWriter):
         contents[self.PROBE_POSITION_X] = scanXInMeters
         contents[self.PROBE_POSITION_Y] = scanYInMeters
 
-        probe = experiment.probe
+        probe = artifact.probe
+        probeGeometry = probe.getGeometry()
         contents[self.PROBE_ARRAY] = probe.array
-        contents[self.PROBE_PIXEL_WIDTH] = probe.pixelWidthInMeters
-        contents[self.PROBE_PIXEL_HEIGHT] = probe.pixelHeightInMeters
+        contents[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixelWidthInMeters
+        contents[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixelHeightInMeters
 
-        object_ = experiment.object_
+        object_ = artifact.object_
+        objectGeometry = object_.getGeometry()
         contents[self.OBJECT_ARRAY] = object_.array
-        contents[self.OBJECT_CENTER_X] = object_.centerXInMeters
-        contents[self.OBJECT_CENTER_Y] = object_.centerYInMeters
-        contents[self.OBJECT_PIXEL_WIDTH] = object_.pixelWidthInMeters
-        contents[self.OBJECT_PIXEL_HEIGHT] = object_.pixelHeightInMeters
+        contents[self.OBJECT_CENTER_X] = objectGeometry.centerXInMeters
+        contents[self.OBJECT_CENTER_Y] = objectGeometry.centerYInMeters
+        contents[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixelWidthInMeters
+        contents[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixelHeightInMeters
         contents[self.OBJECT_LAYER_DISTANCE] = object_.layerDistanceInMeters
 
         numpy.savez(filePath, **contents)
@@ -116,9 +118,9 @@ class NPZScanFileReader(ScanFileReader):
 
     def read(self, filePath: Path) -> Scan:
         with numpy.load(filePath) as npzFile:
-            scanIndexes = npzFile[NPZExperimentFileIO.PROBE_POSITION_INDEXES]
-            scanXInMeters = npzFile[NPZExperimentFileIO.PROBE_POSITION_X]
-            scanYInMeters = npzFile[NPZExperimentFileIO.PROBE_POSITION_Y]
+            scanIndexes = npzFile[NPZArtifactFileIO.PROBE_POSITION_INDEXES]
+            scanXInMeters = npzFile[NPZArtifactFileIO.PROBE_POSITION_X]
+            scanYInMeters = npzFile[NPZArtifactFileIO.PROBE_POSITION_Y]
 
         scanPointList: list[ScanPoint] = list()
 
@@ -134,9 +136,9 @@ class NPZProbeFileReader(ProbeFileReader):
     def read(self, filePath: Path) -> Probe:
         with numpy.load(filePath) as npzFile:
             return Probe(
-                array=npzFile[NPZExperimentFileIO.PROBE_ARRAY],
-                pixelWidthInMeters=float(npzFile[NPZExperimentFileIO.PROBE_PIXEL_WIDTH]),
-                pixelHeightInMeters=float(npzFile[NPZExperimentFileIO.PROBE_PIXEL_HEIGHT]),
+                array=npzFile[NPZArtifactFileIO.PROBE_ARRAY],
+                pixelWidthInMeters=float(npzFile[NPZArtifactFileIO.PROBE_PIXEL_WIDTH]),
+                pixelHeightInMeters=float(npzFile[NPZArtifactFileIO.PROBE_PIXEL_HEIGHT]),
             )
 
 
@@ -145,40 +147,40 @@ class NPZObjectFileReader(ObjectFileReader):
     def read(self, filePath: Path) -> Object:
         with numpy.load(filePath) as npzFile:
             return Object(
-                array=npzFile[NPZExperimentFileIO.OBJECT_ARRAY],
-                layerDistanceInMeters=npzFile[NPZExperimentFileIO.OBJECT_LAYER_DISTANCE],
-                pixelWidthInMeters=float(npzFile[NPZExperimentFileIO.OBJECT_PIXEL_WIDTH]),
-                pixelHeightInMeters=float(npzFile[NPZExperimentFileIO.OBJECT_PIXEL_HEIGHT]),
-                centerXInMeters=float(npzFile[NPZExperimentFileIO.OBJECT_CENTER_X]),
-                centerYInMeters=float(npzFile[NPZExperimentFileIO.OBJECT_CENTER_Y]),
+                array=npzFile[NPZArtifactFileIO.OBJECT_ARRAY],
+                layerDistanceInMeters=npzFile[NPZArtifactFileIO.OBJECT_LAYER_DISTANCE],
+                pixelWidthInMeters=float(npzFile[NPZArtifactFileIO.OBJECT_PIXEL_WIDTH]),
+                pixelHeightInMeters=float(npzFile[NPZArtifactFileIO.OBJECT_PIXEL_HEIGHT]),
+                centerXInMeters=float(npzFile[NPZArtifactFileIO.OBJECT_CENTER_X]),
+                centerYInMeters=float(npzFile[NPZArtifactFileIO.OBJECT_CENTER_Y]),
             )
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    npzExperimentFileIO = NPZExperimentFileIO()
+    npzArtifactFileIO = NPZArtifactFileIO()
 
-    registry.experimentFileReaders.registerPlugin(
-        npzExperimentFileIO,
-        simpleName=NPZExperimentFileIO.SIMPLE_NAME,
-        displayName=NPZExperimentFileIO.DISPLAY_NAME,
+    registry.artifactFileReaders.registerPlugin(
+        npzArtifactFileIO,
+        simpleName=NPZArtifactFileIO.SIMPLE_NAME,
+        displayName=NPZArtifactFileIO.DISPLAY_NAME,
     )
-    registry.experimentFileWriters.registerPlugin(
-        npzExperimentFileIO,
-        simpleName=NPZExperimentFileIO.SIMPLE_NAME,
-        displayName=NPZExperimentFileIO.DISPLAY_NAME,
+    registry.artifactFileWriters.registerPlugin(
+        npzArtifactFileIO,
+        simpleName=NPZArtifactFileIO.SIMPLE_NAME,
+        displayName=NPZArtifactFileIO.DISPLAY_NAME,
     )
     registry.scanFileReaders.registerPlugin(
         NPZScanFileReader(),
-        simpleName=NPZExperimentFileIO.SIMPLE_NAME,
-        displayName=NPZExperimentFileIO.DISPLAY_NAME,
+        simpleName=NPZArtifactFileIO.SIMPLE_NAME,
+        displayName=NPZArtifactFileIO.DISPLAY_NAME,
     )
     registry.probeFileReaders.registerPlugin(
         NPZProbeFileReader(),
-        simpleName=NPZExperimentFileIO.SIMPLE_NAME,
-        displayName=NPZExperimentFileIO.DISPLAY_NAME,
+        simpleName=NPZArtifactFileIO.SIMPLE_NAME,
+        displayName=NPZArtifactFileIO.DISPLAY_NAME,
     )
     registry.objectFileReaders.registerPlugin(
         NPZObjectFileReader(),
-        simpleName=NPZExperimentFileIO.SIMPLE_NAME,
-        displayName=NPZExperimentFileIO.DISPLAY_NAME,
+        simpleName=NPZArtifactFileIO.SIMPLE_NAME,
+        displayName=NPZArtifactFileIO.DISPLAY_NAME,
     )

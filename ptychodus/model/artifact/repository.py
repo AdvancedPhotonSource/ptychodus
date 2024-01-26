@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from typing import overload
 import logging
 
-from ...api.experiment import Experiment
+from ...api.artifact import Artifact
 from ...api.observer import Observable
 from ...api.parametric import ParameterRepository
 from ..metadata import MetadataRepositoryItem
@@ -12,37 +12,37 @@ from ..object import ObjectRepositoryItem, ObjectRepositoryItemFactory
 from ..patterns import ActiveDiffractionDataset, PatternSizer
 from ..probe import ProbeRepositoryItem, ProbeRepositoryItemFactory
 from ..scan import ScanRepositoryItem, ScanRepositoryItemFactory
-from .geometry import ExperimentGeometry
+from .geometry import ArtifactGeometry
 
 logger = logging.getLogger(__name__)
 
 
-class ExperimentRepositoryItemObserver(ABC):
+class ArtifactRepositoryItemObserver(ABC):
 
     @abstractmethod
-    def handleMetadataChanged(self, item: ExperimentRepositoryItem) -> None:
+    def handleMetadataChanged(self, item: ArtifactRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleScanChanged(self, item: ExperimentRepositoryItem) -> None:
+    def handleScanChanged(self, item: ArtifactRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleProbeChanged(self, item: ExperimentRepositoryItem) -> None:
+    def handleProbeChanged(self, item: ArtifactRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleObjectChanged(self, item: ExperimentRepositoryItem) -> None:
+    def handleObjectChanged(self, item: ArtifactRepositoryItem) -> None:
         pass
 
 
-class ExperimentRepositoryItem(ParameterRepository):
+class ArtifactRepositoryItem(ParameterRepository):
 
-    def __init__(self, parent: ExperimentRepositoryItemObserver, privateIndex: int,
+    def __init__(self, parent: ArtifactRepositoryItemObserver, privateIndex: int,
                  metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
-                 geometry: ExperimentGeometry, probe: ProbeRepositoryItem,
+                 geometry: ArtifactGeometry, probe: ProbeRepositoryItem,
                  object_: ObjectRepositoryItem, patterns: ActiveDiffractionDataset) -> None:
-        super().__init__('Experiment')
+        super().__init__('Artifact')
         self._parent = parent
         self._privateIndex = privateIndex
         self._metadata = metadata
@@ -93,8 +93,8 @@ class ExperimentRepositoryItem(ParameterRepository):
         object_ = self._object.getObject()
         return self._geometry.isObjectGeometryValid(object_.getGeometry())
 
-    def getExperiment(self) -> Experiment:
-        return Experiment(
+    def getArtifact(self) -> Artifact:
+        return Artifact(
             metadata=self._metadata.getMetadata(),
             scan=self._scan.getScan(),
             probe=self._probe.getProbe(),
@@ -114,10 +114,10 @@ class ExperimentRepositoryItem(ParameterRepository):
             self.notifyObservers()
 
 
-class ExperimentRepositoryObserver(ABC):
+class ArtifactRepositoryObserver(ABC):
 
     @abstractmethod
-    def handleItemInserted(self, index: int, item: ExperimentRepositoryItem) -> None:
+    def handleItemInserted(self, index: int, item: ArtifactRepositoryItem) -> None:
         pass
 
     @abstractmethod
@@ -137,11 +137,11 @@ class ExperimentRepositoryObserver(ABC):
         pass
 
     @abstractmethod
-    def handleItemRemoved(self, index: int, item: ExperimentRepositoryItem) -> None:
+    def handleItemRemoved(self, index: int, item: ArtifactRepositoryItem) -> None:
         pass
 
 
-class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentRepositoryItemObserver):
+class ArtifactRepository(Sequence[ArtifactRepositoryItem], ArtifactRepositoryItemObserver):
 
     def __init__(self, patternSizer: PatternSizer, patterns: ActiveDiffractionDataset,
                  scanRepositoryItemFactory: ScanRepositoryItemFactory,
@@ -153,40 +153,39 @@ class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentReposit
         self._scanRepositoryItemFactory = scanRepositoryItemFactory
         self._probeRepositoryItemFactory = probeRepositoryItemFactory
         self._objectRepositoryItemFactory = objectRepositoryItemFactory
-        self._itemList: list[ExperimentRepositoryItem] = list()
-        self._observerList: list[ExperimentRepositoryObserver] = list()
+        self._itemList: list[ArtifactRepositoryItem] = list()
+        self._observerList: list[ArtifactRepositoryObserver] = list()
 
     @overload
-    def __getitem__(self, index: int) -> ExperimentRepositoryItem:
+    def __getitem__(self, index: int) -> ArtifactRepositoryItem:
         ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ExperimentRepositoryItem]:
+    def __getitem__(self, index: slice) -> Sequence[ArtifactRepositoryItem]:
         ...
 
     def __getitem__(
-            self,
-            index: int | slice) -> ExperimentRepositoryItem | Sequence[ExperimentRepositoryItem]:
+            self, index: int | slice) -> ArtifactRepositoryItem | Sequence[ArtifactRepositoryItem]:
         return self._itemList[index]
 
     def __len__(self) -> int:
         return len(self._itemList)
 
-    def insertExperiment(self, experiment: Experiment) -> int:
+    def insertArtifact(self, artifact: Artifact) -> int:
         index = len(self._itemList)
 
-        metadata = MetadataRepositoryItem(experiment.metadata)
-        scan = self._scanRepositoryItemFactory.create(experiment.scan)
-        geometry = ExperimentGeometry(metadata, scan, self._patternSizer)
+        metadata = MetadataRepositoryItem(artifact.metadata)
+        scan = self._scanRepositoryItemFactory.create(artifact.scan)
+        geometry = ArtifactGeometry(metadata, scan, self._patternSizer)
 
-        item = ExperimentRepositoryItem(
+        item = ArtifactRepositoryItem(
             parent=self,
             privateIndex=index,
             metadata=metadata,
             scan=scan,
             geometry=geometry,
-            probe=self._probeRepositoryItemFactory.create(experiment.probe),
-            object_=self._objectRepositoryItemFactory.create(experiment.object_),
+            probe=self._probeRepositoryItemFactory.create(artifact.probe),
+            object_=self._objectRepositoryItemFactory.create(artifact.object_),
             patterns=self._patterns)
         self._itemList.append(item)
 
@@ -195,38 +194,38 @@ class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentReposit
 
         return index
 
-    def addObserver(self, observer: ExperimentRepositoryObserver) -> None:
+    def addObserver(self, observer: ArtifactRepositoryObserver) -> None:
         if observer not in self._observerList:
             self._observerList.append(observer)
 
-    def removeObserver(self, observer: ExperimentRepositoryObserver) -> None:
+    def removeObserver(self, observer: ArtifactRepositoryObserver) -> None:
         try:
             self._observerList.remove(observer)
         except ValueError:
             pass
 
-    def handleMetadataChanged(self, item: ExperimentRepositoryItem) -> None:
+    def handleMetadataChanged(self, item: ArtifactRepositoryItem) -> None:
         index = item._privateIndex
         metadata = item.getMetadata()
 
         for observer in self._observerList:
             observer.handleMetadataChanged(index, metadata)
 
-    def handleScanChanged(self, item: ExperimentRepositoryItem) -> None:
+    def handleScanChanged(self, item: ArtifactRepositoryItem) -> None:
         index = item._privateIndex
         scan = item.getScan()
 
         for observer in self._observerList:
             observer.handleScanChanged(index, scan)
 
-    def handleProbeChanged(self, item: ExperimentRepositoryItem) -> None:
+    def handleProbeChanged(self, item: ArtifactRepositoryItem) -> None:
         index = item._privateIndex
         probe = item.getProbe()
 
         for observer in self._observerList:
             observer.handleProbeChanged(index, probe)
 
-    def handleObjectChanged(self, item: ExperimentRepositoryItem) -> None:
+    def handleObjectChanged(self, item: ArtifactRepositoryItem) -> None:
         index = item._privateIndex
         object_ = item.getObject()
 
@@ -237,11 +236,11 @@ class ExperimentRepository(Sequence[ExperimentRepositoryItem], ExperimentReposit
         for index, item in enumerate(self._itemList):
             item._privateIndex = index
 
-    def removeExperiment(self, index: int) -> None:
+    def removeArtifact(self, index: int) -> None:
         try:
             item = self._itemList.pop(index)
         except IndexError:
-            logger.debug(f'Failed to remove experiment item {index}!')
+            logger.debug(f'Failed to remove artifact item {index}!')
         else:
             self._updateIndexes()
 

@@ -4,8 +4,8 @@ import logging
 
 import h5py
 
-from ptychodus.api.experiment import (Experiment, ExperimentFileReader, ExperimentFileWriter,
-                                      ExperimentMetadata)
+from ptychodus.api.artifact import (Artifact, ArtifactFileReader, ArtifactFileWriter,
+                                    ArtifactMetadata)
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe
@@ -14,9 +14,9 @@ from ptychodus.api.scan import Scan, ScanPoint
 logger = logging.getLogger(__name__)
 
 
-class H5ExperimentFileIO(ExperimentFileReader, ExperimentFileWriter):
+class H5ArtifactFileIO(ArtifactFileReader, ArtifactFileWriter):
     SIMPLE_NAME: Final[str] = 'HDF5'
-    DISPLAY_NAME: Final[str] = 'Ptychodus Experiment Data Files (*.h5 *.hdf5)'
+    DISPLAY_NAME: Final[str] = 'Ptychodus Artifact Files (*.h5 *.hdf5)'
 
     NAME: Final[str] = 'name'
     COMMENTS: Final[str] = 'comments'
@@ -37,11 +37,11 @@ class H5ExperimentFileIO(ExperimentFileReader, ExperimentFileWriter):
     OBJECT_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
 
-    def read(self, filePath: Path) -> Experiment:
+    def read(self, filePath: Path) -> Artifact:
         scanPointList: list[ScanPoint] = list()
 
         with h5py.File(filePath, 'r') as h5File:
-            metadata = ExperimentMetadata(
+            metadata = ArtifactMetadata(
                 name=h5File.attrs[self.NAME].asstr()[()],
                 comments=h5File.attrs[self.COMMENTS].asstr()[()],
                 probeEnergyInElectronVolts=float(h5File.attrs[self.PROBE_ENERGY]),
@@ -74,25 +74,25 @@ class H5ExperimentFileIO(ExperimentFileReader, ExperimentFileWriter):
                 centerYInMeters=float(h5Object[self.OBJECT_CENTER_Y]),
             )
 
-        return Experiment(
+        return Artifact(
             metadata=metadata,
             scan=Scan(scanPointList),
             probe=probe,
             object_=object_,
         )
 
-    def write(self, filePath: Path, experiment: Experiment) -> None:
+    def write(self, filePath: Path, artifact: Artifact) -> None:
         scanIndexes: list[int] = list()
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
 
-        for point in experiment.scan:
+        for point in artifact.scan:
             scanIndexes.append(point.index)
             scanXInMeters.append(point.positionXInMeters)
             scanYInMeters.append(point.positionYInMeters)
 
         with h5py.File(filePath, 'w') as h5File:
-            metadata = experiment.metadata
+            metadata = artifact.metadata
             h5File.attrs[self.NAME] = metadata.name
             h5File.attrs[self.COMMENTS] = metadata.comments
             h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorObjectDistanceInMeters
@@ -102,30 +102,32 @@ class H5ExperimentFileIO(ExperimentFileReader, ExperimentFileWriter):
             h5File.create_dataset(self.PROBE_POSITION_X, data=scanXInMeters)
             h5File.create_dataset(self.PROBE_POSITION_Y, data=scanYInMeters)
 
-            probe = experiment.probe
+            probe = artifact.probe
+            probeGeometry = probe.getGeometry()
             h5Probe = h5File.create_dataset(self.PROBE_ARRAY, data=probe.array)
-            h5Probe.attrs[self.PROBE_PIXEL_WIDTH] = probe.pixelWidthInMeters
-            h5Probe.attrs[self.PROBE_PIXEL_HEIGHT] = probe.pixelHeightInMeters
+            h5Probe.attrs[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixelWidthInMeters
+            h5Probe.attrs[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixelHeightInMeters
 
-            object_ = experiment.object_
+            object_ = artifact.object_
+            objectGeometry = object_.getGeometry()
             h5Object = h5File.create_dataset(self.OBJECT_ARRAY, data=object_.array)
-            h5Object.attrs[self.OBJECT_CENTER_X] = object_.centerXInMeters
-            h5Object.attrs[self.OBJECT_CENTER_Y] = object_.centerYInMeters
-            h5Object.attrs[self.OBJECT_PIXEL_WIDTH] = object_.pixelWidthInMeters
-            h5Object.attrs[self.OBJECT_PIXEL_HEIGHT] = object_.pixelHeightInMeters
+            h5Object.attrs[self.OBJECT_CENTER_X] = objectGeometry.centerXInMeters
+            h5Object.attrs[self.OBJECT_CENTER_Y] = objectGeometry.centerYInMeters
+            h5Object.attrs[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixelWidthInMeters
+            h5Object.attrs[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixelHeightInMeters
             h5File.create_dataset(self.OBJECT_LAYER_DISTANCE, data=object_.layerDistanceInMeters)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    h5ExperimentFileIO = H5ExperimentFileIO()
+    h5ArtifactFileIO = H5ArtifactFileIO()
 
-    registry.experimentFileReaders.registerPlugin(
-        h5ExperimentFileIO,
-        simpleName=H5ExperimentFileIO.SIMPLE_NAME,
-        displayName=H5ExperimentFileIO.DISPLAY_NAME,
+    registry.artifactFileReaders.registerPlugin(
+        h5ArtifactFileIO,
+        simpleName=H5ArtifactFileIO.SIMPLE_NAME,
+        displayName=H5ArtifactFileIO.DISPLAY_NAME,
     )
-    registry.experimentFileWriters.registerPlugin(
-        h5ExperimentFileIO,
-        simpleName=H5ExperimentFileIO.SIMPLE_NAME,
-        displayName=H5ExperimentFileIO.DISPLAY_NAME,
+    registry.artifactFileWriters.registerPlugin(
+        h5ArtifactFileIO,
+        simpleName=H5ArtifactFileIO.SIMPLE_NAME,
+        displayName=H5ArtifactFileIO.DISPLAY_NAME,
     )

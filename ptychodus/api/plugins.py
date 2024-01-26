@@ -8,7 +8,7 @@ import logging
 import pkgutil
 import re
 
-from .experiment import ExperimentFileReader, ExperimentFileWriter
+from .artifact import ArtifactFileReader, ArtifactFileWriter
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
@@ -107,8 +107,8 @@ class PluginRegistry:
         self.objectPhaseCenteringStrategies = PluginChooser[ObjectPhaseCenteringStrategy]()
         self.objectFileReaders = PluginChooser[ObjectFileReader]()
         self.objectFileWriters = PluginChooser[ObjectFileWriter]()
-        self.experimentFileReaders = PluginChooser[ExperimentFileReader]()
-        self.experimentFileWriters = PluginChooser[ExperimentFileWriter]()
+        self.artifactFileReaders = PluginChooser[ArtifactFileReader]()
+        self.artifactFileWriters = PluginChooser[ArtifactFileWriter]()
 
     @classmethod
     def loadPlugins(cls) -> PluginRegistry:

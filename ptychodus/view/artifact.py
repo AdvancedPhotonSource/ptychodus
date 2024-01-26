@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QGroupB
                              QLabel, QMenu, QPushButton, QTableView, QVBoxLayout, QWidget)
 
 
-class ExperimentInfoDialog(QDialog):
+class ArtifactInfoDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
@@ -12,7 +12,7 @@ class ExperimentInfoDialog(QDialog):
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ExperimentInfoDialog:
+    def createInstance(cls, parent: QWidget | None = None) -> ArtifactInfoDialog:
         view = cls(parent)
 
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
@@ -32,7 +32,7 @@ class ExperimentInfoDialog(QDialog):
             self.reject()
 
 
-class ExperimentButtonBox(QWidget):
+class ArtifactButtonBox(QWidget):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
@@ -43,7 +43,7 @@ class ExperimentButtonBox(QWidget):
         self.removeButton = QPushButton('Remove')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ExperimentButtonBox:
+    def createInstance(cls, parent: QWidget | None = None) -> ArtifactButtonBox:
         view = cls(parent)
 
         view.insertButton.setMenu(view.insertMenu)
@@ -59,16 +59,16 @@ class ExperimentButtonBox(QWidget):
         return view
 
 
-class ExperimentRepositoryView(QGroupBox):
+class ArtifactRepositoryView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Repository', parent)
         self.tableView = QTableView()
         self.infoLabel = QLabel()
-        self.buttonBox = ExperimentButtonBox.createInstance()
+        self.buttonBox = ArtifactButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ExperimentRepositoryView:
+    def createInstance(cls, parent: QWidget | None = None) -> ArtifactRepositoryView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -80,14 +80,14 @@ class ExperimentRepositoryView(QGroupBox):
         return view
 
 
-class ExperimentView(QWidget):
+class ArtifactView(QWidget):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.repositoryView = ExperimentRepositoryView.createInstance()
+        self.repositoryView = ArtifactRepositoryView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ExperimentView:
+    def createInstance(cls, parent: QWidget | None = None) -> ArtifactView:
         view = cls(parent)
 
         layout = QVBoxLayout()

@@ -1,9 +1,9 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="icons">
+        <file alias="artifact">Font-Awesome-6.4.2/svgs/solid/flask-vial.svg</file>
         <file alias="automate">Font-Awesome-6.4.2/svgs/solid/robot.svg</file>
         <file alias="check">Font-Awesome-6.4.2/svgs/regular/circle-check.svg</file>
-        <file alias="experiment">Font-Awesome-6.4.2/svgs/solid/flask-vial.svg</file>
         <file alias="home">Font-Awesome-6.4.2/svgs/solid/house-chimney.svg</file>
         <file alias="line-cut">Font-Awesome-6.4.2/svgs/solid/chart-line.svg</file>
         <file alias="monitor">Font-Awesome-6.4.2/svgs/solid/display.svg</file>
