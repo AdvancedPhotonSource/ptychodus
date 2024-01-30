@@ -28,7 +28,7 @@ ScopeAuthorizerMapping: TypeAlias = Mapping[str, AuthorizerTypes]
 PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
 
-def ptychodus_reconstruct(**data: str) -> None:
+def ptychodus_reconstruct(**data: str) -> None:  # FIXME type hint
     from pathlib import Path
     from ptychodus.model import ModelArgs, ModelCore
 

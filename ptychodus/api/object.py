@@ -24,6 +24,22 @@ class ObjectGeometry:
     centerYInMeters: float
 
     @property
+    def widthInMeters(self) -> float:
+        return self.widthInPixels * self.pixelWidthInMeters
+
+    @property
+    def heightInMeters(self) -> float:
+        return self.heightInPixels * self.pixelHeightInMeters
+
+    @property
+    def minimumXInMeters(self) -> float:
+        return self.centerXInMeters - self.widthInMeters / 2.
+
+    @property
+    def minimumYInMeters(self) -> float:
+        return self.centerYInMeters - self.heightInMeters / 2.
+
+    @property
     def _radiusX(self) -> float:
         return self.widthInPixels / 2
 
@@ -42,7 +58,11 @@ class ObjectGeometry:
         return Point2D(x, y)
 
     def contains(self, geometry: ObjectGeometry) -> bool:
-        return False  # FIXME
+        dx = self.centerXInMeters - geometry.centerXInMeters
+        dy = self.centerYInMeters - geometry.centerYInMeters
+        dw = self.widthInMeters - geometry.widthInMeters
+        dh = self.heightInMeters - geometry.heightInMeters
+        return (abs(dx) <= dw and abs(dy) <= dh)
 
 
 class ObjectGeometryProvider(ABC):

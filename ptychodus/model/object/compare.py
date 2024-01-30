@@ -1,24 +1,18 @@
-from __future__ import annotations
 from collections.abc import Mapping, Sequence
-from typing import Final
 import logging
 
 from ...api.object import Object
 from ...api.observer import Observable, Observer
 from ...api.visualize import FourierRingCorrelation
-from .repository import ObjectRepositoryItem
 from .builder import ObjectBuilder
-from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
 
 
 class CompareObjectBuilder(ObjectBuilder, Observer):
-    SIMPLE_NAME: Final[str] = 'Compare'
-    DISPLAY_NAME: Final[str] = 'Compare'
 
     def __init__(self, repository: Mapping[str, ObjectRepositoryItem]) -> None:
-        super().__init__()
+        super().__init__('Compare')
         self._repository = repository
         self._name1 = str()
         self._item1 = ObjectRepositoryItem('')
@@ -30,21 +24,7 @@ class CompareObjectBuilder(ObjectBuilder, Observer):
             self.setName1(name)
             self.setName2(name)
 
-    @property
-    def simpleName(self) -> str:
-        return self.SIMPLE_NAME
-
-    @property
-    def displayName(self) -> str:
-        return self.DISPLAY_NAME
-
-    def syncFromSettings(self, settings: ObjectSettings) -> None:
-        pass
-
-    def syncToSettings(self, settings: ObjectSettings) -> None:
-        pass
-
-    def __call__(self) -> Object:
+    def build(self) -> Object:
         object1 = self._item1.getObject()
         object2 = self._item2.getObject()
 

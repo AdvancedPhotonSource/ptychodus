@@ -1,91 +1,48 @@
-from __future__ import annotations
-from collections.abc import Sequence
-import logging
-
-from scipy.ndimage import map_coordinates
-import numpy
-
 from ...api.geometry import Point2D
-from ...api.object import (ObjectArrayType, ObjectGrid, ObjectInterpolator, ObjectPatch,
-                           ObjectPatchGrid, ObjectPhaseCenteringStrategy)
-from ...api.observer import Observable, Observer
+from ...api.object import Object, ObjectInterpolator
 from ...api.patterns import ImageExtent
-from ...api.plugins import PluginChooser
-from .settings import ObjectSettings
-
-logger = logging.getLogger(__name__)
 
 
 class ObjectLinearInterpolator(ObjectInterpolator):
 
-    def __init__(self, grid: ObjectGrid, array: ObjectArrayType) -> None:
-        self._grid = grid
-        self._array = array
+    def __init__(self, object_: Object) -> None:
+        self._object = object_
 
-    def getGrid(self) -> ObjectGrid:
-        return self._grid
+    def getPatch(self, patchCenter: Point2D, patchExtent: ImageExtent) -> Object:
+        geometry = self._object.getGeometry()
 
-    def getArray(self) -> ObjectArrayType:
-        return self._array
+        patchWidth = patchExtent.widthInPixels
+        patchRadiusXInMeters = geometry.pixelWidthInMeters * patchWidth / 2
+        patchMinimumXInMeters = patchCenter.x - patchRadiusXInMeters
+        ixBeginF, xi = divmod(patchMinimumXInMeters - geometry.minimumXInMeters,
+                              geometry.pixelWidthInMeters)
+        xiC = 1. - xi
+        ixBegin = int(ixBeginF)
+        ixEnd = ixBegin + patchWidth + 1
+        ixSlice0 = slice(ixBegin, ixEnd)
+        ixSlice1 = slice(ixBegin + 1, ixEnd + 1)
 
-    def getPatch(self, patchCenter: Point2D, patchExtent: ImageExtent) -> ObjectPatch:
-        grid = ObjectPatchGrid.createInstance(self._grid, patchCenter, patchExtent)
-        yy, xx = numpy.meshgrid(grid.axisY.getObjectCoordinates(),
-                                grid.axisX.getObjectCoordinates(),
-                                indexing='ij')
-        array = map_coordinates(self._array, (yy, xx), order=1)
-        return ObjectPatch(grid=grid, array=array.reshape(patchExtent.shape))
+        patchHeight = patchExtent.heightInPixels
+        patchRadiusYInMeters = geometry.pixelHeightInMeters * patchHeight / 2
+        patchMinimumYInMeters = patchCenter.y - patchRadiusYInMeters
+        iyBeginF, eta = divmod(patchMinimumYInMeters - geometry.minimumYInMeters,
+                               geometry.pixelHeightInMeters)
+        etaC = 1. - eta
+        iyBegin = int(iyBeginF)
+        iyEnd = iyBegin + patchHeight + 1
+        iySlice0 = slice(iyBegin, iyEnd)
+        iySlice1 = slice(iyBegin + 1, iyEnd + 1)
 
+        patch = xiC * etaC * self._object.array[:, iySlice0, ixSlice0]
+        patch += xi * etaC * self._object.array[:, iySlice0, ixSlice1]
+        patch += xiC * eta * self._object.array[:, iySlice1, ixSlice0]
+        patch += xi * eta * self._object.array[:, iySlice1, ixSlice1]
 
-class ObjectInterpolatorFactory(Observable, Observer):
-
-    def __init__(self, settings: ObjectSettings,
-                 phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
-                 reinitObservable: Observable) -> None:
-        super().__init__()
-        self._settings = settings
-        self._phaseCenteringStrategyChooser = phaseCenteringStrategyChooser
-        self._reinitObservable = reinitObservable
-
-    @classmethod
-    def createInstance(cls, settings: ObjectSettings,
-                       phaseCenteringStrategyChooser: PluginChooser[ObjectPhaseCenteringStrategy],
-                       reinitObservable: Observable) -> ObjectInterpolatorFactory:
-        factory = cls(settings, phaseCenteringStrategyChooser, reinitObservable)
-        reinitObservable.addObserver(factory)
-        factory._syncFromSettings()
-        return factory
-
-    def createInterpolator(self, objectArray: ObjectArrayType,
-                           objectCentroid: Point2D) -> ObjectInterpolator:
-        centerPhase = self._phaseCenteringStrategyChooser.currentPlugin.strategy
-        objectExtent = ImageExtent(
-            widthInPixels=objectArray.shape[-1],
-            heightInPixels=objectArray.shape[-2],
+        return Object(
+            array=patch,
+            layerDistanceInMeters=self._object.layerDistanceInMeters,
+            pixelWidthInMeters=geometry.pixelWidthInMeters,
+            pixelHeightInMeters=geometry.pixelHeightInMeters,
+            centerXInMeters=geometry.centerXInMeters,
+            centerYInMeters=geometry.centerYInMeters,
         )
-        pixelGeometry = self._sizer.getPixelGeometry()
-        objectGrid = ObjectGrid.createInstance(objectCentroid, objectExtent, pixelGeometry)
-
-        return ObjectLinearInterpolator(
-            grid=objectGrid,
-            array=centerPhase(objectArray),
-        )
-
-    def getPhaseCenteringStrategyList(self) -> Sequence[str]:
-        return self._phaseCenteringStrategyChooser.getDisplayNameList()
-
-    def getPhaseCenteringStrategy(self) -> str:
-        return self._phaseCenteringStrategyChooser.currentPlugin.displayName
-
-    def setPhaseCenteringStrategy(self, name: str) -> None:
-        self._phaseCenteringStrategyChooser.setCurrentPluginByName(name)
-        simpleName = self._phaseCenteringStrategyChooser.currentPlugin.simpleName
-        self._settings.phaseCenteringStrategy.value = simpleName
-
-    def _syncFromSettings(self) -> None:
-        simpleName = self._settings.phaseCenteringStrategy.value
-        self._phaseCenteringStrategyChooser.setCurrentPluginByName(simpleName)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._reinitObservable:
-            self._syncFromSettings()
