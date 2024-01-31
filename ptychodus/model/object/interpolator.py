@@ -16,7 +16,6 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         patchMinimumXInMeters = patchCenter.x - patchRadiusXInMeters
         ixBeginF, xi = divmod(patchMinimumXInMeters - geometry.minimumXInMeters,
                               geometry.pixelWidthInMeters)
-        xiC = 1. - xi
         ixBegin = int(ixBeginF)
         ixEnd = ixBegin + patchWidth + 1
         ixSlice0 = slice(ixBegin, ixEnd)
@@ -27,16 +26,23 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         patchMinimumYInMeters = patchCenter.y - patchRadiusYInMeters
         iyBeginF, eta = divmod(patchMinimumYInMeters - geometry.minimumYInMeters,
                                geometry.pixelHeightInMeters)
-        etaC = 1. - eta
         iyBegin = int(iyBeginF)
         iyEnd = iyBegin + patchHeight + 1
         iySlice0 = slice(iyBegin, iyEnd)
         iySlice1 = slice(iyBegin + 1, iyEnd + 1)
 
-        patch = xiC * etaC * self._object.array[:, iySlice0, ixSlice0]
-        patch += xi * etaC * self._object.array[:, iySlice0, ixSlice1]
-        patch += xiC * eta * self._object.array[:, iySlice1, ixSlice0]
-        patch += xi * eta * self._object.array[:, iySlice1, ixSlice1]
+        xiC = 1. - xi
+        etaC = 1. - eta
+
+        w00 = xiC * etaC
+        w01 = xi * etaC
+        w10 = xiC * eta
+        w11 = xi * eta
+
+        patch = w00 * self._object.array[:, iySlice0, ixSlice0]
+        patch += w01 * self._object.array[:, iySlice0, ixSlice1]
+        patch += w10 * self._object.array[:, iySlice1, ixSlice0]
+        patch += w11 * self._object.array[:, iySlice1, ixSlice1]
 
         return Object(
             array=patch,

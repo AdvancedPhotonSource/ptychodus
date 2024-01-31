@@ -13,11 +13,9 @@ from ...api.plugins import PluginChooser
 from ...api.probe import Probe
 from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,
                                   Reconstructor, ReconstructorLibrary, TrainableReconstructor)
-from ...api.scan import ScanIndexFilter, ScanPoint
-from ..object import ObjectAPI
+from ...api.scan import ScanPoint
+from ..scan import ScanIndexFilter
 from ..patterns import ActiveDiffractionDataset
-from ..probe import ProbeAPI
-from ..scan import ScanAPI
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
@@ -26,22 +24,17 @@ logger = logging.getLogger(__name__)
 class ActiveReconstructor(Observable, Observer):
 
     def __init__(self, settings: ReconstructorSettings,
-                 diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                 probeAPI: ProbeAPI, objectAPI: ObjectAPI, reinitObservable: Observable,
+                 diffractionDataset: ActiveDiffractionDataset, reinitObservable: Observable,
                  pluginChooser: PluginChooser[Reconstructor]) -> None:
         super().__init__()
         self._settings = settings
         self._diffractionDataset = diffractionDataset
-        self._scanAPI = scanAPI
-        self._probeAPI = probeAPI
-        self._objectAPI = objectAPI
         self._reinitObservable = reinitObservable
         self._pluginChooser = pluginChooser
 
     @classmethod
     def createInstance(cls, settings: ReconstructorSettings,
-                       diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                       probeAPI: ProbeAPI, objectAPI: ObjectAPI,
+                       diffractionDataset: ActiveDiffractionDataset,
                        libraries: Iterable[ReconstructorLibrary],
                        reinitObservable: Observable) -> ActiveReconstructor:
         pluginChooser = PluginChooser[Reconstructor]()
@@ -50,14 +43,13 @@ class ActiveReconstructor(Observable, Observer):
             for reconstructor in library:
                 pluginChooser.registerPlugin(
                     reconstructor,
-                    simpleName=f'{library.name}/{reconstructor.name}',
+                    displayName=f'{library.name}/{reconstructor.name}',
                 )
 
         if not pluginChooser:
-            pluginChooser.registerPlugin(NullReconstructor('None'), simpleName='None/None')
+            pluginChooser.registerPlugin(NullReconstructor('None'), displayName='None/None')
 
-        activeReconstructor = cls(settings, diffractionDataset, scanAPI, probeAPI, objectAPI,
-                                  reinitObservable, pluginChooser)
+        activeReconstructor = cls(settings, diffractionDataset, reinitObservable, pluginChooser)
         reinitObservable.addObserver(activeReconstructor)
         activeReconstructor._syncFromSettings()
         return activeReconstructor

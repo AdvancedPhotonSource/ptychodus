@@ -3,6 +3,7 @@ from .builderFactory import ScanBuilderFactory
 from .cartesian import CartesianScanBuilder
 from .concentric import ConcentricScanBuilder
 from .core import ScanCore
+from .indexFilter import ScanIndexFilter
 from .item import ScanRepositoryItem
 from .itemFactory import ScanRepositoryItemFactory
 from .lissajous import LissajousScanBuilder
@@ -16,6 +17,7 @@ __all__ = [
     'LissajousScanBuilder',
     'ScanBuilderFactory',
     'ScanCore',
+    'ScanIndexFilter',
     'ScanRepositoryItem',
     'ScanRepositoryItemFactory',
     'SpiralScanBuilder',
