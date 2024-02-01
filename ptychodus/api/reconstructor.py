@@ -4,7 +4,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from .artifact import Artifact
+from .product import Product
 from .patterns import DiffractionPatternArrayType
 from .visualize import Plot2D
 
@@ -12,19 +12,19 @@ from .visualize import Plot2D
 @dataclass(frozen=True)
 class ReconstructInput:
     patterns: DiffractionPatternArrayType
-    artifact: Artifact
+    product: Product
 
 
 @dataclass(frozen=True)
 class ReconstructOutput:
-    artifact: Artifact
+    product: Product
     objective: Sequence[Sequence[float]]
     plot2D: Plot2D
     result: int
 
     @classmethod
-    def createNull(cls, artifact: Artifact) -> ReconstructOutput:
-        return cls(artifact, [[]], Plot2D.createNull(), 0)
+    def createNull(cls, product: Product) -> ReconstructOutput:
+        return cls(product, [[]], Plot2D.createNull(), 0)
 
 
 class Reconstructor(ABC):
@@ -77,7 +77,7 @@ class NullReconstructor(TrainableReconstructor):
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput(
-            artifact=parameters.artifact,
+            product=parameters.product,
             objective=[[]],
             plot2D=Plot2D.createNull(),
             result=0,

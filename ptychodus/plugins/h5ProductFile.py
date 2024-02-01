@@ -4,8 +4,7 @@ import logging
 
 import h5py
 
-from ptychodus.api.artifact import (Artifact, ArtifactFileReader, ArtifactFileWriter,
-                                    ArtifactMetadata)
+from ptychodus.api.product import (Product, ProductFileReader, ProductFileWriter, ProductMetadata)
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe
@@ -14,9 +13,9 @@ from ptychodus.api.scan import Scan, ScanPoint
 logger = logging.getLogger(__name__)
 
 
-class H5ArtifactFileIO(ArtifactFileReader, ArtifactFileWriter):
+class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     SIMPLE_NAME: Final[str] = 'HDF5'
-    DISPLAY_NAME: Final[str] = 'Ptychodus Artifact Files (*.h5 *.hdf5)'
+    DISPLAY_NAME: Final[str] = 'Ptychodus Product Files (*.h5 *.hdf5)'
 
     NAME: Final[str] = 'name'
     COMMENTS: Final[str] = 'comments'
@@ -37,11 +36,11 @@ class H5ArtifactFileIO(ArtifactFileReader, ArtifactFileWriter):
     OBJECT_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
 
-    def read(self, filePath: Path) -> Artifact:
+    def read(self, filePath: Path) -> Product:
         scanPointList: list[ScanPoint] = list()
 
         with h5py.File(filePath, 'r') as h5File:
-            metadata = ArtifactMetadata(
+            metadata = ProductMetadata(
                 name=h5File.attrs[self.NAME].asstr()[()],
                 comments=h5File.attrs[self.COMMENTS].asstr()[()],
                 probeEnergyInElectronVolts=float(h5File.attrs[self.PROBE_ENERGY]),
@@ -74,25 +73,25 @@ class H5ArtifactFileIO(ArtifactFileReader, ArtifactFileWriter):
                 centerYInMeters=float(h5Object[self.OBJECT_CENTER_Y]),
             )
 
-        return Artifact(
+        return Product(
             metadata=metadata,
             scan=Scan(scanPointList),
             probe=probe,
             object_=object_,
         )
 
-    def write(self, filePath: Path, artifact: Artifact) -> None:
+    def write(self, filePath: Path, product: Product) -> None:
         scanIndexes: list[int] = list()
         scanXInMeters: list[float] = list()
         scanYInMeters: list[float] = list()
 
-        for point in artifact.scan:
+        for point in product.scan:
             scanIndexes.append(point.index)
             scanXInMeters.append(point.positionXInMeters)
             scanYInMeters.append(point.positionYInMeters)
 
         with h5py.File(filePath, 'w') as h5File:
-            metadata = artifact.metadata
+            metadata = product.metadata
             h5File.attrs[self.NAME] = metadata.name
             h5File.attrs[self.COMMENTS] = metadata.comments
             h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorObjectDistanceInMeters
@@ -102,13 +101,13 @@ class H5ArtifactFileIO(ArtifactFileReader, ArtifactFileWriter):
             h5File.create_dataset(self.PROBE_POSITION_X, data=scanXInMeters)
             h5File.create_dataset(self.PROBE_POSITION_Y, data=scanYInMeters)
 
-            probe = artifact.probe
+            probe = product.probe
             probeGeometry = probe.getGeometry()
             h5Probe = h5File.create_dataset(self.PROBE_ARRAY, data=probe.array)
             h5Probe.attrs[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixelWidthInMeters
             h5Probe.attrs[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixelHeightInMeters
 
-            object_ = artifact.object_
+            object_ = product.object_
             objectGeometry = object_.getGeometry()
             h5Object = h5File.create_dataset(self.OBJECT_ARRAY, data=object_.array)
             h5Object.attrs[self.OBJECT_CENTER_X] = objectGeometry.centerXInMeters
@@ -119,15 +118,15 @@ class H5ArtifactFileIO(ArtifactFileReader, ArtifactFileWriter):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
-    h5ArtifactFileIO = H5ArtifactFileIO()
+    h5ProductFileIO = H5ProductFileIO()
 
-    registry.artifactFileReaders.registerPlugin(
-        h5ArtifactFileIO,
-        simpleName=H5ArtifactFileIO.SIMPLE_NAME,
-        displayName=H5ArtifactFileIO.DISPLAY_NAME,
+    registry.productFileReaders.registerPlugin(
+        h5ProductFileIO,
+        simpleName=H5ProductFileIO.SIMPLE_NAME,
+        displayName=H5ProductFileIO.DISPLAY_NAME,
     )
-    registry.artifactFileWriters.registerPlugin(
-        h5ArtifactFileIO,
-        simpleName=H5ArtifactFileIO.SIMPLE_NAME,
-        displayName=H5ArtifactFileIO.DISPLAY_NAME,
+    registry.productFileWriters.registerPlugin(
+        h5ProductFileIO,
+        simpleName=H5ProductFileIO.SIMPLE_NAME,
+        displayName=H5ProductFileIO.DISPLAY_NAME,
     )

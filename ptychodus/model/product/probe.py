@@ -8,14 +8,14 @@ from ..metadata import MetadataRepositoryItem
 from ..object import ObjectRepositoryItem
 from ..probe import ProbeBuilderFactory, ProbeRepositoryItem
 from ..scan import ScanRepositoryItem
-from .repository import ArtifactRepository, ArtifactRepositoryItem, ArtifactRepositoryObserver
+from .repository import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
 
 logger = logging.getLogger(__name__)
 
 
-class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ArtifactRepositoryObserver):
+class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepositoryObserver):
 
-    def __init__(self, repository: ArtifactRepository, factory: ProbeBuilderFactory) -> None:
+    def __init__(self, repository: ProductRepository, factory: ProbeBuilderFactory) -> None:
         super().__init__()
         self._repository = repository
         self._repository.addObserver(self)
@@ -57,7 +57,7 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ArtifactRepositor
         else:
             self._factory.saveProbe(filePath, fileFilter, item.getProbe())
 
-    def handleItemInserted(self, index: int, item: ArtifactRepositoryItem) -> None:
+    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
         self.notifyObserversItemInserted(index, item.getProbe())
 
     def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
@@ -72,5 +72,5 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ArtifactRepositor
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handleItemRemoved(self, index: int, item: ArtifactRepositoryItem) -> None:
+    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
         self.notifyObserversItemRemoved(index, item.getProbe())

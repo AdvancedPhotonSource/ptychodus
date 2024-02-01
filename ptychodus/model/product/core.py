@@ -1,4 +1,4 @@
-from ...api.artifact import ArtifactFileReader, ArtifactFileWriter
+from ...api.product import ProductFileReader, ProductFileWriter
 from ...api.plugins import PluginChooser
 from ..metadata import MetadataBuilder
 from ..object import ObjectBuilderFactory, ObjectRepositoryItemFactory
@@ -8,11 +8,11 @@ from ..scan import ScanBuilderFactory, ScanRepositoryItemFactory
 from .metadata import MetadataRepository
 from .object import ObjectRepository
 from .probe import ProbeRepository
-from .repository import ArtifactRepository
+from .repository import ProductRepository
 from .scan import ScanRepository
 
 
-class ArtifactCore:
+class ProductCore:
 
     def __init__(self, patternSizer: PatternSizer, patterns: ActiveDiffractionDataset,
                  metadataBuilder: MetadataBuilder,
@@ -22,11 +22,11 @@ class ArtifactCore:
                  objectBuilderFactory: ObjectBuilderFactory,
                  probeRepositoryItemFactory: ProbeRepositoryItemFactory,
                  probeBuilderFactory: ProbeBuilderFactory,
-                 fileReaderChooser: PluginChooser[ArtifactFileReader],
-                 fileWriterChooser: PluginChooser[ArtifactFileWriter]) -> None:
-        self._repository = ArtifactRepository(patternSizer, patterns, scanRepositoryItemFactory,
-                                              probeRepositoryItemFactory,
-                                              objectRepositoryItemFactory)
+                 fileReaderChooser: PluginChooser[ProductFileReader],
+                 fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
+        self._repository = ProductRepository(patternSizer, patterns, scanRepositoryItemFactory,
+                                             probeRepositoryItemFactory,
+                                             objectRepositoryItemFactory)
         self.metadataRepository = MetadataRepository(self._repository, metadataBuilder,
                                                      fileReaderChooser, fileWriterChooser)
         self.scanRepository = ScanRepository(self._repository, scanBuilderFactory)

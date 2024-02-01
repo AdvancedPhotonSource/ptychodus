@@ -7,7 +7,7 @@ from ..model import ModelCore
 from ..view import ViewCore
 from .automation import AutomationController
 from .data import FileDialogFactory
-from .artifact import ArtifactController
+from .product import ProductController
 from .memory import MemoryController
 from .object import ObjectImageController, ObjectController
 from .patterns import PatternsController
@@ -41,9 +41,9 @@ class ControllerCore:
                                                                      view.settingsParametersView,
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
-        self._artifactController = ArtifactController(model.detectorPresenter,
-                                                      model.artifactRepositoryPresenter,
-                                                      view.artifactView, self._fileDialogFactory)
+        self._productController = ProductController(model.detectorPresenter,
+                                                    model.productRepositoryPresenter,
+                                                    view.productView, self._fileDialogFactory)
         self._detectorController = PatternsController.createInstance(
             model.detectorPresenter, model.diffractionDatasetInputOutputPresenter,
             model.metadataPresenter, model.diffractionDatasetPresenter, model.patternPresenter,

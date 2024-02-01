@@ -4,7 +4,7 @@ from typing import overload
 import logging
 import sys
 
-from ...api.artifact import Artifact, ArtifactFileReader, ArtifactFileWriter
+from ...api.product import Product, ProductFileReader, ProductFileWriter
 from ...api.object import Object
 from ...api.observer import ObservableSequence
 from ...api.plugins import PluginChooser
@@ -14,16 +14,16 @@ from ..metadata import MetadataBuilder, MetadataRepositoryItem
 from ..object import ObjectRepositoryItem
 from ..probe import ProbeRepositoryItem
 from ..scan import ScanRepositoryItem
-from .repository import ArtifactRepository, ArtifactRepositoryItem, ArtifactRepositoryObserver
+from .repository import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
 
 logger = logging.getLogger(__name__)
 
 
-class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ArtifactRepositoryObserver):
+class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ProductRepositoryObserver):
 
-    def __init__(self, repository: ArtifactRepository, metadataBuilder: MetadataBuilder,
-                 fileReaderChooser: PluginChooser[ArtifactFileReader],
-                 fileWriterChooser: PluginChooser[ArtifactFileWriter]) -> None:
+    def __init__(self, repository: ProductRepository, metadataBuilder: MetadataBuilder,
+                 fileReaderChooser: PluginChooser[ProductFileReader],
+                 fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
         super().__init__()
         self._repository = repository
         self._repository.addObserver(self)
@@ -49,14 +49,14 @@ class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ArtifactRep
     def __len__(self) -> int:
         return len(self._repository)
 
-    def insertArtifact(self, name: str) -> None:
-        artifact = Artifact(
+    def insertProduct(self, name: str) -> None:
+        product = Product(
             metadata=self._metadataBuilder.build(name),
             scan=Scan(),
             probe=Probe(),
             object_=Object(),
         )
-        self._repository.insertArtifact(artifact)
+        self._repository.insertProduct(product)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -64,7 +64,7 @@ class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ArtifactRep
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.currentPlugin.displayName
 
-    def openArtifact(self, filePath: Path, fileFilter: str) -> None:
+    def openProduct(self, filePath: Path, fileFilter: str) -> None:
         if filePath.is_file():
             self._fileReaderChooser.setCurrentPluginByName(fileFilter)
             fileType = self._fileReaderChooser.currentPlugin.simpleName
@@ -72,13 +72,13 @@ class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ArtifactRep
             fileReader = self._fileReaderChooser.currentPlugin.strategy
 
             try:
-                artifact = fileReader.read(filePath)
+                product = fileReader.read(filePath)
             except Exception as exc:
                 raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
             else:
-                self._repository.insertArtifact(artifact)
+                self._repository.insertProduct(product)
         else:
-            logger.debug(f'Refusing to create artifact with invalid file path \"{filePath}\"')
+            logger.debug(f'Refusing to create product with invalid file path \"{filePath}\"')
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()
@@ -86,20 +86,20 @@ class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ArtifactRep
     def getSaveFileFilter(self) -> str:
         return self._fileWriterChooser.currentPlugin.displayName
 
-    def saveArtifact(self, index: int, filePath: Path, fileFilter: str) -> None:
+    def saveProduct(self, index: int, filePath: Path, fileFilter: str) -> None:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.debug(f'Failed to save artifact {index}!')
+            logger.debug(f'Failed to save product {index}!')
             return
 
         self._fileWriterChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.currentPlugin.strategy
-        writer.write(filePath, item.getArtifact())
+        writer.write(filePath, item.getProduct())
 
-    def handleItemInserted(self, index: int, item: ArtifactRepositoryItem) -> None:
+    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
         self.notifyObserversItemInserted(index, item.getMetadata())
 
     def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
@@ -114,7 +114,7 @@ class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ArtifactRep
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handleItemRemoved(self, index: int, item: ArtifactRepositoryItem) -> None:
+    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
         self.notifyObserversItemRemoved(index, item.getMetadata())
 
     def getInfoText(self) -> str:

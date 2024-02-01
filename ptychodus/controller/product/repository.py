@@ -7,19 +7,19 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QItemSelection, QModelIndex, 
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.observer import SequenceObserver
-from ...model.artifact import ArtifactRepositoryPresenter
-from ...view.artifact import ArtifactRepositoryView
+from ...model.product import ProductRepositoryPresenter
+from ...view.product import ProductRepositoryView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from .info import ArtifactInfoViewController
+from .info import ProductInfoViewController
 
 logger = logging.getLogger(__name__)
 
 
-class ArtifactRepositoryTableModel(QAbstractTableModel):
+class ProductRepositoryTableModel(QAbstractTableModel):
 
     def __init__(self,
-                 presenter: ArtifactRepositoryPresenter,
+                 presenter: ProductRepositoryPresenter,
                  parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
@@ -55,21 +55,21 @@ class ArtifactRepositoryTableModel(QAbstractTableModel):
         value = QVariant()
 
         if index.isValid():
-            artifact = self._presenter[index.row()]
+            product = self._presenter[index.row()]
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
-                    value = QVariant(artifact.getName())
+                    value = QVariant(product.getName())
                 elif index.column() == 1:
-                    value = QVariant(f'{artifact.getProbeEnergyInElectronVolts() / 1000.:.1f}')
+                    value = QVariant(f'{product.getProbeEnergyInElectronVolts() / 1000.:.1f}')
                 elif index.column() == 2:
-                    value = QVariant(f'{artifact.getDetectorObjectDistanceInMeters():.3g}')
+                    value = QVariant(f'{product.getDetectorObjectDistanceInMeters():.3g}')
                 elif index.column() == 3:
                     value = QVariant('0')  # FIXME objectPlanePixelWidthInMeters
                 elif index.column() == 4:
                     value = QVariant('0')  # FIXME objectPlanePixelHeightInMeters
                 elif index.column() == 5:
-                    value = QVariant(f'{sys.getsizeof(artifact) / (1024 * 1024):.2f}')
+                    value = QVariant(f'{sys.getsizeof(product) / (1024 * 1024):.2f}')
 
         return value
 
@@ -78,10 +78,10 @@ class ArtifactRepositoryTableModel(QAbstractTableModel):
                 value: str,
                 role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
-            artifact = self._presenter[index.row()]
+            product = self._presenter[index.row()]
 
             if index.column() == 0:
-                artifact.setName(value)
+                product.setName(value)
                 self.dataChanged.emit(index, index)
                 return True
             elif index.column() == 1:
@@ -90,14 +90,14 @@ class ArtifactRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     pass
                 else:
-                    artifact.setProbeEnergyInElectronVolts(energyInKiloElectronVolts * 1000)
+                    product.setProbeEnergyInElectronVolts(energyInKiloElectronVolts * 1000)
             elif index.column() == 2:
                 try:
                     distanceInMeters = float(value)
                 except ValueError:
                     pass
                 else:
-                    artifact.setDetectorObjectDistanceInMeters(distanceInMeters)
+                    product.setDetectorObjectDistanceInMeters(distanceInMeters)
 
         return False
 
@@ -108,10 +108,10 @@ class ArtifactRepositoryTableModel(QAbstractTableModel):
         return len(self._header)
 
 
-class ArtifactRepositoryController(SequenceObserver):
+class ProductRepositoryController(SequenceObserver):
 
-    def __init__(self, presenter: ArtifactRepositoryPresenter, view: ArtifactRepositoryView,
-                 fileDialogFactory: FileDialogFactory, tableModel: ArtifactRepositoryTableModel,
+    def __init__(self, presenter: ProductRepositoryPresenter, view: ProductRepositoryView,
+                 fileDialogFactory: FileDialogFactory, tableModel: ProductRepositoryTableModel,
                  tableProxyModel: QSortFilterProxyModel) -> None:
         super().__init__()
         self._presenter = presenter
@@ -121,9 +121,9 @@ class ArtifactRepositoryController(SequenceObserver):
         self._tableProxyModel = tableProxyModel
 
     @classmethod
-    def createInstance(cls, presenter: ArtifactRepositoryPresenter, view: ArtifactRepositoryView,
-                       fileDialogFactory: FileDialogFactory) -> ArtifactRepositoryController:
-        tableModel = ArtifactRepositoryTableModel(presenter)
+    def createInstance(cls, presenter: ProductRepositoryPresenter, view: ProductRepositoryView,
+                       fileDialogFactory: FileDialogFactory) -> ProductRepositoryController:
+        tableModel = ProductRepositoryTableModel(presenter)
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
@@ -138,66 +138,66 @@ class ArtifactRepositoryController(SequenceObserver):
         view.tableView.selectionModel().selectionChanged.connect(controller._updateEnabledButtons)
 
         openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
-        openFileAction.triggered.connect(controller._openArtifact)
+        openFileAction.triggered.connect(controller._openProduct)
 
         createNewAction = view.buttonBox.insertMenu.addAction('Create New')
-        createNewAction.triggered.connect(controller._insertArtifact)
+        createNewAction.triggered.connect(controller._insertProduct)
 
-        view.buttonBox.infoButton.clicked.connect(controller._openSelectedArtifactInfo)
-        view.buttonBox.saveButton.clicked.connect(controller._saveSelectedArtifact)
-        view.buttonBox.removeButton.clicked.connect(controller._removeSelectedArtifact)
+        view.buttonBox.infoButton.clicked.connect(controller._openSelectedProductInfo)
+        view.buttonBox.saveButton.clicked.connect(controller._saveSelectedProduct)
+        view.buttonBox.removeButton.clicked.connect(controller._removeSelectedProduct)
 
         controller._syncModelToView()
         controller._setButtonsEnabled(False)
 
         return controller
 
-    def _openArtifact(self) -> None:
+    def _openProduct(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
-            'Open Artifact',
+            'Open Product',
             nameFilters=self._presenter.getOpenFileFilterList(),
             selectedNameFilter=self._presenter.getOpenFileFilter())
 
         if filePath:
-            self._presenter.openArtifact(filePath, nameFilter)
+            self._presenter.openProduct(filePath, nameFilter)
 
-    def _insertArtifact(self) -> None:
-        self._presenter.insertArtifact()
+    def _insertProduct(self) -> None:
+        self._presenter.insertProduct()
 
-    def _saveSelectedArtifact(self) -> None:
+    def _saveSelectedProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
                 self._view,
-                'Save Artifact',
+                'Save Product',
                 nameFilters=self._presenter.getSaveFileFilterList(),
                 selectedNameFilter=self._presenter.getSaveFileFilter())
 
             if filePath:
                 try:
-                    self._presenter.saveArtifact(current.row(), filePath, nameFilter)
+                    self._presenter.saveProduct(current.row(), filePath, nameFilter)
                 except Exception as err:
                     logger.exception(err)
                     ExceptionDialog.showException('File Writer', err)
         else:
             logger.error('No items are selected!')
 
-    def _openSelectedArtifactInfo(self) -> None:
+    def _openSelectedProductInfo(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
-            artifact = self._presenter[current.row()]
-            ArtifactInfoViewController.showInfo(artifact, self._view)
+            product = self._presenter[current.row()]
+            ProductInfoViewController.showInfo(product, self._view)
         else:
             logger.error('No items are selected!')
 
-    def _removeSelectedArtifact(self) -> None:
+    def _removeSelectedProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
-            self._presenter.removeArtifact(current.row())
+            self._presenter.removeProduct(current.row())
         else:
             logger.error('No items are selected!')
 

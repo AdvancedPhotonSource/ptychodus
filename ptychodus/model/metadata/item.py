@@ -1,10 +1,10 @@
-from ...api.artifact import ArtifactMetadata
+from ...api.product import ProductMetadata
 from ...api.parametric import ParameterRepository
 
 
 class MetadataRepositoryItem(ParameterRepository):
 
-    def __init__(self, metadata: ArtifactMetadata) -> None:
+    def __init__(self, metadata: ProductMetadata) -> None:
         super().__init__('Metadata')  # FIXME snake_case?
         self.name = self._registerStringParameter('Name', metadata.name)
         self.comments = self._registerStringParameter('Comments', metadata.comments)
@@ -21,8 +21,8 @@ class MetadataRepositoryItem(ParameterRepository):
         hc_eVm = planckConstant_eV_per_Hz * lightSpeedInMetersPerSecond
         return hc_eVm / self.probeEnergyInElectronVolts.getValue()
 
-    def getMetadata(self) -> ArtifactMetadata:
-        return ArtifactMetadata(
+    def getMetadata(self) -> ProductMetadata:
+        return ProductMetadata(
             name=self.name.getValue(),
             comments=self.comments.getValue(),
             probeEnergyInElectronVolts=self.probeEnergyInElectronVolts.getValue(),

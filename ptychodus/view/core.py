@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QProgressB
                              QSplitter, QStackedWidget, QTableView, QToolBar, QWidget)
 
 from . import resources
-from .artifact import ArtifactView
+from .product import ProductView
 from .automation import AutomationView
 from .image import ImageView
 from .monitor import MonitorObjectView, MonitorProbeView
@@ -45,10 +45,9 @@ class ViewCore(QMainWindow):
         self.patternsView = PatternsView.createInstance()
         self.patternsImageView = ImageView.createInstance(self.statusBar())
 
-        self.artifactAction = self.navigationToolBar.addAction(QIcon(':/icons/artifact'),
-                                                               'Artifact')
-        self.artifactView = ArtifactView.createInstance()
-        self.artifactDiagramView = QWidget()
+        self.productAction = self.navigationToolBar.addAction(QIcon(':/icons/product'), 'Product')
+        self.productView = ProductView.createInstance()
+        self.productDiagramView = QWidget()
 
         self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
         self.scanView = RepositoryTableView.createInstance()
@@ -104,7 +103,7 @@ class ViewCore(QMainWindow):
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsParametersView)
         view.parametersWidget.addWidget(view.patternsView)
-        view.parametersWidget.addWidget(view.artifactView)
+        view.parametersWidget.addWidget(view.productView)
         view.parametersWidget.addWidget(view.scanView)
         view.parametersWidget.addWidget(view.probeView)
         view.parametersWidget.addWidget(view.objectView)
@@ -118,7 +117,7 @@ class ViewCore(QMainWindow):
         # maintain same order as navigationToolBar buttons
         view.contentsWidget.addWidget(view.settingsEntryView)
         view.contentsWidget.addWidget(view.patternsImageView)
-        view.contentsWidget.addWidget(view.artifactDiagramView)
+        view.contentsWidget.addWidget(view.productDiagramView)
         view.contentsWidget.addWidget(view.scanPlotView)
         view.contentsWidget.addWidget(view.probeImageView)
         view.contentsWidget.addWidget(view.objectImageView)

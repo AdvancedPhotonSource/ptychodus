@@ -2,16 +2,16 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFi
                           QVariant)
 from PyQt5.QtWidgets import QWidget
 
-from ...api.artifact import Artifact
+from ...api.product import Product
 from ...api.observer import Observable, Observer
-from ...view.artifact import ArtifactInfoDialog
+from ...view.product import ProductInfoDialog
 
 
-class ArtifactPropertyTableModel(QAbstractTableModel):
+class ProductPropertyTableModel(QAbstractTableModel):
 
-    def __init__(self, artifact: Artifact, parent: QObject | None = None) -> None:
+    def __init__(self, product: Product, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._artifact = artifact
+        self._product = product
         self._header = ['Property', 'Value']
         self._properties = [
             'Probe Wavelength [nm]',
@@ -40,7 +40,7 @@ class ArtifactPropertyTableModel(QAbstractTableModel):
                 value = QVariant(self._properties[index.row()])
             elif index.column() == 1:
                 if index.row() == 0:
-                    probeEnergy = self._artifact.getProbeEnergyInElectronVolts()
+                    probeEnergy = self._product.getProbeEnergyInElectronVolts()
                     value = QVariant(f'{probeEnergy / 1000:.1f}')
                 else:
                     value = QVariant(index.row())  # FIXME
@@ -54,24 +54,24 @@ class ArtifactPropertyTableModel(QAbstractTableModel):
         return len(self._header)
 
 
-class ArtifactInfoViewController(Observer):
+class ProductInfoViewController(Observer):
 
-    def __init__(self, artifact: Artifact, tableModel: ArtifactPropertyTableModel) -> None:
+    def __init__(self, product: Product, tableModel: ProductPropertyTableModel) -> None:
         super().__init__()
-        self._artifact = artifact
+        self._product = product
         self._tableModel = tableModel
 
     @classmethod
-    def showInfo(cls, artifact: Artifact, parent: QWidget) -> None:
-        tableModel = ArtifactPropertyTableModel(artifact)
-        controller = cls(artifact, tableModel)
-        artifact.addObserver(controller)
+    def showInfo(cls, product: Product, parent: QWidget) -> None:
+        tableModel = ProductPropertyTableModel(product)
+        controller = cls(product, tableModel)
+        product.addObserver(controller)
 
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
-        dialog = ArtifactInfoDialog.createInstance(parent)
-        dialog.setWindowTitle(f'Edit Artifact: {artifact.getName()}')
+        dialog = ProductInfoDialog.createInstance(parent)
+        dialog.setWindowTitle(f'Edit Product: {product.getName()}')
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)
         dialog.tableView.verticalHeader().hide()
@@ -81,12 +81,12 @@ class ArtifactInfoViewController(Observer):
         dialog.open()
 
     def _finish(self, result: int) -> None:
-        self._artifact.removeObserver(self)
+        self._product.removeObserver(self)
 
     def _syncModelToView(self) -> None:
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._artifact:
+        if observable is self._product:
             self._syncModelToView()
