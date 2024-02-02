@@ -32,7 +32,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
                     detectorExtent = ImageExtent(detectorWidth, detectorHeight)
-                    detectorObjectDistanceInMeters = float(
+                    detectorDistanceInMeters = float(
                         h5File['/entry_1/instrument_1/detector_1/distance'][()])
                     detectorPixelGeometry = PixelGeometry(
                         float(h5File['/entry_1/instrument_1/detector_1/x_pixel_size'][()]),
@@ -47,7 +47,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
-                        detectorObjectDistanceInMeters=detectorObjectDistanceInMeters,
+                        detectorDistanceInMeters=detectorDistanceInMeters,
                         detectorExtent=detectorExtent,
                         detectorPixelGeometry=detectorPixelGeometry,
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,

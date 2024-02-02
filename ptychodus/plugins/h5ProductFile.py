@@ -44,7 +44,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
                 name=h5File.attrs[self.NAME].asstr()[()],
                 comments=h5File.attrs[self.COMMENTS].asstr()[()],
                 probeEnergyInElectronVolts=float(h5File.attrs[self.PROBE_ENERGY]),
-                detectorObjectDistanceInMeters=float(h5File.attrs[self.DETECTOR_OBJECT_DISTANCE]),
+                detectorDistanceInMeters=float(h5File.attrs[self.DETECTOR_OBJECT_DISTANCE]),
             )
 
             h5ScanIndexes = h5File[self.PROBE_POSITION_INDEXES]
@@ -94,7 +94,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             metadata = product.metadata
             h5File.attrs[self.NAME] = metadata.name
             h5File.attrs[self.COMMENTS] = metadata.comments
-            h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorObjectDistanceInMeters
+            h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorDistanceInMeters
             h5File.attrs[self.PROBE_ENERGY] = metadata.probeEnergyInElectronVolts
 
             h5File.create_datset(self.PROBE_POSITION_INDEXES, data=scanIndexes)

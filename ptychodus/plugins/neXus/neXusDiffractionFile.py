@@ -88,7 +88,7 @@ class DetectorSpecificGroup:
 @dataclass(frozen=True)
 class DetectorGroup:
     detectorSpecific: DetectorSpecificGroup
-    detectorObjectDistanceInMeters: float
+    detectorDistanceInMeters: float
     beamCenterXInPixels: int
     beamCenterYInPixels: int
     bitDepthReadout: int
@@ -247,7 +247,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=h5Dataset.shape[0],
                         numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
                         patternDataType=h5Dataset.dtype,
-                        detectorObjectDistanceInMeters=detector.detectorObjectDistanceInMeters,
+                        detectorDistanceInMeters=detector.detectorDistanceInMeters,
                         detectorExtent=detectorExtent,
                         detectorPixelGeometry=detectorPixelGeometry,
                         detectorBitDepth=detector.bitDepthReadout,

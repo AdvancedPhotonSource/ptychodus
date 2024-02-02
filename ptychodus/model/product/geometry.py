@@ -38,7 +38,7 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
     @property
     def _lambdaZInSquareMeters(self) -> float:
         lambdaInMeters = self._metadata.probeWavelengthInMeters
-        zInMeters = self._metadata.detectorObjectDistanceInMeters.getValue()
+        zInMeters = self._metadata.detectorDistanceInMeters.getValue()
         return lambdaInMeters * zInMeters
 
     def getProbeWavelengthInMeters(self) -> float:

@@ -1,22 +1,16 @@
 from ...api.product import ProductMetadata
+from .settings import MetadataSettings
 
 
 class MetadataBuilder:
 
-    def __init__(self) -> None:
-        self._probeEnergyInElectronVolts = 10000.
-        self._detectorObjectDistanceInMeters = 1.
+    def __init__(self, settings: MetadataSettings) -> None:
+        self._settings = settings
 
-    def setProbeEnergyInElectronVolts(self, energyInElectronVolts: float) -> None:
-        self._probeEnergyInElectronVolts = energyInElectronVolts
-
-    def setDetectorObjectDistanceInMeters(self, distanceInMeters: float) -> None:
-        self._detectorObjectDistanceInMeters = distanceInMeters
-
-    def build(self, name: str) -> ProductMetadata:
+    def build(self, name: str, comments: str = '') -> ProductMetadata:
         return ProductMetadata(
             name=name,
-            comments='',
-            probeEnergyInElectronVolts=self._probeEnergyInElectronVolts,
-            detectorObjectDistanceInMeters=self._detectorObjectDistanceInMeters,
+            comments=comments,
+            probeEnergyInElectronVolts=float(self._settings.probeEnergyInElectronVolts.value),
+            detectorDistanceInMeters=float(self._settings.detectorDistanceInMeters.value),
         )

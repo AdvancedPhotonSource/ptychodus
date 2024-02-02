@@ -2,7 +2,6 @@ import numpy
 
 from ...api.geometry import Point2D
 from ...api.object import Object, ObjectArrayType, ObjectGeometry
-from ...api.patterns import ImageExtent
 
 
 class ObjectStitcher:

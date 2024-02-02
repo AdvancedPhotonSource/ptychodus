@@ -1,8 +1,8 @@
 from __future__ import annotations
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, overload
 import importlib
 import logging
 import pkgutil
@@ -17,7 +17,6 @@ from .scan import ScanFileReader, ScanFileWriter
 from .visualize import ScalarTransformation
 
 __all__ = [
-    'PluginEntry',
     'PluginChooser',
     'PluginRegistry',
 ]
@@ -34,7 +33,7 @@ class PluginEntry(Generic[T]):
     displayName: str
 
 
-class PluginChooser(Generic[T], Observable):
+class PluginChooser(Sequence[PluginEntry[T]], Observable):
 
     def __init__(self) -> None:
         super().__init__()
@@ -72,17 +71,19 @@ class PluginChooser(Generic[T], Observable):
 
         logger.debug(f'Invalid plugin name \"{name}\"')
 
-    def __iter__(self) -> Iterator[PluginEntry[T]]:
-        return iter(self._entryList)
+    @overload
+    def __getitem__(self, index: int) -> PluginEntry[T]:
+        ...
 
-    def __getitem__(self, name: str) -> PluginEntry[T]:
-        namecf = name.casefold()
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[PluginEntry[T]]:
+        ...
 
-        for entry in self._entryList:
-            if namecf == entry.simpleName.casefold() or namecf == entry.displayName.casefold():
-                return entry
+    def __getitem__(self, index: int | slice) -> PluginEntry[T] | Sequence[PluginEntry[T]]:
+        return self._entryList[index]
 
-        raise KeyError(f'Invalid plugin name \"{name}\"')
+    def __len__(self) -> int:
+        return len(self._entryList)
 
     def __bool__(self) -> bool:
         return bool(self._entryList)

@@ -10,8 +10,8 @@ class MetadataRepositoryItem(ParameterRepository):
         self.comments = self._registerStringParameter('Comments', metadata.comments)
         self.probeEnergyInElectronVolts = self._registerRealParameter(
             'ProbeEnergyInElectronVolts', metadata.probeEnergyInElectronVolts, minimum=0.)
-        self.detectorObjectDistanceInMeters = self._registerRealParameter(
-            'DetectorObjectDistanceInMeters', metadata.detectorObjectDistanceInMeters, minimum=0.)
+        self.detectorDistanceInMeters = self._registerRealParameter(
+            'DetectorDistanceInMeters', metadata.detectorDistanceInMeters, minimum=0.)
 
     @property
     def probeWavelengthInMeters(self) -> float:
@@ -26,5 +26,5 @@ class MetadataRepositoryItem(ParameterRepository):
             name=self.name.getValue(),
             comments=self.comments.getValue(),
             probeEnergyInElectronVolts=self.probeEnergyInElectronVolts.getValue(),
-            detectorObjectDistanceInMeters=self.detectorObjectDistanceInMeters.getValue(),
+            detectorDistanceInMeters=self.detectorDistanceInMeters.getValue(),
         )

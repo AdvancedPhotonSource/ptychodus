@@ -96,8 +96,14 @@ class ActiveReconstructor(Observable, Observer):
     def name(self) -> str:
         return self._pluginChooser.currentPlugin.displayName
 
-    def reconstruct(self, label: str, indexFilter: ScanIndexFilter, *,
-                    selectResults: bool) -> ReconstructOutput:
+    def reconstruct(self,
+                    label: str | None = None,
+                    indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
+                    *,
+                    selectResults: bool = True) -> ReconstructOutput:
+        if label is None:
+            label = self.name
+
         reconstructor = self._pluginChooser.currentPlugin.strategy
         parameters = self._prepareInputData(indexFilter)
 
@@ -121,7 +127,18 @@ class ActiveReconstructor(Observable, Observer):
                                                      Object(result.objectArray),
                                                      selectItem=selectResults)
 
+        logger.info(result.result)
         return result
+
+    def reconstructSplit(self, label: str | None = None) -> \
+            tuple[ReconstructOutput, ReconstructOutput]:
+        if label is None:
+            label = self.name
+
+        resultOdd = self.reconstruct(f'{label} - Odd', ScanIndexFilter.ODD, selectResults=False)
+        resultEven = self.reconstruct(f'{label} - Even', ScanIndexFilter.EVEN, selectResults=False)
+
+        return resultOdd, resultEven
 
     @property
     def isTrainable(self) -> bool:

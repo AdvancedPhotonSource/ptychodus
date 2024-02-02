@@ -46,9 +46,7 @@ class ImageExtent:
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ImageExtent):
-            hasSameWidth = (self.widthInPixels == other.widthInPixels)
-            hasSameHeight = (self.heightInPixels == other.heightInPixels)
-            return (hasSameWidth and hasSameHeight)
+            return (self.shape == other.shape)
 
         return False
 
@@ -125,7 +123,7 @@ class DiffractionMetadata:
     numberOfPatternsPerArray: int
     numberOfPatternsTotal: int
     patternDataType: numpy.dtype[numpy.integer[Any]]
-    detectorObjectDistanceInMeters: float | None = None
+    detectorDistanceInMeters: float | None = None
     detectorExtent: ImageExtent | None = None
     detectorPixelGeometry: PixelGeometry | None = None
     detectorBitDepth: int | None = None

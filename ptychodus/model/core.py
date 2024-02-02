@@ -22,20 +22,20 @@ from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
 from ..api.state import StateDataRegistry
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
-from .experiment import ExperimentCore, ExperimentRepositoryPresenter
 from .image import ImageCore, ImagePresenter
 from .memory import MemoryPresenter
-from .metadata import MetadataPresenter
-from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
+from .metadata import MetadataCore
+from .object import ObjectCore
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
                        DiffractionDatasetPresenter, DiffractionPatternPresenter, PatternsCore)
-from .probe import ProbeCore, ProbePresenter, ProbeRepositoryPresenter
+from .probe import ProbeCore
+from .product import ProductCore
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .rpc import RPCMessageService
 from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
-from .scan import ScanCore, ScanPresenter, ScanRepositoryPresenter
+from .scan import ScanCore
 from .tike import TikeReconstructorLibrary
 from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
                        WorkflowParametersPresenter, WorkflowStatusPresenter)
@@ -81,31 +81,29 @@ class ModelCore:
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._patternsCore = PatternsCore(self.settingsRegistry,
                                           self._pluginRegistry.diffractionFileReaders)
-        self._experimentCore = ExperimentCore(self._patternsCore.patternSizer,
-                                              self._pluginRegistry.experimentFileReaders,
-                                              self._pluginRegistry.experimentFileWriters)
         self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations,
                                             isComplex=False)
 
-        self._scanCore = ScanCore(self.rng, self.settingsRegistry, self._patternsCore.dataset,
-                                  self._pluginRegistry.scanFileReaders,
+        self._metadataCore = MetadataCore(self.settingsRegistry, self._patternsCore.dataset,
+                                          self._patternsCore.detector,
+                                          self._patternsCore.patternSettings)
+        self._scanCore = ScanCore(self.rng, self._pluginRegistry.scanFileReaders,
                                   self._pluginRegistry.scanFileWriters)
-        self._probeCore = ProbeCore(self.rng, self.settingsRegistry, self._patternsCore.detector,
-                                    self._patternsCore.patternSizer,
-                                    self._pluginRegistry.probeFileReaders,
+        self._probeCore = ProbeCore(self.rng, self._pluginRegistry.probeFileReaders,
                                     self._pluginRegistry.probeFileWriters)
         self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
                                          isComplex=True)
-        self._objectCore = ObjectCore(self.rng, self.settingsRegistry, self._probeCore.apparatus,
-                                      self._scanCore.sizer, self._probeCore.sizer,
-                                      self._pluginRegistry.objectPhaseCenteringStrategies,
-                                      self._pluginRegistry.objectFileReaders,
+        self._objectCore = ObjectCore(self.rng, self._pluginRegistry.objectFileReaders,
                                       self._pluginRegistry.objectFileWriters)
         self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
                                           isComplex=True)
-        self.metadataPresenter = MetadataPresenter.createInstance(
-            self._patternsCore.dataset, self._patternsCore.detector,
-            self._patternsCore.patternSettings, self._experimentCore.settings)
+        self._productCore = ProductCore(
+            self._patternsCore.patternSizer, self._patternsCore.dataset,
+            self._metadataCore.builder, self._scanCore.repositoryItemFactory,
+            self._scanCore.builderFactory, self._probeCore.repositoryItemFactory,
+            self._probeCore.builderFactory, self._objectCore.repositoryItemFactory,
+            self._objectCore.builderFactory, self._pluginRegistry.productFileReaders,
+            self._pluginRegistry.productFileWriters)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
@@ -126,8 +124,7 @@ class ModelCore:
             ],
         )
 
-        self._stateDataRegistry = StateDataRegistry(self._patternsCore, self._scanCore,
-                                                    self._probeCore, self._objectCore)
+        self._stateDataRegistry = StateDataRegistry(self._patternsCore)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
         self._automationCore = AutomationCore(self.settingsRegistry, self._patternsCore.dataAPI,
                                               self._scanCore.scanAPI, self._probeCore.probeAPI,
@@ -253,36 +250,8 @@ class ModelCore:
         return self._patternsCore.detectorPresenter
 
     @property
-    def experimentRepositoryPresenter(self) -> ExperimentRepositoryPresenter:
-        return self._experimentCore.repositoryPresenter
-
-    @property
-    def scanPresenter(self) -> ScanPresenter:
-        return self._scanCore.presenter
-
-    @property
-    def scanRepositoryPresenter(self) -> ScanRepositoryPresenter:
-        return self._scanCore.repositoryPresenter
-
-    @property
-    def probePresenter(self) -> ProbePresenter:
-        return self._probeCore.presenter
-
-    @property
-    def probeRepositoryPresenter(self) -> ProbeRepositoryPresenter:
-        return self._probeCore.repositoryPresenter
-
-    @property
     def probeImagePresenter(self) -> ImagePresenter:
         return self._probeImageCore.presenter
-
-    @property
-    def objectPresenter(self) -> ObjectPresenter:
-        return self._objectCore.presenter
-
-    @property
-    def objectRepositoryPresenter(self) -> ObjectRepositoryPresenter:
-        return self._objectCore.repositoryPresenter
 
     @property
     def objectImagePresenter(self) -> ImagePresenter:

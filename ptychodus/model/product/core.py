@@ -18,10 +18,10 @@ class ProductCore:
                  metadataBuilder: MetadataBuilder,
                  scanRepositoryItemFactory: ScanRepositoryItemFactory,
                  scanBuilderFactory: ScanBuilderFactory,
-                 objectRepositoryItemFactory: ObjectRepositoryItemFactory,
-                 objectBuilderFactory: ObjectBuilderFactory,
                  probeRepositoryItemFactory: ProbeRepositoryItemFactory,
                  probeBuilderFactory: ProbeBuilderFactory,
+                 objectRepositoryItemFactory: ObjectRepositoryItemFactory,
+                 objectBuilderFactory: ObjectBuilderFactory,
                  fileReaderChooser: PluginChooser[ProductFileReader],
                  fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
         self._repository = ProductRepository(patternSizer, patterns, scanRepositoryItemFactory,

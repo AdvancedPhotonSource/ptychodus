@@ -39,7 +39,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 name=str(npzFile[self.NAME]),
                 comments=str(npzFile[self.COMMENTS]),
                 probeEnergyInElectronVolts=float(npzFile[self.PROBE_ENERGY]),
-                detectorObjectDistanceInMeters=float(npzFile[self.DETECTOR_OBJECT_DISTANCE]),
+                detectorDistanceInMeters=float(npzFile[self.DETECTOR_OBJECT_DISTANCE]),
             )
 
             scanIndexes = npzFile[self.PROBE_POSITION_INDEXES]
@@ -88,7 +88,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         metadata = product.metadata
         contents[self.NAME] = metadata.name
         contents[self.COMMENTS] = metadata.comments
-        contents[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorObjectDistanceInMeters
+        contents[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorDistanceInMeters
         contents[self.PROBE_ENERGY] = metadata.probeEnergyInElectronVolts
 
         contents[self.PROBE_POSITION_INDEXES] = scanIndexes

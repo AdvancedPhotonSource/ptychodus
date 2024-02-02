@@ -1,21 +1,24 @@
 from __future__ import annotations
+from decimal import Decimal
 
 from ...api.observer import Observable, Observer
 from ...api.patterns import DiffractionDataset, DiffractionMetadata
+from ...api.settings import SettingsRegistry
 from ..patterns import Detector, DiffractionPatternSettings
 from .builder import MetadataBuilder
+from .settings import MetadataSettings
 
 
 class MetadataPresenter(Observable, Observer):
 
     def __init__(self, diffractionDataset: DiffractionDataset, detector: Detector,
                  patternSettings: DiffractionPatternSettings,
-                 metadataBuilder: MetadataBuilder) -> None:
+                 metadataSettings: MetadataSettings) -> None:
         super().__init__()
         self._diffractionDataset = diffractionDataset
         self._detector = detector
         self._patternSettings = patternSettings
-        self._metadataBuilder = metadataBuilder
+        self._metadataSettings = metadataSettings
 
         diffractionDataset.addObserver(self)
 
@@ -95,17 +98,29 @@ class MetadataPresenter(Observable, Observer):
         energyInElectronVolts = self._metadata.probeEnergyInElectronVolts
 
         if energyInElectronVolts:
-            self._metadataBuilder.setProbeEnergyInElectronVolts(energyInElectronVolts)
+            self._metadataSettings.probeEnergyInElectronVolts.value = \
+                    Decimal.from_float(energyInElectronVolts)
 
-    def canSyncDetectorObjectDistance(self) -> bool:
-        return (self._metadata.detectorObjectDistanceInMeters is not None)
+    def canSyncDetectorDistance(self) -> bool:
+        return (self._metadata.detectorDistanceInMeters is not None)
 
-    def syncDetectorObjectDistance(self) -> None:
-        distanceInMeters = self._metadata.detectorObjectDistanceInMeters
+    def syncDetectorDistance(self) -> None:
+        distanceInMeters = self._metadata.detectorDistanceInMeters
 
         if distanceInMeters:
-            self._metadataBuilder.setDetectorObjectDistanceInMeters(distanceInMeters)
+            self._metadataSettings.detectorDistanceInMeters.value = \
+                    Decimal.from_float(distanceInMeters)
 
     def update(self, observable: Observable) -> None:
         if observable is self._diffractionDataset:
             self.notifyObservers()
+
+
+class MetadataCore:
+
+    def __init__(self, settingsRegistry: SettingsRegistry, diffractionDataset: DiffractionDataset,
+                 detector: Detector, patternSettings: DiffractionPatternSettings) -> None:
+        self._settings = MetadataSettings.createInstance(settingsRegistry)
+        self.builder = MetadataBuilder(self._settings)
+        self.presenter = MetadataPresenter(diffractionDataset, detector, patternSettings,
+                                           self._settings)

@@ -12,7 +12,7 @@ class ProductMetadata:
     name: str
     comments: str
     probeEnergyInElectronVolts: float
-    detectorObjectDistanceInMeters: float
+    detectorDistanceInMeters: float
 
 
 @dataclass(frozen=True)
@@ -27,7 +27,7 @@ class ProductFileReader(ABC):
 
     @abstractmethod
     def read(self, filePath: Path) -> Product:
-        '''reads an product from file'''
+        '''reads a product from file'''
         pass
 
 
@@ -35,5 +35,5 @@ class ProductFileWriter(ABC):
 
     @abstractmethod
     def write(self, filePath: Path, product: Product) -> None:
-        '''writes an product to file'''
+        '''writes a product to file'''
         pass

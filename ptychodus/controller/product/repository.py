@@ -63,7 +63,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 elif index.column() == 1:
                     value = QVariant(f'{product.getProbeEnergyInElectronVolts() / 1000.:.1f}')
                 elif index.column() == 2:
-                    value = QVariant(f'{product.getDetectorObjectDistanceInMeters():.3g}')
+                    value = QVariant(f'{product.getDetectorDistanceInMeters():.3g}')
                 elif index.column() == 3:
                     value = QVariant('0')  # FIXME objectPlanePixelWidthInMeters
                 elif index.column() == 4:
@@ -97,7 +97,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     pass
                 else:
-                    product.setDetectorObjectDistanceInMeters(distanceInMeters)
+                    product.setDetectorDistanceInMeters(distanceInMeters)
 
         return False
 
