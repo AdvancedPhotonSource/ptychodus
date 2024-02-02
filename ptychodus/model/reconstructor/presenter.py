@@ -8,73 +8,81 @@ import numpy
 
 from ...api.object import Object
 from ...api.observer import Observable, Observer
-from ...api.visualize import Plot2D
 from ...api.plugins import PluginChooser
 from ...api.probe import Probe
+from ...api.product import Product
 from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,
                                   Reconstructor, ReconstructorLibrary, TrainableReconstructor)
-from ...api.scan import ScanPoint
-from ..scan import ScanIndexFilter
+from ...api.scan import Scan, ScanPoint
+from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ..patterns import ActiveDiffractionDataset
+from ..product import ProductRepository
+from ..scan import ScanIndexFilter
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
 
 
-class ActiveReconstructor(Observable, Observer):
+class ReconstructorPresenter(Observable, Observer):
 
     def __init__(self, settings: ReconstructorSettings,
-                 diffractionDataset: ActiveDiffractionDataset, reinitObservable: Observable,
-                 pluginChooser: PluginChooser[Reconstructor]) -> None:
+                 diffractionDataset: ActiveDiffractionDataset,
+                 productRepository: ProductRepository,
+                 reconstructorChooser: PluginChooser[Reconstructor],
+                 reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._diffractionDataset = diffractionDataset
+        self._productRepository = productRepository
+        self._reconstructorChooser = reconstructorChooser
         self._reinitObservable = reinitObservable
-        self._pluginChooser = pluginChooser
 
     @classmethod
     def createInstance(cls, settings: ReconstructorSettings,
                        diffractionDataset: ActiveDiffractionDataset,
-                       libraries: Iterable[ReconstructorLibrary],
-                       reinitObservable: Observable) -> ActiveReconstructor:
-        pluginChooser = PluginChooser[Reconstructor]()
-
-        for library in libraries:
-            for reconstructor in library:
-                pluginChooser.registerPlugin(
-                    reconstructor,
-                    displayName=f'{library.name}/{reconstructor.name}',
-                )
-
-        if not pluginChooser:
-            pluginChooser.registerPlugin(NullReconstructor('None'), displayName='None/None')
-
-        activeReconstructor = cls(settings, diffractionDataset, reinitObservable, pluginChooser)
+                       productRepository: ProductRepository,
+                       reconstructorChooser: PluginChooser[Reconstructor],
+                       reinitObservable: Observable) -> ReconstructorPresenter:
+        activeReconstructor = cls(settings, diffractionDataset, productRepository,
+                                  reconstructorChooser, reinitObservable)
         reinitObservable.addObserver(activeReconstructor)
         activeReconstructor._syncFromSettings()
         return activeReconstructor
 
     def getReconstructorList(self) -> Sequence[str]:
-        return self._pluginChooser.getDisplayNameList()
+        return self._reconstructorChooser.getDisplayNameList()
 
-    def _prepareInputData(self, indexFilter: ScanIndexFilter) -> ReconstructInput:
-        selectedScan = self._scanAPI.getSelectedScan()
+    def getReconstructor(self) -> str:
+        return self._reconstructorChooser.currentPlugin.displayName
 
-        if selectedScan is None:
-            raise ValueError('No scan is selected!')
+    def setReconstructor(self, name: str) -> None:
+        self._reconstructorChooser.setCurrentPluginByName(name)
+        self._settings.algorithm.value = self._reconstructorChooser.currentPlugin.simpleName
+        self.notifyObservers()
+
+    def _syncFromSettings(self) -> None:
+        self.setReconstructor(self._settings.algorithm.value)
+
+    def _prepareInputData(self, inputProductIndex: int,
+                          indexFilter: ScanIndexFilter) -> ReconstructInput:
+        try:
+            inputProductItem = self._productRepository[inputProductIndex]
+        except IndexError:
+            inputProduct = inputProductItem.getProduct()
+            # FIXME log error
 
         dataIndexes = self._diffractionDataset.getAssembledIndexes()
-        scanIndexes = [point.index for point in selectedScan if indexFilter(point.index)]
+        scanIndexes = [point.index for point in inputProduct.scan if indexFilter(point.index)]
         commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))
 
-        diffractionPatternArray = numpy.take(
+        patterns = numpy.take(
             self._diffractionDataset.getAssembledData(),
             commonIndexes,
             axis=0,
         )
 
         pointList: list[ScanPoint] = list()
-        pointIter = iter(selectedScan)
+        pointIter = iter(inputProduct.scan)
 
         for index in commonIndexes:
             while True:
@@ -84,74 +92,77 @@ class ActiveReconstructor(Observable, Observer):
                     pointList.append(point)
                     break
 
-        return ReconstructInput(
-            diffractionPatternArray=diffractionPatternArray,
-            scan=pointList,
-            probeArray=self._probeAPI.getSelectedProbe().getArray(),
-            # TODO vvv generalize when able vvv
-            objectInterpolator=self._objectAPI.getSelectedThinObjectInterpolator(),
-        )
+        probe = inputProduct.probe  # FIXME remap if needed
 
-    @property
-    def name(self) -> str:
-        return self._pluginChooser.currentPlugin.displayName
+        product = Product(
+            metadata=inputProduct.metadata,
+            scan=Scan(pointList),
+            probe=probe,
+            object_=inputProduct.object_,
+            costs=inputProduct.costs,
+        )
+        return ReconstructInput(patterns, product)
 
     def reconstruct(self,
-                    label: str | None = None,
-                    indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
-                    *,
-                    selectResults: bool = True) -> ReconstructOutput:
-        if label is None:
-            label = self.name
-
-        reconstructor = self._pluginChooser.currentPlugin.strategy
-        parameters = self._prepareInputData(indexFilter)
+                    inputProductIndex: int,
+                    outputProductName: str,
+                    indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> ReconstructOutput:
+        # FIXME insert result into repository
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+        parameters = self._prepareInputData(inputProductIndex, indexFilter)
 
         tic = time.perf_counter()
         result = reconstructor.reconstruct(parameters)
         toc = time.perf_counter()
         logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')
 
-        if result.scan is not None:
-            self._scanAPI.insertItemIntoRepositoryFromScan(label,
-                                                           result.scan,
-                                                           selectItem=selectResults)
-
-        if result.probeArray is not None:
-            self._probeAPI.insertItemIntoRepository(label,
-                                                    Probe(result.probeArray),
-                                                    selectItem=selectResults)
-
-        if result.objectArray is not None:
-            self._objectAPI.insertItemIntoRepository(label,
-                                                     Object(result.objectArray),
-                                                     selectItem=selectResults)
-
         logger.info(result.result)
+
+        # FIXME self._plot2D = result.plot2D
+
         return result
 
-    def reconstructSplit(self, label: str | None = None) -> \
-            tuple[ReconstructOutput, ReconstructOutput]:
-        if label is None:
-            label = self.name
+    def reconstructSplit(self, inputProductIndex: int,
+                         outputProductName: str) -> tuple[ReconstructOutput, ReconstructOutput]:
+        resultOdd = self.reconstruct(
+            inputProductIndex,
+            f'{outputProductName} - Odd',
+            ScanIndexFilter.ODD,
+        )
+        resultEven = self.reconstruct(
+            inputProductIndex,
+            f'{outputProductName} - Even',
+            ScanIndexFilter.EVEN,
+        )
 
-        resultOdd = self.reconstruct(f'{label} - Odd', ScanIndexFilter.ODD, selectResults=False)
-        resultEven = self.reconstruct(f'{label} - Even', ScanIndexFilter.EVEN, selectResults=False)
+        seriesXList: list[PlotSeries] = list()
+        seriesYList: list[PlotSeries] = list()
+
+        for evenOdd, plot2D in zip(('Odd', 'Even'), (resultOdd.plot2D, resultEven.plot2D)):
+            for seriesX in plot2D.axisX.series:
+                for seriesY in plot2D.axisY.series:
+                    seriesXList.append(PlotSeries(f'{seriesX.label} - {evenOdd}', seriesX.values))
+                    seriesYList.append(PlotSeries(f'{seriesY.label} - {evenOdd}', seriesY.values))
+
+        plot2D = Plot2D(  # FIXME use this
+            axisX=PlotAxis(label=plot2D.axisX.label, series=seriesXList),
+            axisY=PlotAxis(label=plot2D.axisY.label, series=seriesYList),
+        )
 
         return resultOdd, resultEven
 
     @property
     def isTrainable(self) -> bool:
-        reconstructor = self._pluginChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
         return isinstance(reconstructor, TrainableReconstructor)
 
-    def ingestTrainingData(self) -> None:
-        reconstructor = self._pluginChooser.currentPlugin.strategy
+    def ingestTrainingData(self, inputProductIndex: int) -> None:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Preparing input data...')
             tic = time.perf_counter()
-            parameters = self._prepareInputData(ScanIndexFilter.ALL)
+            parameters = self._prepareInputData(inputProductIndex, ScanIndexFilter.ALL)
             toc = time.perf_counter()
             logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
 
@@ -164,7 +175,7 @@ class ActiveReconstructor(Observable, Observer):
             logger.warning('Reconstructor is not trainable!')
 
     def getSaveFileFilterList(self) -> Sequence[str]:
-        reconstructor = self._pluginChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getSaveFileFilterList()
@@ -174,7 +185,7 @@ class ActiveReconstructor(Observable, Observer):
         return list()
 
     def getSaveFileFilter(self) -> str:
-        reconstructor = self._pluginChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getSaveFileFilter()
@@ -184,7 +195,7 @@ class ActiveReconstructor(Observable, Observer):
         return str()
 
     def saveTrainingData(self, filePath: Path) -> None:
-        reconstructor = self._pluginChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Saving...')
@@ -196,7 +207,7 @@ class ActiveReconstructor(Observable, Observer):
             logger.warning('Reconstructor is not trainable!')
 
     def train(self) -> Plot2D:
-        reconstructor = self._pluginChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
         plot2D = Plot2D.createNull()
 
         if isinstance(reconstructor, TrainableReconstructor):
@@ -211,7 +222,7 @@ class ActiveReconstructor(Observable, Observer):
         return plot2D
 
     def clearTrainingData(self) -> None:
-        reconstructor = self._pluginChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Resetting...')
@@ -221,14 +232,6 @@ class ActiveReconstructor(Observable, Observer):
             logger.info(f'Reset time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Reconstructor is not trainable!')
-
-    def selectReconstructor(self, name: str) -> None:
-        self._pluginChooser.setCurrentPluginByName(name)
-        self._settings.algorithm.value = self._pluginChooser.currentPlugin.simpleName
-        self.notifyObservers()
-
-    def _syncFromSettings(self) -> None:
-        self.selectReconstructor(self._settings.algorithm.value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:

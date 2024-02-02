@@ -4,12 +4,13 @@ from typing import overload
 import logging
 import sys
 
-from ...api.product import Product, ProductFileReader, ProductFileWriter
 from ...api.object import Object
 from ...api.observer import ObservableSequence
 from ...api.plugins import PluginChooser
 from ...api.probe import Probe
+from ...api.product import Product, ProductFileReader, ProductFileWriter
 from ...api.scan import Scan
+from ...api.visualize import Plot2D
 from ..metadata import MetadataBuilder, MetadataRepositoryItem
 from ..object import ObjectRepositoryItem
 from ..probe import ProbeRepositoryItem
@@ -55,6 +56,7 @@ class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ProductRepo
             scan=Scan(),
             probe=Probe(),
             object_=Object(),
+            costs=Plot2D.createNull(),
         )
         self._repository.insertProduct(product)
 
@@ -112,6 +114,9 @@ class MetadataRepository(ObservableSequence[MetadataRepositoryItem], ProductRepo
         pass
 
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+        pass
+
+    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
         pass
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:

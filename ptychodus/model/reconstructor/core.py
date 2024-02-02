@@ -1,112 +1,39 @@
-from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 import logging
 
 from ...api.observer import Observable, Observer
-from ...api.reconstructor import ReconstructorLibrary
+from ...api.plugins import PluginChooser
+from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
 from ...api.settings import SettingsRegistry
-from ...api.visualize import Plot2D, PlotAxis, PlotSeries
-from ..object import ObjectAPI
 from ..patterns import ActiveDiffractionDataset
-from ..probe import ProbeAPI
-from ..scan import ScanAPI
-from .active import ActiveReconstructor
-from .api import ReconstructorAPI
+from ..product import ProductRepository
+from .presenter import ReconstructorPresenter
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
 
 
-class ReconstructorPresenter(Observable, Observer):
-
-    def __init__(self, activeReconstructor: ActiveReconstructor,
-                 reconstructorAPI: ReconstructorAPI) -> None:
-        super().__init__()
-        self._activeReconstructor = activeReconstructor
-        self._reconstructorAPI = reconstructorAPI
-        self._plot2D = Plot2D.createNull()
-
-    @classmethod
-    def createInstance(cls, activeReconstructor: ActiveReconstructor,
-                       reconstructorAPI: ReconstructorAPI) -> ReconstructorPresenter:
-        presenter = cls(activeReconstructor, reconstructorAPI)
-        activeReconstructor.addObserver(presenter)
-        return presenter
-
-    def getReconstructorList(self) -> Sequence[str]:
-        return self._activeReconstructor.getReconstructorList()
-
-    def getReconstructor(self) -> str:
-        return self._activeReconstructor.name
-
-    def setReconstructor(self, name: str) -> None:
-        self._activeReconstructor.selectReconstructor(name)
-
-    def reconstruct(self) -> None:
-        result = self._reconstructorAPI.reconstruct()
-        self._plot2D = result.plot2D
-        self.notifyObservers()
-
-    def reconstructSplit(self) -> None:
-        seriesXList: list[PlotSeries] = list()
-        seriesYList: list[PlotSeries] = list()
-
-        resultOdd, resultEven = self._reconstructorAPI.reconstructSplit()
-
-        for evenOdd, plot2D in zip(('Odd', 'Even'), (resultOdd.plot2D, resultEven.plot2D)):
-            for seriesX in plot2D.axisX.series:
-                for seriesY in plot2D.axisY.series:
-                    seriesXList.append(PlotSeries(f'{seriesX.label} - {evenOdd}', seriesX.values))
-                    seriesYList.append(PlotSeries(f'{seriesY.label} - {evenOdd}', seriesY.values))
-
-        self._plot2D = Plot2D(
-            axisX=PlotAxis(label=plot2D.axisX.label, series=seriesXList),
-            axisY=PlotAxis(label=plot2D.axisY.label, series=seriesYList),
-        )
-        self.notifyObservers()
-
-    def getPlot(self) -> Plot2D:
-        return self._plot2D
-
-    @property
-    def isTrainable(self) -> bool:
-        return self._activeReconstructor.isTrainable
-
-    def ingestTrainingData(self) -> None:
-        self._reconstructorAPI.ingestTrainingData()
-
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._activeReconstructor.getSaveFileFilterList()
-
-    def getSaveFileFilter(self) -> str:
-        return self._activeReconstructor.getSaveFileFilter()
-
-    def saveTrainingData(self, filePath: Path) -> None:
-        self._reconstructorAPI.saveTrainingData(filePath)
-
-    def train(self) -> None:
-        self._plot2D = self._reconstructorAPI.train()
-        self.notifyObservers()
-
-    def clearTrainingData(self) -> None:
-        self._reconstructorAPI.clearTrainingData()
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._activeReconstructor:
-            self.notifyObservers()
-
-
 class ReconstructorCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry,
-                 diffractionDataset: ActiveDiffractionDataset, scanAPI: ScanAPI,
-                 probeAPI: ProbeAPI, objectAPI: ObjectAPI,
-                 libraryList: Sequence[ReconstructorLibrary]) -> None:
+                 diffractionDataset: ActiveDiffractionDataset,
+                 productRepository: ProductRepository,
+                 librarySeq: Sequence[ReconstructorLibrary]) -> None:
         self.settings = ReconstructorSettings.createInstance(settingsRegistry)
-        self._activeReconstructor = ActiveReconstructor.createInstance(
-            self.settings, diffractionDataset, scanAPI, probeAPI, objectAPI, libraryList,
-            settingsRegistry)
-        self.reconstructorAPI = ReconstructorAPI(objectAPI, self._activeReconstructor)
-        self.presenter = ReconstructorPresenter.createInstance(self._activeReconstructor,
-                                                               self.reconstructorAPI)
+        self._pluginChooser = PluginChooser[Reconstructor]()
+
+        for library in librarySeq:
+            for reconstructor in library:
+                self._pluginChooser.registerPlugin(
+                    reconstructor,
+                    displayName=f'{library.name}/{reconstructor.name}',
+                )
+
+        if not self._pluginChooser:
+            self._pluginChooser.registerPlugin(NullReconstructor('None'), displayName='None/None')
+
+        self.presenter = ReconstructorPresenter.createInstance(self.settings, diffractionDataset,
+                                                               productRepository,
+                                                               self._pluginChooser,
+                                                               settingsRegistry)

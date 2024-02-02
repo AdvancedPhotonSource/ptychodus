@@ -5,6 +5,7 @@ from pathlib import Path
 from .object import Object
 from .probe import Probe
 from .scan import Scan
+from .visualize import Plot2D
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class Product:
     scan: Scan
     probe: Probe
     object_: Object
+    costs: Plot2D
 
 
 class ProductFileReader(ABC):

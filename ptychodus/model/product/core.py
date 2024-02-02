@@ -24,11 +24,12 @@ class ProductCore:
                  objectBuilderFactory: ObjectBuilderFactory,
                  fileReaderChooser: PluginChooser[ProductFileReader],
                  fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
-        self._repository = ProductRepository(patternSizer, patterns, scanRepositoryItemFactory,
-                                             probeRepositoryItemFactory,
-                                             objectRepositoryItemFactory)
-        self.metadataRepository = MetadataRepository(self._repository, metadataBuilder,
+        self.productRepository = ProductRepository(patternSizer, patterns,
+                                                   scanRepositoryItemFactory,
+                                                   probeRepositoryItemFactory,
+                                                   objectRepositoryItemFactory)
+        self.metadataRepository = MetadataRepository(self.productRepository, metadataBuilder,
                                                      fileReaderChooser, fileWriterChooser)
-        self.scanRepository = ScanRepository(self._repository, scanBuilderFactory)
-        self.probeRepository = ProbeRepository(self._repository, probeBuilderFactory)
-        self.objectRepository = ObjectRepository(self._repository, objectBuilderFactory)
+        self.scanRepository = ScanRepository(self.productRepository, scanBuilderFactory)
+        self.probeRepository = ProbeRepository(self.productRepository, probeBuilderFactory)
+        self.objectRepository = ObjectRepository(self.productRepository, objectBuilderFactory)

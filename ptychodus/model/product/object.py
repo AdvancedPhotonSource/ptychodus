@@ -4,6 +4,7 @@ from typing import overload
 import logging
 
 from ...api.observer import ObservableSequence
+from ...api.visualize import Plot2D
 from ..metadata import MetadataRepositoryItem
 from ..object import ObjectBuilderFactory, ObjectRepositoryItem
 from ..probe import ProbeRepositoryItem
@@ -71,6 +72,9 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
 
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
         self.notifyObserversItemChanged(index, item)
+
+    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
+        pass
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
         self.notifyObserversItemRemoved(index, item.getObject())

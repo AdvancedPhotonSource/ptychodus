@@ -4,11 +4,7 @@ import logging
 import re
 
 from ...api.state import StateDataRegistry
-from ..object import ObjectAPI
 from ..patterns import DiffractionDataAPI
-from ..probe import ProbeAPI
-from ..reconstructor import ReconstructorAPI
-from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 
 logger = logging.getLogger(__name__)
@@ -25,12 +21,8 @@ class AutomationDatasetWorkflow(ABC):
 
 class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
-                 objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
+    def __init__(self, dataAPI: DiffractionDataAPI, workflowCore: WorkflowCore) -> None:
         self._dataAPI = dataAPI
-        self._scanAPI = scanAPI
-        self._probeAPI = probeAPI
-        self._objectAPI = objectAPI
         self._workflowCore = workflowCore
 
     def execute(self, filePath: Path) -> None:
@@ -53,14 +45,10 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         self._workflowCore.executeWorkflow(flowLabel)
 
 
-class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
+class S2AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
-                 objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
+    def __init__(self, dataAPI: DiffractionDataAPI, workflowCore: WorkflowCore) -> None:
         self._dataAPI = dataAPI
-        self._scanAPI = scanAPI
-        self._probeAPI = probeAPI
-        self._objectAPI = objectAPI
         self._workflowCore = workflowCore
 
     def execute(self, filePath: Path) -> None:
@@ -78,12 +66,11 @@ class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
 class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, registry: StateDataRegistry, reconstructorAPI: ReconstructorAPI) -> None:
+    def __init__(self, registry: StateDataRegistry) -> None:
         self._registry = registry
-        self._reconstructorAPI = reconstructorAPI
 
     def execute(self, filePath: Path) -> None:
         # TODO watch for ptychodus NPZ files
         self._registry.openStateData(filePath)
-        self._reconstructorAPI.ingestTrainingData()
-        self._reconstructorAPI.train()
+        self._reconstructor.ingestTrainingData()
+        self._reconstructor.train()

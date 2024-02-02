@@ -114,9 +114,7 @@ class ModelCore:
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             self._patternsCore.dataset,
-            self._scanCore.scanAPI,
-            self._probeCore.probeAPI,
-            self._objectCore.objectAPI,
+            self._productCore.productRepository,
             [
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,

@@ -6,17 +6,14 @@ import queue
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
-from ..object import ObjectAPI
 from ..patterns import DiffractionDataAPI
-from ..probe import ProbeAPI
-from ..scan import ScanAPI
 from ..workflow import WorkflowCore
 from .buffer import AutomationDatasetBuffer
 from .processor import AutomationDatasetProcessor
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
 from .watcher import DataDirectoryWatcher
-from .workflow import S02AutomationDatasetWorkflow
+from .workflow import S2AutomationDatasetWorkflow
 
 
 class AutomationPresenter(Observable, Observer):
@@ -148,12 +145,10 @@ class AutomationProcessingPresenter(Observable, Observer):
 class AutomationCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, dataAPI: DiffractionDataAPI,
-                 scanAPI: ScanAPI, probeAPI: ProbeAPI, objectAPI: ObjectAPI,
                  workflowCore: WorkflowCore) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
-        self._workflow = S02AutomationDatasetWorkflow(dataAPI, scanAPI, probeAPI, objectAPI,
-                                                      workflowCore)
+        self._workflow = S2AutomationDatasetWorkflow(dataAPI, workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
                                                      self._workflow, self._processingQueue)

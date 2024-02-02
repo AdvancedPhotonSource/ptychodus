@@ -4,9 +4,10 @@ from collections.abc import Sequence
 from typing import overload
 import logging
 
-from ...api.product import Product
 from ...api.observer import Observable
 from ...api.parametric import ParameterRepository
+from ...api.product import Product
+from ...api.visualize import Plot2D
 from ..metadata import MetadataRepositoryItem
 from ..object import ObjectRepositoryItem, ObjectRepositoryItemFactory
 from ..patterns import ActiveDiffractionDataset, PatternSizer
@@ -35,31 +36,38 @@ class ProductRepositoryItemObserver(ABC):
     def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
         pass
 
+    @abstractmethod
+    def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
+        pass
+
 
 class ProductRepositoryItem(ParameterRepository):
 
     def __init__(self, parent: ProductRepositoryItemObserver, privateIndex: int,
                  metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
                  geometry: ProductGeometry, probe: ProbeRepositoryItem,
-                 object_: ObjectRepositoryItem, patterns: ActiveDiffractionDataset) -> None:
+                 object_: ObjectRepositoryItem, costs: Plot2D,
+                 patterns: ActiveDiffractionDataset) -> None:
         super().__init__('Product')
         self._parent = parent
         self._privateIndex = privateIndex
         self._metadata = metadata
         self._scan = scan
+        self._geometry = geometry
         self._probe = probe
         self._object = object_
-        self._geometry = geometry
+        self._costs = costs
         self._patterns = patterns
 
         self._addParameterRepository(self._metadata)
         self._addParameterRepository(self._scan)
+        self._addParameterRepository(self._geometry)
         self._addParameterRepository(self._probe)
         self._addParameterRepository(self._object)
-        self._addParameterRepository(self._geometry)
 
         self._metadata.addObserver(self)
         self._scan.addObserver(self)
+        self._geometry.addObserver(self)
         self._probe.addObserver(self)
         self._object.addObserver(self)
         self._patterns.addObserver(self)
@@ -93,24 +101,40 @@ class ProductRepositoryItem(ParameterRepository):
         object_ = self._object.getObject()
         return self._geometry.isObjectGeometryValid(object_.getGeometry())
 
+    def _invalidateCosts(self) -> None:
+        self._costs = Plot2D.createNull()
+        self._parent.handleCostsChanged(self)
+
+    def getCosts(self) -> Plot2D:
+        return self._costs
+
     def getProduct(self) -> Product:
         return Product(
             metadata=self._metadata.getMetadata(),
             scan=self._scan.getScan(),
             probe=self._probe.getProbe(),
             object_=self._object.getObject(),
+            costs=self.getCosts(),
         )
 
     def update(self, observable: Observable) -> None:
         if observable is self._metadata:
+            self._invalidateCosts()
             self._parent.handleMetadataChanged(self)
         elif observable is self._scan:
+            self._invalidateCosts()
             self._parent.handleScanChanged(self)
+        elif observable is self._geometry:
+            pass  # FIXME
         elif observable is self._probe:
+            self._invalidateCosts()
             self._parent.handleProbeChanged(self)
         elif observable is self._object:
+            self._invalidateCosts()
             self._parent.handleObjectChanged(self)
         elif observable is self._patterns:
+            # FIXME because validation might change
+            # FIXME extract validator
             self.notifyObservers()
 
 
@@ -134,6 +158,10 @@ class ProductRepositoryObserver(ABC):
 
     @abstractmethod
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+        pass
+
+    @abstractmethod
+    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
         pass
 
     @abstractmethod
@@ -178,15 +206,17 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         scan = self._scanRepositoryItemFactory.create(product.scan)
         geometry = ProductGeometry(metadata, scan, self._patternSizer)
 
-        item = ProductRepositoryItem(parent=self,
-                                     privateIndex=index,
-                                     metadata=metadata,
-                                     scan=scan,
-                                     geometry=geometry,
-                                     probe=self._probeRepositoryItemFactory.create(product.probe),
-                                     object_=self._objectRepositoryItemFactory.create(
-                                         product.object_),
-                                     patterns=self._patterns)
+        item = ProductRepositoryItem(
+            parent=self,
+            privateIndex=index,
+            metadata=metadata,
+            scan=scan,
+            geometry=geometry,
+            probe=self._probeRepositoryItemFactory.create(product.probe),
+            object_=self._objectRepositoryItemFactory.create(product.object_),
+            patterns=self._patterns,
+            costs=product.costs,
+        )
         self._itemList.append(item)
 
         for observer in self._observerList:
@@ -231,6 +261,13 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         for observer in self._observerList:
             observer.handleObjectChanged(index, object_)
+
+    def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
+        index = item._privateIndex
+        costs = item.getCosts()
+
+        for observer in self._observerList:
+            observer.handleCostsChanged(index, costs)
 
     def _updateIndexes(self) -> None:
         for index, item in enumerate(self._itemList):

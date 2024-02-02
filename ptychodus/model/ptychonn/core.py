@@ -10,7 +10,6 @@ from ...api.observer import Observable, Observer
 from ...api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
                                   TrainableReconstructor)
 from ...api.settings import SettingsRegistry
-from ..object import ObjectAPI
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 logger = logging.getLogger(__name__)
@@ -182,7 +181,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry, objectAPI: ObjectAPI,
+    def createInstance(cls, settingsRegistry: SettingsRegistry,
                        isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
         modelSettings = PtychoNNModelSettings.createInstance(settingsRegistry)
         trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
