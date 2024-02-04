@@ -133,10 +133,13 @@ class ReconstructorPresenter(Observable, Observer):
             ScanIndexFilter.EVEN,
         )
 
+        costsOdd = resultOdd.product.costs
+        costsEven = resultEven.product.costs
+
         seriesXList: list[PlotSeries] = list()
         seriesYList: list[PlotSeries] = list()
 
-        for evenOdd, plot2D in zip(('Odd', 'Even'), (resultOdd.plot2D, resultEven.plot2D)):
+        for evenOdd, plot2D in zip(('Odd', 'Even'), (costsOdd, costsEven)):
             for seriesX in plot2D.axisX.series:
                 for seriesY in plot2D.axisY.series:
                     seriesXList.append(PlotSeries(f'{seriesX.label} - {evenOdd}', seriesX.values))

@@ -8,6 +8,8 @@ from typing import Any, TypeAlias
 import numpy
 import numpy.typing
 
+from .patterns import ImageExtent
+
 ProbeArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
 
@@ -93,6 +95,12 @@ class Probe:
             heightInPixels=self._array.shape[-2],
             pixelWidthInMeters=self._pixelWidthInMeters,
             pixelHeightInMeters=self._pixelHeightInMeters,
+        )
+
+    def getExtent(self) -> ImageExtent:
+        return ImageExtent(
+            widthInPixels=self._array.shape[-1],
+            heightInPixels=self._array.shape[-2],
         )
 
     def getMode(self, number: int) -> ProbeArrayType:

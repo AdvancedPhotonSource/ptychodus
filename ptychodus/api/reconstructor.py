@@ -18,13 +18,7 @@ class ReconstructInput:
 @dataclass(frozen=True)
 class ReconstructOutput:
     product: Product
-    objective: Sequence[Sequence[float]]
-    plot2D: Plot2D
     result: int
-
-    @classmethod
-    def createNull(cls, product: Product) -> ReconstructOutput:
-        return cls(product, [[]], Plot2D.createNull(), 0)
 
 
 class Reconstructor(ABC):
@@ -76,12 +70,7 @@ class NullReconstructor(TrainableReconstructor):
         return self._name
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        return ReconstructOutput(
-            product=parameters.product,
-            objective=[[]],
-            plot2D=Plot2D.createNull(),
-            result=0,
-        )
+        return ReconstructOutput(parameters.product, 0)
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         pass

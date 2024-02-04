@@ -6,15 +6,16 @@ from typing import Any, Mapping, TypeAlias
 import logging
 
 from ptychonn import ReconSmallModel, Tester, Trainer
-from scipy.ndimage import map_coordinates
 import numpy
 import numpy.typing
 
-from ...api.apparatus import ImageExtent
+from ...api.geometry import Point2D
 from ...api.object import ObjectArrayType
+from ...api.patterns import ImageExtent
+from ...api.product import Product
 from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
 from ...api.visualize import Plot2D, PlotAxis, PlotSeries
-from ..object import ObjectAPI
+from ..object import ObjectLinearInterpolator, ObjectStitcher
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 FloatArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]
@@ -89,11 +90,9 @@ class ObjectPatchCircularBuffer:
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def __init__(self, modelSettings: PtychoNNModelSettings,
-                 trainingSettings: PtychoNNTrainingSettings, objectAPI: ObjectAPI, *,
-                 enableAmplitude: bool) -> None:
+                 trainingSettings: PtychoNNTrainingSettings, *, enableAmplitude: bool) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
-        self._objectAPI = objectAPI
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
         self._enableAmplitude = enableAmplitude
@@ -116,7 +115,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         # TODO data size/shape requirements to GUI
-        data = parameters.diffractionPatternArray
+        data = parameters.patterns
         dataSize = data.shape[-1]
 
         if dataSize != data.shape[-2]:
@@ -155,62 +154,54 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         objectPatches = tester.predictTestData(npz_save_path=npzSavePath)
 
         logger.debug('Stitching...')
-        objectInterpolator = parameters.objectInterpolator
-        objectGrid = objectInterpolator.getGrid()
-        objectArray = objectInterpolator.getArray()
-        objectArrayUpper = numpy.zeros_like(objectArray, dtype=complex)
-        objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
+        stitcher = ObjectStitcher(parameters.product.object_.getGeometry())
 
-        patchExtent = ImageExtent(
-            widthInPixels=objectPatches.shape[-1],
-            heightInPixels=objectPatches.shape[-2],
+        for scanPoint, objectPatchChannels in zip(parameters.product.scan, objectPatches):
+            patchCenter = Point2D(
+                x=scanPoint.positionXInMeters,
+                y=scanPoint.positionYInMeters,
+            )
+            patchArray = numpy.exp(1j * objectPatchChannels[0])
+
+            if objectPatchChannels.shape[0] == 2:
+                patchArray *= objectPatchChannels[1]
+            else:
+                patchArray *= 0.5
+
+            stitcher.addPatch(patchCenter, patchArray)
+
+        product = Product(
+            metadata=parameters.product.metadata,
+            scan=parameters.product.scan,
+            probe=parameters.product.probe,
+            object_=stitcher.build(),
+            costs=Plot2D.createNull(),  # TODO put something here?
         )
 
-        for scanPoint, objectPatchReals in zip(parameters.scan.values(), objectPatches):
-            objectPatch = 0.5 * numpy.exp(1j * objectPatchReals[0])
-
-            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.widthInPixels)
-            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.heightInPixels)
-
-            pixelCentersX = patchAxisX.getObjectPixelCenters()
-            pixelCentersY = patchAxisY.getObjectPixelCenters()
-
-            xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
-            patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
-
-            # TODO consider inverse distance weighting
-            objectArrayUpper[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += patchValues
-            objectArrayCount[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += 1
-
-        objectArrayLower = numpy.maximum(objectArrayCount, 1)
-        objectArray = objectArrayUpper / objectArrayLower
-
-        return ReconstructOutput(
-            scan=None,
-            probeArray=None,
-            objectArray=objectArray,
-            objective=[[]],
-            plot2D=Plot2D.createNull(),  # TODO show something here?
-            result=0,
-        )
+        return ReconstructOutput(product, 0)
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        objectInterpolator = parameters.objectInterpolator
+        interpolator = ObjectLinearInterpolator(parameters.product.object_)
+        probeExtent = parameters.product.probe.getExtent()
 
         if self._patternBuffer.isZeroSized:
-            diffractionPatternExtent = parameters.diffractionPatternExtent
+            patternExtent = ImageExtent(widthInPixels=parameters.patterns.shape[-1],
+                                        heightInPixels=parameters.patterns.shape[-2])
             maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
-
             channels = 2 if self._enableAmplitude else 1
-            self._patternBuffer = PatternCircularBuffer(diffractionPatternExtent, maximumSize)
-            self._objectPatchBuffer = ObjectPatchCircularBuffer(diffractionPatternExtent, channels,
+            self._patternBuffer = PatternCircularBuffer(patternExtent, maximumSize)
+            self._objectPatchBuffer = ObjectPatchCircularBuffer(patternExtent, channels,
                                                                 maximumSize)
 
-        for scanIndex, scanPoint in parameters.scan.items():
-            objectPatch = objectInterpolator.getPatch(scanPoint, parameters.probeExtent)
+        for scanPoint in parameters.product.scan:
+            patchCenter = Point2D(
+                x=scanPoint.positionXInMeters,
+                y=scanPoint.positionYInMeters,
+            )
+            objectPatch = interpolator.getPatch(patchCenter, probeExtent)
             self._objectPatchBuffer.append(objectPatch.array)
 
-        for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
+        for pattern in parameters.patterns.astype(numpy.float32):
             self._patternBuffer.append(pattern)
 
     def _plotMetrics(self, metrics: Mapping[str, Any]) -> Plot2D:

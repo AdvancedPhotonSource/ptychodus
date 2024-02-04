@@ -200,11 +200,9 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         else:
             phaseOnlyReconstructor = PtychoNNTrainableReconstructor(modelSettings,
                                                                     trainingSettings,
-                                                                    objectAPI,
                                                                     enableAmplitude=False)
             amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(modelSettings,
                                                                          trainingSettings,
-                                                                         objectAPI,
                                                                          enableAmplitude=True)
             reconstructors.append(phaseOnlyReconstructor)
             reconstructors.append(amplitudePhaseReconstructor)
