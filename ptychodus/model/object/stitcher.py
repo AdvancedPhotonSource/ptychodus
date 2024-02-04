@@ -11,6 +11,12 @@ class ObjectStitcher:
         self._weights = numpy.zeros((geometry.heightInPixels, geometry.widthInPixels))
         self._array: ObjectArrayType = numpy.zeros_like(self._weights, dtype=complex)
 
+    def _addPatchPart(self, ixSlice: slice, iySlice: slice, weight: float,
+                      patchArray: ObjectArrayType) -> None:
+        idx = numpy.s_[iySlice, ixSlice]
+        self._weights[idx] += weight
+        self._array[idx] += (patchArray - self._array[idx]) * weight / self._weights[idx]
+
     def addPatch(self, patchCenter: Point2D, patchArray: ObjectArrayType) -> None:
         geometry = self._geometry
 
@@ -37,21 +43,10 @@ class ObjectStitcher:
         xiC = 1. - xi
         etaC = 1. - eta
 
-        w00 = xiC * etaC
-        w01 = xi * etaC
-        w10 = xiC * eta
-        w11 = xi * eta
-
-        # FIXME online update for weighted sum (see Welford's online algorithm)
-        self._array[:, iySlice0, ixSlice0] += w00 * patchArray
-        self._array[:, iySlice0, ixSlice1] += w01 * patchArray
-        self._array[:, iySlice1, ixSlice0] += w10 * patchArray
-        self._array[:, iySlice1, ixSlice1] += w11 * patchArray
-
-        self._weights[:, iySlice0, ixSlice0] += w00
-        self._weights[:, iySlice0, ixSlice1] += w01
-        self._weights[:, iySlice1, ixSlice0] += w10
-        self._weights[:, iySlice1, ixSlice1] += w11
+        self._addPatchPart(ixSlice0, iySlice0, xiC * etaC, patchArray)
+        self._addPatchPart(ixSlice1, iySlice0, xi * etaC, patchArray)
+        self._addPatchPart(ixSlice0, iySlice1, xiC * eta, patchArray)
+        self._addPatchPart(ixSlice1, iySlice1, xi * eta, patchArray)
 
     def build(self) -> Object:
         return Object(

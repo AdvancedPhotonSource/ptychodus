@@ -333,7 +333,7 @@ class ExtendedPIEReconstructor(Reconstructor):
         return 'ePIE'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        return ReconstructOutput.createNull()  # TODO
+        return ReconstructOutput.createNull(parameters.product)  # TODO
 
 
 # {"epie", (PyCFunction)ptycholib_epie, METH_VARARGS|METH_KEYWORDS, epie_docstring},
@@ -357,7 +357,7 @@ class DifferenceMapReconstructor(Reconstructor):
         return 'DM'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        return ReconstructOutput.createNull()  # TODO
+        return ReconstructOutput.createNull(parameters.product)  # TODO
 
 
 # {"dm", (PyCFunction)ptycholib_dm, METH_VARARGS|METH_KEYWORDS, dm_docstring},
@@ -372,7 +372,7 @@ class LeastSquaresMaximumLikelihoodReconstructor(Reconstructor):
         return 'MLs'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        return ReconstructOutput.createNull()  # TODO
+        return ReconstructOutput.createNull(parameters.product)  # TODO
 
 
 # {"mls", (PyCFunction)ptycholib_mls, METH_VARARGS|METH_KEYWORDS, mls_docstring},

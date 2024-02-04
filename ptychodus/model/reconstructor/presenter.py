@@ -1,18 +1,16 @@
 from __future__ import annotations
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 import logging
 import time
 
 import numpy
 
-from ...api.object import Object
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
-from ...api.probe import Probe
 from ...api.product import Product
-from ...api.reconstructor import (NullReconstructor, ReconstructInput, ReconstructOutput,
-                                  Reconstructor, ReconstructorLibrary, TrainableReconstructor)
+from ...api.reconstructor import (ReconstructInput, ReconstructOutput, Reconstructor,
+                                  TrainableReconstructor)
 from ...api.scan import Scan, ScanPoint
 from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ..patterns import ActiveDiffractionDataset

@@ -125,8 +125,7 @@ class ModelCore:
         self._stateDataRegistry = StateDataRegistry(self._patternsCore)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
         self._automationCore = AutomationCore(self.settingsRegistry, self._patternsCore.dataAPI,
-                                              self._scanCore.scanAPI, self._probeCore.probeAPI,
-                                              self._objectCore.objectAPI, self._workflowCore)
+                                              self._workflowCore)
 
         self.rpcMessageService: RPCMessageService | None = None
 

@@ -1,8 +1,6 @@
 from collections.abc import Sequence
-from pathlib import Path
 import logging
 
-from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
 from ...api.settings import SettingsRegistry

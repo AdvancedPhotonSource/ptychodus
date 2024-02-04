@@ -9,7 +9,7 @@ import numpy
 import numpy.typing
 
 from .geometry import Point2D
-from .patterns import ImageExtent
+from .patterns import ImageExtent, PixelGeometry
 
 ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
@@ -135,6 +135,12 @@ class Object:
             pixelHeightInMeters=self._pixelHeightInMeters,
             centerXInMeters=self._centerXInMeters,
             centerYInMeters=self._centerYInMeters,
+        )
+
+    def getPixelGeometry(self) -> PixelGeometry:
+        return PixelGeometry(
+            widthInMeters=self._pixelWidthInMeters,
+            heightInMeters=self._pixelHeightInMeters,
         )
 
     def getLayer(self, number: int) -> ObjectArrayType:

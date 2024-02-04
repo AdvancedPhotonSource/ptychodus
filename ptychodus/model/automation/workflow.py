@@ -39,9 +39,9 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
                 break
 
         self._dataAPI.loadDiffractionDataset(diffractionFilePath, fileType='HDF5')
-        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='MDA', selectItem=True)
+        # FIXME self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='MDA', selectItem=True)
         # NOTE reuse probe
-        self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
+        # FIXME self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)
 
 
@@ -58,9 +58,9 @@ class S2AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
         diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
         self._dataAPI.loadDiffractionDataset(diffractionFilePath, fileType='NeXus')
-        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='CSV', selectItem=True)
+        # FIXME self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='CSV', selectItem=True)
         # NOTE reuse probe
-        self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
+        # FIXME self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
         self._workflowCore.executeWorkflow(flowLabel)
 
 
@@ -72,5 +72,5 @@ class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
     def execute(self, filePath: Path) -> None:
         # TODO watch for ptychodus NPZ files
         self._registry.openStateData(filePath)
-        self._reconstructor.ingestTrainingData()
-        self._reconstructor.train()
+        # FIXME self._reconstructor.ingestTrainingData()
+        # FIXME self._reconstructor.train()
