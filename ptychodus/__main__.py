@@ -79,8 +79,6 @@ def main() -> int:
         restartFilePath=Path(parsedArgs.restart.name) if parsedArgs.restart else None,
         settingsFilePath=Path(parsedArgs.settings.name) if parsedArgs.settings else None,
         replacementPathPrefix=parsedArgs.prefix,
-        rpcPort=parsedArgs.port,
-        autoExecuteRPCs=bool(parsedArgs.batch),
         isDeveloperModeEnabled=parsedArgs.dev,
     )
 

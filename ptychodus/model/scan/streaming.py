@@ -43,6 +43,8 @@ logger = logging.getLogger(__name__)
 # TODO         if position > self._maximum:
 # TODO             self._maximum = position
 
+# FIXME pvaccess.Channel.monitor
+
 
 class StreamingScanBuilder(ScanBuilder):  # FIXME pvaccess
 

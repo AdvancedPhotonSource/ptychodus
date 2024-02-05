@@ -33,8 +33,6 @@ from .product import ProductCore
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
-from .rpc import RPCMessageService
-from .rpcLoadResults import LoadResultsExecutor, LoadResultsMessage
 from .scan import ScanCore
 from .tike import TikeReconstructorLibrary
 from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
@@ -49,7 +47,7 @@ def configureLogger() -> None:
                         encoding='utf-8',
                         level=logging.DEBUG)
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
-    logging.getLogger('tike').setLevel(logging.INFO)
+    logging.getLogger('tike').setLevel(logging.WARNING)
 
     logger.info(f'Ptychodus {version("ptychodus")}')
     logger.info(f'NumPy {version("numpy")}')
@@ -64,8 +62,6 @@ class ModelArgs:
     restartFilePath: Path | None
     settingsFilePath: Path | None
     replacementPathPrefix: str | None = None
-    rpcPort: int = -1
-    autoExecuteRPCs: bool = False
     isDeveloperModeEnabled: bool = False
 
 
@@ -127,14 +123,6 @@ class ModelCore:
         self._automationCore = AutomationCore(self.settingsRegistry, self._patternsCore.dataAPI,
                                               self._workflowCore)
 
-        self.rpcMessageService: RPCMessageService | None = None
-
-        if modelArgs.rpcPort >= 0:
-            self.rpcMessageService = RPCMessageService(modelArgs.rpcPort,
-                                                       modelArgs.autoExecuteRPCs)
-            self.rpcMessageService.registerProcedure(LoadResultsMessage,
-                                                     LoadResultsExecutor(self._stateDataRegistry))
-
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFilePath:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
@@ -145,9 +133,6 @@ class ModelCore:
         if self._patternsCore.dataAPI.getAssemblyQueueSize() > 0:
             self._patternsCore.dataAPI.startAssemblingDiffractionPatterns()
             self._patternsCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
-
-        if self.rpcMessageService:
-            self.rpcMessageService.start()
 
         self._patternsCore.start()
         self._workflowCore.start()
@@ -170,9 +155,6 @@ class ModelCore:
         self._workflowCore.stop()
         self._patternsCore.stop()
 
-        if self.rpcMessageService:
-            self.rpcMessageService.stop()
-
     @property
     def detectorImagePresenter(self) -> ImagePresenter:
         return self._detectorImageCore.presenter
@@ -192,24 +174,24 @@ class ModelCore:
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
         self._patternsCore.dataAPI.initializeStreaming(metadata)
         self._patternsCore.dataAPI.startAssemblingDiffractionPatterns()
-        self._scanCore.scanAPI.initializeStreamingScan()
+        self._scanCore.scanAPI.initializeStreamingScan()  # FIXME
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
         self._patternsCore.dataAPI.assemble(array)
-        self._scanCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)
+        self._scanCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)  # FIXME
 
     def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
                                timeStamps: Sequence[float]) -> None:
-        self._scanCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)
+        self._scanCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)  # FIXME
 
     def assembleScanPositionsY(self, valuesInMeters: Sequence[float],
                                timeStamps: Sequence[float]) -> None:
-        self._scanCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)
+        self._scanCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)  # FIXME
 
     def finalizeStreamingWorkflow(self) -> None:
-        self._scanCore.scanAPI.finalizeStreamingScan()
+        self._scanCore.scanAPI.finalizeStreamingScan()  # FIXME
         self._patternsCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
-        self._objectCore.objectAPI.selectNewItemFromInitializerSimpleName('Random')
+        self._objectCore.objectAPI.selectNewItemFromInitializerSimpleName('Random')  # FIXME
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
         return self._patternsCore.dataAPI.getAssemblyQueueSize()
@@ -227,7 +209,7 @@ class ModelCore:
         self._stateDataRegistry.openStateData(filePath)
 
     def batchModeReconstruct(self, filePath: Path) -> int:
-        result = self._reconstructorCore.reconstructorAPI.reconstruct()
+        result = self._reconstructorCore.reconstructorAPI.reconstruct()  # FIXME
         self.saveStateData(filePath, restartable=False)
         return result.result
 
@@ -235,9 +217,9 @@ class ModelCore:
         for filePath in directoryPath.glob('*.npz'):
             # TODO sort by filePath.stat().st_mtime
             self._stateDataRegistry.openStateData(filePath)
-            self._reconstructorCore.reconstructorAPI.ingestTrainingData()
+            self._reconstructorCore.reconstructorAPI.ingestTrainingData()  # FIXME
 
-        self._reconstructorCore.reconstructorAPI.train()
+        self._reconstructorCore.reconstructorAPI.train()  # FIXME
 
         someQualityMetric = 0.  # TODO
         return someQualityMetric

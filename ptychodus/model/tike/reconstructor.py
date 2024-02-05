@@ -10,8 +10,8 @@ import numpy.typing
 import tike.ptycho
 
 from ...api.geometry import Point2D
-from ...api.object import Object, ObjectArrayType
-from ...api.probe import Probe, ProbeArrayType
+from ...api.object import Object
+from ...api.probe import Probe
 from ...api.product import Product
 from ...api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ...api.scan import Scan, ScanPoint

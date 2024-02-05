@@ -105,11 +105,6 @@ class ControllerCore:
         controller._automationTimer.timeout.connect(model.refreshAutomationDatasets)
         controller._automationTimer.start(1000)  # TODO make configurable
 
-        if model.rpcMessageService and model.rpcMessageService.isActive:
-            controller._processMessagesTimer.timeout.connect(
-                model.rpcMessageService.processMessages)
-            controller._processMessagesTimer.start(1000)  # TODO make configurable
-
         return controller
 
     def showMainWindow(self, windowTitle: str) -> None:
