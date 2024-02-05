@@ -73,6 +73,13 @@ class Probe:
         self._pixelWidthInMeters = pixelWidthInMeters
         self._pixelHeightInMeters = pixelHeightInMeters
 
+    def copy(self) -> Probe:
+        return Probe(
+            array=numpy.array(self._array),
+            pixelWidthInMeters=float(self._pixelWidthInMeters),
+            pixelHeightInMeters=float(self._pixelHeightInMeters),
+        )
+
     @property
     def array(self) -> ProbeArrayType:
         return self._array
@@ -88,6 +95,14 @@ class Probe:
     @property
     def sizeInBytes(self) -> int:
         return self._array.nbytes
+
+    @property
+    def pixelWidthInMeters(self) -> float:
+        return self._pixelWidthInMeters
+
+    @property
+    def pixelHeightInMeters(self) -> float:
+        return self._pixelHeightInMeters
 
     def getGeometry(self) -> ProbeGeometry:
         return ProbeGeometry(

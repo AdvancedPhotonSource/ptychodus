@@ -51,6 +51,9 @@ class Scan(Sequence[ScanPoint]):
     def __init__(self, pointSeq: Sequence[ScanPoint] | None = None) -> None:
         self._pointSeq: Sequence[ScanPoint] = [] if pointSeq is None else pointSeq
 
+    def copy(self) -> Scan:
+        return Scan(list(self._pointSeq))
+
     @overload
     def __getitem__(self, index: int) -> ScanPoint:
         ...

@@ -111,6 +111,16 @@ class Object:
         self._centerXInMeters = centerXInMeters
         self._centerYInMeters = centerYInMeters
 
+    def copy(self) -> Object:
+        return Object(
+            array=numpy.array(self._array),
+            layerDistanceInMeters=list(self._layerDistanceInMeters),
+            pixelWidthInMeters=float(self._pixelWidthInMeters),
+            pixelHeightInMeters=float(self._pixelHeightInMeters),
+            centerXInMeters=float(self._centerXInMeters),
+            centerYInMeters=float(self._centerYInMeters),
+        )
+
     @property
     def array(self) -> ObjectArrayType:
         return self._array
@@ -126,6 +136,22 @@ class Object:
     @property
     def sizeInBytes(self) -> int:
         return self._array.nbytes
+
+    @property
+    def pixelWidthInMeters(self) -> float:
+        return self._pixelWidthInMeters
+
+    @property
+    def pixelHeightInMeters(self) -> float:
+        return self._pixelHeightInMeters
+
+    @property
+    def centerXInMeters(self) -> float:
+        return self._centerXInMeters
+
+    @property
+    def centerYInMeters(self) -> float:
+        return self._centerYInMeters
 
     def getGeometry(self) -> ObjectGeometry:
         return ObjectGeometry(
