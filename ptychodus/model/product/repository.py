@@ -14,6 +14,7 @@ from ..patterns import ActiveDiffractionDataset, PatternSizer
 from ..probe import ProbeRepositoryItem, ProbeRepositoryItemFactory
 from ..scan import ScanRepositoryItem, ScanRepositoryItemFactory
 from .geometry import ProductGeometry
+from .validator import ProductValidator
 
 logger = logging.getLogger(__name__)
 
@@ -43,34 +44,28 @@ class ProductRepositoryItemObserver(ABC):
 
 class ProductRepositoryItem(ParameterRepository):
 
-    def __init__(self, parent: ProductRepositoryItemObserver, privateIndex: int,
-                 metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
-                 geometry: ProductGeometry, probe: ProbeRepositoryItem,
-                 object_: ObjectRepositoryItem, costs: Plot2D,
-                 patterns: ActiveDiffractionDataset) -> None:
+    def __init__(self, parent: ProductRepositoryItemObserver, metadata: MetadataRepositoryItem,
+                 scan: ScanRepositoryItem, geometry: ProductGeometry, probe: ProbeRepositoryItem,
+                 object_: ObjectRepositoryItem, validator: ProductValidator,
+                 costs: Plot2D) -> None:
         super().__init__('Product')
         self._parent = parent
-        self._privateIndex = privateIndex
         self._metadata = metadata
         self._scan = scan
         self._geometry = geometry
         self._probe = probe
         self._object = object_
         self._costs = costs
-        self._patterns = patterns
 
-        self._addParameterRepository(self._metadata)
-        self._addParameterRepository(self._scan)
-        self._addParameterRepository(self._geometry)
-        self._addParameterRepository(self._probe)
-        self._addParameterRepository(self._object)
+        self._addParameterRepository(self._metadata, observe=True)
+        self._addParameterRepository(self._scan, observe=True)
+        self._addParameterRepository(self._geometry, observe=False)
+        self._addParameterRepository(self._probe, observe=True)
+        self._addParameterRepository(self._object, observe=True)
 
-        self._metadata.addObserver(self)
-        self._scan.addObserver(self)
-        self._geometry.addObserver(self)
-        self._probe.addObserver(self)
-        self._object.addObserver(self)
-        self._patterns.addObserver(self)
+    @property
+    def name(self) -> str:
+        return self._metadata.name.getValue()
 
     def getMetadata(self) -> MetadataRepositoryItem:
         return self._metadata
@@ -78,28 +73,11 @@ class ProductRepositoryItem(ParameterRepository):
     def getScan(self) -> ScanRepositoryItem:
         return self._scan
 
-    def isScanValid(self) -> bool:
-        # FIXME self.notifyObservers() when isScanValid changes
-        scan = self._scan.getScan()
-        scanIndexes = set(point.index for point in scan)
-        patternIndexes = set(self._patterns.getAssembledIndexes())
-        return (not scanIndexes.isdisjoint(patternIndexes))
-
     def getProbe(self) -> ProbeRepositoryItem:
         return self._probe
 
-    def isProbeValid(self) -> bool:
-        # FIXME self.notifyObservers() when isProbeValid changes
-        probe = self._probe.getProbe()
-        return self._geometry.isProbeGeometryValid(probe.getGeometry())
-
     def getObject(self) -> ObjectRepositoryItem:
         return self._object
-
-    def isObjectValid(self) -> bool:
-        # FIXME self.notifyObservers() when isObjectValid changes
-        object_ = self._object.getObject()
-        return self._geometry.isObjectGeometryValid(object_.getGeometry())
 
     def _invalidateCosts(self) -> None:
         self._costs = Plot2D.createNull()
@@ -124,18 +102,12 @@ class ProductRepositoryItem(ParameterRepository):
         elif observable is self._scan:
             self._invalidateCosts()
             self._parent.handleScanChanged(self)
-        elif observable is self._geometry:
-            pass  # FIXME
         elif observable is self._probe:
             self._invalidateCosts()
             self._parent.handleProbeChanged(self)
         elif observable is self._object:
             self._invalidateCosts()
             self._parent.handleObjectChanged(self)
-        elif observable is self._patterns:
-            # FIXME because validation might change
-            # FIXME extract validator
-            self.notifyObservers()
 
 
 class ProductRepositoryObserver(ABC):
@@ -181,6 +153,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         self._scanRepositoryItemFactory = scanRepositoryItemFactory
         self._probeRepositoryItemFactory = probeRepositoryItemFactory
         self._objectRepositoryItemFactory = objectRepositoryItemFactory
+        self._itemIndexLut: dict[str, int] = dict()
         self._itemList: list[ProductRepositoryItem] = list()
         self._observerList: list[ProductRepositoryObserver] = list()
 
@@ -201,20 +174,28 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def insertProduct(self, product: Product) -> int:
         index = len(self._itemList)
-
         metadata = MetadataRepositoryItem(product.metadata)
+        name = metadata.name.getValue()
+        match = 0
+
+        while self._itemIndexLUT.setdefault(name, index) != index:
+            match += 1
+            name = metadata.name.getValue() + f'-{match}'
+
+        metadata.name.setValue(name)
+
         scan = self._scanRepositoryItemFactory.create(product.scan)
         geometry = ProductGeometry(metadata, scan, self._patternSizer)
-
+        probe = self._probeRepositoryItemFactory.create(product.probe)
+        object_ = self._objectRepositoryItemFactory.create(product.object_)
         item = ProductRepositoryItem(
             parent=self,
-            privateIndex=index,
             metadata=metadata,
             scan=scan,
             geometry=geometry,
-            probe=self._probeRepositoryItemFactory.create(product.probe),
-            object_=self._objectRepositoryItemFactory.create(product.object_),
-            patterns=self._patterns,
+            probe=probe,
+            object_=object_,
+            validator=ProductValidator(self._patterns, scan, geometry, probe, object_),
             costs=product.costs,
         )
         self._itemList.append(item)
@@ -223,6 +204,21 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             observer.handleItemInserted(index, item)
 
         return index
+
+    def _updateIndexes(self) -> None:
+        self._itemIndexLUT = {item.name: index for index, item in enumerate(self._itemList)}
+
+    def removeProduct(self, index: int) -> None:
+        try:
+            item = self._itemList.pop(index)
+        except IndexError:
+            logger.debug(f'Failed to remove product item {index}!')
+            return
+
+        self._updateIndexes()
+
+        for observer in self._observerList:
+            observer.handleItemRemoved(index, item)
 
     def addObserver(self, observer: ProductRepositoryObserver) -> None:
         if observer not in self._observerList:
@@ -235,51 +231,62 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             pass
 
     def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
-        index = item._privateIndex
+        try:
+            index = self._itemIndexLUT[item.name]
+        except KeyError:
+            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            return
+
         metadata = item.getMetadata()
+        self._updateIndexes()  # FIXME also enforce that name remains unique
 
         for observer in self._observerList:
             observer.handleMetadataChanged(index, metadata)
 
     def handleScanChanged(self, item: ProductRepositoryItem) -> None:
-        index = item._privateIndex
+        try:
+            index = self._itemIndexLUT[item.name]
+        except KeyError:
+            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            return
+
         scan = item.getScan()
 
         for observer in self._observerList:
             observer.handleScanChanged(index, scan)
 
     def handleProbeChanged(self, item: ProductRepositoryItem) -> None:
-        index = item._privateIndex
+        try:
+            index = self._itemIndexLUT[item.name]
+        except KeyError:
+            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            return
+
         probe = item.getProbe()
 
         for observer in self._observerList:
             observer.handleProbeChanged(index, probe)
 
     def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
-        index = item._privateIndex
+        try:
+            index = self._itemIndexLUT[item.name]
+        except KeyError:
+            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            return
+
         object_ = item.getObject()
 
         for observer in self._observerList:
             observer.handleObjectChanged(index, object_)
 
     def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
-        index = item._privateIndex
+        try:
+            index = self._itemIndexLUT[item.name]
+        except KeyError:
+            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            return
+
         costs = item.getCosts()
 
         for observer in self._observerList:
             observer.handleCostsChanged(index, costs)
-
-    def _updateIndexes(self) -> None:
-        for index, item in enumerate(self._itemList):
-            item._privateIndex = index
-
-    def removeProduct(self, index: int) -> None:
-        try:
-            item = self._itemList.pop(index)
-        except IndexError:
-            logger.debug(f'Failed to remove product item {index}!')
-        else:
-            self._updateIndexes()
-
-            for observer in self._observerList:
-                observer.handleItemRemoved(index, item)

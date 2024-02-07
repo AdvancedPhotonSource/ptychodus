@@ -4,11 +4,12 @@ import logging
 
 import h5py
 
-from ptychodus.api.product import (Product, ProductFileReader, ProductFileWriter, ProductMetadata)
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe
+from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter, ProductMetadata
 from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.visualize import Plot2D
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             scan=Scan(scanPointList),
             probe=probe,
             object_=object_,
+            costs=Plot2D.createNull(),  # FIXME
         )
 
     def write(self, filePath: Path, product: Product) -> None:

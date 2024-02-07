@@ -3,11 +3,12 @@ from typing import Any, Final
 
 import numpy
 
-from ptychodus.api.product import (Product, ProductFileReader, ProductFileWriter, ProductMetadata)
 from ptychodus.api.object import Object, ObjectFileReader
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileReader
+from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter, ProductMetadata
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
+from ptychodus.api.visualize import Plot2D
 
 
 class NPZProductFileIO(ProductFileReader, ProductFileWriter):
@@ -72,6 +73,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             scan=Scan(scanPointList),
             probe=probe,
             object_=object_,
+            costs=Plot2D.createNull(),  # FIXME
         )
 
     def write(self, filePath: Path, product: Product) -> None:
