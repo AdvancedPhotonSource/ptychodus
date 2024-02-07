@@ -14,8 +14,8 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
     SIMPLE_NAME: Final[str] = 'LYNXOrchestra'
     MICRONS_TO_METERS: Final[float] = 1.e-6
     DATA_POINT_COLUMN: Final[int] = 0
-    X_COLUMN: Final[int] = 2
-    Y_COLUMN: Final[int] = 5
+    X_COLUMN: Final[int] = 3
+    Y_COLUMN: Final[int] = 6
 
     EXPECTED_HEADER: Final[list[str]] = [
         'DataPoint',
