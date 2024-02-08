@@ -3,8 +3,9 @@ from .api import DiffractionDataAPI
 from .core import DiffractionDatasetPresenter, DiffractionPatternArrayPresenter, PatternsCore
 from .detector import Detector, DetectorPresenter
 from .io import DiffractionDatasetInputOutputPresenter
+from .metadata import DiffractionMetadataPresenter
 from .patterns import DiffractionPatternPresenter
-from .settings import DiffractionPatternSettings
+from .settings import DiffractionDatasetSettings
 from .sizer import PatternSizer
 
 __all__ = [
@@ -14,9 +15,10 @@ __all__ = [
     'DiffractionDataAPI',
     'DiffractionDatasetInputOutputPresenter',
     'DiffractionDatasetPresenter',
+    'DiffractionDatasetSettings',
+    'DiffractionMetadataPresenter',
     'DiffractionPatternArrayPresenter',
     'DiffractionPatternPresenter',
-    'DiffractionPatternSettings',
     'PatternSizer',
     'PatternsCore',
 ]

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
-                             QLabel, QMenu, QPushButton, QTableView, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QHBoxLayout, QLabel,
+                             QMenu, QPushButton, QTableView, QVBoxLayout, QWidget)
 
 
 class ProductInfoDialog(QDialog):
@@ -59,39 +59,22 @@ class ProductButtonBox(QWidget):
         return view
 
 
-class ProductRepositoryView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Repository', parent)
-        self.tableView = QTableView()
-        self.infoLabel = QLabel()
-        self.buttonBox = ProductButtonBox.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ProductRepositoryView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.tableView)
-        layout.addWidget(view.infoLabel)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-
 class ProductView(QWidget):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.repositoryView = ProductRepositoryView.createInstance()
+        self.tableView = QTableView()
+        self.infoLabel = QLabel()
+        self.buttonBox = ProductButtonBox.createInstance()
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ProductView:
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.repositoryView)
+        layout.addWidget(view.tableView)
+        layout.addWidget(view.infoLabel)
+        layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view

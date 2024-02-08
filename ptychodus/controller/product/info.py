@@ -2,14 +2,14 @@ from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFi
                           QVariant)
 from PyQt5.QtWidgets import QWidget
 
-from ...api.product import Product
 from ...api.observer import Observable, Observer
+from ...model.product import ProductRepositoryItem
 from ...view.product import ProductInfoDialog
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
 
-    def __init__(self, product: Product, parent: QObject | None = None) -> None:
+    def __init__(self, product: ProductRepositoryItem, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._product = product
         self._header = ['Property', 'Value']
@@ -39,8 +39,10 @@ class ProductPropertyTableModel(QAbstractTableModel):
             if index.column() == 0:
                 value = QVariant(self._properties[index.row()])
             elif index.column() == 1:
+                metadata = self._product.getMetadata()
+
                 if index.row() == 0:
-                    probeEnergy = self._product.getProbeEnergyInElectronVolts()
+                    probeEnergy = metadata.probeEnergyInElectronVolts.getValue()
                     value = QVariant(f'{probeEnergy / 1000:.1f}')
                 else:
                     value = QVariant(index.row())  # FIXME
@@ -56,13 +58,14 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
 class ProductInfoViewController(Observer):
 
-    def __init__(self, product: Product, tableModel: ProductPropertyTableModel) -> None:
+    def __init__(self, product: ProductRepositoryItem,
+                 tableModel: ProductPropertyTableModel) -> None:
         super().__init__()
         self._product = product
         self._tableModel = tableModel
 
     @classmethod
-    def showInfo(cls, product: Product, parent: QWidget) -> None:
+    def showInfo(cls, product: ProductRepositoryItem, parent: QWidget) -> None:
         tableModel = ProductPropertyTableModel(product)
         controller = cls(product, tableModel)
         product.addObserver(controller)
@@ -71,7 +74,7 @@ class ProductInfoViewController(Observer):
         tableProxyModel.setSourceModel(tableModel)
 
         dialog = ProductInfoDialog.createInstance(parent)
-        dialog.setWindowTitle(f'Edit Product: {product.getName()}')
+        dialog.setWindowTitle(f'Edit Product: {product.name}')
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)
         dialog.tableView.verticalHeader().hide()

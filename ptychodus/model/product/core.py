@@ -5,7 +5,6 @@ from ..object import ObjectBuilderFactory, ObjectRepositoryItemFactory
 from ..patterns import PatternSizer, ActiveDiffractionDataset
 from ..probe import ProbeBuilderFactory, ProbeRepositoryItemFactory
 from ..scan import ScanBuilderFactory, ScanRepositoryItemFactory
-from .metadata import MetadataRepository
 from .object import ObjectRepository
 from .probe import ProbeRepository
 from .repository import ProductRepository
@@ -24,12 +23,10 @@ class ProductCore:
                  objectBuilderFactory: ObjectBuilderFactory,
                  fileReaderChooser: PluginChooser[ProductFileReader],
                  fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
-        self.productRepository = ProductRepository(patternSizer, patterns,
-                                                   scanRepositoryItemFactory,
-                                                   probeRepositoryItemFactory,
-                                                   objectRepositoryItemFactory)
-        self.metadataRepository = MetadataRepository(self.productRepository, metadataBuilder,
-                                                     fileReaderChooser, fileWriterChooser)
-        self.scanRepository = ScanRepository(self.productRepository, scanBuilderFactory)
-        self.probeRepository = ProbeRepository(self.productRepository, probeBuilderFactory)
-        self.objectRepository = ObjectRepository(self.productRepository, objectBuilderFactory)
+        self.repository = ProductRepository(patternSizer, patterns, metadataBuilder,
+                                            scanRepositoryItemFactory, probeRepositoryItemFactory,
+                                            objectRepositoryItemFactory, fileReaderChooser,
+                                            fileWriterChooser)
+        self.scanRepository = ScanRepository(self.repository, scanBuilderFactory)
+        self.probeRepository = ProbeRepository(self.repository, probeBuilderFactory)
+        self.objectRepository = ObjectRepository(self.repository, objectBuilderFactory)

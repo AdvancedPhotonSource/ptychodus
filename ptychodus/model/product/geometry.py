@@ -3,7 +3,6 @@ import numpy
 from ...api.object import ObjectGeometry, ObjectGeometryProvider
 from ...api.observer import Observable
 from ...api.parametric import ParameterRepository
-from ...api.patterns import PixelGeometry
 from ...api.probe import ProbeGeometry, ProbeGeometryProvider
 from ...api.scan import ScanBoundingBox
 from ..metadata import MetadataRepositoryItem
@@ -41,15 +40,13 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
         zInMeters = self._metadata.detectorDistanceInMeters.getValue()
         return lambdaInMeters * zInMeters
 
-    def getProbeWavelengthInMeters(self) -> float:
-        return self._metadata.probeWavelengthInMeters
+    @property
+    def objectPlanePixelWidthInMeters(self) -> float:
+        return self._lambdaZInSquareMeters / self._patternSizer.getWidthInMeters()
 
-    def getObjectPlanePixelGeometry(self) -> PixelGeometry:
-        lambdaZInSquareMeters = self._lambdaZInSquareMeters
-        return PixelGeometry(
-            widthInMeters=lambdaZInSquareMeters / self._patternSizer.getWidthInMeters(),
-            heightInMeters=lambdaZInSquareMeters / self._patternSizer.getHeightInMeters(),
-        )
+    @property
+    def objectPlanePixelHeightInMeters(self) -> float:
+        return self._lambdaZInSquareMeters / self._patternSizer.getHeightInMeters()
 
     def getFresnelNumber(self) -> float:
         widthInMeters = self._patternSizer.getWidthInMeters()
@@ -71,14 +68,16 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
 
         return bbox
 
+    def getProbeWavelengthInMeters(self) -> float:
+        return self._metadata.probeWavelengthInMeters
+
     def getProbeGeometry(self) -> ProbeGeometry:
         extent = self._patternSizer.getImageExtent()
-        pixelGeometry = self.getObjectPlanePixelGeometry()
         return ProbeGeometry(
             widthInPixels=extent.widthInPixels,
             heightInPixels=extent.heightInPixels,
-            pixelWidthInMeters=pixelGeometry.widthInMeters,
-            pixelHeightInMeters=pixelGeometry.heightInMeters,
+            pixelWidthInMeters=self.objectPlanePixelWidthInMeters,
+            pixelHeightInMeters=self.objectPlanePixelHeightInMeters,
         )
 
     def isProbeGeometryValid(self, geometry: ProbeGeometry) -> bool:
@@ -104,15 +103,14 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
             centerXInMeters = scanBoundingBox.centerXInMeters
             centerYInMeters = scanBoundingBox.centerYInMeters
 
-        pixelGeometry = self.getObjectPlanePixelGeometry()
-        widthInPixels = widthInMeters / pixelGeometry.widthInMeters
-        heightInPixels = heightInMeters / pixelGeometry.heightInMeters
+        widthInPixels = widthInMeters / self.objectPlanePixelWidthInMeters
+        heightInPixels = heightInMeters / self.objectPlanePixelHeightInMeters
 
         return ObjectGeometry(
             widthInPixels=int(numpy.ceil(widthInPixels)),
             heightInPixels=int(numpy.ceil(heightInPixels)),
-            pixelWidthInMeters=pixelGeometry.widthInMeters,
-            pixelHeightInMeters=pixelGeometry.heightInMeters,
+            pixelWidthInMeters=self.objectPlanePixelWidthInMeters,
+            pixelHeightInMeters=self.objectPlanePixelHeightInMeters,
             centerXInMeters=centerXInMeters,
             centerYInMeters=centerYInMeters,
         )

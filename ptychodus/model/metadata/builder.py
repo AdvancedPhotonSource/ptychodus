@@ -1,10 +1,10 @@
 from ...api.product import ProductMetadata
-from .settings import MetadataSettings
+from ..patterns import DiffractionDatasetSettings
 
 
 class MetadataBuilder:
 
-    def __init__(self, settings: MetadataSettings) -> None:
+    def __init__(self, settings: DiffractionDatasetSettings) -> None:
         self._settings = settings
 
     def build(self, name: str, comments: str = '') -> ProductMetadata:

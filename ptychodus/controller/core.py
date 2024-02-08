@@ -9,70 +9,45 @@ from .automation import AutomationController
 from .data import FileDialogFactory
 from .product import ProductController
 from .memory import MemoryController
-from .object import ObjectImageController, ObjectController
+#from .object import ObjectImageController, ObjectController
 from .patterns import PatternsController
-from .probe import ProbeImageController, ProbeController
-from .ptychonn import PtychoNNViewControllerFactory
-from .ptychopy import PtychoPyViewControllerFactory
-from .reconstructor import ReconstructorParametersController
-from .scan import ScanController
+#from .probe import ProbeImageController, ProbeController
+#from .ptychonn import PtychoNNViewControllerFactory
+#from .ptychopy import PtychoPyViewControllerFactory
+#from .reconstructor import ReconstructorParametersController
+#from .scan import ScanController
 from .settings import SettingsController
-from .tike import TikeViewControllerFactory
+#from .tike import TikeViewControllerFactory
 from .workflow import WorkflowController
 
 
 class ControllerCore:
 
     def __init__(self, model: ModelCore, view: ViewCore) -> None:
-        self.model = model
         self.view = view
 
         self._memoryController = MemoryController.createInstance(model.memoryPresenter,
                                                                  view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
-
-        self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(
-            model.ptychopyReconstructorLibrary)
-        self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
-            model.ptychonnReconstructorLibrary, self._fileDialogFactory)
-        self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
-
+        # FIXME self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(model.ptychopyReconstructorLibrary)
+        # FIXME self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(model.ptychonnReconstructorLibrary, self._fileDialogFactory)
+        # FIXME self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
                                                                      view.settingsParametersView,
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
-        self._productController = ProductController(model.detectorPresenter,
-                                                    model.productRepositoryPresenter,
-                                                    view.productView, self._fileDialogFactory)
-        self._detectorController = PatternsController.createInstance(
+        self._patternsController = PatternsController.createInstance(
             model.detectorPresenter, model.diffractionDatasetInputOutputPresenter,
-            model.metadataPresenter, model.diffractionDatasetPresenter, model.patternPresenter,
-            model.detectorImagePresenter, view.patternsView, view.patternsImageView,
-            self._fileDialogFactory)
-        self._scanController = ScanController.createInstance(model.scanRepositoryPresenter,
-                                                             view.scanView, view.scanPlotView,
-                                                             self._fileDialogFactory)
-        self._probeController = ProbeController.createInstance(model.apparatusPresenter,
-                                                               model.probeRepositoryPresenter,
-                                                               model.probeImagePresenter,
-                                                               view.probeView, view.probeImageView,
-                                                               self._fileDialogFactory)
-        self._objectController = ObjectController.createInstance(
-            model.apparatusPresenter, model.objectRepositoryPresenter, model.objectImagePresenter,
-            view.objectView, view.objectImageView, self._fileDialogFactory)
-        self._reconstructorParametersController = ReconstructorParametersController.createInstance(
-            model.reconstructorPresenter,
-            model.scanPresenter,
-            model.probePresenter,
-            model.objectPresenter,
-            view.reconstructorParametersView,
-            view.reconstructorPlotView,
-            self._fileDialogFactory,
-            [
-                self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory,
-                self._tikeViewControllerFactory
-            ],
-        )
+            model.diffractionMetadataPresenter, model.diffractionDatasetPresenter,
+            model.patternPresenter, model.detectorImagePresenter, view.patternsView,
+            view.patternsImageView, self._fileDialogFactory)
+        self._productController = ProductController.createInstance(model.productRepository,
+                                                                   view.productView,
+                                                                   self._fileDialogFactory)
+        # FIXME self._scanController = ScanController.createInstance(model.scanRepositoryPresenter, view.scanView, view.scanPlotView, self._fileDialogFactory)
+        # FIXME self._probeController = ProbeController.createInstance(model.apparatusPresenter, model.probeRepositoryPresenter, model.probeImagePresenter, view.probeView, view.probeImageView, self._fileDialogFactory)
+        # FIXME self._objectController = ObjectController.createInstance(model.apparatusPresenter, model.objectRepositoryPresenter, model.objectImagePresenter, view.objectView, view.objectImageView, self._fileDialogFactory)
+        # FIXME self._reconstructorParametersController = ReconstructorParametersController.createInstance(model.reconstructorPresenter, model.scanPresenter, model.probePresenter, model.objectPresenter, view.reconstructorParametersView, view.reconstructorPlotView, self._fileDialogFactory, [self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory, self._tikeViewControllerFactory], )
         self._workflowController = WorkflowController.createInstance(
             model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
             model.workflowStatusPresenter, model.workflowExecutionPresenter,
@@ -80,12 +55,8 @@ class ControllerCore:
         self._automationController = AutomationController.createInstance(
             model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
             view.automationView, self._fileDialogFactory)
-        self._monitorProbeController = ProbeImageController.createInstance(
-            model.apparatusPresenter, model.probePresenter, model.probeImagePresenter,
-            view.monitorProbeView.imageView, self._fileDialogFactory)
-        self._monitorObjectController = ObjectImageController.createInstance(
-            model.apparatusPresenter, model.objectPresenter, model.objectImagePresenter,
-            view.monitorObjectView.imageView, self._fileDialogFactory)
+        # FIXME self._monitorProbeController = ProbeImageController.createInstance(model.apparatusPresenter, model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView, self._fileDialogFactory)
+        # FIXME self._monitorObjectController = ObjectImageController.createInstance(model.apparatusPresenter, model.objectPresenter, model.objectImagePresenter, view.monitorObjectView.imageView, self._fileDialogFactory)
         self._refreshDataTimer = QTimer()
         self._automationTimer = QTimer()
         self._processMessagesTimer = QTimer()

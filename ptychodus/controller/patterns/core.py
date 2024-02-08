@@ -5,10 +5,10 @@ from PyQt5.QtCore import QItemSelection
 from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ...api.observer import Observable, Observer
-from ...model import MetadataPresenter
 from ...model.image import ImagePresenter
 from ...model.patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
-                               DiffractionDatasetPresenter, DiffractionPatternPresenter)
+                               DiffractionDatasetPresenter, DiffractionMetadataPresenter,
+                               DiffractionPatternPresenter)
 from ...view.image import ImageView
 from ...view.patterns import PatternsView
 from ..data import FileDialogFactory
@@ -25,7 +25,7 @@ class PatternsController(Observer):
 
     def __init__(self, detectorPresenter: DetectorPresenter,
                  ioPresenter: DiffractionDatasetInputOutputPresenter,
-                 metadataPresenter: MetadataPresenter,
+                 metadataPresenter: DiffractionMetadataPresenter,
                  datasetPresenter: DiffractionDatasetPresenter,
                  patternPresenter: DiffractionPatternPresenter, imagePresenter: ImagePresenter,
                  view: PatternsView, imageView: ImageView,
@@ -49,7 +49,7 @@ class PatternsController(Observer):
     @classmethod
     def createInstance(cls, detectorPresenter: DetectorPresenter,
                        ioPresenter: DiffractionDatasetInputOutputPresenter,
-                       metadataPresenter: MetadataPresenter,
+                       metadataPresenter: DiffractionMetadataPresenter,
                        datasetPresenter: DiffractionDatasetPresenter,
                        patternPresenter: DiffractionPatternPresenter,
                        imagePresenter: ImagePresenter, view: PatternsView, imageView: ImageView,

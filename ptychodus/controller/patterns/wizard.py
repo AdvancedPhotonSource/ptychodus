@@ -7,9 +7,8 @@ from PyQt5.QtCore import Qt, QDir, QFileInfo, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView, QFileSystemModel, QWizard
 
 from ...api.observer import Observable, Observer
-from ...model import MetadataPresenter
 from ...model.patterns import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
-                               DiffractionPatternPresenter)
+                               DiffractionMetadataPresenter, DiffractionPatternPresenter)
 from ...view.patterns import (OpenDatasetWizard, OpenDatasetWizardFilesPage,
                               OpenDatasetWizardMetadataPage, OpenDatasetWizardPatternsPage,
                               OpenDatasetWizardPatternCropView, OpenDatasetWizardPatternLoadView,
@@ -128,13 +127,14 @@ class OpenDatasetWizardFilesController(Observer):
 
 class OpenDatasetWizardMetadataController(Observer):
 
-    def __init__(self, presenter: MetadataPresenter, page: OpenDatasetWizardMetadataPage) -> None:
+    def __init__(self, presenter: DiffractionMetadataPresenter,
+                 page: OpenDatasetWizardMetadataPage) -> None:
         super().__init__()
         self._presenter = presenter
         self._page = page
 
     @classmethod
-    def createInstance(cls, presenter: MetadataPresenter,
+    def createInstance(cls, presenter: DiffractionMetadataPresenter,
                        page: OpenDatasetWizardMetadataPage) -> OpenDatasetWizardMetadataController:
         controller = cls(presenter, page)
         presenter.addObserver(controller)
@@ -418,7 +418,7 @@ class OpenDatasetWizardPatternsController:
 class OpenDatasetWizardController:
 
     def __init__(self, ioPresenter: DiffractionDatasetInputOutputPresenter,
-                 metadataPresenter: MetadataPresenter,
+                 metadataPresenter: DiffractionMetadataPresenter,
                  datasetPresenter: DiffractionDatasetPresenter,
                  patternPresenter: DiffractionPatternPresenter, wizard: OpenDatasetWizard,
                  fileDialogFactory: FileDialogFactory) -> None:
@@ -434,7 +434,7 @@ class OpenDatasetWizardController:
 
     @classmethod
     def createInstance(cls, ioPresenter: DiffractionDatasetInputOutputPresenter,
-                       metadataPresenter: MetadataPresenter,
+                       metadataPresenter: DiffractionMetadataPresenter,
                        datasetPresenter: DiffractionDatasetPresenter,
                        patternPresenter: DiffractionPatternPresenter, wizard: OpenDatasetWizard,
                        fileDialogFactory: FileDialogFactory) -> OpenDatasetWizardController:

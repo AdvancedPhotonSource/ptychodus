@@ -20,6 +20,7 @@ from .api import DiffractionDataAPI
 from .builder import ActiveDiffractionDatasetBuilder
 from .detector import Detector, DetectorPresenter
 from .io import DiffractionDatasetInputOutputPresenter
+from .metadata import DiffractionMetadataPresenter
 from .patterns import DiffractionPatternPresenter
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
 from .sizer import PatternSizer
@@ -141,25 +142,28 @@ class PatternsCore(StatefulCore[DiffractionPatternStateData]):
                  fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
         self.detector = Detector.createInstance(settingsRegistry)
         self.detectorPresenter = DetectorPresenter.createInstance(self.detector)
-        self._datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
-        self.patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
+        self.datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
+        self._patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
 
         # TODO vvv refactor vvv
-        fileReaderChooser.setCurrentPluginByName(self._datasetSettings.fileType.value)
+        fileReaderChooser.setCurrentPluginByName(self.datasetSettings.fileType.value)
 
-        self.patternSizer = PatternSizer.createInstance(self.patternSettings, self.detector)
+        self.patternSizer = PatternSizer.createInstance(self._patternSettings, self.detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
-            self.patternSettings, self.patternSizer)
+            self._patternSettings, self.patternSizer)
 
-        self.dataset = ActiveDiffractionDataset(self._datasetSettings, self.patternSettings,
+        self.dataset = ActiveDiffractionDataset(self.datasetSettings, self._patternSettings,
                                                 self.patternSizer)
-        self._builder = ActiveDiffractionDatasetBuilder(self._datasetSettings, self.dataset)
+        self._builder = ActiveDiffractionDatasetBuilder(self.datasetSettings, self.dataset)
         self.dataAPI = DiffractionDataAPI(self._builder, fileReaderChooser)
 
+        self.metadataPresenter = DiffractionMetadataPresenter(self.dataset, self.detector,
+                                                              self.datasetSettings,
+                                                              self._patternSettings)
         self.datasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self._datasetSettings, self.dataset)
+            self.datasetSettings, self.dataset)
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter.createInstance(
-            self._datasetSettings, self.dataset, self.dataAPI, settingsRegistry)
+            self.datasetSettings, self.dataset, self.dataAPI, settingsRegistry)
 
     def getStateData(self) -> DiffractionPatternStateData:
         return DiffractionPatternStateData(

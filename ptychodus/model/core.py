@@ -27,9 +27,10 @@ from .memory import MemoryPresenter
 from .metadata import MetadataCore
 from .object import ObjectCore
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
-                       DiffractionDatasetPresenter, DiffractionPatternPresenter, PatternsCore)
+                       DiffractionDatasetPresenter, DiffractionMetadataPresenter,
+                       DiffractionPatternPresenter, PatternsCore)
 from .probe import ProbeCore
-from .product import ProductCore
+from .product import ProductCore, ProductRepository
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
@@ -80,9 +81,7 @@ class ModelCore:
         self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations,
                                             isComplex=False)
 
-        self._metadataCore = MetadataCore(self.settingsRegistry, self._patternsCore.dataset,
-                                          self._patternsCore.detector,
-                                          self._patternsCore.patternSettings)
+        self._metadataCore = MetadataCore(self._patternsCore.datasetSettings)
         self._scanCore = ScanCore(self.rng, self._pluginRegistry.scanFileReaders,
                                   self._pluginRegistry.scanFileWriters)
         self._probeCore = ProbeCore(self.rng, self._pluginRegistry.probeFileReaders,
@@ -110,7 +109,7 @@ class ModelCore:
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             self._patternsCore.dataset,
-            self._productCore.productRepository,
+            self._productCore.repository,
             [
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
@@ -160,16 +159,24 @@ class ModelCore:
         return self._detectorImageCore.presenter
 
     @property
-    def patternPresenter(self) -> DiffractionPatternPresenter:
-        return self._patternsCore.patternPresenter
+    def diffractionDatasetInputOutputPresenter(self) -> DiffractionDatasetInputOutputPresenter:
+        return self._patternsCore.datasetInputOutputPresenter
+
+    @property
+    def diffractionMetadataPresenter(self) -> DiffractionMetadataPresenter:
+        return self._patternsCore.metadataPresenter
 
     @property
     def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
         return self._patternsCore.datasetPresenter
 
     @property
-    def diffractionDatasetInputOutputPresenter(self) -> DiffractionDatasetInputOutputPresenter:
-        return self._patternsCore.datasetInputOutputPresenter
+    def patternPresenter(self) -> DiffractionPatternPresenter:
+        return self._patternsCore.patternPresenter
+
+    @property
+    def productRepository(self) -> ProductRepository:
+        return self._productCore.repository
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
         self._patternsCore.dataAPI.initializeStreaming(metadata)
