@@ -35,12 +35,30 @@ class PlotSeries:
 
 
 @dataclass(frozen=True)
+class PlotUncertainSeries:
+    label: str
+    lo: Sequence[float]
+    values: Sequence[float]
+    hi: Sequence[float]
+
+
+@dataclass(frozen=True)
 class PlotAxis:
     label: str
     series: Sequence[PlotSeries]
 
     @classmethod
     def createNull(cls) -> PlotAxis:
+        return cls('', [])
+
+
+@dataclass(frozen=True)
+class PlotUncertainAxis:
+    label: str
+    series: Sequence[PlotUncertainSeries]
+
+    @classmethod
+    def createNull(cls) -> PlotUncertainAxis:
         return cls('', [])
 
 
@@ -52,6 +70,16 @@ class Plot2D:
     @classmethod
     def createNull(cls) -> Plot2D:
         return cls(PlotAxis.createNull(), PlotAxis.createNull())
+
+
+@dataclass(frozen=True)
+class PlotUncertain2D:
+    axisX: PlotAxis
+    axisY: PlotUncertainAxis
+
+    @classmethod
+    def createNull(cls) -> PlotUncertain2D:
+        return cls(PlotAxis.createNull(), PlotUncertainAxis.createNull())
 
 
 @dataclass(frozen=True)
