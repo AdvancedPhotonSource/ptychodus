@@ -2,7 +2,6 @@
 <RCC version="1.0">
     <qresource prefix="icons">
         <file alias="automate">Font-Awesome-6.4.2/svgs/solid/robot.svg</file>
-        <file alias="check">Font-Awesome-6.4.2/svgs/regular/circle-check.svg</file>
         <file alias="home">Font-Awesome-6.4.2/svgs/solid/house-chimney.svg</file>
         <file alias="line-cut">Font-Awesome-6.4.2/svgs/solid/chart-line.svg</file>
         <file alias="monitor">Font-Awesome-6.4.2/svgs/solid/display.svg</file>
@@ -10,7 +9,7 @@
         <file alias="object">Font-Awesome-6.4.2/svgs/solid/layer-group.svg</file>
         <file alias="patterns">Font-Awesome-6.4.2/svgs/solid/table-cells.svg</file>
         <file alias="probe">Font-Awesome-6.4.2/svgs/solid/circle-radiation.svg</file>
-        <file alias="product">Font-Awesome-6.4.2/svgs/solid/flask-vial.svg</file>
+        <file alias="product">Font-Awesome-6.4.2/svgs/solid/list.svg</file>
         <file alias="reconstructor">Font-Awesome-6.4.2/svgs/solid/screwdriver-wrench.svg</file>
         <file alias="rectangle">Font-Awesome-6.4.2/svgs/solid/vector-square.svg</file>
         <file alias="ruler">Font-Awesome-6.4.2/svgs/solid/ruler.svg</file>
@@ -18,6 +17,5 @@
         <file alias="scan">Font-Awesome-6.4.2/svgs/solid/route.svg</file>
         <file alias="settings">Font-Awesome-6.4.2/svgs/solid/gear.svg</file>
         <file alias="workflow">Font-Awesome-6.4.2/svgs/solid/toolbox.svg</file>
-        <file alias="xmark">Font-Awesome-6.4.2/svgs/regular/circle-xmark.svg</file>
     </qresource>
 </RCC>

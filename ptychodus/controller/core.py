@@ -7,17 +7,17 @@ from ..model import ModelCore
 from ..view import ViewCore
 from .automation import AutomationController
 from .data import FileDialogFactory
-from .product import ProductController
 from .memory import MemoryController
 #from .object import ObjectImageController, ObjectController
 from .patterns import PatternsController
 #from .probe import ProbeImageController, ProbeController
-#from .ptychonn import PtychoNNViewControllerFactory
-#from .ptychopy import PtychoPyViewControllerFactory
-#from .reconstructor import ReconstructorParametersController
+from .product import ProductController
+from .ptychonn import PtychoNNViewControllerFactory
+from .ptychopy import PtychoPyViewControllerFactory
+from .reconstructor import ReconstructorController
 #from .scan import ScanController
 from .settings import SettingsController
-#from .tike import TikeViewControllerFactory
+from .tike import TikeViewControllerFactory
 from .workflow import WorkflowController
 
 
@@ -29,9 +29,11 @@ class ControllerCore:
         self._memoryController = MemoryController.createInstance(model.memoryPresenter,
                                                                  view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
-        # FIXME self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(model.ptychopyReconstructorLibrary)
-        # FIXME self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(model.ptychonnReconstructorLibrary, self._fileDialogFactory)
-        # FIXME self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
+        self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(
+            model.ptychopyReconstructorLibrary)
+        self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
+            model.ptychonnReconstructorLibrary, self._fileDialogFactory)
+        self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
                                                                      view.settingsParametersView,
                                                                      view.settingsEntryView,
@@ -47,7 +49,17 @@ class ControllerCore:
         # FIXME self._scanController = ScanController.createInstance(model.scanRepositoryPresenter, view.scanView, view.scanPlotView, self._fileDialogFactory)
         # FIXME self._probeController = ProbeController.createInstance(model.apparatusPresenter, model.probeRepositoryPresenter, model.probeImagePresenter, view.probeView, view.probeImageView, self._fileDialogFactory)
         # FIXME self._objectController = ObjectController.createInstance(model.apparatusPresenter, model.objectRepositoryPresenter, model.objectImagePresenter, view.objectView, view.objectImageView, self._fileDialogFactory)
-        # FIXME self._reconstructorParametersController = ReconstructorParametersController.createInstance(model.reconstructorPresenter, model.scanPresenter, model.probePresenter, model.objectPresenter, view.reconstructorParametersView, view.reconstructorPlotView, self._fileDialogFactory, [self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory, self._tikeViewControllerFactory], )
+        self._reconstructorParametersController = ReconstructorController.createInstance(
+            model.reconstructorPresenter,
+            model.productRepository,
+            view.reconstructorParametersView,
+            view.reconstructorPlotView,
+            self._fileDialogFactory,
+            [
+                self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory,
+                self._tikeViewControllerFactory
+            ],
+        )
         self._workflowController = WorkflowController.createInstance(
             model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
             model.workflowStatusPresenter, model.workflowExecutionPresenter,

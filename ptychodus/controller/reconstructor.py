@@ -5,14 +5,16 @@ import logging
 import itertools
 
 from PyQt5.QtCore import Qt, QStringListModel
-from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QWidget
 
 from ..api.observer import Observable, Observer
-from ..model.object import ObjectPresenter
-from ..model.probe import ProbePresenter
+from ..api.visualize import Plot2D
+from ..model.metadata import MetadataRepositoryItem
+from ..model.object import ObjectRepositoryItem
+from ..model.probe import ProbeRepositoryItem
+from ..model.scan import ScanRepositoryItem
+from ..model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
 from ..model.reconstructor import ReconstructorPresenter
-from ..model.scan import ScanPresenter
 from ..view.reconstructor import ReconstructorParametersView, ReconstructorPlotView
 from ..view.widgets import ExceptionDialog
 from .data import FileDialogFactory
@@ -32,41 +34,33 @@ class ReconstructorViewControllerFactory(ABC):
         pass
 
 
-class ReconstructorParametersController(Observer):
+class ReconstructorController(ProductRepositoryObserver, Observer):
 
-    def __init__(self, presenter: ReconstructorPresenter, scanPresenter: ScanPresenter,
-                 probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
+    def __init__(self, presenter: ReconstructorPresenter, productRepository: ProductRepository,
                  view: ReconstructorParametersView, plotView: ReconstructorPlotView,
                  fileDialogFactory: FileDialogFactory,
                  viewControllerFactoryList: Iterable[ReconstructorViewControllerFactory]) -> None:
         super().__init__()
         self._presenter = presenter
-        self._scanPresenter = scanPresenter
-        self._probePresenter = probePresenter
-        self._objectPresenter = objectPresenter
+        self._productRepository = productRepository
         self._view = view
         self._plotView = plotView
         self._fileDialogFactory = fileDialogFactory
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = \
                 { vcf.backendName: vcf for vcf in viewControllerFactoryList }
-        self._scanListModel = QStringListModel()
-        self._probeListModel = QStringListModel()
-        self._objectListModel = QStringListModel()
+        self._productListModel = QStringListModel()
 
     @classmethod
     def createInstance(
-        cls, presenter: ReconstructorPresenter, scanPresenter: ScanPresenter,
-        probePresenter: ProbePresenter, objectPresenter: ObjectPresenter,
+        cls, presenter: ReconstructorPresenter, productRepository: ProductRepository,
         view: ReconstructorParametersView, plotView: ReconstructorPlotView,
         fileDialogFactory: FileDialogFactory,
         viewControllerFactoryList: list[ReconstructorViewControllerFactory]
-    ) -> ReconstructorParametersController:
-        controller = cls(presenter, scanPresenter, probePresenter, objectPresenter, view, plotView,
-                         fileDialogFactory, viewControllerFactoryList)
+    ) -> ReconstructorController:
+        controller = cls(presenter, productRepository, view, plotView, fileDialogFactory,
+                         viewControllerFactoryList)
         presenter.addObserver(controller)
-        scanPresenter.addObserver(controller)
-        probePresenter.addObserver(controller)
-        objectPresenter.addObserver(controller)
+        productRepository.addObserver(controller)
 
         for name in presenter.getReconstructorList():
             controller._addReconstructor(name)
@@ -75,14 +69,8 @@ class ReconstructorParametersController(Observer):
         view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex)
 
-        view.reconstructorView.scanComboBox.textActivated.connect(scanPresenter.selectScan)
-        view.reconstructorView.scanComboBox.setModel(controller._scanListModel)
-
-        view.reconstructorView.probeComboBox.textActivated.connect(probePresenter.selectProbe)
-        view.reconstructorView.probeComboBox.setModel(controller._probeListModel)
-
-        view.reconstructorView.objectComboBox.textActivated.connect(objectPresenter.selectObject)
-        view.reconstructorView.objectComboBox.setModel(controller._objectListModel)
+        view.reconstructorView.productComboBox.textActivated.connect(controller._redrawPlot)
+        view.reconstructorView.productComboBox.setModel(controller._productListModel)
 
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
         view.reconstructorView.reconstructSplitButton.clicked.connect(controller._reconstructSplit)
@@ -91,10 +79,8 @@ class ReconstructorParametersController(Observer):
         view.reconstructorView.trainButton.clicked.connect(controller._train)
         view.reconstructorView.clearButton.clicked.connect(controller._clearTrainingData)
 
-        controller._syncModelToView()
-        controller._syncScanToView()
-        controller._syncProbeToView()
-        controller._syncObjectToView()
+        controller._syncAlgorithmToView()
+        controller._syncProductToView()
 
         return controller
 
@@ -113,22 +99,42 @@ class ReconstructorParametersController(Observer):
         self._view.stackedWidget.addWidget(widget)
 
     def _reconstruct(self) -> None:
+        outputProductName = self._presenter.getReconstructor()
+        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
+
+        if inputProductIndex < 0:
+            logger.debug('No current index!')
+            return
+
         try:
-            self._presenter.reconstruct()
+            self._presenter.reconstruct(inputProductIndex, outputProductName)
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
 
     def _reconstructSplit(self) -> None:
+        outputProductName = self._presenter.getReconstructor()
+        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
+
+        if inputProductIndex < 0:
+            logger.debug('No current index!')
+            return
+
         try:
-            self._presenter.reconstructSplit()
+            self._presenter.reconstructSplit(inputProductIndex, outputProductName)
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Split Reconstructor', err)
 
     def _ingestTrainingData(self) -> None:
+        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
+
+        if inputProductIndex < 0:
+            logger.debug('No current index!')
+            return
+
         try:
-            self._presenter.ingestTrainingData()
+            self._presenter.ingestTrainingData(inputProductIndex)
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Ingester', err)
@@ -161,45 +167,23 @@ class ReconstructorParametersController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Clear', err)
 
-    def _syncScanToView(self) -> None:
-        self._view.reconstructorView.scanComboBox.blockSignals(True)
-        self._scanListModel.setStringList(self._scanPresenter.getSelectableNames())
-        self._view.reconstructorView.scanComboBox.setCurrentText(
-            self._scanPresenter.getSelectedScan())
-        self._view.reconstructorView.scanComboBox.blockSignals(False)
-
-        isValid = self._scanPresenter.isSelectedScanValid()
-        validationPixmap = self._getValidationPixmap(isValid)
-        self._view.reconstructorView.scanValidationLabel.setPixmap(validationPixmap)
-
-    def _syncProbeToView(self) -> None:
-        self._view.reconstructorView.probeComboBox.blockSignals(True)
-        self._probeListModel.setStringList(self._probePresenter.getSelectableNames())
-        self._view.reconstructorView.probeComboBox.setCurrentText(
-            self._probePresenter.getSelectedProbe())
-        self._view.reconstructorView.probeComboBox.blockSignals(False)
-
-        isValid = self._probePresenter.isSelectedProbeValid()
-        validationPixmap = self._getValidationPixmap(isValid)
-        self._view.reconstructorView.probeValidationLabel.setPixmap(validationPixmap)
-
-    def _syncObjectToView(self) -> None:
-        self._view.reconstructorView.objectComboBox.blockSignals(True)
-        self._objectListModel.setStringList(self._objectPresenter.getSelectableNames())
-        self._view.reconstructorView.objectComboBox.setCurrentText(
-            self._objectPresenter.getSelectedObject())
-        self._view.reconstructorView.objectComboBox.blockSignals(False)
-
-        isValid = self._objectPresenter.isSelectedObjectValid()
-        validationPixmap = self._getValidationPixmap(isValid)
-        self._view.reconstructorView.objectValidationLabel.setPixmap(validationPixmap)
-
-    def _getValidationPixmap(self, isValid: bool) -> QPixmap:
-        pixmap = QPixmap(':/icons/check' if isValid else ':/icons/xmark')
-        return pixmap.scaledToHeight(24)
+    def _syncProductToView(self) -> None:
+        self._productListModel.setStringList(product.name for product in self._productRepository)
 
     def _redrawPlot(self) -> None:
-        plot2D = self._presenter.getPlot()
+        productIndex = self._view.reconstructorView.productComboBox.currentIndex()
+
+        if productIndex < 0:
+            logger.debug('No current index!')
+            return
+
+        try:
+            item = self._productRepository[productIndex]
+        except IndexError as err:
+            logger.exception(err)
+            return
+
+        plot2D = item.getCosts()
         axisX = plot2D.axisX
         axisY = plot2D.axisY
 
@@ -224,7 +208,7 @@ class ReconstructorParametersController(Observer):
 
         self._plotView.figureCanvas.draw()
 
-    def _syncModelToView(self) -> None:
+    def _syncAlgorithmToView(self) -> None:
         self._view.reconstructorView.algorithmComboBox.setCurrentText(
             self._presenter.getReconstructor())
 
@@ -236,12 +220,30 @@ class ReconstructorParametersController(Observer):
 
         self._redrawPlot()
 
+    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
+        self._syncProductToView()
+
+    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
+        self._syncProductToView()
+
+    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
+        pass
+
+    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
+        pass
+
+    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+        pass
+
+    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
+        currentIndex = self._view.reconstructorView.productComboBox.currentIndex()
+
+        if index == currentIndex:
+            self._redrawPlot()
+
+    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
+        self._syncProductToView()
+
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
-        elif observable is self._scanPresenter:
-            self._syncScanToView()
-        elif observable is self._probePresenter:
-            self._syncProbeToView()
-        elif observable is self._objectPresenter:
-            self._syncObjectToView()
+            self._syncAlgorithmToView()
