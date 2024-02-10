@@ -20,7 +20,6 @@ class PtychoPINNModelSettings(Observable, Observer):
         self.outer_offset_train = settingsGroup.createIntegerEntry('OuterOffsetTrain', 0)
         self.outer_offset_test = settingsGroup.createIntegerEntry('OuterOffsetTest', 0)
         self.batch_size = settingsGroup.createIntegerEntry('BatchSize', 16)
-        self.nepochs = settingsGroup.createIntegerEntry('NEpochs', 60)
         self.n_filters_scale = settingsGroup.createIntegerEntry('NFiltersScale', 2)
         self.nphotons = settingsGroup.createRealEntry('NPhotons', '1e9')
         self.probe_trainable = settingsGroup.createBooleanEntry('ProbeTrainable', False)
