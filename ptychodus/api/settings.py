@@ -123,6 +123,15 @@ class SettingsRegistry(Observable):
         self._groupList: list[SettingsGroup] = list()
         self._fileFilterList: list[str] = ['Initialization Files (*.ini)']
 
+    def to_dict(self) -> dict[str, dict[str, Any]]:
+        settings_dict = {}
+        for group in self._groupList:
+            group_dict = {}
+            for entry in group:
+                group_dict[entry.name] = entry.value
+            settings_dict[group.name] = group_dict
+        return settings_dict
+
     def createGroup(self, name: str) -> SettingsGroup:
         for existingGroup in self._groupList:
             if name.casefold() == existingGroup.name.casefold():
