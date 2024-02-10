@@ -73,17 +73,6 @@ class PtychoPINNModelPresenter(Observable, Observer):
     def setGridsize(self, value: int) -> None:
         self._settings.gridsize.value = value
 
-    def getOuterOffsetTrain(self) -> int:
-        return self._settings.outer_offset_train.value
-
-    def setOuterOffsetTrain(self, value: int) -> None:
-        self._settings.outer_offset_train.value = value
-
-    def getOuterOffsetTest(self) -> int:
-        return self._settings.outer_offset_test.value
-
-    def setOuterOffsetTest(self, value: int) -> None:
-        self._settings.outer_offset_test.value = value
 
     def getBatchSize(self) -> int:
         return self._settings.batch_size.value
