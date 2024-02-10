@@ -76,10 +76,11 @@ class ObjectPatchCircularBuffer:
 
     def getBuffer(self) -> FloatArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
+from .loader import PtychoData, PtychoDataContainer
+
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def __init__(self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI, *, enableAmplitude: bool) -> None:
-        self._modelSettings = modelSettings
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._objectAPI = objectAPI
@@ -95,6 +96,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
         self._fileFilterList = ['NumPy Zipped Archive (*.npz)']
         self.fileFilterList = ['NumPy Arrays (*.npy)', 'NumPy Zipped Archive (*.npz)']
+        self._initialize_ptycho()
+        self._ptychoDataContainer: PtychoDataContainer | None = None
+
+
 
     @property
     def name(self) -> str:
@@ -103,23 +108,28 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        # Adjusted to match the API specification and example implementation. Actual logic depends on the model details.
-        objectInterpolator = parameters.objectInterpolator
-
-        if self._patternBuffer.isZeroSized:
-            diffractionPatternExtent = parameters.diffractionPatternExtent
-            maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
-
-            channels = 2 if self._enableAmplitude else 1
-            self._patternBuffer = PatternCircularBuffer(diffractionPatternExtent, maximumSize)
-            self._objectPatchBuffer = ObjectPatchCircularBuffer(diffractionPatternExtent, channels, maximumSize)
-
-        for scanIndex, scanPoint in parameters.scan.items():
-            objectPatch = objectInterpolator.getPatch(scanPoint, parameters.probeExtent)
-            self._objectPatchBuffer.append(objectPatch.array)
-
-        for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
-            self._patternBuffer.append(pattern)
+        # Extract diffraction patterns from the pattern buffer
+        diffractionPatterns = self._patternBuffer.getBuffer()
+        # Extract object patches (amplitude and phase) from the object patch buffer
+        objectPatches = self._objectPatchBuffer.getBuffer()
+        # Extract scan coordinates from the ReconstructInput parameter
+        scanCoordinates = numpy.array(list(parameters.scan.values()))
+        # This method will be updated in the next steps to use loader.RawData.from_coords_without_pc
+        # to load a training dataset from the pattern buffer.
+        from ptycho.loader import PtychoDataContainer
+        diffractionPatterns = self._patternBuffer.getBuffer()
+        scanCoordinates = numpy.array(list(parameters.scan.values()))
+        xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
+        probeGuess = parameters.probeArray
+        objectGuess = parameters.objectInterpolator.getArray()
+        self._ptychoDataContainer = PtychoDataContainer.from_raw_data_without_pc(
+            xcoords=xcoords,
+            ycoords=ycoords,
+            diff3d=diffractionPatterns,
+            probeGuess=probeGuess,
+            scan_index=numpy.zeros(len(diffractionPatterns)),# TODO assuming all patches are from the same object
+            objectGuess=objectGuess
+        )
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self.fileFilterList
@@ -135,21 +145,25 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         }
         numpy.savez(filePath, **trainingData)
 
+    def _initialize_ptycho(self) -> None:
+        from .params import update_cfg_from_settings, cfg
+        from ptycho import params as ptycho_params
+        # Update the configuration for ptycho based on the current settings in ptychodus
+        update_cfg_from_settings(self.modelSettings)
+        # Apply the updated configuration to ptycho's configuration
+        ptycho_params.cfg.update(cfg)
+
     def train(self) -> Plot2D:
-        # Detailed TODO: Implement the model training logic specific to PtychoPINN
-        # This should include initializing the model, preparing the data, running the training loop,
-        # and validating the model. The specifics of these steps depend on the PtychoPINN architecture
-        # and training procedure, which are not detailed here.
-        #
-        # After training, generate a Plot2D object to visualize the training progress, such as loss over epochs.
-        # This visualization is crucial for understanding the training dynamics and evaluating the model's performance.
-        #
-        # Placeholder for training logic:
-        # Initialize model, prepare data, run training loop, validate model
-        #
-        # Placeholder for generating Plot2D object:
-        trainingLoss = [0]  # Replace with actual training loss values
-        validationLoss = [0]  # Replace with actual validation loss values
+        if self._ptychoDataContainer is None:
+            print("Training data has not been ingested. running _initialize_ptycho().")
+            self._initialize_ptycho()
+        else:
+            print("Training data has already been ingested. Not running _initialize_ptycho().")
+        from ptycho import train_pinn
+        model_instance, history =  train_pinn.train(self._ptychoDataContainer)
+        # TODO save the tensorflow model instance to file
+        trainingLoss = history.history['loss']
+        validationLoss = history.history['val_loss']  # Replace with actual validation loss values
         validationLossSeries = PlotSeries(label='Validation Loss', values=validationLoss)
         trainingLossSeries = PlotSeries(label='Training Loss', values=trainingLoss)
         seriesX = PlotSeries(label='Epoch', values=[*range(len(trainingLoss))])

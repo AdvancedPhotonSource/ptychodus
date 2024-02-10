@@ -48,10 +48,20 @@ class SettingsGroup(Observable, Observer):
         super().__init__()
         self._name = name
         self._entryList: list[SettingsEntry[Any]] = list()
+        self._settingsRegistry: SettingsRegistry | None = None
 
     @property
     def name(self) -> str:
         return self._name
+
+    def setSettingsRegistry(self, settingsRegistry: SettingsRegistry) -> None:
+        self._settingsRegistry = settingsRegistry
+
+    def to_dict(self) -> dict[str, Any]:
+        if self._settingsRegistry is not None:
+            return self._settingsRegistry.to_dict().get(self._name, {})
+        else:
+            return {}
 
     def createStringEntry(self, name: str, defaultValue: str) -> SettingsEntry[str]:
         candidateEntry = SettingsEntry[str](name, defaultValue,
@@ -122,6 +132,15 @@ class SettingsRegistry(Observable):
         self._replacementPathPrefix = replacementPathPrefix
         self._groupList: list[SettingsGroup] = list()
         self._fileFilterList: list[str] = ['Initialization Files (*.ini)']
+
+    def to_dict(self) -> dict[str, dict[str, Any]]:
+        settings_dict = {}
+        for group in self._groupList:
+            group_dict = {}
+            for entry in group:
+                group_dict[entry.name] = entry.value
+            settings_dict[group.name] = group_dict
+        return settings_dict
 
     def createGroup(self, name: str) -> SettingsGroup:
         for existingGroup in self._groupList:

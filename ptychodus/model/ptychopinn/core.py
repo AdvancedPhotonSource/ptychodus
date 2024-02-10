@@ -73,17 +73,6 @@ class PtychoPINNModelPresenter(Observable, Observer):
     def setGridsize(self, value: int) -> None:
         self._settings.gridsize.value = value
 
-    def getOuterOffsetTrain(self) -> int:
-        return self._settings.outer_offset_train.value
-
-    def setOuterOffsetTrain(self, value: int) -> None:
-        self._settings.outer_offset_train.value = value
-
-    def getOuterOffsetTest(self) -> int:
-        return self._settings.outer_offset_test.value
-
-    def setOuterOffsetTest(self, value: int) -> None:
-        self._settings.outer_offset_test.value = value
 
     def getBatchSize(self) -> int:
         return self._settings.batch_size.value
@@ -91,11 +80,6 @@ class PtychoPINNModelPresenter(Observable, Observer):
     def setBatchSize(self, value: int) -> None:
         self._settings.batch_size.value = value
 
-    def getNEpochs(self) -> int:
-        return self._settings.nepochs.value
-
-    def setNEpochs(self, value: int) -> None:
-        self._settings.nepochs.value = value
 
     def getNFiltersScale(self) -> int:
         return self._settings.n_filters_scale.value
@@ -172,6 +156,11 @@ class PtychoPINNTrainingPresenter(Observable, Observer):
         super().__init__()
         self._settings = settings
 
+    def getNEpochs(self) -> int:
+        return self._settings.trainingEpochs.value
+
+    def setNEpochs(self, value: int) -> None:
+        self._settings.trainingEpochs.value = value
 
     def getOutputPath(self) -> Path:
         return self._settings.outputPath.value
