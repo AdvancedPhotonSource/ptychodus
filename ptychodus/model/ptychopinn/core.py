@@ -92,10 +92,10 @@ class PtychoPINNModelPresenter(Observable, Observer):
         self._settings.batch_size.value = value
 
     def getNEpochs(self) -> int:
-        return self._settings.nepochs.value
+        return self.trainingPresenter._settings.nepochs.value
 
     def setNEpochs(self, value: int) -> None:
-        self._settings.nepochs.value = value
+        self.trainingPresenter._settings.nepochs.value = value
 
     def getNFiltersScale(self) -> int:
         return self._settings.n_filters_scale.value
