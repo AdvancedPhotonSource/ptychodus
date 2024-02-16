@@ -8,15 +8,14 @@ from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QProgressB
                              QSplitter, QStackedWidget, QTableView, QToolBar, QWidget)
 
 from . import resources
-from .product import ProductView
 from .automation import AutomationView
 from .image import ImageView
-from .monitor import MonitorObjectView, MonitorProbeView
 from .patterns import PatternsView
+from .product import ProductView
 from .reconstructor import ReconstructorParametersView, ReconstructorPlotView
+from .repository import RepositoryTableView, RepositoryTreeView
 from .scan import ScanPlotView
 from .settings import SettingsParametersView
-from .widgets import RepositoryTableView, RepositoryTreeView
 from .workflow import WorkflowParametersView
 
 logger = logging.getLogger(__name__)
@@ -45,7 +44,8 @@ class ViewCore(QMainWindow):
         self.patternsView = PatternsView.createInstance()
         self.patternsImageView = ImageView.createInstance(self.statusBar())
 
-        self.productAction = self.navigationToolBar.addAction(QIcon(':/icons/product'), 'Product')
+        self.productAction = self.navigationToolBar.addAction(QIcon(':/icons/products'),
+                                                              'Products')
         self.productView = ProductView.createInstance()
         self.productDiagramView = QWidget()
 
@@ -75,10 +75,6 @@ class ViewCore(QMainWindow):
                                                                  'Automation')
         self.automationView = AutomationView.createInstance()
         self.automationWidget = QWidget()
-
-        self.monitorAction = self.navigationToolBar.addAction(QIcon(':/icons/monitor'), 'Monitor')
-        self.monitorProbeView = MonitorProbeView.createInstance(self.statusBar())
-        self.monitorObjectView = MonitorObjectView.createInstance(self.statusBar())
 
     @classmethod
     def createInstance(cls,
@@ -110,7 +106,6 @@ class ViewCore(QMainWindow):
         view.parametersWidget.addWidget(view.reconstructorParametersView)
         view.parametersWidget.addWidget(view.workflowParametersView)
         view.parametersWidget.addWidget(view.automationView)
-        view.parametersWidget.addWidget(view.monitorProbeView)
         view.parametersWidget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         view.splitter.addWidget(view.parametersWidget)
 
@@ -124,7 +119,6 @@ class ViewCore(QMainWindow):
         view.contentsWidget.addWidget(view.reconstructorPlotView)
         view.contentsWidget.addWidget(view.workflowTableView)
         view.contentsWidget.addWidget(view.automationWidget)
-        view.contentsWidget.addWidget(view.monitorObjectView)
         view.contentsWidget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         view.splitter.addWidget(view.contentsWidget)
 

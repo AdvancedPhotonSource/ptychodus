@@ -8,9 +8,9 @@ from ..view import ViewCore
 from .automation import AutomationController
 from .data import FileDialogFactory
 from .memory import MemoryController
-#from .object import ObjectImageController, ObjectController
+from .object import ObjectController
 from .patterns import PatternsController
-#from .probe import ProbeImageController, ProbeController
+#from .probe import ProbeController
 from .product import ProductController
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
@@ -48,7 +48,11 @@ class ControllerCore:
                                                                    self._fileDialogFactory)
         # FIXME self._scanController = ScanController.createInstance(model.scanRepositoryPresenter, view.scanView, view.scanPlotView, self._fileDialogFactory)
         # FIXME self._probeController = ProbeController.createInstance(model.apparatusPresenter, model.probeRepositoryPresenter, model.probeImagePresenter, view.probeView, view.probeImageView, self._fileDialogFactory)
-        # FIXME self._objectController = ObjectController.createInstance(model.apparatusPresenter, model.objectRepositoryPresenter, model.objectImagePresenter, view.objectView, view.objectImageView, self._fileDialogFactory)
+        self._objectController = ObjectController.createInstance(model.objectRepository,
+                                                                 model.objectImagePresenter,
+                                                                 view.objectView,
+                                                                 view.objectImageView,
+                                                                 self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,
@@ -67,8 +71,6 @@ class ControllerCore:
         self._automationController = AutomationController.createInstance(
             model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
             view.automationView, self._fileDialogFactory)
-        # FIXME self._monitorProbeController = ProbeImageController.createInstance(model.apparatusPresenter, model.probePresenter, model.probeImagePresenter, view.monitorProbeView.imageView, self._fileDialogFactory)
-        # FIXME self._monitorObjectController = ObjectImageController.createInstance(model.apparatusPresenter, model.objectPresenter, model.objectImagePresenter, view.monitorObjectView.imageView, self._fileDialogFactory)
         self._refreshDataTimer = QTimer()
         self._automationTimer = QTimer()
         self._processMessagesTimer = QTimer()

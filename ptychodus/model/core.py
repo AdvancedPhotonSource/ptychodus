@@ -30,7 +30,7 @@ from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter
                        DiffractionDatasetPresenter, DiffractionMetadataPresenter,
                        DiffractionPatternPresenter, PatternsCore)
 from .probe import ProbeCore
-from .product import ProductCore, ProductRepository
+from .product import ObjectRepository, ProductCore, ProductRepository
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
@@ -177,6 +177,10 @@ class ModelCore:
     @property
     def productRepository(self) -> ProductRepository:
         return self._productCore.repository
+
+    @property
+    def objectRepository(self) -> ObjectRepository:
+        return self._productCore.objectRepository
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
         self._patternsCore.dataAPI.initializeStreaming(metadata)

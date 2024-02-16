@@ -5,7 +5,8 @@ from PyQt5.QtCore import QStringListModel
 from PyQt5.QtWidgets import QWidget
 
 from ...api.observer import Observable, Observer
-from ...model.object import ObjectRepositoryItemPresenter, CompareObjectInitializer
+from ...model.object import CompareObjectBuilder
+from ...model.product import ObjectRepository
 from ...view.object import (ObjectEditorDialog, CompareObjectView, CompareObjectParametersView,
                             CompareObjectPlotView)
 
@@ -14,26 +15,25 @@ logger = logging.getLogger(__name__)
 
 class CompareObjectParametersController(Observer):
 
-    def __init__(self, presenter: ObjectRepositoryItemPresenter,
-                 view: CompareObjectParametersView) -> None:
+    def __init__(self, repository: ObjectRepository, view: CompareObjectParametersView) -> None:
         super().__init__()
         self._item = presenter.item
         self._view = view
         self._nameListModel = QStringListModel()
-        self._initializer: CompareObjectInitializer | None = None
+        self._initializer: CompareObjectBuilder | None = None
 
     @classmethod
-    def createInstance(cls, presenter: ObjectRepositoryItemPresenter,
+    def createInstance(cls, repository: ObjectRepository,
                        view: CompareObjectParametersView) -> None:
-        controller = cls(presenter, view)
-        controller._updateInitializer()
+        controller = cls(repository, view)
+        controller._updateBuilder()
         controller._syncModelToView()
         presenter.item.addObserver(controller)
 
-    def _updateInitializer(self) -> None:
-        initializer = self._item.getInitializer()
+    def _updateBuilder(self) -> None:
+        initializer = self._item.getBuilder()
 
-        if isinstance(initializer, CompareObjectInitializer):
+        if isinstance(initializer, CompareObjectBuilder):
             self._initializer = initializer
         else:
             logger.error('Null initializer!')
@@ -63,25 +63,23 @@ class CompareObjectParametersController(Observer):
 
 class CompareObjectPlotController(Observer):
 
-    def __init__(self, presenter: ObjectRepositoryItemPresenter,
-                 view: CompareObjectPlotView) -> None:
+    def __init__(self, repository: ObjectRepository, view: CompareObjectPlotView) -> None:
         super().__init__()
         self._item = presenter.item
         self._view = view
-        self._initializer: CompareObjectInitializer | None = None
+        self._initializer: CompareObjectBuilder | None = None
 
     @classmethod
-    def createInstance(cls, presenter: ObjectRepositoryItemPresenter,
-                       view: CompareObjectPlotView) -> None:
-        controller = cls(presenter, view)
-        controller._updateInitializer()
+    def createInstance(cls, repository: ObjectRepository, view: CompareObjectPlotView) -> None:
+        controller = cls(repository, view)
+        controller._updateBuilder()
         controller._syncModelToView()
         presenter.item.addObserver(controller)
 
-    def _updateInitializer(self) -> None:
-        initializer = self._item.getInitializer()
+    def _updateBuilder(self) -> None:
+        initializer = self._item.getBuilder()
 
-        if isinstance(initializer, CompareObjectInitializer):
+        if isinstance(initializer, CompareObjectBuilder):
             self._initializer = initializer
         else:
             logger.error('Null initializer!')
@@ -121,16 +119,16 @@ class CompareObjectPlotController(Observer):
 
 class CompareObjectViewController:
 
-    def __init__(self, presenter: ObjectRepositoryItemPresenter, parent: QWidget) -> None:
+    def __init__(self, repository: ObjectRepository, parent: QWidget) -> None:
         super().__init__()
         self._view = CompareObjectView.createInstance()
         self._parametersController = CompareObjectParametersController.createInstance(
-            presenter, self._view.parametersView)
+            repository, self._view.parametersView)
         self._plotController = CompareObjectPlotController.createInstance(
-            presenter, self._view.plotView)
+            repository, self._view.plotView)
         self._dialog = ObjectEditorDialog.createInstance(presenter.name, self._view, parent)
 
     @classmethod
-    def editParameters(cls, presenter: ObjectRepositoryItemPresenter, parent: QWidget) -> None:
-        controller = cls(presenter, parent)
+    def editParameters(cls, repository: ObjectRepository, parent: QWidget) -> None:
+        controller = cls(repository, parent)
         controller._dialog.open()

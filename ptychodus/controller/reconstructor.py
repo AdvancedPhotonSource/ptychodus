@@ -168,7 +168,8 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             ExceptionDialog.showException('Clear', err)
 
     def _syncProductToView(self) -> None:
-        self._productListModel.setStringList(product.name for product in self._productRepository)
+        self._productListModel.setStringList(product.getName()
+                                             for product in self._productRepository)
 
     def _redrawPlot(self) -> None:
         productIndex = self._view.reconstructorView.productComboBox.currentIndex()

@@ -57,6 +57,12 @@ class IntegerParameter(Parameter[int]):
         self._minimum = minimum
         self._maximum = maximum
 
+    def getMinimum(self) -> int | None:
+        return self._minimum
+
+    def getMaximum(self) -> int | None:
+        return self._maximum
+
     def getValue(self) -> int:
         value = super().getValue()
 
@@ -75,6 +81,12 @@ class RealParameter(Parameter[float]):
         super().__init__(value)
         self._minimum = minimum
         self._maximum = maximum
+
+    def getMinimum(self) -> float | None:
+        return self._minimum
+
+    def getMaximum(self) -> float | None:
+        return self._maximum
 
     def getValue(self) -> float:
         value = super().getValue()
@@ -122,7 +134,7 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
         else:
             raise ValueError('Name already exists!')
 
-    def _registerStringParameter(self, name: str, value: str) -> Parameter[str]:
+    def _registerStringParameter(self, name: str, value: str) -> StringParameter:
         parameter = StringParameter(value)
         self._registerParameter(name, parameter)
         return parameter
@@ -132,7 +144,7 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
         self._registerParameter(name, parameter)
         return parameter
 
-    def _registerBooleanParameter(self, name: str, value: bool) -> Parameter[bool]:
+    def _registerBooleanParameter(self, name: str, value: bool) -> BooleanParameter:
         parameter = BooleanParameter(value)
         self._registerParameter(name, parameter)
         return parameter
@@ -142,7 +154,7 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
                                   value: int,
                                   *,
                                   minimum: int | None = None,
-                                  maximum: int | None = None) -> Parameter[int]:
+                                  maximum: int | None = None) -> IntegerParameter:
         parameter = IntegerParameter(value, minimum=minimum, maximum=maximum)
         self._registerParameter(name, parameter)
         return parameter
@@ -152,7 +164,7 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
                                value: float,
                                *,
                                minimum: float | None = None,
-                               maximum: float | None = None) -> Parameter[float]:
+                               maximum: float | None = None) -> RealParameter:
         parameter = RealParameter(value, minimum=minimum, maximum=maximum)
         self._registerParameter(name, parameter)
         return parameter

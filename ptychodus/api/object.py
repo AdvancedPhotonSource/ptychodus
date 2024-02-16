@@ -138,6 +138,14 @@ class Object:
         return self._array.nbytes
 
     @property
+    def widthInPixels(self) -> int:
+        return self._array.shape[-1]
+
+    @property
+    def heightInPixels(self) -> int:
+        return self._array.shape[-2]
+
+    @property
     def pixelWidthInMeters(self) -> float:
         return self._pixelWidthInMeters
 
@@ -155,8 +163,8 @@ class Object:
 
     def getGeometry(self) -> ObjectGeometry:
         return ObjectGeometry(
-            widthInPixels=self._array.shape[-1],
-            heightInPixels=self._array.shape[-2],
+            widthInPixels=self.widthInPixels,
+            heightInPixels=self.heightInPixels,
             pixelWidthInMeters=self._pixelWidthInMeters,
             pixelHeightInMeters=self._pixelHeightInMeters,
             centerXInMeters=self._centerXInMeters,

@@ -40,6 +40,12 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
     def __len__(self) -> int:
         return len(self._repository)
 
+    def getOpenFileFilterList(self) -> Sequence[str]:
+        return self._factory.getOpenFileFilterList()
+
+    def getOpenFileFilter(self) -> str:
+        return self._factory.getOpenFileFilter()
+
     def openObject(self, index: int, filePath: Path, fileFilter: str) -> None:
         builder = self._factory.createObjectFromFile(filePath, fileFilter)
 
@@ -49,6 +55,12 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
             logger.warning(f'Failed to open object {index}!')
         else:
             item.setBuilder(builder)
+
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return self._factory.getSaveFileFilterList()
+
+    def getSaveFileFilter(self) -> str:
+        return self._factory.getSaveFileFilter()
 
     def saveObject(self, index: int, filePath: Path, fileFilter: str) -> None:
         try:

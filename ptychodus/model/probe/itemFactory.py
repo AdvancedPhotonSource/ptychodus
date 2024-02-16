@@ -1,5 +1,6 @@
 import numpy
 
+from ...api.parametric import Parameter
 from ...api.probe import Probe
 from .builder import FromMemoryProbeBuilder
 from .item import ProbeRepositoryItem
@@ -11,7 +12,7 @@ class ProbeRepositoryItemFactory:
     def __init__(self, rng: numpy.random.Generator) -> None:
         self._rng = rng
 
-    def create(self, probe: Probe) -> ProbeRepositoryItem:
+    def create(self, name: Parameter[str], probe: Probe) -> ProbeRepositoryItem:
         builder = FromMemoryProbeBuilder(probe)
         multimodalBuilder = MultimodalProbeBuilder(self._rng)
-        return ProbeRepositoryItem(builder, multimodalBuilder)
+        return ProbeRepositoryItem(name, builder, multimodalBuilder)

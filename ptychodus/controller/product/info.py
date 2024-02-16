@@ -74,7 +74,7 @@ class ProductInfoViewController(Observer):
         tableProxyModel.setSourceModel(tableModel)
 
         dialog = ProductInfoDialog.createInstance(parent)
-        dialog.setWindowTitle(f'Edit Product: {product.name}')
+        dialog.setWindowTitle(f'Edit Product: {product.getName()}')
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)
         dialog.tableView.verticalHeader().hide()

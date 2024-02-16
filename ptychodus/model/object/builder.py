@@ -14,6 +14,9 @@ class ObjectBuilder(ParameterRepository):
         super().__init__('Builder')
         self._name = self._registerStringParameter('Name', name)
 
+    def getName(self) -> str:
+        return self._name.getValue()
+
     @abstractmethod
     def build(self) -> Object:
         pass

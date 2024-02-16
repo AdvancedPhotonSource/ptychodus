@@ -8,7 +8,7 @@ import sys
 
 from ...api.object import Object
 from ...api.observer import Observable
-from ...api.parametric import ParameterRepository
+from ...api.parametric import Parameter, ParameterRepository
 from ...api.plugins import PluginChooser
 from ...api.probe import Probe
 from ...api.product import Product, ProductFileReader, ProductFileWriter
@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 
 
 class ProductRepositoryItemObserver(ABC):
+
+    @abstractmethod
+    def requestNameChange(self, currentName: str, requestedName: str) -> str:
+        pass
 
     @abstractmethod
     def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
@@ -46,6 +50,22 @@ class ProductRepositoryItemObserver(ABC):
     @abstractmethod
     def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
         pass
+
+
+class ProductNameParameter(Parameter[str]):
+
+    def __init__(self, parent: ProductRepositoryItemObserver, value: str) -> None:
+        super().__init__(value)
+        self._parent = parent
+
+    def setValue(self, value: str, *, notify=True) -> None:
+        uniqueValue = self._parent.requestNameChange(self._value, value)
+
+        if self._value != uniqueValue:
+            self._value = uniqueValue
+
+            if notify:
+                self.notifyObservers()
 
 
 class ProductRepositoryItem(ParameterRepository):
@@ -70,8 +90,7 @@ class ProductRepositoryItem(ParameterRepository):
         self._addParameterRepository(self._probe, observe=True)
         self._addParameterRepository(self._object, observe=True)
 
-    @property
-    def name(self) -> str:
+    def getName(self) -> str:
         return self._metadata.name.getValue()
 
     def getMetadata(self) -> MetadataRepositoryItem:
@@ -164,6 +183,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         fileReaderChooser: PluginChooser[ProductFileReader],
         fileWriterChooser: PluginChooser[ProductFileWriter],
     ) -> None:
+        # FIXME also need ability to initialize product components from other products
         super().__init__()
         self._patternSizer = patternSizer
         self._patterns = patterns
@@ -193,7 +213,6 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         return len(self._itemList)
 
     def createNewProduct(self, name: str = 'Unnamed') -> None:
-        # FIXME also need ability to initialize product components from other products
         product = Product(
             metadata=self._metadataBuilder.build(name),
             scan=Scan(),
@@ -203,22 +222,27 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         )
         self.insertProduct(product)
 
-    def insertProduct(self, product: Product) -> int:
-        index = len(self._itemList)
-        metadata = MetadataRepositoryItem(product.metadata)
-        name = metadata.name.getValue()
+    def _addUniqueNameToLUT(self, requestedName: str, index: int) -> str:
+        name = requestedName
         match = 0
 
         while self._itemIndexLUT.setdefault(name, index) != index:
             match += 1
-            name = metadata.name.getValue() + f'-{match}'
+            name = requestedName + f'-{match}'
 
-        metadata.name.setValue(name)
+        return name
 
-        scan = self._scanRepositoryItemFactory.create(product.scan)
+    def insertProduct(self, product: Product) -> int:
+        index = len(self._itemList)
+        uniqueName = self._addUniqueNameToLUT(product.metadata.name, index)
+        nameParameter = ProductNameParameter(self, uniqueName)
+
+        metadata = MetadataRepositoryItem(nameParameter, product.metadata)
+        scan = self._scanRepositoryItemFactory.create(nameParameter, product.scan)
         geometry = ProductGeometry(metadata, scan, self._patternSizer)
-        probe = self._probeRepositoryItemFactory.create(product.probe)
-        object_ = self._objectRepositoryItemFactory.create(product.object_)
+        probe = self._probeRepositoryItemFactory.create(nameParameter, product.probe)
+        object_ = self._objectRepositoryItemFactory.create(nameParameter, product.object_)
+
         item = ProductRepositoryItem(
             parent=self,
             metadata=metadata,
@@ -236,9 +260,6 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         return index
 
-    def _updateIndexes(self) -> None:
-        self._itemIndexLUT = {item.name: index for index, item in enumerate(self._itemList)}
-
     def removeProduct(self, index: int) -> None:
         try:
             item = self._itemList.pop(index)
@@ -246,7 +267,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             logger.debug(f'Failed to remove product item {index}!')
             return
 
-        self._updateIndexes()
+        self._itemIndexLUT = {item.getName(): index for index, item in enumerate(self._itemList)}
 
         for observer in self._observerList:
             observer.handleItemRemoved(index, item)
@@ -306,13 +327,20 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         except ValueError:
             pass
 
-    def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
-        self._updateIndexes()  # FIXME also enforce that name remains unique
-
+    def requestNameChange(self, currentName: str, requestedName: str) -> str:
         try:
-            index = self._itemIndexLUT[item.name]
+            index = self._itemIndexLUT.pop(currentName)
         except KeyError:
-            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            logger.warning(f'Failed to change \"{currentName}\" to \"{requestedName}\"!')
+            return currentName
+
+        return self._addUniqueNameToLUT(requestedName, index)
+
+    def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
+        try:
+            index = self._itemIndexLUT[item.getName()]
+        except KeyError:
+            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
 
         metadata = item.getMetadata()
@@ -322,9 +350,9 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handleScanChanged(self, item: ProductRepositoryItem) -> None:
         try:
-            index = self._itemIndexLUT[item.name]
+            index = self._itemIndexLUT[item.getName()]
         except KeyError:
-            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
 
         scan = item.getScan()
@@ -334,9 +362,9 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handleProbeChanged(self, item: ProductRepositoryItem) -> None:
         try:
-            index = self._itemIndexLUT[item.name]
+            index = self._itemIndexLUT[item.getName()]
         except KeyError:
-            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
 
         probe = item.getProbe()
@@ -346,9 +374,9 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
         try:
-            index = self._itemIndexLUT[item.name]
+            index = self._itemIndexLUT[item.getName()]
         except KeyError:
-            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
 
         object_ = item.getObject()
@@ -358,9 +386,9 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
         try:
-            index = self._itemIndexLUT[item.name]
+            index = self._itemIndexLUT[item.getName()]
         except KeyError:
-            logger.warning(f'Failed to look up index for \"{item.name}\"!')
+            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
 
         costs = item.getCosts()

@@ -9,24 +9,22 @@ class RepositoryButtonBox(QWidget):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.insertMenu = QMenu()
-        self.insertButton = QPushButton('Insert')
-        self.saveButton = QPushButton('Save')
         self.editButton = QPushButton('Edit')
-        self.removeButton = QPushButton('Remove')
+        self.saveButton = QPushButton('Save')
+        self.analyzeButton = QPushButton('Analyze')
+        self.analyzeMenu = QMenu()  # FIXME use this
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> RepositoryButtonBox:
         view = cls(parent)
 
-        view.insertButton.setMenu(view.insertMenu)
+        view.analyzeButton.setMenu(view.analyzeMenu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.insertButton)
-        layout.addWidget(view.saveButton)
         layout.addWidget(view.editButton)
-        layout.addWidget(view.removeButton)
+        layout.addWidget(view.saveButton)
+        layout.addWidget(view.analyzeButton)
         view.setLayout(layout)
 
         return view

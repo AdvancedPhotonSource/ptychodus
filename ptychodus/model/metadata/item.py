@@ -1,13 +1,14 @@
 from ...api.product import ProductMetadata
-from ...api.parametric import ParameterRepository
+from ...api.parametric import Parameter, ParameterRepository
 
 
 class MetadataRepositoryItem(ParameterRepository):
 
-    def __init__(self, metadata: ProductMetadata) -> None:
+    def __init__(self, name: Parameter[str], metadata: ProductMetadata) -> None:
         super().__init__('Metadata')  # FIXME snake_case?
         # FIXME support sys.getsizeof(self)
-        self.name = self._registerStringParameter('Name', metadata.name)
+        self._registerParameter('Name', name)
+        self.name = name
         self.comments = self._registerStringParameter('Comments', metadata.comments)
         self.probeEnergyInElectronVolts = self._registerRealParameter(
             'ProbeEnergyInElectronVolts', metadata.probeEnergyInElectronVolts, minimum=0.)

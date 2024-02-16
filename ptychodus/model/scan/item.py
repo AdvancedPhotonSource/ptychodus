@@ -5,7 +5,7 @@ import sys
 import numpy
 
 from ...api.observer import Observable
-from ...api.parametric import ParameterRepository
+from ...api.parametric import Parameter, ParameterRepository
 from ...api.scan import Scan, ScanBoundingBox, ScanPoint
 from .boundingBox import ScanBoundingBoxBuilder
 from .builder import ScanBuilder
@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 
 class ScanRepositoryItem(ParameterRepository):
 
-    def __init__(self, builder: ScanBuilder, transform: ScanPointTransform) -> None:
+    def __init__(self, name: Parameter[str], builder: ScanBuilder,
+                 transform: ScanPointTransform) -> None:
         super().__init__('Scan')
+        self._name = name
         self._builder = builder
         self._transform = transform
 
@@ -31,6 +33,9 @@ class ScanRepositoryItem(ParameterRepository):
         self._addParameterRepository(transform, observe=True)
 
         self._rebuild()
+
+    def getName(self) -> str:
+        return self._name.getValue()
 
     def getUntransformedScan(self) -> Scan:
         return self._untransformedScan

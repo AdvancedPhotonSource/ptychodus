@@ -8,7 +8,8 @@ from ...api.observer import Observable, Observer
 from ...model.image import ImagePresenter
 from ...model.probe import ApparatusPresenter, ProbeRepositoryItem, ProbeRepositoryPresenter
 from ...view.image import ImageView
-from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate, RepositoryTreeView
+from ...view.repository import RepositoryTreeView
+from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .disk import DiskProbeViewController

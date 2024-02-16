@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
 from ..api.tree import SimpleTreeNode
 
 
-class SimpleTreeModel(QAbstractItemModel):
+class SimpleTreeModel(QAbstractItemModel):  # FIXME to patterns
 
     def __init__(self, rootNode: SimpleTreeNode, parent: QObject | None = None) -> None:
         super().__init__(parent)
