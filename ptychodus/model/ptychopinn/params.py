@@ -1,6 +1,7 @@
 """
 Stores global variables for data generation and model configuration
 """
+from .settings import PtychoPINNModelSettings
 # TODO naming convention for different types of parameters
 # TODO what default value and initialization for the probe scale?
 from ptychodus.api.settings import SettingsRegistry
