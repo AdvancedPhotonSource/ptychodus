@@ -53,22 +53,19 @@ def update_cfg_from_settings(settings_registry: SettingsRegistry):
     ptychopinn_training_settings = settings_dict.get('PtychoPINNTraining', {})
 
     # Update shared settings
-    cfg['N'] = int(ptychopinn_settings.get('N', cfg['N']))
-    cfg['gridsize'] = int(ptychopinn_settings.get('Gridsize', cfg['gridsize']))
-    cfg['batch_size'] = int(ptychopinn_settings.get('BatchSize', cfg['batch_size']))
-    cfg['n_filters_scale'] = int(ptychopinn_settings.get('NFiltersScale', cfg['n_filters_scale']))
-    cfg['output_prefix'] = str(ptychopinn_settings.get('OutputPrefix', cfg['output_prefix']))
-    cfg['default_probe_scale'] = float(ptychopinn_settings.get('DefaultProbeScale', cfg['default_probe_scale']))
-    cfg['nphotons'] = float(ptychopinn_settings.get('NPhotons', cfg['nphotons']))
-    cfg['object.big'] = bool(ptychopinn_settings.get('ObjectBig', cfg['object.big']))
-    cfg['probe.big'] = bool(ptychopinn_settings.get('ProbeBig', cfg['probe.big']))
-    cfg['probe_scale'] = float(ptychopinn_settings.get('ProbeScale', cfg['probe_scale']))
-    cfg['probe.mask'] = bool(ptychopinn_settings.get('ProbeMask', cfg['probe.mask']))
-    cfg['model_type'] = str(ptychopinn_settings.get('ModelType', cfg['model_type']))
-    cfg['amp_activation'] = str(ptychopinn_settings.get('AmpActivation', cfg['amp_activation']))
+    for key in ['N', 'offset', 'gridsize', 'batch_size', 'n_filters_scale', 'nphotons', 'object.big', 'probe.big', 'probe_scale', 'probe.mask', 'model_type', 'size', 'amp_activation']:
+        if key in ptychopinn_settings:
+            cfg[key] = ptychopinn_settings[key]
 
-    # Settings specific to training
-    # Note: Some settings may not be directly transferable and may require additional logic
+    # Update training specific settings
+    for key in ['mae_weight', 'nll_weight', 'tv_weight', 'realspace_mae_weight', 'realspace_weight']:
+        if key in ptychopinn_training_settings:
+            cfg[key] = ptychopinn_training_settings[key]
+
+    # Update derived values
+    cfg['bigN'] = get_bigN()
+    cfg['padded_size'] = get_padded_size()
+    cfg['padding_size'] = get_padding_size()
 
 # TODO refactor
 def validate():
