@@ -96,13 +96,6 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self.fileFilterList = ['NumPy Arrays (*.npy)', 'NumPy Zipped Archive (*.npz)']
         self._initialize_ptycho()
 
-    def _initialize_ptycho(self) -> None:
-        from .params import update_cfg_from_settings, cfg
-        from ptycho import params as ptycho_params
-        # Update the configuration for ptycho based on the current settings in ptychodus
-        update_cfg_from_settings(self.modelSettings)
-        # Apply the updated configuration to ptycho's configuration
-        ptycho_params.cfg.update(cfg)
 
 
     @property
@@ -143,6 +136,14 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             'objectPatches': self._objectPatchBuffer.getBuffer(),
         }
         numpy.savez(filePath, **trainingData)
+
+    def _initialize_ptycho(self) -> None:
+        from .params import update_cfg_from_settings, cfg
+        from ptycho import params as ptycho_params
+        # Update the configuration for ptycho based on the current settings in ptychodus
+        update_cfg_from_settings(self.modelSettings)
+        # Apply the updated configuration to ptycho's configuration
+        ptycho_params.cfg.update(cfg)
 
     def train(self) -> Plot2D:
         # Detailed TODO: Implement the model training logic specific to PtychoPINN
