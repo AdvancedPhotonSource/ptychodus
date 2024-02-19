@@ -76,6 +76,8 @@ class ObjectPatchCircularBuffer:
 
     def getBuffer(self) -> FloatArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
+from .loader import PtychoData, PtychoDataContainer
+
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def __init__(self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI, *, enableAmplitude: bool) -> None:
@@ -95,6 +97,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self._fileFilterList = ['NumPy Zipped Archive (*.npz)']
         self.fileFilterList = ['NumPy Arrays (*.npy)', 'NumPy Zipped Archive (*.npz)']
         self._initialize_ptycho()
+        self._ptychoDataContainer: PtychoDataContainer | None = None
 
 
 
@@ -106,6 +109,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         # Adjusted to match the API specification and example implementation. Actual logic depends on the model details.
+    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         objectInterpolator = parameters.objectInterpolator
 
         if self._patternBuffer.isZeroSized:
@@ -125,6 +129,20 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
             self._patternBuffer.append(pattern)
 
+        # Instantiate PtychoData using the same values for 'nominal' and 'true' coordinates
+        coords = numpy.array(list(parameters.scan.values()))
+        self._ptychoDataContainer = PtychoDataContainer(
+            X=self._patternBuffer.getBuffer(),
+            Y_I=None,  # Placeholder, actual values to be computed during training
+            Y_phi=None,  # Placeholder, actual values to be computed during training
+            norm_Y_I=None,  # Placeholder, actual values to be computed during training
+            YY_full=None,  # Placeholder, actual values to be computed during training
+            coords_nominal=coords,
+            coords_true=coords,
+            nn_indices=None,  # Placeholder, actual values to be computed during training
+            global_offsets=None,  # Placeholder, actual values to be computed during training
+            local_offsets=None  # Placeholder, actual values to be computed during training
+        )
         # Example of how to handle the probe data, adjust based on actual model requirements
         if self._probeData is not None:
             # Process or directly use self._probeData as needed for your model
