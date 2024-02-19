@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QHBoxLa
                              QMenu, QPushButton, QTableView, QVBoxLayout, QWidget)
 
 
-class ProductInfoDialog(QDialog):
+class ProductEditorDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
@@ -12,7 +12,7 @@ class ProductInfoDialog(QDialog):
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ProductInfoDialog:
+    def createInstance(cls, parent: QWidget | None = None) -> ProductEditorDialog:
         view = cls(parent)
 
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
@@ -39,7 +39,7 @@ class ProductButtonBox(QWidget):
         self.insertMenu = QMenu()
         self.insertButton = QPushButton('Insert')
         self.saveButton = QPushButton('Save')
-        self.infoButton = QPushButton('Info')
+        self.editButton = QPushButton('Edit')
         self.removeButton = QPushButton('Remove')
 
     @classmethod
@@ -52,7 +52,7 @@ class ProductButtonBox(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.insertButton)
         layout.addWidget(view.saveButton)
-        layout.addWidget(view.infoButton)
+        layout.addWidget(view.editButton)
         layout.addWidget(view.removeButton)
         view.setLayout(layout)
 

@@ -15,7 +15,7 @@ from ...model.scan import ScanRepositoryItem
 from ...view.product import ProductView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from .info import ProductInfoViewController
+from .editor import ProductEditorViewController
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +162,7 @@ class ProductController(ProductRepositoryObserver):
         createNewAction = view.buttonBox.insertMenu.addAction('Create New')
         createNewAction.triggered.connect(controller._createNewProduct)
 
-        view.buttonBox.infoButton.clicked.connect(controller._openCurrentProductInfo)
+        view.buttonBox.editButton.clicked.connect(controller._editCurrentProduct)
         view.buttonBox.saveButton.clicked.connect(controller._saveCurrentProduct)
         view.buttonBox.removeButton.clicked.connect(controller._removeCurrentProduct)
 
@@ -200,12 +200,12 @@ class ProductController(ProductRepositoryObserver):
         else:
             logger.error('No current item!')
 
-    def _openCurrentProductInfo(self) -> None:
+    def _editCurrentProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
             product = self._repository[current.row()]
-            ProductInfoViewController.showInfo(product, self._view)
+            ProductEditorViewController.editProduct(product, self._view)
         else:
             logger.error('No current item!')
 
@@ -220,7 +220,7 @@ class ProductController(ProductRepositoryObserver):
     def _updateEnabledButtons(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
         self._view.buttonBox.saveButton.setEnabled(enabled)
-        self._view.buttonBox.infoButton.setEnabled(enabled)
+        self._view.buttonBox.editButton.setEnabled(enabled)
         self._view.buttonBox.removeButton.setEnabled(enabled)
 
     def _updateInfoText(self) -> None:

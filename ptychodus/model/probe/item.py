@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 
 from ...api.observer import Observable
-from ...api.parametric import Parameter, ParameterRepository
+from ...api.parametric import ParameterRepository
 from ...api.probe import Probe
 from .builder import ProbeBuilder
 from .multimodal import MultimodalProbeBuilder
@@ -12,10 +12,8 @@ logger = logging.getLogger(__name__)
 
 class ProbeRepositoryItem(ParameterRepository):
 
-    def __init__(self, name: Parameter[str], builder: ProbeBuilder,
-                 modesBuilder: MultimodalProbeBuilder) -> None:
+    def __init__(self, builder: ProbeBuilder, modesBuilder: MultimodalProbeBuilder) -> None:
         super().__init__('Probe')
-        self._name = name
         self._builder = builder
         self._modesBuilder = modesBuilder
         self._probe = Probe()
@@ -24,9 +22,6 @@ class ProbeRepositoryItem(ParameterRepository):
         self._addParameterRepository(modesBuilder, observe=True)
 
         self._rebuild()
-
-    def getName(self) -> str:
-        return self._name.getValue()
 
     def getProbe(self) -> Probe:
         return self._probe

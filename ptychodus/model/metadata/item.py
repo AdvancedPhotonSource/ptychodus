@@ -15,14 +15,6 @@ class MetadataRepositoryItem(ParameterRepository):
         self.detectorDistanceInMeters = self._registerRealParameter(
             'DetectorDistanceInMeters', metadata.detectorDistanceInMeters, minimum=0.)
 
-    @property
-    def probeWavelengthInMeters(self) -> float:
-        # Source: https://physics.nist.gov/cuu/Constants/index.html
-        planckConstant_eV_per_Hz = 4.135667696e-15
-        lightSpeedInMetersPerSecond = 299792458
-        hc_eVm = planckConstant_eV_per_Hz * lightSpeedInMetersPerSecond
-        return hc_eVm / self.probeEnergyInElectronVolts.getValue()
-
     def getMetadata(self) -> ProductMetadata:
         return ProductMetadata(
             name=self.name.getValue(),

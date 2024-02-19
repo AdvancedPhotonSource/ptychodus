@@ -93,7 +93,7 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         geometry = self._geometryProvider.getProbeGeometry()
 
         # central wavelength
-        wavelength = self._geometryProvider.getProbeWavelengthInMeters()
+        wavelength = self._geometryProvider.probeWavelengthInMeters
 
         # pixel size on sample plane (TODO non-square pixels are unsupported)
         dx = geometry.pixelWidthInMeters

@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ...api.observer import Observable, Observer
 from ...model.product import ProductRepositoryItem
-from ...view.product import ProductInfoDialog
+from ...view.product import ProductEditorDialog
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
@@ -18,7 +18,6 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Fresnel Number',
             'Object Plane Pixel Width [nm]',
             'Object Plane Pixel Height [nm]',
-            'Resolution Gain',  # FIXME
         ]
 
     def headerData(self,
@@ -33,21 +32,22 @@ class ProductPropertyTableModel(QAbstractTableModel):
         return result
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        value = QVariant()
-
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             if index.column() == 0:
-                value = QVariant(self._properties[index.row()])
+                return QVariant(self._properties[index.row()])
             elif index.column() == 1:
-                metadata = self._product.getMetadata()
+                geometry = self._product.getGeometry()
 
                 if index.row() == 0:
-                    probeEnergy = metadata.probeEnergyInElectronVolts.getValue()
-                    value = QVariant(f'{probeEnergy / 1000:.1f}')
-                else:
-                    value = QVariant(index.row())  # FIXME
+                    return QVariant(f'{geometry.probeWavelengthInMeters * 1.e9:.4g}')
+                elif index.row() == 1:
+                    return QVariant(f'{geometry.fresnelNumber:.4g}')
+                elif index.row() == 2:
+                    return QVariant(f'{geometry.objectPlanePixelWidthInMeters * 1.e9:.4g}')
+                elif index.row() == 3:
+                    return QVariant(f'{geometry.objectPlanePixelHeightInMeters * 1.e9:.4g}')
 
-        return value
+        return QVariant()
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._properties)
@@ -56,7 +56,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
         return len(self._header)
 
 
-class ProductInfoViewController(Observer):
+class ProductEditorViewController(Observer):
 
     def __init__(self, product: ProductRepositoryItem,
                  tableModel: ProductPropertyTableModel) -> None:
@@ -65,7 +65,7 @@ class ProductInfoViewController(Observer):
         self._tableModel = tableModel
 
     @classmethod
-    def showInfo(cls, product: ProductRepositoryItem, parent: QWidget) -> None:
+    def editProduct(cls, product: ProductRepositoryItem, parent: QWidget) -> None:
         tableModel = ProductPropertyTableModel(product)
         controller = cls(product, tableModel)
         product.addObserver(controller)
@@ -73,7 +73,7 @@ class ProductInfoViewController(Observer):
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
-        dialog = ProductInfoDialog.createInstance(parent)
+        dialog = ProductEditorDialog.createInstance(parent)
         dialog.setWindowTitle(f'Edit Product: {product.getName()}')
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)

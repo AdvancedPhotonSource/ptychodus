@@ -93,6 +93,9 @@ class ProductRepositoryItem(ParameterRepository):
     def getName(self) -> str:
         return self._metadata.name.getValue()
 
+    def setName(self, name: str) -> None:
+        self._metadata.name.setValue(name)
+
     def getMetadata(self) -> MetadataRepositoryItem:
         return self._metadata
 
@@ -172,18 +175,13 @@ class ProductRepositoryObserver(ABC):
 
 class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemObserver):
 
-    def __init__(
-        self,
-        patternSizer: PatternSizer,
-        patterns: ActiveDiffractionDataset,
-        metadataBuilder: MetadataBuilder,
-        scanRepositoryItemFactory: ScanRepositoryItemFactory,
-        probeRepositoryItemFactory: ProbeRepositoryItemFactory,
-        objectRepositoryItemFactory: ObjectRepositoryItemFactory,
-        fileReaderChooser: PluginChooser[ProductFileReader],
-        fileWriterChooser: PluginChooser[ProductFileWriter],
-    ) -> None:
-        # FIXME also need ability to initialize product components from other products
+    def __init__(self, patternSizer: PatternSizer, patterns: ActiveDiffractionDataset,
+                 metadataBuilder: MetadataBuilder,
+                 scanRepositoryItemFactory: ScanRepositoryItemFactory,
+                 probeRepositoryItemFactory: ProbeRepositoryItemFactory,
+                 objectRepositoryItemFactory: ObjectRepositoryItemFactory,
+                 fileReaderChooser: PluginChooser[ProductFileReader],
+                 fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
         super().__init__()
         self._patternSizer = patternSizer
         self._patterns = patterns
@@ -238,10 +236,10 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         nameParameter = ProductNameParameter(self, uniqueName)
 
         metadata = MetadataRepositoryItem(nameParameter, product.metadata)
-        scan = self._scanRepositoryItemFactory.create(nameParameter, product.scan)
+        scan = self._scanRepositoryItemFactory.create(product.scan)
         geometry = ProductGeometry(metadata, scan, self._patternSizer)
-        probe = self._probeRepositoryItemFactory.create(nameParameter, product.probe)
-        object_ = self._objectRepositoryItemFactory.create(nameParameter, product.object_)
+        probe = self._probeRepositoryItemFactory.create(product.probe)
+        object_ = self._objectRepositoryItemFactory.create(product.object_)
 
         item = ProductRepositoryItem(
             parent=self,
@@ -293,6 +291,9 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
                 self.insertProduct(product)
         else:
             logger.debug(f'Refusing to create product with invalid file path \"{filePath}\"')
+
+    def copyProduct(self, sourceIndex: int, destinationIndex: int) -> None:  # FIXME use this
+        print(f'Copy {sourceIndex} -> {destinationIndex}')  # FIXME
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()

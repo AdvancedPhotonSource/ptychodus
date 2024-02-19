@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
@@ -22,7 +22,7 @@ T = TypeVar('T', bound=QWidget)
 
 class RandomObjectView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Parameters', parent)
         self.numberOfLayersSpinBox = QSpinBox()
         self.layerDistanceWidget = LengthWidget.createInstance()
@@ -33,7 +33,7 @@ class RandomObjectView(QGroupBox):
         self.phaseDeviationSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> RandomObjectView:
+    def createInstance(cls, parent: QWidget | None = None) -> RandomObjectView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -51,7 +51,7 @@ class RandomObjectView(QGroupBox):
 
 class CompareObjectParametersView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Parameters', parent)
         self.name1Label = QLabel('Name 1:')
         self.name1ComboBox = QComboBox()
@@ -59,7 +59,7 @@ class CompareObjectParametersView(QGroupBox):
         self.name2ComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> CompareObjectParametersView:
+    def createInstance(cls, parent: QWidget | None = None) -> CompareObjectParametersView:
         view = cls(parent)
         view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
@@ -77,7 +77,7 @@ class CompareObjectParametersView(QGroupBox):
 
 class CompareObjectPlotView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
@@ -85,7 +85,7 @@ class CompareObjectPlotView(QWidget):
         self.axes = self.figure.add_subplot(111)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> CompareObjectPlotView:
+    def createInstance(cls, parent: QWidget | None = None) -> CompareObjectPlotView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -99,13 +99,13 @@ class CompareObjectPlotView(QWidget):
 
 class CompareObjectView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.parametersView = CompareObjectParametersView.createInstance(self)
         self.plotView = CompareObjectPlotView.createInstance(self)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> CompareObjectView:
+    def createInstance(cls, parent: QWidget | None = None) -> CompareObjectView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -119,7 +119,7 @@ class CompareObjectView(QWidget):
 
 class ObjectEditorDialog(Generic[T], QDialog):
 
-    def __init__(self, editorView: T, parent: Optional[QWidget]) -> None:
+    def __init__(self, editorView: T, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.editorView = editorView
         self.buttonBox = QDialogButtonBox()
@@ -128,7 +128,7 @@ class ObjectEditorDialog(Generic[T], QDialog):
     def createInstance(cls,
                        title: str,
                        editorView: T,
-                       parent: Optional[QWidget] = None) -> ObjectEditorDialog[T]:
+                       parent: QWidget | None = None) -> ObjectEditorDialog[T]:
         view = cls(editorView, parent)
         view.setWindowTitle(title)
 

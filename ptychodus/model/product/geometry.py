@@ -35,10 +35,16 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
             'ScanBoundingBoxMaximumYInMeters', 1.e-5)
 
     @property
+    def probeWavelengthInMeters(self) -> float:
+        # Source: https://physics.nist.gov/cuu/Constants/index.html
+        planckConstant_eV_per_Hz = 4.135667696e-15
+        lightSpeedInMetersPerSecond = 299792458
+        hc_eVm = planckConstant_eV_per_Hz * lightSpeedInMetersPerSecond
+        return hc_eVm / self._metadata.probeEnergyInElectronVolts.getValue()
+
+    @property
     def _lambdaZInSquareMeters(self) -> float:
-        lambdaInMeters = self._metadata.probeWavelengthInMeters
-        zInMeters = self._metadata.detectorDistanceInMeters.getValue()
-        return lambdaInMeters * zInMeters
+        return self.probeWavelengthInMeters * self._metadata.detectorDistanceInMeters.getValue()
 
     @property
     def objectPlanePixelWidthInMeters(self) -> float:
@@ -48,7 +54,8 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
     def objectPlanePixelHeightInMeters(self) -> float:
         return self._lambdaZInSquareMeters / self._patternSizer.getHeightInMeters()
 
-    def getFresnelNumber(self) -> float:
+    @property
+    def fresnelNumber(self) -> float:
         widthInMeters = self._patternSizer.getWidthInMeters()
         heightInMeters = self._patternSizer.getHeightInMeters()
         sizeInMeters = max(widthInMeters, heightInMeters)
@@ -67,9 +74,6 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
             bbox = expandedBBox if bbox is None else bbox.hull(expandedBBox)
 
         return bbox
-
-    def getProbeWavelengthInMeters(self) -> float:
-        return self._metadata.probeWavelengthInMeters
 
     def getProbeGeometry(self) -> ProbeGeometry:
         extent = self._patternSizer.getImageExtent()

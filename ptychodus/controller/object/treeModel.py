@@ -143,7 +143,7 @@ class ObjectTreeModel(QAbstractItemModel):
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
-                    return QVariant(item.getName())
+                    return QVariant(self._repository.getName(index.row()))
                 elif index.column() == 1:
                     return QVariant()
                 elif index.column() == 2:
@@ -165,7 +165,7 @@ class ObjectTreeModel(QAbstractItemModel):
         if index.isValid():
             parent = index.parent()
 
-            if not parent.isValid() and index.column() < 2:
+            if not parent.isValid() and index.column() in (0, 2):
                 value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -178,13 +178,12 @@ class ObjectTreeModel(QAbstractItemModel):
             parent = index.parent()
 
             if not parent.isValid():
-                item = self._repository[index.row()]
-
                 if index.column() == 0:
-                    item.setName(value)
+                    self._repository.setName(index.row(), value)
                     return True
-                elif index.column() == 1:
-                    return False  # FIXME combobox
+                elif index.column() == 2:
+                    self._repository.setBuilderByName(index.row(), value)
+                    return True
 
         return False
 
