@@ -50,7 +50,10 @@ def params():
 
 def update_cfg_from_settings(model_settings: PtychoPINNModelSettings):
     settings_registry = model_settings._settingsGroup._settingsRegistry
-    settings_dict = settings_registry.to_dict()
+    if settings_registry is not None:
+        settings_dict = settings_registry.to_dict()
+    else:
+        settings_dict = {}
     ptychopinn_settings = settings_dict.get('PtychoPINN', {})
     ptychopinn_training_settings = settings_dict.get('PtychoPINNTraining', {})
 
