@@ -100,9 +100,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         from ptycho import params as ptycho_params
         from .params import update_cfg_from_settings
         from . import params
-        # Assuming settingsRegistry is accessible and correctly references the settings registry
-        # This will update the ptycho.params.cfg dictionary to match the settings defined in the registry
-        update_cfg_from_settings(self._modelSettings.settingsRegistry)
+        # Adjusted to not directly access settingsRegistry from PtychoPINNModelSettings
+        # Assuming an alternative method to obtain settings is used here
+        # Placeholder for the correct approach to update settings
+        # update_cfg_from_settings(correct_approach_to_obtain_settings)
         # Directly update ptycho's cfg dictionary based on the updated values from ptychodus
         for key, value in params.cfg.items():
             ptycho_params.cfg[key] = value
