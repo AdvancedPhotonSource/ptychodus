@@ -69,8 +69,8 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
 
                 detector_count = int(row[DETECTOR_COUNT])
                 point = ScanPoint(
-                    x=float(row[X]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
-                    y=float(row[Y]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
+                    x=-float(row[X]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
+                    y=-float(row[Y]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
                 )
                 pointSeqMap[detector_count].append(point)
 
