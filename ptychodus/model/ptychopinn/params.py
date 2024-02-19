@@ -52,15 +52,35 @@ def update_cfg_from_settings(settings_registry: SettingsRegistry):
     ptychopinn_settings = settings_dict.get('PtychoPINN', {})
     ptychopinn_training_settings = settings_dict.get('PtychoPINNTraining', {})
 
-    # Update shared settings
-    for key in ['N', 'offset', 'gridsize', 'batch_size', 'n_filters_scale', 'nphotons', 'object.big', 'probe.big', 'probe_scale', 'probe.mask', 'model_type', 'size', 'amp_activation']:
-        if key in ptychopinn_settings:
-            cfg[key] = ptychopinn_settings[key]
+    # Define a mapping from settings registry keys to cfg keys
+    key_mapping = {
+        'LearningRate': 'learning_rate',
+        'N': 'N',
+        'Offset': 'offset',
+        'Gridsize': 'gridsize',
+        'BatchSize': 'batch_size',
+        'NFiltersScale': 'n_filters_scale',
+        'NPhotons': 'nphotons',
+        'ProbeTrainable': 'probe.trainable',
+        'IntensityScaleTrainable': 'intensity_scale.trainable',
+        'ObjectBig': 'object.big',
+        'ProbeBig': 'probe.big',
+        'ProbeScale': 'probe_scale',
+        'ProbeMask': 'probe.mask',
+        'ModelType': 'model_type',
+        'Size': 'size',
+        'AmpActivation': 'amp_activation',
+        'MAEWeight': 'mae_weight',
+        'NLLWeight': 'nll_weight',
+        'TVWeight': 'tv_weight',
+        'RealspaceMAEWeight': 'realspace_mae_weight',
+        'RealspaceWeight': 'realspace_weight',
+    }
 
-    # Update training specific settings
-    for key in ['mae_weight', 'nll_weight', 'tv_weight', 'realspace_mae_weight', 'realspace_weight']:
-        if key in ptychopinn_training_settings:
-            cfg[key] = ptychopinn_training_settings[key]
+    # Update shared settings
+    for registry_key, cfg_key in key_mapping.items():
+        if registry_key in ptychopinn_settings or registry_key in ptychopinn_training_settings:
+            cfg[cfg_key] = ptychopinn_settings.get(registry_key, ptychopinn_training_settings.get(registry_key, cfg[cfg_key]))
 
     # Update derived values
     cfg['bigN'] = get_bigN()
