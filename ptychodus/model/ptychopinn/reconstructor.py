@@ -95,6 +95,11 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
         self._fileFilterList = ['NumPy Zipped Archive (*.npz)']
         self.fileFilterList = ['NumPy Arrays (*.npy)', 'NumPy Zipped Archive (*.npz)']
+        self._initialize_ptycho()
+
+    def _initialize_ptycho(self) -> None:
+        from ptychodus.model.ptychopinn.params import update_cfg_from_settings
+        update_cfg_from_settings(self._modelSettings.settingsRegistry)
 
     @property
     def name(self) -> str:
