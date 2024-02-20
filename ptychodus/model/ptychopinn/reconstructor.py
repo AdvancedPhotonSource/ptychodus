@@ -110,43 +110,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         # Adjusted to match the API specification and example implementation. Actual logic depends on the model details.
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        objectInterpolator = parameters.objectInterpolator
-
-        if self._patternBuffer.isZeroSized:
-            diffractionPatternExtent = parameters.diffractionPatternExtent
-            maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
-
-            channels = 2 if self._enableAmplitude else 1
-            self._patternBuffer = PatternCircularBuffer(diffractionPatternExtent, maximumSize)
-            self._objectPatchBuffer = ObjectPatchCircularBuffer(diffractionPatternExtent, channels, maximumSize)
-            # Ensure the probe data is also considered for training
-            self._probeData = parameters.probeArray
-
-        for scanIndex, scanPoint in parameters.scan.items():
-            objectPatch = objectInterpolator.getPatch(scanPoint, parameters.probeExtent)
-            self._objectPatchBuffer.append(objectPatch.array)
-
-        for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
-            self._patternBuffer.append(pattern)
-
-        # Instantiate PtychoData using the same values for 'nominal' and 'true' coordinates
-        coords = numpy.array(list(parameters.scan.values()))
-        self._ptychoDataContainer = PtychoDataContainer(
-            X=self._patternBuffer.getBuffer(),
-            Y_I=None,  # Placeholder, actual values to be computed during training
-            Y_phi=None,  # Placeholder, actual values to be computed during training
-            norm_Y_I=None,  # Placeholder, actual values to be computed during training
-            YY_full=None,  # Placeholder, actual values to be computed during training
-            coords_nominal=coords,
-            coords_true=coords,
-            nn_indices=None,  # Placeholder, actual values to be computed during training
-            global_offsets=None,  # Placeholder, actual values to be computed during training
-            local_offsets=None  # Placeholder, actual values to be computed during training
-        )
-        # Example of how to handle the probe data, adjust based on actual model requirements
-        if self._probeData is not None:
-            # Process or directly use self._probeData as needed for your model
-            pass
+        # This method will be updated in the next steps to use loader.RawData.from_coords_without_pc
+        # to load a training dataset from the pattern buffer.
+        pass
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self.fileFilterList
