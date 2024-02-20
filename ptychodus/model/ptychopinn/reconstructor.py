@@ -116,7 +116,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         # This method will be updated in the next steps to use loader.RawData.from_coords_without_pc
         # to load a training dataset from the pattern buffer.
-        from .loader import PtychoDataContainer
+        from ptycho.loader import PtychoDataContainer
         diffractionPatterns = self._patternBuffer.getBuffer()
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
@@ -127,7 +127,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             ycoords=ycoords,
             diff3d=diffractionPatterns,
             probeGuess=probeGuess,
-            scan_index=numpy.arange(len(diffractionPatterns)),
+            scan_index=numpy.zeros(len(diffractionPatterns)),# TODO assuming all patches are from the same object
             objectGuess=objectGuess
         )
 
