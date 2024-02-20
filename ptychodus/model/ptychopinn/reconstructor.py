@@ -116,7 +116,25 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         # This method will be updated in the next steps to use loader.RawData.from_coords_without_pc
         # to load a training dataset from the pattern buffer.
-        pass
+        from .loader import PtychoDataContainer
+        diffractionPatterns = self._patternBuffer.getBuffer()
+        scanCoordinates = numpy.array(list(parameters.scan.values()))
+        xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
+        probeGuess = parameters.probeArray
+        objectGuess = None
+        if self._enableAmplitude:
+            objectPatches = self._objectPatchBuffer.getBuffer()
+            amplitude = numpy.mean(objectPatches[:, 1, :, :], axis=0)
+            phase = numpy.mean(objectPatches[:, 0, :, :], axis=0)
+            objectGuess = amplitude * numpy.exp(1j * phase)
+        self._ptychoDataContainer = PtychoDataContainer.from_raw_data_without_pc(
+            xcoords=xcoords,
+            ycoords=ycoords,
+            diff3d=diffractionPatterns,
+            probeGuess=probeGuess,
+            scan_index=numpy.arange(len(diffractionPatterns)),
+            objectGuess=objectGuess
+        )
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self.fileFilterList
