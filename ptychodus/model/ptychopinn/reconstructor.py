@@ -154,10 +154,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         ptycho_params.cfg.update(cfg)
 
     def train(self) -> Plot2D:
-        # Detailed TODO: Implement the model training logic specific to PtychoPINN
-        # This should include initializing the model, preparing the data, running the training loop,
-        # and validating the model. The specifics of these steps depend on the PtychoPINN architecture
-        # and training procedure, which are not detailed here.
+        # The training dataset has been loaded using the PtychoDataContainer.from_raw_data_without_pc method,
+        # with the entire ground truth object used as the objectGuess parameter. The next steps involve
+        # initializing the PtychoPINN model, preparing the loaded dataset, running the training loop,
+        # and validating the model's performance.
         #
         # After training, generate a Plot2D object to visualize the training progress, such as loss over epochs.
         # This visualization is crucial for understanding the training dynamics and evaluating the model's performance.
