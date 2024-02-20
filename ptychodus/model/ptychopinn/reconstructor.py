@@ -121,12 +121,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         scanCoordinates = numpy.array(list(parameters.scan.values()))
         xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
         probeGuess = parameters.probeArray
-        objectGuess = None
-        if self._enableAmplitude:
-            objectPatches = self._objectPatchBuffer.getBuffer()
-            amplitude = numpy.mean(objectPatches[:, 1, :, :], axis=0)
-            phase = numpy.mean(objectPatches[:, 0, :, :], axis=0)
-            objectGuess = amplitude * numpy.exp(1j * phase)
+        objectGuess = parameters.objectInterpolator.getArray()
         self._ptychoDataContainer = PtychoDataContainer.from_raw_data_without_pc(
             xcoords=xcoords,
             ycoords=ycoords,
