@@ -114,14 +114,6 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         objectPatches = self._objectPatchBuffer.getBuffer()
         # Extract scan coordinates from the ReconstructInput parameter
         scanCoordinates = numpy.array(list(parameters.scan.values()))
-        # Adjusted to match the API specification and example implementation. Actual logic depends on the model details.
-    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        # Extract diffraction patterns from the pattern buffer
-        diffractionPatterns = self._patternBuffer.getBuffer()
-        # Extract object patches (amplitude and phase) from the object patch buffer
-        objectPatches = self._objectPatchBuffer.getBuffer()
-        # Extract scan coordinates from the ReconstructInput parameter
-        scanCoordinates = numpy.array(list(parameters.scan.values()))
         # This method will be updated in the next steps to use loader.RawData.from_coords_without_pc
         # to load a training dataset from the pattern buffer.
         pass
