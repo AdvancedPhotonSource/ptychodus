@@ -154,6 +154,8 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         ptycho_params.cfg.update(cfg)
 
     def train(self) -> Plot2D:
+        if self._ptychoDataContainer is None:
+            raise ValueError("Training data has not been ingested. Please call ingestTrainingData() before training.")
         # The training dataset has been loaded using the PtychoDataContainer.from_raw_data_without_pc method,
         # with the entire ground truth object used as the objectGuess parameter. The next steps involve
         # initializing the PtychoPINN model, preparing the loaded dataset, running the training loop,
