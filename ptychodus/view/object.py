@@ -49,7 +49,7 @@ class RandomObjectView(QGroupBox):
         return view
 
 
-class CompareObjectParametersView(QGroupBox):
+class FourierRingCorrelationParametersView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Parameters', parent)
@@ -59,7 +59,7 @@ class CompareObjectParametersView(QGroupBox):
         self.name2ComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> CompareObjectParametersView:
+    def createInstance(cls, parent: QWidget | None = None) -> FourierRingCorrelationParametersView:
         view = cls(parent)
         view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
@@ -75,46 +75,39 @@ class CompareObjectParametersView(QGroupBox):
         return view
 
 
-class CompareObjectPlotView(QWidget):
+class FourierRingCorrelationDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
+        self.parametersView = FourierRingCorrelationParametersView.createInstance()
         self.figure = Figure()
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
+        self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> CompareObjectPlotView:
+    def createInstance(cls, parent: QWidget | None = None) -> FourierRingCorrelationDialog:
         view = cls(parent)
+        view.setWindowTitle('Fourier Ring Correlation')
+
+        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
+        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.parametersView)
         layout.addWidget(view.navigationToolbar)
         layout.addWidget(view.figureCanvas)
+        layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view
 
-
-class CompareObjectView(QWidget):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.parametersView = CompareObjectParametersView.createInstance(self)
-        self.plotView = CompareObjectPlotView.createInstance(self)
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> CompareObjectView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.parametersView)
-        layout.addWidget(view.plotView)
-        view.setLayout(layout)
-
-        return view
+    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
+            self.accept()
+        else:
+            self.reject()
 
 
 class ObjectEditorDialog(Generic[T], QDialog):

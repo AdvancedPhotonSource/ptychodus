@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QGridLayout,
-                             QHBoxLayout, QLabel, QMenu, QPushButton, QTableView, QTreeView,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QHBoxLayout, QMenu, QPushButton, QTableView, QTreeView, QVBoxLayout,
+                             QWidget)
 
 
 class RepositoryButtonBox(QWidget):
@@ -39,9 +39,7 @@ class RepositoryItemCopierDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.copyLabel = QLabel('Copy:')
         self.sourceComboBox = QComboBox()
-        self.directionLabel = QLabel('\u2192')
         self.destinationComboBox = QComboBox()
         self.buttonBox = QDialogButtonBox()
 
@@ -49,19 +47,15 @@ class RepositoryItemCopierDialog(QDialog):
     def createInstance(cls, parent: QWidget | None = None) -> RepositoryItemCopierDialog:
         view = cls(parent)
 
-        layout = QGridLayout()
-        layout.addWidget(view.copyLabel, 0, 0)
-        layout.addWidget(view.sourceComboBox, 0, 1)
-        layout.addWidget(view.directionLabel, 0, 2)
-        layout.addWidget(view.destinationComboBox, 0, 3)
-        layout.addWidget(view.buttonBox, 1, 0, 1, 4)
-        layout.setColumnStretch(1, 1)
-        layout.setColumnStretch(3, 1)
-        view.setLayout(layout)
-
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+
+        layout = QFormLayout()
+        layout.addRow('From:', view.sourceComboBox)
+        layout.addRow('To:', view.destinationComboBox)
+        layout.addRow(view.buttonBox)
+        view.setLayout(layout)
 
         return view
 

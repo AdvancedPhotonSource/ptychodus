@@ -48,11 +48,9 @@ class ControllerCore:
                                                                    self._fileDialogFactory)
         # FIXME self._scanController = ScanController.createInstance(model.scanRepositoryPresenter, view.scanView, view.scanPlotView, self._fileDialogFactory)
         # FIXME self._probeController = ProbeController.createInstance(model.apparatusPresenter, model.probeRepositoryPresenter, model.probeImagePresenter, view.probeView, view.probeImageView, self._fileDialogFactory)
-        self._objectController = ObjectController.createInstance(model.objectRepository,
-                                                                 model.objectImagePresenter,
-                                                                 view.objectView,
-                                                                 view.objectImageView,
-                                                                 self._fileDialogFactory)
+        self._objectController = ObjectController.createInstance(
+            model.objectRepository, model.objectImagePresenter, model.fourierRingCorrelator,
+            view.objectView, view.objectImageView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,

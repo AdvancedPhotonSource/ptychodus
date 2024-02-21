@@ -5,14 +5,17 @@ from PyQt5.QtCore import QModelIndex, QStringListModel, Qt
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
 
 from ...api.observer import SequenceObserver
+from ...model.analysis import FourierRingCorrelator
 from ...model.image import ImagePresenter
 from ...model.object import ObjectRepositoryItem
 from ...model.product import ObjectRepository
 from ...view.image import ImageView
-from ...view.repository import RepositoryItemCopierDialog, RepositoryTreeView
+from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
+from .frc import FourierRingCorrelationViewController
+from .listModel import ObjectListModel
 from .random import RandomObjectViewController
 from .treeModel import ObjectTreeModel
 
@@ -22,25 +25,31 @@ logger = logging.getLogger(__name__)
 class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
     def __init__(self, repository: ObjectRepository, imagePresenter: ImagePresenter,
-                 view: RepositoryTreeView, imageView: ImageView,
-                 fileDialogFactory: FileDialogFactory, treeModel: ObjectTreeModel) -> None:
+                 correlator: FourierRingCorrelator, view: RepositoryTreeView, imageView: ImageView,
+                 fileDialogFactory: FileDialogFactory, listModel: ObjectListModel,
+                 treeModel: ObjectTreeModel) -> None:
         super().__init__()
         self._repository = repository
         self._imagePresenter = imagePresenter
+        self._correlator = correlator
         self._view = view
         self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
+        self._listModel = listModel
         self._treeModel = treeModel
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
 
     @classmethod
     def createInstance(cls, repository: ObjectRepository, imagePresenter: ImagePresenter,
-                       view: RepositoryTreeView, imageView: ImageView,
+                       correlator: FourierRingCorrelator, view: RepositoryTreeView,
+                       imageView: ImageView,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
+        listModel = ObjectListModel(repository)
         treeModel = ObjectTreeModel(repository)
-        controller = cls(repository, imagePresenter, view, imageView, fileDialogFactory, treeModel)
+        controller = cls(repository, imagePresenter, correlator, view, imageView,
+                         fileDialogFactory, listModel, treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -60,15 +69,15 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         copyAction.triggered.connect(controller._copyToCurrentObject)
 
         view.copierDialog.setWindowTitle('Object Copier')
-        view.copierDialog.sourceComboBox.setModel(treeModel)
-        view.copierDialog.destinationComboBox.setModel(treeModel)
+        view.copierDialog.sourceComboBox.setModel(listModel)
+        view.copierDialog.destinationComboBox.setModel(listModel)
         view.copierDialog.finished.connect(controller._finishCopyingObject)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentObject)
         view.buttonBox.saveButton.clicked.connect(controller._saveCurrentObject)
 
-        compareAction = view.buttonBox.analyzeMenu.addAction('Compare...')
-        compareAction.triggered.connect(controller._compareCurrentObject)
+        frcAction = view.buttonBox.analyzeMenu.addAction('Fourier Ring Correlation...')
+        frcAction.triggered.connect(controller._analyzeFRC)
 
         return controller
 
@@ -146,13 +155,16 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)
 
-    def _compareCurrentObject(self) -> None:
+    def _analyzeFRC(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
             return
 
-        print(f'Compare {itemIndex}')  # FIXME
+        frcDialog = FourierRingCorrelationViewController.analyze(self._correlator, self._listModel,
+                                                                 self._view)
+        frcDialog.parametersView.name2ComboBox.setCurrentIndex(itemIndex)
+        frcDialog.open()
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
@@ -175,10 +187,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 self._imagePresenter.setArray(object_.array, object_.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ObjectRepositoryItem) -> None:
+        self._listModel.insertItem(index, item)
         self._treeModel.insertItem(index, item)
 
     def handleItemChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+        self._listModel.updateItem(index, item)
         self._treeModel.updateItem(index, item)
 
     def handleItemRemoved(self, index: int, item: ObjectRepositoryItem) -> None:
+        self._listModel.removeItem(index, item)
         self._treeModel.removeItem(index, item)

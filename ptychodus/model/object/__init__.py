@@ -8,6 +8,7 @@ from .random import RandomObjectBuilder
 from .stitcher import ObjectStitcher
 
 __all__ = [
+    'FourierRingCorrelator',
     'ObjectBuilder',
     'ObjectBuilderFactory',
     'ObjectCore',
