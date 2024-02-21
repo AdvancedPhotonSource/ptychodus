@@ -16,7 +16,7 @@ from ..data import FileDialogFactory
 from ..image import ImageController
 from .frc import FourierRingCorrelationViewController
 from .listModel import ObjectListModel
-from .random import RandomObjectViewController
+from .random import RandomObjectEditorViewController
 from .treeModel import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if itemIndex < 0:
             return
 
-        print(f'Edit {itemIndex}')  # FIXME
+        print(f'Edit {itemIndex}')  # FIXME dialog.setWindowTitle(item.getName()); dialog.open()
 
     def _saveCurrentObject(self) -> None:
         itemIndex = self._getCurrentItemIndex()

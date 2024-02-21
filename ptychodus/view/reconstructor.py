@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import Optional
 
-from PyQt5.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QLabel, QPushButton, QScrollArea,
+from PyQt5.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QGridLayout, QGroupBox, QLabel,
+                             QPlainTextEdit, QProgressBar, QPushButton, QScrollArea,
                              QStackedWidget, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 
 class ReconstructorView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Parameters', parent)
         self.algorithmLabel = QLabel('Algorithm:')
         self.algorithmComboBox = QComboBox()
@@ -25,7 +25,7 @@ class ReconstructorView(QGroupBox):
         self.reconstructSplitButton = QPushButton('Split')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorView:
+    def createInstance(cls, parent: QWidget | None = None) -> ReconstructorView:
         view = cls(parent)
 
         view.ingestButton.setToolTip('Ingest Training Data')
@@ -55,16 +55,43 @@ class ReconstructorView(QGroupBox):
         return view
 
 
+class ReconstructorProgressDialog(QDialog):
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__(parent)
+        self.textEdit = QPlainTextEdit()
+        self.progressBar = QProgressBar()
+        self.buttonBox = QDialogButtonBox()
+
+    @classmethod
+    def createInstance(cls, parent: QWidget | None = None) -> ReconstructorProgressDialog:
+        dialog = cls(parent)
+        dialog.setWindowTitle('Reconstruction Progress')
+        dialog.buttonBox.addButton(QDialogButtonBox.Ok)
+        dialog.buttonBox.accepted.connect(dialog.accept)
+        dialog.buttonBox.addButton(QDialogButtonBox.Cancel)
+        dialog.buttonBox.rejected.connect(dialog.reject)
+
+        layout = QVBoxLayout()
+        layout.addWidget(dialog.textEdit)
+        layout.addWidget(dialog.progressBar)
+        layout.addWidget(dialog.buttonBox)
+        dialog.setLayout(layout)
+
+        return dialog
+
+
 class ReconstructorParametersView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.reconstructorView = ReconstructorView.createInstance()
         self.stackedWidget = QStackedWidget()
         self.scrollArea = QScrollArea()
+        self.progressDialog = ReconstructorProgressDialog.createInstance()  # FIXME use this
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorParametersView:
+    def createInstance(cls, parent: QWidget | None = None) -> ReconstructorParametersView:
         view = cls(parent)
 
         view.scrollArea.setWidgetResizable(True)
@@ -82,7 +109,7 @@ class ReconstructorParametersView(QWidget):
 
 class ReconstructorPlotView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
@@ -90,7 +117,7 @@ class ReconstructorPlotView(QWidget):
         self.axes = self.figure.add_subplot(111)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ReconstructorPlotView:
+    def createInstance(cls, parent: QWidget | None = None) -> ReconstructorPlotView:
         view = cls(parent)
 
         layout = QVBoxLayout()
