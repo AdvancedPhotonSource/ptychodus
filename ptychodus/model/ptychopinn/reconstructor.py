@@ -155,21 +155,15 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def train(self) -> Plot2D:
         if self._ptychoDataContainer is None:
-            raise ValueError("Training data has not been ingested. Please call ingestTrainingData() before training.")
-        # The training dataset has been loaded using the PtychoDataContainer.from_raw_data_without_pc method,
-        # with the entire ground truth object used as the objectGuess parameter. The next steps involve
-        # initializing the PtychoPINN model, preparing the loaded dataset, running the training loop,
-        # and validating the model's performance.
-        #
-        # After training, generate a Plot2D object to visualize the training progress, such as loss over epochs.
-        # This visualization is crucial for understanding the training dynamics and evaluating the model's performance.
-        #
-        # Placeholder for training logic:
-        # Initialize model, prepare data, run training loop, validate model
-        #
-        # Placeholder for generating Plot2D object:
-        trainingLoss = [0]  # Replace with actual training loss values
-        validationLoss = [0]  # Replace with actual validation loss values
+            print("Training data has not been ingested. running _initialize_ptycho().")
+            self._initialize_ptycho()
+        else:
+            print("Training data has already been ingested. Not running _initialize_ptycho().")
+        from ptycho import train_pinn
+        model_instance, history =  train_pinn.train(self._ptychoDataContainer)
+        # TODO save the tensorflow model instance to file
+        trainingLoss = history.history['loss']
+        validationLoss = history.history['val_loss']  # Replace with actual validation loss values
         validationLossSeries = PlotSeries(label='Validation Loss', values=validationLoss)
         trainingLossSeries = PlotSeries(label='Training Loss', values=trainingLoss)
         seriesX = PlotSeries(label='Epoch', values=[*range(len(trainingLoss))])
