@@ -11,6 +11,7 @@ from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableR
 import numpy
 import numpy.typing
 import logging
+from ptycho.loader import PtychoDataContainer
 
 FloatArrayType = numpy.typing.NDArray[numpy.float32]
 logger = logging.getLogger(__name__)
@@ -76,15 +77,13 @@ class ObjectPatchCircularBuffer:
 
     def getBuffer(self) -> FloatArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
-from .loader import PtychoData, PtychoDataContainer
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
-    def __init__(self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI, *, enableAmplitude: bool) -> None:
+    def __init__(self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._objectAPI = objectAPI
-        self._enableAmplitude = enableAmplitude
         self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
         ptychopinnVersion = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinnVersion}')
@@ -103,7 +102,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     @property
     def name(self) -> str:
-        return 'AmplitudePhase' if self._enableAmplitude else 'PhaseOnly'
+        return 'AmplitudePhase' 
 
     # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
 
@@ -177,3 +176,5 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         logger.debug('Clearing training data...')
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
+    def reconstruct(self, *args, **kwargs):
+        raise NotImplementedError("Reconstruct method is not implemented yet.")

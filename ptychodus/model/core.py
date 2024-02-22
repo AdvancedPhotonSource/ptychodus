@@ -31,6 +31,7 @@ from .metadata import MetadataPresenter
 from .object import ObjectCore, ObjectPresenter, ObjectRepositoryPresenter
 from .probe import ApparatusPresenter, ProbeCore, ProbePresenter, ProbeRepositoryPresenter
 from .ptychonn import PtychoNNReconstructorLibrary
+from .ptychopinn import PtychoPINNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .rpc import RPCMessageService
@@ -114,6 +115,8 @@ class ModelCore:
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
+        self.ptychopinnReconstructorLibrary = PtychoPINNReconstructorLibrary.createInstance(
+            self.settingsRegistry, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
@@ -125,6 +128,7 @@ class ModelCore:
             [
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
+                self.ptychopinnReconstructorLibrary,
                 self.ptychopyReconstructorLibrary,
             ],
         )
