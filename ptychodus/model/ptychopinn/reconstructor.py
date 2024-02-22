@@ -181,22 +181,35 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 class PtychoPINNReconstructorLibrary:
     def __init__(self, model_path: str):
         self.model_path = model_path
-        # TODO: Load the model from the specified path
+        # TODO: Implement the logic to load the PtychoPINN model from the specified path.
+        # This involves using TensorFlow or a similar library to load the model architecture
+        # and weights from `model_path`. Ensure that the model is correctly initialized and
+        # ready for performing reconstructions.
         self.model = self.load_model(model_path)
 
     @classmethod
     def createInstance(cls, model_path: str):
-        # TODO: This method creates and returns an instance of PtychoPINNReconstructorLibrary
+        # TODO: Implement the factory method to create and return an instance of
+        # PtychoPINNReconstructorLibrary. This method should take a `model_path` argument,
+        # which specifies the location of the saved model, and use it to instantiate the class.
         return cls(model_path)
 
     def load_model(self, path: str):
-        # TODO: Implement model loading logic
+        # TODO: Define the method to load the model from a given path. This method should
+        # support loading the model architecture and weights from the file specified by `path`.
+        # Consider using TensorFlow's `load_model` function or an equivalent in other libraries.
         pass
 
     def reconstruct(self, input_data):
-        # TODO: Implement reconstruction logic using the loaded model
+        # TODO: Implement the reconstruction logic using the loaded model. This method should
+        # take input data, preprocess it as required by the model, perform inference to
+        # reconstruct the image or pattern, and then postprocess the output as needed.
+        # Ensure the input data is correctly shaped and scaled for the model.
         pass
 
     def save_results(self, results, output_path: str):
-        # TODO: Implement logic for saving the reconstruction results to a file
+        # TODO: Implement the logic to save the reconstruction results to a file. This method
+        # should take the results of the reconstruction and save them to `output_path`.
+        # Consider the format in which the results should be saved (e.g., images, numpy arrays)
+        # and use appropriate libraries (e.g., PIL for images, numpy for arrays) to save the data.
         pass
