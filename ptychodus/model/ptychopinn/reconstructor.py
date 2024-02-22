@@ -188,7 +188,9 @@ class PtychoPINNReconstructorLibrary:
         self.model = self.load_model(model_path)
 
     @classmethod
-    def createInstance(cls, model_path: str):
+    def createInstance(cls, *args, **kwargs):
+        # Assuming the first argument is always model_path based on the current usage pattern.
+        model_path = args[0] if args else kwargs.get('model_path', '')
         # TODO: Implement the factory method to create and return an instance of
         # PtychoPINNReconstructorLibrary. This method should take a `model_path` argument,
         # which specifies the location of the saved model, and use it to instantiate the class.
