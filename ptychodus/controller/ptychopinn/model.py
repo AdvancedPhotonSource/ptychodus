@@ -24,7 +24,7 @@ class PtychoPINNModelParametersController(Observer):
 
         view.modelStateLineEdit.editingFinished.connect(controller._syncModelStateFilePathToModel)
         view.modelStateBrowseButton.clicked.connect(controller._openModelState)
-        view.gridSizeSpinBox.valueChanged.connect(presenter.setGridSize)
+        view.gridSizeSpinBox.valueChanged.connect(presenter.setGridsize)
         view.nFiltersScaleSpinBox.valueChanged.connect(presenter.setNFiltersScale)
         view.nPhotonsLineEdit.editingFinished.connect(lambda: presenter.setNPhotons(view.nPhotonsLineEdit.value()))
         view.probeTrainableCheckBox.toggled.connect(presenter.setProbeTrainable)
@@ -60,7 +60,7 @@ class PtychoPINNModelParametersController(Observer):
         else:
             self._view.modelStateLineEdit.clear()
 
-        self._view.gridSizeSpinBox.setValue(self._presenter.getGridSize())
+        self._view.gridSizeSpinBox.setValue(self._presenter.getGridsize())
         self._view.nFiltersScaleSpinBox.setValue(self._presenter.getNFiltersScale())
         self._view.nPhotonsLineEdit.setValue(self._presenter.getNPhotons())
         self._view.probeTrainableCheckBox.setChecked(self._presenter.isProbeTrainable())

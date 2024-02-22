@@ -24,6 +24,12 @@ class PtychoPINNModelPresenter(Observable, Observer):
         self._settings = settings
         self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
 
+    def __init__(self, settings: PtychoPINNModelSettings) -> None:
+        super().__init__()
+        self._settings = settings
+        self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
+        self._stateFilePath: Path = Path()
+
     @classmethod
     def createInstance(cls, settings: PtychoPINNModelSettings) -> PtychoPINNModelPresenter:
         presenter = cls(settings)
@@ -62,8 +68,20 @@ class PtychoPINNModelPresenter(Observable, Observer):
         return Interval[int](1, self.MAX_INT)
 
 
+    def setStateFilePath(self, path: Path) -> None:
+        self._stateFilePath = path
+        self.notifyObservers()
+
+    def getStateFilePath(self) -> Path:
+        return self._stateFilePath
+
     def getGridsize(self) -> int:
         return self._settings.gridsize.value
+
+    def setGridsize(self, value: int) -> None:
+        if 1 <= value <= self.MAX_INT:
+            self._settings.gridsize.value = value
+            self.notifyObservers()
 
     def setGridsize(self, value: int) -> None:
         self._settings.gridsize.value = value
