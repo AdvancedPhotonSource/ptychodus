@@ -146,6 +146,59 @@ class PtychoPINNModelPresenter(Observable, Observer):
 
 
 class PtychoPINNTrainingPresenter(Observable, Observer):
+    def setValidationSetFractionalSize(self, value: Decimal) -> None:
+        self._settings.validationSetFractionalSize.value = value
+
+    def setMaximumLearningRate(self, value: Decimal) -> None:
+        self._settings.maximumLearningRate.value = value
+
+    def setMinimumLearningRate(self, value: Decimal) -> None:
+        self._settings.minimumLearningRate.value = value
+
+    def setTrainingEpochs(self, value: int) -> None:
+        self._settings.trainingEpochs.value = value
+
+    def setMaeWeight(self, value: Decimal) -> None:
+        self._settings.maeWeight.value = value
+
+    def setNllWeight(self, value: Decimal) -> None:
+        self._settings.nllWeight.value = value
+
+    def setRealspaceMAEWeight(self, value: Decimal) -> None:
+        self._settings.realspaceMAEWeight.value = value
+
+    def setRealspaceWeight(self, value: Decimal) -> None:
+        self._settings.realspaceWeight.value = value
+
+    def getValidationSetFractionalSize(self) -> Decimal:
+        return self._settings.validationSetFractionalSize.value
+
+    def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('0'), Decimal('1'))
+
+    def getMaximumLearningRate(self) -> Decimal:
+        return self._settings.maximumLearningRate.value
+
+    def getMinimumLearningRate(self) -> Decimal:
+        return self._settings.minimumLearningRate.value
+
+    def getTrainingEpochs(self) -> int:
+        return self._settings.trainingEpochs.value
+
+    def getTrainingEpochsLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getMaeWeight(self) -> Decimal:
+        return self._settings.maeWeight.value
+
+    def getNllWeight(self) -> Decimal:
+        return self._settings.nllWeight.value
+
+    def getRealspaceMAEWeight(self) -> Decimal:
+        return self._settings.realspaceMAEWeight.value
+
+    def getRealspaceWeight(self) -> Decimal:
+        return self._settings.realspaceWeight.value
     MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: PtychoPINNTrainingSettings) -> None:
