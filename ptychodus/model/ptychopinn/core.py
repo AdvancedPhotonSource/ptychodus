@@ -61,11 +61,6 @@ class PtychoPINNModelPresenter(Observable, Observer):
     def getSizeLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
-    def getOffset(self) -> int:
-        return self._settings.offset.value
-
-    def setOffset(self, value: int) -> None:
-        self._settings.offset.value = value
 
     def getGridsize(self) -> int:
         return self._settings.gridsize.value
@@ -129,17 +124,7 @@ class PtychoPINNModelPresenter(Observable, Observer):
     def setProbeMask(self, enabled: bool) -> None:
         self._settings.probe_mask.value = enabled
 
-    def getModelType(self) -> str:
-        return self._settings.model_type.value
 
-    def setModelType(self, model_type: str) -> None:
-        self._settings.model_type.value = model_type
-
-    def getSize(self) -> int:
-        return self._settings.size.value
-
-    def setSize(self, value: int) -> None:
-        self._settings.size.value = value
 
     def getAmpActivation(self) -> str:
         return self._settings.amp_activation.value
