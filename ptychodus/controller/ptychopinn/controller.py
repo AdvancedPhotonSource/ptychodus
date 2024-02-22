@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ...model.ptychopinn import PtychoPINNModelPresenter, PtychoPINNTrainingPresenter
+from ptychodus.model.ptychopinn.core import PtychoPINNModelPresenter, PtychoPINNTrainingPresenter
 from ...view.ptychopinn import PtychoPINNParametersView
 from ..data import FileDialogFactory
 from .model import PtychoPINNModelParametersController

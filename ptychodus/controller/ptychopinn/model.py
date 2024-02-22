@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ...api.observer import Observable, Observer
-from ...model.ptychopinn import PtychoPINNModelPresenter
+from ptychodus.model.ptychopinn.core import PtychoPINNModelPresenter
 from ...view.ptychopinn import PtychoPINNModelParametersView
 from ..data import FileDialogFactory
 

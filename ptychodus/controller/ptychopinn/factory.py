@@ -2,7 +2,7 @@ from ..reconstructor import ReconstructorViewControllerFactory
 
 from PyQt5.QtWidgets import QWidget
 
-from ...model.ptychopinn import PtychoPINNReconstructorLibrary
+from ptychodus.model.ptychopinn.core import PtychoPINNReconstructorLibrary
 from ...view.ptychopinn import PtychoPINNParametersView
 from ..data import FileDialogFactory
 from .controller import PtychoPINNParametersController
