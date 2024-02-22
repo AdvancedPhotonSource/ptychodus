@@ -176,3 +176,5 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         logger.debug('Clearing training data...')
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
+    def reconstruct(self, *args, **kwargs):
+        raise NotImplementedError("Reconstruct method is not implemented yet.")
