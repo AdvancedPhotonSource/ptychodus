@@ -112,11 +112,11 @@ class ModelCore:
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
+        self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
+            self.settingsRegistry, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopinnReconstructorLibrary = PtychoPINNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
-            self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
-        self.ptychopinnReconstructorLibrary = PtychoPINNReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
@@ -127,6 +127,7 @@ class ModelCore:
             [
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
+                self.ptychopinnReconstructorLibrary,
                 self.ptychopyReconstructorLibrary,
             ],
         )
