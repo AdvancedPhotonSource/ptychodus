@@ -4,7 +4,7 @@ from pathlib import Path
 import logging
 
 from ...api.observer import Observable, Observer
-from ...model.ptychopinn import PtychoPINNTrainingPresenter
+from ptychodus.model.ptychopinn.core import PtychoPINNTrainingPresenter
 from ...view.ptychopinn import PtychoPINNOutputParametersView, PtychoPINNTrainingParametersView
 from ..data import FileDialogFactory
 
