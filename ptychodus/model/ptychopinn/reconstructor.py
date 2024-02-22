@@ -179,8 +179,11 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def reconstruct(self, *args, **kwargs):
         raise NotImplementedError("Reconstruct method is not implemented yet.")
 class PtychoPINNReconstructorLibrary:
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, settingsRegistry, objectAPI, isDeveloperModeEnabled: bool):
         self.model_path = model_path
+        self.settingsRegistry = settingsRegistry
+        self.objectAPI = objectAPI
+        self.isDeveloperModeEnabled = isDeveloperModeEnabled
         # TODO: Implement the logic to load the PtychoPINN model from the specified path.
         # This involves using TensorFlow or a similar library to load the model architecture
         # and weights from `model_path`. Ensure that the model is correctly initialized and
@@ -188,7 +191,8 @@ class PtychoPINNReconstructorLibrary:
         self.model = self.load_model(model_path)
 
     @classmethod
-    def createInstance(cls, *args, **kwargs):
+    def createInstance(cls, model_path: str, settingsRegistry, objectAPI, isDeveloperModeEnabled: bool):
+        return cls(model_path, settingsRegistry, objectAPI, isDeveloperModeEnabled)
         # Assuming the first argument is always model_path based on the current usage pattern.
         model_path = args[0] if args else kwargs.get('model_path', '')
         # TODO: Implement the factory method to create and return an instance of
