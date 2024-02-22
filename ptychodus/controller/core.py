@@ -10,12 +10,12 @@ from .data import FileDialogFactory
 from .memory import MemoryController
 from .object import ObjectController
 from .patterns import PatternsController
-#from .probe import ProbeController
+from .probe import ProbeController
 from .product import ProductController
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import ReconstructorController
-#from .scan import ScanController
+# FIXME from .scan import ScanController
 from .settings import SettingsController
 from .tike import TikeViewControllerFactory
 from .workflow import WorkflowController
@@ -47,7 +47,10 @@ class ControllerCore:
                                                                    view.productView,
                                                                    self._fileDialogFactory)
         # FIXME self._scanController = ScanController.createInstance(model.scanRepositoryPresenter, view.scanView, view.scanPlotView, self._fileDialogFactory)
-        # FIXME self._probeController = ProbeController.createInstance(model.apparatusPresenter, model.probeRepositoryPresenter, model.probeImagePresenter, view.probeView, view.probeImageView, self._fileDialogFactory)
+        self._probeController = ProbeController.createInstance(model.probeRepository,
+                                                               model.probeImagePresenter,
+                                                               view.probeView, view.probeImageView,
+                                                               self._fileDialogFactory)
         self._objectController = ObjectController.createInstance(
             model.objectRepository, model.objectImagePresenter, model.fourierRingCorrelator,
             view.objectView, view.objectImageView, self._fileDialogFactory)

@@ -8,7 +8,7 @@ from typing import Any, TypeAlias
 import numpy
 import numpy.typing
 
-from .patterns import ImageExtent
+from .patterns import ImageExtent, PixelGeometry
 
 ProbeArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
@@ -53,6 +53,16 @@ class ProbeGeometryProvider(ABC):
 
 class Probe:
 
+    @staticmethod
+    def _calculateModeRelativePower(array: ProbeArrayType) -> Sequence[float]:
+        power = numpy.sum((array * array.conj()).real, axis=(-2, -1))
+        powersum = power.sum()
+
+        if powersum > 0.:
+            power /= powersum
+
+        return power.tolist()
+
     def __init__(self,
                  array: ProbeArrayType | None = None,
                  *,
@@ -71,6 +81,7 @@ class Probe:
             else:
                 raise TypeError('Probe must be a complex-valued ndarray')
 
+        self._modeRelativePower = Probe._calculateModeRelativePower(self._array)
         self._pixelWidthInMeters = pixelWidthInMeters
         self._pixelHeightInMeters = pixelHeightInMeters
 
@@ -98,6 +109,14 @@ class Probe:
         return self._array.nbytes
 
     @property
+    def widthInPixels(self) -> int:
+        return self._array.shape[-1]
+
+    @property
+    def heightInPixels(self) -> int:
+        return self._array.shape[-2]
+
+    @property
     def pixelWidthInMeters(self) -> float:
         return self._pixelWidthInMeters
 
@@ -107,16 +126,22 @@ class Probe:
 
     def getGeometry(self) -> ProbeGeometry:
         return ProbeGeometry(
-            widthInPixels=self._array.shape[-1],
-            heightInPixels=self._array.shape[-2],
+            widthInPixels=self.widthInPixels,
+            heightInPixels=self.heightInPixels,
             pixelWidthInMeters=self._pixelWidthInMeters,
             pixelHeightInMeters=self._pixelHeightInMeters,
         )
 
+    def getPixelGeometry(self) -> PixelGeometry:
+        return PixelGeometry(
+            widthInMeters=self._pixelWidthInMeters,
+            heightInMeters=self._pixelHeightInMeters,
+        )
+
     def getExtent(self) -> ImageExtent:
         return ImageExtent(
-            widthInPixels=self._array.shape[-1],
-            heightInPixels=self._array.shape[-2],
+            widthInPixels=self.widthInPixels,
+            heightInPixels=self.heightInPixels,
         )
 
     def getMode(self, number: int) -> ProbeArrayType:
@@ -128,15 +153,11 @@ class Probe:
         else:
             return self._array
 
-    def getModeRelativePower(self) -> Sequence[float]:
-        probe = self._array
-        power = numpy.sum((probe * probe.conj()).real, axis=(-2, -1))
-        powersum = power.sum()
+    def getModeRelativePower(self, number: int) -> float:
+        return self._modeRelativePower[number]
 
-        if powersum > 0.:
-            power /= powersum
-
-        return power
+    def getCoherence(self) -> float:
+        return numpy.sum(numpy.square(self._modeRelativePower))
 
 
 class ProbeFileReader(ABC):

@@ -188,7 +188,9 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 logger.warning('Unable to access item for visualization!')
             else:
                 object_ = item.getObject()
-                self._imagePresenter.setArray(object_.array, object_.getPixelGeometry())
+                array = object_.getLayer(current.row()) if current.parent().isValid() \
+                        else object_.getLayersFlattened()
+                self._imagePresenter.setArray(array, object_.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ObjectRepositoryItem) -> None:
         self._listModel.insertItem(index, item)

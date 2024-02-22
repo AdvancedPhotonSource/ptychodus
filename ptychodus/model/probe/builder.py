@@ -47,6 +47,9 @@ class ProbeBuilder(ParameterRepository):
     def normalize(self, array: ProbeArrayType) -> ProbeArrayType:
         return array / numpy.sqrt(numpy.sum(numpy.abs(array)**2))
 
+    def getName(self) -> str:
+        return self._name.getValue()
+
     @abstractmethod
     def build(self) -> Probe:
         pass

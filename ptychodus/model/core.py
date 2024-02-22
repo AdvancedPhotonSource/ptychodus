@@ -31,7 +31,8 @@ from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter
                        DiffractionDatasetPresenter, DiffractionMetadataPresenter,
                        DiffractionPatternPresenter, PatternsCore)
 from .probe import ProbeCore
-from .product import ObjectRepository, ProductCore, ProductRepository
+from .product import (ObjectRepository, ProbeRepository, ProductCore, ProductRepository,
+                      ScanRepository)
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
@@ -179,6 +180,14 @@ class ModelCore:
     @property
     def productRepository(self) -> ProductRepository:
         return self._productCore.repository
+
+    @property
+    def scanRepository(self) -> ScanRepository:
+        return self._productCore.scanRepository
+
+    @property
+    def probeRepository(self) -> ProbeRepository:
+        return self._productCore.probeRepository
 
     @property
     def objectRepository(self) -> ObjectRepository:
