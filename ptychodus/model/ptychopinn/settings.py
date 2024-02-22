@@ -48,6 +48,10 @@ class PtychoPINNTrainingSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
+        self.maeWeight = settingsGroup.createRealEntry('MAEWeight', '0.5')
+        self.nllWeight = settingsGroup.createRealEntry('NLLWeight', '0.5')
+        self.realspaceMAEWeight = settingsGroup.createRealEntry('RealspaceMAEWeight', '0.5')
+        self.realspaceWeight = settingsGroup.createRealEntry('RealspaceWeight', '0.5')
 
         # generic settings shared with ptychonn
         self.maximumTrainingDatasetSize = settingsGroup.createIntegerEntry(
