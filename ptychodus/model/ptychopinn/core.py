@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 
-from ...api.object import ObjectAPI
+from ptychodus.model.object.api import ObjectAPI
 
 class PtychoPINNModelPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
