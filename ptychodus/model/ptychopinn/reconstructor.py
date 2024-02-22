@@ -11,6 +11,7 @@ from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableR
 import numpy
 import numpy.typing
 import logging
+from ptycho.loader import PtychoDataContainer
 
 FloatArrayType = numpy.typing.NDArray[numpy.float32]
 logger = logging.getLogger(__name__)
@@ -76,7 +77,6 @@ class ObjectPatchCircularBuffer:
 
     def getBuffer(self) -> FloatArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
-from .loader import PtychoData, PtychoDataContainer
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
