@@ -99,9 +99,25 @@ class PtychoPINNTrainingParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Training Parameters', parent)
+        self.maximumTrainingDatasetSizeLabel = QLabel('Maximum Training Dataset Size:')
+        self.maximumTrainingDatasetSizeSpinBox = QSpinBox()
+        self.validationSetFractionalSizeLabel = QLabel('Validation Set Fractional Size:')
+        self.validationSetFractionalSizeSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.maximumLearningRateLabel = QLabel('Maximum Learning Rate:')
+        self.maximumLearningRateLineEdit = DecimalLineEdit.createInstance()
+        self.minimumLearningRateLabel = QLabel('Minimum Learning Rate:')
+        self.minimumLearningRateLineEdit = DecimalLineEdit.createInstance()
         # Assuming similar widgets are needed, adjust as per PtychoPINN specifics
         self.trainingEpochsLabel = QLabel('Training Epochs:')
         self.trainingEpochsSpinBox = QSpinBox()
+        self.maeWeightLabel = QLabel('MAE Weight:')
+        self.maeWeightLineEdit = DecimalLineEdit.createInstance()
+        self.nllWeightLabel = QLabel('NLL Weight:')
+        self.nllWeightLineEdit = DecimalLineEdit.createInstance()
+        self.realspaceMAEWeightLabel = QLabel('Realspace MAE Weight:')
+        self.realspaceMAEWeightLineEdit = DecimalLineEdit.createInstance()
+        self.realspaceWeightLabel = QLabel('Realspace Weight:')
+        self.realspaceWeightLineEdit = DecimalLineEdit.createInstance()
         self.outputParametersView = PtychoPINNOutputParametersView.createInstance()
 
     @classmethod
@@ -109,6 +125,15 @@ class PtychoPINNTrainingParametersView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
+        layout.addRow(view.maximumTrainingDatasetSizeLabel, view.maximumTrainingDatasetSizeSpinBox)
+        layout.addRow('Validation Set Fractional Size:', view.validationSetFractionalSizeSlider)
+        layout.addRow('Maximum Learning Rate:', view.maximumLearningRateLineEdit)
+        layout.addRow('Minimum Learning Rate:', view.minimumLearningRateLineEdit)
+        layout.addRow(view.trainingEpochsLabel, view.trainingEpochsSpinBox)
+        layout.addRow('MAE Weight:', view.maeWeightLineEdit)
+        layout.addRow('NLL Weight:', view.nllWeightLineEdit)
+        layout.addRow('Realspace MAE Weight:', view.realspaceMAEWeightLineEdit)
+        layout.addRow('Realspace Weight:', view.realspaceWeightLineEdit)
         layout.addRow(view.trainingEpochsLabel, view.trainingEpochsSpinBox)
         layout.addRow(view.outputParametersView)
         view.setLayout(layout)
