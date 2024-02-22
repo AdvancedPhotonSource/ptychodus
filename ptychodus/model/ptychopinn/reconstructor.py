@@ -178,3 +178,8 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
     def reconstruct(self, *args, **kwargs):
         raise NotImplementedError("Reconstruct method is not implemented yet.")
+class PtychoPINNReconstructorLibrary:
+    def __init__(self):
+        # Initialization code here
+
+    # Additional methods here
