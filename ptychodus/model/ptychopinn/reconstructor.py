@@ -181,22 +181,22 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 class PtychoPINNReconstructorLibrary:
     def __init__(self, model_path: str):
         self.model_path = model_path
-        # Load the model from the specified path
+        # TODO: Load the model from the specified path
         self.model = self.load_model(model_path)
 
     @classmethod
     def createInstance(cls, model_path: str):
-        # This method creates and returns an instance of PtychoPINNReconstructorLibrary
+        # TODO: This method creates and returns an instance of PtychoPINNReconstructorLibrary
         return cls(model_path)
 
     def load_model(self, path: str):
-        # Placeholder for model loading logic
+        # TODO: Implement model loading logic
         pass
 
     def reconstruct(self, input_data):
-        # Placeholder for reconstruction logic using the loaded model
+        # TODO: Implement reconstruction logic using the loaded model
         pass
 
     def save_results(self, results, output_path: str):
-        # Placeholder for saving the reconstruction results to a file
+        # TODO: Implement logic for saving the reconstruction results to a file
         pass
