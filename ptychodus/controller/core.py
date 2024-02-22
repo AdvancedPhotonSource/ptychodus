@@ -12,6 +12,7 @@ from .memory import MemoryController
 from .object import ObjectImageController, ObjectController
 from .probe import ProbeImageController, ProbeController
 from .ptychonn import PtychoNNViewControllerFactory
+from .ptychopinn import PtychoPINNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import ReconstructorParametersController
 from .scan import ScanController
@@ -34,6 +35,8 @@ class ControllerCore:
             model.ptychopyReconstructorLibrary)
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
             model.ptychonnReconstructorLibrary, self._fileDialogFactory)
+        self._ptychopinnViewControllerFactory = PtychoPINNViewControllerFactory(
+            model.ptychopinnReconstructorLibrary, self._fileDialogFactory)
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
 
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
@@ -72,6 +75,9 @@ class ControllerCore:
             [
                 self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory,
                 self._tikeViewControllerFactory
+            ],
+            [
+                self._ptychopinnViewControllerFactory
             ],
         )
         self._workflowController = WorkflowController.createInstance(
