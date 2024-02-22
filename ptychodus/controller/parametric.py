@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Final
 import logging
@@ -106,43 +107,53 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
             self._syncModelToView()
 
 
+class ParameterDialog(QDialog):
+
+    def __init__(self, viewControllers: Sequence[ParameterViewController],
+                 buttonBox: QDialogButtonBox, parent: QWidget | None) -> None:
+        super().__init__(parent)
+        self._viewControllers = viewControllers
+        self._buttonBox = buttonBox
+
+        buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
+        buttonBox.clicked.connect(self._handleButtonBoxClicked)
+
+    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
+        # TODO remove observers from viewControllers
+
+        if self._buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
+            self.accept()
+        else:
+            self.reject()
+
+
 class ParameterDialogBuilder:
 
     def __init__(self) -> None:
-        self._vcDict: dict[str, ParameterViewController] = dict()
-        self._dialog = QDialog()
-        self._buttonBox = QDialogButtonBox()
-        self._buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        self._buttonBox.clicked.connect(self._handleButtonBoxClicked)
+        self._viewControllers: dict[str, ParameterViewController] = dict()
 
     def addSpinBox(self, label: str, parameter: IntegerParameter) -> None:
-        self._vcDict[label] = SpinBoxParameterViewController(parameter)
+        self._viewControllers[label] = SpinBoxParameterViewController(parameter)
 
     def addDecimalSlider(self, label: str, parameter: RealParameter) -> None:
-        self._vcDict[label] = DecimalSliderParameterViewController(parameter)
+        self._viewControllers[label] = DecimalSliderParameterViewController(parameter)
 
     def addLengthWidget(self, label: str, parameter: RealParameter) -> None:
-        self._vcDict[label] = LengthWidgetParameterViewController(parameter)
+        self._viewControllers[label] = LengthWidgetParameterViewController(parameter)
 
     def build(self, windowTitle: str, parent: QWidget | None) -> QDialog:
         layout = QFormLayout()
 
-        for label, vc in self._vcDict.items():
+        for label, vc in self._viewControllers.items():
             layout.addRow(f'{label}:', vc.getWidget())
 
-        layout.addRow(self._buttonBox)
+        buttonBox = QDialogButtonBox()
+        layout.addRow(buttonBox)
 
-        if parent is not None:
-            self._dialog.setParent(parent)
+        dialog = ParameterDialog(list(self._viewControllers.values()), buttonBox, parent)
+        dialog.setLayout(layout)
+        dialog.setWindowTitle(windowTitle)
 
-        self._dialog.setLayout(layout)
-        self._dialog.setWindowTitle(windowTitle)
-        return self._dialog
+        self._viewControllers.clear()
 
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        # FIXME add/remove observers
-
-        if self._buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self._dialog.accept()
-        else:
-            self._dialog.reject()
+        return dialog

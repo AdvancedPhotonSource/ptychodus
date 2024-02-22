@@ -1,18 +1,16 @@
-import logging
-
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QDialog, QMessageBox, QWidget
 
 from ...model.object import ObjectRepositoryItem, RandomObjectBuilder
 from ..parametric import ParameterDialogBuilder
 
-logger = logging.getLogger(__name__)
 
+class ObjectEditorViewControllerFactory:
 
-class RandomObjectEditorViewController:
-
-    @classmethod
-    def edit(cls, item: ObjectRepositoryItem, parent: QWidget) -> None:
+    def createEditorDialog(self, itemName: str, item: ObjectRepositoryItem,
+                           parent: QWidget) -> QDialog:
         objectBuilder = item.getBuilder()
+        builderName = objectBuilder.getName()
+        title = f'{builderName}: {itemName}'
 
         if isinstance(objectBuilder, RandomObjectBuilder):
             dialogBuilder = ParameterDialogBuilder()
@@ -23,7 +21,8 @@ class RandomObjectEditorViewController:
             dialogBuilder.addDecimalSlider('Amplitude Mean', objectBuilder.amplitudeMean)
             dialogBuilder.addDecimalSlider('Amplitude Deviation', objectBuilder.amplitudeDeviation)
             dialogBuilder.addDecimalSlider('Phase Deviation', objectBuilder.phaseDeviation)
-            dialog = dialogBuilder.build(windowTitle, parent)
-            dialog.open()
-        else:
-            logger.warning('Builder is not a RandomObjectBuilder')
+            return dialogBuilder.build(title, parent)
+
+        return QMessageBox(QMessageBox.Icon.Information, title,
+                           f'\"{builderName}\" has no editable parameters!', QMessageBox.Ok,
+                           parent)

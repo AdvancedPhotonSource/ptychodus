@@ -1,8 +1,8 @@
 from __future__ import annotations
 import logging
 
-from PyQt5.QtCore import QModelIndex, QStringListModel, Qt
-from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
+from PyQt5.QtCore import QModelIndex, QStringListModel
+from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ...api.observer import SequenceObserver
 from ...model.analysis import FourierRingCorrelator
@@ -14,9 +14,9 @@ from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
+from .editorFactory import ObjectEditorViewControllerFactory
 from .frc import FourierRingCorrelationViewController
 from .listModel import ObjectListModel
-from .random import RandomObjectEditorViewController
 from .treeModel import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._fileDialogFactory = fileDialogFactory
         self._listModel = listModel
         self._treeModel = treeModel
+        self._editorFactory = ObjectEditorViewControllerFactory()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
 
@@ -134,7 +135,10 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if itemIndex < 0:
             return
 
-        print(f'Edit {itemIndex}')  # FIXME dialog.setWindowTitle(item.getName()); dialog.open()
+        itemName = self._repository.getName(itemIndex)
+        item = self._repository[itemIndex]
+        dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
+        dialog.open()
 
     def _saveCurrentObject(self) -> None:
         itemIndex = self._getCurrentItemIndex()
