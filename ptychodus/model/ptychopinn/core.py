@@ -280,10 +280,27 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoPINNReconstructorLibrary:
+    def createInstance(cls, settingsRegistry: SettingsRegistry, objectAPI: ObjectAPI,
+                       isDeveloperModeEnabled: bool) -> PtychoPINNReconstructorLibrary:
         modelSettings = PtychoPINNModelSettings.createInstance(settingsRegistry)
         trainingSettings = PtychoPINNTrainingSettings.createInstance(settingsRegistry)
         ptychoPINNReconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
+        reconstructors: list[TrainableReconstructor] = list()
+
+        try:
+            from .reconstructor import PtychoPINNTrainableReconstructor
+        except ModuleNotFoundError:
+            logger.info('PtychoPINN not found.')
+
+            if isDeveloperModeEnabled:
+                reconstructors.append(ptychoPINNReconstructor)
+        else:
+            ptychoPINNReconstructor = PtychoPINNTrainableReconstructor(modelSettings,
+                                                                        trainingSettings,
+                                                                        objectAPI)
+            reconstructors.append(ptychoPINNReconstructor)
+
+        return cls(modelSettings, trainingSettings, reconstructors)
         reconstructors: list[TrainableReconstructor] = [ptychoPINNReconstructor]
         return cls(modelSettings, trainingSettings, reconstructors)
 
