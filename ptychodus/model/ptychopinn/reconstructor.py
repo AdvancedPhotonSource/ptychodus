@@ -184,6 +184,11 @@ class PtychoPINNReconstructorLibrary:
         # Load the model from the specified path
         self.model = self.load_model(model_path)
 
+    @classmethod
+    def createInstance(cls, model_path: str):
+        # This method creates and returns an instance of PtychoPINNReconstructorLibrary
+        return cls(model_path)
+
     def load_model(self, path: str):
         # Placeholder for model loading logic
         pass
