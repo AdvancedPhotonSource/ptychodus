@@ -152,19 +152,18 @@ class ProbeTreeModel(QAbstractItemModel):
                 elif index.column() == 2:
                     return QVariant(item.getBuilder().getName())
                 elif index.column() == 3:
-                    value = QVariant(str(probe.dataType))
+                    return QVariant(str(probe.dataType))
                 elif index.column() == 4:
-                    value = QVariant(probe.widthInPixels)
+                    return QVariant(probe.widthInPixels)
                 elif index.column() == 5:
-                    value = QVariant(probe.heightInPixels)
+                    return QVariant(probe.heightInPixels)
                 elif index.column() == 6:
-                    value = QVariant(f'{probe.sizeInBytes / (1024 * 1024):.2f}')
+                    return QVariant(f'{probe.sizeInBytes / (1024 * 1024):.2f}')
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.getProbe()
                 coherence = probe.getCoherence()
-
-                if numpy.isfinite(coherence):
-                    return QVariant(int(100. * coherence))
+                return QVariant(int(100. * coherence)) if numpy.isfinite(coherence) \
+                        else QVariant(-1)
 
         return QVariant()
 

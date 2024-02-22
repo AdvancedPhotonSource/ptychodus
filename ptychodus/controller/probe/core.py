@@ -13,7 +13,7 @@ from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
 from ..image import ImageController
-# FIXME from .editorFactory import ProbeEditorViewControllerFactory
+from .editorFactory import ProbeEditorViewControllerFactory
 from .listModel import ProbeListModel
 from .treeModel import ProbeTreeModel
 
@@ -34,7 +34,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._fileDialogFactory = fileDialogFactory
         self._listModel = listModel
         self._treeModel = treeModel
-        # FIXME self._editorFactory = ProbeEditorViewControllerFactory()
+        self._editorFactory = ProbeEditorViewControllerFactory()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
 
@@ -58,7 +58,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         powerItemDelegate = ProgressBarItemDelegate(view.treeView)
         view.treeView.setItemDelegateForColumn(1, powerItemDelegate)
         view.treeView.setItemDelegateForColumn(2, builderItemDelegate)
-        view.treeView.selectionModel().selectionChanged.connect(controller._updateView)
+        view.treeView.selectionModel().currentChanged.connect(controller._updateView)
         controller._updateView(QModelIndex(), QModelIndex())
 
         loadFromFileAction = view.buttonBox.loadMenu.addAction('Open File...')
@@ -131,10 +131,9 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             return
 
         itemName = self._repository.getName(itemIndex)
-        print(f'Edit {itemName}')  # FIXME
-        # FIXME item = self._repository[itemIndex]
-        # FIXME dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
-        # FIXME dialog.open()
+        item = self._repository[itemIndex]
+        dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
+        dialog.open()
 
     def _saveCurrentProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()

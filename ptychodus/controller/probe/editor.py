@@ -1,11 +1,11 @@
 from __future__ import annotations
 import logging
 
-from PyQt5.QtWidgets import QButtonGroup, QGroupBox, QWidget
+from PyQt5.QtWidgets import QButtonGroup
 
 from ...api.observer import Observable, Observer
-from ...model.probe import ProbeModeDecayType, ProbeRepositoryItem, ProbeRepositoryItemPresenter
-from ...view.probe import ProbeEditorDialog, ProbeModesView
+from ...model.probe import ProbeModeDecayType, ProbeRepositoryItem
+from ...view.probe import ProbeModesView
 
 logger = logging.getLogger(__name__)
 
@@ -58,20 +58,3 @@ class ProbeModesController(Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._item:
             self._syncModelToView()
-
-
-class ProbeEditorViewController:
-
-    def __init__(self, presenter: ProbeRepositoryItemPresenter, editorView: QGroupBox,
-                 parent: QWidget | None) -> None:
-        self._dialog = ProbeEditorDialog.createInstance(presenter.name, editorView, parent)
-        self._modesController = ProbeModesController.createInstance(presenter.item,
-                                                                    self._dialog.modesView)
-
-    @classmethod
-    def editParameters(cls,
-                       presenter: ProbeRepositoryItemPresenter,
-                       editorView: QGroupBox,
-                       parent: QWidget | None = None) -> None:
-        vc = cls(presenter, editorView, parent)
-        vc._dialog.open()

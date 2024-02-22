@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLa
 from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.parametric import IntegerParameter, RealParameter
-from ..view.widgets import DecimalSlider, LengthWidget
+from ..view.widgets import DecimalLineEdit, DecimalSlider, LengthWidget
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,13 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
     def __init__(self, parameter: IntegerParameter) -> None:
         self._parameter = parameter
-        self._spinBox = QSpinBox()
-        self._spinBox.valueChanged.connect(parameter.setValue)
+        self._widget = QSpinBox()
+
+        self._syncModelToView()
+        self._widget.valueChanged.connect(parameter.setValue)
 
     def getWidget(self) -> QWidget:
-        return self._spinBox
+        return self._widget
 
     def _syncModelToView(self) -> None:
         minimum = self._parameter.getMinimum()
@@ -45,15 +47,38 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
         if minimum is None:
             logger.error('Minimum not provided!')
         else:
-            self._spinBox.blockSignals(True)
+            self._widget.blockSignals(True)
 
             if maximum is None:
-                self._spinBox.setRange(minimum, SpinBoxParameterViewController.MAX_INT)
+                self._widget.setRange(minimum, SpinBoxParameterViewController.MAX_INT)
             else:
-                self._spinBox.setRange(minimum, maximum)
+                self._widget.setRange(minimum, maximum)
 
-            self._spinBox.setValue(self._parameter.getValue())
-            self._spinBox.blockSignals(False)
+            self._widget.setValue(self._parameter.getValue())
+            self._widget.blockSignals(False)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
+class DecimalLineEditParameterViewController(ParameterViewController, Observer):
+
+    def __init__(self, parameter: RealParameter) -> None:
+        self._parameter = parameter
+        self._widget = DecimalLineEdit.createInstance()
+
+        self._syncModelToView()
+        self._widget.valueChanged.connect(parameter.setValue)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncViewToModel(self, value: Decimal) -> None:
+        self._parameter.setValue(float(value))
+
+    def _syncModelToView(self) -> None:
+        self._widget.setValue(Decimal(repr(self._parameter.getValue())))
 
     def update(self, observable: Observable) -> None:
         if observable is self._parameter:
@@ -64,11 +89,13 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
 
     def __init__(self, parameter: RealParameter) -> None:
         self._parameter = parameter
-        self._slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self._slider.valueChanged.connect(parameter.setValue)
+        self._widget = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+
+        self._syncModelToView()
+        self._widget.valueChanged.connect(parameter.setValue)
 
     def getWidget(self) -> QWidget:
-        return self._slider
+        return self._widget
 
     def _syncModelToView(self) -> None:
         minimum = self._parameter.getMinimum()
@@ -79,7 +106,7 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
         else:
             value = Decimal(repr(self._parameter.getValue()))
             range_ = Interval[Decimal](Decimal(repr(minimum)), Decimal(repr(maximum)))
-            self._slider.setValueAndRange(value, range_)
+            self._widget.setValueAndRange(value, range_)
 
     def update(self, observable: Observable) -> None:
         if observable is self._parameter:
@@ -91,6 +118,8 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
     def __init__(self, parameter: RealParameter) -> None:
         self._parameter = parameter
         self._widget = LengthWidget.createInstance()
+
+        self._syncModelToView()
         self._widget.lengthChanged.connect(self._syncViewToModel)
 
     def getWidget(self) -> QWidget:
@@ -119,6 +148,7 @@ class ParameterDialog(QDialog):
         buttonBox.clicked.connect(self._handleButtonBoxClicked)
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
+        # FIXME observer -> signal adapter
         # TODO remove observers from viewControllers
 
         if self._buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
@@ -134,6 +164,9 @@ class ParameterDialogBuilder:
 
     def addSpinBox(self, label: str, parameter: IntegerParameter) -> None:
         self._viewControllers[label] = SpinBoxParameterViewController(parameter)
+
+    def addDecimalLineEdit(self, label: str, parameter: RealParameter) -> None:
+        self._viewControllers[label] = DecimalLineEditParameterViewController(parameter)
 
     def addDecimalSlider(self, label: str, parameter: RealParameter) -> None:
         self._viewControllers[label] = DecimalSliderParameterViewController(parameter)

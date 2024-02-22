@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QDialog, QMessageBox, QWidget
 
-from ...model.probe import ProbeRepositoryItem, RandomProbeBuilder
+from ...model.probe import (DiskProbeBuilder, FresnelZonePlateProbeBuilder, ProbeRepositoryItem,
+                            SuperGaussianProbeBuilder)
 from ..parametric import ParameterDialogBuilder
 
 
@@ -12,15 +13,25 @@ class ProbeEditorViewControllerFactory:
         builderName = probeBuilder.getName()
         title = f'{builderName}: {itemName}'
 
-        if isinstance(probeBuilder, RandomProbeBuilder):
+        if isinstance(probeBuilder, DiskProbeBuilder):
             dialogBuilder = ParameterDialogBuilder()
-            dialogBuilder.addSpinBox('Number of Layers', probeBuilder.numberOfLayers)
-            dialogBuilder.addLengthWidget('Layer Distance', probeBuilder.layerDistanceInMeters)
-            dialogBuilder.addSpinBox('Extra Padding X', probeBuilder.extraPaddingX)
-            dialogBuilder.addSpinBox('Extra Padding Y', probeBuilder.extraPaddingY)
-            dialogBuilder.addDecimalSlider('Amplitude Mean', probeBuilder.amplitudeMean)
-            dialogBuilder.addDecimalSlider('Amplitude Deviation', probeBuilder.amplitudeDeviation)
-            dialogBuilder.addDecimalSlider('Phase Deviation', probeBuilder.phaseDeviation)
+            dialogBuilder.addLengthWidget('Diameter', probeBuilder.diameterInMeters)
+            return dialogBuilder.build(title, parent)
+        elif isinstance(probeBuilder, FresnelZonePlateProbeBuilder):
+            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder.addLengthWidget('Zone Plate Diameter',
+                                          probeBuilder.zonePlateDiameterInMeters)
+            dialogBuilder.addLengthWidget('Outermost Zone Width',
+                                          probeBuilder.outermostZoneWidthInMeters)
+            dialogBuilder.addLengthWidget('Central Beamstop Diameter',
+                                          probeBuilder.centralBeamstopDiameterInMeters)
+            dialogBuilder.addLengthWidget('Defocus Distance', probeBuilder.defocusDistanceInMeters)
+            return dialogBuilder.build(title, parent)
+        elif isinstance(probeBuilder, SuperGaussianProbeBuilder):
+            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder.addLengthWidget('Annular Radius', probeBuilder.annularRadiusInMeters)
+            dialogBuilder.addLengthWidget('Full Width at Half Maximum', probeBuilder.fwhmInMeters)
+            dialogBuilder.addDecimalLineEdit('Order Parameter', probeBuilder.orderParameter)
             return dialogBuilder.build(title, parent)
 
         return QMessageBox(QMessageBox.Icon.Information, title,
