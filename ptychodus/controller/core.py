@@ -12,7 +12,7 @@ from .memory import MemoryController
 from .object import ObjectImageController, ObjectController
 from .probe import ProbeImageController, ProbeController
 from .ptychonn import PtychoNNViewControllerFactory
-from .ptychopinn import PtychoPINNViewControllerFactory
+from .ptychopinn.factory import PtychoPINNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import ReconstructorParametersController
 from .scan import ScanController
