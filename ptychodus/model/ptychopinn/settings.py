@@ -18,7 +18,6 @@ class PtychoPINNModelSettings(Observable, Observer):
         self.offset = settingsGroup.createIntegerEntry('Offset', 4)
         self.gridsize = settingsGroup.createIntegerEntry('Gridsize', 2)
         self.batch_size = settingsGroup.createIntegerEntry('BatchSize', 16)
-        self.batch_size = settingsGroup.createIntegerEntry('BatchSize', 16)
         self.n_filters_scale = settingsGroup.createIntegerEntry('NFiltersScale', 2)
         self.nphotons = settingsGroup.createRealEntry('NPhotons', '1e9')
         self.probe_trainable = settingsGroup.createBooleanEntry('ProbeTrainable', False)
@@ -48,6 +47,11 @@ class PtychoPINNTrainingSettings(Observable, Observer):
     def __init__(self, settingsGroup: SettingsGroup) -> None:
         super().__init__()
         self._settingsGroup = settingsGroup
+        self.maeWeight = settingsGroup.createRealEntry('MAEWeight', '0.')
+        self.nllWeight = settingsGroup.createRealEntry('NLLWeight', '1.')
+        self.tv_weight = settingsGroup.createRealEntry('TVWeight', '0.')
+        self.realspaceMAEWeight = settingsGroup.createRealEntry('RealspaceMAEWeight', '0.')
+        self.realspaceWeight = settingsGroup.createRealEntry('RealspaceWeight', '0.')
 
         # generic settings shared with ptychonn
         self.maximumTrainingDatasetSize = settingsGroup.createIntegerEntry(
@@ -64,12 +68,9 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self.outputPath = settingsGroup.createPathEntry('OutputPath', Path('/path/to/output'))
         self.outputSuffix = settingsGroup.createStringEntry('OutputSuffix', 'suffix')
 
-        # ptychopinn specific settings
-        self.mae_weight = settingsGroup.createRealEntry('MAEWeight', '0.')
-        self.nll_weight = settingsGroup.createRealEntry('NLLWeight', '1.')
-        self.tv_weight = settingsGroup.createRealEntry('TVWeight', '0.')
-        self.realspace_mae_weight = settingsGroup.createRealEntry('RealspaceMAEWeight', '0.')
-        self.realspace_weight = settingsGroup.createRealEntry('RealspaceWeight', '0.')
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoPINNTrainingSettings:

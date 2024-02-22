@@ -11,6 +11,7 @@ from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableR
 import numpy
 import numpy.typing
 import logging
+from ptycho.loader import PtychoDataContainer
 
 FloatArrayType = numpy.typing.NDArray[numpy.float32]
 logger = logging.getLogger(__name__)
@@ -76,15 +77,13 @@ class ObjectPatchCircularBuffer:
 
     def getBuffer(self) -> FloatArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
-from .loader import PtychoData, PtychoDataContainer
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
-    def __init__(self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI, *, enableAmplitude: bool) -> None:
+    def __init__(self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._objectAPI = objectAPI
-        self._enableAmplitude = enableAmplitude
         self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
         ptychopinnVersion = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinnVersion}')
@@ -103,33 +102,16 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     @property
     def name(self) -> str:
-        return 'AmplitudePhase' if self._enableAmplitude else 'PhaseOnly'
+        return 'AmplitudePhase' 
 
     # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        # Extract diffraction patterns from the pattern buffer
-        diffractionPatterns = self._patternBuffer.getBuffer()
-        # Extract object patches (amplitude and phase) from the object patch buffer
-        objectPatches = self._objectPatchBuffer.getBuffer()
-        # Extract scan coordinates from the ReconstructInput parameter
-        scanCoordinates = numpy.array(list(parameters.scan.values()))
-        # This method will be updated in the next steps to use loader.RawData.from_coords_without_pc
-        # to load a training dataset from the pattern buffer.
-        from ptycho.loader import PtychoDataContainer
         diffractionPatterns = self._patternBuffer.getBuffer()
         scanCoordinates = numpy.array(list(parameters.scan.values()))
-        xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
         probeGuess = parameters.probeArray
         objectGuess = parameters.objectInterpolator.getArray()
-        self._ptychoDataContainer = PtychoDataContainer.from_raw_data_without_pc(
-            xcoords=xcoords,
-            ycoords=ycoords,
-            diff3d=diffractionPatterns,
-            probeGuess=probeGuess,
-            scan_index=numpy.zeros(len(diffractionPatterns)),# TODO assuming all patches are from the same object
-            objectGuess=objectGuess
-        )
+        self._ptychoDataContainer = create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess, scanCoordinates)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self.fileFilterList
@@ -161,7 +143,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             print("Training data has already been ingested. Not running _initialize_ptycho().")
         from ptycho import train_pinn
         model_instance, history =  train_pinn.train(self._ptychoDataContainer)
-        # TODO save the tensorflow model instance to file
+        self._model_instance = model_instance
+        self._history = history
+
         trainingLoss = history.history['loss']
         validationLoss = history.history['val_loss']  # Replace with actual validation loss values
         validationLossSeries = PlotSeries(label='Validation Loss', values=validationLoss)
@@ -177,3 +161,82 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         logger.debug('Clearing training data...')
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
+<<<<<<< HEAD
+
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+        from scipy.ndimage import map_coordinates
+        from ptycho import train_pinn
+        assert self._model_instance
+        #raise NotImplementedError("Reconstruct method is not implemented yet.")
+        # TODO data size/shape requirements to GUI
+        data = parameters.diffractionPatternArray
+        dataSize = data.shape[-1]
+
+        if dataSize != data.shape[-2]:
+            raise ValueError('PtychoPINN expects square diffraction data!')
+
+        isDataSizePow2 = (dataSize & (dataSize - 1) == 0 and dataSize > 0)
+
+        if not isDataSizePow2:
+            raise ValueError('PtychoPINN expects that the diffraction data size is a power of two!')
+
+        scanCoordinates = numpy.array(list(parameters.scan.values()))
+        probeGuess = parameters.probeArray
+        objectGuess = parameters.objectInterpolator.getArray()
+        test_data = create_ptycho_data_container(data, probeGuess, objectGuess, scanCoordinates)
+        eval_results = train_pinn.eval(test_data, self._history, self._model_instance) 
+        objectPatches = eval_results['reconstructed_obj'][:, :, :, 0]
+        self._eval_output = eval_results
+
+        # TODO save the test data
+
+        logger.debug('Stitching...')
+        objectInterpolator = parameters.objectInterpolator
+        objectGrid = objectInterpolator.getGrid()
+        objectArray = objectInterpolator.getArray()
+        objectArrayUpper = numpy.zeros_like(objectArray, dtype=complex)
+        objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
+
+        patchExtent = ImageExtent(
+            width=objectPatches.shape[-1],
+            height=objectPatches.shape[-2],
+        )
+
+        for scanPoint, objectPatch in zip(parameters.scan.values(), objectPatches):
+
+            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
+            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
+
+            pixelCentersX = patchAxisX.getObjectPixelCenters()
+            pixelCentersY = patchAxisY.getObjectPixelCenters()
+
+            xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
+            patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
+
+            # TODO consider inverse distance weighting
+            objectArrayUpper[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += patchValues
+            objectArrayCount[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += 1
+
+        objectArrayLower = numpy.maximum(objectArrayCount, 1)
+        objectArray = objectArrayUpper / objectArrayLower
+
+        return ReconstructOutput(
+            scan=None,
+            probeArray=None,
+            objectArray=objectArray,
+            objective=[[]],
+            plot2D=Plot2D.createNull(),  # TODO show something here?
+            result=0,
+        )
+
+def create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess: ObjectArrayType, scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
+    xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
+    return PtychoDataContainer.from_raw_data_without_pc(
+        xcoords=xcoords,
+        ycoords=ycoords,
+        diff3d=diffractionPatterns,
+        probeGuess=probeGuess,
+        scan_index=numpy.zeros(len(diffractionPatterns)),  # Assuming all patches are from the same object
+        objectGuess=objectGuess
+    )
+

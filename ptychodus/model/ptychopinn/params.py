@@ -80,6 +80,8 @@ def update_cfg_from_settings(model_settings: PtychoPINNModelSettings):
         'TVWeight': 'tv_weight',
         'RealspaceMAEWeight': 'realspace_mae_weight',
         'RealspaceWeight': 'realspace_weight',
+        'OutputPath': 'output_path',
+        'OutputSuffix': 'output_suffix',
     }
 
     # Update shared settings

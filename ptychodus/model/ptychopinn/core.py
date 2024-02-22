@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 
+from ptychodus.model.object.api import ObjectAPI
+
 class PtychoPINNModelPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
@@ -23,6 +25,7 @@ class PtychoPINNModelPresenter(Observable, Observer):
         super().__init__()
         self._settings = settings
         self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
+
 
     @classmethod
     def createInstance(cls, settings: PtychoPINNModelSettings) -> PtychoPINNModelPresenter:
@@ -61,17 +64,22 @@ class PtychoPINNModelPresenter(Observable, Observer):
     def getSizeLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
-    def getOffset(self) -> int:
-        return self._settings.offset.value
 
-    def setOffset(self, value: int) -> None:
-        self._settings.offset.value = value
+    def setStateFilePath(self, path: Path) -> None:
+        self._stateFilePath = path
+        self.notifyObservers()
+
+    def getStateFilePath(self) -> Path:
+        return self._stateFilePath
 
     def getGridsize(self) -> int:
         return self._settings.gridsize.value
 
     def setGridsize(self, value: int) -> None:
-        self._settings.gridsize.value = value
+        if 1 <= value <= self.MAX_INT:
+            self._settings.gridsize.value = value
+            self.notifyObservers()
+
 
 
     def getBatchSize(self) -> int:
@@ -129,17 +137,7 @@ class PtychoPINNModelPresenter(Observable, Observer):
     def setProbeMask(self, enabled: bool) -> None:
         self._settings.probe_mask.value = enabled
 
-    def getModelType(self) -> str:
-        return self._settings.model_type.value
 
-    def setModelType(self, model_type: str) -> None:
-        self._settings.model_type.value = model_type
-
-    def getSize(self) -> int:
-        return self._settings.size.value
-
-    def setSize(self, value: int) -> None:
-        self._settings.size.value = value
 
     def getAmpActivation(self) -> str:
         return self._settings.amp_activation.value
@@ -150,6 +148,59 @@ class PtychoPINNModelPresenter(Observable, Observer):
 
 
 class PtychoPINNTrainingPresenter(Observable, Observer):
+    def setValidationSetFractionalSize(self, value: Decimal) -> None:
+        self._settings.validationSetFractionalSize.value = value
+
+    def setMaximumLearningRate(self, value: Decimal) -> None:
+        self._settings.maximumLearningRate.value = value
+
+    def setMinimumLearningRate(self, value: Decimal) -> None:
+        self._settings.minimumLearningRate.value = value
+
+    def setTrainingEpochs(self, value: int) -> None:
+        self._settings.trainingEpochs.value = value
+
+    def setMaeWeight(self, value: Decimal) -> None:
+        self._settings.maeWeight.value = value
+
+    def setNllWeight(self, value: Decimal) -> None:
+        self._settings.nllWeight.value = value
+
+    def setRealspaceMAEWeight(self, value: Decimal) -> None:
+        self._settings.realspaceMAEWeight.value = value
+
+    def setRealspaceWeight(self, value: Decimal) -> None:
+        self._settings.realspaceWeight.value = value
+
+    def getValidationSetFractionalSize(self) -> Decimal:
+        return self._settings.validationSetFractionalSize.value
+
+    def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('0'), Decimal('1'))
+
+    def getMaximumLearningRate(self) -> Decimal:
+        return self._settings.maximumLearningRate.value
+
+    def getMinimumLearningRate(self) -> Decimal:
+        return self._settings.minimumLearningRate.value
+
+    def getTrainingEpochs(self) -> int:
+        return self._settings.trainingEpochs.value
+
+    def getTrainingEpochsLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getMaeWeight(self) -> Decimal:
+        return self._settings.maeWeight.value
+
+    def getNllWeight(self) -> Decimal:
+        return self._settings.nllWeight.value
+
+    def getRealspaceMAEWeight(self) -> Decimal:
+        return self._settings.realspaceMAEWeight.value
+
+    def getRealspaceWeight(self) -> Decimal:
+        return self._settings.realspaceWeight.value
     MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, settings: PtychoPINNTrainingSettings) -> None:
@@ -231,12 +282,49 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoPINNReconstructorLibrary:
+    def createInstance(cls, settingsRegistry: SettingsRegistry, objectAPI: ObjectAPI,
+                       isDeveloperModeEnabled: bool) -> PtychoPINNReconstructorLibrary:
         modelSettings = PtychoPINNModelSettings.createInstance(settingsRegistry)
         trainingSettings = PtychoPINNTrainingSettings.createInstance(settingsRegistry)
         ptychoPINNReconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
+        reconstructors: list[TrainableReconstructor] = list()
+
+        try:
+            from .reconstructor import PtychoPINNTrainableReconstructor
+        except ModuleNotFoundError:
+            logger.info('PtychoPINN not found.')
+
+            if isDeveloperModeEnabled:
+                reconstructors.append(ptychoPINNReconstructor)
+        else:
+            ptychoPINNReconstructor = PtychoPINNTrainableReconstructor(modelSettings,
+                                                                        trainingSettings,
+                                                                        objectAPI)
+            reconstructors.append(ptychoPINNReconstructor)
+
+        return cls(modelSettings, trainingSettings, reconstructors)
         reconstructors: list[TrainableReconstructor] = [ptychoPINNReconstructor]
         return cls(modelSettings, trainingSettings, reconstructors)
+
+    def load_model(self, path: str):
+        # TODO: Define the method to load the model from a given path. This method should
+        # support loading the model architecture and weights from the file specified by `path`.
+        # Consider using TensorFlow's `load_model` function or an equivalent in other libraries.
+        pass
+
+    def reconstruct(self, input_data):
+        # TODO: Implement the reconstruction logic using the loaded model. This method should
+        # take input data, preprocess it as required by the model, perform inference to
+        # reconstruct the image or pattern, and then postprocess the output as needed.
+        # Ensure the input data is correctly shaped and scaled for the model.
+        pass
+
+    def save_results(self, results, output_path: str):
+        # TODO: Implement the logic to save the reconstruction results to a file. This method
+        # should take the results of the reconstruction and save them to `output_path`.
+        # Consider the format in which the results should be saved (e.g., images, numpy arrays)
+        # and use appropriate libraries (e.g., PIL for images, numpy for arrays) to save the data.
+        pass
 
     @property
     def name(self) -> str:
