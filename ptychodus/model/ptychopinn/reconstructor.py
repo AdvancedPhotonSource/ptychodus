@@ -80,11 +80,10 @@ class ObjectPatchCircularBuffer:
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
-    def __init__(self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI, *, enableAmplitude: bool) -> None:
+    def __init__(self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._objectAPI = objectAPI
-        self._enableAmplitude = enableAmplitude
         self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
         ptychopinnVersion = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinnVersion}')
@@ -103,7 +102,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     @property
     def name(self) -> str:
-        return 'AmplitudePhase' if self._enableAmplitude else 'PhaseOnly'
+        return 'AmplitudePhase' 
 
     # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
 
