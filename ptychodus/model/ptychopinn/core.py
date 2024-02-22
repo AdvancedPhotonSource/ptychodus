@@ -293,17 +293,37 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)
-from ..api.reconstructor import ReconstructorLibrary
+from ...api.observer import Observable, Observer
+from ...api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
+                                  TrainableReconstructor)
+from ...api.settings import SettingsRegistry
+from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
+from ..object import ObjectAPI
 
 class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
-    @staticmethod
-    def createInstance(settingsRegistry, objectAPI, isDeveloperModeEnabled: bool) -> PtychoPINNReconstructorLibrary:
-        # Initialize the PtychoPINN reconstructor library with necessary settings
-        # This is a placeholder implementation. Actual initialization logic will vary.
-        return PtychoPINNReconstructorLibrary()
 
-    def __init__(self):
+    def __init__(self, modelSettings: PtychoPINNModelSettings,
+                 trainingSettings: PtychoPINNTrainingSettings,
+                 reconstructors: Sequence[Reconstructor]) -> None:
         super().__init__()
-        # Initialize any PtychoPINN-specific settings or resources here
+        self._modelSettings = modelSettings
+        self._trainingSettings = trainingSettings
+        self.modelPresenter = PtychoPINNModelPresenter.createInstance(modelSettings)
+        self.trainingPresenter = PtychoPINNTrainingPresenter.createInstance(trainingSettings)
+        self._reconstructors = reconstructors
 
-    # Implement any additional methods required for the PtychoPINN reconstruction process
+    @classmethod
+    def createInstance(cls, settingsRegistry: SettingsRegistry, objectAPI: ObjectAPI,
+                       isDeveloperModeEnabled: bool) -> PtychoPINNReconstructorLibrary:
+        modelSettings = PtychoPINNModelSettings.createInstance(settingsRegistry)
+        trainingSettings = PtychoPINNTrainingSettings.createInstance(settingsRegistry)
+        ptychoPINNReconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
+        reconstructors: list[TrainableReconstructor] = [ptychoPINNReconstructor]
+        return cls(modelSettings, trainingSettings, reconstructors)
+
+    @property
+    def name(self) -> str:
+        return 'PtychoPINN'
+
+    def __iter__(self) -> Iterator[Reconstructor]:
+        return iter(self._reconstructors)
