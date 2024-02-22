@@ -293,37 +293,3 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)
-from ...api.observer import Observable, Observer
-from ...api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
-                                  TrainableReconstructor)
-from ...api.settings import SettingsRegistry
-from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
-from ..object import ObjectAPI
-
-class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
-
-    def __init__(self, modelSettings: PtychoPINNModelSettings,
-                 trainingSettings: PtychoPINNTrainingSettings,
-                 reconstructors: Sequence[Reconstructor]) -> None:
-        super().__init__()
-        self._modelSettings = modelSettings
-        self._trainingSettings = trainingSettings
-        self.modelPresenter = PtychoPINNModelPresenter.createInstance(modelSettings)
-        self.trainingPresenter = PtychoPINNTrainingPresenter.createInstance(trainingSettings)
-        self._reconstructors = reconstructors
-
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry, objectAPI: ObjectAPI,
-                       isDeveloperModeEnabled: bool) -> PtychoPINNReconstructorLibrary:
-        modelSettings = PtychoPINNModelSettings.createInstance(settingsRegistry)
-        trainingSettings = PtychoPINNTrainingSettings.createInstance(settingsRegistry)
-        ptychoPINNReconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
-        reconstructors: list[TrainableReconstructor] = [ptychoPINNReconstructor]
-        return cls(modelSettings, trainingSettings, reconstructors)
-
-    @property
-    def name(self) -> str:
-        return 'PtychoPINN'
-
-    def __iter__(self) -> Iterator[Reconstructor]:
-        return iter(self._reconstructors)
