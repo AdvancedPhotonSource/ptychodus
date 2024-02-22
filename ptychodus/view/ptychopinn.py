@@ -20,8 +20,6 @@ class PtychoPINNModelParametersView(QGroupBox):
         self.gridSizeSpinBox = QSpinBox()
         self.nFiltersScaleLabel = QLabel('N Filters Scale:')
         self.nFiltersScaleSpinBox = QSpinBox()
-        self.batchSizeLabel = QLabel('Batch Size:')
-        self.batchSizeSpinBox = QSpinBox()
         self.nPhotonsLabel = QLabel('N Photons:')
         self.nPhotonsLineEdit = DecimalLineEdit.createInstance()
         self.probeTrainableCheckBox = QCheckBox('Probe Trainable')
