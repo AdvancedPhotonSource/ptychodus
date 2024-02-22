@@ -46,8 +46,6 @@ class PtychoPINNModelParametersView(QGroupBox):
         layout.addWidget(view.batchSizeSpinBox, 2, 1, 1, 2)
         layout.addWidget(view.nFiltersScaleLabel, 2, 0)
         layout.addWidget(view.nFiltersScaleSpinBox, 2, 1, 1, 2)
-        layout.addWidget(view.batchSizeLabel, 3, 0)
-        layout.addWidget(view.batchSizeSpinBox, 3, 1, 1, 2)
         layout.addWidget(view.nPhotonsLabel, 4, 0)
         layout.addWidget(view.nPhotonsLineEdit, 4, 1, 1, 2)
         layout.addWidget(view.probeTrainableCheckBox, 5, 0, 1, 3)
