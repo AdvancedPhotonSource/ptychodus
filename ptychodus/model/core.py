@@ -112,7 +112,7 @@ class ModelCore:
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
-        self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
+        self.ptychopinnReconstructorLibrary = PtychoPINNReconstructorLibrary.createInstance(
             self.settingsRegistry, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
         self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
@@ -320,3 +320,4 @@ class ModelCore:
     @property
     def automationProcessingPresenter(self) -> AutomationProcessingPresenter:
         return self._automationCore.processingPresenter
+from .ptychopinn import PtychoPINNReconstructorLibrary

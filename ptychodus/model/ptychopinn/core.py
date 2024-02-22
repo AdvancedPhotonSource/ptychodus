@@ -293,3 +293,17 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)
+from ..api.reconstructor import ReconstructorLibrary
+
+class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
+    @staticmethod
+    def createInstance(settingsRegistry, objectAPI, isDeveloperModeEnabled: bool) -> PtychoPINNReconstructorLibrary:
+        # Initialize the PtychoPINN reconstructor library with necessary settings
+        # This is a placeholder implementation. Actual initialization logic will vary.
+        return PtychoPINNReconstructorLibrary()
+
+    def __init__(self):
+        super().__init__()
+        # Initialize any PtychoPINN-specific settings or resources here
+
+    # Implement any additional methods required for the PtychoPINN reconstruction process
