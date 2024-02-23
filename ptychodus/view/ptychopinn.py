@@ -5,7 +5,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QCheckBox, QFormLayout, QGridLayout, QGroupBox, QLabel, QLineEdit,
                              QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
-from .widgets import DecimalLineEdit, DecimalSlider
+from PyQt5.QtWidgets import QSpinBox
+from .widgets import DecimalSlider
 
 
 class PtychoPINNModelParametersView(QGroupBox):
@@ -21,7 +22,7 @@ class PtychoPINNModelParametersView(QGroupBox):
         self.nFiltersScaleLabel = QLabel('N Filters Scale:')
         self.nFiltersScaleSpinBox = QSpinBox()
         self.nPhotonsLabel = QLabel('N Photons:')
-        self.nPhotonsLineEdit = DecimalLineEdit.createInstance()
+        self.nPhotonsSpinBox = QSpinBox()
         self.probeTrainableCheckBox = QCheckBox('Probe Trainable')
         self.intensityScaleTrainableCheckBox = QCheckBox('Intensity Scale Trainable')
         self.objectBigCheckBox = QCheckBox('Object Big')
@@ -45,7 +46,7 @@ class PtychoPINNModelParametersView(QGroupBox):
         layout.addWidget(view.nFiltersScaleLabel, 2, 0)
         layout.addWidget(view.nFiltersScaleSpinBox, 2, 1, 1, 2)
         layout.addWidget(view.nPhotonsLabel, 3, 0)
-        layout.addWidget(view.nPhotonsLineEdit, 3, 1, 1, 2)
+        layout.addWidget(view.nPhotonsSpinBox, 3, 1, 1, 2)
         layout.addWidget(view.probeTrainableCheckBox, 4, 0, 1, 3)
         layout.addWidget(view.intensityScaleTrainableCheckBox, 5, 0, 1, 3)
         layout.addWidget(view.objectBigCheckBox, 6, 0, 1, 3)
