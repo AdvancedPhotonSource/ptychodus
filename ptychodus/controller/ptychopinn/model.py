@@ -26,15 +26,13 @@ class PtychoPINNModelParametersController(Observer):
         view.modelStateBrowseButton.clicked.connect(controller._openModelState)
         view.gridSizeSpinBox.valueChanged.connect(presenter.setGridsize)
         view.nFiltersScaleSpinBox.valueChanged.connect(presenter.setNFiltersScale)
-        view.nPhotonsSpinBox.valueChanged.connect(presenter.setNPhotons)
+        view.nPhotonsLineEdit.editingFinished.connect(lambda: presenter.setNPhotons(Decimal(view.nPhotonsLineEdit.text())))
         view.probeTrainableCheckBox.toggled.connect(presenter.setProbeTrainable)
         view.intensityScaleTrainableCheckBox.toggled.connect(presenter.setIntensityScaleTrainable)
         view.objectBigCheckBox.toggled.connect(presenter.setObjectBig)
         view.probeBigCheckBox.toggled.connect(presenter.setProbeBig)
         view.probeScaleLineEdit.editingFinished.connect(lambda: presenter.setProbeScale(Decimal(view.probeScaleLineEdit.text())))
-        view.ampActivationLineEdit.editingFinished.connect(lambda: presenter.setAmpActivation(view.ampActivationLineEdit.text()))
         view.probeMaskCheckBox.toggled.connect(presenter.setProbeMask)
-        view.ampActivationLineEdit.editingFinished.connect(lambda: presenter.setAmpActivation(view.ampActivationLineEdit.text()))
 
         controller._syncModelToView()
 
@@ -68,7 +66,7 @@ class PtychoPINNModelParametersController(Observer):
         self._view.intensityScaleTrainableCheckBox.setChecked(self._presenter.isIntensityScaleTrainable())
         self._view.objectBigCheckBox.setChecked(self._presenter.isObjectBig())
         self._view.probeBigCheckBox.setChecked(self._presenter.isProbeBig())
-        self._view.probeScaleLineEdit.setValue(self._presenter.getProbeScale())
+        self._view.probeScaleLineEdit.setText(str(self._presenter.getProbeScale()))
         self._view.probeMaskCheckBox.setChecked(self._presenter.isProbeMask())
         self._view.ampActivationLineEdit.setText(self._presenter.getAmpActivation())
 
