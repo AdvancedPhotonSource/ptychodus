@@ -26,7 +26,7 @@ class PtychoPINNModelParametersController(Observer):
         view.modelStateBrowseButton.clicked.connect(controller._openModelState)
         view.gridSizeSpinBox.valueChanged.connect(presenter.setGridsize)
         view.nFiltersScaleSpinBox.valueChanged.connect(presenter.setNFiltersScale)
-        view.nPhotonsLineEdit.editingFinished.connect(lambda: presenter.setNPhotons(Decimal(view.nPhotonsLineEdit.text())))
+        view.nPhotonsLineEdit.valueChanged.connect(lambda value: presenter.setNPhotons(value))
         view.probeTrainableCheckBox.toggled.connect(presenter.setProbeTrainable)
         view.intensityScaleTrainableCheckBox.toggled.connect(presenter.setIntensityScaleTrainable)
         view.objectBigCheckBox.toggled.connect(presenter.setObjectBig)
