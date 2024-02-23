@@ -53,7 +53,7 @@ class PtychoPINNModelParametersView(QGroupBox):
         layout.addWidget(view.objectBigCheckBox, 6, 0, 1, 3)
         layout.addWidget(view.probeBigCheckBox, 7, 0, 1, 3)
         layout.addWidget(view.probeScaleLabel, 8, 0)
-        layout.addWidget(view.probeScaleSpinBox, 8, 1, 1, 2)
+        layout.addWidget(view.probeScaleLineEdit, 8, 1, 1, 2)
         layout.addWidget(view.probeMaskCheckBox, 9, 0, 1, 3)
         layout.addWidget(view.ampActivationLabel, 9, 0)
         layout.addWidget(view.ampActivationLineEdit, 9, 1, 1, 2)
