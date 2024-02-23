@@ -18,7 +18,6 @@ class PtychoPINNModelSettings(Observable, Observer):
         self.offset = settingsGroup.createIntegerEntry('Offset', 4)
         self.gridsize = settingsGroup.createIntegerEntry('Gridsize', 2)
         self.batch_size = settingsGroup.createIntegerEntry('BatchSize', 16)
-        self.batch_size = settingsGroup.createIntegerEntry('BatchSize', 16)
         self.n_filters_scale = settingsGroup.createIntegerEntry('NFiltersScale', 2)
         self.nphotons = settingsGroup.createRealEntry('NPhotons', '1e9')
         self.probe_trainable = settingsGroup.createBooleanEntry('ProbeTrainable', False)
