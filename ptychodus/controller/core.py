@@ -74,10 +74,7 @@ class ControllerCore:
             self._fileDialogFactory,
             [
                 self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory,
-                self._tikeViewControllerFactory
-            ],
-            [
-                self._ptychopinnViewControllerFactory
+                self._tikeViewControllerFactory, self._ptychopinnViewControllerFactory
             ],
         )
         self._workflowController = WorkflowController.createInstance(
