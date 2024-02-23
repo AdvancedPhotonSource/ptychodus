@@ -71,8 +71,8 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
 
                 point = ScanPoint(
                     int(row[self.DATA_POINT_COLUMN]),
-                    float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
-                    float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
+                    -float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
+                    -float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
                 )
                 pointList.append(point)
 
