@@ -31,7 +31,7 @@ class PtychoPINNModelParametersController(Observer):
         view.intensityScaleTrainableCheckBox.toggled.connect(presenter.setIntensityScaleTrainable)
         view.objectBigCheckBox.toggled.connect(presenter.setObjectBig)
         view.probeBigCheckBox.toggled.connect(presenter.setProbeBig)
-        view.probeScaleLineEdit.editingFinished.connect(lambda: presenter.setProbeScale(float(view.probeScaleLineEdit.text())))
+        view.probeScaleLineEdit.editingFinished.connect(lambda: presenter.setProbeScale(Decimal(view.probeScaleLineEdit.text())))
         view.ampActivationLineEdit.editingFinished.connect(lambda: presenter.setAmpActivation(view.ampActivationLineEdit.text()))
         view.probeMaskCheckBox.toggled.connect(presenter.setProbeMask)
         view.ampActivationLineEdit.editingFinished.connect(lambda: presenter.setAmpActivation(view.ampActivationLineEdit.text()))
