@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from enum import auto, Enum
+from enum import auto, IntEnum
 import logging
 
 import numpy
@@ -12,7 +12,7 @@ from ...api.probe import Probe, ProbeArrayType
 logger = logging.getLogger(__name__)
 
 
-class ProbeModeDecayType(Enum):
+class ProbeModeDecayType(IntEnum):
     POLYNOMIAL = auto()
     EXPONENTIAL = auto()
 
@@ -25,9 +25,7 @@ class MultimodalProbeBuilder(ParameterRepository):
 
         self.isOrthogonalizeModesEnabled = self._registerBooleanParameter(
             'IsOrthogonalizeModesEnabled', True)
-        self.numberOfAdditionalModes = self._registerIntegerParameter('NumberOfAdditionalModes',
-                                                                      0,
-                                                                      minimum=0)
+        self.numberOfModes = self._registerIntegerParameter('NumberOfModes', 1, minimum=1)
         self.modeDecayType = self._registerStringParameter('ProbeModeDecayType', 'Polynomial')
         self.modeDecayRatio = self._registerRealParameter('ModeDecayRatio',
                                                           1.,
@@ -50,7 +48,7 @@ class MultimodalProbeBuilder(ParameterRepository):
         else:
             raise ValueError('Probe array must contain at least two dimensions.')
 
-        for mode in range(self.numberOfAdditionalModes.getValue()):
+        for mode in range(self.numberOfModes.getValue() - 1):
             # randomly shift the first mode
             pw = probe.shape[-1]  # TODO clean up
             variate1 = self._rng.uniform(size=(2, 1)) - 0.5
@@ -99,7 +97,7 @@ class MultimodalProbeBuilder(ParameterRepository):
         return adjustedProbe
 
     def build(self, probe: Probe) -> Probe:
-        if self.numberOfAdditionalModes.getValue() < 1:
+        if self.numberOfModes.getValue() <= 1:
             return probe
 
         array = self._initializeModes(probe.array)
@@ -108,8 +106,7 @@ class MultimodalProbeBuilder(ParameterRepository):
             array = self._orthogonalizeModes(array)
 
         array = self._adjustRelativePower(array)
-        geometry = probe.getGeometry()
 
         return Probe(array,
-                     pixelWidthInMeters=geometry.pixelWidthInMeters,
-                     pixelHeightInMeters=geometry.pixelHeightInMeters)
+                     pixelWidthInMeters=probe.pixelWidthInMeters,
+                     pixelHeightInMeters=probe.pixelHeightInMeters)

@@ -32,6 +32,12 @@ class ScanBoundingBoxBuilder:
         )
 
     def getBoundingBox(self) -> ScanBoundingBox | None:
+        isEmptyX = (self._maximumXInMeters < self._minimumXInMeters)
+        isEmptyY = (self._maximumYInMeters < self._minimumYInMeters)
+
+        if isEmptyX or isEmptyY:
+            return None
+
         return ScanBoundingBox(
             minimumXInMeters=self._minimumXInMeters,
             maximumXInMeters=self._maximumXInMeters,

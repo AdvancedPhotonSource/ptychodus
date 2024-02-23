@@ -5,12 +5,12 @@ from typing import Final
 import logging
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QSpinBox,
-                             QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGroupBox, QSpinBox, QWidget)
 
 from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
-from ..api.parametric import IntegerParameter, RealParameter
+from ..api.parametric import BooleanParameter, IntegerParameter, RealParameter
 from ..view.widgets import DecimalLineEdit, DecimalSlider, LengthWidget
 
 logger = logging.getLogger(__name__)
@@ -27,15 +27,39 @@ class ParameterViewController(ABC):
         pass
 
 
+class CheckBoxParameterViewController(ParameterViewController, Observer):
+
+    def __init__(self, parameter: BooleanParameter) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = QCheckBox()
+
+        self._syncModelToView()
+        self._widget.toggled.connect(parameter.setValue)
+        parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncModelToView(self) -> None:
+        self._widget.setChecked(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
 class SpinBoxParameterViewController(ParameterViewController, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
     def __init__(self, parameter: IntegerParameter) -> None:
+        super().__init__()
         self._parameter = parameter
         self._widget = QSpinBox()
 
         self._syncModelToView()
         self._widget.valueChanged.connect(parameter.setValue)
+        parameter.addObserver(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
@@ -65,11 +89,13 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 
     def __init__(self, parameter: RealParameter) -> None:
+        super().__init__()
         self._parameter = parameter
         self._widget = DecimalLineEdit.createInstance()
 
         self._syncModelToView()
         self._widget.valueChanged.connect(parameter.setValue)
+        parameter.addObserver(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
@@ -88,14 +114,19 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 class DecimalSliderParameterViewController(ParameterViewController, Observer):
 
     def __init__(self, parameter: RealParameter) -> None:
+        super().__init__()
         self._parameter = parameter
         self._widget = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
 
         self._syncModelToView()
-        self._widget.valueChanged.connect(parameter.setValue)
+        self._widget.valueChanged.connect(self._syncViewToModel)
+        parameter.addObserver(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
+
+    def _syncViewToModel(self, value: Decimal) -> None:
+        self._parameter.setValue(float(value))
 
     def _syncModelToView(self) -> None:
         minimum = self._parameter.getMinimum()
@@ -116,11 +147,13 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
 class LengthWidgetParameterViewController(ParameterViewController, Observer):
 
     def __init__(self, parameter: RealParameter) -> None:
+        super().__init__()
         self._parameter = parameter
         self._widget = LengthWidget.createInstance()
 
         self._syncModelToView()
         self._widget.lengthChanged.connect(self._syncViewToModel)
+        parameter.addObserver(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
@@ -160,27 +193,60 @@ class ParameterDialog(QDialog):
 class ParameterDialogBuilder:
 
     def __init__(self) -> None:
-        self._viewControllers: dict[str, ParameterViewController] = dict()
+        self._viewControllers: dict[tuple[str, str], ParameterViewController] = dict()
 
-    def addSpinBox(self, label: str, parameter: IntegerParameter) -> None:
-        self._viewControllers[label] = SpinBoxParameterViewController(parameter)
+    def addCheckBox(self, parameter: BooleanParameter, label: str, group: str = '') -> None:
+        viewController = CheckBoxParameterViewController(parameter)
+        self.addViewController(viewController, label, group)
 
-    def addDecimalLineEdit(self, label: str, parameter: RealParameter) -> None:
-        self._viewControllers[label] = DecimalLineEditParameterViewController(parameter)
+    def addSpinBox(self, parameter: IntegerParameter, label: str, group: str = '') -> None:
+        viewController = SpinBoxParameterViewController(parameter)
+        self.addViewController(viewController, label, group)
 
-    def addDecimalSlider(self, label: str, parameter: RealParameter) -> None:
-        self._viewControllers[label] = DecimalSliderParameterViewController(parameter)
+    def addDecimalLineEdit(self, parameter: RealParameter, label: str, group: str = '') -> None:
+        viewController = DecimalLineEditParameterViewController(parameter)
+        self.addViewController(viewController, label, group)
 
-    def addLengthWidget(self, label: str, parameter: RealParameter) -> None:
-        self._viewControllers[label] = LengthWidgetParameterViewController(parameter)
+    def addDecimalSlider(self, parameter: RealParameter, label: str, group: str = '') -> None:
+        viewController = DecimalSliderParameterViewController(parameter)
+        self.addViewController(viewController, label, group)
+
+    def addLengthWidget(self, parameter: RealParameter, label: str, group: str = '') -> None:
+        viewController = LengthWidgetParameterViewController(parameter)
+        self.addViewController(viewController, label, group)
+
+    def addViewController(self,
+                          viewController: ParameterViewController,
+                          label: str,
+                          group: str = '') -> None:
+        self._viewControllers[group, label] = viewController
 
     def build(self, windowTitle: str, parent: QWidget | None) -> QDialog:
-        layout = QFormLayout()
+        groupDict = {'': QFormLayout()}
 
-        for label, vc in self._viewControllers.items():
-            layout.addRow(f'{label}:', vc.getWidget())
+        for (groupName, widgetLabel), vc in self._viewControllers.items():
+            try:
+                layout = groupDict[groupName]
+            except KeyError:
+                layout = QFormLayout()
+                groupDict[groupName] = layout
+
+            widget = vc.getWidget()
+
+            if isinstance(widget, CheckBoxParameterViewController):
+                widget.setText(widgetLabel)
+                layout.addRow(widget)
+            else:
+                layout.addRow(f'{widgetLabel}:', widget)
 
         buttonBox = QDialogButtonBox()
+        layout = groupDict.pop('')
+
+        for groupName, groupLayout in groupDict.items():
+            groupBox = QGroupBox(groupName)
+            groupBox.setLayout(groupLayout)
+            layout.addRow(groupBox)
+
         layout.addRow(buttonBox)
 
         dialog = ParameterDialog(list(self._viewControllers.values()), buttonBox, parent)

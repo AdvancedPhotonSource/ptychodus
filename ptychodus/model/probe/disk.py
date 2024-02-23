@@ -24,7 +24,7 @@ class DiskProbeBuilder(ProbeBuilder):
         r_m = self.diameterInMeters.getValue() / 2.
 
         return Probe(
-            array=self.normalize(numpy.where(R_m < r_m, 1., 0.) + 0j),
+            array=self.normalize(numpy.where(R_m < r_m, 1 + 0j, 0j)),
             pixelWidthInMeters=geometry.pixelWidthInMeters,
             pixelHeightInMeters=geometry.pixelHeightInMeters,
         )

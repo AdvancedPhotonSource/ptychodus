@@ -12,14 +12,15 @@ logger = logging.getLogger(__name__)
 
 class ProbeRepositoryItem(ParameterRepository):
 
-    def __init__(self, builder: ProbeBuilder, modesBuilder: MultimodalProbeBuilder) -> None:
+    def __init__(self, builder: ProbeBuilder,
+                 additionalModesBuilder: MultimodalProbeBuilder) -> None:
         super().__init__('Probe')
         self._builder = builder
-        self._modesBuilder = modesBuilder
+        self._additionalModesBuilder = additionalModesBuilder
         self._probe = Probe()
 
         self._addParameterRepository(builder, observe=True)
-        self._addParameterRepository(modesBuilder, observe=True)
+        self._addParameterRepository(additionalModesBuilder, observe=True)
 
         self._rebuild()
 
@@ -44,13 +45,16 @@ class ProbeRepositoryItem(ParameterRepository):
             logger.exception('Failed to reinitialize probe!')
             return
 
-        self._probe = self._modesBuilder.build(probe)
+        self._probe = self._additionalModesBuilder.build(probe)
         self.notifyObservers()
+
+    def getAdditionalModesBuilder(self) -> MultimodalProbeBuilder:
+        return self._additionalModesBuilder
 
     def update(self, observable: Observable) -> None:
         if observable is self._builder:
             self._rebuild()
-        elif observable is self._modesBuilder:
+        elif observable is self._additionalModesBuilder:
             self._rebuild()
         else:
             super().update(observable)

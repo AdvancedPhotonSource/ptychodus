@@ -11,6 +11,10 @@ from .builder import ProbeBuilder
 
 @dataclass(frozen=True)
 class FresnelZonePlate:
+    # FIXME 'Velociprobe': FresnelZonePlate(180e-6, 50e-9, 60e-6),
+    # FIXME '2-ID-D': FresnelZonePlate(160e-6, 70e-9, 60e-6),
+    # FIXME 'LYNX': FresnelZonePlate(114.8e-6, 60e-9, 40e-6),
+    # FIXME 'HXN': FresnelZonePlate(160e-6, 30e-9, 80e-6),
     zonePlateDiameterInMeters: float
     outermostZoneWidthInMeters: float
     centralBeamstopDiameterInMeters: float
@@ -131,12 +135,3 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
             pixelWidthInMeters=geometry.pixelWidthInMeters,
             pixelHeightInMeters=geometry.pixelHeightInMeters,
         )
-
-
-# FIXME self._custom = FresnelZonePlate(180e-6, 50e-9, 60e-6)
-# FIXME self._fzpDict: Mapping[str, FresnelZonePlate] = {
-# FIXME     'Velociprobe': FresnelZonePlate(180e-6, 50e-9, 60e-6),
-# FIXME     '2-ID-D': FresnelZonePlate(160e-6, 70e-9, 60e-6),
-# FIXME     'LYNX': FresnelZonePlate(114.8e-6, 60e-9, 40e-6),
-# FIXME     'HXN': FresnelZonePlate(160e-6, 30e-9, 80e-6),
-# FIXME }

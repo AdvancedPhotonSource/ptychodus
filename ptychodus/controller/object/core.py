@@ -200,6 +200,10 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._listModel.updateItem(index, item)
         self._treeModel.updateItem(index, item)
 
+        if index == self._getCurrentItemIndex():
+            currentIndex = self._view.treeView.currentIndex()
+            self._updateView(currentIndex, currentIndex)
+
     def handleItemRemoved(self, index: int, item: ObjectRepositoryItem) -> None:
         self._listModel.removeItem(index, item)
         self._treeModel.removeItem(index, item)

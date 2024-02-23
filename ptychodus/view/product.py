@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QHBoxLayout, QLabel,
-                             QMenu, QPushButton, QTableView, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
+                             QLabel, QMenu, QPlainTextEdit, QPushButton, QTableView, QVBoxLayout,
+                             QWidget)
 
 
 class ProductEditorDialog(QDialog):
@@ -9,17 +10,26 @@ class ProductEditorDialog(QDialog):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.tableView = QTableView()
+        self.textEdit = QPlainTextEdit()
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ProductEditorDialog:
         view = cls(parent)
 
+        commentsLayout = QVBoxLayout()
+        commentsLayout.setContentsMargins(0, 0, 0, 0)
+        commentsLayout.addWidget(view.textEdit)
+
+        commentsBox = QGroupBox('Comments')
+        commentsBox.setLayout(commentsLayout)
+
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
         layout.addWidget(view.tableView)
+        layout.addWidget(commentsBox)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 

@@ -30,8 +30,10 @@ class RectangularProbeBuilder(ProbeBuilder):
         aY_m = numpy.fabs(coords.positionYInMeters)
         ry_m = self.heightInMeters.getValue() / 2.
 
+        isInside = numpy.logical_and(aX_m < rx_m, aY_m < ry_m)
+
         return Probe(
-            array=self.normalize(numpy.where(aX_m < rx_m and aY_m < ry_m, 1., 0.) + 0j),
+            array=self.normalize(numpy.where(isInside, 1 + 0j, 0j)),
             pixelWidthInMeters=geometry.pixelWidthInMeters,
             pixelHeightInMeters=geometry.pixelHeightInMeters,
         )

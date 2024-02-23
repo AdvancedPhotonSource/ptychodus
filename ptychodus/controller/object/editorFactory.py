@@ -14,13 +14,13 @@ class ObjectEditorViewControllerFactory:
 
         if isinstance(objectBuilder, RandomObjectBuilder):
             dialogBuilder = ParameterDialogBuilder()
-            dialogBuilder.addSpinBox('Number of Layers', objectBuilder.numberOfLayers)
-            dialogBuilder.addLengthWidget('Layer Distance', objectBuilder.layerDistanceInMeters)
-            dialogBuilder.addSpinBox('Extra Padding X', objectBuilder.extraPaddingX)
-            dialogBuilder.addSpinBox('Extra Padding Y', objectBuilder.extraPaddingY)
-            dialogBuilder.addDecimalSlider('Amplitude Mean', objectBuilder.amplitudeMean)
-            dialogBuilder.addDecimalSlider('Amplitude Deviation', objectBuilder.amplitudeDeviation)
-            dialogBuilder.addDecimalSlider('Phase Deviation', objectBuilder.phaseDeviation)
+            dialogBuilder.addSpinBox(objectBuilder.numberOfLayers, 'Number of Layers')
+            dialogBuilder.addLengthWidget(objectBuilder.layerDistanceInMeters, 'Layer Distance')
+            dialogBuilder.addSpinBox(objectBuilder.extraPaddingX, 'Extra Padding X')
+            dialogBuilder.addSpinBox(objectBuilder.extraPaddingY, 'Extra Padding Y')
+            dialogBuilder.addDecimalSlider(objectBuilder.amplitudeMean, 'Amplitude Mean')
+            dialogBuilder.addDecimalSlider(objectBuilder.amplitudeDeviation, 'Amplitude Deviation')
+            dialogBuilder.addDecimalSlider(objectBuilder.phaseDeviation, 'Phase Deviation')
             return dialogBuilder.build(title, parent)
 
         return QMessageBox(QMessageBox.Icon.Information, title,

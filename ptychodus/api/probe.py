@@ -157,7 +157,7 @@ class Probe:
         return self._modeRelativePower[number]
 
     def getCoherence(self) -> float:
-        return numpy.sum(numpy.square(self._modeRelativePower))
+        return numpy.sqrt(numpy.sum(numpy.square(self._modeRelativePower)))
 
 
 class ProbeFileReader(ABC):

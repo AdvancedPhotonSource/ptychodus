@@ -56,7 +56,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
         return len(self._header)
 
 
-class ProductEditorViewController(Observer):
+class ProductEditorViewController(Observer):  # FIXME edit comments
 
     def __init__(self, product: ProductRepositoryItem,
                  tableModel: ProductPropertyTableModel) -> None:

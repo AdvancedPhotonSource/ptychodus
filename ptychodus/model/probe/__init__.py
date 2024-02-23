@@ -5,12 +5,14 @@ from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
 from .item import ProbeRepositoryItem
 from .itemFactory import ProbeRepositoryItemFactory
-from .multimodal import ProbeModeDecayType
+from .multimodal import MultimodalProbeBuilder, ProbeModeDecayType
+from .rect import RectangularProbeBuilder
 from .superGaussian import SuperGaussianProbeBuilder
 
 __all__ = [
     'DiskProbeBuilder',
     'FresnelZonePlateProbeBuilder',
+    'MultimodalProbeBuilder',
     'ProbeBuilder',
     'ProbeBuilderFactory',
     'ProbeCore',
@@ -19,5 +21,6 @@ __all__ = [
     'ProbeRepositoryItem',
     'ProbeRepositoryItemFactory',
     'ProbeRepositoryPresenter',
+    'RectangularProbeBuilder',
     'SuperGaussianProbeBuilder',
 ]
