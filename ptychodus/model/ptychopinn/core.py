@@ -306,6 +306,26 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         reconstructors: list[TrainableReconstructor] = [ptychoPINNReconstructor]
         return cls(modelSettings, trainingSettings, reconstructors)
 
+    def load_model(self, path: str):
+        # TODO: Define the method to load the model from a given path. This method should
+        # support loading the model architecture and weights from the file specified by `path`.
+        # Consider using TensorFlow's `load_model` function or an equivalent in other libraries.
+        pass
+
+    def reconstruct(self, input_data):
+        # TODO: Implement the reconstruction logic using the loaded model. This method should
+        # take input data, preprocess it as required by the model, perform inference to
+        # reconstruct the image or pattern, and then postprocess the output as needed.
+        # Ensure the input data is correctly shaped and scaled for the model.
+        pass
+
+    def save_results(self, results, output_path: str):
+        # TODO: Implement the logic to save the reconstruction results to a file. This method
+        # should take the results of the reconstruction and save them to `output_path`.
+        # Consider the format in which the results should be saved (e.g., images, numpy arrays)
+        # and use appropriate libraries (e.g., PIL for images, numpy for arrays) to save the data.
+        pass
+
     @property
     def name(self) -> str:
         return 'PtychoPINN'
