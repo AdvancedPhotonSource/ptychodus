@@ -74,9 +74,8 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self.realspace_mae_weight = settingsGroup.createRealEntry('RealspaceMAEWeight', '0.')
         self.realspace_weight = settingsGroup.createRealEntry('RealspaceWeight', '0.')
     def update(self, observable: Observable) -> None:
-        # Implement the update method to handle changes in observed settings.
-        # This method is required by the Observer interface.
-        pass
+        if observable is self._settingsGroup:
+            self.notifyObservers()
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoPINNTrainingSettings:
