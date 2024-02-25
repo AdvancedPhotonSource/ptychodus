@@ -1,5 +1,6 @@
-from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel,
-                          QVariant)
+from typing import Any
+
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
 from PyQt5.QtWidgets import QWidget
 
 from ...api.observer import Observable, Observer
@@ -23,31 +24,25 @@ class ProductPropertyTableModel(QAbstractTableModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        result = QVariant()
-
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            result = QVariant(self._header[section])
+            return self._header[section]
 
-        return result
-
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             if index.column() == 0:
-                return QVariant(self._properties[index.row()])
+                return self._properties[index.row()]
             elif index.column() == 1:
                 geometry = self._product.getGeometry()
 
                 if index.row() == 0:
-                    return QVariant(f'{geometry.probeWavelengthInMeters * 1.e9:.4g}')
+                    return f'{geometry.probeWavelengthInMeters * 1.e9:.4g}'
                 elif index.row() == 1:
-                    return QVariant(f'{geometry.fresnelNumber:.4g}')
+                    return f'{geometry.fresnelNumber:.4g}'
                 elif index.row() == 2:
-                    return QVariant(f'{geometry.objectPlanePixelWidthInMeters * 1.e9:.4g}')
+                    return f'{geometry.objectPlanePixelWidthInMeters * 1.e9:.4g}'
                 elif index.row() == 3:
-                    return QVariant(f'{geometry.objectPlanePixelHeightInMeters * 1.e9:.4g}')
-
-        return QVariant()
+                    return f'{geometry.objectPlanePixelHeightInMeters * 1.e9:.4g}'
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._properties)

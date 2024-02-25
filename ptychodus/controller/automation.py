@@ -1,7 +1,8 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import Any
 
-from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QTimer, QVariant
+from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QTimer
 from PyQt5.QtGui import QFont
 
 from ..api.observer import Observable, Observer
@@ -122,13 +123,10 @@ class AutomationProcessingListModel(QAbstractListModel):
         super().__init__(parent)
         self._presenter = presenter
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        value = QVariant()
-
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
             if role == Qt.ItemDataRole.DisplayRole:
-                label = self._presenter.getDatasetLabel(index.row())
-                value = QVariant(label)
+                return self._presenter.getDatasetLabel(index.row())
             elif role == Qt.ItemDataRole.FontRole:
                 font = QFont()
                 state = self._presenter.getDatasetState(index.row())
@@ -138,9 +136,7 @@ class AutomationProcessingListModel(QAbstractListModel):
                 elif state == AutomationDatasetState.PROCESSING:
                     font.setBold(True)
 
-                value = QVariant(font)
-
-        return value
+                return font
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return self._presenter.getNumberOfDatasets()

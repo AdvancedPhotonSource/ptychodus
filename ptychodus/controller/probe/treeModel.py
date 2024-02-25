@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import overload
+from typing import Any, overload
 
 import numpy
 
-from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
 from ...model.probe import ProbeRepositoryItem
 from ...model.product import ProbeRepository
@@ -86,11 +86,9 @@ class ProbeTreeModel(QAbstractItemModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return QVariant(self._header[section])
-
-        return QVariant()
+            return self._header[section]
 
     @overload
     def parent(self, index: QModelIndex) -> QModelIndex:
@@ -123,9 +121,9 @@ class ProbeTreeModel(QAbstractItemModel):
 
         return QModelIndex()
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if not index.isValid():
-            return QVariant()
+            return None
 
         parent = index.parent()
 
@@ -133,39 +131,36 @@ class ProbeTreeModel(QAbstractItemModel):
             item = self._repository[parent.row()]
 
             if role == Qt.ItemDataRole.DisplayRole and index.column() == 0:
-                return QVariant(f'Mode {index.row() + 1}')
+                return f'Mode {index.row() + 1}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.getProbe()
                 relativePower = probe.getModeRelativePower(index.row())
 
                 if numpy.isfinite(relativePower):
-                    return QVariant(int(100. * relativePower))
+                    return int(100. * relativePower)
         else:
             item = self._repository[index.row()]
             probe = item.getProbe()
 
             if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
-                    return QVariant(self._repository.getName(index.row()))
+                    return self._repository.getName(index.row())
                 elif index.column() == 1:
-                    return QVariant()
+                    return None
                 elif index.column() == 2:
-                    return QVariant(item.getBuilder().getName())
+                    return item.getBuilder().getName()
                 elif index.column() == 3:
-                    return QVariant(str(probe.dataType))
+                    return str(probe.dataType)
                 elif index.column() == 4:
-                    return QVariant(probe.widthInPixels)
+                    return probe.widthInPixels
                 elif index.column() == 5:
-                    return QVariant(probe.heightInPixels)
+                    return probe.heightInPixels
                 elif index.column() == 6:
-                    return QVariant(f'{probe.sizeInBytes / (1024 * 1024):.2f}')
+                    return f'{probe.sizeInBytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.getProbe()
                 coherence = probe.getCoherence()
-                return QVariant(int(100. * coherence)) if numpy.isfinite(coherence) \
-                        else QVariant(-1)
-
-        return QVariant()
+                return int(100. * coherence) if numpy.isfinite(coherence) else -1
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -180,17 +175,17 @@ class ProbeTreeModel(QAbstractItemModel):
 
     def setData(self,
                 index: QModelIndex,
-                value: QVariant,
+                value: Any,
                 role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             parent = index.parent()
 
             if not parent.isValid():
                 if index.column() == 0:
-                    self._repository.setName(index.row(), value.value())
+                    self._repository.setName(index.row(), str(value))
                     return True
                 elif index.column() == 2:
-                    self._repository.setBuilderByName(index.row(), value.value())
+                    self._repository.setBuilderByName(index.row(), str(value))
                     return True
 
         return False

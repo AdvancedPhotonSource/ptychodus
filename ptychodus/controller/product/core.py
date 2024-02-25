@@ -1,9 +1,9 @@
 from __future__ import annotations
+from typing import Any
 import logging
 import sys
 
-from PyQt5.QtCore import (Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel,
-                          QVariant)
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.visualize import Plot2D
@@ -45,47 +45,38 @@ class ProductRepositoryTableModel(QAbstractTableModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        result = QVariant()
-
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            result = QVariant(self._header[section])
+            return self._header[section]
 
-        return result
-
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        value = QVariant()
-
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
             try:
                 item = self._repository[index.row()]
             except IndexError as err:
                 logger.exception(err)
-                return value
+                return None
 
             metadata = item.getMetadata()
             geometry = item.getGeometry()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
-                    value = QVariant(metadata.name.getValue())
+                    return metadata.name.getValue()
                 elif index.column() == 1:
-                    value = QVariant(
-                        f'{metadata.probeEnergyInElectronVolts.getValue() / 1000.:.1f}')
+                    return f'{metadata.probeEnergyInElectronVolts.getValue() / 1000.:.1f}'
                 elif index.column() == 2:
-                    value = QVariant(f'{metadata.detectorDistanceInMeters.getValue():.3g}')
+                    return f'{metadata.detectorDistanceInMeters.getValue():.3g}'
                 elif index.column() == 3:
-                    value = QVariant(f'{geometry.objectPlanePixelWidthInMeters:.3g}')
+                    return f'{geometry.objectPlanePixelWidthInMeters:.3g}'
                 elif index.column() == 4:
-                    value = QVariant(f'{geometry.objectPlanePixelHeightInMeters:.3g}')
+                    return f'{geometry.objectPlanePixelHeightInMeters:.3g}'
                 elif index.column() == 5:
-                    value = QVariant(f'{sys.getsizeof(item) / (1024 * 1024):.2f}')
-
-        return value
+                    return f'{sys.getsizeof(item) / (1024 * 1024):.2f}'
 
     def setData(self,
                 index: QModelIndex,
-                value: QVariant,
+                value: Any,
                 role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             try:
@@ -97,13 +88,23 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             metadata = item.getMetadata()
 
             if index.column() == 0:
-                metadata.name.setValue(value.value())
+                metadata.name.setValue(str(value))
                 return True
             elif index.column() == 1:
-                metadata.probeEnergyInElectronVolts.setValue(value.value() * 1000)
+                try:
+                    energyInKEV = float(value)
+                except ValueError:
+                    return False
+
+                metadata.probeEnergyInElectronVolts.setValue(energyInKEV * 1000)
                 return True
             elif index.column() == 2:
-                metadata.detectorDistanceInMeters.setValue(value.value())
+                try:
+                    distanceInM = float(value)
+                except ValueError:
+                    return False
+
+                metadata.detectorDistanceInMeters.setValue(distanceInM)
                 return True
 
         return False

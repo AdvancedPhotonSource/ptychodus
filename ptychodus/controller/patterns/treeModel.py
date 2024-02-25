@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import overload
+from typing import Any, overload
 
-from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QFont
 
 from ...api.patterns import DiffractionPatternArrayType, DiffractionPatternState
@@ -115,13 +115,9 @@ class DatasetTreeModel(QAbstractItemModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        result = QVariant()
-
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            result = QVariant(self._header[section])
-
-        return result
+            return self._header[section]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -135,25 +131,21 @@ class DatasetTreeModel(QAbstractItemModel):
 
         return value
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        value = QVariant()
-
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
             node = index.internalPointer()
 
             if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
-                    value = QVariant(node.label)
+                    return node.label
                 elif index.column() == 1:
-                    value = QVariant(node.numberOfFrames)
+                    return node.numberOfFrames
                 elif index.column() == 2:
-                    value = QVariant(f'{node.sizeInBytes / (1024 * 1024):.2f}')
+                    return f'{node.sizeInBytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.FontRole:
                 font = QFont()
                 font.setItalic(node.state == DiffractionPatternState.FOUND)
-                value = QVariant(font)
-
-        return value
+                return font
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         value = QModelIndex()

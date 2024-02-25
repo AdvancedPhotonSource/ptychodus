@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import overload
+from typing import Any, overload
 
-from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
 from ...model.object import ObjectRepositoryItem
 from ...model.product import ObjectRepository
@@ -84,11 +84,9 @@ class ObjectTreeModel(QAbstractItemModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return QVariant(self._header[section])
-
-        return QVariant()
+            return self._header[section]
 
     @overload
     def parent(self, index: QModelIndex) -> QModelIndex:
@@ -121,9 +119,9 @@ class ObjectTreeModel(QAbstractItemModel):
 
         return QModelIndex()
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if not index.isValid():
-            return QVariant()
+            return None
 
         parent = index.parent()
 
@@ -132,32 +130,30 @@ class ObjectTreeModel(QAbstractItemModel):
 
             if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
-                    return QVariant(f'Layer {index.row() + 1}')
-                if index.column() == 1:
+                    return f'Layer {index.row() + 1}'
+                if index.column() == 1:  # FIXME edit layer distance
                     object_ = item.getObject()
                     distanceInMeters = object_.getLayerDistanceInMeters(index.row())
-                    return QVariant(distanceInMeters)
+                    return distanceInMeters
         else:
             item = self._repository[index.row()]
             object_ = item.getObject()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
-                    return QVariant(self._repository.getName(index.row()))
+                    return self._repository.getName(index.row())
                 elif index.column() == 1:
-                    return QVariant()
+                    return None
                 elif index.column() == 2:
-                    return QVariant(item.getBuilder().getName())
+                    return item.getBuilder().getName()
                 elif index.column() == 3:
-                    return QVariant(str(object_.dataType))
+                    return str(object_.dataType)
                 elif index.column() == 4:
-                    return QVariant(object_.widthInPixels)
+                    return object_.widthInPixels
                 elif index.column() == 5:
-                    return QVariant(object_.heightInPixels)
+                    return object_.heightInPixels
                 elif index.column() == 6:
-                    return QVariant(f'{object_.sizeInBytes / (1024 * 1024):.2f}')
-
-        return QVariant()
+                    return f'{object_.sizeInBytes / (1024 * 1024):.2f}'
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -172,17 +168,17 @@ class ObjectTreeModel(QAbstractItemModel):
 
     def setData(self,
                 index: QModelIndex,
-                value: QVariant,
+                value: Any,
                 role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             parent = index.parent()
 
             if not parent.isValid():
                 if index.column() == 0:
-                    self._repository.setName(index.row(), value.value())
+                    self._repository.setName(index.row(), str(value))
                     return True
                 elif index.column() == 2:
-                    self._repository.setBuilderByName(index.row(), value.value())
+                    self._repository.setBuilderByName(index.row(), str(value))
                     return True
 
         return False

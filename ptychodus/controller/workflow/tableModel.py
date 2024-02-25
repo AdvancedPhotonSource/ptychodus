@@ -1,4 +1,6 @@
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl, QVariant
+from typing import Any
+
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl
 from PyQt5.QtGui import QColor, QFont
 
 from ...model.workflow import WorkflowStatusPresenter
@@ -22,51 +24,43 @@ class WorkflowTableModel(QAbstractTableModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        value = QVariant()
-
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if role == Qt.ItemDataRole.DisplayRole:
             if orientation == Qt.Orientation.Horizontal:
-                value = QVariant(self._sectionHeaders[section])
+                return self._sectionHeaders[section]
             elif orientation == Qt.Orientation.Vertical:
-                value = QVariant(section)
+                return section
 
-        return value
-
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        value = QVariant()
-
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
             flowRun = self._presenter[index.row()]
 
             if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
-                    value = QVariant(flowRun.label)
+                    return flowRun.label
                 elif index.column() == 1:
-                    value = QVariant(flowRun.startTime.strftime(self._dtFormat))
+                    return flowRun.startTime.strftime(self._dtFormat)
                 elif index.column() == 2:
                     if flowRun.completionTime is not None:
-                        value = QVariant(flowRun.completionTime.strftime(self._dtFormat))
+                        return flowRun.completionTime.strftime(self._dtFormat)
                 elif index.column() == 3:
-                    value = QVariant(flowRun.status)
+                    return flowRun.status
                 elif index.column() == 4:
-                    value = QVariant(flowRun.action)
+                    return flowRun.action
                 elif index.column() == 5:
-                    value = QVariant(flowRun.runID)
+                    return flowRun.runID
             elif index.column() == 5:
                 if role == Qt.ItemDataRole.ToolTipRole:
-                    value = QVariant(flowRun.runURL)
+                    return flowRun.runURL
                 elif role == Qt.ItemDataRole.FontRole:
                     font = QFont()
                     font.setUnderline(True)
-                    value = QVariant(font)
+                    return font
                 elif role == Qt.ItemDataRole.ForegroundRole:
                     color = QColor(Qt.GlobalColor.blue)
-                    value = QVariant(color)
+                    return color
                 elif role == Qt.ItemDataRole.UserRole:
-                    value = QVariant(QUrl(flowRun.runURL))
-
-        return value
+                    return QUrl(flowRun.runURL)
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._presenter)

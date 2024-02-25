@@ -1,6 +1,6 @@
-from typing import overload
+from typing import Any, overload
 
-from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
 from ...api.tree import SimpleTreeNode
 
@@ -44,13 +44,9 @@ class SimpleTreeModel(QAbstractItemModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        value = None
-
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            value = self._rootNode.data(section)
-
-        return QVariant(value)
+            return self._rootNode.data(section)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         return super().flags(index)
@@ -67,14 +63,10 @@ class SimpleTreeModel(QAbstractItemModel):
 
         return value
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        value = QVariant()
-
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             node = index.internalPointer()
-            value = node.data(index.column())
-
-        return value
+            return node.data(index.column())
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.column() > 0:

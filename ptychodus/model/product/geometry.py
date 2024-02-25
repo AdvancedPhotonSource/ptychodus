@@ -40,7 +40,11 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
         planckConstant_eV_per_Hz = 4.135667696e-15
         lightSpeedInMetersPerSecond = 299792458
         hc_eVm = planckConstant_eV_per_Hz * lightSpeedInMetersPerSecond
-        return hc_eVm / self._metadata.probeEnergyInElectronVolts.getValue()
+
+        try:
+            return hc_eVm / self._metadata.probeEnergyInElectronVolts.getValue()
+        except ZeroDivisionError:
+            return 0.
 
     @property
     def _lambdaZInSquareMeters(self) -> float:

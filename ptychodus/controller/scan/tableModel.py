@@ -1,4 +1,6 @@
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
+from typing import Any
+
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
 
 from ...model.product import ScanRepository
 from ...model.scan import ScanRepositoryItem
@@ -31,38 +33,34 @@ class ScanTableModel(QAbstractTableModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return QVariant(self._header[section])
+            return self._header[section]
 
-        return QVariant()
-
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if not index.isValid():
-            return QVariant()
+            return None
 
         item = self._repository[index.row()]
         scan = item.getScan()
 
         if role == Qt.ItemDataRole.DisplayRole:
             if index.column() == 0:
-                return QVariant(self._repository.getName(index.row()))
+                return self._repository.getName(index.row())
             elif index.column() == 1:
-                return QVariant()
+                return None
             elif index.column() == 2:
-                return QVariant(item.getBuilder().getName())
+                return item.getBuilder().getName()
             elif index.column() == 3:
-                return QVariant(len(scan))
+                return len(scan)
             elif index.column() == 4:
-                return QVariant(f'{item.getLengthInMeters():.6f}')  # FIXME
+                return f'{item.getLengthInMeters():.6f}'  # FIXME
             elif index.column() == 5:
-                return QVariant(f'{scan.sizeInBytes / (1024 * 1024):.2f}')
+                return f'{scan.sizeInBytes / (1024 * 1024):.2f}'
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:
-                return QVariant(Qt.CheckState.Checked if index.row() in
-                                self._checkedItemIndexes else Qt.CheckState.Unchecked)
-
-        return QVariant()
+                return Qt.CheckState.Checked if index.row() in self._checkedItemIndexes \
+                        else Qt.CheckState.Unchecked
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -78,21 +76,21 @@ class ScanTableModel(QAbstractTableModel):
 
     def setData(self,
                 index: QModelIndex,
-                value: QVariant,
+                value: Any,
                 role: int = Qt.ItemDataRole.EditRole) -> bool:
         if not index.isValid():
             return False
 
         if role == Qt.ItemDataRole.EditRole:
             if index.column() == 0:
-                self._repository.setName(index.row(), value.value())
+                self._repository.setName(index.row(), str(value))
                 return True
             elif index.column() == 2:
-                self._repository.setBuilderByName(index.row(), value.value())
+                self._repository.setBuilderByName(index.row(), str(value))
                 return True
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:
-                if value.value() == Qt.CheckState.Checked:
+                if value == Qt.CheckState.Checked:
                     self._checkedItemIndexes.add(index.row())
                 else:
                     self._checkedItemIndexes.discard(index.row())

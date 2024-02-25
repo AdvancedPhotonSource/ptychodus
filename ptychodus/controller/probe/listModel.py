@@ -1,4 +1,6 @@
-from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QVariant
+from typing import Any
+
+from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject
 
 from ...model.probe import ProbeRepositoryItem
 from ...model.product import ProbeRepository
@@ -23,11 +25,9 @@ class ProbeListModel(QAbstractListModel):
         self.beginRemoveRows(QModelIndex(), index, index)
         self.endRemoveRows()
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            return QVariant(self._repository.getName(index.row()))
-
-        return QVariant()
+            return self._repository.getName(index.row())
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._repository)
