@@ -180,17 +180,17 @@ class ProbeTreeModel(QAbstractItemModel):
 
     def setData(self,
                 index: QModelIndex,
-                value: str,
+                value: QVariant,
                 role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             parent = index.parent()
 
             if not parent.isValid():
                 if index.column() == 0:
-                    self._repository.setName(index.row(), value)
+                    self._repository.setName(index.row(), value.value())
                     return True
                 elif index.column() == 2:
-                    self._repository.setBuilderByName(index.row(), value)
+                    self._repository.setBuilderByName(index.row(), value.value())
                     return True
 
         return False

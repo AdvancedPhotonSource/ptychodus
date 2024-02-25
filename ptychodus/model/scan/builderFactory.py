@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 import logging
 
@@ -13,11 +13,10 @@ from .spiral import SpiralScanBuilder
 logger = logging.getLogger(__name__)
 
 
-class ScanBuilderFactory(Mapping[str, ScanBuilder]):
+class ScanBuilderFactory(Iterable[str]):
 
     def __init__(self, fileReaderChooser: PluginChooser[ScanFileReader],
                  fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
-        super().__init__()
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[], ScanBuilder]] = {
@@ -33,16 +32,13 @@ class ScanBuilderFactory(Mapping[str, ScanBuilder]):
     def __iter__(self) -> Iterator[str]:
         return iter(self._builders)
 
-    def __getitem__(self, name: str) -> ScanBuilder:
+    def create(self, name: str) -> ScanBuilder:
         try:
             factory = self._builders[name]
         except KeyError as exc:
             raise KeyError(f'Unknown scan builder \"{name}\"!') from exc
 
         return factory()
-
-    def __len__(self) -> int:
-        return len(self._builders)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()

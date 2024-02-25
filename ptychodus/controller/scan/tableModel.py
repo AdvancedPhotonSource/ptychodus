@@ -1,60 +1,78 @@
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QVariant
 
-from ...model.scan import ScanRepositoryPresenter
+from ...model.product import ScanRepository
+from ...model.scan import ScanRepositoryItem
 
 
 class ScanTableModel(QAbstractTableModel):
 
-    def __init__(self, presenter: ScanRepositoryPresenter, parent: QObject | None = None) -> None:
+    def __init__(self, repository: ScanRepository, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._presenter = presenter
-        self._header = ['Name', 'Initializer', 'Points', 'Length [m]', 'Size [MB]']
-        self._checkedNames: set[str] = set()
+        self._repository = repository
+        self._header = ['Name', 'Plot', 'Builder', 'Points', 'Length [m]', 'Size [MB]']
+        self._checkedItemIndexes: set[int] = set()
 
-    def isChecked(self, name: str) -> bool:
-        return (name in self._checkedNames)
+    def insertItem(self, index: int, item: ScanRepositoryItem) -> None:
+        self.beginInsertRows(QModelIndex(), index, index)
+        self.endInsertRows()
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = super().flags(index)
+    def updateItem(self, index: int, item: ScanRepositoryItem) -> None:
+        topLeft = self.index(index, 0)
+        bottomRight = self.index(index, len(self._header))
+        self.dataChanged.emit(topLeft, bottomRight)
 
-        if index.isValid() and index.column() == 0:
-            value |= Qt.ItemFlag.ItemIsUserCheckable
+    def removeItem(self, index: int, item: ScanRepositoryItem) -> None:
+        self.beginRemoveRows(QModelIndex(), index, index)
+        self.endRemoveRows()
 
-        return value
+    def isItemChecked(self, itemIndex: int) -> bool:
+        return (itemIndex in self._checkedItemIndexes)
 
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        result = QVariant()
-
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            result = QVariant(self._header[section])
+            return QVariant(self._header[section])
 
-        return result
+        return QVariant()
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> QVariant:
-        value = QVariant()
+        if not index.isValid():
+            return QVariant()
+
+        item = self._repository[index.row()]
+        scan = item.getScan()
+
+        if role == Qt.ItemDataRole.DisplayRole:
+            if index.column() == 0:
+                return QVariant(self._repository.getName(index.row()))
+            elif index.column() == 1:
+                return QVariant()
+            elif index.column() == 2:
+                return QVariant(item.getBuilder().getName())
+            elif index.column() == 3:
+                return QVariant(len(scan))
+            elif index.column() == 4:
+                return QVariant(f'{item.getLengthInMeters():.6f}')  # FIXME
+            elif index.column() == 5:
+                return QVariant(f'{scan.sizeInBytes / (1024 * 1024):.2f}')
+        elif role == Qt.ItemDataRole.CheckStateRole:
+            if index.column() == 1:
+                return QVariant(Qt.CheckState.Checked if index.row() in
+                                self._checkedItemIndexes else Qt.CheckState.Unchecked)
+
+        return QVariant()
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        value = super().flags(index)
 
         if index.isValid():
-            itemPresenter = self._presenter[index.row()]
-            item = itemPresenter.item
+            if index.column() in (0, 2):
+                value |= Qt.ItemFlag.ItemIsEditable
 
-            if role == Qt.ItemDataRole.DisplayRole:
-                if index.column() == 0:
-                    value = QVariant(itemPresenter.name)
-                elif index.column() == 1:
-                    value = QVariant(item.getInitializerSimpleName())
-                elif index.column() == 2:
-                    value = QVariant(len(item))
-                elif index.column() == 3:
-                    value = QVariant(f'{item.getLengthInMeters():.6f}')
-                elif index.column() == 4:
-                    value = QVariant(f'{item.getSizeInBytes() / (1024 * 1024):.2f}')
-            elif role == Qt.ItemDataRole.CheckStateRole:
-                if index.column() == 0:
-                    value = QVariant(Qt.CheckState.Checked if itemPresenter.name in
-                                     self._checkedNames else Qt.CheckState.Unchecked)
+            if index.column() == 1:
+                value |= Qt.ItemFlag.ItemIsUserCheckable
 
         return value
 
@@ -62,22 +80,29 @@ class ScanTableModel(QAbstractTableModel):
                 index: QModelIndex,
                 value: QVariant,
                 role: int = Qt.ItemDataRole.EditRole) -> bool:
-        if index.isValid() and index.column() == 0 and role == Qt.ItemDataRole.CheckStateRole:
-            item = self._presenter[index.row()]
+        if not index.isValid():
+            return False
 
-            if value == QVariant(Qt.CheckState.Checked):
-                self._checkedNames.add(item.name)
-            else:
-                self._checkedNames.discard(item.name)
+        if role == Qt.ItemDataRole.EditRole:
+            if index.column() == 0:
+                self._repository.setName(index.row(), value.value())
+                return True
+            elif index.column() == 2:
+                self._repository.setBuilderByName(index.row(), value.value())
+                return True
+        elif role == Qt.ItemDataRole.CheckStateRole:
+            if index.column() == 1:
+                if value.value() == Qt.CheckState.Checked:
+                    self._checkedItemIndexes.add(index.row())
+                else:
+                    self._checkedItemIndexes.discard(index.row())
 
-            self.dataChanged.emit(index, index)
-
-            return True
+                return True
 
         return False
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._presenter)
+        return len(self._repository)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._header)

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QGridLayout,
-                             QGroupBox, QLabel, QSizePolicy, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import QAbstractButton, QDialog, QDialogButtonBox, QVBoxLayout, QWidget
 
 
-class ProbePropagationDialog(QDialog):
+class ProbePropagationDialog(QDialog):  # FIXME use this
 
     def __init__(self, buttonBox: QDialogButtonBox, parent: QWidget | None) -> None:
         super().__init__(parent)

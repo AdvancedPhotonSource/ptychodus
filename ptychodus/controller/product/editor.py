@@ -56,20 +56,18 @@ class ProductPropertyTableModel(QAbstractTableModel):
         return len(self._header)
 
 
-class ProductEditorViewController(Observer):  # FIXME edit comments
+class ProductEditorViewController(Observer):
 
-    def __init__(self, product: ProductRepositoryItem,
-                 tableModel: ProductPropertyTableModel) -> None:
+    def __init__(self, product: ProductRepositoryItem, tableModel: ProductPropertyTableModel,
+                 dialog: ProductEditorDialog) -> None:
         super().__init__()
         self._product = product
         self._tableModel = tableModel
+        self._dialog = dialog
 
     @classmethod
     def editProduct(cls, product: ProductRepositoryItem, parent: QWidget) -> None:
         tableModel = ProductPropertyTableModel(product)
-        controller = cls(product, tableModel)
-        product.addObserver(controller)
-
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
@@ -78,17 +76,31 @@ class ProductEditorViewController(Observer):  # FIXME edit comments
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)
         dialog.tableView.verticalHeader().hide()
-        dialog.finished.connect(controller._finish)
+        dialog.tableView.resizeColumnsToContents()
+        dialog.tableView.resizeRowsToContents()
 
-        controller._syncModelToView()
+        viewController = cls(product, tableModel, dialog)
+        product.addObserver(viewController)
+        dialog.textEdit.textChanged.connect(viewController._syncViewToModel)
+
+        viewController._syncModelToView()
+        dialog.finished.connect(viewController._finish)
         dialog.open()
+        dialog.adjustSize()
 
-    def _finish(self, result: int) -> None:
-        self._product.removeObserver(self)
+    def _syncViewToModel(self) -> None:
+        metadata = self._product.getMetadata()
+        metadata.comments.setValue(self._dialog.textEdit.toPlainText())
 
     def _syncModelToView(self) -> None:
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
+
+        metadata = self._product.getMetadata()
+        self._dialog.textEdit.setPlainText(metadata.comments.getValue())
+
+    def _finish(self, result: int) -> None:
+        self._product.removeObserver(self)
 
     def update(self, observable: Observable) -> None:
         if observable is self._product:

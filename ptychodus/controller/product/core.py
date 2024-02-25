@@ -85,7 +85,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
     def setData(self,
                 index: QModelIndex,
-                value: str,
+                value: QVariant,
                 role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             try:
@@ -97,24 +97,14 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             metadata = item.getMetadata()
 
             if index.column() == 0:
-                metadata.name.setValue(value)
+                metadata.name.setValue(value.value())
                 return True
             elif index.column() == 1:
-                try:
-                    energyInKEV = float(value)
-                except ValueError:
-                    pass
-                else:
-                    metadata.probeEnergyInElectronVolts.setValue(energyInKEV * 1000)
-                    return True
+                metadata.probeEnergyInElectronVolts.setValue(value.value() * 1000)
+                return True
             elif index.column() == 2:
-                try:
-                    distanceInMeters = float(value)
-                except ValueError:
-                    pass
-                else:
-                    metadata.detectorDistanceInMeters.setValue(distanceInMeters)
-                    return True
+                metadata.detectorDistanceInMeters.setValue(value.value())
+                return True
 
         return False
 

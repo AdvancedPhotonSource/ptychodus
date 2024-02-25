@@ -15,7 +15,7 @@ from .product import ProductController
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import ReconstructorController
-# FIXME from .scan import ScanController
+from .scan import ScanController
 from .settings import SettingsController
 from .tike import TikeViewControllerFactory
 from .workflow import WorkflowController
@@ -46,7 +46,9 @@ class ControllerCore:
         self._productController = ProductController.createInstance(model.productRepository,
                                                                    view.productView,
                                                                    self._fileDialogFactory)
-        # FIXME self._scanController = ScanController.createInstance(model.scanRepositoryPresenter, view.scanView, view.scanPlotView, self._fileDialogFactory)
+        self._scanController = ScanController.createInstance(model.scanRepository, view.scanView,
+                                                             view.scanPlotView,
+                                                             self._fileDialogFactory)
         self._probeController = ProbeController.createInstance(model.probeRepository,
                                                                model.probeImagePresenter,
                                                                view.probeView, view.probeImageView,
