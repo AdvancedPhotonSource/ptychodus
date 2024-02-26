@@ -69,7 +69,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentObject)
 
-        view.copierDialog.setWindowTitle('Object Copier')
+        view.copierDialog.setWindowTitle('Copy Object')
         view.copierDialog.sourceComboBox.setModel(listModel)
         view.copierDialog.destinationComboBox.setModel(listModel)
         view.copierDialog.finished.connect(controller._finishCopyingObject)

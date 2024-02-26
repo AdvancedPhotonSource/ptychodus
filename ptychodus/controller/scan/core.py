@@ -63,7 +63,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentScan)
 
-        view.copierDialog.setWindowTitle('Scan Copier')
+        view.copierDialog.setWindowTitle('Copy Scan')
         view.copierDialog.sourceComboBox.setModel(tableModel)
         view.copierDialog.destinationComboBox.setModel(tableModel)
         view.copierDialog.finished.connect(controller._finishCopyingScan)

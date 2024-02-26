@@ -34,7 +34,6 @@ from .probe import ProbeCore
 from .product import (ObjectRepository, ProbeRepository, ProductCore, ProductRepository,
                       ScanRepository)
 from .ptychonn import PtychoNNReconstructorLibrary
-from .ptychopy import PtychoPyReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .scan import ScanCore
 from .tike import TikeReconstructorLibrary
@@ -106,8 +105,6 @@ class ModelCore:
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
-        self.ptychopyReconstructorLibrary = PtychoPyReconstructorLibrary.createInstance(
-            self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             self._patternsCore.dataset,
@@ -115,7 +112,6 @@ class ModelCore:
             [
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
-                self.ptychopyReconstructorLibrary,
             ],
         )
         self._analysisCore = AnalysisCore(self._productCore.objectRepository)

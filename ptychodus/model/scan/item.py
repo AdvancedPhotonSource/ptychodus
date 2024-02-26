@@ -89,6 +89,9 @@ class ScanRepositoryItem(ParameterRepository):
             self._untransformedScan = scan
             self._transformScan()
 
+    def getTransform(self) -> ScanPointTransform:
+        return self._transform
+
     def update(self, observable: Observable) -> None:
         if observable is self._builder:
             self._rebuild()

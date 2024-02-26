@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonB
 from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
 from ..api.parametric import BooleanParameter, IntegerParameter, RealParameter
-from ..view.widgets import DecimalLineEdit, DecimalSlider, LengthWidget
+from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWidget
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +169,31 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
             self._syncModelToView()
 
 
+class AngleWidgetParameterViewController(ParameterViewController, Observer):
+
+    def __init__(self, parameter: RealParameter) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = AngleWidget.createInstance()
+
+        self._syncModelToView()
+        self._widget.angleChanged.connect(self._syncViewToModel)
+        parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncViewToModel(self, value: Decimal) -> None:
+        self._parameter.setValue(float(value))
+
+    def _syncModelToView(self) -> None:
+        self._widget.setAngleInTurns(Decimal(repr(self._parameter.getValue())))
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
 class ParameterDialog(QDialog):
 
     def __init__(self, viewControllers: Sequence[ParameterViewController],
@@ -213,6 +238,10 @@ class ParameterDialogBuilder:
 
     def addLengthWidget(self, parameter: RealParameter, label: str, group: str = '') -> None:
         viewController = LengthWidgetParameterViewController(parameter)
+        self.addViewController(viewController, label, group)
+
+    def addAngleWidget(self, parameter: RealParameter, label: str, group: str = '') -> None:
+        viewController = AngleWidgetParameterViewController(parameter)
         self.addViewController(viewController, label, group)
 
     def addViewController(self,

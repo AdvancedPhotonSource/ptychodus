@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 import logging
 
 from PyQt5.QtCore import PYQT_VERSION_STR, QSize, QT_VERSION_STR, Qt
@@ -23,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ViewCore(QMainWindow):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
 
         self.navigationToolBar = QToolBar()
@@ -79,7 +78,7 @@ class ViewCore(QMainWindow):
     @classmethod
     def createInstance(cls,
                        isDeveloperModeEnabled: bool,
-                       parent: Optional[QWidget] = None) -> ViewCore:
+                       parent: QWidget | None = None) -> ViewCore:
         logger.info(f'PyQt {PYQT_VERSION_STR}')
         logger.info(f'Qt {QT_VERSION_STR}')
 

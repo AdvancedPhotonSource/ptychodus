@@ -20,7 +20,6 @@ module = [
     "hdf5plugin",
     "parsl.*",
     "ptychonn.*",
-    "ptychopy",
     "pvaccess",
     "pvapy.*",
     "scipy.*",

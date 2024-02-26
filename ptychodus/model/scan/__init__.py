@@ -8,6 +8,7 @@ from .item import ScanRepositoryItem
 from .itemFactory import ScanRepositoryItemFactory
 from .lissajous import LissajousScanBuilder
 from .spiral import SpiralScanBuilder
+from .transform import ScanPointTransform
 
 __all__ = [
     'CartesianScanBuilder',
@@ -18,6 +19,7 @@ __all__ = [
     'ScanBuilderFactory',
     'ScanCore',
     'ScanIndexFilter',
+    'ScanPointTransform',
     'ScanRepositoryItem',
     'ScanRepositoryItemFactory',
     'SpiralScanBuilder',

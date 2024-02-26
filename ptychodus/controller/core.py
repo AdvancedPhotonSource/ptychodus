@@ -13,7 +13,6 @@ from .patterns import PatternsController
 from .probe import ProbeController
 from .product import ProductController
 from .ptychonn import PtychoNNViewControllerFactory
-from .ptychopy import PtychoPyViewControllerFactory
 from .reconstructor import ReconstructorController
 from .scan import ScanController
 from .settings import SettingsController
@@ -29,8 +28,6 @@ class ControllerCore:
         self._memoryController = MemoryController.createInstance(model.memoryPresenter,
                                                                  view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
-        self._ptychopyViewControllerFactory = PtychoPyViewControllerFactory(
-            model.ptychopyReconstructorLibrary)
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
             model.ptychonnReconstructorLibrary, self._fileDialogFactory)
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
@@ -62,10 +59,7 @@ class ControllerCore:
             view.reconstructorParametersView,
             view.reconstructorPlotView,
             self._fileDialogFactory,
-            [
-                self._ptychopyViewControllerFactory, self._ptychonnViewControllerFactory,
-                self._tikeViewControllerFactory
-            ],
+            [self._ptychonnViewControllerFactory, self._tikeViewControllerFactory],
         )
         self._workflowController = WorkflowController.createInstance(
             model.workflowParametersPresenter, model.workflowAuthorizationPresenter,

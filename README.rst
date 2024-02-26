@@ -1,11 +1,7 @@
 Ptychodus
 =========
 
-`ptychodus`_ is a ptychography analysis application that supports multiple reconstruction libraries. Current reconstructor status:
-
-* `tike`_ is working
-* `PtychoNN`_ is working
-* `ptychopy`_ is under development
+`ptychodus`_ is a ptychography analysis application that supports multiple reconstruction libraries.
 
 Standard Installation
 ---------------------
@@ -68,13 +64,13 @@ Developer Installation
    $ conda activate ptychodus
    $ pip install -e ./ptychodus
 
-* To install the `tike` backend:
+* To install the `tike`_ backend:
 
 .. code-block:: shell
 
    $ conda install -n ptychodus -c conda-forge tike
 
-* To install the `PtychoNN` backend:
+* To install the `PtychoNN`_ backend:
 
 .. code-block:: shell
 
@@ -108,6 +104,5 @@ Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
 
 .. _`ptychodus`: https://github.com/AdvancedPhotonSource/ptychodus
 .. _`tike`: https://github.com/tomography/tike
-.. _`ptychopy`: https://github.com/AdvancedPhotonSource/ptychopy
 .. _`PtychoNN`: https://github.com/mcherukara/PtychoNN
 .. _`PvaPy`: https://github.com/epics-base/pvaPy

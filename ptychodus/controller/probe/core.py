@@ -67,7 +67,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentProbe)
 
-        view.copierDialog.setWindowTitle('Probe Copier')
+        view.copierDialog.setWindowTitle('Copy Probe')
         view.copierDialog.sourceComboBox.setModel(listModel)
         view.copierDialog.destinationComboBox.setModel(listModel)
         view.copierDialog.finished.connect(controller._finishCopyingProbe)
