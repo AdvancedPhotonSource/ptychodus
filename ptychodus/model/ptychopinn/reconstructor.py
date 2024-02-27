@@ -107,28 +107,11 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        # Extract diffraction patterns from the pattern buffer
-        diffractionPatterns = self._patternBuffer.getBuffer()
-        # Extract object patches (amplitude and phase) from the object patch buffer
-        objectPatches = self._objectPatchBuffer.getBuffer()
-        # Extract scan coordinates from the ReconstructInput parameter
-        scanCoordinates = numpy.array(list(parameters.scan.values()))
-        # This method will be updated in the next steps to use loader.RawData.from_coords_without_pc
-        # to load a training dataset from the pattern buffer.
-        from ptycho.loader import PtychoDataContainer
         diffractionPatterns = self._patternBuffer.getBuffer()
         scanCoordinates = numpy.array(list(parameters.scan.values()))
-        xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
         probeGuess = parameters.probeArray
         objectGuess = parameters.objectInterpolator.getArray()
-        self._ptychoDataContainer = PtychoDataContainer.from_raw_data_without_pc(
-            xcoords=xcoords,
-            ycoords=ycoords,
-            diff3d=diffractionPatterns,
-            probeGuess=probeGuess,
-            scan_index=numpy.zeros(len(diffractionPatterns)),# TODO assuming all patches are from the same object
-            objectGuess=objectGuess
-        )
+        self._ptychoDataContainer = create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess, scanCoordinates)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self.fileFilterList
@@ -268,3 +251,14 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             plot2D=Plot2D.createNull(),  # TODO show something here?
             result=0,
         )
+def create_ptycho_data_container(diffractionPatterns: FloatArrayType, probeGuess: ProbeArrayType, objectGuess: ObjectArrayType, scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
+    xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
+    return PtychoDataContainer.from_raw_data_without_pc(
+        xcoords=xcoords,
+        ycoords=ycoords,
+        diff3d=diffractionPatterns,
+        probeGuess=probeGuess,
+        scan_index=numpy.zeros(len(diffractionPatterns)),  # Assuming all patches are from the same object
+        objectGuess=objectGuess
+    )
+
