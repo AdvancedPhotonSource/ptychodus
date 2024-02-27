@@ -160,7 +160,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             print("Training data has already been ingested. Not running _initialize_ptycho().")
         from ptycho import train_pinn
         model_instance, history =  train_pinn.train(self._ptychoDataContainer)
-        # TODO save the tensorflow model instance to file
+        self._model_instance = model_instance
+        self._history = history
+
         trainingLoss = history.history['loss']
         validationLoss = history.history['val_loss']  # Replace with actual validation loss values
         validationLossSeries = PlotSeries(label='Validation Loss', values=validationLoss)
@@ -176,5 +178,93 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         logger.debug('Clearing training data...')
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
-    def reconstruct(self, *args, **kwargs):
-        raise NotImplementedError("Reconstruct method is not implemented yet.")
+
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+        from ptycho import train_pinn
+        assert self._model_instance
+        #raise NotImplementedError("Reconstruct method is not implemented yet.")
+        # TODO data size/shape requirements to GUI
+        data = parameters.diffractionPatternArray
+        dataSize = data.shape[-1]
+
+        if dataSize != data.shape[-2]:
+            raise ValueError('PtychoPINN expects square diffraction data!')
+
+        isDataSizePow2 = (dataSize & (dataSize - 1) == 0 and dataSize > 0)
+
+        if not isDataSizePow2:
+            raise ValueError('PtychoPINN expects that the diffraction data size is a power of two!')
+
+        eval_results = train_pinn.eval(test_data, self._history, self._model_instance) 
+
+#        # Bin diffraction data
+#        # TODO extract binning to data loading (and verify that x-y coordinates are correct)
+#        inputSize = dataSize
+#        binSize = dataSize // inputSize
+#
+#        if binSize == 1:
+#            binnedData = data
+#        else:
+#            binnedData = numpy.zeros((data.shape[0], inputSize, inputSize), dtype=data.dtype)
+#
+#            for i in range(inputSize):
+#                for j in range(inputSize):
+#                    binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
+#                                                         binSize * j:binSize * (j + 1)])
+#
+#        logger.debug('Loading model state...')
+#        tester = Tester(
+#            model=self._createModel(),
+#            model_params_path=self._modelSettings.stateFilePath.value,
+#        )
+#
+#        logger.debug('Inferring...')
+#        tester.setTestData(binnedData.astype(numpy.float32),
+#                           batch_size=self._modelSettings.batchSize.value)
+#        npzSavePath = None  # TODO self._trainingSettings.outputPath.value / 'preds.npz'
+#        objectPatches = tester.predictTestData(npz_save_path=npzSavePath)
+
+        logger.debug('Stitching...')
+        objectInterpolator = parameters.objectInterpolator
+        objectGrid = objectInterpolator.getGrid()
+        objectArray = objectInterpolator.getArray()
+        objectArrayUpper = numpy.zeros_like(objectArray, dtype=complex)
+        objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
+
+        patchExtent = ImageExtent(
+            width=objectPatches.shape[-1],
+            height=objectPatches.shape[-2],
+        )
+
+        for scanPoint, objectPatchChannels in zip(parameters.scan.values(), objectPatches):
+            objectPatch = numpy.exp(1j * objectPatchChannels[0])
+
+            if objectPatchChannels.shape[0] == 2:
+                objectPatch *= objectPatchChannels[1]
+            else:
+                objectPatch *= 0.5
+
+            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
+            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
+
+            pixelCentersX = patchAxisX.getObjectPixelCenters()
+            pixelCentersY = patchAxisY.getObjectPixelCenters()
+
+            xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
+            patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
+
+            # TODO consider inverse distance weighting
+            objectArrayUpper[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += patchValues
+            objectArrayCount[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += 1
+
+        objectArrayLower = numpy.maximum(objectArrayCount, 1)
+        objectArray = objectArrayUpper / objectArrayLower
+
+        return ReconstructOutput(
+            scan=None,
+            probeArray=None,
+            objectArray=objectArray,
+            objective=[[]],
+            plot2D=Plot2D.createNull(),  # TODO show something here?
+            result=0,
+        )
