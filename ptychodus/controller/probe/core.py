@@ -2,9 +2,10 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog
+from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
 from ...api.observer import SequenceObserver
+from ...model.analysis import ProbePropagator
 from ...model.image import ImagePresenter
 from ...model.probe import ProbeRepositoryItem
 from ...model.product import ProbeRepository
@@ -15,6 +16,7 @@ from ..data import FileDialogFactory
 from ..image import ImageController
 from .editorFactory import ProbeEditorViewControllerFactory
 from .listModel import ProbeListModel
+from .propagator import ProbePropagationViewController
 from .treeModel import ProbeTreeModel
 
 logger = logging.getLogger(__name__)
@@ -23,9 +25,9 @@ logger = logging.getLogger(__name__)
 class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
     def __init__(self, repository: ProbeRepository, imagePresenter: ImagePresenter,
-                 view: RepositoryTreeView, imageView: ImageView,
-                 fileDialogFactory: FileDialogFactory, listModel: ProbeListModel,
-                 treeModel: ProbeTreeModel) -> None:
+                 propagator: ProbePropagator, view: RepositoryTreeView, imageView: ImageView,
+                 statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
+                 listModel: ProbeListModel, treeModel: ProbeTreeModel) -> None:
         super().__init__()
         self._repository = repository
         self._imagePresenter = imagePresenter
@@ -37,16 +39,19 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._editorFactory = ProbeEditorViewControllerFactory()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
+        self._propagationDialog = ProbePropagationViewController(propagator, listModel, statusBar,
+                                                                 view)
 
     @classmethod
     def createInstance(cls, repository: ProbeRepository, imagePresenter: ImagePresenter,
-                       view: RepositoryTreeView, imageView: ImageView,
+                       propagator: ProbePropagator, view: RepositoryTreeView, imageView: ImageView,
+                       statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         listModel = ProbeListModel(repository)
         treeModel = ProbeTreeModel(repository)
-        controller = cls(repository, imagePresenter, view, imageView, fileDialogFactory, listModel,
-                         treeModel)
+        controller = cls(repository, imagePresenter, propagator, view, imageView, statusBar,
+                         fileDialogFactory, listModel, treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -74,6 +79,9 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentProbe)
         view.buttonBox.saveButton.clicked.connect(controller._saveCurrentProbe)
+
+        propagateAction = view.buttonBox.analyzeMenu.addAction('Propagate...')
+        propagateAction.triggered.connect(controller._propagateProbe)
 
         return controller
 
@@ -153,6 +161,14 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)
+
+    def _propagateProbe(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            self._propagationDialog.propagate(itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

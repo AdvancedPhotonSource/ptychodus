@@ -64,22 +64,22 @@ class ProbeEditorViewControllerFactory:
         additionalModesGroup = 'Additional Modes'
         dialogBuilder.addSpinBox(
             modesBuilder.numberOfModes,
-            'Number of Modes',
+            'Number of Modes:',
             additionalModesGroup,
         )
         dialogBuilder.addCheckBox(
             modesBuilder.isOrthogonalizeModesEnabled,
-            'Orthogonalize Modes',
+            'Orthogonalize Modes:',
             additionalModesGroup,
         )
         dialogBuilder.addViewController(
             DecayTypeParameterViewController(modesBuilder.modeDecayType),
-            'Decay Type',
+            'Decay Type:',
             additionalModesGroup,
         )
         dialogBuilder.addDecimalSlider(
             modesBuilder.modeDecayRatio,
-            'Decay Ratio',
+            'Decay Ratio:',
             additionalModesGroup,
         )
 
@@ -89,13 +89,13 @@ class ProbeEditorViewControllerFactory:
         builderName = probeBuilder.getName()
         modesBuilder = item.getAdditionalModesBuilder()
         primaryModeGroup = 'Primary Mode'
-        title = f'{builderName}: {itemName}'
+        title = f'{itemName} [{builderName}]'
 
         if isinstance(probeBuilder, DiskProbeBuilder):
             dialogBuilder = ParameterDialogBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.diameterInMeters,
-                'Diameter',
+                'Diameter:',
                 primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
@@ -104,22 +104,22 @@ class ProbeEditorViewControllerFactory:
             dialogBuilder = ParameterDialogBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.zonePlateDiameterInMeters,
-                'Zone Plate Diameter',
+                'Zone Plate Diameter:',
                 primaryModeGroup,
             )
             dialogBuilder.addLengthWidget(
                 probeBuilder.outermostZoneWidthInMeters,
-                'Outermost Zone Width',
+                'Outermost Zone Width:',
                 primaryModeGroup,
             )
             dialogBuilder.addLengthWidget(
                 probeBuilder.centralBeamstopDiameterInMeters,
-                'Central Beamstop Diameter',
+                'Central Beamstop Diameter:',
                 primaryModeGroup,
             )
             dialogBuilder.addLengthWidget(
                 probeBuilder.defocusDistanceInMeters,
-                'Defocus Distance',
+                'Defocus Distance:',
                 primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
@@ -128,12 +128,12 @@ class ProbeEditorViewControllerFactory:
             dialogBuilder = ParameterDialogBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.widthInMeters,
-                'Width',
+                'Width:',
                 primaryModeGroup,
             )
             dialogBuilder.addLengthWidget(
                 probeBuilder.heightInMeters,
-                'Height',
+                'Height:',
                 primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
@@ -142,17 +142,17 @@ class ProbeEditorViewControllerFactory:
             dialogBuilder = ParameterDialogBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.annularRadiusInMeters,
-                'Annular Radius',
+                'Annular Radius:',
                 primaryModeGroup,
             )
             dialogBuilder.addLengthWidget(
                 probeBuilder.fwhmInMeters,
-                'Full Width at Half Maximum',
+                'Full Width at Half Maximum:',
                 primaryModeGroup,
             )
             dialogBuilder.addDecimalLineEdit(
                 probeBuilder.orderParameter,
-                'Order Parameter',
+                'Order Parameter:',
                 primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)

@@ -61,6 +61,7 @@ class RandomObjectBuilder(ObjectBuilder):
             objectShape,
         )
 
+        # FIXME end with inf
         layerDistances = [self.layerDistanceInMeters.getValue()] * self.numberOfLayers.getValue()
 
         return Object(

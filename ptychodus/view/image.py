@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox,
                              QGraphicsLineItem, QGraphicsPixmapItem, QGraphicsRectItem,
                              QGraphicsScene, QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent,
                              QGraphicsView, QGridLayout, QHBoxLayout, QPushButton, QSizePolicy,
-                             QSpinBox, QStatusBar, QToolButton, QVBoxLayout, QWidget)
+                             QStatusBar, QToolButton, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -174,28 +174,6 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-
-        return view
-
-
-class IndexGroupBox(BottomTitledGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Index', parent)
-        self.indexSpinBox = QSpinBox()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> IndexGroupBox:
-        view = cls(parent)
-
-        view.indexSpinBox.setToolTip('Image Index')
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 35)
-        layout.addWidget(view.indexSpinBox)
-        view.setLayout(layout)
-
-        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
 
         return view
 

@@ -1,6 +1,5 @@
 from itertools import pairwise
 import logging
-import sys
 
 import numpy
 
@@ -25,7 +24,6 @@ class ScanRepositoryItem(ParameterRepository):
         self._transformedScan = Scan()
         self._boundingBoxBuilder = ScanBoundingBoxBuilder()
         self._lengthInMeters = 0.
-        self._sizeInBytes = 0
 
         self._addParameterRepository(builder, observe=True)
         self._addParameterRepository(transform, observe=True)
@@ -55,9 +53,6 @@ class ScanRepositoryItem(ParameterRepository):
     def getLengthInMeters(self) -> float:
         return self._lengthInMeters
 
-    def getSizeInBytes(self) -> int:
-        return self._sizeInBytes
-
     def _transformScan(self) -> None:
         transformedPoints: list[ScanPoint] = list()
         boundingBoxBuilder = ScanBoundingBoxBuilder()
@@ -76,8 +71,6 @@ class ScanRepositoryItem(ParameterRepository):
         self._transformedScan = Scan(transformedPoints)
         self._boundingBoxBuilder = boundingBoxBuilder
         self._lengthInMeters = lengthInMeters
-        self._sizeInBytes = sys.getsizeof(self._untransformedScan) \
-                + sys.getsizeof(self._transformedScan)
         self.notifyObservers()
 
     def _rebuild(self) -> None:

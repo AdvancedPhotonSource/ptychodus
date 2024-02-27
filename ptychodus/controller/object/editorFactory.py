@@ -10,17 +10,26 @@ class ObjectEditorViewControllerFactory:
                            parent: QWidget) -> QDialog:
         objectBuilder = item.getBuilder()
         builderName = objectBuilder.getName()
-        title = f'{builderName}: {itemName}'
+        firstLayerGroup = 'First Layer'
+        additionalLayersGroup = 'Additional Layers'
+        title = f'{itemName} [{builderName}]'
 
         if isinstance(objectBuilder, RandomObjectBuilder):
             dialogBuilder = ParameterDialogBuilder()
-            dialogBuilder.addSpinBox(objectBuilder.numberOfLayers, 'Number of Layers')
-            dialogBuilder.addLengthWidget(objectBuilder.layerDistanceInMeters, 'Layer Distance')
-            dialogBuilder.addSpinBox(objectBuilder.extraPaddingX, 'Extra Padding X')
-            dialogBuilder.addSpinBox(objectBuilder.extraPaddingY, 'Extra Padding Y')
-            dialogBuilder.addDecimalSlider(objectBuilder.amplitudeMean, 'Amplitude Mean')
-            dialogBuilder.addDecimalSlider(objectBuilder.amplitudeDeviation, 'Amplitude Deviation')
-            dialogBuilder.addDecimalSlider(objectBuilder.phaseDeviation, 'Phase Deviation')
+            dialogBuilder.addSpinBox(objectBuilder.extraPaddingX, 'Extra Padding X:',
+                                     firstLayerGroup)
+            dialogBuilder.addSpinBox(objectBuilder.extraPaddingY, 'Extra Padding Y:',
+                                     firstLayerGroup)
+            dialogBuilder.addDecimalSlider(objectBuilder.amplitudeMean, 'Amplitude Mean:',
+                                           firstLayerGroup)
+            dialogBuilder.addDecimalSlider(objectBuilder.amplitudeDeviation,
+                                           'Amplitude Deviation:', firstLayerGroup)
+            dialogBuilder.addDecimalSlider(objectBuilder.phaseDeviation, 'Phase Deviation:',
+                                           firstLayerGroup)
+            dialogBuilder.addSpinBox(objectBuilder.numberOfLayers, 'Number of Layers:',
+                                     additionalLayersGroup)
+            dialogBuilder.addLengthWidget(objectBuilder.layerDistanceInMeters, 'Layer Distance:',
+                                          additionalLayersGroup)
             return dialogBuilder.build(title, parent)
 
         return QMessageBox(QMessageBox.Icon.Information, title,

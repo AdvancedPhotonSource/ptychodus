@@ -21,7 +21,7 @@ from ..api.patterns import DiffractionMetadata, DiffractionPatternArray
 from ..api.plugins import PluginRegistry
 from ..api.settings import SettingsRegistry
 from ..api.state import StateDataRegistry
-from .analysis import AnalysisCore, FourierRingCorrelator
+from .analysis import AnalysisCore, DichroicAnalyzer, FourierRingCorrelator, ProbePropagator
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .image import ImageCore, ImagePresenter
 from .memory import MemoryPresenter
@@ -114,7 +114,8 @@ class ModelCore:
                 self.ptychonnReconstructorLibrary,
             ],
         )
-        self._analysisCore = AnalysisCore(self._productCore.objectRepository)
+        self._analysisCore = AnalysisCore(self._productCore.probeRepository,
+                                          self._productCore.objectRepository)
 
         self._stateDataRegistry = StateDataRegistry(self._patternsCore)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
@@ -259,8 +260,16 @@ class ModelCore:
         return self._reconstructorCore.presenter
 
     @property
+    def probePropagator(self) -> ProbePropagator:
+        return self._analysisCore.probePropagator
+
+    @property
     def fourierRingCorrelator(self) -> FourierRingCorrelator:
         return self._analysisCore.fourierRingCorrelator
+
+    @property
+    def dichroicAnalyzer(self) -> DichroicAnalyzer:
+        return self._analysisCore.dichroicAnalyzer
 
     @property
     def areWorkflowsSupported(self) -> bool:

@@ -88,10 +88,10 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
 class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 
-    def __init__(self, parameter: RealParameter) -> None:
+    def __init__(self, parameter: RealParameter, *, isSigned: bool = False) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = DecimalLineEdit.createInstance()
+        self._widget = DecimalLineEdit.createInstance(isSigned=isSigned)
 
         self._syncModelToView()
         self._widget.valueChanged.connect(parameter.setValue)
@@ -146,10 +146,10 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
 
 class LengthWidgetParameterViewController(ParameterViewController, Observer):
 
-    def __init__(self, parameter: RealParameter) -> None:
+    def __init__(self, parameter: RealParameter, *, isSigned: bool = False) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = LengthWidget.createInstance()
+        self._widget = LengthWidget.createInstance(isSigned=isSigned)
 
         self._syncModelToView()
         self._widget.lengthChanged.connect(self._syncViewToModel)
@@ -206,7 +206,6 @@ class ParameterDialog(QDialog):
         buttonBox.clicked.connect(self._handleButtonBoxClicked)
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        # FIXME observer -> signal adapter
         # TODO remove observers from viewControllers
 
         if self._buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
@@ -265,8 +264,10 @@ class ParameterDialogBuilder:
             if isinstance(widget, CheckBoxParameterViewController):
                 widget.setText(widgetLabel)
                 layout.addRow(widget)
+            elif widgetLabel.startswith('_'):
+                layout.addRow(widget)
             else:
-                layout.addRow(f'{widgetLabel}:', widget)
+                layout.addRow(widgetLabel, widget)
 
         buttonBox = QDialogButtonBox()
         layout = groupDict.pop('')

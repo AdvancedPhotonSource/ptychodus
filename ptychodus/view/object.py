@@ -1,45 +1,24 @@
 from __future__ import annotations
 
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QGridLayout,
-                             QGroupBox, QLabel, QSizePolicy, QVBoxLayout, QWidget)
+                             QLabel, QStatusBar, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-
-class FourierRingCorrelationParametersView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Parameters', parent)
-        self.name1Label = QLabel('Name 1:')
-        self.name1ComboBox = QComboBox()
-        self.name2Label = QLabel('Name 2:')
-        self.name2ComboBox = QComboBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> FourierRingCorrelationParametersView:
-        view = cls(parent)
-        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-
-        layout = QGridLayout()
-        layout.addWidget(view.name1Label, 0, 0)
-        layout.addWidget(view.name1ComboBox, 0, 1)
-        layout.addWidget(view.name2Label, 0, 2)
-        layout.addWidget(view.name2ComboBox, 0, 3)
-        layout.setColumnStretch(1, 1)
-        layout.setColumnStretch(3, 1)
-        view.setLayout(layout)
-
-        return view
+from .image import ImageView
 
 
 class FourierRingCorrelationDialog(QDialog):
 
-    def __init__(self, buttonBox: QDialogButtonBox, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self._buttonBox = buttonBox
-        self.parametersView = FourierRingCorrelationParametersView.createInstance()
+        self.buttonBox = QDialogButtonBox()
+        self.name1Label = QLabel('Name 1:')
+        self.name1ComboBox = QComboBox()
+        self.name2Label = QLabel('Name 2:')
+        self.name2ComboBox = QComboBox()
         self.figure = Figure()
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
@@ -47,24 +26,69 @@ class FourierRingCorrelationDialog(QDialog):
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> FourierRingCorrelationDialog:
-        buttonBox = QDialogButtonBox()
-        view = cls(buttonBox, parent)
+        view = cls(parent)
         view.setWindowTitle('Fourier Ring Correlation')
 
-        buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        buttonBox.clicked.connect(view._handleButtonBoxClicked)
+        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
+        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
-        layout = QVBoxLayout()
-        layout.addWidget(view.parametersView)
-        layout.addWidget(view.navigationToolbar)
-        layout.addWidget(view.figureCanvas)
-        layout.addWidget(buttonBox)
+        layout = QGridLayout()
+        layout.addWidget(view.name1Label, 0, 0)
+        layout.addWidget(view.name1ComboBox, 0, 1)
+        layout.addWidget(view.name2Label, 0, 2)
+        layout.addWidget(view.name2ComboBox, 0, 3)
+        layout.addWidget(view.navigationToolbar, 1, 0, 1, 4)
+        layout.addWidget(view.figureCanvas, 2, 0, 1, 4)
+        layout.addWidget(view.buttonBox, 3, 0, 1, 4)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(3, 1)
         view.setLayout(layout)
 
         return view
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self._buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
+            self.accept()
+        else:
+            self.reject()
+
+
+class DichroicDialog(QDialog):
+
+    def __init__(self, statusBar: QStatusBar, parent: QWidget | None) -> None:
+        super().__init__(parent)
+        self.lcircNameLabel = QLabel('Left Circular:')
+        self.lcircNameComboBox = QComboBox()
+        self.rcircNameLabel = QLabel('Right Circular:')
+        self.rcircNameComboBox = QComboBox()
+        self.imageView = ImageView.createInstance(statusBar)
+        self.buttonBox = QDialogButtonBox()
+
+    @classmethod
+    def createInstance(cls,
+                       statusBar: QStatusBar,
+                       parent: QWidget | None = None) -> DichroicDialog:
+        view = cls(statusBar, parent)
+        view.setWindowTitle('Dichroic Analysis')
+
+        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
+        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+
+        layout = QGridLayout()
+        layout.addWidget(view.lcircNameLabel, 0, 0)
+        layout.addWidget(view.lcircNameComboBox, 0, 1)
+        layout.addWidget(view.rcircNameLabel, 0, 2)
+        layout.addWidget(view.rcircNameComboBox, 0, 3)
+        layout.addWidget(view.imageView, 1, 0, 1, 4)
+        layout.addWidget(view.buttonBox, 2, 0, 1, 4)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(3, 1)
+        view.setLayout(layout)
+
+        return view
+
+    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()

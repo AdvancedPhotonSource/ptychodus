@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 
 import numpy
 
@@ -57,7 +57,7 @@ class ScanPointTransform(ParameterRepository):
         return ScanPoint(point.index, posX, posY)
 
 
-class ScanPointTransformFactory(Mapping[str, ScanPointTransform]):
+class ScanPointTransformFactory(Iterable[str]):
 
     def __init__(self, rng: numpy.random.Generator) -> None:
         self._rng = rng
@@ -102,13 +102,10 @@ class ScanPointTransformFactory(Mapping[str, ScanPointTransform]):
     def __iter__(self) -> Iterator[str]:
         return iter(self._transformations)
 
-    def __getitem__(self, name: str) -> ScanPointTransform:
+    def create(self, name: str) -> ScanPointTransform:
         try:
             factory = self._transformations[name]
         except KeyError as exc:
             raise KeyError(f'Unknown scan point transform \"{name}\"!') from exc
 
         return factory()
-
-    def __len__(self) -> int:
-        return len(self._transformations)

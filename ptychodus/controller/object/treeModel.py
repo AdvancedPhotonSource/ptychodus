@@ -131,10 +131,8 @@ class ObjectTreeModel(QAbstractItemModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
                     return f'Layer {index.row() + 1}'
-                if index.column() == 1:  # FIXME edit layer distance
-                    object_ = item.getObject()
-                    distanceInMeters = object_.getLayerDistanceInMeters(index.row())
-                    return distanceInMeters
+                elif index.column() == 1:
+                    return item.getLayerDistanceInMeters(index.row())
         else:
             item = self._repository[index.row()]
             object_ = item.getObject()
@@ -161,8 +159,12 @@ class ObjectTreeModel(QAbstractItemModel):
         if index.isValid():
             parent = index.parent()
 
-            if not parent.isValid() and index.column() in (0, 2):
-                value |= Qt.ItemFlag.ItemIsEditable
+            if parent.isValid():
+                if index.column() == 1:
+                    value |= Qt.ItemFlag.ItemIsEditable
+            else:
+                if index.column() in (0, 2):
+                    value |= Qt.ItemFlag.ItemIsEditable
 
         return value
 
@@ -173,7 +175,18 @@ class ObjectTreeModel(QAbstractItemModel):
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             parent = index.parent()
 
-            if not parent.isValid():
+            if parent.isValid():
+                item = self._repository[parent.row()]
+
+                if index.column() == 1:
+                    try:
+                        distanceInM = float(value)
+                    except ValueError:
+                        return False
+
+                    item.setLayerDistanceInMeters(index.row(), distanceInM)
+                    return False
+            else:
                 if index.column() == 0:
                     self._repository.setName(index.row(), str(value))
                     return True

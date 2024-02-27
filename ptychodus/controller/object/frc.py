@@ -12,28 +12,25 @@ logger = logging.getLogger(__name__)
 
 class FourierRingCorrelationViewController:
 
-    def __init__(self, correlator: FourierRingCorrelator,
-                 dialog: FourierRingCorrelationDialog) -> None:
+    def __init__(self, correlator: FourierRingCorrelator, listModel: ObjectListModel,
+                 parent: QWidget | None) -> None:
         super().__init__()
         self._correlator = correlator
-        self._dialog = dialog
+        self._dialog = FourierRingCorrelationDialog.createInstance(parent)
+        self._dialog.name1ComboBox.setModel(listModel)
+        self._dialog.name1ComboBox.textActivated.connect(self._redrawPlot)
+        self._dialog.name2ComboBox.setModel(listModel)
+        self._dialog.name2ComboBox.textActivated.connect(self._redrawPlot)
 
-    @classmethod
-    def analyze(cls, correlator: FourierRingCorrelator, listModel: ObjectListModel,
-                parent: QWidget) -> FourierRingCorrelationDialog:
-        dialog = FourierRingCorrelationDialog.createInstance(parent)
-        viewController = cls(correlator, dialog)
-
-        dialog.parametersView.name1ComboBox.setModel(listModel)
-        dialog.parametersView.name1ComboBox.textActivated.connect(viewController._redrawPlot)
-        dialog.parametersView.name2ComboBox.setModel(listModel)
-        dialog.parametersView.name2ComboBox.textActivated.connect(viewController._redrawPlot)
-
-        return dialog
+    def analyze(self, itemIndex1: int, itemIndex2: int) -> None:
+        self._dialog.name1ComboBox.setCurrentIndex(itemIndex1)
+        self._dialog.name2ComboBox.setCurrentIndex(itemIndex2)
+        self._redrawPlot()
+        self._dialog.open()
 
     def _redrawPlot(self) -> None:
-        currentIndex1 = self._dialog.parametersView.name1ComboBox.currentIndex()
-        currentIndex2 = self._dialog.parametersView.name2ComboBox.currentIndex()
+        currentIndex1 = self._dialog.name1ComboBox.currentIndex()
+        currentIndex2 = self._dialog.name2ComboBox.currentIndex()
 
         if currentIndex1 < 0 or currentIndex2 < 0:
             logger.warning('Invalid item index for FRC!')

@@ -15,7 +15,7 @@ class ReconstructorView(QGroupBox):
         super().__init__('Parameters', parent)
         self.algorithmLabel = QLabel('Algorithm:')
         self.algorithmComboBox = QComboBox()
-        self.productLabel = QLabel('Product:')
+        self.productLabel = QLabel('Input:')
         self.productComboBox = QComboBox()
         self.ingestButton = QPushButton('Ingest')
         self.saveButton = QPushButton('Save')

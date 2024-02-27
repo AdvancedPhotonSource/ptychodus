@@ -20,6 +20,7 @@ class ProbeBuilderFactory(Iterable[str]):
         super().__init__()
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
+        # FIXME init from average diffraction pattern
         self._builders: Mapping[str, Callable[[ProbeGeometryProvider], ProbeBuilder]] = {
             'Disk': self._createDiskBuilder,
             'FZP': self._createFZPBuilder,

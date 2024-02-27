@@ -2,10 +2,10 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog
+from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
 from ...api.observer import SequenceObserver
-from ...model.analysis import FourierRingCorrelator
+from ...model.analysis import DichroicAnalyzer, FourierRingCorrelator
 from ...model.image import ImagePresenter
 from ...model.object import ObjectRepositoryItem
 from ...model.product import ObjectRepository
@@ -14,6 +14,7 @@ from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
+from .dichroic import DichroicViewController
 from .editorFactory import ObjectEditorViewControllerFactory
 from .frc import FourierRingCorrelationViewController
 from .listModel import ObjectListModel
@@ -25,13 +26,13 @@ logger = logging.getLogger(__name__)
 class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
     def __init__(self, repository: ObjectRepository, imagePresenter: ImagePresenter,
-                 correlator: FourierRingCorrelator, view: RepositoryTreeView, imageView: ImageView,
+                 correlator: FourierRingCorrelator, dichroicAnalyzer: DichroicAnalyzer,
+                 view: RepositoryTreeView, imageView: ImageView, statusBar: QStatusBar,
                  fileDialogFactory: FileDialogFactory, listModel: ObjectListModel,
                  treeModel: ObjectTreeModel) -> None:
         super().__init__()
         self._repository = repository
         self._imagePresenter = imagePresenter
-        self._correlator = correlator
         self._view = view
         self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
@@ -40,17 +41,19 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._editorFactory = ObjectEditorViewControllerFactory()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
+        self._frcDialog = FourierRingCorrelationViewController(correlator, listModel, view)
+        self._dichroicDialog = DichroicViewController(dichroicAnalyzer, listModel, statusBar, view)
 
     @classmethod
     def createInstance(cls, repository: ObjectRepository, imagePresenter: ImagePresenter,
-                       correlator: FourierRingCorrelator, view: RepositoryTreeView,
-                       imageView: ImageView,
+                       correlator: FourierRingCorrelator, dichroicAnalyzer: DichroicAnalyzer,
+                       view: RepositoryTreeView, imageView: ImageView, statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         listModel = ObjectListModel(repository)
         treeModel = ObjectTreeModel(repository)
-        controller = cls(repository, imagePresenter, correlator, view, imageView,
-                         fileDialogFactory, listModel, treeModel)
+        controller = cls(repository, imagePresenter, correlator, dichroicAnalyzer, view, imageView,
+                         statusBar, fileDialogFactory, listModel, treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -79,6 +82,9 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
         frcAction = view.buttonBox.analyzeMenu.addAction('Fourier Ring Correlation...')
         frcAction.triggered.connect(controller._analyzeFRC)
+
+        dichroicAction = view.buttonBox.analyzeMenu.addAction('Dichroic Analysis...')
+        dichroicAction.triggered.connect(controller._analyzeDichroic)
 
         return controller
 
@@ -163,12 +169,17 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            return
+            logger.warning('No current item!')
+        else:
+            self._frcDialog.analyze(itemIndex, itemIndex)
 
-        frcDialog = FourierRingCorrelationViewController.analyze(self._correlator, self._listModel,
-                                                                 self._view)
-        frcDialog.parametersView.name2ComboBox.setCurrentIndex(itemIndex)
-        frcDialog.open()
+    def _analyzeDichroic(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            self._dichroicDialog.analyze(itemIndex, itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

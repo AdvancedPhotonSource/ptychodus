@@ -48,11 +48,14 @@ class ControllerCore:
                                                              self._fileDialogFactory)
         self._probeController = ProbeController.createInstance(model.probeRepository,
                                                                model.probeImagePresenter,
+                                                               model.probePropagator,
                                                                view.probeView, view.probeImageView,
+                                                               view.statusBar(),
                                                                self._fileDialogFactory)
         self._objectController = ObjectController.createInstance(
             model.objectRepository, model.objectImagePresenter, model.fourierRingCorrelator,
-            view.objectView, view.objectImageView, self._fileDialogFactory)
+            model.dichroicAnalyzer, view.objectView, view.objectImageView, view.statusBar(),
+            self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,
