@@ -102,7 +102,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     @property
     def name(self) -> str:
-        return 'AmplitudePhase' 
+        return 'AmplitudePhase'
 
     # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
 
@@ -161,7 +161,6 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         logger.debug('Clearing training data...')
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
-<<<<<<< HEAD
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         from scipy.ndimage import map_coordinates
@@ -184,7 +183,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         probeGuess = parameters.probeArray
         objectGuess = parameters.objectInterpolator.getArray()
         test_data = create_ptycho_data_container(data, probeGuess, objectGuess, scanCoordinates)
-        eval_results = train_pinn.eval(test_data, self._history, self._model_instance) 
+        eval_results = train_pinn.eval(test_data, self._history, self._model_instance)
         objectPatches = eval_results['reconstructed_obj'][:, :, :, 0]
         self._eval_output = eval_results
 
