@@ -1,0 +1,334 @@
+from __future__ import annotations
+from collections.abc import Iterator, Sequence
+from decimal import Decimal
+from pathlib import Path
+from typing import Final
+import logging
+
+from ...api.geometry import Interval
+from ...api.observer import Observable, Observer
+from ...api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
+                                  TrainableReconstructor)
+from ...api.settings import SettingsRegistry
+from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
+
+logger = logging.getLogger(__name__)
+
+
+
+from ptychodus.model.object.api import ObjectAPI
+
+class PtychoPINNModelPresenter(Observable, Observer):
+    MAX_INT: Final[int] = 0x7FFFFFFF
+
+    def __init__(self, settings: PtychoPINNModelSettings) -> None:
+        super().__init__()
+        self._settings = settings
+        self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
+
+
+    @classmethod
+    def createInstance(cls, settings: PtychoPINNModelSettings) -> PtychoPINNModelPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
+        return presenter
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self.notifyObservers()
+
+    _fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
+
+    def getStateFileFilterList(self) -> Sequence[str]:
+        return self._fileFilterList
+
+    def getStateFileFilter(self) -> str:
+        return self._fileFilterList[0]
+
+
+    def getGridsizeLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getNEpochsLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getNFiltersScaleLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getNPhotonsLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('1e0'), Decimal('1e12'))
+
+    def getProbeScaleLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('1e-3'), Decimal('1e3'))
+
+    def getSizeLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+
+    def setStateFilePath(self, path: Path) -> None:
+        self._stateFilePath = path
+        self.notifyObservers()
+
+    def getStateFilePath(self) -> Path:
+        return self._stateFilePath
+
+    def getGridsize(self) -> int:
+        return self._settings.gridsize.value
+
+    def setGridsize(self, value: int) -> None:
+        if 1 <= value <= self.MAX_INT:
+            self._settings.gridsize.value = value
+            self.notifyObservers()
+
+
+
+    def getBatchSize(self) -> int:
+        return self._settings.batch_size.value
+
+    def setBatchSize(self, value: int) -> None:
+        self._settings.batch_size.value = value
+
+
+    def getNFiltersScale(self) -> int:
+        return self._settings.n_filters_scale.value
+
+    def setNFiltersScale(self, value: int) -> None:
+        self._settings.n_filters_scale.value = value
+
+    def getNPhotons(self) -> Decimal:
+        return self._settings.nphotons.value
+
+    def setNPhotons(self, value: Decimal) -> None:
+        self._settings.nphotons.value = value
+
+    def isProbeTrainable(self) -> bool:
+        return self._settings.probe_trainable.value
+
+    def setProbeTrainable(self, enabled: bool) -> None:
+        self._settings.probe_trainable.value = enabled
+
+    def isIntensityScaleTrainable(self) -> bool:
+        return self._settings.intensity_scale_trainable.value
+
+    def setIntensityScaleTrainable(self, enabled: bool) -> None:
+        self._settings.intensity_scale_trainable.value = enabled
+
+    def isObjectBig(self) -> bool:
+        return self._settings.object_big.value
+
+    def setObjectBig(self, enabled: bool) -> None:
+        self._settings.object_big.value = enabled
+
+    def isProbeBig(self) -> bool:
+        return self._settings.probe_big.value
+
+    def setProbeBig(self, enabled: bool) -> None:
+        self._settings.probe_big.value = enabled
+
+    def getProbeScale(self) -> Decimal:
+        return self._settings.probe_scale.value
+
+    def setProbeScale(self, value: Decimal) -> None:
+        self._settings.probe_scale.value = value
+
+    def isProbeMask(self) -> bool:
+        return self._settings.probe_mask.value
+
+    def setProbeMask(self, enabled: bool) -> None:
+        self._settings.probe_mask.value = enabled
+
+
+
+    def getAmpActivation(self) -> str:
+        return self._settings.amp_activation.value
+
+    def setAmpActivation(self, amp_activation: str) -> None:
+        self._settings.amp_activation.value = amp_activation
+
+
+
+class PtychoPINNTrainingPresenter(Observable, Observer):
+    def setValidationSetFractionalSize(self, value: Decimal) -> None:
+        self._settings.validationSetFractionalSize.value = value
+
+    def setMaximumLearningRate(self, value: Decimal) -> None:
+        self._settings.maximumLearningRate.value = value
+
+    def setMinimumLearningRate(self, value: Decimal) -> None:
+        self._settings.minimumLearningRate.value = value
+
+    def setTrainingEpochs(self, value: int) -> None:
+        self._settings.trainingEpochs.value = value
+
+    def setMaeWeight(self, value: Decimal) -> None:
+        self._settings.maeWeight.value = value
+
+    def setNllWeight(self, value: Decimal) -> None:
+        self._settings.nllWeight.value = value
+
+    def setRealspaceMAEWeight(self, value: Decimal) -> None:
+        self._settings.realspaceMAEWeight.value = value
+
+    def setRealspaceWeight(self, value: Decimal) -> None:
+        self._settings.realspaceWeight.value = value
+
+    def getValidationSetFractionalSize(self) -> Decimal:
+        return self._settings.validationSetFractionalSize.value
+
+    def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('0'), Decimal('1'))
+
+    def getMaximumLearningRate(self) -> Decimal:
+        return self._settings.maximumLearningRate.value
+
+    def getMinimumLearningRate(self) -> Decimal:
+        return self._settings.minimumLearningRate.value
+
+    def getTrainingEpochs(self) -> int:
+        return self._settings.trainingEpochs.value
+
+    def getTrainingEpochsLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getMaeWeight(self) -> Decimal:
+        return self._settings.maeWeight.value
+
+    def getNllWeight(self) -> Decimal:
+        return self._settings.nllWeight.value
+
+    def getRealspaceMAEWeight(self) -> Decimal:
+        return self._settings.realspaceMAEWeight.value
+
+    def getRealspaceWeight(self) -> Decimal:
+        return self._settings.realspaceWeight.value
+    MAX_INT: Final[int] = 0x7FFFFFFF
+
+    def __init__(self, settings: PtychoPINNTrainingSettings) -> None:
+        super().__init__()
+        self._settings = settings
+
+    def getNEpochs(self) -> int:
+        return self._settings.trainingEpochs.value
+
+    def setNEpochs(self, value: int) -> None:
+        self._settings.trainingEpochs.value = value
+
+    def getOutputPath(self) -> Path:
+        return self._settings.outputPath.value
+
+    def setOutputPath(self, directory: Path) -> None:
+        self._settings.outputPath.value = directory
+
+    def getOutputSuffix(self) -> str:
+        return self._settings.outputSuffix.value
+
+    def setOutputSuffix(self, suffix: str) -> None:
+        self._settings.outputSuffix.value = suffix
+
+    def isSaveTrainingArtifactsEnabled(self) -> bool:
+        return self._settings.saveTrainingArtifacts.value
+
+    def setSaveTrainingArtifactsEnabled(self, enabled: bool) -> None:
+        self._settings.saveTrainingArtifacts.value = enabled
+
+    def getMAEWeightLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('0'), Decimal('1'))
+
+    def getNLLWeightLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('0'), Decimal('1'))
+
+    def getTVWeightLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('0'), Decimal('1'))
+
+    def getRealspaceMAEWeightLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('0'), Decimal('1'))
+
+    def getRealspaceWeightLimits(self) -> Interval[Decimal]:
+        return Interval[Decimal](Decimal('0'), Decimal('1'))
+
+    def getEpochsLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getEpochs(self) -> int:
+        limits = self.getEpochsLimits()
+        return limits.clamp(self._settings.trainingEpochs.value)
+
+    def setEpochs(self, value: int) -> None:
+        self._settings.trainingEpochs.value = value
+
+    @classmethod
+    def createInstance(cls, settings: PtychoPINNTrainingSettings) -> PtychoPINNTrainingPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
+        return presenter
+
+    # Methods to interact with training settings have been defined
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self.notifyObservers()
+
+
+class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
+
+    def __init__(self, modelSettings: PtychoPINNModelSettings,
+                 trainingSettings: PtychoPINNTrainingSettings,
+                 reconstructors: Sequence[Reconstructor]) -> None:
+        super().__init__()
+        self._modelSettings = modelSettings
+        self._trainingSettings = trainingSettings
+        self.modelPresenter = PtychoPINNModelPresenter.createInstance(modelSettings)
+        self.trainingPresenter = PtychoPINNTrainingPresenter.createInstance(trainingSettings)
+        self._reconstructors = reconstructors
+
+    @classmethod
+    def createInstance(cls, settingsRegistry: SettingsRegistry, objectAPI: ObjectAPI,
+                       isDeveloperModeEnabled: bool) -> PtychoPINNReconstructorLibrary:
+        modelSettings = PtychoPINNModelSettings.createInstance(settingsRegistry)
+        trainingSettings = PtychoPINNTrainingSettings.createInstance(settingsRegistry)
+        ptychoPINNReconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
+        reconstructors: list[TrainableReconstructor] = list()
+
+        try:
+            from .reconstructor import PtychoPINNTrainableReconstructor
+        except ModuleNotFoundError:
+            logger.info('PtychoPINN not found.')
+
+            if isDeveloperModeEnabled:
+                reconstructors.append(ptychoPINNReconstructor)
+        else:
+            ptychoPINNReconstructor = PtychoPINNTrainableReconstructor(modelSettings,
+                                                                        trainingSettings,
+                                                                        objectAPI)
+            reconstructors.append(ptychoPINNReconstructor)
+
+        return cls(modelSettings, trainingSettings, reconstructors)
+        reconstructors: list[TrainableReconstructor] = [ptychoPINNReconstructor]
+        return cls(modelSettings, trainingSettings, reconstructors)
+
+    def load_model(self, path: str):
+        # TODO: Define the method to load the model from a given path. This method should
+        # support loading the model architecture and weights from the file specified by `path`.
+        # Consider using TensorFlow's `load_model` function or an equivalent in other libraries.
+        pass
+
+    def reconstruct(self, input_data):
+        # TODO: Implement the reconstruction logic using the loaded model. This method should
+        # take input data, preprocess it as required by the model, perform inference to
+        # reconstruct the image or pattern, and then postprocess the output as needed.
+        # Ensure the input data is correctly shaped and scaled for the model.
+        pass
+
+    def save_results(self, results, output_path: str):
+        # TODO: Implement the logic to save the reconstruction results to a file. This method
+        # should take the results of the reconstruction and save them to `output_path`.
+        # Consider the format in which the results should be saved (e.g., images, numpy arrays)
+        # and use appropriate libraries (e.g., PIL for images, numpy for arrays) to save the data.
+        pass
+
+    @property
+    def name(self) -> str:
+        return 'PtychoPINN'
+
+    def __iter__(self) -> Iterator[Reconstructor]:
+        return iter(self._reconstructors)

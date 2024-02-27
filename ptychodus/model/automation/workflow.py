@@ -87,3 +87,13 @@ class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
         self._registry.openStateData(filePath)
         self._reconstructorAPI.ingestTrainingData()
         self._reconstructorAPI.train()
+
+#class PtychoPinnTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
+#   TODO
+#    def __init__(self, dataAPI):
+#        super().__init__(dataAPI)
+#
+#    def execute(self):
+#        # Implement training execution specific to ptychopinn
+#        pass
+#
