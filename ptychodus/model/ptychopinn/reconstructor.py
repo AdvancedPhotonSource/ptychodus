@@ -163,6 +163,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+        from scipy.ndimage import map_coordinates
         from ptycho import train_pinn
         assert self._model_instance
         #raise NotImplementedError("Reconstruct method is not implemented yet.")
@@ -178,34 +179,15 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         if not isDataSizePow2:
             raise ValueError('PtychoPINN expects that the diffraction data size is a power of two!')
 
+        scanCoordinates = numpy.array(list(parameters.scan.values()))
+        probeGuess = parameters.probeArray
+        objectGuess = parameters.objectInterpolator.getArray()
+        test_data = create_ptycho_data_container(data, probeGuess, objectGuess, scanCoordinates)
         eval_results = train_pinn.eval(test_data, self._history, self._model_instance) 
+        objectPatches = eval_results['reconstructed_obj'][:, :, :, 0]
+        self._eval_output = eval_results
 
-#        # Bin diffraction data
-#        # TODO extract binning to data loading (and verify that x-y coordinates are correct)
-#        inputSize = dataSize
-#        binSize = dataSize // inputSize
-#
-#        if binSize == 1:
-#            binnedData = data
-#        else:
-#            binnedData = numpy.zeros((data.shape[0], inputSize, inputSize), dtype=data.dtype)
-#
-#            for i in range(inputSize):
-#                for j in range(inputSize):
-#                    binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
-#                                                         binSize * j:binSize * (j + 1)])
-#
-#        logger.debug('Loading model state...')
-#        tester = Tester(
-#            model=self._createModel(),
-#            model_params_path=self._modelSettings.stateFilePath.value,
-#        )
-#
-#        logger.debug('Inferring...')
-#        tester.setTestData(binnedData.astype(numpy.float32),
-#                           batch_size=self._modelSettings.batchSize.value)
-#        npzSavePath = None  # TODO self._trainingSettings.outputPath.value / 'preds.npz'
-#        objectPatches = tester.predictTestData(npz_save_path=npzSavePath)
+        # TODO save the test data
 
         logger.debug('Stitching...')
         objectInterpolator = parameters.objectInterpolator
@@ -219,13 +201,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             height=objectPatches.shape[-2],
         )
 
-        for scanPoint, objectPatchChannels in zip(parameters.scan.values(), objectPatches):
-            objectPatch = numpy.exp(1j * objectPatchChannels[0])
-
-            if objectPatchChannels.shape[0] == 2:
-                objectPatch *= objectPatchChannels[1]
-            else:
-                objectPatch *= 0.5
+        for scanPoint, objectPatch in zip(parameters.scan.values(), objectPatches):
 
             patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
             patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
@@ -251,7 +227,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             plot2D=Plot2D.createNull(),  # TODO show something here?
             result=0,
         )
-def create_ptycho_data_container(diffractionPatterns: FloatArrayType, probeGuess: ProbeArrayType, objectGuess: ObjectArrayType, scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
+def create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess: ObjectArrayType, scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
     xcoords, ycoords = scanCoordinates[:, 0], scanCoordinates[:, 1]
     return PtychoDataContainer.from_raw_data_without_pc(
         xcoords=xcoords,
