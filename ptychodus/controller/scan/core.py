@@ -150,9 +150,9 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
 
         for row in range(self._proxyModel.rowCount()):
             proxyIndex = self._proxyModel.index(row, 0)
+            itemIndex = self._proxyModel.mapToSource(proxyIndex).row()
 
-            if proxyIndex.data(Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Checked:
-                itemIndex = self._proxyModel.mapToSource(proxyIndex).row()
+            if self._tableModel.isItemChecked(itemIndex):
                 itemName = self._repository.getName(itemIndex)
                 scan = self._repository[itemIndex].getScan()
                 x = [point.positionXInMeters for point in scan]

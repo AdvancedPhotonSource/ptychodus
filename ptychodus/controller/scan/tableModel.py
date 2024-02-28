@@ -95,6 +95,8 @@ class ScanTableModel(QAbstractTableModel):
                 else:
                     self._checkedItemIndexes.discard(index.row())
 
+                self.dataChanged.emit(index, index)
+
                 return True
 
         return False
