@@ -148,7 +148,8 @@ class TikeReconstructor:
 
         objectInput = parameters.product.object_
         objectGeometry = objectInput.getGeometry()
-        objectInputArray = objectInput.array.astype('complex64')
+        # TODO change array[0] -> array when multislice is available
+        objectInputArray = objectInput.array[0].astype('complex64')
 
         probeInput = parameters.product.probe
         probeInputArray = probeInput.array[numpy.newaxis, numpy.newaxis, ...].astype('complex64')

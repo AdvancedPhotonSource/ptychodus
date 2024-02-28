@@ -63,12 +63,9 @@ class ReconstructorPresenter(Observable, Observer):
 
     def _prepareInputData(self, inputProductIndex: int,
                           indexFilter: ScanIndexFilter) -> ReconstructInput:
-        try:
-            inputProductItem = self._productRepository[inputProductIndex]
-        except IndexError:
-            inputProduct = inputProductItem.getProduct()
-            # FIXME log error
-
+        # FIXME try/except IndexError
+        inputProductItem = self._productRepository[inputProductIndex]
+        inputProduct = inputProductItem.getProduct()
         dataIndexes = self._diffractionDataset.getAssembledIndexes()
         scanIndexes = [point.index for point in inputProduct.scan if indexFilter(point.index)]
         commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))
@@ -99,24 +96,22 @@ class ReconstructorPresenter(Observable, Observer):
             object_=inputProduct.object_,
             costs=inputProduct.costs,
         )
+
         return ReconstructInput(patterns, product)
 
     def reconstruct(self,
                     inputProductIndex: int,
                     outputProductName: str,
                     indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> ReconstructOutput:
-        # FIXME insert result into repository
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
         parameters = self._prepareInputData(inputProductIndex, indexFilter)
 
         tic = time.perf_counter()
         result = reconstructor.reconstruct(parameters)
         toc = time.perf_counter()
-        logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')
+        logger.info(f'Reconstruction time {toc - tic:.4f} seconds. (code={result.result})')
 
-        logger.info(result.result)
-
-        # FIXME self._plot2D = result.plot2D
+        self._productRepository.insertProduct(result.product)
 
         return result
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 
-from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, QStringListModel, Qt
+from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ...api.observer import SequenceObserver
