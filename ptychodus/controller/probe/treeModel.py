@@ -34,7 +34,7 @@ class ProbeTreeModel(QAbstractItemModel):
         self._repository = repository
         self._treeRoot = ProbeTreeNode()
         self._header = [
-            'Name', 'Relative Power', 'Initializer', 'Data Type', 'Width [px]', 'Height [px]',
+            'Name', 'Relative Power', 'Builder', 'Data Type', 'Width [px]', 'Height [px]',
             'Size [MB]'
         ]
 
