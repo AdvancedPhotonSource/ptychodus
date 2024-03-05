@@ -10,7 +10,7 @@ import sys
 
 try:
     # NOTE must import hdf5plugin before h5py
-    import hdf5plugin
+    import hdf5plugin  # noqa
 except ModuleNotFoundError:
     pass
 

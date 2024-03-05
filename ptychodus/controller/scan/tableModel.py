@@ -54,7 +54,7 @@ class ScanTableModel(QAbstractTableModel):
             elif index.column() == 3:
                 return len(scan)
             elif index.column() == 4:
-                return f'{item.getLengthInMeters():.6f}'  # FIXME
+                return f'{item.getLengthInMeters():.6f}'
             elif index.column() == 5:
                 return f'{scan.sizeInBytes / (1024 * 1024):.2f}'
         elif role == Qt.ItemDataRole.CheckStateRole:

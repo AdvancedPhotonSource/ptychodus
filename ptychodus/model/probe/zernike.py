@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypeAlias
 
@@ -16,19 +15,13 @@ ComplexArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, An
 
 
 @dataclass(frozen=True)
-class ZernikeIndex:
+class ZernikeMonomial:
     radial_degree: int  # n
     angular_frequency: int  # m
 
     @property
     def spatial_frequencey(self) -> int:
         return self.radial_degree + abs(self.angular_frequency)
-
-
-@dataclass(frozen=True)
-class ZernikeMonomial:
-    radial_degree: int  # n
-    angular_frequency: int  # m
 
     def _radial_polynomial(self, distance: RealArrayType) -> RealArrayType:
         n_minus_m = self.radial_degree - abs(self.angular_frequency)
@@ -56,7 +49,10 @@ class ZernikeMonomial:
         return numpy.sin(-self.angular_frequency * angle) if self.angular_frequency < 0 \
                 else numpy.cos(self.angular_frequency * angle)
 
-    def __call__(self, distance: RealArrayType, angle: RealArrayType) -> RealArrayType:
+    def __call__(self,
+                 distance: RealArrayType,
+                 angle: RealArrayType,
+                 undefined_value: float = 0.) -> RealArrayType:
         rvalue = self._radial_polynomial(distance)
         avalue = self._angular_function(angle)
         nvalue_sq = self.radial_degree + 1
@@ -64,7 +60,8 @@ class ZernikeMonomial:
         if self.angular_frequency != 0:
             nvalue_sq *= 2
 
-        return numpy.where(distance <= 1, numpy.sqrt(nvalue_sq) * rvalue * avalue, numpy.nan)
+        return numpy.where(numpy.logical_and(0 < distance, distance <= 1),
+                           numpy.sqrt(nvalue_sq) * rvalue * avalue, undefined_value)
 
     def __str__(self) -> str:
         return f'$Z_{self.radial_degree}^{{{self.angular_frequency:+d}}}$'
@@ -76,6 +73,7 @@ class ZernikeProbeBuilder(ProbeBuilder):
         super().__init__('Zernike')
         self._geometryProvider = geometryProvider
         self._coefficients: list[complex] = [1, 2, 3, 4, 5, 6]  # FIXME
+        self._monomials: list[ZernikeMonomial] = []  # FIXME
 
         self.diameterInMeters = self._registerRealParameter(
             'DiameterInMeters',
@@ -83,9 +81,11 @@ class ZernikeProbeBuilder(ProbeBuilder):
             minimum=0.,
         )
 
-    @staticmethod
-    def index(idx: int) -> ZernikeIndex:
-        return ZernikeIndex(idx, 0)  # FIXME
+    def getCoefficient(self, idx: int) -> complex:
+        return self._coefficients[idx]
+
+    def getMonomial(self, idx: int) -> ZernikeMonomial:
+        return self._monomials[idx]
 
     def build(self) -> Probe:
         geometry = self._geometryProvider.getProbeGeometry()

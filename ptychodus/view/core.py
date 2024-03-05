@@ -6,7 +6,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QActionGroup, QApplication, QMainWindow, QProgressBar, QSizePolicy,
                              QSplitter, QStackedWidget, QTableView, QToolBar, QWidget)
 
-from . import resources
+from . import resources  # noqa
 from .automation import AutomationView
 from .image import ImageView
 from .patterns import PatternsView

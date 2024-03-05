@@ -3,8 +3,9 @@ from __future__ import annotations
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog, QGridLayout, QLabel, QMessageBox, QWidget
 
-from ...model.scan import (CartesianScanBuilder, ConcentricScanBuilder, LissajousScanBuilder,
-                           ScanPointTransform, ScanRepositoryItem, SpiralScanBuilder)
+from ...model.scan import (CartesianScanBuilder, ConcentricScanBuilder, FromFileScanBuilder,
+                           FromMemoryScanBuilder, LissajousScanBuilder, ScanPointTransform,
+                           ScanRepositoryItem, SpiralScanBuilder)
 from ..parametric import (DecimalLineEditParameterViewController,
                           LengthWidgetParameterViewController, ParameterDialogBuilder,
                           ParameterViewController)
@@ -93,8 +94,11 @@ class ScanEditorViewControllerFactory:
                                      baseScanGroup)
             dialogBuilder.addLengthWidget(scanBuilder.stepSizeXInMeters, 'Step Size X:',
                                           baseScanGroup)
-            dialogBuilder.addLengthWidget(scanBuilder.stepSizeYInMeters, 'Step Size Y:',
-                                          baseScanGroup)
+
+            if not scanBuilder.isEquilateral:
+                dialogBuilder.addLengthWidget(scanBuilder.stepSizeYInMeters, 'Step Size Y:',
+                                              baseScanGroup)
+
             self._appendTransformControls(dialogBuilder, item.getTransform())
             return dialogBuilder.build(title, parent)
         elif isinstance(scanBuilder, ConcentricScanBuilder):
@@ -105,6 +109,14 @@ class ScanEditorViewControllerFactory:
                                      'Number of Points in First Shell:', baseScanGroup)
             dialogBuilder.addLengthWidget(scanBuilder.radialStepSizeInMeters, 'Radial Step Size:',
                                           baseScanGroup)
+            self._appendTransformControls(dialogBuilder, item.getTransform())
+            return dialogBuilder.build(title, parent)
+        elif isinstance(scanBuilder, FromFileScanBuilder):
+            dialogBuilder = ParameterDialogBuilder()
+            self._appendTransformControls(dialogBuilder, item.getTransform())
+            return dialogBuilder.build(title, parent)
+        elif isinstance(scanBuilder, FromMemoryScanBuilder):
+            dialogBuilder = ParameterDialogBuilder()
             self._appendTransformControls(dialogBuilder, item.getTransform())
             return dialogBuilder.build(title, parent)
         elif isinstance(scanBuilder, SpiralScanBuilder):

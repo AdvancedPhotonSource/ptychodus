@@ -5,7 +5,7 @@ import logging
 from ...api.plugins import PluginChooser
 from ...api.scan import Scan, ScanFileReader, ScanFileWriter
 from .builder import FromFileScanBuilder, ScanBuilder
-from .cartesian import CartesianScanBuilder
+from .cartesian import CartesianScanBuilder, CartesianScanVariant
 from .concentric import ConcentricScanBuilder
 from .lissajous import LissajousScanBuilder
 from .spiral import SpiralScanBuilder
@@ -15,19 +15,25 @@ logger = logging.getLogger(__name__)
 
 class ScanBuilderFactory(Iterable[str]):
 
+    @classmethod
+    def _createBuilders(cls) -> Mapping[str, Callable[[], ScanBuilder]]:
+        builders: dict[str, Callable[[], ScanBuilder]] = {
+            variant.getDisplayName():
+            lambda variant=variant: CartesianScanBuilder(variant)  # type: ignore
+            for variant in CartesianScanVariant
+        }
+        builders.update({
+            'Concentric': lambda: ConcentricScanBuilder(),
+            'Spiral': lambda: SpiralScanBuilder(),
+            'Lissajous': lambda: LissajousScanBuilder(),
+        })
+        return builders
+
     def __init__(self, fileReaderChooser: PluginChooser[ScanFileReader],
                  fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
-        self._builders: Mapping[str, Callable[[], ScanBuilder]] = {
-            'Raster': lambda: CartesianScanBuilder(snake=False, centered=False),
-            'Snake': lambda: CartesianScanBuilder(snake=True, centered=False),
-            'Centered Raster': lambda: CartesianScanBuilder(snake=False, centered=True),
-            'Centered Snake': lambda: CartesianScanBuilder(snake=True, centered=True),
-            'Concentric': lambda: ConcentricScanBuilder(),
-            'Spiral': lambda: SpiralScanBuilder(),
-            'Lissajous': lambda: LissajousScanBuilder(),
-        }
+        self._builders = ScanBuilderFactory._createBuilders()
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._builders)

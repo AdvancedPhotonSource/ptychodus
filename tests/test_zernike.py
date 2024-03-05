@@ -11,7 +11,6 @@ def test_indexing() -> None:
 
         for m in range(-n, n + 1, 2):
             idx_calc = (n * (n + 2) + m) // 2
-            # FIXME n_calc = math.isqrt(2 * idx)
             print(f'{n=} {m=:+d} {idx=} {idx_calc=}')
             assert idx == idx_calc
             idx += 1
@@ -48,7 +47,7 @@ def test_pyramid() -> None:
     for radial_degree in range(max_radial_degree):
         for angular_frequency in range(-radial_degree, radial_degree + 1, 2):
             monomial = ZernikeMonomial(radial_degree, angular_frequency)
-            Z = monomial(distance, angle)
+            Z = monomial(distance, angle, undefined_value=numpy.nan)
 
             row = radial_degree
             col = max_radial_degree + angular_frequency
@@ -59,5 +58,5 @@ def test_pyramid() -> None:
             ax.set_title(str(monomial))
             ax.axis('off')
 
-    plt.savefig(f'zernike_pyramid.png', bbox_inches='tight', dpi=my_dpi)
+    plt.savefig('zernike_pyramid.png', bbox_inches='tight', dpi=my_dpi)
     plt.close(fig)
