@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QDialog, QMessageBox, QWidget
 
-from ...model.object import ObjectRepositoryItem, RandomObjectBuilder
+from ...model.product.object import ObjectRepositoryItem, RandomObjectBuilder
 from ..parametric import ParameterDialogBuilder
 
 

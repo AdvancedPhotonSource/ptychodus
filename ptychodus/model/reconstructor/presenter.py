@@ -15,7 +15,7 @@ from ...api.scan import Scan, ScanPoint
 from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ..patterns import ActiveDiffractionDataset
 from ..product import ProductRepository
-from ..scan import ScanIndexFilter
+from .indexFilter import ScanIndexFilter
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)

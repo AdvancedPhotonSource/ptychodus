@@ -1,8 +1,8 @@
 from .core import ProductCore
-from .object import ObjectRepository
-from .probe import ProbeRepository
-from .repository import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
-from .scan import ScanRepository
+from .objectRepository import ObjectRepository
+from .probeRepository import ProbeRepository
+from .productRepository import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
+from .scanRepository import ScanRepository
 
 __all__ = [
     'ObjectRepository',

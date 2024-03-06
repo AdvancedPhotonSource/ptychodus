@@ -3,9 +3,10 @@ from PyQt5.QtWidgets import (QButtonGroup, QDialog, QFormLayout, QHBoxLayout, QM
 
 from ...api.observer import Observable, Observer
 from ...api.parametric import StringParameter
-from ...model.probe import (DiskProbeBuilder, FresnelZonePlateProbeBuilder, MultimodalProbeBuilder,
-                            ProbeModeDecayType, ProbeRepositoryItem, RectangularProbeBuilder,
-                            SuperGaussianProbeBuilder)
+from ...model.product.probe import (DiskProbeBuilder, FresnelZonePlateProbeBuilder,
+                                    MultimodalProbeBuilder, ProbeModeDecayType,
+                                    ProbeRepositoryItem, RectangularProbeBuilder,
+                                    SuperGaussianProbeBuilder)
 from ...view.widgets import GroupBoxWithPresets
 from ..parametric import (LengthWidgetParameterViewController, ParameterDialogBuilder,
                           ParameterViewController)

@@ -15,7 +15,7 @@ from ...api.patterns import ImageExtent
 from ...api.product import Product
 from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
 from ...api.visualize import Plot2D, PlotAxis, PlotSeries
-from ..object import ObjectLinearInterpolator, ObjectStitcher
+from ..analysis import ObjectLinearInterpolator, ObjectStitcher
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 FloatArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]

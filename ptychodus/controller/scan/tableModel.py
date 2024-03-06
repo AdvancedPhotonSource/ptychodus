@@ -3,7 +3,7 @@ from typing import Any
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
 
 from ...model.product import ScanRepository
-from ...model.scan import ScanRepositoryItem
+from ...model.product.scan import ScanRepositoryItem
 
 
 class ScanTableModel(QAbstractTableModel):

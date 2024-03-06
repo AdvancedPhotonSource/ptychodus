@@ -25,17 +25,13 @@ from .analysis import AnalysisCore, DichroicAnalyzer, FourierRingCorrelator, Pro
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .image import ImageCore, ImagePresenter
 from .memory import MemoryPresenter
-from .metadata import MetadataCore
-from .object import ObjectCore
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
                        DiffractionDatasetPresenter, DiffractionMetadataPresenter,
                        DiffractionPatternPresenter, PatternsCore)
-from .probe import ProbeCore
 from .product import (ObjectRepository, ProbeRepository, ProductCore, ProductRepository,
                       ScanRepository)
 from .ptychonn import PtychoNNReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
-from .scan import ScanCore
 from .tike import TikeReconstructorLibrary
 from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
                        WorkflowParametersPresenter, WorkflowStatusPresenter)
@@ -79,28 +75,20 @@ class ModelCore:
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._patternsCore = PatternsCore(self.settingsRegistry,
                                           self._pluginRegistry.diffractionFileReaders)
+        self._productCore = ProductCore(
+            self.rng, self._patternsCore.datasetSettings, self._patternsCore.patternSizer,
+            self._patternsCore.dataset, self._pluginRegistry.scanFileReaders,
+            self._pluginRegistry.scanFileWriters, self._pluginRegistry.fresnelZonePlates,
+            self._pluginRegistry.probeFileReaders, self._pluginRegistry.probeFileWriters,
+            self._pluginRegistry.objectFileReaders, self._pluginRegistry.objectFileWriters,
+            self._pluginRegistry.productFileReaders, self._pluginRegistry.productFileWriters)
+
         self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations,
                                             isComplex=False)
-
-        self._metadataCore = MetadataCore(self._patternsCore.datasetSettings)
-        self._scanCore = ScanCore(self.rng, self._pluginRegistry.scanFileReaders,
-                                  self._pluginRegistry.scanFileWriters)
-        self._probeCore = ProbeCore(self.rng, self._pluginRegistry.fresnelZonePlates,
-                                    self._pluginRegistry.probeFileReaders,
-                                    self._pluginRegistry.probeFileWriters)
         self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
                                          isComplex=True)
-        self._objectCore = ObjectCore(self.rng, self._pluginRegistry.objectFileReaders,
-                                      self._pluginRegistry.objectFileWriters)
         self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
                                           isComplex=True)
-        self._productCore = ProductCore(
-            self._patternsCore.patternSizer, self._patternsCore.dataset,
-            self._metadataCore.builder, self._scanCore.repositoryItemFactory,
-            self._scanCore.builderFactory, self._probeCore.repositoryItemFactory,
-            self._probeCore.builderFactory, self._objectCore.repositoryItemFactory,
-            self._objectCore.builderFactory, self._pluginRegistry.productFileReaders,
-            self._pluginRegistry.productFileWriters)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
@@ -109,7 +97,7 @@ class ModelCore:
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             self._patternsCore.dataset,
-            self._productCore.repository,
+            self._productCore.productRepository,
             [
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
@@ -117,7 +105,6 @@ class ModelCore:
         )
         self._analysisCore = AnalysisCore(self._productCore.probeRepository,
                                           self._productCore.objectRepository)
-
         self._stateDataRegistry = StateDataRegistry(self._patternsCore)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
         self._automationCore = AutomationCore(self.settingsRegistry, self._patternsCore.dataAPI,
@@ -177,7 +164,7 @@ class ModelCore:
 
     @property
     def productRepository(self) -> ProductRepository:
-        return self._productCore.repository
+        return self._productCore.productRepository
 
     @property
     def scanRepository(self) -> ScanRepository:

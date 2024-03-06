@@ -5,8 +5,8 @@ import numpy
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
-from ...model.probe import ProbeRepositoryItem
 from ...model.product import ProbeRepository
+from ...model.product.probe import ProbeRepositoryItem
 
 
 class ProbeTreeNode:

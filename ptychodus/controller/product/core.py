@@ -7,11 +7,11 @@ from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFil
 from PyQt5.QtWidgets import QAbstractItemView
 
 from ...api.visualize import Plot2D
-from ...model.metadata import MetadataRepositoryItem
-from ...model.object import ObjectRepositoryItem
-from ...model.probe import ProbeRepositoryItem
 from ...model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
-from ...model.scan import ScanRepositoryItem
+from ...model.product.metadata import MetadataRepositoryItem
+from ...model.product.object import ObjectRepositoryItem
+from ...model.product.probe import ProbeRepositoryItem
+from ...model.product.scan import ScanRepositoryItem
 from ...view.product import ProductView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory

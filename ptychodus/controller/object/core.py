@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 from ...api.observer import SequenceObserver
 from ...model.analysis import DichroicAnalyzer, FourierRingCorrelator
 from ...model.image import ImagePresenter
-from ...model.object import ObjectRepositoryItem
 from ...model.product import ObjectRepository
+from ...model.product.object import ObjectRepositoryItem
 from ...view.image import ImageView
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog

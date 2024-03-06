@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ...api.observer import SequenceObserver
 from ...model.product import ScanRepository
-from ...model.scan import ScanRepositoryItem
+from ...model.product.scan import ScanRepositoryItem
 from ...view.repository import RepositoryTableView
 from ...view.scan import ScanPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog

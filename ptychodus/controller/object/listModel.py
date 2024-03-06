@@ -2,8 +2,8 @@ from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject
 
-from ...model.object import ObjectRepositoryItem
 from ...model.product import ObjectRepository
+from ...model.product.object import ObjectRepositoryItem
 
 
 class ObjectListModel(QAbstractListModel):

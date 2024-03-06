@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 from ...api.observer import SequenceObserver
 from ...model.analysis import ProbePropagator
 from ...model.image import ImagePresenter
-from ...model.probe import ProbeRepositoryItem
 from ...model.product import ProbeRepository
+from ...model.product.probe import ProbeRepositoryItem
 from ...view.image import ImageView
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog, ProgressBarItemDelegate

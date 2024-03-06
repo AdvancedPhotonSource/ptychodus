@@ -3,8 +3,8 @@ from typing import Any, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
-from ...model.object import ObjectRepositoryItem
 from ...model.product import ObjectRepository
+from ...model.product.object import ObjectRepositoryItem
 
 
 class ObjectTreeNode:

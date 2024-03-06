@@ -3,9 +3,10 @@ from __future__ import annotations
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog, QGridLayout, QLabel, QMessageBox, QWidget
 
-from ...model.scan import (CartesianScanBuilder, ConcentricScanBuilder, FromFileScanBuilder,
-                           FromMemoryScanBuilder, LissajousScanBuilder, ScanPointTransform,
-                           ScanRepositoryItem, SpiralScanBuilder)
+from ...model.product.scan import (CartesianScanBuilder, ConcentricScanBuilder,
+                                   FromFileScanBuilder, FromMemoryScanBuilder,
+                                   LissajousScanBuilder, ScanPointTransform, ScanRepositoryItem,
+                                   SpiralScanBuilder)
 from ..parametric import (DecimalLineEditParameterViewController,
                           LengthWidgetParameterViewController, ParameterDialogBuilder,
                           ParameterViewController)

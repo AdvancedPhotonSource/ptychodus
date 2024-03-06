@@ -2,8 +2,8 @@ from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject
 
-from ...model.probe import ProbeRepositoryItem
 from ...model.product import ProbeRepository
+from ...model.product.probe import ProbeRepositoryItem
 
 
 class ProbeListModel(QAbstractListModel):
