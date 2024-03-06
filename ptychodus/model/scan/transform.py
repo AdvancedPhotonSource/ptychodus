@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Iterator
 
 import numpy
 
@@ -8,25 +8,54 @@ from ...api.scan import ScanPoint
 
 class ScanPointTransform(ParameterRepository):
 
-    def __init__(self, affineAX: float, affineAY: float, affineAT: float, affineBX: float,
-                 affineBY: float, affineBT: float, jitterRadiusInMeters: float,
-                 rng: numpy.random.Generator) -> None:
+    def __init__(self, rng: numpy.random.Generator) -> None:
         super().__init__('Transform')
 
-        self.affineAX = self._registerRealParameter('AffineAX', affineAX)
-        self.affineAY = self._registerRealParameter('AffineAY', affineAY)
-        self.affineAT = self._registerRealParameter('AffineAT', affineAT)
+        self.affineAX = self._registerRealParameter('AffineAX', 1.)
+        self.affineAY = self._registerRealParameter('AffineAY', 0.)
+        self.affineAT = self._registerRealParameter('AffineAT', 0.)
 
-        self.affineBX = self._registerRealParameter('AffineBX', affineBX)
-        self.affineBY = self._registerRealParameter('AffineBY', affineBY)
-        self.affineBT = self._registerRealParameter('AffineBT', affineBT)
+        self.affineBX = self._registerRealParameter('AffineBX', 0.)
+        self.affineBY = self._registerRealParameter('AffineBY', 1.)
+        self.affineBT = self._registerRealParameter('AffineBT', 0.)
 
         self.jitterRadiusInMeters = self._registerRealParameter(
             'JitterRadiusInMeters',
-            jitterRadiusInMeters,
+            0.,
             minimum=0.,
         )
         self._rng = rng
+
+    @staticmethod
+    def negateX(preset: int) -> bool:
+        return (preset & 0x1 != 0x0)
+
+    @staticmethod
+    def negateY(preset: int) -> bool:
+        return (preset & 0x2 != 0x0)
+
+    @staticmethod
+    def swapXY(preset: int) -> bool:
+        return (preset & 0x4 != 0x0)
+
+    def labelsForPresets(self) -> Iterator[str]:
+        for index in range(8):
+            xp = '\u2212x' if self.negateX(index) else '\u002Bx'
+            yp = '\u2212y' if self.negateY(index) else '\u002By'
+            fxy = f'{yp}, {xp}' if self.swapXY(index) else f'{xp}, {yp}'
+            yield f'(x, y) \u2192 ({fxy})'
+
+    def applyPresets(self, index: int) -> None:
+        if self.swapXY(index):
+            self.affineAY.setValue(-1 if self.negateY(index) else +1)
+            self.affineBX.setValue(-1 if self.negateX(index) else +1)
+            self.affineAX.setValue(0)
+            self.affineBY.setValue(0)
+        else:
+            self.affineAX.setValue(-1 if self.negateX(index) else +1)
+            self.affineBY.setValue(-1 if self.negateY(index) else +1)
+            self.affineAY.setValue(0)
+            self.affineBX.setValue(0)
 
     def __call__(self, point: ScanPoint) -> ScanPoint:
         ax = self.affineAX.getValue()
@@ -55,57 +84,3 @@ class ScanPointTransform(ParameterRepository):
                     break
 
         return ScanPoint(point.index, posX, posY)
-
-
-class ScanPointTransformFactory(Iterable[str]):
-
-    def __init__(self, rng: numpy.random.Generator) -> None:
-        self._rng = rng
-        self._transformations: Mapping[str, Callable[[], ScanPointTransform]] = {
-            '\u002BX\u002BY': self._createPXPY,
-            '\u2212X\u002BY': self._createMXPY,
-            '\u002BX\u2212Y': self._createPXMY,
-            '\u2212X\u2212Y': self._createMXMY,
-            '\u002BY\u002BX': self._createPYPX,
-            '\u002BY\u2212X': self._createPYMX,
-            '\u2212Y\u002BX': self._createMYPX,
-            '\u2212Y\u2212X': self._createMYMX,
-        }
-
-    def _createPXPY(self) -> ScanPointTransform:
-        return ScanPointTransform(+1., 0., 0., 0., +1., 0., 0., self._rng)
-
-    def _createMXPY(self) -> ScanPointTransform:
-        return ScanPointTransform(-1., 0., 0., 0., +1., 0., 0., self._rng)
-
-    def _createPXMY(self) -> ScanPointTransform:
-        return ScanPointTransform(+1., 0., 0., 0., -1., 0., 0., self._rng)
-
-    def _createMXMY(self) -> ScanPointTransform:
-        return ScanPointTransform(-1., 0., 0., 0., -1., 0., 0., self._rng)
-
-    def _createPYPX(self) -> ScanPointTransform:
-        return ScanPointTransform(0., +1., 0., +1., 0., 0., 0., self._rng)
-
-    def _createPYMX(self) -> ScanPointTransform:
-        return ScanPointTransform(0., +1., 0., -1., 0., 0., 0., self._rng)
-
-    def _createMYPX(self) -> ScanPointTransform:
-        return ScanPointTransform(0., -1., 0., +1., 0., 0., 0., self._rng)
-
-    def _createMYMX(self) -> ScanPointTransform:
-        return ScanPointTransform(0., -1., 0., -1., 0., 0., 0., self._rng)
-
-    def createDefaultTransform(self) -> ScanPointTransform:
-        return self._createPXPY()
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._transformations)
-
-    def create(self, name: str) -> ScanPointTransform:
-        try:
-            factory = self._transformations[name]
-        except KeyError as exc:
-            raise KeyError(f'Unknown scan point transform \"{name}\"!') from exc
-
-        return factory()

@@ -1,6 +1,5 @@
 from __future__ import annotations
 from decimal import Decimal, ROUND_FLOOR
-from typing import Optional
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QComboBox, QHBoxLayout, QWidget
@@ -11,7 +10,7 @@ from .decimalLineEdit import DecimalLineEdit
 class LengthWidget(QWidget):
     lengthChanged = pyqtSignal(Decimal)
 
-    def __init__(self, isSigned: bool, parent: Optional[QWidget]) -> None:
+    def __init__(self, isSigned: bool, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.lengthInMeters = Decimal()
         self.lineEdit = DecimalLineEdit.createInstance(isSigned=isSigned)
@@ -21,7 +20,7 @@ class LengthWidget(QWidget):
     def createInstance(cls,
                        *,
                        isSigned: bool = False,
-                       parent: Optional[QWidget] = None) -> LengthWidget:
+                       parent: QWidget | None = None) -> LengthWidget:
         widget = cls(isSigned, parent)
 
         if not isSigned:

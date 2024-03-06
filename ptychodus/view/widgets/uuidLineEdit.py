@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PyQt5.QtCore import QRegularExpression
 from PyQt5.QtGui import QRegularExpressionValidator
 from PyQt5.QtWidgets import QLineEdit, QWidget
@@ -13,6 +11,6 @@ class UUIDLineEdit(QLineEdit):
         uuidre = f'{hexre}{{8}}-{hexre}{{4}}-{hexre}{{4}}-{hexre}{{4}}-{hexre}{{12}}'
         return QRegularExpressionValidator(QRegularExpression(uuidre))
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setValidator(UUIDLineEdit._createValidator())

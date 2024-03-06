@@ -97,7 +97,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
             return modelIndex.row()
 
-        logger.warning('No items are selected!')
+        logger.warning('No current index!')
         return -1
 
     def _loadCurrentProbeFromFile(self) -> None:

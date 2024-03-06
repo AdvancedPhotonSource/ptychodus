@@ -80,7 +80,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             modelIndex = self._proxyModel.mapToSource(proxyIndex)
             return modelIndex.row()
 
-        logger.warning('No items are selected!')
+        logger.warning('No current index!')
         return -1
 
     def _loadCurrentScanFromFile(self) -> None:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 from decimal import Decimal
-from typing import Optional
 
 import numpy
 
@@ -13,7 +12,7 @@ from ...api.geometry import Interval
 class DecimalSlider(QWidget):
     valueChanged = pyqtSignal(Decimal)
 
-    def __init__(self, orientation: Qt.Orientation, parent: Optional[QWidget]) -> None:
+    def __init__(self, orientation: Qt.Orientation, parent: QWidget | None) -> None:
         super().__init__(parent)
         self._slider = QSlider(orientation)
         self._label = QLabel()
@@ -24,7 +23,7 @@ class DecimalSlider(QWidget):
     @classmethod
     def createInstance(cls,
                        orientation: Qt.Orientation,
-                       parent: Optional[QWidget] = None) -> DecimalSlider:
+                       parent: QWidget | None = None) -> DecimalSlider:
         widget = cls(orientation, parent)
 
         widget._slider.setRange(0, 1000)

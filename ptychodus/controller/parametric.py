@@ -6,7 +6,7 @@ import logging
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QSpinBox, QWidget)
+                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
 
 from ..api.geometry import Interval
 from ..api.observer import Observable, Observer
@@ -94,7 +94,7 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
         self._widget = DecimalLineEdit.createInstance(isSigned=isSigned)
 
         self._syncModelToView()
-        self._widget.valueChanged.connect(parameter.setValue)
+        self._widget.valueChanged.connect(self._syncViewToModel)
         parameter.addObserver(self)
 
     def getWidget(self) -> QWidget:
@@ -254,30 +254,29 @@ class ParameterDialogBuilder:
 
         for (groupName, widgetLabel), vc in self._viewControllers.items():
             try:
-                layout = groupDict[groupName]
+                formLayout = groupDict[groupName]
             except KeyError:
-                layout = QFormLayout()
-                groupDict[groupName] = layout
+                formLayout = QFormLayout()
+                groupDict[groupName] = formLayout
 
             widget = vc.getWidget()
 
-            if isinstance(widget, CheckBoxParameterViewController):
-                widget.setText(widgetLabel)
-                layout.addRow(widget)
-            elif widgetLabel.startswith('_'):
-                layout.addRow(widget)
+            if widgetLabel.startswith('_'):
+                formLayout.addRow(widget)
             else:
-                layout.addRow(widgetLabel, widget)
+                formLayout.addRow(widgetLabel, widget)
 
         buttonBox = QDialogButtonBox()
-        layout = groupDict.pop('')
+        formLayout = groupDict.pop('')
 
         for groupName, groupLayout in groupDict.items():
             groupBox = QGroupBox(groupName)
             groupBox.setLayout(groupLayout)
-            layout.addRow(groupBox)
+            formLayout.addRow(groupBox)
 
-        layout.addRow(buttonBox)
+        layout = QVBoxLayout()
+        layout.addLayout(formLayout)
+        layout.addWidget(buttonBox)
 
         dialog = ParameterDialog(list(self._viewControllers.values()), buttonBox, parent)
         dialog.setLayout(layout)

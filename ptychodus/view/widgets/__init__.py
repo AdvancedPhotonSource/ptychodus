@@ -1,5 +1,5 @@
 from .angleWidget import AngleWidget
-from .bottomTitledGroupBox import BottomTitledGroupBox
+from .groupBox import BottomTitledGroupBox, GroupBoxWithPresets
 from .comboBoxItemDelegate import ComboBoxItemDelegate
 from .decimalLineEdit import DecimalLineEdit
 from .decimalSlider import DecimalSlider
@@ -15,6 +15,7 @@ __all__ = [
     'DecimalLineEdit',
     'DecimalSlider',
     'ExceptionDialog',
+    'GroupBoxWithPresets',
     'LengthWidget',
     'ProgressBarItemDelegate',
     'UUIDLineEdit',

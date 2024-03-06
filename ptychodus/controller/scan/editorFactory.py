@@ -9,13 +9,18 @@ from ...model.scan import (CartesianScanBuilder, ConcentricScanBuilder, FromFile
 from ..parametric import (DecimalLineEditParameterViewController,
                           LengthWidgetParameterViewController, ParameterDialogBuilder,
                           ParameterViewController)
+from ...view.widgets import GroupBoxWithPresets
 
 
 class ScanTransformViewController(ParameterViewController):
 
     def __init__(self, transform: ScanPointTransform) -> None:
         super().__init__()
-        self._widget = QWidget()
+        self._widget = GroupBoxWithPresets('Transformation')
+
+        for index, presetsLabel in enumerate(transform.labelsForPresets()):
+            action = self._widget.presetsMenu.addAction(presetsLabel)
+            action.triggered.connect(lambda _, index=index: transform.applyPresets(index))
 
         self._labelXP = QLabel('x\u2032 =')
         self._labelXP.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -61,7 +66,7 @@ class ScanTransformViewController(ParameterViewController):
 
         layout.addWidget(self._jitterRadiusLabel, 2, 0)
         layout.addWidget(self._jitterRadiusViewController.getWidget(), 2, 1, 1, 5)
-        self._widget.setLayout(layout)
+        self._widget.contents.setLayout(layout)
 
     def getWidget(self) -> QWidget:
         return self._widget
@@ -71,12 +76,10 @@ class ScanEditorViewControllerFactory:
 
     def _appendTransformControls(self, dialogBuilder: ParameterDialogBuilder,
                                  transform: ScanPointTransform) -> None:
-        # FIXME load transform presets (button menu?)
-        transformationGroup = 'Transformation'
+        # FIXME to bottom of dialog
         dialogBuilder.addViewController(
             ScanTransformViewController(transform),
             '_Transform',
-            transformationGroup,
         )
 
     def createEditorDialog(self, itemName: str, item: ScanRepositoryItem,
