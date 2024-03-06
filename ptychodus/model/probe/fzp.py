@@ -1,27 +1,13 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from collections.abc import Iterator
 from typing import Any
 
 import numpy
 import numpy.typing
 
-from ...api.probe import Probe, ProbeGeometryProvider
+from ...api.plugins import PluginChooser
+from ...api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
 from .builder import ProbeBuilder
-
-
-@dataclass(frozen=True)
-class FresnelZonePlate:
-    # FIXME 'Velociprobe': FresnelZonePlate(180e-6, 50e-9, 60e-6),
-    # FIXME '2-ID-D': FresnelZonePlate(160e-6, 70e-9, 60e-6),
-    # FIXME 'LYNX': FresnelZonePlate(114.8e-6, 60e-9, 40e-6),
-    # FIXME 'HXN': FresnelZonePlate(160e-6, 30e-9, 80e-6),
-    zonePlateDiameterInMeters: float
-    outermostZoneWidthInMeters: float
-    centralBeamstopDiameterInMeters: float
-
-    def getFocalLengthInMeters(self, centralWavelengthInMeters: float) -> float:
-        return self.zonePlateDiameterInMeters * self.outermostZoneWidthInMeters \
-                / centralWavelengthInMeters
 
 
 def fresnel_propagation(input: numpy.typing.NDArray[Any], dxy: float, z: float,
@@ -69,9 +55,11 @@ def fresnel_propagation(input: numpy.typing.NDArray[Any], dxy: float, z: float,
 
 class FresnelZonePlateProbeBuilder(ProbeBuilder):
 
-    def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
+    def __init__(self, geometryProvider: ProbeGeometryProvider,
+                 fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]) -> None:
         super().__init__('Fresnel Zone Plate')
         self._geometryProvider = geometryProvider
+        self._fresnelZonePlateChooser = fresnelZonePlateChooser
 
         self.zonePlateDiameterInMeters = self._registerRealParameter(
             'zonePlateDiameterInMeters',
@@ -92,6 +80,16 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
             'defocusDistanceInMeters',
             800e-6,
         )  # from sample to the focal plane
+
+    def labelsForPresets(self) -> Iterator[str]:
+        for entry in self._fresnelZonePlateChooser:
+            yield entry.displayName
+
+    def applyPresets(self, index: int) -> None:
+        fzp = self._fresnelZonePlateChooser[index].strategy
+        self.zonePlateDiameterInMeters.setValue(fzp.zonePlateDiameterInMeters)
+        self.outermostZoneWidthInMeters.setValue(fzp.outermostZoneWidthInMeters)
+        self.centralBeamstopDiameterInMeters.setValue(fzp.centralBeamstopDiameterInMeters)
 
     def build(self) -> Probe:
         geometry = self._geometryProvider.getProbeGeometry()

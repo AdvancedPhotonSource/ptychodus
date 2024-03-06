@@ -11,6 +11,10 @@ from ..parametric import (DecimalLineEditParameterViewController,
                           ParameterViewController)
 from ...view.widgets import GroupBoxWithPresets
 
+__all__ = [
+    'ScanEditorViewControllerFactory',
+]
+
 
 class ScanTransformViewController(ParameterViewController):
 

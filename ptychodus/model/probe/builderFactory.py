@@ -3,7 +3,8 @@ from pathlib import Path
 import logging
 
 from ...api.plugins import PluginChooser
-from ...api.probe import Probe, ProbeFileReader, ProbeFileWriter, ProbeGeometryProvider
+from ...api.probe import (FresnelZonePlate, Probe, ProbeFileReader, ProbeFileWriter,
+                          ProbeGeometryProvider)
 from .builder import FromFileProbeBuilder, ProbeBuilder
 from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
@@ -15,9 +16,11 @@ logger = logging.getLogger(__name__)
 
 class ProbeBuilderFactory(Iterable[str]):
 
-    def __init__(self, fileReaderChooser: PluginChooser[ProbeFileReader],
+    def __init__(self, fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
+                 fileReaderChooser: PluginChooser[ProbeFileReader],
                  fileWriterChooser: PluginChooser[ProbeFileWriter]) -> None:
         super().__init__()
+        self._fresnelZonePlateChooser = fresnelZonePlateChooser
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         # FIXME init from average diffraction pattern
@@ -43,7 +46,7 @@ class ProbeBuilderFactory(Iterable[str]):
         return DiskProbeBuilder(geometryProvider)
 
     def _createFZPBuilder(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
-        return FresnelZonePlateProbeBuilder(geometryProvider)
+        return FresnelZonePlateProbeBuilder(geometryProvider, self._fresnelZonePlateChooser)
 
     def _createRectangularBuilder(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
         return RectangularProbeBuilder(geometryProvider)

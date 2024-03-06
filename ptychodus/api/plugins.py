@@ -12,7 +12,7 @@ from .product import ProductFileReader, ProductFileWriter
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
-from .probe import ProbeFileReader, ProbeFileWriter
+from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from .scan import ScanFileReader, ScanFileWriter
 from .visualize import ScalarTransformation
 
@@ -103,6 +103,7 @@ class PluginRegistry:
         self.scalarTransformations = PluginChooser[ScalarTransformation]()
         self.scanFileReaders = PluginChooser[ScanFileReader]()
         self.scanFileWriters = PluginChooser[ScanFileWriter]()
+        self.fresnelZonePlates = PluginChooser[FresnelZonePlate]()
         self.probeFileReaders = PluginChooser[ProbeFileReader]()
         self.probeFileWriters = PluginChooser[ProbeFileWriter]()
         self.objectPhaseCenteringStrategies = PluginChooser[ObjectPhaseCenteringStrategy]()

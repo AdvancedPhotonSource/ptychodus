@@ -85,7 +85,8 @@ class ModelCore:
         self._metadataCore = MetadataCore(self._patternsCore.datasetSettings)
         self._scanCore = ScanCore(self.rng, self._pluginRegistry.scanFileReaders,
                                   self._pluginRegistry.scanFileWriters)
-        self._probeCore = ProbeCore(self.rng, self._pluginRegistry.probeFileReaders,
+        self._probeCore = ProbeCore(self.rng, self._pluginRegistry.fresnelZonePlates,
+                                    self._pluginRegistry.probeFileReaders,
                                     self._pluginRegistry.probeFileWriters)
         self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
                                          isComplex=True)

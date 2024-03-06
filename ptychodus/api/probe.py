@@ -14,6 +14,17 @@ ProbeArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]
 
 
 @dataclass(frozen=True)
+class FresnelZonePlate:
+    zonePlateDiameterInMeters: float
+    outermostZoneWidthInMeters: float
+    centralBeamstopDiameterInMeters: float
+
+    def getFocalLengthInMeters(self, centralWavelengthInMeters: float) -> float:
+        return self.zonePlateDiameterInMeters * self.outermostZoneWidthInMeters \
+                / centralWavelengthInMeters
+
+
+@dataclass(frozen=True)
 class ProbeGeometry:
     widthInPixels: int
     heightInPixels: int

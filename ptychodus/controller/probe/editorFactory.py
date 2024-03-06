@@ -1,11 +1,51 @@
-from PyQt5.QtWidgets import QButtonGroup, QDialog, QHBoxLayout, QMessageBox, QRadioButton, QWidget
+from PyQt5.QtWidgets import (QButtonGroup, QDialog, QFormLayout, QHBoxLayout, QMessageBox,
+                             QRadioButton, QWidget)
 
 from ...api.observer import Observable, Observer
 from ...api.parametric import StringParameter
 from ...model.probe import (DiskProbeBuilder, FresnelZonePlateProbeBuilder, MultimodalProbeBuilder,
                             ProbeModeDecayType, ProbeRepositoryItem, RectangularProbeBuilder,
                             SuperGaussianProbeBuilder)
-from ..parametric import ParameterDialogBuilder, ParameterViewController
+from ...view.widgets import GroupBoxWithPresets
+from ..parametric import (LengthWidgetParameterViewController, ParameterDialogBuilder,
+                          ParameterViewController)
+
+__all__ = [
+    'ProbeEditorViewControllerFactory',
+]
+
+
+class FresnelZonePlateViewController(ParameterViewController):
+
+    def __init__(self, title: str, probeBuilder: FresnelZonePlateProbeBuilder) -> None:
+        super().__init__()
+        self._widget = GroupBoxWithPresets(title)
+
+        for index, presetsLabel in enumerate(probeBuilder.labelsForPresets()):
+            action = self._widget.presetsMenu.addAction(presetsLabel)
+            action.triggered.connect(lambda _, index=index: probeBuilder.applyPresets(index))
+
+        self._zonePlateDiameterViewController = LengthWidgetParameterViewController(
+            probeBuilder.zonePlateDiameterInMeters)
+        self._outermostZoneWidthInMetersViewController = LengthWidgetParameterViewController(
+            probeBuilder.outermostZoneWidthInMeters)
+        self._centralBeamstopDiameterInMetersViewController = LengthWidgetParameterViewController(
+            probeBuilder.centralBeamstopDiameterInMeters)
+        self._defocusDistanceInMetersViewController = LengthWidgetParameterViewController(
+            probeBuilder.defocusDistanceInMeters)
+
+        layout = QFormLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addRow('Zone Plate Diameter:', self._zonePlateDiameterViewController.getWidget())
+        layout.addRow('Outermost Zone Width:',
+                      self._outermostZoneWidthInMetersViewController.getWidget())
+        layout.addRow('Central Beamstop Diameter:',
+                      self._centralBeamstopDiameterInMetersViewController.getWidget())
+        layout.addRow('Defocus Distance:', self._defocusDistanceInMetersViewController.getWidget())
+        self._widget.contents.setLayout(layout)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
 
 
 class DecayTypeParameterViewController(ParameterViewController, Observer):
@@ -102,25 +142,9 @@ class ProbeEditorViewControllerFactory:
             return dialogBuilder.build(title, parent)
         elif isinstance(probeBuilder, FresnelZonePlateProbeBuilder):
             dialogBuilder = ParameterDialogBuilder()
-            dialogBuilder.addLengthWidget(
-                probeBuilder.zonePlateDiameterInMeters,
-                'Zone Plate Diameter:',
-                primaryModeGroup,
-            )
-            dialogBuilder.addLengthWidget(
-                probeBuilder.outermostZoneWidthInMeters,
-                'Outermost Zone Width:',
-                primaryModeGroup,
-            )
-            dialogBuilder.addLengthWidget(
-                probeBuilder.centralBeamstopDiameterInMeters,
-                'Central Beamstop Diameter:',
-                primaryModeGroup,
-            )
-            dialogBuilder.addLengthWidget(
-                probeBuilder.defocusDistanceInMeters,
-                'Defocus Distance:',
-                primaryModeGroup,
+            dialogBuilder.addViewController(
+                FresnelZonePlateViewController(primaryModeGroup, probeBuilder),
+                '_FresnelZonePlate',
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
             return dialogBuilder.build(title, parent)
