@@ -67,6 +67,7 @@ class TikeReconstructor:
                 vdecay=float(settings.vdecay.value),
                 mdecay=float(settings.mdecay.value),
                 use_position_regularization=settings.usePositionRegularization.value,
+                update_magnitude_limit=float(settings.updateMagnitudeLimit.value),
             )
 
         return options

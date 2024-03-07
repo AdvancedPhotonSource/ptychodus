@@ -27,6 +27,7 @@ class TikePositionCorrectionController(Observer):
 
         view.positionRegularizationCheckBox.toggled.connect(
             presenter.setPositionRegularizationEnabled)
+        view.updateMagnitudeLimitLineEdit.valueChanged.connect(presenter.setUpdateMagnitudeLimit)
 
         controller._syncModelToView()
 
@@ -37,6 +38,7 @@ class TikePositionCorrectionController(Observer):
 
         self._view.positionRegularizationCheckBox.setChecked(
             self._presenter.isPositionRegularizationEnabled())
+        self._view.updateMagnitudeLimitLineEdit.setValue(self._presenter.getUpdateMagnitudeLimit())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
