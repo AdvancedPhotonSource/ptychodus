@@ -2,8 +2,6 @@
 
 
 def test_indexing() -> None:
-    import math
-
     idx = 0
 
     for n in range(10):
@@ -23,7 +21,7 @@ def test_pyramid() -> None:
     import matplotlib.colors
     import matplotlib.pyplot as plt
 
-    from ptychodus.model.probe.zernike import ZernikeMonomial
+    from ptychodus.model.product.probe.zernike import ZernikePolynomial
 
     my_dpi = 300
     num_pixels = 256
@@ -38,16 +36,14 @@ def test_pyramid() -> None:
 
     ###
 
-    plt.rc('text', usetex=True)
-
     fig = plt.figure(dpi=my_dpi)
     fig.patch.set_alpha(0.)
     gs = fig.add_gridspec(max_radial_degree + 1, 2 * (max_radial_degree + 1))
 
     for radial_degree in range(max_radial_degree):
         for angular_frequency in range(-radial_degree, radial_degree + 1, 2):
-            monomial = ZernikeMonomial(radial_degree, angular_frequency)
-            Z = monomial(distance, angle, undefined_value=numpy.nan)
+            polynomial = ZernikePolynomial(radial_degree, angular_frequency)
+            Z = polynomial(distance, angle, undefined_value=numpy.nan)
 
             row = radial_degree
             col = max_radial_degree + angular_frequency
@@ -55,7 +51,7 @@ def test_pyramid() -> None:
             ax = fig.add_subplot(gs[row:row + 1, col:col + 2])
             ax.pcolormesh(X, Y, Z, norm=matplotlib.colors.CenteredNorm(), cmap='seismic')
             ax.set_aspect('equal')
-            ax.set_title(str(monomial))
+            ax.set_title(str(polynomial))
             ax.axis('off')
 
     plt.savefig('zernike_pyramid.png', bbox_inches='tight', dpi=my_dpi)

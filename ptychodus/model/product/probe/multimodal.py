@@ -79,19 +79,20 @@ class MultimodalProbeBuilder(ParameterRepository):
         modeDecayTypeText = self.modeDecayType.getValue()
         modeDecayRatio = self.modeDecayRatio.getValue()
 
-        try:
-            modeDecayType = ProbeModeDecayType[modeDecayTypeText.upper()]
-        except KeyError:
-            modeDecayType = ProbeModeDecayType.POLYNOMIAL
+        if modeDecayRatio > 0.:
+            try:
+                modeDecayType = ProbeModeDecayType[modeDecayTypeText.upper()]
+            except KeyError:
+                modeDecayType = ProbeModeDecayType.POLYNOMIAL
 
-        if modeDecayType == ProbeModeDecayType.EXPONENTIAL:
-            b = 1. + (1. - modeDecayRatio) / modeDecayRatio
-            weights = [b**-n for n in range(totalNumberOfModes)]
-        else:
-            b = numpy.log(modeDecayRatio) / numpy.log(2.)
-            weights = [(n + 1)**b for n in range(totalNumberOfModes)]
+            if modeDecayType == ProbeModeDecayType.EXPONENTIAL:
+                b = 1. + (1. - modeDecayRatio) / modeDecayRatio
+                return [b**-n for n in range(totalNumberOfModes)]
+            else:
+                b = numpy.log(modeDecayRatio) / numpy.log(2.)
+                return [(n + 1)**b for n in range(totalNumberOfModes)]
 
-        return weights
+        return [1.] + [0.] * (totalNumberOfModes - 1)
 
     def _adjustRelativePower(self, probe: ProbeArrayType) -> ProbeArrayType:
         modeWeights = self._getModeWeights(probe.shape[-3])

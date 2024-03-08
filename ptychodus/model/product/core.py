@@ -36,7 +36,7 @@ class ProductCore:
     ) -> None:
         self._scanBuilderFactory = ScanBuilderFactory(scanFileReaderChooser, scanFileWriterChooser)
         self._scanRepositoryItemFactory = ScanRepositoryItemFactory(rng)
-        self._probeBuilderFactory = ProbeBuilderFactory(fresnelZonePlateChooser,
+        self._probeBuilderFactory = ProbeBuilderFactory(patterns, fresnelZonePlateChooser,
                                                         probeFileReaderChooser,
                                                         probeFileWriterChooser)
         self._probeRepositoryItemFactory = ProbeRepositoryItemFactory(rng)

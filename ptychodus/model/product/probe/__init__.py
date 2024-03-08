@@ -1,3 +1,4 @@
+from .average import AverageProbeBuilder
 from .builder import ProbeBuilder
 from .builderFactory import ProbeBuilderFactory
 from .disk import DiskProbeBuilder
@@ -7,8 +8,10 @@ from .itemFactory import ProbeRepositoryItemFactory
 from .multimodal import MultimodalProbeBuilder, ProbeModeDecayType
 from .rect import RectangularProbeBuilder
 from .superGaussian import SuperGaussianProbeBuilder
+from .zernike import ZernikeProbeBuilder
 
 __all__ = [
+    'AverageProbeBuilder',
     'DiskProbeBuilder',
     'FresnelZonePlateProbeBuilder',
     'MultimodalProbeBuilder',
@@ -21,4 +24,5 @@ __all__ = [
     'ProbeRepositoryPresenter',
     'RectangularProbeBuilder',
     'SuperGaussianProbeBuilder',
+    'ZernikeProbeBuilder',
 ]

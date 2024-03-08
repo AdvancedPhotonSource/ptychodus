@@ -3,10 +3,11 @@ from PyQt5.QtWidgets import (QButtonGroup, QDialog, QFormLayout, QHBoxLayout, QM
 
 from ...api.observer import Observable, Observer
 from ...api.parametric import StringParameter
-from ...model.product.probe import (DiskProbeBuilder, FresnelZonePlateProbeBuilder,
-                                    MultimodalProbeBuilder, ProbeModeDecayType,
-                                    ProbeRepositoryItem, RectangularProbeBuilder,
-                                    SuperGaussianProbeBuilder)
+from ...model.product.probe import (AverageProbeBuilder, DiskProbeBuilder,
+                                    FresnelZonePlateProbeBuilder, MultimodalProbeBuilder,
+                                    ProbeModeDecayType, ProbeRepositoryItem,
+                                    RectangularProbeBuilder, SuperGaussianProbeBuilder,
+                                    ZernikeProbeBuilder)
 from ...view.widgets import GroupBoxWithPresets
 from ..parametric import (LengthWidgetParameterViewController, ParameterDialogBuilder,
                           ParameterViewController)
@@ -132,7 +133,11 @@ class ProbeEditorViewControllerFactory:
         primaryModeGroup = 'Primary Mode'
         title = f'{itemName} [{builderName}]'
 
-        if isinstance(probeBuilder, DiskProbeBuilder):
+        if isinstance(probeBuilder, AverageProbeBuilder):
+            dialogBuilder = ParameterDialogBuilder()
+            self._appendAdditionalModes(dialogBuilder, modesBuilder)
+            return dialogBuilder.build(title, parent)
+        elif isinstance(probeBuilder, DiskProbeBuilder):
             dialogBuilder = ParameterDialogBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.diameterInMeters,
@@ -178,6 +183,15 @@ class ProbeEditorViewControllerFactory:
             dialogBuilder.addDecimalLineEdit(
                 probeBuilder.orderParameter,
                 'Order Parameter:',
+                primaryModeGroup,
+            )
+            self._appendAdditionalModes(dialogBuilder, modesBuilder)
+            return dialogBuilder.build(title, parent)
+        elif isinstance(probeBuilder, ZernikeProbeBuilder):
+            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder.addLengthWidget(
+                probeBuilder.diameterInMeters,
+                'Diameter:',
                 primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
