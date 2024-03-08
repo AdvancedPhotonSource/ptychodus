@@ -9,7 +9,7 @@ __all__ = [
     'AnalysisCore',
     'DichroicAnalyzer',
     'FourierRingCorrelator',
-    'ObjectInterpolator',
+    'ObjectLinearInterpolator',
     'ObjectStitcher',
     'ProbePropagator',
 ]

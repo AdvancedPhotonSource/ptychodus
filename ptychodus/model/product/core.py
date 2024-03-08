@@ -7,7 +7,6 @@ from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.scan import ScanFileReader, ScanFileWriter
 
 from ..patterns import ActiveDiffractionDataset, DiffractionDatasetSettings, PatternSizer
-from .metadata import MetadataBuilder
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory
 from .objectRepository import ObjectRepository
 from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory
@@ -35,7 +34,6 @@ class ProductCore:
         productFileReaderChooser: PluginChooser[ProductFileReader],
         productFileWriterChooser: PluginChooser[ProductFileWriter],
     ) -> None:
-        self._metadataBuilder = MetadataBuilder(datasetSettings)
         self._scanBuilderFactory = ScanBuilderFactory(scanFileReaderChooser, scanFileWriterChooser)
         self._scanRepositoryItemFactory = ScanRepositoryItemFactory(rng)
         self._probeBuilderFactory = ProbeBuilderFactory(fresnelZonePlateChooser,
@@ -46,7 +44,7 @@ class ProductCore:
                                                           objectFileWriterChooser)
         self._objectRepositoryItemFactory = ObjectRepositoryItemFactory(rng)
 
-        self.productRepository = ProductRepository(patternSizer, patterns, self._metadataBuilder,
+        self.productRepository = ProductRepository(datasetSettings, patternSizer, patterns,
                                                    self._scanRepositoryItemFactory,
                                                    self._probeRepositoryItemFactory,
                                                    self._objectRepositoryItemFactory,

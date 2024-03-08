@@ -1,7 +1,7 @@
-from .builder import MetadataBuilder
 from .item import MetadataRepositoryItem
+from .itemFactory import MetadataRepositoryItemFactory
 
 __all__ = [
-    'MetadataBuilder',
     'MetadataRepositoryItem',
+    'MetadataRepositoryItemFactory',
 ]

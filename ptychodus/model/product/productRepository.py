@@ -1,183 +1,30 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from pathlib import Path
 from typing import overload
 import logging
 import sys
 
-from ptychodus.api.object import Object
-from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import Parameter, ParameterRepository
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import Probe
-from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter, ProductMetadata
-from ptychodus.api.scan import Scan
+from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 from ptychodus.api.visualize import Plot2D
 
-from ..patterns import ActiveDiffractionDataset, PatternSizer
-from .metadata import MetadataBuilder, MetadataRepositoryItem
-from .object import ObjectRepositoryItem, ObjectRepositoryItemFactory
-from .probe import ProbeRepositoryItem, ProbeRepositoryItemFactory
+from ..patterns import ActiveDiffractionDataset, DiffractionDatasetSettings, PatternSizer
+from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
+from .metadata import MetadataRepositoryItemFactory
+from .object import ObjectRepositoryItemFactory
+from .probe import ProbeRepositoryItemFactory
 from .productGeometry import ProductGeometry
 from .productValidator import ProductValidator
-from .scan import ScanRepositoryItem, ScanRepositoryItemFactory
+from .scan import ScanRepositoryItemFactory
 
 logger = logging.getLogger(__name__)
 
 
-class ProductRepositoryItemObserver(ABC):
-
-    @abstractmethod
-    def requestNameChange(self, currentName: str, requestedName: str) -> str:
-        pass
-
-    @abstractmethod
-    def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
-        pass
-
-    @abstractmethod
-    def handleScanChanged(self, item: ProductRepositoryItem) -> None:
-        pass
-
-    @abstractmethod
-    def handleProbeChanged(self, item: ProductRepositoryItem) -> None:
-        pass
-
-    @abstractmethod
-    def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
-        pass
-
-    @abstractmethod
-    def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
-        pass
-
-
-class ProductNameParameter(Parameter[str]):
-
-    def __init__(self, parent: ProductRepositoryItemObserver, value: str) -> None:
-        super().__init__(value)
-        self._parent = parent
-
-    def setValue(self, value: str, *, notify=True) -> None:
-        uniqueValue = self._parent.requestNameChange(self._value, value)
-
-        if self._value != uniqueValue:
-            self._value = uniqueValue
-
-            if notify:
-                self.notifyObservers()
-
-
-class ProductRepositoryItem(ParameterRepository):
-
-    def __init__(self, parent: ProductRepositoryItemObserver, metadata: MetadataRepositoryItem,
-                 scan: ScanRepositoryItem, geometry: ProductGeometry, probe: ProbeRepositoryItem,
-                 object_: ObjectRepositoryItem, validator: ProductValidator,
-                 costs: Plot2D) -> None:
-        super().__init__('Product')
-        self._parent = parent
-        self._metadata = metadata
-        self._scan = scan
-        self._geometry = geometry
-        self._probe = probe
-        self._object = object_
-        self._validator = validator
-        self._costs = costs
-
-        self._addParameterRepository(self._metadata, observe=True)
-        self._addParameterRepository(self._scan, observe=True)
-        self._addParameterRepository(self._geometry, observe=False)
-        self._addParameterRepository(self._probe, observe=True)
-        self._addParameterRepository(self._object, observe=True)
-
-    def getName(self) -> str:
-        return self._metadata.name.getValue()
-
-    def setName(self, name: str) -> None:
-        self._metadata.name.setValue(name)
-
-    def getMetadata(self) -> MetadataRepositoryItem:
-        return self._metadata
-
-    def getScan(self) -> ScanRepositoryItem:
-        return self._scan
-
-    def getGeometry(self) -> ProductGeometry:
-        return self._geometry
-
-    def getProbe(self) -> ProbeRepositoryItem:
-        return self._probe
-
-    def getObject(self) -> ObjectRepositoryItem:
-        return self._object
-
-    def _invalidateCosts(self) -> None:
-        self._costs = Plot2D.createNull()
-        self._parent.handleCostsChanged(self)
-
-    def getCosts(self) -> Plot2D:
-        return self._costs
-
-    def getProduct(self) -> Product:
-        return Product(
-            metadata=self._metadata.getMetadata(),
-            scan=self._scan.getScan(),
-            probe=self._probe.getProbe(),
-            object_=self._object.getObject(),
-            costs=self.getCosts(),
-        )
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._metadata:
-            self._invalidateCosts()
-            self._parent.handleMetadataChanged(self)
-        elif observable is self._scan:
-            self._invalidateCosts()
-            self._parent.handleScanChanged(self)
-        elif observable is self._probe:
-            self._invalidateCosts()
-            self._parent.handleProbeChanged(self)
-        elif observable is self._object:
-            self._invalidateCosts()
-            self._parent.handleObjectChanged(self)
-
-
-class ProductRepositoryObserver(ABC):
-
-    @abstractmethod
-    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
-        pass
-
-    @abstractmethod
-    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
-        pass
-
-    @abstractmethod
-    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
-        pass
-
-    @abstractmethod
-    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
-        pass
-
-    @abstractmethod
-    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
-        pass
-
-    @abstractmethod
-    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
-        pass
-
-    @abstractmethod
-    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
-        pass
-
-
 class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemObserver):
 
-    def __init__(self, patternSizer: PatternSizer, patterns: ActiveDiffractionDataset,
-                 metadataBuilder: MetadataBuilder,
+    def __init__(self, datasetSettings: DiffractionDatasetSettings, patternSizer: PatternSizer,
+                 patterns: ActiveDiffractionDataset,
                  scanRepositoryItemFactory: ScanRepositoryItemFactory,
                  probeRepositoryItemFactory: ProbeRepositoryItemFactory,
                  objectRepositoryItemFactory: ObjectRepositoryItemFactory,
@@ -186,15 +33,16 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         super().__init__()
         self._patternSizer = patternSizer
         self._patterns = patterns
-        self._metadataBuilder = metadataBuilder
         self._scanRepositoryItemFactory = scanRepositoryItemFactory
         self._probeRepositoryItemFactory = probeRepositoryItemFactory
         self._objectRepositoryItemFactory = objectRepositoryItemFactory
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
-        self._itemIndexLUT: dict[str, int] = dict()
         self._itemList: list[ProductRepositoryItem] = list()
-        self._observerList: list[ProductRepositoryObserver] = list()
+        self._metadataRepositoryItemFactory = MetadataRepositoryItemFactory(self, datasetSettings)
+        self._observerList: list[ProductRepositoryObserver] = [
+            self._metadataRepositoryItemFactory,  # NOTE must be first!
+        ]
 
     @overload
     def __getitem__(self, index: int) -> ProductRepositoryItem:
@@ -211,24 +59,21 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
     def __len__(self) -> int:
         return len(self._itemList)
 
-    def _addUniqueNameToLUT(self, requestedName: str, index: int) -> str:
-        name = requestedName
-        match = 0
-
-        while self._itemIndexLUT.setdefault(name, index) != index:
-            match += 1
-            name = requestedName + f'-{match}'
-
-        return name
-
-    def _insertProduct(self, metadata: ProductMetadata, scanItem: ScanRepositoryItem,
-                       probeItem: ProbeRepositoryItem, objectItem: ObjectRepositoryItem,
-                       costs: Plot2D) -> int:  # FIXME
+    def _insertProduct(self, item: ProductRepositoryItem) -> int:
         index = len(self._itemList)
-        uniqueName = self._addUniqueNameToLUT(metadata.name, index)
-        nameParameter = ProductNameParameter(self, uniqueName)
-        metadataItem = MetadataRepositoryItem(nameParameter, metadata)
+        self._itemList.append(item)
+
+        for observer in self._observerList:
+            observer.handleItemInserted(index, item)
+
+        return index
+
+    def createNewProduct(self, name: str = 'Unnamed') -> int:
+        metadataItem = self._metadataRepositoryItemFactory.createDefault(name)
+        scanItem = self._scanRepositoryItemFactory.createDefault()
         geometry = ProductGeometry(metadataItem, scanItem, self._patternSizer)
+        probeItem = self._probeRepositoryItemFactory.createDefault(geometry)
+        objectItem = self._objectRepositoryItemFactory.createDefault(geometry)
 
         item = ProductRepositoryItem(
             parent=self,
@@ -238,28 +83,30 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             probe=probeItem,
             object_=objectItem,
             validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
-            costs=costs,
+            costs=Plot2D.createNull(),
         )
-        self._itemList.append(item)
 
-        for observer in self._observerList:
-            observer.handleItemInserted(index, item)
-
-        return index
-
-    def createNewProduct(self, name: str = 'Unnamed') -> int:
-        metadata = self._metadataBuilder.createDefault(name)
-        scanItem = self._scanRepositoryItemFactory.createDefault()
-        probeItem = self._probeRepositoryItemFactory.createDefault(geometry)  # FIXME
-        objectItem = self._objectRepositoryItemFactory.createDefault(geometry)  # FIXME
-        return self._insertProduct(metadata, scanItem, probeItem, objectItem, Plot2D.createNull())
+        return self._insertProduct(item)
 
     def insertProduct(self, product: Product) -> int:
-        metadata = product.metadata
+        metadataItem = self._metadataRepositoryItemFactory.create(product.metadata)
         scanItem = self._scanRepositoryItemFactory.create(product.scan)
+        geometry = ProductGeometry(metadataItem, scanItem, self._patternSizer)
         probeItem = self._probeRepositoryItemFactory.create(product.probe)
         objectItem = self._objectRepositoryItemFactory.create(product.object_)
-        return self._insertProduct(metadata, scanItem, probeItem, objectItem, product.costs)
+
+        item = ProductRepositoryItem(
+            parent=self,
+            metadata=metadataItem,
+            scan=scanItem,
+            geometry=geometry,
+            probe=probeItem,
+            object_=objectItem,
+            validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
+            costs=product.costs,
+        )
+
+        return self._insertProduct(item)
 
     def removeProduct(self, index: int) -> None:
         try:
@@ -267,8 +114,6 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         except IndexError:
             logger.debug(f'Failed to remove product item {index}!')
             return
-
-        self._itemIndexLUT = {item.getName(): index for index, item in enumerate(self._itemList)}
 
         for observer in self._observerList:
             observer.handleItemRemoved(index, item)
@@ -331,71 +176,61 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         except ValueError:
             pass
 
-    def requestNameChange(self, currentName: str, requestedName: str) -> str:
-        try:
-            index = self._itemIndexLUT.pop(currentName)
-        except KeyError:
-            logger.warning(f'Failed to change \"{currentName}\" to \"{requestedName}\"!')
-            return currentName
-
-        return self._addUniqueNameToLUT(requestedName, index)
-
     def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
-        try:
-            index = self._itemIndexLUT[item.getName()]
-        except KeyError:
+        metadata = item.getMetadata()
+        index = metadata.getIndex()
+
+        if index < 0:
             logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
-
-        metadata = item.getMetadata()
 
         for observer in self._observerList:
             observer.handleMetadataChanged(index, metadata)
 
     def handleScanChanged(self, item: ProductRepositoryItem) -> None:
-        try:
-            index = self._itemIndexLUT[item.getName()]
-        except KeyError:
+        metadata = item.getMetadata()
+        index = metadata.getIndex()
+        scan = item.getScan()
+
+        if index < 0:
             logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
-
-        scan = item.getScan()
 
         for observer in self._observerList:
             observer.handleScanChanged(index, scan)
 
     def handleProbeChanged(self, item: ProductRepositoryItem) -> None:
-        try:
-            index = self._itemIndexLUT[item.getName()]
-        except KeyError:
+        metadata = item.getMetadata()
+        index = metadata.getIndex()
+        probe = item.getProbe()
+
+        if index < 0:
             logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
-
-        probe = item.getProbe()
 
         for observer in self._observerList:
             observer.handleProbeChanged(index, probe)
 
     def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
-        try:
-            index = self._itemIndexLUT[item.getName()]
-        except KeyError:
+        metadata = item.getMetadata()
+        index = metadata.getIndex()
+        object_ = item.getObject()
+
+        if index < 0:
             logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
-
-        object_ = item.getObject()
 
         for observer in self._observerList:
             observer.handleObjectChanged(index, object_)
 
     def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
-        try:
-            index = self._itemIndexLUT[item.getName()]
-        except KeyError:
+        metadata = item.getMetadata()
+        index = metadata.getIndex()
+        costs = item.getCosts()
+
+        if index < 0:
             logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
             return
-
-        costs = item.getCosts()
 
         for observer in self._observerList:
             observer.handleCostsChanged(index, costs)

@@ -62,7 +62,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
-                    return metadata.name.getValue()
+                    return metadata.getName()
                 elif index.column() == 1:
                     return f'{metadata.probeEnergyInElectronVolts.getValue() / 1000.:.1f}'
                 elif index.column() == 2:
@@ -88,7 +88,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             metadata = item.getMetadata()
 
             if index.column() == 0:
-                metadata.name.setValue(str(value))
+                metadata.setName(str(value))
                 return True
             elif index.column() == 1:
                 try:
