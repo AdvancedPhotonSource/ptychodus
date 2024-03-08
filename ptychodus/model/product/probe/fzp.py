@@ -82,6 +82,15 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
             800e-6,
         )  # from sample to the focal plane
 
+    def copy(self, geometryProvider: ProbeGeometryProvider) -> FresnelZonePlateProbeBuilder:
+        builder = FresnelZonePlateProbeBuilder(geometryProvider, self._fresnelZonePlateChooser)
+        builder.zonePlateDiameterInMeters.setValue(self.zonePlateDiameterInMeters.getValue())
+        builder.outermostZoneWidthInMeters.setValue(self.outermostZoneWidthInMeters.getValue())
+        builder.centralBeamstopDiameterInMeters.setValue(
+            self.centralBeamstopDiameterInMeters.getValue())
+        builder.defocusDistanceInMeters.setValue(self.defocusDistanceInMeters.getValue())
+        return builder
+
     def labelsForPresets(self) -> Iterator[str]:
         for entry in self._fresnelZonePlateChooser:
             yield entry.displayName

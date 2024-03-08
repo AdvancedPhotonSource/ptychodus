@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 import logging
 
@@ -27,11 +28,14 @@ class MetadataRepositoryItem(ParameterRepository):
             'DetectorDistanceInMeters', metadata.detectorDistanceInMeters, minimum=0.)
         self._index = -1
 
+    def copy(self) -> MetadataRepositoryItem:
+        return MetadataRepositoryItem(self._parent, self.getMetadata())
+
     def getName(self) -> str:
         return self._name.getValue()
 
     def setName(self, name: str) -> None:
-        uniqueName = self._parent.createUniqueName(name)  # FIXME
+        uniqueName = self._parent.createUniqueName(name)
         self._name.setValue(uniqueName)
 
     def getIndex(self) -> int:

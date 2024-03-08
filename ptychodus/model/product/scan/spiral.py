@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy
 
 from ptychodus.api.scan import Scan, ScanPoint
@@ -16,6 +18,12 @@ class SpiralScanBuilder(ScanBuilder):
             5e-7,
             minimum=0.,
         )
+
+    def copy(self) -> SpiralScanBuilder:
+        builder = SpiralScanBuilder()
+        builder.numberOfPoints.setValue(self.numberOfPoints.getValue())
+        builder.radiusScalarInMeters.setValue(self.radiusScalarInMeters.getValue())
+        return builder
 
     def build(self) -> Scan:
         pointList: list[ScanPoint] = list()

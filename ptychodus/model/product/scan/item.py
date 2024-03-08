@@ -1,3 +1,4 @@
+from __future__ import annotations
 from itertools import pairwise
 import logging
 
@@ -30,6 +31,9 @@ class ScanRepositoryItem(ParameterRepository):
         self._addParameterRepository(transform, observe=True)
 
         self._rebuild()
+
+    def copy(self) -> ScanRepositoryItem:
+        return ScanRepositoryItem(self.getBuilder().copy(), self.getTransform().copy())
 
     def getUntransformedScan(self) -> Scan:
         return self._untransformedScan

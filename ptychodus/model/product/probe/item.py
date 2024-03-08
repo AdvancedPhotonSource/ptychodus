@@ -3,7 +3,7 @@ import logging
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterRepository
-from ptychodus.api.probe import Probe
+from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
 from .builder import ProbeBuilder
 from .multimodal import MultimodalProbeBuilder
@@ -24,6 +24,10 @@ class ProbeRepositoryItem(ParameterRepository):
         self._addParameterRepository(additionalModesBuilder, observe=True)
 
         self._rebuild()
+
+    def copy(self, geometryProvider: ProbeGeometryProvider) -> ProbeRepositoryItem:
+        return ProbeRepositoryItem(self.getBuilder().copy(geometryProvider),
+                                   self.getAdditionalModesBuilder().copy())
 
     def getProbe(self) -> Probe:
         return self._probe

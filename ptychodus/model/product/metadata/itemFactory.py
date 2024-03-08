@@ -20,7 +20,6 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
                  settings: DiffractionDatasetSettings) -> None:
         self._repository = repository
         self._settings = settings
-        self._reservedNames: set[str] = set()
 
     def create(self, metadata: ProductMetadata) -> MetadataRepositoryItem:
         return MetadataRepositoryItem(self, metadata)
@@ -35,27 +34,20 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
         return self.create(metadata)
 
     def createUniqueName(self, candidateName: str) -> str:
+        reservedNames = set([item.getName() for item in self._repository])
         name = candidateName
         match = 0
 
-        while name in self._reservedNames:
+        while name in reservedNames:
             match += 1
             name = candidateName + f'-{match}'
 
         return name
 
     def _updateLUT(self) -> None:
-        self._reservedNames.clear()
-
         for index, item in enumerate(self._repository):
             metadata = item.getMetadata()
             metadata._index = index
-            name = metadata.getName()
-
-            if name in self._reservedNames:
-                logger.warning('')  # FIXME
-            else:
-                self._reservedNames.add(name)
 
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
         self._updateLUT()

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy
 
 from ptychodus.api.scan import Scan, ScanPoint
@@ -18,6 +20,13 @@ class ConcentricScanBuilder(ScanBuilder):
         self.numberOfShells = self._registerIntegerParameter('NumberOfShells', 5, minimum=0)
         self.numberOfPointsInFirstShell = self._registerIntegerParameter(
             'NumberOfPointsInFirstShell', 10, minimum=0)
+
+    def copy(self) -> ConcentricScanBuilder:
+        builder = ConcentricScanBuilder()
+        builder.radialStepSizeInMeters.setValue(self.radialStepSizeInMeters.getValue())
+        builder.numberOfShells.setValue(self.numberOfShells.getValue())
+        builder.numberOfPointsInFirstShell.setValue(self.numberOfPointsInFirstShell.getValue())
+        return builder
 
     @property
     def _numberOfPoints(self) -> int:

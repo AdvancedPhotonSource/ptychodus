@@ -3,7 +3,7 @@ import logging
 
 import numpy
 
-from ptychodus.api.object import Object
+from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterRepository
 
@@ -23,6 +23,9 @@ class ObjectRepositoryItem(ParameterRepository):
         self._addParameterRepository(builder, observe=True)
 
         self._rebuild()
+
+    def copy(self, geometryProvider: ObjectGeometryProvider) -> ObjectRepositoryItem:
+        return ObjectRepositoryItem(self.getBuilder().copy(geometryProvider))
 
     def getObject(self) -> Object:
         return self._object

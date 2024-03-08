@@ -88,6 +88,28 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         return self._insertProduct(item)
 
+    def duplicateProduct(self, sourceIndex: int) -> int:
+        sourceItem = self._itemList[sourceIndex]
+
+        metadataItem = sourceItem.getMetadata().copy()
+        scanItem = sourceItem.getScan().copy()
+        geometry = ProductGeometry(metadataItem, scanItem, self._patternSizer)
+        probeItem = sourceItem.getProbe().copy(geometry)
+        objectItem = sourceItem.getObject().copy(geometry)
+
+        item = ProductRepositoryItem(
+            parent=self,
+            metadata=metadataItem,
+            scan=scanItem,
+            geometry=geometry,
+            probe=probeItem,
+            object_=objectItem,
+            validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
+            costs=sourceItem.getCosts().copy(),
+        )
+
+        return self._insertProduct(item)
+
     def insertProduct(self, product: Product) -> int:
         metadataItem = self._metadataRepositoryItemFactory.create(product.metadata)
         scanItem = self._scanRepositoryItemFactory.create(product.scan)
@@ -139,9 +161,6 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
                 self.insertProduct(product)
         else:
             logger.debug(f'Refusing to create product with invalid file path \"{filePath}\"')
-
-    def copyProduct(self, sourceIndex: int, destinationIndex: int) -> None:  # FIXME use this
-        print(f'Copy {sourceIndex} -> {destinationIndex}')  # FIXME
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()

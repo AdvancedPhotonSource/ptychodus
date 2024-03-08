@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy
 
 from ptychodus.api.scan import Scan, ScanPoint
@@ -23,6 +25,16 @@ class LissajousScanBuilder(ScanBuilder):
         self.angularStepXInTurns = self._registerRealParameter('angularStepXInTurns', 0.03)
         self.angularStepYInTurns = self._registerRealParameter('angularStepYInTurns', 0.04)
         self.angularShiftInTurns = self._registerRealParameter('angularShiftInTurns', 0.25)
+
+    def copy(self) -> LissajousScanBuilder:
+        builder = LissajousScanBuilder()
+        builder.numberOfPoints.setValue(self.numberOfPoints.getValue())
+        builder.amplitudeXInMeters.setValue(self.amplitudeXInMeters.getValue())
+        builder.amplitudeYInMeters.setValue(self.amplitudeYInMeters.getValue())
+        builder.angularStepXInTurns.setValue(self.angularStepXInTurns.getValue())
+        builder.angularStepYInTurns.setValue(self.angularStepYInTurns.getValue())
+        builder.angularShiftInTurns.setValue(self.angularShiftInTurns.getValue())
+        return builder
 
     def build(self) -> Scan:
         pointList: list[ScanPoint] = list()

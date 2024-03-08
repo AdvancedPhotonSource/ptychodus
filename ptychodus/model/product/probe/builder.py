@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,7 +9,8 @@ import numpy
 import numpy.typing
 
 from ptychodus.api.parametric import ParameterRepository
-from ptychodus.api.probe import Probe, ProbeArrayType, ProbeFileReader, ProbeGeometry
+from ptychodus.api.probe import (Probe, ProbeArrayType, ProbeFileReader, ProbeGeometry,
+                                 ProbeGeometryProvider)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +53,10 @@ class ProbeBuilder(ParameterRepository):
         return self._name.getValue()
 
     @abstractmethod
+    def copy(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
+        pass
+
+    @abstractmethod
     def build(self) -> Probe:
         pass
 
@@ -59,7 +65,10 @@ class FromMemoryProbeBuilder(ProbeBuilder):
 
     def __init__(self, probe: Probe) -> None:
         super().__init__('From Memory')
-        self._probe = probe
+        self._probe = probe.copy()
+
+    def copy(self, geometryProvider: ProbeGeometryProvider) -> FromMemoryProbeBuilder:
+        return FromMemoryProbeBuilder(self._probe)
 
     def build(self) -> Probe:
         return self._probe
@@ -72,6 +81,10 @@ class FromFileProbeBuilder(ProbeBuilder):
         self.filePath = self._registerPathParameter('FilePath', filePath)
         self.fileType = self._registerStringParameter('FileType', fileType)
         self._fileReader = fileReader
+
+    def copy(self, geometryProvider: ProbeGeometryProvider) -> FromFileProbeBuilder:
+        return FromFileProbeBuilder(self.filePath.getValue(), self.fileType.getValue(),
+                                    self._fileReader)
 
     def build(self) -> Probe:
         filePath = self.filePath.getValue()

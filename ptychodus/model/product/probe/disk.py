@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy
 
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
@@ -16,6 +18,11 @@ class DiskProbeBuilder(ProbeBuilder):
             1.e-6,
             minimum=0.,
         )
+
+    def copy(self, geometryProvider: ProbeGeometryProvider) -> DiskProbeBuilder:
+        builder = DiskProbeBuilder(geometryProvider)
+        builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
+        return builder
 
     def build(self) -> Probe:
         geometry = self._geometryProvider.getProbeGeometry()

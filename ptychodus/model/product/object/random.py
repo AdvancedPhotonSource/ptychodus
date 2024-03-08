@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
@@ -44,6 +46,17 @@ class RandomObjectBuilder(ObjectBuilder):
             1.e-6,
             minimum=0.,
         )
+
+    def copy(self, geometryProvider: ObjectGeometryProvider) -> RandomObjectBuilder:
+        builder = RandomObjectBuilder(self._rng, geometryProvider)
+        builder.extraPaddingX.setValue(self.extraPaddingX.getValue())
+        builder.extraPaddingY.setValue(self.extraPaddingY.getValue())
+        builder.amplitudeMean.setValue(self.amplitudeMean.getValue())
+        builder.amplitudeDeviation.setValue(self.amplitudeDeviation.getValue())
+        builder.phaseDeviation.setValue(self.phaseDeviation.getValue())
+        builder.numberOfLayers.setValue(self.numberOfLayers.getValue())
+        builder.layerDistanceInMeters.setValue(self.layerDistanceInMeters.getValue())
+        return builder
 
     def build(self) -> Object:
         geometry = self._geometryProvider.getObjectGeometry()

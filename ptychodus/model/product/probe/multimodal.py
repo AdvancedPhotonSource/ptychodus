@@ -32,6 +32,14 @@ class MultimodalProbeBuilder(ParameterRepository):
                                                           minimum=0.,
                                                           maximum=1.)
 
+    def copy(self) -> MultimodalProbeBuilder:
+        builder = MultimodalProbeBuilder(self._rng)
+        builder.isOrthogonalizeModesEnabled.setValue(self.isOrthogonalizeModesEnabled.getValue())
+        builder.numberOfModes.setValue(self.numberOfModes.getValue())
+        builder.modeDecayType.setValue(self.modeDecayType.getValue())
+        builder.modeDecayRatio.setValue(self.modeDecayRatio.getValue())
+        return builder
+
     def _initializeModes(self, probe: ProbeArrayType) -> ProbeArrayType:
         modeList: list[ProbeArrayType] = list()
 

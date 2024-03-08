@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections.abc import Iterator
 
 import numpy
@@ -10,6 +11,7 @@ class ScanPointTransform(ParameterRepository):
 
     def __init__(self, rng: numpy.random.Generator) -> None:
         super().__init__('Transform')
+        self._rng = rng
 
         self.affineAX = self._registerRealParameter('AffineAX', 1.)
         self.affineAY = self._registerRealParameter('AffineAY', 0.)
@@ -24,7 +26,17 @@ class ScanPointTransform(ParameterRepository):
             0.,
             minimum=0.,
         )
-        self._rng = rng
+
+    def copy(self) -> ScanPointTransform:
+        transform = ScanPointTransform(self._rng)
+        transform.affineAX.setValue(self.affineAX.getValue())
+        transform.affineAY.setValue(self.affineAY.getValue())
+        transform.affineAT.setValue(self.affineAT.getValue())
+        transform.affineBX.setValue(self.affineBX.getValue())
+        transform.affineBY.setValue(self.affineBY.getValue())
+        transform.affineBT.setValue(self.affineBT.getValue())
+        transform.jitterRadiusInMeters.setValue(self.jitterRadiusInMeters.getValue())
+        return transform
 
     @staticmethod
     def negateX(preset: int) -> bool:

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Sequence
 from pathlib import Path
@@ -19,6 +20,10 @@ class ScanBuilder(ParameterRepository):
         return self._name.getValue()
 
     @abstractmethod
+    def copy(self) -> ScanBuilder:
+        pass
+
+    @abstractmethod
     def build(self) -> Scan:
         pass
 
@@ -28,6 +33,9 @@ class FromMemoryScanBuilder(ScanBuilder):
     def __init__(self, points: Sequence[ScanPoint]) -> None:
         super().__init__('From Memory')
         self._scan = Scan(points)
+
+    def copy(self) -> FromMemoryScanBuilder:
+        return FromMemoryScanBuilder(self._scan)
 
     def build(self) -> Scan:
         return self._scan
@@ -40,6 +48,10 @@ class FromFileScanBuilder(ScanBuilder):
         self.filePath = self._registerPathParameter('FilePath', filePath)
         self.fileType = self._registerStringParameter('FileType', fileType)
         self._fileReader = fileReader
+
+    def copy(self) -> FromFileScanBuilder:
+        return FromFileScanBuilder(self.filePath.getValue(), self.fileType.getValue(),
+                                   self._fileReader)
 
     def build(self) -> Scan:
         filePath = self.filePath.getValue()

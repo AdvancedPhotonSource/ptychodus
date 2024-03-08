@@ -61,6 +61,14 @@ class CartesianScanBuilder(ScanBuilder):
         self.stepSizeXInMeters = self._registerRealParameter('StepSizeXInMeters', 1e-6, minimum=0.)
         self.stepSizeYInMeters = self._registerRealParameter('StepSizeYInMeters', 1e-6, minimum=0.)
 
+    def copy(self) -> CartesianScanBuilder:
+        builder = CartesianScanBuilder(self._variant)
+        builder.numberOfPointsX.setValue(self.numberOfPointsX.getValue())
+        builder.numberOfPointsY.setValue(self.numberOfPointsY.getValue())
+        builder.stepSizeXInMeters.setValue(self.stepSizeXInMeters.getValue())
+        builder.stepSizeYInMeters.setValue(self.stepSizeYInMeters.getValue())
+        return builder
+
     @property
     def isEquilateral(self) -> bool:
         return self._variant.isEquilateral

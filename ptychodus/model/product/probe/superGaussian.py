@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy
 
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
@@ -26,6 +28,13 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
             1.,
             minimum=1.,
         )
+
+    def copy(self, geometryProvider: ProbeGeometryProvider) -> SuperGaussianProbeBuilder:
+        builder = SuperGaussianProbeBuilder(geometryProvider)
+        builder.annularRadiusInMeters.setValue(self.annularRadiusInMeters.getValue())
+        builder.fwhmInMeters.setValue(self.fwhmInMeters.getValue())
+        builder.orderParameter.setValue(self.orderParameter.getValue())
+        return builder
 
     def build(self) -> Probe:
         geometry = self._geometryProvider.getProbeGeometry()

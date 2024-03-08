@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy
 
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
@@ -21,6 +23,12 @@ class RectangularProbeBuilder(ProbeBuilder):
             1.e-6,
             minimum=0.,
         )
+
+    def copy(self, geometryProvider: ProbeGeometryProvider) -> RectangularProbeBuilder:
+        builder = RectangularProbeBuilder(geometryProvider)
+        builder.widthInMeters.setValue(self.widthInMeters.getValue())
+        builder.heightInMeters.setValue(self.heightInMeters.getValue())
+        return builder
 
     def build(self) -> Probe:
         geometry = self._geometryProvider.getProbeGeometry()

@@ -4,7 +4,7 @@ import logging
 import sys
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
-from PyQt5.QtWidgets import QAbstractItemView
+from PyQt5.QtWidgets import QAbstractItemView, QAction
 
 from ...api.visualize import Plot2D
 from ...model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
@@ -119,23 +119,30 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 class ProductController(ProductRepositoryObserver):
 
     def __init__(self, repository: ProductRepository, view: ProductView,
-                 fileDialogFactory: FileDialogFactory, tableModel: ProductRepositoryTableModel,
+                 fileDialogFactory: FileDialogFactory, duplicateAction: QAction,
+                 tableModel: ProductRepositoryTableModel,
                  tableProxyModel: QSortFilterProxyModel) -> None:
         super().__init__()
         self._repository = repository
         self._view = view
         self._fileDialogFactory = fileDialogFactory
+        self._duplicateAction = duplicateAction
         self._tableModel = tableModel
         self._tableProxyModel = tableProxyModel
 
     @classmethod
     def createInstance(cls, repository: ProductRepository, view: ProductView,
                        fileDialogFactory: FileDialogFactory) -> ProductController:
+        openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
+        createNewAction = view.buttonBox.insertMenu.addAction('Create New')
+        duplicateAction = view.buttonBox.insertMenu.addAction('Duplicate')
+
         tableModel = ProductRepositoryTableModel(repository)
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
-        controller = cls(repository, view, fileDialogFactory, tableModel, tableProxyModel)
+        controller = cls(repository, view, fileDialogFactory, duplicateAction, tableModel,
+                         tableProxyModel)
         repository.addObserver(controller)
         controller._updateInfoText()
 
@@ -147,11 +154,9 @@ class ProductController(ProductRepositoryObserver):
         view.tableView.selectionModel().currentChanged.connect(controller._updateEnabledButtons)
         controller._updateEnabledButtons(QModelIndex(), QModelIndex())
 
-        openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
         openFileAction.triggered.connect(controller._openProduct)
-
-        createNewAction = view.buttonBox.insertMenu.addAction('Create New')
         createNewAction.triggered.connect(controller._createNewProduct)
+        duplicateAction.triggered.connect(controller._duplicateCurrentProduct)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentProduct)
         view.buttonBox.saveButton.clicked.connect(controller._saveCurrentProduct)
@@ -191,6 +196,14 @@ class ProductController(ProductRepositoryObserver):
         else:
             logger.error('No current item!')
 
+    def _duplicateCurrentProduct(self) -> None:
+        current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
+
+        if current.isValid():
+            self._repository.duplicateProduct(current.row())
+        else:
+            logger.error('No current item!')
+
     def _editCurrentProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
@@ -210,6 +223,7 @@ class ProductController(ProductRepositoryObserver):
 
     def _updateEnabledButtons(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
+        self._duplicateAction.setEnabled(enabled)
         self._view.buttonBox.saveButton.setEnabled(enabled)
         self._view.buttonBox.editButton.setEnabled(enabled)
         self._view.buttonBox.removeButton.setEnabled(enabled)
