@@ -115,6 +115,7 @@ class TikePositionCorrectionView(QGroupBox):
         super().__init__('Position Correction', parent)
         self.positionRegularizationCheckBox = QCheckBox('Use Regularization')
         self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
+        self.updateMagnitudeLimitLineEdit = DecimalLineEdit.createInstance()
 
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikePositionCorrectionView:
@@ -122,10 +123,14 @@ class TikePositionCorrectionView(QGroupBox):
 
         view.positionRegularizationCheckBox.setToolTip(
             'Whether the positions are constrained to fit a random error plus affine error model.')
+        view.updateMagnitudeLimitLineEdit.setToolTip(
+            'When set to a positive number, x and y update magnitudes are clipped (limited) '
+            'to this value.')
 
         layout = QFormLayout()
         layout.addRow(view.positionRegularizationCheckBox)
         layout.addRow(view.adaptiveMomentView)
+        layout.addRow('Update Magnitude Limit:', view.updateMagnitudeLimitLineEdit)
         view.setLayout(layout)
 
         return view

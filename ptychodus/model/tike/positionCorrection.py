@@ -1,4 +1,5 @@
 from __future__ import annotations
+from decimal import Decimal
 
 from ...api.settings import SettingsGroup, SettingsRegistry
 from .adaptiveMoment import TikeAdaptiveMomentPresenter, TikeAdaptiveMomentSettings
@@ -12,6 +13,7 @@ class TikePositionCorrectionSettings(TikeAdaptiveMomentSettings):
             'UsePositionCorrection', False)
         self.usePositionRegularization = settingsGroup.createBooleanEntry(
             'UsePositionRegularization', False)
+        self.updateMagnitudeLimit = settingsGroup.createRealEntry('Update Magnitude Limit', '0.0')
         # TODO transform: Global transform of positions.
         # TODO origin: The rotation center of the transformation.
 
@@ -42,3 +44,9 @@ class TikePositionCorrectionPresenter(TikeAdaptiveMomentPresenter[TikePositionCo
 
     def setPositionRegularizationEnabled(self, enabled: bool) -> None:
         self._settings.usePositionRegularization.value = enabled
+
+    def getUpdateMagnitudeLimit(self) -> Decimal:
+        return self._settings.updateMagnitudeLimit.value
+
+    def setUpdateMagnitudeLimit(self, value: Decimal) -> None:
+        self._settings.updateMagnitudeLimit.value = value
