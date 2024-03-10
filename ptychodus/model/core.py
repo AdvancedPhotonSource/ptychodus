@@ -103,7 +103,8 @@ class ModelCore:
                 self.ptychonnReconstructorLibrary,
             ],
         )
-        self._analysisCore = AnalysisCore(self._productCore.probeRepository,
+        self._analysisCore = AnalysisCore(self._pluginRegistry.scalarTransformations.copy(),
+                                          self._productCore.probeRepository,
                                           self._productCore.objectRepository)
         self._stateDataRegistry = StateDataRegistry(self._patternsCore)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
@@ -198,7 +199,6 @@ class ModelCore:
     def finalizeStreamingWorkflow(self) -> None:
         self._scanCore.scanAPI.finalizeStreamingScan()  # FIXME
         self._patternsCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
-        self._objectCore.objectAPI.selectNewItemFromInitializerSimpleName('Random')  # FIXME
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
         return self._patternsCore.dataAPI.getAssemblyQueueSize()
@@ -252,12 +252,20 @@ class ModelCore:
         return self._analysisCore.probePropagator
 
     @property
+    def probePropagatorImagePresenter(self) -> ImagePresenter:
+        return self._analysisCore.probePropagatorImageCore.presenter
+
+    @property
     def fourierRingCorrelator(self) -> FourierRingCorrelator:
         return self._analysisCore.fourierRingCorrelator
 
     @property
     def dichroicAnalyzer(self) -> DichroicAnalyzer:
         return self._analysisCore.dichroicAnalyzer
+
+    @property
+    def dichroicImagePresenter(self) -> ImagePresenter:
+        return self._analysisCore.dichroicImageCore.presenter
 
     @property
     def areWorkflowsSupported(self) -> bool:

@@ -2,7 +2,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from decimal import Decimal
 from enum import auto, Enum
-from typing import Optional
 
 from PyQt5.QtCore import (pyqtSignal, Qt, QObject, QPoint, QPointF, QLineF, QRect, QRectF, QSize,
                           QSizeF)
@@ -24,7 +23,7 @@ from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 class ImageDisplayRangeDialog(QDialog):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.buttonBox = QDialogButtonBox()
         self.minValueLineEdit = DecimalLineEdit.createInstance()
@@ -41,7 +40,7 @@ class ImageDisplayRangeDialog(QDialog):
         return self.maxValueLineEdit.getValue()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDisplayRangeDialog:
+    def createInstance(cls, parent: QWidget | None = None) -> ImageDisplayRangeDialog:
         dialog = cls(parent)
         dialog.setWindowTitle('Set Display Range')
         dialog.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
@@ -60,7 +59,7 @@ class ImageDisplayRangeDialog(QDialog):
 
 class ImageToolsGroupBox(BottomTitledGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Tools', parent)
         self.homeButton = QToolButton()
         self.saveButton = QToolButton()
@@ -70,7 +69,7 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         self.lineCutButton = QToolButton()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageToolsGroupBox:
+    def createInstance(cls, parent: QWidget | None = None) -> ImageToolsGroupBox:
         view = cls(parent)
 
         view.homeButton.setIcon(QIcon(':/icons/home'))
@@ -113,14 +112,14 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
 
 class ImageColorizerGroupBox(BottomTitledGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Colorize', parent)
         self.colorizerComboBox = QComboBox()
         self.scalarTransformComboBox = QComboBox()
         self.variantComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageColorizerGroupBox:
+    def createInstance(cls, parent: QWidget | None = None) -> ImageColorizerGroupBox:
         view = cls(parent)
 
         view.colorizerComboBox.setToolTip('Array Component')
@@ -141,7 +140,7 @@ class ImageColorizerGroupBox(BottomTitledGroupBox):
 
 class ImageDataRangeGroupBox(BottomTitledGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Data Range', parent)
         self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
         self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
@@ -151,7 +150,7 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         self.displayRangeDialog = ImageDisplayRangeDialog.createInstance(self)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageDataRangeGroupBox:
+    def createInstance(cls, parent: QWidget | None = None) -> ImageDataRangeGroupBox:
         view = cls(parent)
 
         view.minDisplayValueSlider.setToolTip('Minimum Display Value')
@@ -180,14 +179,14 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
 
 class ImageRibbon(QWidget):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.imageToolsGroupBox = ImageToolsGroupBox.createInstance()
         self.colormapGroupBox = ImageColorizerGroupBox.createInstance()
         self.dataRangeGroupBox = ImageDataRangeGroupBox.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ImageRibbon:
+    def createInstance(cls, parent: QWidget | None = None) -> ImageRibbon:
         view = cls(parent)
 
         layout = QHBoxLayout()
@@ -346,7 +345,7 @@ class ImageWidget(QGraphicsView):
     rectangleFinished = pyqtSignal(QRectF)
     lineCutFinished = pyqtSignal(QLineF)
 
-    def __init__(self, imageItem: ImageItem, parent: Optional[QWidget]) -> None:
+    def __init__(self, imageItem: ImageItem, parent: QWidget | None) -> None:
         super().__init__(parent)
         self._imageItem = imageItem
         self._colorLegendMinValue = 0.
@@ -361,9 +360,7 @@ class ImageWidget(QGraphicsView):
         self._isColorLegendCyclic = False
 
     @classmethod
-    def createInstance(cls,
-                       statusBar: QStatusBar,
-                       parent: Optional[QWidget] = None) -> ImageWidget:
+    def createInstance(cls, statusBar: QStatusBar, parent: QWidget | None = None) -> ImageWidget:
         imageItemEvents = ImageItemEvents()
         imageItem = ImageItem(imageItemEvents, statusBar)
         widget = cls(imageItem, parent)
@@ -494,7 +491,7 @@ class ImageWidget(QGraphicsView):
 
 class LineCutDialog(QDialog):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
@@ -502,7 +499,7 @@ class LineCutDialog(QDialog):
         self.axes = self.figure.add_subplot(111)
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> LineCutDialog:
+    def createInstance(cls, parent: QWidget | None = None) -> LineCutDialog:
         title = 'Line-Cut Dialog'
         view = cls(parent)
         view.setWindowTitle(title)
@@ -518,14 +515,14 @@ class LineCutDialog(QDialog):
 
 class ImageView(QWidget):
 
-    def __init__(self, statusBar: QStatusBar, parent: Optional[QWidget]) -> None:
+    def __init__(self, statusBar: QStatusBar, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.imageRibbon = ImageRibbon.createInstance()
         self.imageWidget = ImageWidget.createInstance(statusBar)
         self.lineCutDialog = LineCutDialog.createInstance()
 
     @classmethod
-    def createInstance(cls, statusBar: QStatusBar, parent: Optional[QWidget] = None) -> ImageView:
+    def createInstance(cls, statusBar: QStatusBar, parent: QWidget | None = None) -> ImageView:
         view = cls(statusBar, parent)
 
         layout = QVBoxLayout()

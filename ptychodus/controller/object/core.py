@@ -17,7 +17,6 @@ from ..image import ImageController
 from .dichroic import DichroicViewController
 from .editorFactory import ObjectEditorViewControllerFactory
 from .frc import FourierRingCorrelationViewController
-from .listModel import ObjectListModel
 from .treeModel import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
@@ -27,8 +26,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
     def __init__(self, repository: ObjectRepository, imagePresenter: ImagePresenter,
                  correlator: FourierRingCorrelator, dichroicAnalyzer: DichroicAnalyzer,
-                 view: RepositoryTreeView, imageView: ImageView, statusBar: QStatusBar,
-                 fileDialogFactory: FileDialogFactory, listModel: ObjectListModel,
+                 dichroicImagePresenter: ImagePresenter, view: RepositoryTreeView,
+                 imageView: ImageView, statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
                  treeModel: ObjectTreeModel) -> None:
         super().__init__()
         self._repository = repository
@@ -36,24 +35,27 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._view = view
         self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
-        self._listModel = listModel
         self._treeModel = treeModel
         self._editorFactory = ObjectEditorViewControllerFactory()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
-        self._frcDialog = FourierRingCorrelationViewController(correlator, listModel, view)
-        self._dichroicDialog = DichroicViewController(dichroicAnalyzer, listModel, statusBar, view)
+        self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel, view)
+        self._dichroicViewController = DichroicViewController(dichroicAnalyzer,
+                                                              dichroicImagePresenter,
+                                                              fileDialogFactory, treeModel,
+                                                              statusBar, view)
 
     @classmethod
     def createInstance(cls, repository: ObjectRepository, imagePresenter: ImagePresenter,
                        correlator: FourierRingCorrelator, dichroicAnalyzer: DichroicAnalyzer,
-                       view: RepositoryTreeView, imageView: ImageView, statusBar: QStatusBar,
+                       dichroicImagePresenter: ImagePresenter, view: RepositoryTreeView,
+                       imageView: ImageView, statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
-        listModel = ObjectListModel(repository)
         treeModel = ObjectTreeModel(repository)
-        controller = cls(repository, imagePresenter, correlator, dichroicAnalyzer, view, imageView,
-                         statusBar, fileDialogFactory, listModel, treeModel)
+        controller = cls(repository, imagePresenter, correlator, dichroicAnalyzer,
+                         dichroicImagePresenter, view, imageView, statusBar, fileDialogFactory,
+                         treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -73,8 +75,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         copyAction.triggered.connect(controller._copyToCurrentObject)
 
         view.copierDialog.setWindowTitle('Copy Object')
-        view.copierDialog.sourceComboBox.setModel(listModel)
-        view.copierDialog.destinationComboBox.setModel(listModel)
+        view.copierDialog.sourceComboBox.setModel(treeModel)
+        view.copierDialog.destinationComboBox.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingObject)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentObject)
@@ -171,7 +173,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._frcDialog.analyze(itemIndex, itemIndex)
+            self._frcViewController.analyze(itemIndex, itemIndex)
 
     def _analyzeDichroic(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -179,7 +181,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._dichroicDialog.analyze(itemIndex, itemIndex)
+            self._dichroicViewController.analyze(itemIndex, itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
@@ -204,11 +206,9 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 self._imagePresenter.setArray(array, object_.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._listModel.insertItem(index, item)
         self._treeModel.insertItem(index, item)
 
     def handleItemChanged(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._listModel.updateItem(index, item)
         self._treeModel.updateItem(index, item)
 
         if index == self._getCurrentItemIndex():
@@ -216,5 +216,4 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             self._updateView(currentIndex, currentIndex)
 
     def handleItemRemoved(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._listModel.removeItem(index, item)
         self._treeModel.removeItem(index, item)

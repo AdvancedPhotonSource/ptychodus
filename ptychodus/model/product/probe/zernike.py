@@ -12,7 +12,6 @@ from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from .builder import ProbeBuilder
 
 RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
-ComplexArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
 logger = logging.getLogger(__name__)
 

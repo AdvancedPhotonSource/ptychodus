@@ -46,16 +46,14 @@ class ControllerCore:
         self._scanController = ScanController.createInstance(model.scanRepository, view.scanView,
                                                              view.scanPlotView,
                                                              self._fileDialogFactory)
-        self._probeController = ProbeController.createInstance(model.probeRepository,
-                                                               model.probeImagePresenter,
-                                                               model.probePropagator,
-                                                               view.probeView, view.probeImageView,
-                                                               view.statusBar(),
-                                                               self._fileDialogFactory)
+        self._probeController = ProbeController.createInstance(
+            model.probeRepository, model.probeImagePresenter, model.probePropagator,
+            model.probePropagatorImagePresenter, view.probeView, view.probeImageView,
+            view.statusBar(), self._fileDialogFactory)
         self._objectController = ObjectController.createInstance(
             model.objectRepository, model.objectImagePresenter, model.fourierRingCorrelator,
-            model.dichroicAnalyzer, view.objectView, view.objectImageView, view.statusBar(),
-            self._fileDialogFactory)
+            model.dichroicAnalyzer, model.dichroicImagePresenter, view.objectView,
+            view.objectImageView, view.statusBar(), self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,

@@ -15,7 +15,6 @@ from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog, ProgressBarIt
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .editorFactory import ProbeEditorViewControllerFactory
-from .listModel import ProbeListModel
 from .propagator import ProbePropagationViewController
 from .treeModel import ProbeTreeModel
 
@@ -25,33 +24,31 @@ logger = logging.getLogger(__name__)
 class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
     def __init__(self, repository: ProbeRepository, imagePresenter: ImagePresenter,
-                 propagator: ProbePropagator, view: RepositoryTreeView, imageView: ImageView,
-                 statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
-                 listModel: ProbeListModel, treeModel: ProbeTreeModel) -> None:
+                 propagator: ProbePropagator, propagatorImagePresenter: ImagePresenter,
+                 view: RepositoryTreeView, imageView: ImageView, statusBar: QStatusBar,
+                 fileDialogFactory: FileDialogFactory, treeModel: ProbeTreeModel) -> None:
         super().__init__()
         self._repository = repository
         self._imagePresenter = imagePresenter
         self._view = view
         self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
-        self._listModel = listModel
         self._treeModel = treeModel
         self._editorFactory = ProbeEditorViewControllerFactory()
         self._imageController = ImageController.createInstance(imagePresenter, imageView,
                                                                fileDialogFactory)
-        self._propagationDialog = ProbePropagationViewController(propagator, listModel, statusBar,
-                                                                 view)
+        self._propagationViewController = ProbePropagationViewController(
+            propagator, propagatorImagePresenter, fileDialogFactory, statusBar, view)
 
     @classmethod
     def createInstance(cls, repository: ProbeRepository, imagePresenter: ImagePresenter,
-                       propagator: ProbePropagator, view: RepositoryTreeView, imageView: ImageView,
-                       statusBar: QStatusBar,
+                       propagator: ProbePropagator, propagatorImagePresenter: ImagePresenter,
+                       view: RepositoryTreeView, imageView: ImageView, statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
-        listModel = ProbeListModel(repository)
         treeModel = ProbeTreeModel(repository)
-        controller = cls(repository, imagePresenter, propagator, view, imageView, statusBar,
-                         fileDialogFactory, listModel, treeModel)
+        controller = cls(repository, imagePresenter, propagator, propagatorImagePresenter, view,
+                         imageView, statusBar, fileDialogFactory, treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -73,8 +70,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         copyAction.triggered.connect(controller._copyToCurrentProbe)
 
         view.copierDialog.setWindowTitle('Copy Probe')
-        view.copierDialog.sourceComboBox.setModel(listModel)
-        view.copierDialog.destinationComboBox.setModel(listModel)
+        view.copierDialog.sourceComboBox.setModel(treeModel)
+        view.copierDialog.destinationComboBox.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingProbe)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentProbe)
@@ -168,7 +165,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._propagationDialog.propagate(itemIndex)
+            self._propagationViewController.propagate(itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
@@ -193,11 +190,9 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 self._imagePresenter.setArray(array, probe.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._listModel.insertItem(index, item)
         self._treeModel.insertItem(index, item)
 
     def handleItemChanged(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._listModel.updateItem(index, item)
         self._treeModel.updateItem(index, item)
 
         if index == self._getCurrentItemIndex():
@@ -205,5 +200,4 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             self._updateView(currentIndex, currentIndex)
 
     def handleItemRemoved(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._listModel.removeItem(index, item)
         self._treeModel.removeItem(index, item)

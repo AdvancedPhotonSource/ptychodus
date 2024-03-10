@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QGridLayout,
-                             QLabel, QStatusBar, QWidget)
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGraphicsView, QGridLayout, QGroupBox, QLabel, QPushButton,
+                             QStatusBar, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -14,7 +16,6 @@ class FourierRingCorrelationDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.buttonBox = QDialogButtonBox()
         self.name1Label = QLabel('Name 1:')
         self.name1ComboBox = QComboBox()
         self.name2Label = QLabel('Name 2:')
@@ -23,6 +24,7 @@ class FourierRingCorrelationDialog(QDialog):
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
+        self.buttonBox = QDialogButtonBox()
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> FourierRingCorrelationDialog:
@@ -32,16 +34,19 @@ class FourierRingCorrelationDialog(QDialog):
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
-        layout = QGridLayout()
-        layout.addWidget(view.name1Label, 0, 0)
-        layout.addWidget(view.name1ComboBox, 0, 1)
-        layout.addWidget(view.name2Label, 0, 2)
-        layout.addWidget(view.name2ComboBox, 0, 3)
-        layout.addWidget(view.navigationToolbar, 1, 0, 1, 4)
-        layout.addWidget(view.figureCanvas, 2, 0, 1, 4)
-        layout.addWidget(view.buttonBox, 3, 0, 1, 4)
-        layout.setColumnStretch(1, 1)
-        layout.setColumnStretch(3, 1)
+        parametersLayout = QGridLayout()
+        parametersLayout.addWidget(view.name1Label, 0, 0)
+        parametersLayout.addWidget(view.name1ComboBox, 0, 1)
+        parametersLayout.addWidget(view.name2Label, 0, 2)
+        parametersLayout.addWidget(view.name2ComboBox, 0, 3)
+        parametersLayout.setColumnStretch(1, 1)
+        parametersLayout.setColumnStretch(3, 1)
+
+        layout = QVBoxLayout()
+        layout.addLayout(parametersLayout)
+        layout.addWidget(view.navigationToolbar)
+        layout.addWidget(view.figureCanvas)
+        layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view
@@ -53,15 +58,80 @@ class FourierRingCorrelationDialog(QDialog):
             self.reject()
 
 
+class DichroicGraphicsView(QGroupBox):  # TODO remove when able
+
+    def __init__(self, title: str, statusBar: QStatusBar, parent: QWidget | None) -> None:
+        super().__init__(title, parent)
+        self.graphicsView = QGraphicsView()
+
+    @classmethod
+    def createInstance(cls,
+                       title: str,
+                       statusBar: QStatusBar,
+                       parent: QWidget | None = None) -> DichroicGraphicsView:
+        view = cls(title, statusBar, parent)
+        view.setAlignment(Qt.AlignHCenter)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.graphicsView)
+        view.setLayout(layout)
+
+        return view
+
+
+class DichroicImageView(QGroupBox):
+
+    def __init__(self, title: str, statusBar: QStatusBar, parent: QWidget | None) -> None:
+        super().__init__(title, parent)
+        self.imageView = ImageView.createInstance(statusBar)
+
+    @classmethod
+    def createInstance(cls,
+                       title: str,
+                       statusBar: QStatusBar,
+                       parent: QWidget | None = None) -> DichroicImageView:
+        view = cls(title, statusBar, parent)
+        view.setAlignment(Qt.AlignHCenter)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.imageView)
+        view.setLayout(layout)
+
+        return view
+
+
+class DichroicParametersView(QGroupBox):
+
+    def __init__(self, title: str, parent: QWidget | None) -> None:
+        super().__init__(title, parent)
+        self.lcircComboBox = QComboBox()
+        self.rcircComboBox = QComboBox()
+        self.saveButton = QPushButton('Save')
+
+    @classmethod
+    def createInstance(cls, title: str, parent: QWidget | None = None) -> DichroicParametersView:
+        view = cls(title, parent)
+        view.setAlignment(Qt.AlignHCenter)
+
+        layout = QFormLayout()
+        layout.addRow('Left Circular:', view.lcircComboBox)
+        layout.addRow('Right Circular:', view.rcircComboBox)
+        layout.addRow(view.saveButton)
+        view.setLayout(layout)
+
+        return view
+
+
 class DichroicDialog(QDialog):
 
     def __init__(self, statusBar: QStatusBar, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.lcircNameLabel = QLabel('Left Circular:')
-        self.lcircNameComboBox = QComboBox()
-        self.rcircNameLabel = QLabel('Right Circular:')
-        self.rcircNameComboBox = QComboBox()
-        self.imageView = ImageView.createInstance(statusBar)
+        self.numeratorImageView = DichroicGraphicsView.createInstance('Numerator', statusBar)
+        self.ratioImageView = DichroicImageView.createInstance('Ratio', statusBar)
+        self.denominatorImageView = DichroicGraphicsView.createInstance('Denominator', statusBar)
+        self.parametersView = DichroicParametersView.createInstance('Parameters')
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
@@ -74,15 +144,15 @@ class DichroicDialog(QDialog):
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
-        layout = QGridLayout()
-        layout.addWidget(view.lcircNameLabel, 0, 0)
-        layout.addWidget(view.lcircNameComboBox, 0, 1)
-        layout.addWidget(view.rcircNameLabel, 0, 2)
-        layout.addWidget(view.rcircNameComboBox, 0, 3)
-        layout.addWidget(view.imageView, 1, 0, 1, 4)
-        layout.addWidget(view.buttonBox, 2, 0, 1, 4)
-        layout.setColumnStretch(1, 1)
-        layout.setColumnStretch(3, 1)
+        contentsLayout = QGridLayout()
+        contentsLayout.addWidget(view.numeratorImageView, 0, 0)
+        contentsLayout.addWidget(view.ratioImageView, 0, 1)
+        contentsLayout.addWidget(view.denominatorImageView, 1, 0)
+        contentsLayout.addWidget(view.parametersView, 1, 1)
+
+        layout = QVBoxLayout()
+        layout.addLayout(contentsLayout)
+        layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view
