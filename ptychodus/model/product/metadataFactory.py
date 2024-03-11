@@ -4,12 +4,12 @@ import logging
 from ptychodus.api.product import ProductMetadata
 from ptychodus.api.visualize import Plot2D
 
-from ...patterns import DiffractionDatasetSettings
-from ..item import ProductRepositoryItem, ProductRepositoryObserver
-from ..object import ObjectRepositoryItem
-from ..probe import ProbeRepositoryItem
-from ..scan import ScanRepositoryItem
-from .item import MetadataRepositoryItem, UniqueNameFactory
+from ..patterns import DiffractionDatasetSettings
+from .item import ProductRepositoryItem, ProductRepositoryObserver
+from .metadata import MetadataRepositoryItem, UniqueNameFactory
+from .object import ObjectRepositoryItem
+from .probe import ProbeRepositoryItem
+from .scan import ScanRepositoryItem
 
 logger = logging.getLogger(__name__)
 

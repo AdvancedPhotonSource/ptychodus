@@ -80,7 +80,7 @@ class WavefieldPropagator:
         return wavefield
 
     def propagate_fourier(self, wavefield: ComplexArrayType, distance: float) -> ComplexArrayType:
-        pass  # FIXME
+        return  # FIXME
 
 
 @dataclass(frozen=True)

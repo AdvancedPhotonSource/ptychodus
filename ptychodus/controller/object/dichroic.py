@@ -15,19 +15,24 @@ class DichroicViewController:
                  statusBar: QStatusBar, parent: QWidget | None) -> None:
         super().__init__()
         self._analyzer = analyzer
+        self._imagePresenter = imagePresenter
         self._dialog = DichroicDialog.createInstance(statusBar, parent)
         self._dialog.parametersView.lcircComboBox.setModel(treeModel)
-        self._dialog.parametersView.lcircComboBox.textActivated.connect(self._doStuff)
+        self._dialog.parametersView.lcircComboBox.currentIndexChanged.connect(self._analyze)
         self._dialog.parametersView.rcircComboBox.setModel(treeModel)
-        self._dialog.parametersView.rcircComboBox.textActivated.connect(self._doStuff)
+        self._dialog.parametersView.rcircComboBox.currentIndexChanged.connect(self._analyze)
         self._ratioImageController = ImageController.createInstance(
             imagePresenter, self._dialog.ratioImageView.imageView, fileDialogFactory)
+
+    def _analyze(self) -> None:
+        lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()
+        rcircItemIndex = self._dialog.parametersView.rcircComboBox.currentIndex()
+        results = self._analyzer.analyze(lcircItemIndex, rcircItemIndex)
+        polarRatio = results.polarRatio[0, :, :]  # TODO support multislice
+        self._imagePresenter.setArray(polarRatio, results.pixelGeometry)
 
     def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> None:
         self._dialog.parametersView.lcircComboBox.setCurrentIndex(lcircItemIndex)
         self._dialog.parametersView.rcircComboBox.setCurrentIndex(rcircItemIndex)
-        self._doStuff()
+        self._analyze()
         self._dialog.open()
-
-    def _doStuff(self) -> None:
-        pass  # FIXME

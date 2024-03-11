@@ -24,7 +24,7 @@ class Parameter(Generic[T], Observable):
     def getValue(self) -> T:
         return self._value
 
-    def setValue(self, value: T, *, notify=True) -> None:
+    def setValue(self, value: T, *, notify: bool = True) -> None:
         if self._value != value:
             self._value = value
 

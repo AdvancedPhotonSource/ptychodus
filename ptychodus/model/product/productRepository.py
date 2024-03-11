@@ -11,7 +11,7 @@ from ptychodus.api.visualize import Plot2D
 
 from ..patterns import ActiveDiffractionDataset, DiffractionDatasetSettings, PatternSizer
 from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
-from .metadata import MetadataRepositoryItemFactory
+from .metadataFactory import MetadataRepositoryItemFactory
 from .object import ObjectRepositoryItemFactory
 from .probe import ProbeRepositoryItemFactory
 from .productGeometry import ProductGeometry

@@ -406,7 +406,7 @@ class ImageWidget(QGraphicsView):
         self._colorLegendMaxValue = maxValue
         self._forceRedraw()
 
-    def setColorLegendVisible(self, visible: bool):
+    def setColorLegendVisible(self, visible: bool) -> None:
         self._isColorLegendVisible = visible
         self._forceRedraw()
 

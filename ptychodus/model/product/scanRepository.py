@@ -6,10 +6,11 @@ import logging
 from ptychodus.api.observer import ObservableSequence
 from ptychodus.api.visualize import Plot2D
 
+from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .productRepository import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
+from .productRepository import ProductRepository
 from .scan import ScanBuilderFactory, ScanRepositoryItem
 
 logger = logging.getLogger(__name__)
