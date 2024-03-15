@@ -81,11 +81,7 @@ class ScanEditorViewControllerFactory:
 
     def _appendTransformControls(self, dialogBuilder: ParameterDialogBuilder,
                                  transform: ScanPointTransform) -> None:
-        # FIXME to bottom of dialog
-        dialogBuilder.addViewController(
-            ScanTransformViewController(transform),
-            '_Transform',
-        )
+        dialogBuilder.addViewControllerToBottom(ScanTransformViewController(transform))
 
     def createEditorDialog(self, itemName: str, item: ScanRepositoryItem,
                            parent: QWidget) -> QDialog:

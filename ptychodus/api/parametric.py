@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 import logging
@@ -100,11 +100,55 @@ class RealParameter(Parameter[float]):
         return value
 
 
+class RealArrayParameter(Parameter[Sequence[float]]):
+
+    def __init__(self, value: Sequence[float]) -> None:
+        super().__init__(list(value))
+
+    def __iter__(self) -> Iterator[float]:
+        return iter(self._value)
+
+    def __getitem__(self, index: int) -> float:
+        return self._value[index]
+
+    def __len__(self) -> int:
+        return len(self._value)
+
+    def setValue(self, value: Sequence[float], *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = list(value)
+
+            if notify:
+                self.notifyObservers()
+
+
+class ComplexArrayParameter(Parameter[Sequence[complex]]):
+
+    def __init__(self, value: Sequence[complex]) -> None:
+        super().__init__(list(value))
+
+    def __iter__(self) -> Iterator[complex]:
+        return iter(self._value)
+
+    def __getitem__(self, index: int) -> complex:
+        return self._value[index]
+
+    def __len__(self) -> int:
+        return len(self._value)
+
+    def setValue(self, value: Sequence[complex], *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = list(value)
+
+            if notify:
+                self.notifyObservers()
+
+
 class ParameterRepository(Mapping[str, Any], Observable, Observer):
 
     def __init__(self, name: str, parent: ParameterRepository | None = None) -> None:
         super().__init__()
-        self._parameterList: dict[str, Parameter[Any]] = dict()
+        self._parameterDict: dict[str, Parameter[Any]] = dict()
         self._repositoryList: list[ParameterRepository] = list()
 
         if parent is not None:
@@ -129,7 +173,7 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
             repository.removeObserver(self)
 
     def _registerParameter(self, name: str, parameter: Parameter[Any]) -> None:
-        if self._parameterList.setdefault(name, parameter) == parameter:
+        if self._parameterDict.setdefault(name, parameter) == parameter:
             parameter.addObserver(self)
         else:
             raise ValueError('Name already exists!')
@@ -169,19 +213,30 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
         self._registerParameter(name, parameter)
         return parameter
 
+    def _registerRealArrayParameter(self, name: str, value: Sequence[float]) -> RealArrayParameter:
+        parameter = RealArrayParameter(value)
+        self._registerParameter(name, parameter)
+        return parameter
+
+    def _registerComplexArrayParameter(self, name: str,
+                                       value: Sequence[complex]) -> ComplexArrayParameter:
+        parameter = ComplexArrayParameter(value)
+        self._registerParameter(name, parameter)
+        return parameter
+
     def __iter__(self) -> Iterator[str]:
-        return iter(self._parameterList)
+        return iter(self._parameterDict)
 
     def __getitem__(self, name: str) -> Any:
-        return self._parameterList[name]
+        return self._parameterDict[name]
 
     def __len__(self) -> int:
-        return len(self._parameterList)
+        return len(self._parameterDict)
 
-    def setParameters(self, parameterList: Mapping[str, Any]) -> None:
-        for key, value in parameterList.items():
+    def setParameters(self, parameterMap: Mapping[str, Any]) -> None:
+        for key, value in parameterMap.items():
             try:
-                parameter = self._parameterList[key]
+                parameter = self._parameterDict[key]
             except KeyError:
                 logger.debug(f'Parameter \"{key}\" not found!')
             else:
@@ -197,5 +252,5 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
-        if observable in self._parameterList.values():
+        if observable in self._parameterDict.values():
             self.notifyObservers()

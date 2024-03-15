@@ -66,7 +66,7 @@ class ZernikePolynomial:
                            numpy.sqrt(nvalue_sq) * rvalue * avalue, undefined_value)
 
     def __str__(self) -> str:
-        return f'$Z_{self.radial_degree}^{{{self.angular_frequency:+d}}}$'
+        return f'$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$'
 
 
 class ZernikeProbeBuilder(ProbeBuilder):
@@ -74,21 +74,23 @@ class ZernikeProbeBuilder(ProbeBuilder):
     def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
         super().__init__('Zernike')
         self._geometryProvider = geometryProvider
-        self._coefficients: list[complex] = [1. + 0j]  # FIXME make parameter
-        self._polynomials: list[ZernikePolynomial] = []
+        self._polynomials: list[ZernikePolynomial] = list()
+        self._order = 0
 
         self.diameterInMeters = self._registerRealParameter(
             'DiameterInMeters',
             1.e-6,
             minimum=0.,
         )
+        self.coefficients = self._registerComplexArrayParameter('Coefficients', [1 + 0j])
 
         self.setOrder(1)
 
     def copy(self, geometryProvider: ProbeGeometryProvider) -> ZernikeProbeBuilder:
         builder = ZernikeProbeBuilder(geometryProvider)
-        # FIXME coefficients
         builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
+        builder.coefficients.setValue(self.coefficients.getValue())
+        builder.setOrder(self.getOrder())
         return builder
 
     def setOrder(self, order: int) -> None:
@@ -96,37 +98,39 @@ class ZernikeProbeBuilder(ProbeBuilder):
             logger.warning('Order must be strictly positive!')
             return
 
+        if self._order == order:
+            return
+
         self._polynomials.clear()
 
         for radial_degree in range(order):
             for angular_frequency in range(-radial_degree, 1 + radial_degree, 2):
                 poly = ZernikePolynomial(radial_degree, angular_frequency)
-                logger.debug(str(poly))
                 self._polynomials.append(poly)
 
+        logger.debug(' '.join(str(poly) for poly in self._polynomials))
         npoly = len(self._polynomials)
-        ncoef = len(self._coefficients)
+        ncoef = len(self.coefficients)
 
         if ncoef < npoly:
-            self._coefficients += [0j] * (npoly - ncoef)
+            coef = list(self.coefficients.getValue())
+            coef += [0j] * (npoly - ncoef)
+            self.coefficients.setValue(coef)
+
+        self._order = order
+        self.notifyObservers()
 
     def getOrder(self) -> int:
-        npoly = len(self._polynomials)
-        order = 0
-
-        while True:
-            order += 1
-
-            if (order * (order + 1)) // 2 > npoly:
-                break
-
-        return order
+        return self._order
 
     def getCoefficient(self, idx: int) -> complex:
-        return self._coefficients[idx]
+        return self.coefficients[idx]
 
     def getPolynomial(self, idx: int) -> ZernikePolynomial:
         return self._polynomials[idx]
+
+    def __len__(self) -> int:
+        return min(len(self.coefficients), len(self._polynomials))
 
     def build(self) -> Probe:
         geometry = self._geometryProvider.getProbeGeometry()
@@ -135,10 +139,9 @@ class ZernikeProbeBuilder(ProbeBuilder):
         radius = self.diameterInMeters.getValue() / 2.
         distance = numpy.hypot(coords.positionYInMeters, coords.positionXInMeters) / radius
         angle = numpy.arctan2(coords.positionYInMeters, coords.positionXInMeters)
-
         array = numpy.zeros_like(distance, dtype=complex)
 
-        for coef, poly in zip(self._coefficients, self._polynomials):
+        for coef, poly in zip(self.coefficients, self._polynomials):
             array += numpy.multiply(coef, poly(distance, angle))
 
         return Probe(

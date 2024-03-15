@@ -217,7 +217,9 @@ class ParameterDialog(QDialog):
 class ParameterDialogBuilder:
 
     def __init__(self) -> None:
+        self._viewControllersTop: list[ParameterViewController] = list()
         self._viewControllers: dict[tuple[str, str], ParameterViewController] = dict()
+        self._viewControllersBottom: list[ParameterViewController] = list()
 
     def addCheckBox(self, parameter: BooleanParameter, label: str, group: str = '') -> None:
         viewController = CheckBoxParameterViewController(parameter)
@@ -243,14 +245,20 @@ class ParameterDialogBuilder:
         viewController = AngleWidgetParameterViewController(parameter)
         self.addViewController(viewController, label, group)
 
+    def addViewControllerToTop(self, viewController: ParameterViewController) -> None:
+        self._viewControllersTop.append(viewController)
+
     def addViewController(self,
                           viewController: ParameterViewController,
                           label: str,
                           group: str = '') -> None:
         self._viewControllers[group, label] = viewController
 
+    def addViewControllerToBottom(self, viewController: ParameterViewController) -> None:
+        self._viewControllersBottom.append(viewController)
+
     def build(self, windowTitle: str, parent: QWidget | None) -> QDialog:
-        groupDict = {'': QFormLayout()}
+        groupDict: dict[str, QFormLayout] = dict()
 
         for (groupName, widgetLabel), vc in self._viewControllers.items():
             try:
@@ -259,29 +267,38 @@ class ParameterDialogBuilder:
                 formLayout = QFormLayout()
                 groupDict[groupName] = formLayout
 
-            widget = vc.getWidget()
-
-            if widgetLabel.startswith('_'):
-                formLayout.addRow(widget)
-            else:
-                formLayout.addRow(widgetLabel, widget)
-
-        buttonBox = QDialogButtonBox()
-        formLayout = groupDict.pop('')
-
-        for groupName, groupLayout in groupDict.items():
-            groupBox = QGroupBox(groupName)
-            groupBox.setLayout(groupLayout)
-            formLayout.addRow(groupBox)
+            formLayout.addRow(widgetLabel, vc.getWidget())
 
         layout = QVBoxLayout()
-        layout.addLayout(formLayout)
+
+        for viewController in self._viewControllersTop:
+            layout.addWidget(viewController.getWidget())
+
+        for groupName, groupLayout in groupDict.items():
+            if groupName:
+                groupBox = QGroupBox(groupName)
+                groupBox.setLayout(groupLayout)
+                layout.addWidget(groupBox)
+            elif groupLayout.count() > 0:
+                layout.addLayout(groupLayout)
+
+        for viewController in self._viewControllersBottom:
+            layout.addWidget(viewController.getWidget())
+
+        buttonBox = QDialogButtonBox()
         layout.addWidget(buttonBox)
+
+        viewControllers: list[ParameterViewController] = list()
+        viewControllers.extend(self._viewControllersTop)
+        viewControllers.extend(self._viewControllers.values())
+        viewControllers.extend(self._viewControllersBottom)
 
         dialog = ParameterDialog(list(self._viewControllers.values()), buttonBox, parent)
         dialog.setLayout(layout)
         dialog.setWindowTitle(windowTitle)
 
+        self._viewControllersTop.clear()
         self._viewControllers.clear()
+        self._viewControllersBottom.clear()
 
         return dialog

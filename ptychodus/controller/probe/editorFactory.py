@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import (QButtonGroup, QDialog, QFormLayout, QHBoxLayout, QMessageBox,
-                             QRadioButton, QWidget)
+from PyQt5.QtWidgets import (QButtonGroup, QDialog, QFormLayout, QGroupBox, QHBoxLayout,
+                             QMessageBox, QRadioButton, QSpinBox, QTableView, QWidget)
 
 from ...api.observer import Observable, Observer
 from ...api.parametric import StringParameter
@@ -48,6 +48,41 @@ class FresnelZonePlateViewController(ParameterViewController):
 
     def getWidget(self) -> QWidget:
         return self._widget
+
+
+class ZernikeViewController(ParameterViewController, Observer):
+
+    def __init__(self, title: str, probeBuilder: ZernikeProbeBuilder) -> None:
+        super().__init__()
+        self._widget = QGroupBox(title)
+        self._probeBuilder = probeBuilder
+        self._orderSpinBox = QSpinBox()
+        self._coefficientsTableView = QTableView()
+        self._diameterViewController = LengthWidgetParameterViewController(
+            probeBuilder.diameterInMeters)
+
+        layout = QFormLayout()
+        layout.addRow('Diameter:', self._diameterViewController.getWidget())
+        layout.addRow('Order:', self._orderSpinBox)
+        layout.addRow(self._coefficientsTableView)
+        self._widget.setLayout(layout)
+
+        self._syncModelToView()
+        self._orderSpinBox.valueChanged.connect(probeBuilder.setOrder)
+        probeBuilder.addObserver(self)
+
+        # FIXME tableView getCoefficient/getPolynomial/len; edit coefficients
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncModelToView(self) -> None:
+        self._orderSpinBox.setRange(1, 100)
+        self._orderSpinBox.setValue(self._probeBuilder.getOrder())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._probeBuilder:
+            self._syncModelToView()
 
 
 class DecayTypeParameterViewController(ParameterViewController, Observer):
@@ -148,10 +183,8 @@ class ProbeEditorViewControllerFactory:
             return dialogBuilder.build(title, parent)
         elif isinstance(probeBuilder, FresnelZonePlateProbeBuilder):
             dialogBuilder = ParameterDialogBuilder()
-            dialogBuilder.addViewController(
-                FresnelZonePlateViewController(primaryModeGroup, probeBuilder),
-                '_FresnelZonePlate',
-            )
+            dialogBuilder.addViewControllerToTop(
+                FresnelZonePlateViewController(primaryModeGroup, probeBuilder))
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
             return dialogBuilder.build(title, parent)
         elif isinstance(probeBuilder, RectangularProbeBuilder):
@@ -189,11 +222,8 @@ class ProbeEditorViewControllerFactory:
             return dialogBuilder.build(title, parent)
         elif isinstance(probeBuilder, ZernikeProbeBuilder):
             dialogBuilder = ParameterDialogBuilder()
-            dialogBuilder.addLengthWidget(
-                probeBuilder.diameterInMeters,
-                'Diameter:',
-                primaryModeGroup,
-            )
+            dialogBuilder.addViewControllerToTop(
+                ZernikeViewController(primaryModeGroup, probeBuilder))
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
             return dialogBuilder.build(title, parent)
 

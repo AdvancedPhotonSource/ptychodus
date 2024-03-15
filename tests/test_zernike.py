@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-
-
 def test_indexing() -> None:
     idx = 0
 

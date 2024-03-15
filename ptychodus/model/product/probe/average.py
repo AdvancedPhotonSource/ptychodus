@@ -22,6 +22,7 @@ class AverageProbeBuilder(ProbeBuilder):
     def build(self) -> Probe:
         geometry = self._geometryProvider.getProbeGeometry()
         intensity = numpy.average(self._patterns.getAssembledData(), axis=0)
+        # FIXME ifft to backpropagate to object plane
         array = numpy.sqrt(intensity, dtype=complex)
 
         return Probe(

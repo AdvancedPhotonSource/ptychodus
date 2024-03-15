@@ -32,7 +32,7 @@ class ProbeBuilderFactory(Iterable[str]):
         self._builders: Mapping[str, Callable[[ProbeGeometryProvider], ProbeBuilder]] = {
             'Average': self._createAverageBuilder,
             'Disk': self._createDiskBuilder,
-            'FZP': self._createFZPBuilder,
+            'Fresnel Zone Plate': self._createFZPBuilder,
             'Rectangular': self._createRectangularBuilder,
             'SuperGaussian': self._createSuperGaussianBuilder,
             'Zernike': self._createZernikeBuilder,
