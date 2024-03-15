@@ -15,9 +15,7 @@ class ProbePropagationViewController:
         super().__init__()
         self._propagator = propagator
         self._dialog = ProbePropagationDialog.createInstance(statusBar, parent)
-        self._imageController = ImageController.createInstance(imagePresenter,
-                                                               self._dialog.xyView.imageView,
-                                                               fileDialogFactory)
+        # FIXME self._imageController = ImageController.createInstance(imagePresenter, self._dialog.xyView.imageView, fileDialogFactory)
 
     def propagate(self, itemIndex: int) -> None:
         # FIXME include item name in window title
