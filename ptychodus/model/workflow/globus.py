@@ -28,28 +28,38 @@ ScopeAuthorizerMapping: TypeAlias = Mapping[str, AuthorizerTypes]
 PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
 
-def ptychodus_reconstruct(**data: str) -> None:  # FIXME type hint
+def ptychodus_reconstruct(**data: str) -> None:
+    import sys
+
     from pathlib import Path
     from ptychodus.model import ModelArgs, ModelCore
 
+    action = data['ptychodus_action']
+    inputFile = Path(data['ptychodus_input_file'])
+    outputFile = Path(data['ptychodus_output_file'])
+
     modelArgs = ModelArgs(
-        restartFilePath=Path(data['ptychodus_restart_file']),
-        settingsFilePath=Path(data['ptychodus_settings_file']),
+        settingsFile=Path(data['ptychodus_settings_file']),
+        replacementPathPrefix=data.get('ptychodus_path_prefix'),
     )
 
-    resultsFilePath = Path(data['ptychodus_results_file'])
-
     with ModelCore(modelArgs) as model:
-        model.batchModeReconstruct(resultsFilePath)
+        if action == 'reconstruct':
+            model.batchModeReconstruct(inputFile, outputFile)
+        elif action == 'train':
+            model.batchModeTrain(inputFile, outputFile)
+        else:
+            print(f'Unknown batch mode action \"{action}\"!', file=sys.stderr)
 
 
 @gladier.generate_flow_definition
 class PtychodusReconstruct(gladier.GladierBaseTool):
     compute_functions = [ptychodus_reconstruct]
     required_input = [
-        'ptychodus_restart_file',
+        'ptychodus_action',
+        'ptychodus_input_file',
+        'ptychodus_output_file',
         'ptychodus_settings_file',
-        'ptychodus_results_file',
     ]
 
 

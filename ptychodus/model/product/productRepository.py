@@ -7,7 +7,6 @@ import sys
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
-from ptychodus.api.visualize import Plot2D
 
 from ..patterns import ActiveDiffractionDataset, DiffractionDatasetSettings, PatternSizer
 from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
@@ -83,7 +82,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             probe=probeItem,
             object_=objectItem,
             validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
-            costs=Plot2D.createNull(),
+            costs=list(),
         )
 
         return self._insertProduct(item)
@@ -105,7 +104,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             probe=probeItem,
             object_=objectItem,
             validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
-            costs=sourceItem.getCosts().copy(),
+            costs=list(sourceItem.getCosts()),
         )
 
         return self._insertProduct(item)
@@ -146,7 +145,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.currentPlugin.displayName
 
-    def openProduct(self, filePath: Path, fileFilter: str) -> None:
+    def openProduct(self, filePath: Path, fileFilter: str) -> int:
         if filePath.is_file():
             self._fileReaderChooser.setCurrentPluginByName(fileFilter)
             fileType = self._fileReaderChooser.currentPlugin.simpleName
@@ -158,9 +157,11 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             except Exception as exc:
                 raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
             else:
-                self.insertProduct(product)
+                return self.insertProduct(product)
         else:
             logger.debug(f'Refusing to create product with invalid file path \"{filePath}\"')
+
+        return -1
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()

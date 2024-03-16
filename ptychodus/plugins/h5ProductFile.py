@@ -9,7 +9,6 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter, ProductMetadata
 from ptychodus.api.scan import Scan, ScanPoint
-from ptychodus.api.visualize import Plot2D
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +35,8 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     OBJECT_LAYER_DISTANCE: Final[str] = 'object_layer_distance_m'
     OBJECT_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
+
+    COSTS_ARRAY: Final[str] = 'costs'
 
     def read(self, filePath: Path) -> Product:
         scanPointList: list[ScanPoint] = list()
@@ -74,12 +75,15 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
                 centerYInMeters=float(h5Object[self.OBJECT_CENTER_Y]),
             )
 
+            h5Costs = h5File[self.COSTS_ARRAY]
+            costs = h5Costs[()]
+
         return Product(
             metadata=metadata,
             scan=Scan(scanPointList),
             probe=probe,
             object_=object_,
-            costs=Plot2D.createNull(),  # FIXME
+            costs=costs,
         )
 
     def write(self, filePath: Path, product: Product) -> None:
@@ -117,6 +121,8 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5Object.attrs[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixelWidthInMeters
             h5Object.attrs[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixelHeightInMeters
             h5File.create_dataset(self.OBJECT_LAYER_DISTANCE, data=object_.layerDistanceInMeters)
+
+            h5File.create_dataset(self.COSTS_ARRAY, data=product.costs)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

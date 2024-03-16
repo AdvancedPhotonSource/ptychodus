@@ -9,10 +9,9 @@ import numpy
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from ...api.product import Product
-from ...api.reconstructor import (ReconstructInput, ReconstructOutput, Reconstructor,
-                                  TrainableReconstructor)
+from ...api.reconstructor import (ReconstructInput, Reconstructor, TrainableReconstructor,
+                                  TrainOutput)
 from ...api.scan import Scan, ScanPoint
-from ...api.visualize import Plot2D, PlotAxis, PlotSeries
 from ..patterns import ActiveDiffractionDataset
 from ..product import ProductRepository
 from .indexFilter import ScanIndexFilter
@@ -102,7 +101,7 @@ class ReconstructorPresenter(Observable, Observer):
     def reconstruct(self,
                     inputProductIndex: int,
                     outputProductName: str,
-                    indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> ReconstructOutput:
+                    indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> int:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
         parameters = self._prepareInputData(inputProductIndex, indexFilter)
 
@@ -111,41 +110,22 @@ class ReconstructorPresenter(Observable, Observer):
         toc = time.perf_counter()
         logger.info(f'Reconstruction time {toc - tic:.4f} seconds. (code={result.result})')
 
-        self._productRepository.insertProduct(result.product)
+        outputProductIndex = self._productRepository.insertProduct(result.product)
+        return outputProductIndex
 
-        return result
-
-    def reconstructSplit(self, inputProductIndex: int,
-                         outputProductName: str) -> tuple[ReconstructOutput, ReconstructOutput]:
-        resultOdd = self.reconstruct(
+    def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
+        outputProductIndexOdd = self.reconstruct(
             inputProductIndex,
             f'{outputProductName} - Odd',
             ScanIndexFilter.ODD,
         )
-        resultEven = self.reconstruct(
+        outputProductIndexEven = self.reconstruct(
             inputProductIndex,
             f'{outputProductName} - Even',
             ScanIndexFilter.EVEN,
         )
 
-        costsOdd = resultOdd.product.costs
-        costsEven = resultEven.product.costs
-
-        seriesXList: list[PlotSeries] = list()
-        seriesYList: list[PlotSeries] = list()
-
-        for evenOdd, plot2D in zip(('Odd', 'Even'), (costsOdd, costsEven)):
-            for seriesX in plot2D.axisX.series:
-                for seriesY in plot2D.axisY.series:
-                    seriesXList.append(PlotSeries(f'{seriesX.label} - {evenOdd}', seriesX.values))
-                    seriesYList.append(PlotSeries(f'{seriesY.label} - {evenOdd}', seriesY.values))
-
-        plot2D = Plot2D(  # FIXME use this
-            axisX=PlotAxis(label=plot2D.axisX.label, series=seriesXList),
-            axisY=PlotAxis(label=plot2D.axisY.label, series=seriesYList),
-        )
-
-        return resultOdd, resultEven
+        return outputProductIndexOdd, outputProductIndexEven
 
     @property
     def isTrainable(self) -> bool:
@@ -194,7 +174,7 @@ class ReconstructorPresenter(Observable, Observer):
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Saving...')
+            logger.info('Saving training data...')
             tic = time.perf_counter()
             reconstructor.saveTrainingData(filePath)
             toc = time.perf_counter()
@@ -202,20 +182,20 @@ class ReconstructorPresenter(Observable, Observer):
         else:
             logger.warning('Reconstructor is not trainable!')
 
-    def train(self) -> Plot2D:
+    def train(self) -> TrainOutput:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
-        plot2D = Plot2D.createNull()
+        result = TrainOutput([], [], -1)
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Training...')
             tic = time.perf_counter()
-            plot2D = reconstructor.train()
+            result = reconstructor.train()
             toc = time.perf_counter()
-            logger.info(f'Training time {toc - tic:.4f} seconds.')
+            logger.info(f'Training time {toc - tic:.4f} seconds. (code={result.result})')
         else:
             logger.warning('Reconstructor is not trainable!')
 
-        return plot2D
+        return result
 
     def clearTrainingData(self) -> None:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
@@ -226,6 +206,18 @@ class ReconstructorPresenter(Observable, Observer):
             reconstructor.clearTrainingData()
             toc = time.perf_counter()
             logger.info(f'Reset time {toc - tic:.4f} seconds.')
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+    def saveModel(self, filePath: Path) -> None:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            logger.info('Saving model...')
+            tic = time.perf_counter()
+            reconstructor.saveModel(filePath)
+            toc = time.perf_counter()
+            logger.info(f'Save time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Reconstructor is not trainable!')
 

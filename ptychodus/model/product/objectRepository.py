@@ -4,7 +4,6 @@ from typing import overload
 import logging
 
 from ptychodus.api.observer import ObservableSequence
-from ptychodus.api.visualize import Plot2D
 
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem
@@ -115,7 +114,7 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
         self.notifyObserversItemChanged(index, item)
 
-    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
+    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
         pass
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:

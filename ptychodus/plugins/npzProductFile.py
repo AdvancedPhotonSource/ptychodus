@@ -8,7 +8,6 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileReader
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter, ProductMetadata
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
-from ptychodus.api.visualize import Plot2D
 
 
 class NPZProductFileIO(ProductFileReader, ProductFileWriter):
@@ -33,6 +32,8 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     OBJECT_LAYER_DISTANCE: Final[str] = 'object_layer_distance_m'
     OBJECT_PIXEL_HEIGHT: Final[str] = 'object_pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'object_pixel_width_m'
+
+    COSTS_ARRAY: Final[str] = 'costs'
 
     def read(self, filePath: Path) -> Product:
         with numpy.load(filePath) as npzFile:
@@ -62,6 +63,8 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 centerYInMeters=float(npzFile[self.OBJECT_CENTER_Y]),
             )
 
+            costs = npzFile[self.COSTS_ARRAY]
+
         scanPointList: list[ScanPoint] = list()
 
         for idx, x_m, y_m in zip(scanIndexes, scanXInMeters, scanYInMeters):
@@ -73,7 +76,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             scan=Scan(scanPointList),
             probe=probe,
             object_=object_,
-            costs=Plot2D.createNull(),  # FIXME
+            costs=costs,
         )
 
     def write(self, filePath: Path, product: Product) -> None:
@@ -111,6 +114,8 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixelWidthInMeters
         contents[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixelHeightInMeters
         contents[self.OBJECT_LAYER_DISTANCE] = object_.layerDistanceInMeters
+
+        contents[self.COSTS_ARRAY] = product.costs
 
         numpy.savez(filePath, **contents)
 

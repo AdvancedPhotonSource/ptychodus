@@ -32,8 +32,11 @@ class WorkflowExecutor:
         self._stateDataRegistry = stateDataRegistry
         self.jobQueue: queue.Queue[WorkflowJob] = queue.Queue()
 
-    def runFlow(self, flowLabel: str) -> None:
+    def runFlow(self, flowLabel: str) -> None:  # FIXME flowLabel -> productIndex
         transferSyncLevel = 3  # Copy files if checksums of the source and destination mismatch
+        ptychodusAction = 'reconstruct'  # FIXME or 'train'
+
+        # FIXME flowLabel -> product.getName()
 
         inputDataPosixPath = self._inputDataLocator.getPosixPath() / flowLabel
         computeDataPosixPath = self._computeDataLocator.getPosixPath() / flowLabel
@@ -42,9 +45,9 @@ class WorkflowExecutor:
         computeDataGlobusPath = f'{self._computeDataLocator.getGlobusPath()}/{flowLabel}'
         outputDataGlobusPath = f'{self._outputDataLocator.getGlobusPath()}/{flowLabel}'
 
-        settingsFileName = 'input.ini'
-        restartFileName = 'input.npz'
-        resultsFileName = 'output.npz'
+        settingsFile = 'input.ini'
+        inputFile = 'input.npz'
+        outputFile = 'output.npz'
 
         try:
             inputDataPosixPath.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -52,9 +55,9 @@ class WorkflowExecutor:
             logger.error('Input data POSIX path must be a directory!')
             return
 
-        self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFileName)
-        self._stateDataRegistry.saveStateData(inputDataPosixPath / restartFileName,
-                                              restartable=True)
+        self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFile)
+        # FIXME stateDataRegistry -> productRepository
+        self._stateDataRegistry.saveStateData(inputDataPosixPath / inputFile, restartable=True)
 
         flowInput = {
             'input_data_transfer_source_endpoint_id':
@@ -71,20 +74,22 @@ class WorkflowExecutor:
             transferSyncLevel,
             'compute_endpoint':
             str(self._settings.computeEndpointID.value),
-            'ptychodus_restart_file':
-            str(computeDataPosixPath / restartFileName),
+            'ptychodus_action':
+            ptychodusAction,
+            'ptychodus_input_file':
+            str(computeDataPosixPath / inputFile),
+            'ptychodus_output_file':
+            str(computeDataPosixPath / outputFile),
             'ptychodus_settings_file':
-            str(computeDataPosixPath / settingsFileName),
-            'ptychodus_results_file':
-            str(computeDataPosixPath / resultsFileName),
+            str(computeDataPosixPath / settingsFile),
             'output_data_transfer_source_endpoint_id':
             str(self._computeDataLocator.getEndpointID()),
             'output_data_transfer_source_path':
-            f'{computeDataGlobusPath}/{resultsFileName}',
+            f'{computeDataGlobusPath}/{outputFile}',
             'output_data_transfer_destination_endpoint_id':
             str(self._outputDataLocator.getEndpointID()),
             'output_data_transfer_destination_path':
-            f'{outputDataGlobusPath}/{resultsFileName}',
+            f'{outputDataGlobusPath}/{outputFile}',
             'output_data_transfer_recursive':
             False
         }

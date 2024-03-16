@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from importlib.metadata import version
 from typing import Any
 import logging
@@ -15,8 +14,6 @@ from ...api.probe import Probe
 from ...api.product import Product
 from ...api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ...api.scan import Scan, ScanPoint
-from ...api.visualize import (PlotAxis, PlotSeries, PlotUncertain2D, PlotUncertainAxis,
-                              PlotUncertainSeries)
 from .multigrid import TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionSettings
@@ -109,39 +106,6 @@ class TikeReconstructor:
                 return int(numGpus)
 
         return 1
-
-    def _plotCosts(self, costs: Sequence[Sequence[float]]) -> PlotUncertain2D:
-        plot = PlotUncertain2D.createNull()
-        numIterations = len(costs)
-
-        if numIterations > 0:
-            seriesX = PlotSeries(label='Iteration', values=[*range(numIterations)])
-            minCost: list[float] = list()
-            midCost: list[float] = list()
-            maxCost: list[float] = list()
-
-            seriesYList: list[PlotUncertainSeries] = list()
-
-            for values in costs:
-                minCost.append(min(values))
-                midCost.append(float(numpy.median(values)))
-                maxCost.append(max(values))
-
-            seriesYList = [
-                PlotUncertainSeries(
-                    label='Median',
-                    lo=minCost,
-                    values=midCost,
-                    hi=maxCost,
-                ),
-            ]
-
-            plot = PlotUncertain2D(
-                axisX=PlotAxis(label='Iteration', series=[seriesX]),
-                axisY=PlotUncertainAxis(label='Cost', series=seriesYList),
-            )
-
-        return plot
 
     def __call__(self, parameters: ReconstructInput,
                  algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> ReconstructOutput:
@@ -259,7 +223,7 @@ class TikeReconstructor:
             scan=scanOutput,
             probe=probeOutput,
             object_=objectOutput,
-            costs=self._plotCosts(result.algorithm_options.costs),
+            costs=[float(numpy.mean(values)) for values in result.algorithm_options.costs],
         )
         return ReconstructOutput(product, 0)
 

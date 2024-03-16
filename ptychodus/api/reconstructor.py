@@ -6,7 +6,6 @@ from pathlib import Path
 
 from .product import Product
 from .patterns import DiffractionPatternArrayType
-from .visualize import Plot2D
 
 
 @dataclass(frozen=True)
@@ -33,6 +32,13 @@ class Reconstructor(ABC):
         pass
 
 
+@dataclass(frozen=True)
+class TrainOutput:
+    trainingLoss: Sequence[float]
+    validationLoss: Sequence[float]
+    result: int
+
+
 class TrainableReconstructor(Reconstructor):
 
     @abstractmethod
@@ -52,12 +58,15 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def train(self) -> Plot2D:
+    def train(self) -> TrainOutput:
         pass
 
     @abstractmethod
     def clearTrainingData(self) -> None:
         pass
+
+    def saveModel(self, filePath: Path) -> None:
+        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # FIXME
 
 
 class NullReconstructor(TrainableReconstructor):
@@ -84,8 +93,8 @@ class NullReconstructor(TrainableReconstructor):
     def saveTrainingData(self, filePath: Path) -> None:
         pass
 
-    def train(self) -> Plot2D:
-        return Plot2D.createNull()
+    def train(self) -> TrainOutput:
+        return TrainOutput([], [], 0)
 
     def clearTrainingData(self) -> None:
         pass

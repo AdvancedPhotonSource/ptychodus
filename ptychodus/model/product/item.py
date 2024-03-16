@@ -1,11 +1,11 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 import logging
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterRepository
 from ptychodus.api.product import Product
-from ptychodus.api.visualize import Plot2D
 
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
@@ -45,7 +45,7 @@ class ProductRepositoryItem(ParameterRepository):
     def __init__(self, parent: ProductRepositoryItemObserver, metadata: MetadataRepositoryItem,
                  scan: ScanRepositoryItem, geometry: ProductGeometry, probe: ProbeRepositoryItem,
                  object_: ObjectRepositoryItem, validator: ProductValidator,
-                 costs: Plot2D) -> None:
+                 costs: Sequence[float]) -> None:
         super().__init__('Product')
         self._parent = parent
         self._metadata = metadata
@@ -54,7 +54,7 @@ class ProductRepositoryItem(ParameterRepository):
         self._probe = probe
         self._object = object_
         self._validator = validator
-        self._costs = costs
+        self._costs = list(costs)
 
         self._addParameterRepository(self._metadata, observe=True)
         self._addParameterRepository(self._scan, observe=True)
@@ -84,10 +84,10 @@ class ProductRepositoryItem(ParameterRepository):
         return self._object
 
     def _invalidateCosts(self) -> None:
-        self._costs = Plot2D.createNull()
+        self._costs = list()
         self._parent.handleCostsChanged(self)
 
-    def getCosts(self) -> Plot2D:
+    def getCosts(self) -> Sequence[float]:
         return self._costs
 
     def getProduct(self) -> Product:
@@ -137,7 +137,7 @@ class ProductRepositoryObserver(ABC):
         pass
 
     @abstractmethod
-    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
+    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
         pass
 
     @abstractmethod

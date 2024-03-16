@@ -1,14 +1,12 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 import logging
-import itertools
 
 from PyQt5.QtCore import Qt, QStringListModel
 from PyQt5.QtWidgets import QLabel, QWidget
 
 from ..api.observer import Observable, Observer
-from ..api.visualize import Plot2D
 from ..model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
 from ..model.product.metadata import MetadataRepositoryItem
 from ..model.product.object import ObjectRepositoryItem
@@ -184,29 +182,12 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(err)
             return
 
-        plot2D = item.getCosts()
-        axisX = plot2D.axisX
-        axisY = plot2D.axisY
-
         ax = self._plotView.axes
         ax.clear()
-        ax.set_xlabel(axisX.label)
-        ax.set_ylabel(axisY.label)
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel('Cost')
         ax.grid(True)
-
-        if ((len(axisX.series) == len(axisY.series))
-                or (len(axisX.series) == 1 and len(axisY.series) >= 1)):
-            for sx, sy in zip(itertools.cycle(axisX.series), axisY.series):
-                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
-
-                if hasattr(sy, 'hi') and hasattr(sy, 'lo'):
-                    ax.fill_between(sx.values, sy.lo, sy.hi, alpha=0.2)
-        else:
-            logger.error('Failed to broadcast plot series!')
-
-        if len(axisX.series) > 0:
-            ax.legend(loc='upper right')
-
+        ax.plot(item.getCosts(), '.-', label='Cost', linewidth=1.5)
         self._plotView.figureCanvas.draw()
 
     def _syncAlgorithmToView(self) -> None:
@@ -236,7 +217,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
+    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
         currentIndex = self._view.reconstructorView.productComboBox.currentIndex()
 
         if index == currentIndex:

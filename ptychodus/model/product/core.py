@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy
 
 from ptychodus.api.object import ObjectFileReader, ObjectFileWriter
@@ -54,3 +56,11 @@ class ProductCore:
         self.probeRepository = ProbeRepository(self.productRepository, self._probeBuilderFactory)
         self.objectRepository = ObjectRepository(self.productRepository,
                                                  self._objectBuilderFactory)
+
+    def openProduct(self, filePath: Path) -> int:
+        fileFilter = ''  # FIXME
+        return self.productRepository.openProduct(filePath, fileFilter)
+
+    def saveProduct(self, productIndex: int, filePath: Path) -> None:
+        fileFilter = ''  # FIXME
+        self.productRepository.saveProduct(productIndex, filePath, fileFilter)

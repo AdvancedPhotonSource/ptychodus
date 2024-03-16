@@ -57,15 +57,13 @@ def configureLogger() -> None:
 
 @dataclass(frozen=True)
 class ModelArgs:
-    restartFilePath: Path | None
-    settingsFilePath: Path | None
+    settingsFile: Path | None
     replacementPathPrefix: str | None = None
-    isDeveloperModeEnabled: bool = False
 
 
 class ModelCore:
 
-    def __init__(self, modelArgs: ModelArgs) -> None:
+    def __init__(self, modelArgs: ModelArgs, *, isDeveloperModeEnabled: bool = False) -> None:
         configureLogger()
         self._modelArgs = modelArgs
         self.rng = numpy.random.default_rng()
@@ -91,9 +89,9 @@ class ModelCore:
                                           isComplex=True)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             self._patternsCore.dataset,
@@ -112,11 +110,8 @@ class ModelCore:
                                               self._workflowCore)
 
     def __enter__(self) -> ModelCore:
-        if self._modelArgs.settingsFilePath:
-            self.settingsRegistry.openSettings(self._modelArgs.settingsFilePath)
-
-        if self._modelArgs.restartFilePath:
-            self.openStateData(self._modelArgs.restartFilePath)
+        if self._modelArgs.settingsFile:
+            self.settingsRegistry.openSettings(self._modelArgs.settingsFile)
 
         if self._patternsCore.dataAPI.getAssemblyQueueSize() > 0:
             self._patternsCore.dataAPI.startAssemblingDiffractionPatterns()
@@ -215,21 +210,39 @@ class ModelCore:
     def openStateData(self, filePath: Path) -> None:
         self._stateDataRegistry.openStateData(filePath)
 
-    def batchModeReconstruct(self, filePath: Path) -> int:
-        result = self._reconstructorCore.reconstructorAPI.reconstruct()  # FIXME
-        self.saveStateData(filePath, restartable=False)
-        return result.result
+    def batchModeReconstruct(self, inputFilePath: Path, outputFilePath: Path) -> int:
+        # FIXME need to transfer/load diffraction patterns
+        inputProductIndex = self._productCore.openProduct(inputFilePath)
 
-    def batchModeTrain(self, directoryPath: Path) -> float:
-        for filePath in directoryPath.glob('*.npz'):
-            # TODO sort by filePath.stat().st_mtime
-            self._stateDataRegistry.openStateData(filePath)
-            self._reconstructorCore.reconstructorAPI.ingestTrainingData()  # FIXME
+        if inputProductIndex < 0:
+            logger.error(f'Failed to open product \"{inputFilePath}\"')
+            return -1
 
-        self._reconstructorCore.reconstructorAPI.train()  # FIXME
+        outputProductName = 'Batch'  # FIXME
+        outputProductIndex = self._reconstructorCore.presenter.reconstruct(
+            inputProductIndex, outputProductName)
 
-        someQualityMetric = 0.  # TODO
-        return someQualityMetric
+        if outputProductIndex < 0:
+            logger.error(f'Failed to reconstruct product index=\"{inputProductIndex}\"')
+            return -1
+
+        self._productCore.saveProduct(outputProductIndex, outputFilePath)
+
+        return 0
+
+    def batchModeTrain(self, inputFilePath: Path, outputFilePath: Path) -> int:
+        # FIXME need to transfer/load diffraction patterns
+        inputProductIndex = self._productCore.openProduct(inputFilePath)
+
+        if inputProductIndex < 0:
+            logger.error(f'Failed to open product \"{inputFilePath}\"')
+            return -1
+
+        self._reconstructorCore.presenter.ingestTrainingData(inputProductIndex)
+        _ = self._reconstructorCore.presenter.train()
+        self._reconstructorCore.presenter.saveModel(outputFilePath)
+
+        return 0
 
     @property
     def detectorPresenter(self) -> DetectorPresenter:

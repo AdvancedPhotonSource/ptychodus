@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, Mapping, TypeAlias
+from typing import TypeAlias
 import logging
 
 from ptychonn import ReconSmallModel, Tester, Trainer
@@ -13,8 +13,8 @@ from ...api.geometry import Point2D
 from ...api.object import ObjectArrayType
 from ...api.patterns import ImageExtent
 from ...api.product import Product
-from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
-from ...api.visualize import Plot2D, PlotAxis, PlotSeries
+from ...api.reconstructor import (ReconstructInput, ReconstructOutput, TrainableReconstructor,
+                                  TrainOutput)
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
@@ -175,7 +175,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             scan=parameters.product.scan,
             probe=parameters.product.probe,
             object_=stitcher.build(),
-            costs=Plot2D.createNull(),  # TODO put something here?
+            costs=list(),  # TODO put something here?
         )
 
         return ReconstructOutput(product, 0)
@@ -204,18 +204,6 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         for pattern in parameters.patterns.astype(numpy.float32):
             self._patternBuffer.append(pattern)
 
-    def _plotMetrics(self, metrics: Mapping[str, Any]) -> Plot2D:
-        trainingLoss = [losses[0] for losses in metrics['losses']]
-        validationLoss = [losses[0] for losses in metrics['val_losses']]
-        validationLossSeries = PlotSeries(label='Validation Loss', values=validationLoss)
-        trainingLossSeries = PlotSeries(label='Training Loss', values=trainingLoss)
-        seriesX = PlotSeries(label='Iteration', values=[*range(len(trainingLoss))])
-
-        return Plot2D(
-            axisX=PlotAxis(label='Epoch', series=[seriesX]),
-            axisY=PlotAxis(label='Loss', series=[trainingLossSeries, validationLossSeries]),
-        )
-
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileFilterList
 
@@ -230,7 +218,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         }
         numpy.savez(filePath, **trainingData)
 
-    def train(self) -> Plot2D:
+    def train(self) -> TrainOutput:
         outputPath = self._trainingSettings.outputPath.value \
                 if self._trainingSettings.saveTrainingArtifacts.value else None
 
@@ -261,7 +249,11 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             output_frequency=self._trainingSettings.statusIntervalInEpochs.value,
         )
 
-        return self._plotMetrics(trainer.metrics)
+        return TrainOutput(
+            trainingLoss=[losses[0] for losses in trainer.metrics['losses']],
+            validationLoss=[losses[0] for losses in trainer.metrics['val_losses']],
+            result=0,
+        )
 
     def clearTrainingData(self) -> None:
         self._patternBuffer = PatternCircularBuffer.createZeroSized()

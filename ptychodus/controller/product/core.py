@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from typing import Any
 import logging
 import sys
@@ -6,7 +7,6 @@ import sys
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
-from ...api.visualize import Plot2D
 from ...model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
@@ -253,7 +253,7 @@ class ProductController(ProductRepositoryObserver):
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
         self._updateInfoText()
 
-    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
+    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
         self._updateInfoText()
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:

@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from .object import Object
 from .probe import Probe
 from .scan import Scan
-from .visualize import Plot2D
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,7 @@ class Product:
     scan: Scan
     probe: Probe
     object_: Object
-    costs: Plot2D
+    costs: Sequence[float]
 
 
 class ProductFileReader(ABC):

@@ -2,7 +2,6 @@ from collections.abc import Sequence
 import logging
 
 from ptychodus.api.product import ProductMetadata
-from ptychodus.api.visualize import Plot2D
 
 from ..patterns import DiffractionDatasetSettings
 from .item import ProductRepositoryItem, ProductRepositoryObserver
@@ -64,7 +63,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handleCostsChanged(self, index: int, costs: Plot2D) -> None:
+    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
         pass
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
