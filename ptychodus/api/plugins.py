@@ -14,7 +14,7 @@ from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from .scan import ScanFileReader, ScanFileWriter
-from .visualize import ScalarTransformation
+from .visualization import ScalarTransformation
 
 __all__ = [
     'PluginChooser',

@@ -9,12 +9,12 @@ from ...api.geometry import Interval, Line2D
 from ...api.observer import Observable, Observer
 from ...api.patterns import PixelGeometry
 from ...api.plugins import PluginChooser
-from ...api.visualize import LineCut, RealArrayType, ScalarTransformation
+from ...api.visualization import LineCut, RealArrayType, ScalarTransformation
 from .colorizer import Colorizer
 from .displayRange import DisplayRange
 from .mappedColorizer import MappedColorizer
 from .modelColorizer import CylindricalColorModelColorizer
-from .visarray import NumericArrayType, VisualizationArray
+from .visarray import NumberArrayType, VisualizationArray
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class ImagePresenter(Observable, Observer):
         colorizerChooser.currentPlugin.strategy.addObserver(presenter)
         return presenter
 
-    def setArray(self, array: NumericArrayType, pixelGeometry: PixelGeometry) -> None:
+    def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
         self._array.setArray(array, pixelGeometry)
 
     def clearArray(self) -> None:

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from ...api.visualize import RealArrayType, ScalarTransformation
+from ...api.visualization import RealArrayType, ScalarTransformation
 from ...api.observer import Observable, Observer
 from ...api.plugins import PluginChooser
 from .displayRange import DisplayRange

@@ -5,7 +5,7 @@ import colorsys
 from matplotlib.colors import Normalize
 import numpy
 
-from ...api.visualize import RealArrayType, ScalarTransformation
+from ...api.visualization import RealArrayType, ScalarTransformation
 from ...api.observer import Observable
 from ...api.plugins import PluginChooser
 from .colorizer import Colorizer

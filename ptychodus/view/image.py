@@ -17,7 +17,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from ..api.visualize import RealArrayType
+from ..api.visualization import RealArrayType
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 

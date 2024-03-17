@@ -7,10 +7,7 @@ import numpy.typing
 
 from ...api.observer import Observable
 from ...api.patterns import PixelGeometry
-from ...api.visualize import RealArrayType
-
-NumericDTypes = numpy.integer[Any] | numpy.floating[Any] | numpy.complexfloating[Any, Any]
-NumericArrayType = numpy.typing.NDArray[NumericDTypes]
+from ...api.visualization import NumberArrayType, RealArrayType
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +16,7 @@ class VisualizationArray(Observable):
 
     def __init__(self) -> None:
         super().__init__()
-        self._array: NumericArrayType = numpy.zeros((0, 0))
+        self._array: NumberArrayType = numpy.zeros((0, 0))
         self._pixelGeometry = PixelGeometry.createNull()
 
     def getRealPart(self) -> RealArrayType:
@@ -60,7 +57,7 @@ class VisualizationArray(Observable):
         self._pixelGeometry = PixelGeometry.createNull()
         self.notifyObservers()
 
-    def setArray(self, array: NumericArrayType, pixelGeometry: PixelGeometry) -> None:
+    def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
         self._array = array
         self._pixelGeometry = pixelGeometry
         self.notifyObservers()

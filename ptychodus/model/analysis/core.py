@@ -1,5 +1,5 @@
 from ...api.plugins import PluginChooser
-from ...api.visualize import ScalarTransformation
+from ...api.visualization import ScalarTransformation
 from ..image import ImageCore
 from ..product import ObjectRepository, ProbeRepository
 from .dichroic import DichroicAnalyzer

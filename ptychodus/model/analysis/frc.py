@@ -9,7 +9,7 @@ import numpy.typing
 import scipy.fft
 
 from ...api.object import ObjectArrayType
-from ...api.visualize import Plot2D, PlotAxis, PlotSeries
+from ...api.visualization import Plot2D, PlotAxis, PlotSeries
 from ..product import ObjectRepository
 
 IntegerArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]

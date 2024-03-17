@@ -30,6 +30,17 @@ class Line2D:
         return f'{type(self).__name__}({self.begin}, {self.end})'
 
 
+@dataclass(frozen=True)
+class Box2D:
+    x: float
+    y: float
+    width: float
+    height: float
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.x}, {self.y}, {self.width}, {self.height})'
+
+
 class Interval(Generic[T]):
 
     def __init__(self, lower: T, upper: T) -> None:
