@@ -13,4 +13,4 @@ class ExceptionDialog(QMessageBox):
         dialog.setText(f'{actor} raised a {exception.__class__.__name__}!')
         dialog.setInformativeText(str(exception))
         dialog.setDetailedText(traceback.format_exc())
-        _ = dialog.exec()
+        _ = dialog.open()

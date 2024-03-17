@@ -33,18 +33,6 @@ class PlotSeries:
 
 
 @dataclass(frozen=True)
-class PlotUncertainSeries:
-    label: str
-    lo: Sequence[float]
-    values: Sequence[float]
-    hi: Sequence[float]
-
-    def copy(self) -> PlotUncertainSeries:
-        return PlotUncertainSeries(str(self.label), list(self.lo), list(self.values),
-                                   list(self.hi))
-
-
-@dataclass(frozen=True)
 class PlotAxis:
     label: str
     series: Sequence[PlotSeries]
@@ -58,19 +46,6 @@ class PlotAxis:
 
 
 @dataclass(frozen=True)
-class PlotUncertainAxis:
-    label: str
-    series: Sequence[PlotUncertainSeries]
-
-    @classmethod
-    def createNull(cls) -> PlotUncertainAxis:
-        return cls('', [])
-
-    def copy(self) -> PlotUncertainAxis:
-        return PlotUncertainAxis(str(self.label), [series.copy() for series in self.series])
-
-
-@dataclass(frozen=True)
 class Plot2D:
     axisX: PlotAxis
     axisY: PlotAxis
@@ -81,19 +56,6 @@ class Plot2D:
 
     def copy(self) -> Plot2D:
         return Plot2D(self.axisX.copy(), self.axisY.copy())
-
-
-@dataclass(frozen=True)
-class PlotUncertain2D:
-    axisX: PlotAxis
-    axisY: PlotUncertainAxis
-
-    @classmethod
-    def createNull(cls) -> PlotUncertain2D:
-        return cls(PlotAxis.createNull(), PlotUncertainAxis.createNull())
-
-    def copy(self) -> PlotUncertain2D:
-        return PlotUncertain2D(self.axisX.copy(), self.axisY.copy())
 
 
 @dataclass(frozen=True)

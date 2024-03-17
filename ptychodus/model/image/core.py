@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
-from decimal import Decimal
 from typing import Final
 import logging
 
@@ -78,42 +77,39 @@ class ImagePresenter(Observable, Observer):
     def setScalarTransformationByName(self, name: str) -> None:
         self._colorizer.setScalarTransformationByName(name)
 
-    def getDisplayRangeLimits(self) -> Interval[Decimal]:
+    def getDisplayRangeLimits(self) -> Interval[float]:
         return self._displayRange.getLimits()
 
-    def getMinDisplayValue(self) -> Decimal:
+    def getMinDisplayValue(self) -> float:
         return self._displayRange.getLower()
 
-    def setMinDisplayValue(self, value: Decimal) -> None:
+    def setMinDisplayValue(self, value: float) -> None:
         self._displayRange.setLower(value)
 
-    def getMaxDisplayValue(self) -> Decimal:
+    def getMaxDisplayValue(self) -> float:
         return self._displayRange.getUpper()
 
-    def setMaxDisplayValue(self, value: Decimal) -> None:
+    def setMaxDisplayValue(self, value: float) -> None:
         self._displayRange.setUpper(value)
 
     def setDisplayRangeToDataRange(self) -> None:
-        dataRange = Interval[Decimal](Decimal(0), Decimal(1))
+        dataRange = Interval[float](0., 1.)
         values = self._colorizer.getDataArray()
 
         if numpy.size(values) > 0:
-            lower = Decimal.from_float(values.min())
-            upper = Decimal.from_float(values.max())
-            dataRange = Interval[Decimal](lower, upper)
+            dataRange = Interval[float](values.min(), values.max())
 
-            if dataRange.lower.is_nan() or dataRange.upper.is_nan():
+            if numpy.isnan(dataRange.lower) or numpy.isnan(dataRange.upper):
                 logger.debug('Visualization array component includes one or more NaNs.')
-                dataRange = Interval[Decimal](Decimal(0), Decimal(1))
+                dataRange = Interval[float](0., 1.)
             elif dataRange.lower == dataRange.upper:
                 logger.debug('Visualization array component values are uniform.')
-                half = Decimal('0.5')
-                dataRange.lower -= half
-                dataRange.upper += half
+                dataRange.lower -= 0.5
+                dataRange.upper += 0.5
 
         self._displayRange.setRangeAndLimits(dataRange)
 
-    def setCustomDisplayRange(self, minValue: Decimal, maxValue: Decimal) -> None:
+    def setCustomDisplayRange(self, minValue: float, maxValue: float) -> None:
         self._displayRange.setLimits(minValue, maxValue)
 
     def getVariantNameList(self) -> Sequence[str]:

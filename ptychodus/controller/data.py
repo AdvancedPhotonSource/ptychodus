@@ -37,7 +37,7 @@ class FileDialogFactory:
         if selectedNameFilter is not None:
             dialog.selectNameFilter(selectedNameFilter)
 
-        if dialog.exec() == QDialog.DialogCode.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:  # TODO exec -> open
             fileNameList = dialog.selectedFiles()
             fileName = fileNameList[0]
 
@@ -68,7 +68,7 @@ class FileDialogFactory:
         if selectedNameFilter is not None:
             dialog.selectNameFilter(selectedNameFilter)
 
-        if dialog.exec() == QDialog.DialogCode.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:  # TODO exec -> open
             fileNameList = dialog.selectedFiles()
             fileName = fileNameList[0]
 

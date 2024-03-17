@@ -1,13 +1,14 @@
 from __future__ import annotations
+from decimal import Decimal
 import logging
 
 from PyQt5.QtCore import QLineF, QRectF, QStringListModel
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import QButtonGroup
+from PyQt5.QtWidgets import QButtonGroup, QDialog
 
 import numpy
 
-from ..api.geometry import Line2D, Point2D
+from ..api.geometry import Interval, Line2D, Point2D
 from ..api.observer import Observable, Observer
 from ..model.image import ImagePresenter
 from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageMouseTool,
@@ -132,6 +133,7 @@ class ImageDataRangeController(Observer):
         view.maxDisplayValueSlider.valueChanged.connect(presenter.setMaxDisplayValue)
         view.autoButton.clicked.connect(presenter.setDisplayRangeToDataRange)
         view.editButton.clicked.connect(controller._editDisplayRange)
+        view.displayRangeDialog.finished.connect(controller._finishEditingDisplayRange)
 
         view.colorLegendButton.setCheckable(True)
         imageWidget.setColorLegendVisible(view.colorLegendButton.isChecked())
@@ -140,21 +142,28 @@ class ImageDataRangeController(Observer):
         return controller
 
     def _editDisplayRange(self) -> None:
-        if self._view.displayRangeDialog.exec():
-            minValue = self._view.displayRangeDialog.minValue()
-            maxValue = self._view.displayRangeDialog.maxValue()
+        self._view.displayRangeDialog.open()
+
+    def _finishEditingDisplayRange(self, result: int) -> None:
+        if result == QDialog.DialogCode.Accepted:
+            minValue = float(self._view.displayRangeDialog.minValue())
+            maxValue = float(self._view.displayRangeDialog.maxValue())
             self._presenter.setCustomDisplayRange(minValue, maxValue)
 
     def _syncModelToView(self) -> None:
-        displayRangeLimits = self._presenter.getDisplayRangeLimits()
+        displayRangeLimitsF = self._presenter.getDisplayRangeLimits()
+        displayRangeLimits = Interval[Decimal](Decimal(repr(displayRangeLimitsF.lower)),
+                                               Decimal(repr(displayRangeLimitsF.upper)))
         minDisplayValue = self._presenter.getMinDisplayValue()
         maxDisplayValue = self._presenter.getMaxDisplayValue()
 
-        self._view.minDisplayValueSlider.setValueAndRange(minDisplayValue, displayRangeLimits)
-        self._view.maxDisplayValueSlider.setValueAndRange(maxDisplayValue, displayRangeLimits)
+        self._view.minDisplayValueSlider.setValueAndRange(Decimal(repr(minDisplayValue)),
+                                                          displayRangeLimits)
+        self._view.maxDisplayValueSlider.setValueAndRange(Decimal(repr(maxDisplayValue)),
+                                                          displayRangeLimits)
         self._view.displayRangeDialog.setMinAndMaxValues(displayRangeLimits.lower,
                                                          displayRangeLimits.upper)
-        self._imageWidget.setColorLegendRange(float(minDisplayValue), float(maxDisplayValue))
+        self._imageWidget.setColorLegendRange(minDisplayValue, maxDisplayValue)
 
         xArray = numpy.linspace(0., 1., 256)
         rgbaArray = self._presenter.getColorSamples(xArray)
