@@ -58,27 +58,27 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
 
     def __init__(self, geometryProvider: ProbeGeometryProvider,
                  fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]) -> None:
-        super().__init__('Fresnel Zone Plate')
+        super().__init__('fresnel_zone_plate')
         self._geometryProvider = geometryProvider
         self._fresnelZonePlateChooser = fresnelZonePlateChooser
 
         self.zonePlateDiameterInMeters = self._registerRealParameter(
-            'zonePlateDiameterInMeters',
+            'zone_plate_diameter_m',
             180e-6,
             minimum=0.,
         )
         self.outermostZoneWidthInMeters = self._registerRealParameter(
-            'outermostZoneWidthInMeters',
+            'outermost_zone_width_m',
             50e-9,
             minimum=0.,
         )
         self.centralBeamstopDiameterInMeters = self._registerRealParameter(
-            'centralBeamstopDiameterInMeters',
+            'central_beamstop_diameter_m',
             60e-6,
             minimum=0.,
         )
         self.defocusDistanceInMeters = self._registerRealParameter(
-            'defocusDistanceInMeters',
+            'defocus_distance_m',
             800e-6,
         )  # from sample to the focal plane
 

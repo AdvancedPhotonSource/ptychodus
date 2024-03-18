@@ -19,14 +19,14 @@ class ScanBuilderFactory(Iterable[str]):
     @classmethod
     def _createBuilders(cls) -> Mapping[str, Callable[[], ScanBuilder]]:
         builders: dict[str, Callable[[], ScanBuilder]] = {
-            variant.getDisplayName():
+            variant.name.lower():
             lambda variant=variant: CartesianScanBuilder(variant)  # type: ignore
             for variant in CartesianScanVariant
         }
         builders.update({
-            'Concentric': lambda: ConcentricScanBuilder(),
-            'Spiral': lambda: SpiralScanBuilder(),
-            'Lissajous': lambda: LissajousScanBuilder(),
+            'concentric': lambda: ConcentricScanBuilder(),
+            'spiral': lambda: SpiralScanBuilder(),
+            'lissajous': lambda: LissajousScanBuilder(),
         })
         return builders
 

@@ -10,19 +10,19 @@ from ptychodus.api.scan import ScanPoint
 class ScanPointTransform(ParameterRepository):
 
     def __init__(self, rng: numpy.random.Generator) -> None:
-        super().__init__('Transform')
+        super().__init__('transform')
         self._rng = rng
 
-        self.affineAX = self._registerRealParameter('AffineAX', 1.)
-        self.affineAY = self._registerRealParameter('AffineAY', 0.)
-        self.affineAT = self._registerRealParameter('AffineAT', 0.)
+        self.affineAX = self._registerRealParameter('affine_ax', 1.)
+        self.affineAY = self._registerRealParameter('affine_ay', 0.)
+        self.affineAT = self._registerRealParameter('affine_at', 0.)
 
-        self.affineBX = self._registerRealParameter('AffineBX', 0.)
-        self.affineBY = self._registerRealParameter('AffineBY', 1.)
-        self.affineBT = self._registerRealParameter('AffineBT', 0.)
+        self.affineBX = self._registerRealParameter('affine_bx', 0.)
+        self.affineBY = self._registerRealParameter('affine_by', 1.)
+        self.affineBT = self._registerRealParameter('affine_bt', 0.)
 
         self.jitterRadiusInMeters = self._registerRealParameter(
-            'JitterRadiusInMeters',
+            'jitter_radius_m',
             0.,
             minimum=0.,
         )

@@ -10,11 +10,11 @@ from .builder import ProbeBuilder
 class DiskProbeBuilder(ProbeBuilder):
 
     def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
-        super().__init__('Disk')
+        super().__init__('disk')
         self._geometryProvider = geometryProvider
 
         self.diameterInMeters = self._registerRealParameter(
-            'DiameterInMeters',
+            'diameter_m',
             1.e-6,
             minimum=0.,
         )

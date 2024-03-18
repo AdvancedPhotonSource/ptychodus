@@ -42,12 +42,14 @@ def main() -> int:
     parser.add_argument(
         '-i',
         '--input',
+        metavar='INPUT_FILE',
         help='input data product file',
         type=argparse.FileType('r'),
     )
     parser.add_argument(
         '-o',
         '--output',
+        metavar='OUTPUT_FILE',
         help='output data product file',
         type=argparse.FileType('w'),
     )

@@ -72,17 +72,17 @@ class ZernikePolynomial:
 class ZernikeProbeBuilder(ProbeBuilder):
 
     def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
-        super().__init__('Zernike')
+        super().__init__('zernike')
         self._geometryProvider = geometryProvider
         self._polynomials: list[ZernikePolynomial] = list()
         self._order = 0
 
         self.diameterInMeters = self._registerRealParameter(
-            'DiameterInMeters',
+            'diameter_m',
             1.e-6,
             minimum=0.,
         )
-        self.coefficients = self._registerComplexArrayParameter('Coefficients', [1 + 0j])
+        self.coefficients = self._registerComplexArrayParameter('coefficients', [1 + 0j])
 
         self.setOrder(1)
 

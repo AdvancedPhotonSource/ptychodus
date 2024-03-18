@@ -11,10 +11,10 @@ class SpiralScanBuilder(ScanBuilder):
     '''https://doi.org/10.1364/OE.22.012634'''
 
     def __init__(self) -> None:
-        super().__init__('Spiral')
-        self.numberOfPoints = self._registerIntegerParameter('NumberOfPoints', 100, minimum=0)
+        super().__init__('spiral')
+        self.numberOfPoints = self._registerIntegerParameter('number_of_points', 100, minimum=0)
         self.radiusScalarInMeters = self._registerRealParameter(
-            'RadiusScalarInMeters',
+            'radius_scalar_m',
             5e-7,
             minimum=0.,
         )

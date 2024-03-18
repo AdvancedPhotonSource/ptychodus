@@ -30,12 +30,12 @@ class ProbeBuilderFactory(Iterable[str]):
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[ProbeGeometryProvider], ProbeBuilder]] = {
-            'Average': self._createAverageBuilder,
-            'Disk': self._createDiskBuilder,
-            'Fresnel Zone Plate': self._createFZPBuilder,
-            'Rectangular': self._createRectangularBuilder,
-            'SuperGaussian': self._createSuperGaussianBuilder,
-            'Zernike': self._createZernikeBuilder,
+            'average_pattern': self._createAverageBuilder,
+            'disk': self._createDiskBuilder,
+            'fresnel_zone_plate': self._createFZPBuilder,
+            'rectangular': self._createRectangularBuilder,
+            'super_gaussian': self._createSuperGaussianBuilder,
+            'zernike': self._createZernikeBuilder,
         }
 
     def __iter__(self) -> Iterator[str]:

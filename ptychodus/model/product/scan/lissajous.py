@@ -10,21 +10,21 @@ from .builder import ScanBuilder
 class LissajousScanBuilder(ScanBuilder):
 
     def __init__(self) -> None:
-        super().__init__('Lissajous')
-        self.numberOfPoints = self._registerIntegerParameter('NumberOfPoints', 100, minimum=0)
+        super().__init__('lissajous')
+        self.numberOfPoints = self._registerIntegerParameter('number_of_points', 100, minimum=0)
         self.amplitudeXInMeters = self._registerRealParameter(
-            'amplitudeXInMeters',
+            'amplitude_x_m',
             4.5e-6,
             minimum=0.,
         )
         self.amplitudeYInMeters = self._registerRealParameter(
-            'amplitudeYInMeters',
+            'amplitude_y_m',
             4.5e-6,
             minimum=0.,
         )
-        self.angularStepXInTurns = self._registerRealParameter('angularStepXInTurns', 0.03)
-        self.angularStepYInTurns = self._registerRealParameter('angularStepYInTurns', 0.04)
-        self.angularShiftInTurns = self._registerRealParameter('angularShiftInTurns', 0.25)
+        self.angularStepXInTurns = self._registerRealParameter('angular_step_x_tr', 0.03)
+        self.angularStepYInTurns = self._registerRealParameter('angular_step_y_tr', 0.04)
+        self.angularShiftInTurns = self._registerRealParameter('angular_shift_tr', 0.25)
 
     def copy(self) -> LissajousScanBuilder:
         builder = LissajousScanBuilder()

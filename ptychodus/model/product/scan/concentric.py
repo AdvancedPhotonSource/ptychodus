@@ -11,15 +11,15 @@ class ConcentricScanBuilder(ScanBuilder):
     '''https://doi.org/10.1088/1367-2630/12/3/035017'''
 
     def __init__(self) -> None:
-        super().__init__('Concentric')
+        super().__init__('concentric')
         self.radialStepSizeInMeters = self._registerRealParameter(
-            'RadialStepSizeInMeters',
+            'radial_step_size_m',
             1e-6,
             minimum=0.,
         )
-        self.numberOfShells = self._registerIntegerParameter('NumberOfShells', 5, minimum=0)
+        self.numberOfShells = self._registerIntegerParameter('number_of_shells', 5, minimum=0)
         self.numberOfPointsInFirstShell = self._registerIntegerParameter(
-            'NumberOfPointsInFirstShell', 10, minimum=0)
+            'number_of_points_1st_shell', 10, minimum=0)
 
     def copy(self) -> ConcentricScanBuilder:
         builder = ConcentricScanBuilder()

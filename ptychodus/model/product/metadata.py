@@ -18,15 +18,15 @@ class UniqueNameFactory(ABC):
 class MetadataRepositoryItem(ParameterRepository):
 
     def __init__(self, parent: UniqueNameFactory, metadata: ProductMetadata) -> None:
-        super().__init__('Metadata')  # FIXME snake_case?
+        super().__init__('metadata')
         self._parent = parent
-        self._name = self._registerStringParameter('Name', parent.createUniqueName(metadata.name))
-        self.comments = self._registerStringParameter('Comments', metadata.comments)
+        self._name = self._registerStringParameter('name', parent.createUniqueName(metadata.name))
+        self.comments = self._registerStringParameter('comments', metadata.comments)
         self.detectorDistanceInMeters = self._registerRealParameter(
-            'DetectorDistanceInMeters', metadata.detectorDistanceInMeters, minimum=0.)
+            'detector_distance_m', metadata.detectorDistanceInMeters, minimum=0.)
         self.probeEnergyInElectronVolts = self._registerRealParameter(
-            'ProbeEnergyInElectronVolts', metadata.probeEnergyInElectronVolts, minimum=0.)
-        self.probePhotonsPerSecond = self._registerRealParameter('ProbePhotonsPerSecond',
+            'probe_energy_eV', metadata.probeEnergyInElectronVolts, minimum=0.)
+        self.probePhotonsPerSecond = self._registerRealParameter('probe_photons_per_second',
                                                                  metadata.probePhotonsPerSecond,
                                                                  minimum=0.)
         self._index = -1

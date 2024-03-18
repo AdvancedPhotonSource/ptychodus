@@ -30,8 +30,8 @@ class ProbeTransverseCoordinates:
 class ProbeBuilder(ParameterRepository):
 
     def __init__(self, name: str) -> None:
-        super().__init__('Builder')
-        self._name = self._registerStringParameter('Name', name)
+        super().__init__('builder')
+        self._name = self._registerStringParameter('name', name)
 
     def getTransverseCoordinates(self, geometry: ProbeGeometry) -> ProbeTransverseCoordinates:
         Y, X = numpy.mgrid[:geometry.heightInPixels, :geometry.widthInPixels]
@@ -64,7 +64,7 @@ class ProbeBuilder(ParameterRepository):
 class FromMemoryProbeBuilder(ProbeBuilder):
 
     def __init__(self, probe: Probe) -> None:
-        super().__init__('From Memory')
+        super().__init__('from_memory')
         self._probe = probe.copy()
 
     def copy(self, geometryProvider: ProbeGeometryProvider) -> FromMemoryProbeBuilder:
@@ -77,9 +77,9 @@ class FromMemoryProbeBuilder(ProbeBuilder):
 class FromFileProbeBuilder(ProbeBuilder):
 
     def __init__(self, filePath: Path, fileType: str, fileReader: ProbeFileReader) -> None:
-        super().__init__('From File')
-        self.filePath = self._registerPathParameter('FilePath', filePath)
-        self.fileType = self._registerStringParameter('FileType', fileType)
+        super().__init__('from_file')
+        self.filePath = self._registerPathParameter('file_path', filePath)
+        self.fileType = self._registerStringParameter('file_type', fileType)
         self._fileReader = fileReader
 
     def copy(self, geometryProvider: ProbeGeometryProvider) -> FromFileProbeBuilder:

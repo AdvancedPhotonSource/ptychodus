@@ -10,21 +10,21 @@ from .builder import ProbeBuilder
 class SuperGaussianProbeBuilder(ProbeBuilder):
 
     def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
-        super().__init__('Super Gaussian')
+        super().__init__('super_gaussian')
         self._geometryProvider = geometryProvider
 
         self.annularRadiusInMeters = self._registerRealParameter(
-            'AnnularRadiusInMeters',
+            'annular_radius_m',
             0.,
             minimum=0.,
         )
         self.fwhmInMeters = self._registerRealParameter(
-            'FullWidthAtHalfMaximumInMeters',
+            'full_width_at_half_maximum_m',
             1.e-6,
             minimum=0.,
         )
         self.orderParameter = self._registerRealParameter(
-            'OrderParameter',
+            'order_parameter',
             1.,
             minimum=1.,
         )

@@ -20,14 +20,14 @@ class ProbeModeDecayType(IntEnum):
 class MultimodalProbeBuilder(ParameterRepository):
 
     def __init__(self, rng: numpy.random.Generator) -> None:
-        super().__init__('Additional Modes')
+        super().__init__('additional_modes')
         self._rng = rng
 
         self.isOrthogonalizeModesEnabled = self._registerBooleanParameter(
-            'IsOrthogonalizeModesEnabled', True)
-        self.numberOfModes = self._registerIntegerParameter('NumberOfModes', 1, minimum=1)
-        self.modeDecayType = self._registerStringParameter('ProbeModeDecayType', 'Polynomial')
-        self.modeDecayRatio = self._registerRealParameter('ModeDecayRatio',
+            'orthogonalize_modes', True)
+        self.numberOfModes = self._registerIntegerParameter('number_of_modes', 1, minimum=1)
+        self.modeDecayType = self._registerStringParameter('mode_decay_type', 'polynomial')
+        self.modeDecayRatio = self._registerRealParameter('mode_decay_ratio',
                                                           1.,
                                                           minimum=0.,
                                                           maximum=1.)

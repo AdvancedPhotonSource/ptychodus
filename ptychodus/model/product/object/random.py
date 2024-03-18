@@ -11,38 +11,38 @@ class RandomObjectBuilder(ObjectBuilder):
 
     def __init__(self, rng: numpy.random.Generator,
                  geometryProvider: ObjectGeometryProvider) -> None:
-        super().__init__('Random')
+        super().__init__('random')
         self._rng = rng
         self._geometryProvider = geometryProvider
 
-        self.extraPaddingX = self._registerIntegerParameter('ExtraPaddingX', 1, minimum=0)
-        self.extraPaddingY = self._registerIntegerParameter('ExtraPaddingY', 1, minimum=0)
+        self.extraPaddingX = self._registerIntegerParameter('extra_padding_x', 1, minimum=0)
+        self.extraPaddingY = self._registerIntegerParameter('extra_padding_y', 1, minimum=0)
 
         self.amplitudeMean = self._registerRealParameter(
-            'AmplitudeMean',
+            'amplitude_mean',
             0.5,
             minimum=0.,
             maximum=1.,
         )
         self.amplitudeDeviation = self._registerRealParameter(
-            'AmplitudeDeviation',
+            'amplitude_deviation',
             0.,
             minimum=0.,
             maximum=1.,
         )
         self.phaseDeviation = self._registerRealParameter(
-            'PhaseDeviation',
+            'phase_deviation',
             0.,
             minimum=0.,
             maximum=numpy.pi,
         )
         self.numberOfLayers = self._registerIntegerParameter(
-            'NumberOfLayers',
+            'number_of_layers',
             1,
             minimum=1,
         )
         self.layerDistanceInMeters = self._registerRealParameter(
-            'LayerDistanceInMeters',
+            'layer_distance_m',
             1.e-6,
             minimum=0.,
         )

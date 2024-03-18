@@ -10,16 +10,16 @@ from .builder import ProbeBuilder
 class RectangularProbeBuilder(ProbeBuilder):
 
     def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
-        super().__init__('Rectangular')
+        super().__init__('rectangular')
         self._geometryProvider = geometryProvider
 
         self.widthInMeters = self._registerRealParameter(
-            'WidthInMeters',
+            'width_m',
             1.e-6,
             minimum=0.,
         )
         self.heightInMeters = self._registerRealParameter(
-            'HeightInMeters',
+            'height_m',
             1.e-6,
             minimum=0.,
         )

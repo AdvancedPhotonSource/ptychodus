@@ -16,7 +16,7 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
 
     def __init__(self, metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
                  patternSizer: PatternSizer) -> None:
-        super().__init__('Sizer')
+        super().__init__('sizer')
         self._metadata = metadata
         self._scan = scan
         self._patternSizer = patternSizer
@@ -26,15 +26,13 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
         self._patternSizer.addObserver(self)
 
         # FIXME to GUI
-        self.expandScanBoundingBox = self._registerBooleanParameter('ExpandScanBoundingBox', False)
-        self.scanBoundingBoxMinimumXInMeters = self._registerRealParameter(
-            'ScanBoundingBoxMinimumXInMeters', 0.)
+        self.expandScanBoundingBox = self._registerBooleanParameter('expand_scan_bbox', False)
+        self.scanBoundingBoxMinimumXInMeters = self._registerRealParameter('scan_bbox_xmin_m', 0.)
         self.scanBoundingBoxMaximumXInMeters = self._registerRealParameter(
-            'ScanBoundingBoxMaximumXInMeters', 1.e-5)
-        self.scanBoundingBoxMinimumYInMeters = self._registerRealParameter(
-            'ScanBoundingBoxMinimumYInMeters', 0.)
+            'scan_bbox_xmax_m', 1e-5)
+        self.scanBoundingBoxMinimumYInMeters = self._registerRealParameter('scan_bbox_ymin_m', 0.)
         self.scanBoundingBoxMaximumYInMeters = self._registerRealParameter(
-            'ScanBoundingBoxMaximumYInMeters', 1.e-5)
+            'scan_bbox_ymax_m', 1e-5)
 
     @property
     def probeEnergyInJoules(self) -> float:

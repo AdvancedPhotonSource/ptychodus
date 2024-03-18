@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class ObjectBuilder(ParameterRepository):
 
     def __init__(self, name: str) -> None:
-        super().__init__('Builder')
-        self._name = self._registerStringParameter('Name', name)
+        super().__init__('builder')
+        self._name = self._registerStringParameter('name', name)
 
     def getName(self) -> str:
         return self._name.getValue()
@@ -30,7 +30,7 @@ class ObjectBuilder(ParameterRepository):
 class FromMemoryObjectBuilder(ObjectBuilder):
 
     def __init__(self, object_: Object) -> None:
-        super().__init__('From Memory')
+        super().__init__('from_memory')
         self._object = object_.copy()
 
     def copy(self, geometryProvider: ObjectGeometryProvider) -> FromMemoryObjectBuilder:
@@ -43,9 +43,9 @@ class FromMemoryObjectBuilder(ObjectBuilder):
 class FromFileObjectBuilder(ObjectBuilder):
 
     def __init__(self, filePath: Path, fileType: str, fileReader: ObjectFileReader) -> None:
-        super().__init__('From File')
-        self.filePath = self._registerPathParameter('FilePath', filePath)
-        self.fileType = self._registerStringParameter('FileType', fileType)
+        super().__init__('from_file')
+        self.filePath = self._registerPathParameter('file_path', filePath)
+        self.fileType = self._registerStringParameter('file_type', fileType)
         self._fileReader = fileReader
 
     def copy(self, geometryProvider: ObjectGeometryProvider) -> FromFileObjectBuilder:

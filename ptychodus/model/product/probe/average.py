@@ -12,7 +12,7 @@ class AverageProbeBuilder(ProbeBuilder):
 
     def __init__(self, patterns: ActiveDiffractionDataset,
                  geometryProvider: ProbeGeometryProvider) -> None:
-        super().__init__('Average')
+        super().__init__('average_pattern')
         self._patterns = patterns
         self._geometryProvider = geometryProvider
 

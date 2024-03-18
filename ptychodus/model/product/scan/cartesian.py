@@ -30,36 +30,16 @@ class CartesianScanVariant(IntEnum):
     def isEquilateral(self) -> bool:
         return (self.value & 4 != 0)
 
-    def getDisplayName(self) -> str:
-        if self is CartesianScanVariant.RECTANGULAR_RASTER:
-            return 'Rectangular Raster'
-        if self is CartesianScanVariant.RECTANGULAR_SNAKE:
-            return 'Rectangular Snake'
-        if self is CartesianScanVariant.TRIANGULAR_RASTER:
-            return 'Triangular Raster'
-        if self is CartesianScanVariant.TRIANGULAR_SNAKE:
-            return 'Triangular Snake'
-        if self is CartesianScanVariant.SQUARE_RASTER:
-            return 'Square Raster'
-        if self is CartesianScanVariant.SQUARE_SNAKE:
-            return 'Square Snake'
-        if self is CartesianScanVariant.HEXAGONAL_RASTER:
-            return 'Hexagonal Raster'
-        if self is CartesianScanVariant.HEXAGONAL_SNAKE:
-            return 'Hexagonal Snake'
-
-        return 'UNKNOWN'
-
 
 class CartesianScanBuilder(ScanBuilder):
 
     def __init__(self, variant: CartesianScanVariant) -> None:
-        super().__init__(variant.getDisplayName())
+        super().__init__(variant.name.lower())
         self._variant = variant
-        self.numberOfPointsX = self._registerIntegerParameter('NumberOfPointsX', 10, minimum=0)
-        self.numberOfPointsY = self._registerIntegerParameter('NumberOfPointsY', 10, minimum=0)
-        self.stepSizeXInMeters = self._registerRealParameter('StepSizeXInMeters', 1e-6, minimum=0.)
-        self.stepSizeYInMeters = self._registerRealParameter('StepSizeYInMeters', 1e-6, minimum=0.)
+        self.numberOfPointsX = self._registerIntegerParameter('number_of_points_x', 10, minimum=0)
+        self.numberOfPointsY = self._registerIntegerParameter('number_of_points_y', 10, minimum=0)
+        self.stepSizeXInMeters = self._registerRealParameter('step_size_x_m', 1e-6, minimum=0.)
+        self.stepSizeYInMeters = self._registerRealParameter('step_size_y_m', 1e-6, minimum=0.)
 
     def copy(self) -> CartesianScanBuilder:
         builder = CartesianScanBuilder(self._variant)

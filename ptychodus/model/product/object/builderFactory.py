@@ -22,7 +22,7 @@ class ObjectBuilderFactory(Iterable[str]):
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[ObjectGeometryProvider], ObjectBuilder]] = {
-            'Random': self._createRandomBuilder,
+            'random': self._createRandomBuilder,
         }
 
     def __iter__(self) -> Iterator[str]:
