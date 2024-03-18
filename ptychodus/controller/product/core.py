@@ -27,8 +27,9 @@ class ProductRepositoryTableModel(QAbstractTableModel):
         self._repository = repository
         self._header = [
             'Name',
-            'Probe Energy\n[keV]',
             'Detector-Object\nDistance [m]',
+            'Probe Energy\n[keV]',
+            'Probe Photon\nFlux [ph/s]',
             'Pixel Width\n[nm]',
             'Pixel Height\n[nm]',
             'Size\n[MB]',
@@ -37,7 +38,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.column() < 3:
+        if index.isValid() and index.column() < 4:
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -64,15 +65,18 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 if index.column() == 0:
                     return metadata.getName()
                 elif index.column() == 1:
-                    return f'{metadata.probeEnergyInElectronVolts.getValue() / 1000.:.1f}'
+                    return f'{metadata.detectorDistanceInMeters.getValue():.4g}'
                 elif index.column() == 2:
-                    return f'{metadata.detectorDistanceInMeters.getValue():.3g}'
+                    return f'{metadata.probeEnergyInElectronVolts.getValue() / 1e3:.4g}'
                 elif index.column() == 3:
-                    return f'{geometry.objectPlanePixelWidthInMeters:.3g}'
+                    return f'{metadata.probePhotonsPerSecond.getValue():.4g}'
                 elif index.column() == 4:
-                    return f'{geometry.objectPlanePixelHeightInMeters:.3g}'
+                    return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
                 elif index.column() == 5:
-                    return f'{sys.getsizeof(item) / (1024 * 1024):.2f}'
+                    return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                elif index.column() == 6:
+                    product = item.getProduct()
+                    return f'{product.sizeInBytes / (1024 * 1024):.2f}'
 
     def setData(self,
                 index: QModelIndex,
@@ -92,19 +96,27 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 return True
             elif index.column() == 1:
                 try:
-                    energyInKEV = float(value)
-                except ValueError:
-                    return False
-
-                metadata.probeEnergyInElectronVolts.setValue(energyInKEV * 1000)
-                return True
-            elif index.column() == 2:
-                try:
                     distanceInM = float(value)
                 except ValueError:
                     return False
 
                 metadata.detectorDistanceInMeters.setValue(distanceInM)
+                return True
+            elif index.column() == 2:
+                try:
+                    energyInKEV = float(value)
+                except ValueError:
+                    return False
+
+                metadata.probeEnergyInElectronVolts.setValue(energyInKEV * 1e3)
+                return True
+            elif index.column() == 3:
+                try:
+                    photonsPerSecond = float(value)
+                except ValueError:
+                    return False
+
+                metadata.probePhotonsPerSecond.setValue(photonsPerSecond)
                 return True
 
         return False

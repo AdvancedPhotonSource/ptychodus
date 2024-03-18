@@ -3,9 +3,11 @@ import logging
 
 import h5py
 
+from ptychodus.api.constants import ELECTRON_VOLT_J
 from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                     ImageExtent, PixelGeometry, SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
+
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)
@@ -40,8 +42,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                     )
                     probeEnergyInJoules = float(
                         h5File['/entry_1/instrument_1/source_1/energy'][()])
-                    oneJouleInElectronVolts = 6.241509074e18
-                    probeEnergyInElectronVolts = probeEnergyInJoules * oneJouleInElectronVolts
+                    probeEnergyInElectronVolts = probeEnergyInJoules / ELECTRON_VOLT_J
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=numberOfPatterns,

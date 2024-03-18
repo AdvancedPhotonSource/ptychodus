@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from sys import getsizeof
 
 from .object import Object
 from .probe import Probe
@@ -12,8 +13,18 @@ from .scan import Scan
 class ProductMetadata:
     name: str
     comments: str
-    probeEnergyInElectronVolts: float
     detectorDistanceInMeters: float
+    probeEnergyInElectronVolts: float
+    probePhotonsPerSecond: float
+
+    @property
+    def sizeInBytes(self) -> int:
+        sz = getsizeof(self.name)
+        sz += getsizeof(self.comments)
+        sz += getsizeof(self.detectorDistanceInMeters)
+        sz += getsizeof(self.probeEnergyInElectronVolts)
+        sz += getsizeof(self.probePhotonsPerSecond)
+        return sz
 
 
 @dataclass(frozen=True)
@@ -23,6 +34,14 @@ class Product:
     probe: Probe
     object_: Object
     costs: Sequence[float]
+
+    @property
+    def sizeInBytes(self) -> int:
+        sz = self.metadata.sizeInBytes
+        sz += self.scan.sizeInBytes
+        sz += self.probe.sizeInBytes
+        sz += self.object_.sizeInBytes
+        return sz
 
 
 class ProductFileReader(ABC):

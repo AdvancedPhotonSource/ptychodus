@@ -16,9 +16,10 @@ class ProductPropertyTableModel(QAbstractTableModel):
         self._header = ['Property', 'Value']
         self._properties = [
             'Probe Wavelength [nm]',
-            'Fresnel Number',
+            'Probe Power [W]',
             'Object Plane Pixel Width [nm]',
             'Object Plane Pixel Height [nm]',
+            'Fresnel Number',
         ]
 
     def headerData(self,
@@ -36,13 +37,15 @@ class ProductPropertyTableModel(QAbstractTableModel):
                 geometry = self._product.getGeometry()
 
                 if index.row() == 0:
-                    return f'{geometry.probeWavelengthInMeters * 1.e9:.4g}'
+                    return f'{geometry.probeWavelengthInMeters * 1e9:.4g}'
                 elif index.row() == 1:
-                    return f'{geometry.fresnelNumber:.4g}'
+                    return f'{geometry.probePowerInWatts:.4g}'
                 elif index.row() == 2:
-                    return f'{geometry.objectPlanePixelWidthInMeters * 1.e9:.4g}'
+                    return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
                 elif index.row() == 3:
-                    return f'{geometry.objectPlanePixelHeightInMeters * 1.e9:.4g}'
+                    return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                elif index.row() == 4:
+                    return f'{geometry.fresnelNumber:.4g}'
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._properties)

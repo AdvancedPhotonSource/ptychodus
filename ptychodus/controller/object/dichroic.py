@@ -27,7 +27,12 @@ class DichroicViewController:
     def _analyze(self) -> None:
         lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()
         rcircItemIndex = self._dialog.parametersView.rcircComboBox.currentIndex()
-        results = self._analyzer.analyze(lcircItemIndex, rcircItemIndex)
+
+        try:
+            results = self._analyzer.analyze(lcircItemIndex, rcircItemIndex)
+        except IndexError:
+            return  # FIXME address crash when removing last product
+
         polarRatio = results.polarRatio[0, :, :]  # TODO support multislice
         self._imagePresenter.setArray(polarRatio, results.pixelGeometry)
 

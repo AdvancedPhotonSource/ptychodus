@@ -160,7 +160,6 @@ class ProbePropagationDialog(QDialog):
                        statusBar: QStatusBar,
                        parent: QWidget | None = None) -> ProbePropagationDialog:
         view = cls(statusBar, parent)
-        view.setWindowTitle('Probe Propagation')
 
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)

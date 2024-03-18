@@ -19,8 +19,9 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
 
     NAME: Final[str] = 'name'
     COMMENTS: Final[str] = 'comments'
-    PROBE_ENERGY: Final[str] = 'probe_energy_eV'
     DETECTOR_OBJECT_DISTANCE: Final[str] = 'detector_object_distance_m'
+    PROBE_ENERGY: Final[str] = 'probe_energy_eV'
+    PROBE_PHOTON_FLUX: Final[str] = 'probe_photons_per_s'
 
     PROBE_ARRAY: Final[str] = 'probe'
     PROBE_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
@@ -45,8 +46,9 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             metadata = ProductMetadata(
                 name=h5File.attrs[self.NAME].asstr()[()],
                 comments=h5File.attrs[self.COMMENTS].asstr()[()],
-                probeEnergyInElectronVolts=float(h5File.attrs[self.PROBE_ENERGY]),
                 detectorDistanceInMeters=float(h5File.attrs[self.DETECTOR_OBJECT_DISTANCE]),
+                probeEnergyInElectronVolts=float(h5File.attrs[self.PROBE_ENERGY]),
+                probePhotonsPerSecond=float(h5File.attrs[self.PROBE_PHOTON_FLUX]),
             )
 
             h5ScanIndexes = h5File[self.PROBE_POSITION_INDEXES]
@@ -102,6 +104,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5File.attrs[self.COMMENTS] = metadata.comments
             h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorDistanceInMeters
             h5File.attrs[self.PROBE_ENERGY] = metadata.probeEnergyInElectronVolts
+            h5File.attrs[self.PROBE_PHOTON_FLUX] = metadata.probePhotonsPerSecond
 
             h5File.create_datset(self.PROBE_POSITION_INDEXES, data=scanIndexes)
             h5File.create_dataset(self.PROBE_POSITION_X, data=scanXInMeters)

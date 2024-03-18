@@ -5,6 +5,7 @@ from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterRepository
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
 from ptychodus.api.scan import ScanBoundingBox
+from ptychodus.api.constants import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
 
 from ..patterns import PatternSizer
 from .metadata import MetadataRepositoryItem
@@ -36,16 +37,21 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
             'ScanBoundingBoxMaximumYInMeters', 1.e-5)
 
     @property
+    def probeEnergyInJoules(self) -> float:
+        return self._metadata.probeEnergyInElectronVolts.getValue() * ELECTRON_VOLT_J
+
+    @property
     def probeWavelengthInMeters(self) -> float:
-        # Source: https://physics.nist.gov/cuu/Constants/index.html
-        planckConstant_eV_per_Hz = 4.135667696e-15
-        lightSpeedInMetersPerSecond = 299792458
-        hc_eVm = planckConstant_eV_per_Hz * lightSpeedInMetersPerSecond
+        hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S
 
         try:
-            return hc_eVm / self._metadata.probeEnergyInElectronVolts.getValue()
+            return hc_Jm / self.probeEnergyInJoules
         except ZeroDivisionError:
             return 0.
+
+    @property
+    def probePowerInWatts(self) -> float:
+        return self.probeEnergyInJoules * self._metadata.probePhotonsPerSecond.getValue()
 
     @property
     def _lambdaZInSquareMeters(self) -> float:

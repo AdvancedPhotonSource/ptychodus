@@ -22,10 +22,13 @@ class MetadataRepositoryItem(ParameterRepository):
         self._parent = parent
         self._name = self._registerStringParameter('Name', parent.createUniqueName(metadata.name))
         self.comments = self._registerStringParameter('Comments', metadata.comments)
-        self.probeEnergyInElectronVolts = self._registerRealParameter(
-            'ProbeEnergyInElectronVolts', metadata.probeEnergyInElectronVolts, minimum=0.)
         self.detectorDistanceInMeters = self._registerRealParameter(
             'DetectorDistanceInMeters', metadata.detectorDistanceInMeters, minimum=0.)
+        self.probeEnergyInElectronVolts = self._registerRealParameter(
+            'ProbeEnergyInElectronVolts', metadata.probeEnergyInElectronVolts, minimum=0.)
+        self.probePhotonsPerSecond = self._registerRealParameter('ProbePhotonsPerSecond',
+                                                                 metadata.probePhotonsPerSecond,
+                                                                 minimum=0.)
         self._index = -1
 
     def copy(self) -> MetadataRepositoryItem:
@@ -45,6 +48,7 @@ class MetadataRepositoryItem(ParameterRepository):
         return ProductMetadata(
             name=self._name.getValue(),
             comments=self.comments.getValue(),
-            probeEnergyInElectronVolts=self.probeEnergyInElectronVolts.getValue(),
             detectorDistanceInMeters=self.detectorDistanceInMeters.getValue(),
+            probeEnergyInElectronVolts=self.probeEnergyInElectronVolts.getValue(),
+            probePhotonsPerSecond=self.probePhotonsPerSecond.getValue(),
         )

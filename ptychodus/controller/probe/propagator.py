@@ -18,7 +18,8 @@ class ProbePropagationViewController:
         # FIXME self._imageController = ImageController.createInstance(imagePresenter, self._dialog.xyView.imageView, fileDialogFactory)
 
     def propagate(self, itemIndex: int) -> None:
-        # FIXME include item name in window title
+        itemName = self._propagator.getName(itemIndex)
         _ = self._propagator.propagate(itemIndex)  # FIXME start, stop, count
         # FIXME do something with result
+        self._dialog.setWindowTitle(f'Propagate Probe: {itemName}')
         self._dialog.open()

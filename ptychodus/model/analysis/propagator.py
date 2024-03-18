@@ -93,5 +93,8 @@ class ProbePropagator:
     def __init__(self, repository: ProbeRepository) -> None:
         self._repository = repository
 
+    def getName(self, itemIndex: int) -> str:
+        return self._repository.getName(itemIndex)
+
     def propagate(self, itemIndex: int) -> ProbePropagation:  # FIXME
         return ProbePropagation(itemIndex)

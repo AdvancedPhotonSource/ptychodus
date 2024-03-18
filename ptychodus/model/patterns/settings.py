@@ -16,10 +16,11 @@ class DiffractionDatasetSettings(Observable, Observer):
         self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory',
                                                               Path.home() / '.ptychodus')
         self.numberOfDataThreads = settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)
-        self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
-            'ProbeEnergyInElectronVolts', '10000')
         self.detectorDistanceInMeters = settingsGroup.createRealEntry(
             'DetectorDistanceInMeters', '1')
+        self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
+            'ProbeEnergyInElectronVolts', '10000')
+        self.probePhotonsPerSecond = settingsGroup.createRealEntry('ProbePhotonsPerSecond', '0')
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry) -> DiffractionDatasetSettings:
