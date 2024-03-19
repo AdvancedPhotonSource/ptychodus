@@ -31,8 +31,12 @@ class MetadataRepositoryItem(ParameterRepository):
                                                                  minimum=0.)
         self._index = -1
 
-    def copy(self) -> MetadataRepositoryItem:
-        return MetadataRepositoryItem(self._parent, self.getMetadata())
+    def assign(self, item: MetadataRepositoryItem) -> None:
+        self.setName(item.getName())
+        self.comments.setValue(item.comments.getValue())
+        self.detectorDistanceInMeters.setValue(item.detectorDistanceInMeters.getValue())
+        self.probeEnergyInElectronVolts.setValue(item.probeEnergyInElectronVolts.getValue())
+        self.probePhotonsPerSecond.setValue(item.probePhotonsPerSecond.getValue())
 
     def getName(self) -> str:
         return self._name.getValue()

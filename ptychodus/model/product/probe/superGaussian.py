@@ -9,9 +9,8 @@ from .builder import ProbeBuilder
 
 class SuperGaussianProbeBuilder(ProbeBuilder):
 
-    def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
+    def __init__(self) -> None:
         super().__init__('super_gaussian')
-        self._geometryProvider = geometryProvider
 
         self.annularRadiusInMeters = self._registerRealParameter(
             'annular_radius_m',
@@ -29,15 +28,15 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
             minimum=1.,
         )
 
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> SuperGaussianProbeBuilder:
-        builder = SuperGaussianProbeBuilder(geometryProvider)
+    def copy(self) -> SuperGaussianProbeBuilder:
+        builder = SuperGaussianProbeBuilder()
         builder.annularRadiusInMeters.setValue(self.annularRadiusInMeters.getValue())
         builder.fwhmInMeters.setValue(self.fwhmInMeters.getValue())
         builder.orderParameter.setValue(self.orderParameter.getValue())
         return builder
 
-    def build(self) -> Probe:
-        geometry = self._geometryProvider.getProbeGeometry()
+    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
+        geometry = geometryProvider.getProbeGeometry()
         coords = self.getTransverseCoordinates(geometry)
 
         Z = (coords.positionRInMeters - self.annularRadiusInMeters.getValue()) \

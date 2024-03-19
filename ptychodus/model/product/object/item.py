@@ -14,18 +14,20 @@ logger = logging.getLogger(__name__)
 
 class ObjectRepositoryItem(ParameterRepository):
 
-    def __init__(self, builder: ObjectBuilder) -> None:
+    def __init__(self, geometryProvider: ObjectGeometryProvider, builder: ObjectBuilder) -> None:
         super().__init__('Object')
+        self._geometryProvider = geometryProvider
         self._builder = builder
         self._object = Object()
-        self._layerDistanceInMeters: list[float] = list()
 
         self._addParameterRepository(builder, observe=True)
+        self.layerDistanceInMeters = self._registerRealArrayParameter('layer_distance_m', [])
 
         self._rebuild()
 
-    def copy(self, geometryProvider: ObjectGeometryProvider) -> ObjectRepositoryItem:
-        return ObjectRepositoryItem(self.getBuilder().copy(geometryProvider))
+    def assign(self, item: ObjectRepositoryItem) -> None:
+        self.layerDistanceInMeters.setValue(item.layerDistanceInMeters.getValue(), notify=False)
+        self.setBuilder(item.getBuilder().copy())
 
     def getObject(self) -> Object:
         return self._object
@@ -38,28 +40,23 @@ class ObjectRepositoryItem(ParameterRepository):
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
-        self._addParameterRepository(self._builder)
+        self._addParameterRepository(self._builder, observe=True)
         self._rebuild()
 
     def _rebuild(self) -> None:
+        layerDistanceInMeters = list(self.layerDistanceInMeters.getValue())
+
+        if len(layerDistanceInMeters) < 1:
+            layerDistanceInMeters.append(numpy.inf)
+
         try:
-            object_ = self._builder.build()  # FIXME (self._layerDistanceInMeters)
+            object_ = self._builder.build(self._geometryProvider, layerDistanceInMeters)
         except Exception:
             logger.exception('Failed to reinitialize object!')
             return
 
         self._object = object_
-        self._layerDistanceInMeters = list(object_.layerDistanceInMeters)
         self.notifyObservers()
-
-    def getLayerDistanceInMeters(self, number: int) -> float:
-        return self._layerDistanceInMeters[number]
-
-    def setLayerDistanceInMeters(self, number: int, distanceInMeters: float) -> None:
-        if numpy.isfinite(distanceInMeters) and distanceInMeters > 0.:
-            if self._layerDistanceInMeters[number] != distanceInMeters:
-                self._layerDistanceInMeters[number] = distanceInMeters
-                self._rebuild()
 
     def update(self, observable: Observable) -> None:
         if observable is self._builder:

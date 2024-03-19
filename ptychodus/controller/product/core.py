@@ -2,7 +2,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 import logging
-import sys
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView, QAction
@@ -212,7 +211,7 @@ class ProductController(ProductRepositoryObserver):
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
-            self._repository.duplicateProduct(current.row())
+            self._repository.createNewProduct(likeIndex=current.row())
         else:
             logger.error('No current item!')
 

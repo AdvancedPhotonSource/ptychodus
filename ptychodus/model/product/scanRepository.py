@@ -82,7 +82,8 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
             item.setBuilder(builder)
 
     def copyScan(self, sourceIndex: int, destinationIndex: int) -> None:
-        print(f'Copy {sourceIndex} -> {destinationIndex}')  # FIXME
+        logger.debug(f'Copy {sourceIndex} -> {destinationIndex}')
+        self[destinationIndex].assign(self[sourceIndex])
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._factory.getSaveFileFilterList()

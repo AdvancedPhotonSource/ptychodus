@@ -9,9 +9,8 @@ from .builder import ProbeBuilder
 
 class DiskProbeBuilder(ProbeBuilder):
 
-    def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
+    def __init__(self) -> None:
         super().__init__('disk')
-        self._geometryProvider = geometryProvider
 
         self.diameterInMeters = self._registerRealParameter(
             'diameter_m',
@@ -19,13 +18,13 @@ class DiskProbeBuilder(ProbeBuilder):
             minimum=0.,
         )
 
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> DiskProbeBuilder:
-        builder = DiskProbeBuilder(geometryProvider)
+    def copy(self) -> DiskProbeBuilder:
+        builder = DiskProbeBuilder()
         builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
         return builder
 
-    def build(self) -> Probe:
-        geometry = self._geometryProvider.getProbeGeometry()
+    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
+        geometry = geometryProvider.getProbeGeometry()
         coords = self.getTransverseCoordinates(geometry)
 
         R_m = coords.positionRInMeters

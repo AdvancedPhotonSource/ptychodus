@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod
+from collections.abc import Sequence
 from pathlib import Path
 import logging
 
@@ -19,11 +20,12 @@ class ObjectBuilder(ParameterRepository):
         return self._name.getValue()
 
     @abstractmethod
-    def copy(self, geometryProvider: ObjectGeometryProvider) -> ObjectBuilder:
+    def copy(self) -> ObjectBuilder:
         pass
 
     @abstractmethod
-    def build(self) -> Object:
+    def build(self, geometryProvider: ObjectGeometryProvider,
+              layerDistanceInMeters: Sequence[float]) -> Object:
         pass
 
 
@@ -33,10 +35,11 @@ class FromMemoryObjectBuilder(ObjectBuilder):
         super().__init__('from_memory')
         self._object = object_.copy()
 
-    def copy(self, geometryProvider: ObjectGeometryProvider) -> FromMemoryObjectBuilder:
+    def copy(self) -> FromMemoryObjectBuilder:
         return FromMemoryObjectBuilder(self._object)
 
-    def build(self) -> Object:
+    def build(self, geometryProvider: ObjectGeometryProvider,
+              layerDistanceInMeters: Sequence[float]) -> Object:
         return self._object
 
 
@@ -48,11 +51,12 @@ class FromFileObjectBuilder(ObjectBuilder):
         self.fileType = self._registerStringParameter('file_type', fileType)
         self._fileReader = fileReader
 
-    def copy(self, geometryProvider: ObjectGeometryProvider) -> FromFileObjectBuilder:
+    def copy(self) -> FromFileObjectBuilder:
         return FromFileObjectBuilder(self.filePath.getValue(), self.fileType.getValue(),
                                      self._fileReader)
 
-    def build(self) -> Object:
+    def build(self, geometryProvider: ObjectGeometryProvider,
+              layerDistanceInMeters: Sequence[float]) -> Object:
         filePath = self.filePath.getValue()
         fileType = self.fileType.getValue()
         logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')

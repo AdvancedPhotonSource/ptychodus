@@ -12,10 +12,9 @@ class ObjectRepositoryItemFactory:
     def __init__(self, rng: numpy.random.Generator) -> None:
         self._rng = rng
 
-    def createDefault(self, geometryProvider: ObjectGeometryProvider) -> ObjectRepositoryItem:
-        builder = RandomObjectBuilder(self._rng, geometryProvider)
-        return ObjectRepositoryItem(builder)
-
-    def create(self, object_: Object) -> ObjectRepositoryItem:
-        builder = FromMemoryObjectBuilder(object_)
-        return ObjectRepositoryItem(builder)
+    def create(self,
+               geometryProvider: ObjectGeometryProvider,
+               object_: Object | None = None) -> ObjectRepositoryItem:
+        builder = RandomObjectBuilder(self._rng) if object_ is None \
+                else FromMemoryObjectBuilder(object_)
+        return ObjectRepositoryItem(geometryProvider, builder)

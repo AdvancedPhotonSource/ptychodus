@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QButtonGroup, QDialog, QFormLayout, QGroupBox, QHBo
 
 from ...api.observer import Observable, Observer
 from ...api.parametric import StringParameter
-from ...model.product.probe import (AverageProbeBuilder, DiskProbeBuilder,
+from ...model.product.probe import (AveragePatternProbeBuilder, DiskProbeBuilder,
                                     FresnelZonePlateProbeBuilder, MultimodalProbeBuilder,
                                     ProbeModeDecayType, ProbeRepositoryItem,
                                     RectangularProbeBuilder, SuperGaussianProbeBuilder,
@@ -168,7 +168,7 @@ class ProbeEditorViewControllerFactory:
         primaryModeGroup = 'Primary Mode'
         title = f'{itemName} [{builderName}]'
 
-        if isinstance(probeBuilder, AverageProbeBuilder):
+        if isinstance(probeBuilder, AveragePatternProbeBuilder):
             dialogBuilder = ParameterDialogBuilder()
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
             return dialogBuilder.build(title, parent)

@@ -4,7 +4,7 @@ import logging
 
 import numpy
 
-from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter, ObjectGeometryProvider
+from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.plugins import PluginChooser
 
 from .builder import FromFileObjectBuilder, ObjectBuilder
@@ -21,23 +21,23 @@ class ObjectBuilderFactory(Iterable[str]):
         self._rng = rng
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
-        self._builders: Mapping[str, Callable[[ObjectGeometryProvider], ObjectBuilder]] = {
+        self._builders: Mapping[str, Callable[[], ObjectBuilder]] = {
             'random': self._createRandomBuilder,
         }
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._builders)
 
-    def create(self, name: str, geometryProvider: ObjectGeometryProvider) -> ObjectBuilder:
+    def create(self, name: str) -> ObjectBuilder:
         try:
             factory = self._builders[name]
         except KeyError as exc:
             raise KeyError(f'Unknown object builder \"{name}\"!') from exc
 
-        return factory(geometryProvider)
+        return factory()
 
-    def _createRandomBuilder(self, geometryProvider: ObjectGeometryProvider) -> ObjectBuilder:
-        return RandomObjectBuilder(self._rng, geometryProvider)
+    def _createRandomBuilder(self) -> ObjectBuilder:
+        return RandomObjectBuilder(self._rng)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()

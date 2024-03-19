@@ -8,19 +8,17 @@ from ...patterns import ActiveDiffractionDataset
 from .builder import ProbeBuilder
 
 
-class AverageProbeBuilder(ProbeBuilder):
+class AveragePatternProbeBuilder(ProbeBuilder):
 
-    def __init__(self, patterns: ActiveDiffractionDataset,
-                 geometryProvider: ProbeGeometryProvider) -> None:
+    def __init__(self, patterns: ActiveDiffractionDataset) -> None:
         super().__init__('average_pattern')
         self._patterns = patterns
-        self._geometryProvider = geometryProvider
 
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> AverageProbeBuilder:
-        return AverageProbeBuilder(self._patterns, geometryProvider)
+    def copy(self) -> AveragePatternProbeBuilder:
+        return AveragePatternProbeBuilder(self._patterns)
 
-    def build(self) -> Probe:
-        geometry = self._geometryProvider.getProbeGeometry()
+    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
+        geometry = geometryProvider.getProbeGeometry()
         intensity = numpy.average(self._patterns.getAssembledData(), axis=0)
         # FIXME ifft to backpropagate to object plane
         array = numpy.sqrt(intensity, dtype=complex)

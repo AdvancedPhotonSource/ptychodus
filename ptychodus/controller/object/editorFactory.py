@@ -26,10 +26,8 @@ class ObjectEditorViewControllerFactory:
                                            'Amplitude Deviation:', firstLayerGroup)
             dialogBuilder.addDecimalSlider(objectBuilder.phaseDeviation, 'Phase Deviation:',
                                            firstLayerGroup)
-            dialogBuilder.addSpinBox(objectBuilder.numberOfLayers, 'Number of Layers:',
-                                     additionalLayersGroup)
-            dialogBuilder.addLengthWidget(objectBuilder.layerDistanceInMeters, 'Layer Distance:',
-                                          additionalLayersGroup)
+            # FIXME dialogBuilder.addSpinBox(objectBuilder.numberOfLayers, 'Number of Layers:', additionalLayersGroup)
+            # FIXME dialogBuilder.addLengthWidget(objectBuilder.layerDistanceInMeters, 'Layer Distance:', additionalLayersGroup)
             return dialogBuilder.build(title, parent)
 
         return QMessageBox(QMessageBox.Icon.Information, title,

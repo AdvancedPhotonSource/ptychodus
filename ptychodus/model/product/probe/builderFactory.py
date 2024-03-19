@@ -3,11 +3,10 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import (FresnelZonePlate, Probe, ProbeFileReader, ProbeFileWriter,
-                                 ProbeGeometryProvider)
+from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeFileReader, ProbeFileWriter
 
 from ...patterns import ActiveDiffractionDataset
-from .average import AverageProbeBuilder
+from .averagePattern import AveragePatternProbeBuilder
 from .builder import FromFileProbeBuilder, ProbeBuilder
 from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
@@ -29,43 +28,31 @@ class ProbeBuilderFactory(Iterable[str]):
         self._fresnelZonePlateChooser = fresnelZonePlateChooser
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
-        self._builders: Mapping[str, Callable[[ProbeGeometryProvider], ProbeBuilder]] = {
-            'average_pattern': self._createAverageBuilder,
-            'disk': self._createDiskBuilder,
-            'fresnel_zone_plate': self._createFZPBuilder,
-            'rectangular': self._createRectangularBuilder,
-            'super_gaussian': self._createSuperGaussianBuilder,
-            'zernike': self._createZernikeBuilder,
+        self._builders: Mapping[str, Callable[[], ProbeBuilder]] = {
+            'average_pattern': self._createAveragePatternBuilder,
+            'disk': lambda: DiskProbeBuilder(),
+            'fresnel_zone_plate': self._createFresnelZonePlateBuilder,
+            'rectangular': lambda: RectangularProbeBuilder(),
+            'super_gaussian': lambda: SuperGaussianProbeBuilder(),
+            'zernike': lambda: ZernikeProbeBuilder(),
         }
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._builders)
 
-    def create(self, name: str, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
+    def create(self, name: str) -> ProbeBuilder:
         try:
             factory = self._builders[name]
         except KeyError as exc:
             raise KeyError(f'Unknown probe builder \"{name}\"!') from exc
 
-        return factory(geometryProvider)
+        return factory()
 
-    def _createAverageBuilder(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
-        return AverageProbeBuilder(self._patterns, geometryProvider)
+    def _createAveragePatternBuilder(self) -> ProbeBuilder:
+        return AveragePatternProbeBuilder(self._patterns)
 
-    def _createDiskBuilder(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
-        return DiskProbeBuilder(geometryProvider)
-
-    def _createFZPBuilder(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
-        return FresnelZonePlateProbeBuilder(geometryProvider, self._fresnelZonePlateChooser)
-
-    def _createRectangularBuilder(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
-        return RectangularProbeBuilder(geometryProvider)
-
-    def _createSuperGaussianBuilder(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
-        return SuperGaussianProbeBuilder(geometryProvider)
-
-    def _createZernikeBuilder(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
-        return ZernikeProbeBuilder(geometryProvider)
+    def _createFresnelZonePlateBuilder(self) -> ProbeBuilder:
+        return FresnelZonePlateProbeBuilder(self._fresnelZonePlateChooser)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()

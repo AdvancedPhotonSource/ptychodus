@@ -9,9 +9,8 @@ from .builder import ProbeBuilder
 
 class RectangularProbeBuilder(ProbeBuilder):
 
-    def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
+    def __init__(self) -> None:
         super().__init__('rectangular')
-        self._geometryProvider = geometryProvider
 
         self.widthInMeters = self._registerRealParameter(
             'width_m',
@@ -24,14 +23,14 @@ class RectangularProbeBuilder(ProbeBuilder):
             minimum=0.,
         )
 
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> RectangularProbeBuilder:
-        builder = RectangularProbeBuilder(geometryProvider)
+    def copy(self) -> RectangularProbeBuilder:
+        builder = RectangularProbeBuilder()
         builder.widthInMeters.setValue(self.widthInMeters.getValue())
         builder.heightInMeters.setValue(self.heightInMeters.getValue())
         return builder
 
-    def build(self) -> Probe:
-        geometry = self._geometryProvider.getProbeGeometry()
+    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
+        geometry = geometryProvider.getProbeGeometry()
         coords = self.getTransverseCoordinates(geometry)
 
         aX_m = numpy.fabs(coords.positionXInMeters)

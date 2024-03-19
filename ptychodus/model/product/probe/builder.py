@@ -53,11 +53,11 @@ class ProbeBuilder(ParameterRepository):
         return self._name.getValue()
 
     @abstractmethod
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> ProbeBuilder:
+    def copy(self) -> ProbeBuilder:
         pass
 
     @abstractmethod
-    def build(self) -> Probe:
+    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         pass
 
 
@@ -67,10 +67,10 @@ class FromMemoryProbeBuilder(ProbeBuilder):
         super().__init__('from_memory')
         self._probe = probe.copy()
 
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> FromMemoryProbeBuilder:
+    def copy(self) -> FromMemoryProbeBuilder:
         return FromMemoryProbeBuilder(self._probe)
 
-    def build(self) -> Probe:
+    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         return self._probe
 
 
@@ -82,11 +82,11 @@ class FromFileProbeBuilder(ProbeBuilder):
         self.fileType = self._registerStringParameter('file_type', fileType)
         self._fileReader = fileReader
 
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> FromFileProbeBuilder:
+    def copy(self) -> FromFileProbeBuilder:
         return FromFileProbeBuilder(self.filePath.getValue(), self.fileType.getValue(),
                                     self._fileReader)
 
-    def build(self) -> Probe:
+    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         filePath = self.filePath.getValue()
         fileType = self.fileType.getValue()
         logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')

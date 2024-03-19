@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 
 import numpy
 
@@ -9,11 +10,9 @@ from .builder import ObjectBuilder
 
 class RandomObjectBuilder(ObjectBuilder):
 
-    def __init__(self, rng: numpy.random.Generator,
-                 geometryProvider: ObjectGeometryProvider) -> None:
+    def __init__(self, rng: numpy.random.Generator) -> None:
         super().__init__('random')
         self._rng = rng
-        self._geometryProvider = geometryProvider
 
         self.extraPaddingX = self._registerIntegerParameter('extra_padding_x', 1, minimum=0)
         self.extraPaddingY = self._registerIntegerParameter('extra_padding_y', 1, minimum=0)
@@ -36,33 +35,22 @@ class RandomObjectBuilder(ObjectBuilder):
             minimum=0.,
             maximum=numpy.pi,
         )
-        self.numberOfLayers = self._registerIntegerParameter(
-            'number_of_layers',
-            1,
-            minimum=1,
-        )
-        self.layerDistanceInMeters = self._registerRealParameter(
-            'layer_distance_m',
-            1.e-6,
-            minimum=0.,
-        )
 
-    def copy(self, geometryProvider: ObjectGeometryProvider) -> RandomObjectBuilder:
-        builder = RandomObjectBuilder(self._rng, geometryProvider)
+    def copy(self) -> RandomObjectBuilder:
+        builder = RandomObjectBuilder(self._rng)
         builder.extraPaddingX.setValue(self.extraPaddingX.getValue())
         builder.extraPaddingY.setValue(self.extraPaddingY.getValue())
         builder.amplitudeMean.setValue(self.amplitudeMean.getValue())
         builder.amplitudeDeviation.setValue(self.amplitudeDeviation.getValue())
         builder.phaseDeviation.setValue(self.phaseDeviation.getValue())
-        builder.numberOfLayers.setValue(self.numberOfLayers.getValue())
-        builder.layerDistanceInMeters.setValue(self.layerDistanceInMeters.getValue())
         return builder
 
-    def build(self) -> Object:
-        geometry = self._geometryProvider.getObjectGeometry()
-        widthInPixels = geometry.widthInPixels + 2 * self.extraPaddingX.getValue()
+    def build(self, geometryProvider: ObjectGeometryProvider,
+              layerDistanceInMeters: Sequence[float]) -> Object:
+        geometry = geometryProvider.getObjectGeometry()
         heightInPixels = geometry.heightInPixels + 2 * self.extraPaddingY.getValue()
-        objectShape = (self.numberOfLayers.getValue(), heightInPixels, widthInPixels)
+        widthInPixels = geometry.widthInPixels + 2 * self.extraPaddingX.getValue()
+        objectShape = (len(layerDistanceInMeters), heightInPixels, widthInPixels)
 
         amplitude = self._rng.normal(
             self.amplitudeMean.getValue(),
@@ -70,17 +58,14 @@ class RandomObjectBuilder(ObjectBuilder):
             objectShape,
         )
         phase = self._rng.normal(
-            -self.phaseDeviation.getValue(),
-            +self.phaseDeviation.getValue(),
+            0.,
+            self.phaseDeviation.getValue(),
             objectShape,
         )
 
-        # FIXME end with inf
-        layerDistances = [self.layerDistanceInMeters.getValue()] * self.numberOfLayers.getValue()
-
         return Object(
             array=numpy.clip(amplitude, 0., 1.) * numpy.exp(1j * phase),
-            layerDistanceInMeters=layerDistances,
+            layerDistanceInMeters=layerDistanceInMeters,
             pixelWidthInMeters=geometry.pixelWidthInMeters,
             pixelHeightInMeters=geometry.pixelHeightInMeters,
             centerXInMeters=geometry.centerXInMeters,

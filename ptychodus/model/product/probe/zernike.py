@@ -71,9 +71,8 @@ class ZernikePolynomial:
 
 class ZernikeProbeBuilder(ProbeBuilder):
 
-    def __init__(self, geometryProvider: ProbeGeometryProvider) -> None:
+    def __init__(self) -> None:
         super().__init__('zernike')
-        self._geometryProvider = geometryProvider
         self._polynomials: list[ZernikePolynomial] = list()
         self._order = 0
 
@@ -86,8 +85,8 @@ class ZernikeProbeBuilder(ProbeBuilder):
 
         self.setOrder(1)
 
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> ZernikeProbeBuilder:
-        builder = ZernikeProbeBuilder(geometryProvider)
+    def copy(self) -> ZernikeProbeBuilder:
+        builder = ZernikeProbeBuilder()
         builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
         builder.coefficients.setValue(self.coefficients.getValue())
         builder.setOrder(self.getOrder())
@@ -132,8 +131,8 @@ class ZernikeProbeBuilder(ProbeBuilder):
     def __len__(self) -> int:
         return min(len(self.coefficients), len(self._polynomials))
 
-    def build(self) -> Probe:
-        geometry = self._geometryProvider.getProbeGeometry()
+    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
+        geometry = geometryProvider.getProbeGeometry()
         coords = self.getTransverseCoordinates(geometry)
 
         radius = self.diameterInMeters.getValue() / 2.

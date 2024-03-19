@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 class ProbeRepositoryItem(ParameterRepository):
 
-    def __init__(self, builder: ProbeBuilder,
+    def __init__(self, geometryProvider: ProbeGeometryProvider, builder: ProbeBuilder,
                  additionalModesBuilder: MultimodalProbeBuilder) -> None:
         super().__init__('Probe')
+        self._geometryProvider = geometryProvider
         self._builder = builder
         self._additionalModesBuilder = additionalModesBuilder
         self._probe = Probe()
@@ -25,9 +26,14 @@ class ProbeRepositoryItem(ParameterRepository):
 
         self._rebuild()
 
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> ProbeRepositoryItem:
-        return ProbeRepositoryItem(self.getBuilder().copy(geometryProvider),
-                                   self.getAdditionalModesBuilder().copy())
+    def assign(self, item: ProbeRepositoryItem) -> None:
+        self._removeParameterRepository(self._additionalModesBuilder)
+        self._additionalModesBuilder.removeObserver(self)
+        self._additionalModesBuilder = item.getAdditionalModesBuilder().copy()
+        self._additionalModesBuilder.addObserver(self)
+        self._addParameterRepository(self._additionalModesBuilder, observe=True)
+
+        self.setBuilder(item.getBuilder().copy())
 
     def getProbe(self) -> Probe:
         return self._probe
@@ -40,12 +46,12 @@ class ProbeRepositoryItem(ParameterRepository):
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
-        self._addParameterRepository(self._builder)
+        self._addParameterRepository(self._builder, observe=True)
         self._rebuild()
 
     def _rebuild(self) -> None:
         try:
-            probe = self._builder.build()
+            probe = self._builder.build(self._geometryProvider)
         except Exception:
             logger.exception('Failed to reinitialize probe!')
             return

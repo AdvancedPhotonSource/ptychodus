@@ -132,7 +132,7 @@ class ObjectTreeModel(QAbstractItemModel):
                 if index.column() == 0:
                     return f'Layer {index.row() + 1}'
                 elif index.column() == 1:
-                    return item.getLayerDistanceInMeters(index.row())
+                    return item.layerDistanceInMeters[index.row()]
         else:
             item = self._repository[index.row()]
             object_ = item.getObject()

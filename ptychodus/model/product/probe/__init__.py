@@ -1,4 +1,4 @@
-from .average import AverageProbeBuilder
+from .averagePattern import AveragePatternProbeBuilder
 from .builder import ProbeBuilder
 from .builderFactory import ProbeBuilderFactory
 from .disk import DiskProbeBuilder
@@ -11,7 +11,7 @@ from .superGaussian import SuperGaussianProbeBuilder
 from .zernike import ZernikeProbeBuilder
 
 __all__ = [
-    'AverageProbeBuilder',
+    'AveragePatternProbeBuilder',
     'DiskProbeBuilder',
     'FresnelZonePlateProbeBuilder',
     'MultimodalProbeBuilder',

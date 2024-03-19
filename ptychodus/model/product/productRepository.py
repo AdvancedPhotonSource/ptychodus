@@ -67,12 +67,20 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         return index
 
-    def createNewProduct(self, name: str = 'Unnamed') -> int:
+    def createNewProduct(self, name: str = 'Unnamed', *, likeIndex: int = -1) -> int:
         metadataItem = self._metadataRepositoryItemFactory.createDefault(name)
         scanItem = self._scanRepositoryItemFactory.createDefault()
         geometry = ProductGeometry(metadataItem, scanItem, self._patternSizer)
-        probeItem = self._probeRepositoryItemFactory.createDefault(geometry)
-        objectItem = self._objectRepositoryItemFactory.createDefault(geometry)
+        probeItem = self._probeRepositoryItemFactory.create(geometry)
+        objectItem = self._objectRepositoryItemFactory.create(geometry)
+
+        if likeIndex >= 0:
+            # FIXME verify name
+            sourceItem = self._itemList[likeIndex]
+            metadataItem.assign(sourceItem.getMetadata())
+            scanItem.assign(sourceItem.getScan())
+            probeItem.assign(sourceItem.getProbe())
+            objectItem.assign(sourceItem.getObject())
 
         item = ProductRepositoryItem(
             parent=self,
@@ -87,34 +95,12 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         return self._insertProduct(item)
 
-    def duplicateProduct(self, sourceIndex: int) -> int:
-        sourceItem = self._itemList[sourceIndex]
-
-        metadataItem = sourceItem.getMetadata().copy()
-        scanItem = sourceItem.getScan().copy()
-        geometry = ProductGeometry(metadataItem, scanItem, self._patternSizer)
-        probeItem = sourceItem.getProbe().copy(geometry)
-        objectItem = sourceItem.getObject().copy(geometry)
-
-        item = ProductRepositoryItem(
-            parent=self,
-            metadata=metadataItem,
-            scan=scanItem,
-            geometry=geometry,
-            probe=probeItem,
-            object_=objectItem,
-            validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
-            costs=list(sourceItem.getCosts()),
-        )
-
-        return self._insertProduct(item)
-
     def insertProduct(self, product: Product) -> int:
         metadataItem = self._metadataRepositoryItemFactory.create(product.metadata)
         scanItem = self._scanRepositoryItemFactory.create(product.scan)
         geometry = ProductGeometry(metadataItem, scanItem, self._patternSizer)
-        probeItem = self._probeRepositoryItemFactory.create(product.probe)
-        objectItem = self._objectRepositoryItemFactory.create(product.object_)
+        probeItem = self._probeRepositoryItemFactory.create(geometry, product.probe)
+        objectItem = self._objectRepositoryItemFactory.create(geometry, product.object_)
 
         item = ProductRepositoryItem(
             parent=self,

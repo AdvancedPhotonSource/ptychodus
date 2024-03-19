@@ -56,10 +56,8 @@ def fresnel_propagation(input: numpy.typing.NDArray[Any], dxy: float, z: float,
 
 class FresnelZonePlateProbeBuilder(ProbeBuilder):
 
-    def __init__(self, geometryProvider: ProbeGeometryProvider,
-                 fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]) -> None:
+    def __init__(self, fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]) -> None:
         super().__init__('fresnel_zone_plate')
-        self._geometryProvider = geometryProvider
         self._fresnelZonePlateChooser = fresnelZonePlateChooser
 
         self.zonePlateDiameterInMeters = self._registerRealParameter(
@@ -82,8 +80,8 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
             800e-6,
         )  # from sample to the focal plane
 
-    def copy(self, geometryProvider: ProbeGeometryProvider) -> FresnelZonePlateProbeBuilder:
-        builder = FresnelZonePlateProbeBuilder(geometryProvider, self._fresnelZonePlateChooser)
+    def copy(self) -> FresnelZonePlateProbeBuilder:
+        builder = FresnelZonePlateProbeBuilder(self._fresnelZonePlateChooser)
         builder.zonePlateDiameterInMeters.setValue(self.zonePlateDiameterInMeters.getValue())
         builder.outermostZoneWidthInMeters.setValue(self.outermostZoneWidthInMeters.getValue())
         builder.centralBeamstopDiameterInMeters.setValue(
@@ -101,11 +99,11 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         self.outermostZoneWidthInMeters.setValue(fzp.outermostZoneWidthInMeters)
         self.centralBeamstopDiameterInMeters.setValue(fzp.centralBeamstopDiameterInMeters)
 
-    def build(self) -> Probe:
-        geometry = self._geometryProvider.getProbeGeometry()
+    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
+        geometry = geometryProvider.getProbeGeometry()
 
         # central wavelength
-        wavelength = self._geometryProvider.probeWavelengthInMeters
+        wavelength = geometryProvider.probeWavelengthInMeters
 
         # pixel size on sample plane (TODO non-square pixels are unsupported)
         dx = geometry.pixelWidthInMeters

@@ -13,12 +13,10 @@ class ProbeRepositoryItemFactory:
     def __init__(self, rng: numpy.random.Generator) -> None:
         self._rng = rng
 
-    def createDefault(self, geometryProvider: ProbeGeometryProvider) -> ProbeRepositoryItem:
-        builder = DiskProbeBuilder(geometryProvider)
+    def create(self,
+               geometryProvider: ProbeGeometryProvider,
+               probe: Probe | None = None) -> ProbeRepositoryItem:
+        builder = DiskProbeBuilder() if probe is None \
+                else FromMemoryProbeBuilder(probe)
         multimodalBuilder = MultimodalProbeBuilder(self._rng)
-        return ProbeRepositoryItem(builder, multimodalBuilder)
-
-    def create(self, probe: Probe) -> ProbeRepositoryItem:
-        builder = FromMemoryProbeBuilder(probe)
-        multimodalBuilder = MultimodalProbeBuilder(self._rng)
-        return ProbeRepositoryItem(builder, multimodalBuilder)
+        return ProbeRepositoryItem(geometryProvider, builder, multimodalBuilder)

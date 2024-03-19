@@ -58,7 +58,7 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
             return False
 
         try:
-            builder = self._factory.create(builderName, item.getGeometry())
+            builder = self._factory.create(builderName)
         except KeyError:
             logger.warning(f'Failed to create builder {builderName}!')
             return False
@@ -83,7 +83,8 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
             item.setBuilder(builder)
 
     def copyObject(self, sourceIndex: int, destinationIndex: int) -> None:
-        print(f'Copy {sourceIndex} -> {destinationIndex}')  # FIXME
+        logger.debug(f'Copy {sourceIndex} -> {destinationIndex}')
+        self[destinationIndex].assign(self[sourceIndex])
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._factory.getSaveFileFilterList()
