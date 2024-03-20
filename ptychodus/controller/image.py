@@ -129,8 +129,10 @@ class ImageDataRangeController(Observer):
         controller._syncModelToView()
         presenter.addObserver(controller)
 
-        view.minDisplayValueSlider.valueChanged.connect(presenter.setMinDisplayValue)
-        view.maxDisplayValueSlider.valueChanged.connect(presenter.setMaxDisplayValue)
+        view.minDisplayValueSlider.valueChanged.connect(
+            lambda value: presenter.setMinDisplayValue(float(value)))
+        view.maxDisplayValueSlider.valueChanged.connect(
+            lambda value: presenter.setMaxDisplayValue(float(value)))
         view.autoButton.clicked.connect(presenter.setDisplayRangeToDataRange)
         view.editButton.clicked.connect(controller._editDisplayRange)
         view.displayRangeDialog.finished.connect(controller._finishEditingDisplayRange)

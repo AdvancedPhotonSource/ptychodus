@@ -21,7 +21,8 @@ class ObjectRepositoryItem(ParameterRepository):
         self._object = Object()
 
         self._addParameterRepository(builder, observe=True)
-        self.layerDistanceInMeters = self._registerRealArrayParameter('layer_distance_m', [])
+        self.layerDistanceInMeters = self._registerRealArrayParameter(
+            'layer_distance_m', [numpy.inf])
 
         self._rebuild()
 

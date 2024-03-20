@@ -184,7 +184,7 @@ class ObjectTreeModel(QAbstractItemModel):
                     except ValueError:
                         return False
 
-                    item.setLayerDistanceInMeters(index.row(), distanceInM)
+                    item.layerDistanceInMeters[index.row()] = distanceInM
                     return False
             else:
                 if index.column() == 0:

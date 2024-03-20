@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, MutableSequence, Sequence
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 import logging
@@ -100,7 +100,7 @@ class RealParameter(Parameter[float]):
         return value
 
 
-class RealArrayParameter(Parameter[Sequence[float]]):
+class RealArrayParameter(Parameter[MutableSequence[float]]):
 
     def __init__(self, value: Sequence[float]) -> None:
         super().__init__(list(value))
@@ -110,6 +110,19 @@ class RealArrayParameter(Parameter[Sequence[float]]):
 
     def __getitem__(self, index: int) -> float:
         return self._value[index]
+
+    def __setitem__(self, index: int, value: float) -> None:
+        if self._value[index] != value:
+            self._value[index] = value
+            self.notifyObservers()
+
+    def __delitem__(self, index: int) -> None:
+        del self._value[index]
+        self.notifyObservers()
+
+    def insert(self, index: int, value: float) -> None:
+        self._value[index] = value
+        self.notifyObservers()
 
     def __len__(self) -> int:
         return len(self._value)
@@ -122,7 +135,7 @@ class RealArrayParameter(Parameter[Sequence[float]]):
                 self.notifyObservers()
 
 
-class ComplexArrayParameter(Parameter[Sequence[complex]]):
+class ComplexArrayParameter(Parameter[MutableSequence[complex]]):
 
     def __init__(self, value: Sequence[complex]) -> None:
         super().__init__(list(value))
@@ -132,6 +145,19 @@ class ComplexArrayParameter(Parameter[Sequence[complex]]):
 
     def __getitem__(self, index: int) -> complex:
         return self._value[index]
+
+    def __setitem__(self, index: int, value: complex) -> None:
+        if self._value[index] != value:
+            self._value[index] = value
+            self.notifyObservers()
+
+    def __delitem__(self, index: int) -> None:
+        del self._value[index]
+        self.notifyObservers()
+
+    def insert(self, index: int, value: complex) -> None:
+        self._value[index] = value
+        self.notifyObservers()
 
     def __len__(self) -> int:
         return len(self._value)

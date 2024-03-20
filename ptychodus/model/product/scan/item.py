@@ -32,8 +32,14 @@ class ScanRepositoryItem(ParameterRepository):
 
         self._rebuild()
 
-    def copy(self) -> ScanRepositoryItem:
-        return ScanRepositoryItem(self.getBuilder().copy(), self.getTransform().copy())
+    def assign(self, item: ScanRepositoryItem) -> None:
+        self._removeParameterRepository(self._transform)
+        self._transform.removeObserver(self)
+        self._transform = item.getTransform().copy()
+        self._transform.addObserver(self)
+        self._addParameterRepository(self._transform)
+
+        self.setBuilder(item.getBuilder().copy())
 
     def getUntransformedScan(self) -> Scan:
         return self._untransformedScan
