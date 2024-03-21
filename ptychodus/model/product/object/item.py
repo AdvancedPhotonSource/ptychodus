@@ -30,6 +30,27 @@ class ObjectRepositoryItem(ParameterRepository):
         self.layerDistanceInMeters.setValue(item.layerDistanceInMeters.getValue(), notify=False)
         self.setBuilder(item.getBuilder().copy())
 
+    def getNumberOfLayers(self) -> int:
+        return len(self.layerDistanceInMeters)
+
+    def setNumberOfLayers(self, number: int) -> None:
+        numRequested = max(1, number)
+        distanceInMeters = list(self.layerDistanceInMeters.getValue())
+        numExisting = len(distanceInMeters)
+        defaultDistanceInMeters = 1e-6  # FIXME from settings
+
+        if numExisting < 2:
+            distanceInMeters = [defaultDistanceInMeters] * numRequested
+        elif numExisting < numRequested:
+            distanceInMeters[-1] = distanceInMeters[-2]  # overwrite inf
+            distanceInMeters.extend(distanceInMeters[-1:] * (numRequested - numExisting))
+        elif numExisting > numRequested:
+            distanceInMeters = distanceInMeters[:numRequested]
+
+        distanceInMeters[-1] = numpy.inf
+        self.layerDistanceInMeters.setValue(distanceInMeters)
+        self._rebuild()
+
     def getObject(self) -> Object:
         return self._object
 

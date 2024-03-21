@@ -132,7 +132,10 @@ class ObjectTreeModel(QAbstractItemModel):
                 if index.column() == 0:
                     return f'Layer {index.row() + 1}'
                 elif index.column() == 1:
-                    return item.layerDistanceInMeters[index.row()]
+                    try:
+                        return item.layerDistanceInMeters[index.row()]
+                    except IndexError:
+                        return float('NaN')
         else:
             item = self._repository[index.row()]
             object_ = item.getObject()
@@ -141,7 +144,7 @@ class ObjectTreeModel(QAbstractItemModel):
                 if index.column() == 0:
                     return self._repository.getName(index.row())
                 elif index.column() == 1:
-                    return None
+                    return object_.getTotalLayerDistanceInMeters()
                 elif index.column() == 2:
                     return item.getBuilder().getName()
                 elif index.column() == 3:
@@ -161,7 +164,10 @@ class ObjectTreeModel(QAbstractItemModel):
 
             if parent.isValid():
                 if index.column() == 1:
-                    value |= Qt.ItemFlag.ItemIsEditable
+                    item = self._repository[parent.row()]
+
+                    if index.row() + 1 < item.getNumberOfLayers():
+                        value |= Qt.ItemFlag.ItemIsEditable
             else:
                 if index.column() in (0, 2):
                     value |= Qt.ItemFlag.ItemIsEditable

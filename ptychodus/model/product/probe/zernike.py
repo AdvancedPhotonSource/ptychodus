@@ -107,7 +107,6 @@ class ZernikeProbeBuilder(ProbeBuilder):
                 poly = ZernikePolynomial(radial_degree, angular_frequency)
                 self._polynomials.append(poly)
 
-        logger.debug(' '.join(str(poly) for poly in self._polynomials))
         npoly = len(self._polynomials)
         ncoef = len(self.coefficients)
 
@@ -121,6 +120,9 @@ class ZernikeProbeBuilder(ProbeBuilder):
 
     def getOrder(self) -> int:
         return self._order
+
+    def setCoefficient(self, idx: int, value: complex) -> None:
+        self.coefficients[idx] = value
 
     def getCoefficient(self, idx: int) -> complex:
         return self.coefficients[idx]

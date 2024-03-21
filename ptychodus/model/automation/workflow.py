@@ -28,7 +28,7 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
     def execute(self, filePath: Path) -> None:
         scanName = filePath.stem
         scanID = int(re.findall(r'\d+', scanName)[-1])
-        flowLabel = f'scan_{scanID}'
+        # FIXME flowLabel = f'scan_{scanID}'
 
         diffractionDirPath = filePath.parents[1] / 'h5'
 
@@ -42,7 +42,7 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         # FIXME self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='MDA', selectItem=True)
         # NOTE reuse probe
         # FIXME self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
-        self._workflowCore.executeWorkflow(flowLabel)
+        # FIXME self._workflowCore.executeWorkflow(inputProductIndex)
 
 
 class S2AutomationDatasetWorkflow(AutomationDatasetWorkflow):
@@ -54,14 +54,14 @@ class S2AutomationDatasetWorkflow(AutomationDatasetWorkflow):
     def execute(self, filePath: Path) -> None:
         scanName = filePath.stem
         scanID = int(re.findall(r'\d+', scanName)[-1])
-        flowLabel = f'scan{scanID}'
+        # FIXME flowLabel = f'scan{scanID}'
 
         diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
         self._dataAPI.loadDiffractionDataset(diffractionFilePath, fileType='NeXus')
         # FIXME self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='CSV', selectItem=True)
         # NOTE reuse probe
         # FIXME self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
-        self._workflowCore.executeWorkflow(flowLabel)
+        # FIXME self._workflowCore.executeWorkflow(inputProductIndex)
 
 
 class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):

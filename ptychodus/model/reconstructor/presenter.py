@@ -62,7 +62,6 @@ class ReconstructorPresenter(Observable, Observer):
 
     def _prepareInputData(self, inputProductIndex: int,
                           indexFilter: ScanIndexFilter) -> ReconstructInput:
-        # FIXME try/except IndexError
         inputProductItem = self._productRepository[inputProductIndex]
         inputProduct = inputProductItem.getProduct()
         dataIndexes = self._diffractionDataset.getAssembledIndexes()

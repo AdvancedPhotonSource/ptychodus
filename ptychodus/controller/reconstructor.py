@@ -99,7 +99,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
-            logger.debug('No current index!')
             return
 
         try:
@@ -113,7 +112,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
-            logger.debug('No current index!')
             return
 
         try:
@@ -126,7 +124,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
-            logger.debug('No current index!')
             return
 
         try:
@@ -167,7 +164,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         productIndex = self._view.reconstructorView.productComboBox.currentIndex()
 
         if productIndex < 0:
-            logger.debug('No current index!')
+            self._plotView.axes.clear()
             return
 
         try:

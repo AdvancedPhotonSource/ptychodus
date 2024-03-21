@@ -1,3 +1,5 @@
+import logging
+
 from PyQt5.QtWidgets import QStatusBar, QWidget
 
 from ...model.analysis import DichroicAnalyzer
@@ -6,6 +8,8 @@ from ...view.object import DichroicDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .treeModel import ObjectTreeModel
+
+logger = logging.getLogger(__name__)
 
 
 class DichroicViewController:
@@ -28,11 +32,10 @@ class DichroicViewController:
         lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()
         rcircItemIndex = self._dialog.parametersView.rcircComboBox.currentIndex()
 
-        try:
-            results = self._analyzer.analyze(lcircItemIndex, rcircItemIndex)
-        except IndexError:
-            return  # FIXME address crash when removing last product
+        if lcircItemIndex < 0 or rcircItemIndex < 0:
+            return
 
+        results = self._analyzer.analyze(lcircItemIndex, rcircItemIndex)
         polarRatio = results.polarRatio[0, :, :]  # TODO support multislice
         self._imagePresenter.setArray(polarRatio, results.pixelGeometry)
 

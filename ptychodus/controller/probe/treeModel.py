@@ -134,7 +134,11 @@ class ProbeTreeModel(QAbstractItemModel):
                 return f'Mode {index.row() + 1}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.getProbe()
-                relativePower = probe.getModeRelativePower(index.row())
+
+                try:
+                    relativePower = probe.getModeRelativePower(index.row())
+                except IndexError:
+                    return -1
 
                 if numpy.isfinite(relativePower):
                     return int(100. * relativePower)

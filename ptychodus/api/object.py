@@ -190,6 +190,9 @@ class Object:
     def getLayerDistanceInMeters(self, number: int) -> float:
         return self._layerDistanceInMeters[number]
 
+    def getTotalLayerDistanceInMeters(self) -> float:
+        return sum(self._layerDistanceInMeters[:-1])
+
 
 class ObjectInterpolator(ABC):
 

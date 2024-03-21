@@ -11,6 +11,7 @@ from ...model.product.probe import (AveragePatternProbeBuilder, DiskProbeBuilder
 from ...view.widgets import GroupBoxWithPresets
 from ..parametric import (LengthWidgetParameterViewController, ParameterDialogBuilder,
                           ParameterViewController)
+from .zernike import ZernikeTableModel
 
 __all__ = [
     'ProbeEditorViewControllerFactory',
@@ -57,9 +58,12 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._widget = QGroupBox(title)
         self._probeBuilder = probeBuilder
         self._orderSpinBox = QSpinBox()
+        self._coefficientsTableModel = ZernikeTableModel(probeBuilder)
         self._coefficientsTableView = QTableView()
         self._diameterViewController = LengthWidgetParameterViewController(
             probeBuilder.diameterInMeters)
+
+        self._coefficientsTableView.setModel(self._coefficientsTableModel)
 
         layout = QFormLayout()
         layout.addRow('Diameter:', self._diameterViewController.getWidget())
@@ -71,14 +75,15 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._orderSpinBox.valueChanged.connect(probeBuilder.setOrder)
         probeBuilder.addObserver(self)
 
-        # FIXME tableView getCoefficient/getPolynomial/len; edit coefficients
-
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncModelToView(self) -> None:
         self._orderSpinBox.setRange(1, 100)
         self._orderSpinBox.setValue(self._probeBuilder.getOrder())
+
+        self._coefficientsTableModel.beginResetModel()  # FIXME clean up
+        self._coefficientsTableModel.endResetModel()
 
     def update(self, observable: Observable) -> None:
         if observable is self._probeBuilder:
