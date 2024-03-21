@@ -11,6 +11,7 @@ from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
 from ...api.state import StateDataRegistry
+from ..product import ProductRepository
 from .authorizer import WorkflowAuthorizer
 from .executor import WorkflowExecutor
 from .locator import DataLocator, OutputDataLocator, SimpleDataLocator
@@ -177,13 +178,13 @@ class WorkflowExecutionPresenter:
     def __init__(self, executor: WorkflowExecutor) -> None:
         self._executor = executor
 
-    def runFlow(self, flowLabel: str) -> None:
-        self._executor.runFlow(flowLabel=flowLabel)
+    def runFlow(self, inputProductIndex: int) -> None:
+        self._executor.runFlow(inputProductIndex)
 
 
 class WorkflowCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry,
+    def __init__(self, productRepository: ProductRepository, settingsRegistry: SettingsRegistry,
                  stateDataRegistry: StateDataRegistry) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
         self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Input')
@@ -195,7 +196,7 @@ class WorkflowCore:
         self._statusRepository = WorkflowStatusRepository()
         self._executor = WorkflowExecutor(self._settings, self._inputDataLocator,
                                           self._computeDataLocator, self._outputDataLocator,
-                                          settingsRegistry, stateDataRegistry)
+                                          productRepository, settingsRegistry, stateDataRegistry)
         self._thread: threading.Thread | None = None
 
         try:
@@ -214,9 +215,9 @@ class WorkflowCore:
         self.statusPresenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
         self.executionPresenter = WorkflowExecutionPresenter(self._executor)
 
-    def executeWorkflow(self, flowLabel: str) -> None:
-        logger.debug(f'Execute Workflow: {flowLabel}')
-        self._executor.runFlow(flowLabel)
+    def executeWorkflow(self, inputProductIndex: int) -> None:
+        logger.debug(f'Execute Workflow: index={inputProductIndex}')
+        self._executor.runFlow(inputProductIndex)
 
     @property
     def areWorkflowsSupported(self) -> bool:

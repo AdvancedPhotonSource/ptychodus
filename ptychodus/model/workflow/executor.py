@@ -6,6 +6,7 @@ import queue
 
 from ...api.settings import SettingsRegistry
 from ...api.state import StateDataRegistry
+from ..product import ProductRepository
 from .locator import DataLocator
 from .settings import WorkflowSettings
 
@@ -22,21 +23,24 @@ class WorkflowExecutor:
 
     def __init__(self, settings: WorkflowSettings, inputDataLocator: DataLocator,
                  computeDataLocator: DataLocator, outputDataLocator: DataLocator,
-                 settingsRegistry: SettingsRegistry, stateDataRegistry: StateDataRegistry) -> None:
+                 productRepository: ProductRepository, settingsRegistry: SettingsRegistry,
+                 stateDataRegistry: StateDataRegistry) -> None:
         super().__init__()
         self._settings = settings
         self._inputDataLocator = inputDataLocator
         self._computeDataLocator = computeDataLocator
         self._outputDataLocator = outputDataLocator
+        self._productRepository = productRepository
         self._settingsRegistry = settingsRegistry
         self._stateDataRegistry = stateDataRegistry
         self.jobQueue: queue.Queue[WorkflowJob] = queue.Queue()
 
-    def runFlow(self, flowLabel: str) -> None:  # FIXME flowLabel -> productIndex
+    def runFlow(self, inputProductIndex: int) -> None:
         transferSyncLevel = 3  # Copy files if checksums of the source and destination mismatch
-        ptychodusAction = 'reconstruct'  # FIXME or 'train'
+        ptychodusAction = 'reconstruct'  # TODO or 'train'
 
-        # FIXME flowLabel -> product.getName()
+        inputProductItem = self._productRepository[inputProductIndex]
+        flowLabel = inputProductItem.getName()
 
         inputDataPosixPath = self._inputDataLocator.getPosixPath() / flowLabel
         computeDataPosixPath = self._computeDataLocator.getPosixPath() / flowLabel

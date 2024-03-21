@@ -1,10 +1,16 @@
 from __future__ import annotations
+import logging
+
+from PyQt5.QtCore import QAbstractItemModel
 
 from ...model.workflow import WorkflowExecutionPresenter, WorkflowParametersPresenter
+from ...view.widgets import ExceptionDialog
 from ...view.workflow import WorkflowExecutionView
 from .compute import WorkflowComputeController
 from .inputData import WorkflowInputDataController
 from .outputData import WorkflowOutputDataController
+
+logger = logging.getLogger(__name__)
 
 
 class WorkflowExecutionController:
@@ -23,12 +29,22 @@ class WorkflowExecutionController:
 
     @classmethod
     def createInstance(cls, parametersPresenter: WorkflowParametersPresenter,
-                       executionPresenter: WorkflowExecutionPresenter,
-                       view: WorkflowExecutionView) -> WorkflowExecutionController:
+                       executionPresenter: WorkflowExecutionPresenter, view: WorkflowExecutionView,
+                       productItemModel: QAbstractItemModel) -> WorkflowExecutionController:
         controller = cls(parametersPresenter, executionPresenter, view)
+        view.productComboBox.setModel(productItemModel)
         view.executeButton.clicked.connect(controller._execute)
         return controller
 
     def _execute(self) -> None:
-        flowLabel = self._view.labelLineEdit.text()  # FIXME from experiment name
-        self._executionPresenter.runFlow(flowLabel=flowLabel)
+        inputProductIndex = self._view.productComboBox.currentIndex()
+
+        if inputProductIndex < 0:
+            logger.debug('No current index!')
+            return
+
+        try:
+            self._executionPresenter.runFlow(inputProductIndex)
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.showException('Reconstructor', err)

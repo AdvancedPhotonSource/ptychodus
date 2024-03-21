@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout,
-                             QWidget)
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFormLayout, QGroupBox, QLabel, QLineEdit, QPushButton, QSpinBox,
+                             QVBoxLayout, QWidget)
 
 from .widgets import UUIDLineEdit
 
@@ -115,7 +115,7 @@ class WorkflowExecutionView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Execution', parent)
-        self.labelLineEdit = QLineEdit('Ptychodus')
+        self.productComboBox = QComboBox()
         self.inputDataView = WorkflowInputDataView.createInstance()
         self.computeView = WorkflowComputeView.createInstance()
         self.outputDataView = WorkflowOutputDataView.createInstance()
@@ -126,7 +126,7 @@ class WorkflowExecutionView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Label:', view.labelLineEdit)
+        layout.addRow('Product:', view.productComboBox)
         layout.addRow(view.inputDataView)
         layout.addRow(view.computeView)
         layout.addRow(view.outputDataView)

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 import logging
 
-from PyQt5.QtCore import Qt, QStringListModel
+from PyQt5.QtCore import Qt, QAbstractItemModel
 from PyQt5.QtWidgets import QLabel, QWidget
 
 from ..api.observer import Observable, Observer
@@ -46,13 +46,12 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._fileDialogFactory = fileDialogFactory
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = \
                 { vcf.backendName: vcf for vcf in viewControllerFactoryList }
-        self._productListModel = QStringListModel()
 
     @classmethod
     def createInstance(
         cls, presenter: ReconstructorPresenter, productRepository: ProductRepository,
         view: ReconstructorParametersView, plotView: ReconstructorPlotView,
-        fileDialogFactory: FileDialogFactory,
+        fileDialogFactory: FileDialogFactory, productTableModel: QAbstractItemModel,
         viewControllerFactoryList: list[ReconstructorViewControllerFactory]
     ) -> ReconstructorController:
         controller = cls(presenter, productRepository, view, plotView, fileDialogFactory,
@@ -68,7 +67,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             view.stackedWidget.setCurrentIndex)
 
         view.reconstructorView.productComboBox.textActivated.connect(controller._redrawPlot)
-        view.reconstructorView.productComboBox.setModel(controller._productListModel)
+        view.reconstructorView.productComboBox.setModel(productTableModel)
 
         view.reconstructorView.reconstructButton.clicked.connect(controller._reconstruct)
         view.reconstructorView.reconstructSplitButton.clicked.connect(controller._reconstructSplit)
@@ -78,7 +77,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         view.reconstructorView.clearButton.clicked.connect(controller._clearTrainingData)
 
         controller._syncAlgorithmToView()
-        controller._syncProductToView()
 
         return controller
 
@@ -165,11 +163,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(err)
             ExceptionDialog.showException('Clear', err)
 
-    def _syncProductToView(self) -> None:
-        self._productListModel.setStringList(product.getName()
-                                             for product in self._productRepository)
-
-    def _redrawPlot(self) -> None:
+    def _redrawPlot(self) -> None:  # FIXME verify that this works
         productIndex = self._view.reconstructorView.productComboBox.currentIndex()
 
         if productIndex < 0:
@@ -203,10 +197,10 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._redrawPlot()
 
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self._syncProductToView()
+        pass
 
     def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
-        self._syncProductToView()
+        pass
 
     def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
         pass
@@ -224,7 +218,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             self._redrawPlot()
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
-        self._syncProductToView()
+        pass
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

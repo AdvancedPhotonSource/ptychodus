@@ -105,7 +105,8 @@ class ModelCore:
                                           self._productCore.probeRepository,
                                           self._productCore.objectRepository)
         self._stateDataRegistry = StateDataRegistry(self._patternsCore)
-        self._workflowCore = WorkflowCore(self.settingsRegistry, self._stateDataRegistry)
+        self._workflowCore = WorkflowCore(self._productCore.productRepository,
+                                          self.settingsRegistry, self._stateDataRegistry)
         self._automationCore = AutomationCore(self.settingsRegistry, self._patternsCore.dataAPI,
                                               self._workflowCore)
 

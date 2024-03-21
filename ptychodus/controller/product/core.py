@@ -175,6 +175,10 @@ class ProductController(ProductRepositoryObserver):
 
         return controller
 
+    @property
+    def tableModel(self) -> QAbstractTableModel:
+        return self._tableModel
+
     def _openProduct(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,

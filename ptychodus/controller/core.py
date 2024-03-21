@@ -60,12 +60,14 @@ class ControllerCore:
             view.reconstructorParametersView,
             view.reconstructorPlotView,
             self._fileDialogFactory,
+            self._productController.tableModel,
             [self._ptychonnViewControllerFactory, self._tikeViewControllerFactory],
         )
         self._workflowController = WorkflowController.createInstance(
             model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
             model.workflowStatusPresenter, model.workflowExecutionPresenter,
-            view.workflowParametersView, view.workflowTableView)
+            view.workflowParametersView, view.workflowTableView,
+            self._productController.tableModel)
         self._automationController = AutomationController.createInstance(
             model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
             view.automationView, self._fileDialogFactory)
