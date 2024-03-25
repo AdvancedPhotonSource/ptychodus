@@ -1,8 +1,9 @@
 from typing import Any, TypeAlias
 
+from scipy.integrate import quad
+from scipy.special import fresnel, j0
 import numpy
 import numpy.typing
-from scipy.special import fresnel, j0
 
 ComplexArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
@@ -21,19 +22,17 @@ class SquareAperture:
 
     def _integral1D(self, r_m: RealArrayType, z_m: float) -> ComplexArrayType:
         sqrt2NF = numpy.sqrt(2 * self.get_fresnel_number(z_m))
-        xi = r_m / self._width_m
-        Sm, Cm = fresnel(sqrt2NF * (1 - 2 * xi))
-        Sp, Cp = fresnel(sqrt2NF * (1 + 2 * xi))
+        xi = 2 * r_m / self._width_m
+        Sm, Cm = fresnel(sqrt2NF * (1 - xi))
+        Sp, Cp = fresnel(sqrt2NF * (1 + xi))
         return (Cm + Cp + 1j * (Sm + Sp)) / numpy.sqrt(2)
 
     def diffract(self, x_m: RealArrayType, y_m: RealArrayType, z_m: float) -> ComplexArrayType:
         '''Fresnel diffraction; see Goodman p.100'''
-        assert (x_m.shape == y_m.shape)
+        assert x_m.shape == y_m.shape
         Ix = self._integral1D(x_m, z_m)
         Iy = self._integral1D(y_m, z_m)
-        wavenumber_rm = 2 * numpy.pi / self._wavelength_m
-        jkz = 1j * wavenumber_rm * z_m
-        return Ix * Iy * numpy.exp(jkz) / 1j
+        return Ix * Iy * numpy.exp(2j * numpy.pi * z_m / self._wavelength_m) / 1j
 
 
 class CircularAperture:

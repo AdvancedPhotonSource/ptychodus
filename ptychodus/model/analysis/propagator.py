@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 class WavefieldPropagator:
 
-    # FIXME fftshift/ifftshift
     def __init__(self, wavelength_m: float, pixel_width_m: float, pixel_height_m: float) -> None:
         self._wavelength_m = wavelength_m
         self._pixel_width_m = pixel_width_m
@@ -70,6 +69,10 @@ class WavefieldPropagator:
         lu = M_grid * fu / M
         lv = N_grid * fu / N
         Fx, Fy = numpy.meshgrid(lu, lv)
+
+        # NOTE: correct usage
+        #   X = fftshift(fft(ifftshift(x)))
+        #   x = fftshift(ifft(ifftshift(X)))
 
         if distance > 0.:
             return  # FIXME
