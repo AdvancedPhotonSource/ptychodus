@@ -16,7 +16,7 @@ NumberTypes: TypeAlias = numpy.integer[Any] | numpy.floating[Any] | numpy.comple
 NumberArrayType: TypeAlias = numpy.typing.NDArray[NumberTypes]
 
 
-class ScalarTransformation(ABC):
+class ScalarTransformation(ABC):  # FIXME remove
     '''interface for real-valued transformations of a real array'''
 
     @abstractmethod

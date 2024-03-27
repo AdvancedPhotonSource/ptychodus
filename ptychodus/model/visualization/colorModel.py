@@ -7,6 +7,11 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import Parameter
 from ptychodus.api.plugins import PluginChooser
 
+__all__ = [
+    'CylindricalColorModel',
+    'CylindricalColorModelParameter',
+]
+
 
 class CylindricalColorModel(ABC):
 
@@ -59,15 +64,47 @@ class HLSAlphaColorModel(CylindricalColorModel):
 
 class CylindricalColorModelParameter(Parameter[str], Observer):
 
-    def __init__(self, chooser: PluginChooser[CylindricalColorModel]) -> None:
-        super().__init__(chooser.currentPlugin.displayName)
-        self._chooser = chooser
+    def __init__(self) -> None:
+        super().__init__('')
+        self._chooser = PluginChooser[CylindricalColorModel]()
+        self._chooser.registerPlugin(
+            HSVSaturationColorModel(),
+            simpleName='HSV-S',
+            displayName='HSV Saturation',
+        )
+        self._chooser.registerPlugin(
+            HSVValueColorModel(),
+            simpleName='HSV-V',
+            displayName='HSV Value',
+        )
+        self._chooser.registerPlugin(
+            HSVAlphaColorModel(),
+            simpleName='HSV-A',
+            displayName='HSV Alpha',
+        )
+        self._chooser.registerPlugin(
+            HLSLightnessColorModel(),
+            simpleName='HLS-L',
+            displayName='HLS Lightness',
+        )
+        self._chooser.registerPlugin(
+            HLSSaturationColorModel(),
+            simpleName='HLS-S',
+            displayName='HLS Saturation',
+        )
+        self._chooser.registerPlugin(
+            HLSAlphaColorModel(),
+            simpleName='HLS-A',
+            displayName='HLS Alpha',
+        )
+        self.setValue('HSV-V')
         self._chooser.addObserver(self)
 
     def choices(self) -> Iterator[str]:
         for name in self._chooser.getDisplayNameList():
             yield name
 
+    @override
     def setValue(self, value: str, *, notify: bool = True) -> None:
         self._chooser.setCurrentPluginByName(value)
         super().setValue(self._chooser.currentPlugin.displayName, notify=notify)
@@ -75,6 +112,7 @@ class CylindricalColorModelParameter(Parameter[str], Observer):
     def getPlugin(self) -> CylindricalColorModel:
         return self._chooser.currentPlugin.strategy
 
+    @override
     def update(self, observable: Observable) -> None:
         if observable is self._chooser:
             super().setValue(self._chooser.currentPlugin.displayName)

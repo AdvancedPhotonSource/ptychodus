@@ -32,9 +32,5 @@ class Renderer(ParameterRepository):
         pass
 
     @abstractmethod
-    def getValueLabel(self) -> str:
-        pass
-
-    @abstractmethod
     def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
         pass

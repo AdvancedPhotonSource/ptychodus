@@ -56,17 +56,6 @@ class AmplitudeArrayComponent(DataArrayComponent):
         return numpy.absolute(array).astype(numpy.single)
 
 
-class IntensityArrayComponent(DataArrayComponent):
-
-    def __init__(self) -> None:
-        super().__init__('Intensity', isCyclic=False)
-
-    @override
-    def calculate(self, array: NumberArrayType) -> RealArrayType:
-        amplitude = numpy.absolute(array).astype(numpy.single)
-        return numpy.square(amplitude)
-
-
 class PhaseInRadiansArrayComponent(DataArrayComponent):
 
     def __init__(self) -> None:
