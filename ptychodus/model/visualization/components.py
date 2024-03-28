@@ -29,7 +29,7 @@ class DataArrayComponent(ABC):
 class RealArrayComponent(DataArrayComponent):
 
     def __init__(self) -> None:
-        super().__init__('Real', isCyclic=False)
+        super().__init__('real', isCyclic=False)
 
     @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:
@@ -39,7 +39,7 @@ class RealArrayComponent(DataArrayComponent):
 class ImaginaryArrayComponent(DataArrayComponent):
 
     def __init__(self) -> None:
-        super().__init__('Imaginary', isCyclic=False)
+        super().__init__('imaginary', isCyclic=False)
 
     @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:
@@ -49,7 +49,7 @@ class ImaginaryArrayComponent(DataArrayComponent):
 class AmplitudeArrayComponent(DataArrayComponent):
 
     def __init__(self) -> None:
-        super().__init__('Amplitude', isCyclic=False)
+        super().__init__('amplitude', isCyclic=False)
 
     @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:
@@ -59,7 +59,7 @@ class AmplitudeArrayComponent(DataArrayComponent):
 class PhaseInRadiansArrayComponent(DataArrayComponent):
 
     def __init__(self) -> None:
-        super().__init__('Phase', isCyclic=True)
+        super().__init__('phase', isCyclic=True)
 
     @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:
@@ -69,7 +69,7 @@ class PhaseInRadiansArrayComponent(DataArrayComponent):
 class UnwrappedPhaseInRadiansArrayComponent(DataArrayComponent):
 
     def __init__(self) -> None:
-        super().__init__('Phase (Unwrapped)', isCyclic=False)
+        super().__init__('unwrapped_phase', isCyclic=False)
 
     @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:

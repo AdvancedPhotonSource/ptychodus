@@ -32,5 +32,6 @@ class Renderer(ParameterRepository):
         pass
 
     @abstractmethod
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
+    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
+               autoscaleColorAxis: bool) -> VisualizationProduct:
         pass
