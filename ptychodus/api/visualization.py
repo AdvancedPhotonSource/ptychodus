@@ -68,12 +68,11 @@ class Plot2D:
 class LineCut:
     distanceInMeters: Sequence[float]
     value: Sequence[float]
-    valueLabel: str
+    valueLabel: str  # FIXME remove
 
 
 @dataclass(frozen=True)
 class KernelDensityEstimate:
-    valueLabel: str
     valueLower: float
     valueUpper: float
     kde: gaussian_kde
@@ -98,6 +97,12 @@ class VisualizationProduct:
         self._rgba = rgba
         self._pixelWidthInMeters = pixelGeometry.widthInMeters
         self._pixelHeightInMeters = pixelGeometry.heightInMeters
+
+    def getValueLabel(self) -> str:
+        return self._valueLabel
+
+    def getImageRGBA(self) -> RealArrayType:
+        return self._rgba
 
     @staticmethod
     def _intersectBoundingBox(begin: float, end: float, n: int) -> Interval[float]:
@@ -152,7 +157,7 @@ class VisualizationProduct:
         alpha = alpha.union(yIntersections)
         return sorted(alpha)
 
-    def getValueAsString(self, x: float, y: float) -> str:  # FIXME use this
+    def getInfoText(self, x: float, y: float) -> str:
         ix = 0 if x < 0. else int(x)
         ix = min(ix, self._values.shape[-1])
         iy = 0 if y < 0. else int(y)
@@ -186,16 +191,19 @@ class VisualizationProduct:
 
         return LineCut(distances, values, self._valueLabel)
 
-    def estimateKernelDensity(self, box: Box2D) -> KernelDensityEstimate:  # FIXME use this
-        xbegin = 0  # FIXME from box.x
-        xend = self._values.shape[-1]  # FIXME from box.x + box.width
-        ybegin = 0  # FIXME from box.y
-        yend = self._values.shape[-2]  # FIXME from box.y + box.height
+    def estimateKernelDensity(self, box: Box2D) -> KernelDensityEstimate:
+        x_begin = int(box.x_begin)
+        x_end = int(box.x_end) + 1
+        y_begin = int(box.y_begin)
+        y_end = int(box.y_end) + 1
+
+        # FIXME clamp {xy}_begin, {xy}_end to data
+        # FIXME check complex values, multimodal probes, multilayer objects
 
         # FIXME Datapoints to estimate from. In case of univariate data this is a 1-D array,
         # FIXME otherwise a 2-D array with shape (# of dims, # of data).
-        values = self._values[..., ybegin:yend, xbegin:xend]
+        values = self._values[..., y_begin:y_end, x_begin:x_end]
         values = values.reshape(values.shape[0], -1) if values.ndim == 3 \
                 else values.reshape(-1)
         kde = gaussian_kde(values)
-        return KernelDensityEstimate(self._valueLabel, values.min(), values.max(), kde)
+        return KernelDensityEstimate(values.min(), values.max(), kde)

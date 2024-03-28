@@ -2,11 +2,14 @@ from __future__ import annotations
 from collections.abc import Iterator
 from decimal import Decimal
 from enum import auto, Enum
+import logging
+
+import numpy
 
 from PyQt5.QtCore import (pyqtSignal, Qt, QObject, QPoint, QPointF, QLineF, QRect, QRectF, QSize,
                           QSizeF)
-from PyQt5.QtGui import (QColor, QConicalGradient, QIcon, QLinearGradient, QPainter, QPen, QPixmap,
-                         QWheelEvent)
+from PyQt5.QtGui import (QColor, QConicalGradient, QIcon, QImage, QLinearGradient, QPainter, QPen,
+                         QPixmap, QWheelEvent)
 from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
                              QGraphicsLineItem, QGraphicsPixmapItem, QGraphicsRectItem,
                              QGraphicsScene, QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent,
@@ -17,8 +20,11 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from ..api.visualization import RealArrayType
+from ptychodus.api.visualization import RealArrayType, VisualizationProduct
+
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
+
+logger = logging.getLogger(__name__)
 
 
 class ImageDisplayRangeDialog(QDialog):
@@ -219,6 +225,7 @@ class ImageItem(QGraphicsPixmapItem):
         super().__init__()
         self._events = events
         self._statusBar = statusBar
+        self._product: VisualizationProduct | None = None
         self._mouseTool = ImageMouseTool.MOVE_TOOL
         self._lineItem = QGraphicsLineItem(self)
         self._lineItem.hide()
@@ -228,6 +235,25 @@ class ImageItem(QGraphicsPixmapItem):
         self.setTransformationMode(Qt.TransformationMode.FastTransformation)
         self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
         self.setAcceptHoverEvents(True)
+
+    def getProduct(self) -> VisualizationProduct | None:
+        return self._product
+
+    def setProduct(self, product: VisualizationProduct) -> None:
+        imageRGBAf = product.getImageRGBA()
+        # NOTE .copy() ensures imageRGBAi is not a view
+        imageRGBAi = numpy.multiply(imageRGBAf, 255).astype(numpy.uint8).copy()
+
+        try:
+            image = QImage(imageRGBAi.data, imageRGBAi.shape[1], imageRGBAi.shape[0],
+                           imageRGBAi.strides[0], QImage.Format.Format_RGBA8888)
+            pixmap = QPixmap.fromImage(image)
+        except Exception as exc:
+            logger.exception(exc)
+            pixmap = QPixmap()
+
+        self._product = product
+        self.setPixmap(pixmap)
 
     def setMouseTool(self, mouseTool: ImageMouseTool) -> None:
         self._mouseTool = mouseTool
@@ -247,8 +273,11 @@ class ImageItem(QGraphicsPixmapItem):
 
     def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
         pos = event.pos()
-        self._statusBar.showMessage(f'{pos.x():.1f}, {pos.y():.1f}')
-        # TODO display value
+
+        if self._product is not None:
+            infoText = self._product.getInfoText(pos.x(), pos.y())
+            self._statusBar.showMessage(infoText)
+
         super().hoverMoveEvent(event)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
@@ -364,6 +393,7 @@ class ImageWidget(QGraphicsView):
         imageItemEvents = ImageItemEvents()
         imageItem = ImageItem(imageItemEvents, statusBar)
         widget = cls(imageItem, parent)
+
         widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
@@ -500,9 +530,32 @@ class LineCutDialog(QDialog):
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> LineCutDialog:
-        title = 'Line-Cut Dialog'
         view = cls(parent)
-        view.setWindowTitle(title)
+        view.setWindowTitle('Line-Cut Dialog')
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.navigationToolbar)
+        layout.addWidget(view.figureCanvas)
+        view.setLayout(layout)
+
+        return view
+
+
+class HistogramDialog(QDialog):
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__(parent)
+        self.figure = Figure()
+        self.figureCanvas = FigureCanvasQTAgg(self.figure)
+        self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
+        self.axes = self.figure.add_subplot(111)
+        # FIXME add rectangle coordinates
+
+    @classmethod
+    def createInstance(cls, parent: QWidget | None = None) -> HistogramDialog:
+        view = cls(parent)
+        view.setWindowTitle('Histogram')
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -519,7 +572,7 @@ class ImageView(QWidget):
         super().__init__(parent)
         self.imageRibbon = ImageRibbon.createInstance()
         self.imageWidget = ImageWidget.createInstance(statusBar)
-        self.lineCutDialog = LineCutDialog.createInstance()
+        self.lineCutDialog = LineCutDialog.createInstance()  # FIXME remove
 
     @classmethod
     def createInstance(cls, statusBar: QStatusBar, parent: QWidget | None = None) -> ImageView:

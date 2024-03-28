@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon, QPixmap, QWheelEvent
+from PyQt5.QtGui import QIcon, QWheelEvent
 from PyQt5.QtWidgets import (QAbstractButton, QAction, QComboBox, QDialog, QDialogButtonBox,
                              QFormLayout, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout,
                              QLabel, QPushButton, QSlider, QSpinBox, QStatusBar, QToolBar,
                              QVBoxLayout, QWidget)
 
-from .image import ImageItem, ImageItemEvents
 from .widgets import DecimalLineEdit, LengthWidget
 
 
 class ProbePropagationCrossSectionView(QGroupBox):
 
-    def __init__(self, title: str, imageItem: ImageItem, parent: QWidget | None) -> None:
+    def __init__(self, title: str, parent: QWidget | None) -> None:
         super().__init__(title, parent)
-        self._imageItem = imageItem
         self.toolBar = QToolBar('Tools')
         self.homeAction = QAction(QIcon(':/icons/home'), 'Home')
         self.saveAction = QAction(QIcon(':/icons/save'), 'Save Image')
@@ -26,19 +24,13 @@ class ProbePropagationCrossSectionView(QGroupBox):
                        title: str,
                        statusBar: QStatusBar,
                        parent: QWidget | None = None) -> ProbePropagationCrossSectionView:
-        imageItemEvents = ImageItemEvents()
-        imageItem = ImageItem(imageItemEvents, statusBar)
-
-        view = cls(title, imageItem, parent)
+        view = cls(title, parent)
         view.setAlignment(Qt.AlignHCenter)
 
         view.toolBar.setFloatable(False)
         view.toolBar.setIconSize(QSize(32, 32))
         view.toolBar.addAction(view.homeAction)
         view.toolBar.addAction(view.saveAction)
-
-        view.graphicsView.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        view.graphicsView.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -47,19 +39,6 @@ class ProbePropagationCrossSectionView(QGroupBox):
         view.setLayout(layout)
 
         return view
-
-    def setPixmap(self, pixmap: QPixmap) -> None:
-        self._imageItem.setPixmap(pixmap)
-
-    def getPixmap(self) -> QPixmap:
-        return self._imageItem.pixmap()
-
-    def zoomToFit(self) -> None:
-        self._imageItem.setPos(0, 0)
-        scene = self.graphicsView.scene()
-        boundingRect = scene.itemsBoundingRect()
-        scene.setSceneRect(boundingRect)
-        self.graphicsView.fitInView(scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def wheelEvent(self, event: QWheelEvent) -> None:
         oldPosition = self.graphicsView.mapToScene(event.pos())

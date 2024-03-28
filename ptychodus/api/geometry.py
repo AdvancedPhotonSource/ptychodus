@@ -37,6 +37,22 @@ class Box2D:
     width: float
     height: float
 
+    @property
+    def x_begin(self) -> float:
+        return self.x
+
+    @property
+    def x_end(self) -> float:
+        return self.x + self.width
+
+    @property
+    def y_begin(self) -> float:
+        return self.y
+
+    @property
+    def y_end(self) -> float:
+        return self.y + self.height
+
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.x}, {self.y}, {self.width}, {self.height})'
 
