@@ -4,12 +4,12 @@ import logging
 from PyQt5.QtCore import QModelIndex, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
-from ...api.observer import SequenceObserver
+from ptychodus.api.observer import SequenceObserver
+
 from ...model.analysis import DichroicAnalyzer, FourierRingCorrelator
-from ...model.image import ImagePresenter
 from ...model.product import ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
-from ...view.image import ImageView
+from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
@@ -24,37 +24,35 @@ logger = logging.getLogger(__name__)
 
 class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
-    def __init__(self, repository: ObjectRepository, imagePresenter: ImagePresenter,
+    def __init__(self, repository: ObjectRepository, imageController: ImageController,
                  correlator: FourierRingCorrelator, dichroicAnalyzer: DichroicAnalyzer,
-                 dichroicImagePresenter: ImagePresenter, view: RepositoryTreeView,
-                 imageView: ImageView, statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
+                 dichroicVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
+                 statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
                  treeModel: ObjectTreeModel) -> None:
         super().__init__()
         self._repository = repository
-        self._imagePresenter = imagePresenter
+        self._imageController = imageController
         self._view = view
-        self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
         self._treeModel = treeModel
         self._editorFactory = ObjectEditorViewControllerFactory()
-        self._imageController = ImageController.createInstance(imagePresenter, imageView,
-                                                               fileDialogFactory)
+
         self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel, view)
         self._dichroicViewController = DichroicViewController(dichroicAnalyzer,
-                                                              dichroicImagePresenter,
+                                                              dichroicVisualizationEngine,
                                                               fileDialogFactory, treeModel,
                                                               statusBar, view)
 
     @classmethod
-    def createInstance(cls, repository: ObjectRepository, imagePresenter: ImagePresenter,
+    def createInstance(cls, repository: ObjectRepository, imageController: ImageController,
                        correlator: FourierRingCorrelator, dichroicAnalyzer: DichroicAnalyzer,
-                       dichroicImagePresenter: ImagePresenter, view: RepositoryTreeView,
-                       imageView: ImageView, statusBar: QStatusBar,
+                       dichroicVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
+                       statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ObjectTreeModel(repository)
-        controller = cls(repository, imagePresenter, correlator, dichroicAnalyzer,
-                         dichroicImagePresenter, view, imageView, statusBar, fileDialogFactory,
+        controller = cls(repository, imageController, correlator, dichroicAnalyzer,
+                         dichroicVisualizationEngine, view, statusBar, fileDialogFactory,
                          treeModel)
         repository.addObserver(controller)
 
@@ -193,7 +191,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            self._imagePresenter.clearArray()
+            self._imageController.clearArray()
         else:
             try:
                 item = self._repository[itemIndex]
@@ -203,7 +201,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 object_ = item.getObject()
                 array = object_.getLayer(current.row()) if current.parent().isValid() \
                         else object_.getLayersFlattened()
-                self._imagePresenter.setArray(array, object_.getPixelGeometry())
+                self._imageController.setArray(array, object_.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ObjectRepositoryItem) -> None:
         self._treeModel.insertItem(index, item)

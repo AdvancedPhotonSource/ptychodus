@@ -41,7 +41,7 @@ class ViewCore(QMainWindow):
         self.patternsAction = self.navigationToolBar.addAction(QIcon(':/icons/patterns'),
                                                                'Patterns')
         self.patternsView = PatternsView.createInstance()
-        self.patternsImageView = ImageView.createInstance(self.statusBar())
+        self.patternsImageView = ImageView.createInstance()
 
         self.productAction = self.navigationToolBar.addAction(QIcon(':/icons/products'),
                                                               'Products')
@@ -54,11 +54,11 @@ class ViewCore(QMainWindow):
 
         self.probeAction = self.navigationToolBar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probeView = RepositoryTreeView.createInstance()
-        self.probeImageView = ImageView.createInstance(self.statusBar())
+        self.probeImageView = ImageView.createInstance()
 
         self.objectAction = self.navigationToolBar.addAction(QIcon(':/icons/object'), 'Object')
         self.objectView = RepositoryTreeView.createInstance()
-        self.objectImageView = ImageView.createInstance(self.statusBar())
+        self.objectImageView = ImageView.createInstance()
 
         self.reconstructorAction = self.navigationToolBar.addAction(QIcon(':/icons/reconstructor'),
                                                                     'Reconstructor')

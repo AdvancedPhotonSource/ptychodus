@@ -7,6 +7,7 @@ from ..model import ModelCore
 from ..view import ViewCore
 from .automation import AutomationController
 from .data import FileDialogFactory
+from .image import ImageController
 from .memory import MemoryController
 from .object import ObjectController
 from .patterns import PatternsController
@@ -35,25 +36,35 @@ class ControllerCore:
                                                                      view.settingsParametersView,
                                                                      view.settingsEntryView,
                                                                      self._fileDialogFactory)
+        self._patternsImageController = ImageController.createInstance(
+            model.patternVisualizationEngine, view.patternsImageView, view.statusBar(),
+            self._fileDialogFactory)
         self._patternsController = PatternsController.createInstance(
             model.detectorPresenter, model.diffractionDatasetInputOutputPresenter,
             model.diffractionMetadataPresenter, model.diffractionDatasetPresenter,
-            model.patternPresenter, model.detectorImagePresenter, view.patternsView,
-            view.patternsImageView, self._fileDialogFactory)
+            model.patternPresenter, self._patternsImageController, view.patternsView,
+            self._fileDialogFactory)
         self._productController = ProductController.createInstance(model.productRepository,
                                                                    view.productView,
                                                                    self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepository, view.scanView,
                                                              view.scanPlotView,
                                                              self._fileDialogFactory)
+        self._probeImageController = ImageController.createInstance(model.probeVisualizationEngine,
+                                                                    view.probeImageView,
+                                                                    view.statusBar(),
+                                                                    self._fileDialogFactory)
         self._probeController = ProbeController.createInstance(
-            model.probeRepository, model.probeImagePresenter, model.probePropagator,
-            model.probePropagatorImagePresenter, view.probeView, view.probeImageView,
+            model.probeRepository, self._probeImageController,
+            model.probePropagator, model.probePropagatorVisualizationEngine, view.probeView,
             view.statusBar(), self._fileDialogFactory)
+        self._objectImageController = ImageController.createInstance(
+            model.objectVisualizationEngine, view.objectImageView, view.statusBar(),
+            self._fileDialogFactory)
         self._objectController = ObjectController.createInstance(
-            model.objectRepository, model.objectImagePresenter, model.fourierRingCorrelator,
-            model.dichroicAnalyzer, model.dichroicImagePresenter, view.objectView,
-            view.objectImageView, view.statusBar(), self._fileDialogFactory)
+            model.objectRepository, self._objectImageController, model.fourierRingCorrelator,
+            model.dichroicAnalyzer, model.dichroicVisualizationEngine, view.objectView,
+            view.statusBar(), self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,

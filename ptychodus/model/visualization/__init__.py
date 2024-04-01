@@ -1,5 +1,5 @@
-from .core import VisualizationCore
+from .core import VisualizationEngine
 
 __all__ = [
-    'VisualizationCore',
+    'VisualizationEngine',
 ]

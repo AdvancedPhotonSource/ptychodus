@@ -23,7 +23,7 @@ from .transformation import ScalarTransformationParameter
 logger = logging.getLogger(__name__)
 
 
-class VisualizationCore(Observable, Observer):
+class VisualizationEngine(Observable, Observer):
 
     def __init__(self, *, isComplex: bool) -> None:
         self._rendererChooser = PluginChooser[Renderer]()
@@ -82,14 +82,8 @@ class VisualizationCore(Observable, Observer):
     def setRenderer(self, value: str) -> None:
         self._rendererChooser.setCurrentPluginByName(value)
 
-    def variants(self) -> Iterator[str]:
-        return self._rendererPlugin.strategy.variants()
-
-    def getVariant(self) -> str:
-        return self._rendererPlugin.strategy.getVariant()
-
-    def setVariant(self, value: str) -> None:
-        return self._rendererPlugin.strategy.setVariant(value)
+    def isRendererCyclic(self) -> bool:
+        return self._rendererPlugin.strategy.isCyclic()
 
     def transformations(self) -> Iterator[str]:
         return self._transformation.choices()
@@ -99,6 +93,15 @@ class VisualizationCore(Observable, Observer):
 
     def setTransformation(self, value: str) -> None:
         self._transformation.setValue(value)
+
+    def variants(self) -> Iterator[str]:
+        return self._rendererPlugin.strategy.variants()
+
+    def getVariant(self) -> str:
+        return self._rendererPlugin.strategy.getVariant()
+
+    def setVariant(self, value: str) -> None:
+        return self._rendererPlugin.strategy.setVariant(value)
 
     def getMinDisplayValue(self) -> float:
         return self._colorAxis.lower.getValue()
@@ -112,14 +115,11 @@ class VisualizationCore(Observable, Observer):
     def setMaxDisplayValue(self, value: float) -> None:
         self._colorAxis.upper.setValue(value)
 
-    def render(self,
-               array: NumberArrayType,
-               pixelGeometry: PixelGeometry,
-               *,
-               autoscaleColorAxis: bool = False) -> VisualizationProduct:
-        return self._rendererPlugin.strategy.render(array,
-                                                    pixelGeometry,
-                                                    autoscaleColorAxis=autoscaleColorAxis)
+    def setDisplayValueRange(self, lower: float, upper: float) -> None:
+        self._colorAxis.setRange(lower, upper)
+
+    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
+        return self._rendererPlugin.strategy.render(array, pixelGeometry)
 
     @override
     def update(self, observable: Observable) -> None:

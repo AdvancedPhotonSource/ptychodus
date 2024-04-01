@@ -23,7 +23,6 @@ from ..api.settings import SettingsRegistry
 from ..api.state import StateDataRegistry
 from .analysis import AnalysisCore, DichroicAnalyzer, FourierRingCorrelator, ProbePropagator
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
-from .image import ImageCore, ImagePresenter
 from .memory import MemoryPresenter
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
                        DiffractionDatasetPresenter, DiffractionMetadataPresenter,
@@ -33,6 +32,7 @@ from .product import (ObjectRepository, ProbeRepository, ProductCore, ProductRep
 from .ptychonn import PtychoNNReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .tike import TikeReconstructorLibrary
+from .visualization import VisualizationEngine
 from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
                        WorkflowParametersPresenter, WorkflowStatusPresenter)
 
@@ -81,12 +81,9 @@ class ModelCore:
             self._pluginRegistry.objectFileReaders, self._pluginRegistry.objectFileWriters,
             self._pluginRegistry.productFileReaders, self._pluginRegistry.productFileWriters)
 
-        self._detectorImageCore = ImageCore(self._pluginRegistry.scalarTransformations,
-                                            isComplex=False)
-        self._probeImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
-                                         isComplex=True)
-        self._objectImageCore = ImageCore(self._pluginRegistry.scalarTransformations.copy(),
-                                          isComplex=True)
+        self.patternVisualizationEngine = VisualizationEngine(isComplex=False)
+        self.probeVisualizationEngine = VisualizationEngine(isComplex=True)
+        self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
 
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, isDeveloperModeEnabled)
@@ -101,8 +98,7 @@ class ModelCore:
                 self.ptychonnReconstructorLibrary,
             ],
         )
-        self._analysisCore = AnalysisCore(self._pluginRegistry.scalarTransformations.copy(),
-                                          self._productCore.probeRepository,
+        self._analysisCore = AnalysisCore(self._productCore.probeRepository,
                                           self._productCore.objectRepository)
         self._stateDataRegistry = StateDataRegistry(self._patternsCore)
         self._workflowCore = WorkflowCore(self._productCore.productRepository,
@@ -138,10 +134,6 @@ class ModelCore:
         self._automationCore.stop()
         self._workflowCore.stop()
         self._patternsCore.stop()
-
-    @property
-    def detectorImagePresenter(self) -> ImagePresenter:
-        return self._detectorImageCore.presenter
 
     @property
     def diffractionDatasetInputOutputPresenter(self) -> DiffractionDatasetInputOutputPresenter:
@@ -250,14 +242,6 @@ class ModelCore:
         return self._patternsCore.detectorPresenter
 
     @property
-    def probeImagePresenter(self) -> ImagePresenter:
-        return self._probeImageCore.presenter
-
-    @property
-    def objectImagePresenter(self) -> ImagePresenter:
-        return self._objectImageCore.presenter
-
-    @property
     def reconstructorPresenter(self) -> ReconstructorPresenter:
         return self._reconstructorCore.presenter
 
@@ -266,8 +250,8 @@ class ModelCore:
         return self._analysisCore.probePropagator
 
     @property
-    def probePropagatorImagePresenter(self) -> ImagePresenter:
-        return self._analysisCore.probePropagatorImageCore.presenter
+    def probePropagatorVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.probePropagatorVisualizationEngine
 
     @property
     def fourierRingCorrelator(self) -> FourierRingCorrelator:
@@ -278,8 +262,8 @@ class ModelCore:
         return self._analysisCore.dichroicAnalyzer
 
     @property
-    def dichroicImagePresenter(self) -> ImagePresenter:
-        return self._analysisCore.dichroicImageCore.presenter
+    def dichroicVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.dichroicVisualizationEngine
 
     @property
     def areWorkflowsSupported(self) -> bool:

@@ -1,15 +1,14 @@
 from __future__ import annotations
 import logging
 
-from PyQt5.QtCore import QItemSelection
+from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
-from ...api.observer import Observable, Observer
-from ...model.image import ImagePresenter
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
                                DiffractionDatasetPresenter, DiffractionMetadataPresenter,
                                DiffractionPatternPresenter)
-from ...view.image import ImageView
 from ...view.patterns import PatternsView
 from ..data import FileDialogFactory
 from ..image import ImageController
@@ -27,20 +26,17 @@ class PatternsController(Observer):
                  ioPresenter: DiffractionDatasetInputOutputPresenter,
                  metadataPresenter: DiffractionMetadataPresenter,
                  datasetPresenter: DiffractionDatasetPresenter,
-                 patternPresenter: DiffractionPatternPresenter, imagePresenter: ImagePresenter,
-                 view: PatternsView, imageView: ImageView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+                 patternPresenter: DiffractionPatternPresenter, imageController: ImageController,
+                 view: PatternsView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._detectorPresenter = detectorPresenter
         self._datasetPresenter = datasetPresenter
         self._ioPresenter = ioPresenter
-        self._imagePresenter = imagePresenter
+        self._imageController = imageController
         self._view = view
         self._fileDialogFactory = fileDialogFactory
         self._detectorController = DetectorController.createInstance(detectorPresenter,
                                                                      view.detectorView)
-        self._imageController = ImageController.createInstance(imagePresenter, imageView,
-                                                               fileDialogFactory)
         self._wizardController = OpenDatasetWizardController.createInstance(
             ioPresenter, metadataPresenter, datasetPresenter, patternPresenter,
             view.openDatasetWizard, fileDialogFactory)
@@ -52,14 +48,16 @@ class PatternsController(Observer):
                        metadataPresenter: DiffractionMetadataPresenter,
                        datasetPresenter: DiffractionDatasetPresenter,
                        patternPresenter: DiffractionPatternPresenter,
-                       imagePresenter: ImagePresenter, view: PatternsView, imageView: ImageView,
+                       imageController: ImageController, view: PatternsView,
                        fileDialogFactory: FileDialogFactory) -> PatternsController:
         controller = cls(detectorPresenter, ioPresenter, metadataPresenter, datasetPresenter,
-                         patternPresenter, imagePresenter, view, imageView, fileDialogFactory)
+                         patternPresenter, imageController, view, fileDialogFactory)
 
         view.treeView.setModel(controller._treeModel)
         view.treeView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        view.treeView.selectionModel().selectionChanged.connect(controller._updateView)
+        view.treeView.selectionModel().currentChanged.connect(controller._updateView)
+        controller._updateView(QModelIndex(), QModelIndex())
+
         view.buttonBox.openButton.clicked.connect(controller._wizardController.openDataset)
         view.buttonBox.saveButton.clicked.connect(controller._saveDataset)
         view.buttonBox.infoButton.clicked.connect(controller._openPatternsInfo)
@@ -71,16 +69,13 @@ class PatternsController(Observer):
 
         return controller
 
-    def _updateView(self, selected: QItemSelection, deselected: QItemSelection) -> None:
-        for index in deselected.indexes():
-            self._imagePresenter.clearArray()
-            break
-
-        for index in selected.indexes():
-            node = index.internalPointer()
+    def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
+        if current.isValid():
+            node = current.internalPointer()
             pixelGeometry = self._detectorPresenter.getPixelGeometry()
-            self._imagePresenter.setArray(node.data, pixelGeometry)
-            break
+            self._imageController.setArray(node.data, pixelGeometry)
+        else:
+            self._imageController.clearArray()
 
     def _saveDataset(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(

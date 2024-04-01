@@ -1,5 +1,4 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, TypeAlias
@@ -14,19 +13,6 @@ from .patterns import PixelGeometry
 RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 NumberTypes: TypeAlias = numpy.integer[Any] | numpy.floating[Any] | numpy.complexfloating[Any, Any]
 NumberArrayType: TypeAlias = numpy.typing.NDArray[NumberTypes]
-
-
-class ScalarTransformation(ABC):  # FIXME remove
-    '''interface for real-valued transformations of a real array'''
-
-    @abstractmethod
-    def decorateText(self, text: str) -> str:
-        pass
-
-    @abstractmethod
-    def __call__(self, array: RealArrayType) -> RealArrayType:
-        '''returns the transformed input array'''
-        pass
 
 
 @dataclass(frozen=True)
@@ -68,7 +54,6 @@ class Plot2D:
 class LineCut:
     distanceInMeters: Sequence[float]
     value: Sequence[float]
-    valueLabel: str  # FIXME remove
 
 
 @dataclass(frozen=True)
@@ -84,12 +69,16 @@ class VisualizationProduct:
     def __init__(self, valueLabel: str, values: NumberArrayType, rgba: RealArrayType,
                  pixelGeometry: PixelGeometry) -> None:
         if values.ndim != 2:
-            raise ValueError('Values must be a 2-dimensional ndarray.')
+            raise ValueError(f'Values must be a 2-dimensional ndarray (actual={values.ndim}).')
 
         if rgba.ndim != 3:
-            raise ValueError('RGBA must be a 3-dimensional ndarray.')
+            raise ValueError(f'RGBA must be a 3-dimensional ndarray (actual={rgba.ndim}).')
 
-        # FIXME validate array shapes
+        if rgba.shape[2] != 4:
+            raise ValueError(f'RGBA final dimension must have length=4 (actual={rgba.shape[2]}).')
+
+        if values.shape[0] != rgba.shape[0] or values.shape[1] != rgba.shape[1]:
+            raise ValueError(f'Shape mismatch (values={values.shape} and rgba={rgba.shape}).')
 
         self._valueLabel = valueLabel
         self._values = numpy.stack((numpy.absolute(values), numpy.angle(values))) \
@@ -189,7 +178,7 @@ class VisualizationProduct:
             distances.append(alpha * lineLength)
             values.append(value)
 
-        return LineCut(distances, values, self._valueLabel)
+        return LineCut(distances, values)
 
     def estimateKernelDensity(self, box: Box2D) -> KernelDensityEstimate:
         x_begin = int(box.x_begin)

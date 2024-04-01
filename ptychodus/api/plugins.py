@@ -14,7 +14,6 @@ from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from .scan import ScanFileReader, ScanFileWriter
-from .visualization import ScalarTransformation
 
 __all__ = [
     'PluginChooser',
@@ -100,7 +99,6 @@ class PluginRegistry:
     def __init__(self) -> None:
         self.diffractionFileReaders = PluginChooser[DiffractionFileReader]()
         self.diffractionFileWriters = PluginChooser[DiffractionFileWriter]()
-        self.scalarTransformations = PluginChooser[ScalarTransformation]()
         self.scanFileReaders = PluginChooser[ScanFileReader]()
         self.scanFileWriters = PluginChooser[ScanFileWriter]()
         self.fresnelZonePlates = PluginChooser[FresnelZonePlate]()

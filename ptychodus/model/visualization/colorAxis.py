@@ -15,6 +15,11 @@ class ColorAxis(ParameterRepository):
         self.lower = self._registerRealParameter('lower', 0.)
         self.upper = self._registerRealParameter('upper', 1.)
 
+    def setRange(self, lower: float, upper: float):
+        self.lower.setValue(lower, notify=False)
+        self.upper.setValue(upper, notify=False)
+        self.notifyObservers()
+
     def setToDataRange(self, array: RealArrayType) -> None:
         if array.size > 0:
             lower = array.min()

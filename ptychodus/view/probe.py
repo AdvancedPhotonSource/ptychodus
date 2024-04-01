@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon, QWheelEvent
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QAbstractButton, QAction, QComboBox, QDialog, QDialogButtonBox,
-                             QFormLayout, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout,
-                             QLabel, QPushButton, QSlider, QSpinBox, QStatusBar, QToolBar,
-                             QVBoxLayout, QWidget)
+                             QFormLayout, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
+                             QSlider, QSpinBox, QToolBar, QVBoxLayout, QWidget)
 
+from .visualization import VisualizationView
 from .widgets import DecimalLineEdit, LengthWidget
 
 
@@ -17,12 +17,11 @@ class ProbePropagationCrossSectionView(QGroupBox):
         self.toolBar = QToolBar('Tools')
         self.homeAction = QAction(QIcon(':/icons/home'), 'Home')
         self.saveAction = QAction(QIcon(':/icons/save'), 'Save Image')
-        self.graphicsView = QGraphicsView()
+        self.graphicsView = VisualizationView()
 
     @classmethod
     def createInstance(cls,
                        title: str,
-                       statusBar: QStatusBar,
                        parent: QWidget | None = None) -> ProbePropagationCrossSectionView:
         view = cls(title, parent)
         view.setAlignment(Qt.AlignHCenter)
@@ -39,18 +38,6 @@ class ProbePropagationCrossSectionView(QGroupBox):
         view.setLayout(layout)
 
         return view
-
-    def wheelEvent(self, event: QWheelEvent) -> None:
-        oldPosition = self.graphicsView.mapToScene(event.pos())
-
-        zoomBase = 1.25
-        zoom = zoomBase if event.angleDelta().y() > 0 else 1. / zoomBase
-        self.graphicsView.scale(zoom, zoom)
-
-        newPosition = self.graphicsView.mapToScene(event.pos())
-
-        deltaPosition = newPosition - oldPosition
-        self.graphicsView.translate(deltaPosition.x(), deltaPosition.y())
 
 
 class DisplayRangeWidget(QWidget):
@@ -122,12 +109,12 @@ class ProbePropagationParametersView(QGroupBox):
 
 class ProbePropagationDialog(QDialog):
 
-    def __init__(self, statusBar: QStatusBar, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.xyView = ProbePropagationCrossSectionView.createInstance('XY Plane', statusBar)
-        self.zxView = ProbePropagationCrossSectionView.createInstance('ZX Plane', statusBar)
+        self.xyView = ProbePropagationCrossSectionView.createInstance('XY Plane')
+        self.zxView = ProbePropagationCrossSectionView.createInstance('ZX Plane')
         self.parametersView = ProbePropagationParametersView.createInstance('Parameters')
-        self.zyView = ProbePropagationCrossSectionView.createInstance('ZY Plane', statusBar)
+        self.zyView = ProbePropagationCrossSectionView.createInstance('ZY Plane')
         self.propagateButton = QPushButton('Propagate')
         self.saveButton = QPushButton('Save')
         self.coordinateSlider = QSlider(Qt.Orientation.Horizontal)
@@ -135,10 +122,8 @@ class ProbePropagationDialog(QDialog):
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls,
-                       statusBar: QStatusBar,
-                       parent: QWidget | None = None) -> ProbePropagationDialog:
-        view = cls(statusBar, parent)
+    def createInstance(cls, parent: QWidget | None = None) -> ProbePropagationDialog:
+        view = cls(parent)
 
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)

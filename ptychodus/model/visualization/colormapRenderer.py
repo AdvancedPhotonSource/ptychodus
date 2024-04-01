@@ -46,14 +46,13 @@ class ColormapRenderer(Renderer):
         return self._component.isCyclic
 
     @override
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
-               autoscaleColorAxis: bool) -> VisualizationProduct:
+    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
         values = self._component.calculate(array)
 
         transform = self._transformation.getPlugin()
         valuesTransformed = transform(values)
 
-        if autoscaleColorAxis:
+        if False:  # FIXME autoscaleColorAxis:
             self._colorAxis.setToDataRange(valuesTransformed)
 
         norm = Normalize(vmin=self._colorAxis.lower.getValue(),

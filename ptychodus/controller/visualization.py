@@ -7,11 +7,12 @@ from PyQt5.QtCore import Qt, QLineF, QRectF
 from PyQt5.QtWidgets import QGraphicsScene, QGraphicsView, QStatusBar
 
 from ptychodus.api.geometry import Box2D, Line2D, Point2D
-from ptychodus.api.visualization import VisualizationProduct
+from ptychodus.api.patterns import PixelGeometry
+from ptychodus.api.visualization import NumberArrayType
 
-from ..model.visualization import VisualizationCore
-from ..view.image import (HistogramDialog, ImageItem, ImageItemEvents, ImageMouseTool,
-                          LineCutDialog)
+from ..model.visualization import VisualizationEngine
+from ..view.visualization import (HistogramDialog, ImageItem, ImageItemEvents, ImageMouseTool,
+                                  LineCutDialog)
 from .data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
@@ -20,9 +21,9 @@ logger = logging.getLogger(__name__)
 class VisualizationController:
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
-    def __init__(self, model: VisualizationCore, view: QGraphicsView, item: ImageItem,
+    def __init__(self, engine: VisualizationEngine, view: QGraphicsView, item: ImageItem,
                  statusBar: QStatusBar, fileDialogFactory: FileDialogFactory) -> None:
-        self._model = model
+        self._engine = engine
         self._view = view
         self._item = ImageItem(ImageItemEvents(), statusBar)
         self._statusBar = statusBar
@@ -31,11 +32,14 @@ class VisualizationController:
         self._histogramDialog = HistogramDialog.createInstance(view)
 
     @classmethod
-    def createInstance(cls, model: VisualizationCore, view: QGraphicsView, statusBar: QStatusBar,
+    def createInstance(cls, engine: VisualizationEngine, view: QGraphicsView,
+                       statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> VisualizationController:
         itemEvents = ImageItemEvents()
         item = ImageItem(itemEvents, statusBar)
-        controller = cls(model, view, item, statusBar, fileDialogFactory)
+        controller = cls(engine, view, item, statusBar, fileDialogFactory)
+        itemEvents.lineCutFinished.connect(controller._analyzeLineCut)
+        itemEvents.rectangleFinished.connect(controller._analyzeRegion)
 
         scene = QGraphicsScene()
         scene.addItem(item)
@@ -44,13 +48,14 @@ class VisualizationController:
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-        # TODO itemEvents.rectangleFinished.connect(widget.rectangleFinished)
-        # TODO itemEvents.lineCutFinished.connect(widget.lineCutFinished)
-
         return controller
 
-    def setProduct(self, product: VisualizationProduct) -> None:
+    def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
+        product = self._engine.render(array, pixelGeometry)
         self._item.setProduct(product)
+
+    def clearArray(self) -> None:
+        self._item.clearProduct()
 
     def setMouseTool(self, mouseTool: ImageMouseTool) -> None:
         self._item.setMouseTool(mouseTool)
@@ -63,7 +68,7 @@ class VisualizationController:
             pixmap = self._item.pixmap()
             pixmap.save(str(filePath))
 
-    def analyzeLineCut(self, line: QLineF) -> None:
+    def _analyzeLineCut(self, line: QLineF) -> None:
         p1 = Point2D(line.x1(), line.y1())
         p2 = Point2D(line.x2(), line.y2())
         line2D = Line2D(p1, p2)
@@ -86,7 +91,7 @@ class VisualizationController:
         self._lineCutDialog.figureCanvas.draw()
         self._lineCutDialog.open()
 
-    def analyzeRegion(self, rect: QRectF) -> None:
+    def _analyzeRegion(self, rect: QRectF) -> None:
         box = Box2D(
             x=rect.x(),
             y=rect.y(),

@@ -48,15 +48,14 @@ class CylindricalColorModelRenderer(Renderer):
         return True
 
     @override
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
-               autoscaleColorAxis: bool) -> VisualizationProduct:
+    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
         amplitude = self._amplitudeComponent.calculate(array)
         phaseInRadians = self._phaseComponent.calculate(array)
 
         transform = self._transformation.getPlugin()
         amplitudeTransformed = transform(amplitude)
 
-        if autoscaleColorAxis:
+        if False:  # FIXME autoscaleColorAxis:
             self._colorAxis.setToDataRange(amplitudeTransformed)
 
         norm = Normalize(vmin=self._colorAxis.lower.getValue(),

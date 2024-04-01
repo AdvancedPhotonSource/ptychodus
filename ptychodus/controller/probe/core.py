@@ -4,12 +4,12 @@ import logging
 from PyQt5.QtCore import QModelIndex, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
-from ...api.observer import SequenceObserver
+from ptychodus.api.observer import SequenceObserver
+
 from ...model.analysis import ProbePropagator
-from ...model.image import ImagePresenter
 from ...model.product import ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
-from ...view.image import ImageView
+from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
@@ -23,32 +23,31 @@ logger = logging.getLogger(__name__)
 
 class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
-    def __init__(self, repository: ProbeRepository, imagePresenter: ImagePresenter,
-                 propagator: ProbePropagator, propagatorImagePresenter: ImagePresenter,
-                 view: RepositoryTreeView, imageView: ImageView, statusBar: QStatusBar,
+    def __init__(self, repository: ProbeRepository, imageController: ImageController,
+                 propagator: ProbePropagator, propagatorVisualizationEngine: VisualizationEngine,
+                 view: RepositoryTreeView, statusBar: QStatusBar,
                  fileDialogFactory: FileDialogFactory, treeModel: ProbeTreeModel) -> None:
         super().__init__()
         self._repository = repository
-        self._imagePresenter = imagePresenter
+        self._imageController = imageController
         self._view = view
-        self._imageView = imageView
         self._fileDialogFactory = fileDialogFactory
         self._treeModel = treeModel
         self._editorFactory = ProbeEditorViewControllerFactory()
-        self._imageController = ImageController.createInstance(imagePresenter, imageView,
-                                                               fileDialogFactory)
+
         self._propagationViewController = ProbePropagationViewController(
-            propagator, propagatorImagePresenter, fileDialogFactory, statusBar, view)
+            propagator, propagatorVisualizationEngine, fileDialogFactory, statusBar, view)
 
     @classmethod
-    def createInstance(cls, repository: ProbeRepository, imagePresenter: ImagePresenter,
-                       propagator: ProbePropagator, propagatorImagePresenter: ImagePresenter,
-                       view: RepositoryTreeView, imageView: ImageView, statusBar: QStatusBar,
+    def createInstance(cls, repository: ProbeRepository, imageController: ImageController,
+                       propagator: ProbePropagator,
+                       propagatorVisualizationEngine: VisualizationEngine,
+                       view: RepositoryTreeView, statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ProbeTreeModel(repository)
-        controller = cls(repository, imagePresenter, propagator, propagatorImagePresenter, view,
-                         imageView, statusBar, fileDialogFactory, treeModel)
+        controller = cls(repository, imageController, propagator, propagatorVisualizationEngine,
+                         view, statusBar, fileDialogFactory, treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -177,7 +176,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            self._imagePresenter.clearArray()
+            self._imageController.clearArray()
         else:
             try:
                 item = self._repository[itemIndex]
@@ -187,7 +186,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 probe = item.getProbe()
                 array = probe.getMode(current.row()) if current.parent().isValid() \
                         else probe.getModesFlattened()
-                self._imagePresenter.setArray(array, probe.getPixelGeometry())
+                self._imageController.setArray(array, probe.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ProbeRepositoryItem) -> None:
         self._treeModel.insertItem(index, item)
