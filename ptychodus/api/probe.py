@@ -8,7 +8,7 @@ from typing import Any, TypeAlias
 import numpy
 import numpy.typing
 
-from .patterns import ImageExtent, PixelGeometry
+from .geometry import ImageExtent, PixelGeometry
 
 ProbeArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 

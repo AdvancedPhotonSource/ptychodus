@@ -83,6 +83,8 @@ class ViewCore(QMainWindow):
         logger.info(f'Qt {QT_VERSION_STR}')
 
         view = cls(parent)
+        view.setWindowIcon(QIcon(':/icons/ptychodus'))
+
         view.navigationToolBar.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
         view.addToolBar(Qt.ToolBarArea.LeftToolBarArea, view.navigationToolBar)
         view.navigationToolBar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)

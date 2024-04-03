@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Iterator
-from decimal import Decimal
 
 from PyQt5.QtCore import Qt, QPoint, QRect, QRectF, QSize
 from PyQt5.QtGui import QColor, QConicalGradient, QIcon, QLinearGradient, QPainter, QPen
@@ -21,16 +20,6 @@ class ImageDisplayRangeDialog(QDialog):
         self.buttonBox = QDialogButtonBox()
         self.minValueLineEdit = DecimalLineEdit.createInstance()
         self.maxValueLineEdit = DecimalLineEdit.createInstance()
-
-    def setMinAndMaxValues(self, minValue: Decimal, maxValue: Decimal) -> None:
-        self.minValueLineEdit.setValue(minValue)
-        self.maxValueLineEdit.setValue(maxValue)
-
-    def minValue(self) -> Decimal:
-        return self.minValueLineEdit.getValue()
-
-    def maxValue(self) -> Decimal:
-        return self.maxValueLineEdit.getValue()
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ImageDisplayRangeDialog:

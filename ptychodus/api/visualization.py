@@ -7,8 +7,7 @@ from scipy.stats import gaussian_kde
 import numpy
 import numpy.typing
 
-from .geometry import Box2D, Interval, Line2D
-from .patterns import PixelGeometry
+from .geometry import Box2D, Interval, Line2D, PixelGeometry
 
 RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 NumberTypes: TypeAlias = numpy.integer[Any] | numpy.floating[Any] | numpy.complexfloating[Any, Any]
@@ -53,7 +52,7 @@ class Plot2D:
 @dataclass(frozen=True)
 class LineCut:
     distanceInMeters: Sequence[float]
-    value: Sequence[float]
+    value: Sequence[float | complex]
 
 
 @dataclass(frozen=True)
@@ -81,8 +80,7 @@ class VisualizationProduct:
             raise ValueError(f'Shape mismatch (values={values.shape} and rgba={rgba.shape}).')
 
         self._valueLabel = valueLabel
-        self._values = numpy.stack((numpy.absolute(values), numpy.angle(values))) \
-                if numpy.iscomplexobj(values) else values
+        self._values = values
         self._rgba = rgba
         self._pixelWidthInMeters = pixelGeometry.widthInMeters
         self._pixelHeightInMeters = pixelGeometry.heightInMeters
@@ -90,8 +88,17 @@ class VisualizationProduct:
     def getValueLabel(self) -> str:
         return self._valueLabel
 
+    def getValues(self) -> NumberArrayType:
+        return self._values
+
     def getImageRGBA(self) -> RealArrayType:
         return self._rgba
+
+    def getPixelGeometry(self) -> PixelGeometry:
+        return PixelGeometry(
+            widthInMeters=self._pixelWidthInMeters,
+            heightInMeters=self._pixelHeightInMeters,
+        )
 
     @staticmethod
     def _intersectBoundingBox(begin: float, end: float, n: int) -> Interval[float]:
@@ -151,13 +158,13 @@ class VisualizationProduct:
         ix = min(ix, self._values.shape[-1])
         iy = 0 if y < 0. else int(y)
         iy = min(iy, self._values.shape[-2])
+        value = self._values[iy, ix]
 
-        if self._values.ndim == 3:
-            amplitude = self._values[0, iy, ix]
-            phase = self._values[1, iy, ix]
+        if numpy.iscomplex(value):
+            amplitude = numpy.absolute(value)
+            phase = numpy.angle(value)
             return f'{x=:.1f} {y=:.1f} {amplitude=:6g} {phase=:6g}'
 
-        value = self._values[iy, ix]
         return f'{x=:.1f} {y=:.1f} {value=:6g}'
 
     def getLineCut(self, line: Line2D) -> LineCut:
@@ -191,7 +198,7 @@ class VisualizationProduct:
 
         # FIXME Datapoints to estimate from. In case of univariate data this is a 1-D array,
         # FIXME otherwise a 2-D array with shape (# of dims, # of data).
-        values = self._values[..., y_begin:y_end, x_begin:x_end]
+        values = self._values[y_begin:y_end, x_begin:x_end]
         values = values.reshape(values.shape[0], -1) if values.ndim == 3 \
                 else values.reshape(-1)
         kde = gaussian_kde(values)

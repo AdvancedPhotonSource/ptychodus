@@ -5,16 +5,17 @@ from pathlib import Path
 from typing import TypeAlias
 import logging
 
-from ptychonn import ReconSmallModel, Tester, Trainer
 import numpy
 import numpy.typing
 
-from ...api.geometry import Point2D
-from ...api.object import ObjectArrayType
-from ...api.patterns import ImageExtent
-from ...api.product import Product
-from ...api.reconstructor import (ReconstructInput, ReconstructOutput, TrainableReconstructor,
-                                  TrainOutput)
+from ptychonn import ReconSmallModel, Tester, Trainer
+
+from ptychodus.api.geometry import ImageExtent, Point2D
+from ptychodus.api.object import ObjectArrayType
+from ptychodus.api.product import Product
+from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
+                                         TrainableReconstructor, TrainOutput)
+
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 

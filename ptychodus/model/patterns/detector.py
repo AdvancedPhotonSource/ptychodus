@@ -2,10 +2,9 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Final
 
-from ...api.geometry import Interval
-from ...api.observer import Observable, Observer
-from ...api.patterns import ImageExtent, PixelGeometry
-from ...api.settings import SettingsRegistry, SettingsGroup
+from ptychodus.api.geometry import ImageExtent, Interval, PixelGeometry
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry, SettingsGroup
 
 
 class Detector(Observable, Observer):

@@ -1,6 +1,5 @@
-from ptychodus.api.geometry import Point2D
+from ptychodus.api.geometry import ImageExtent, Point2D
 from ptychodus.api.object import Object, ObjectInterpolator
-from ptychodus.api.patterns import ImageExtent
 
 
 class ObjectLinearInterpolator(ObjectInterpolator):

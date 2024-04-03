@@ -1,8 +1,8 @@
 from abc import abstractmethod
 from collections.abc import Iterator
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.parametric import ParameterRepository
-from ptychodus.api.patterns import PixelGeometry
 from ptychodus.api.visualization import NumberArrayType, VisualizationProduct
 
 

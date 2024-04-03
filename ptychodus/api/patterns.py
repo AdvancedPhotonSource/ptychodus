@@ -9,49 +9,12 @@ from typing import overload, Any, TypeAlias
 import numpy
 import numpy.typing
 
+from .geometry import ImageExtent, PixelGeometry
 from .observer import Observable
 from .tree import SimpleTreeNode
 
 DiffractionPatternArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 DiffractionPatternIndexes: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
-
-
-@dataclass(frozen=True)
-class PixelGeometry:
-    widthInMeters: float
-    heightInMeters: float
-
-    @classmethod
-    def createNull(cls) -> PixelGeometry:
-        return cls(0., 0.)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})'
-
-
-@dataclass(frozen=True)
-class ImageExtent:
-    widthInPixels: int
-    heightInPixels: int
-
-    @property
-    def size(self) -> int:
-        '''returns the number of pixels in the image'''
-        return self.widthInPixels * self.heightInPixels
-
-    @property
-    def shape(self) -> tuple[int, int]:
-        '''returns the image shape (heightInPixels, widthInPixels) tuple'''
-        return self.heightInPixels, self.widthInPixels
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, ImageExtent):
-            return (self.shape == other.shape)
-
-        return False
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.widthInPixels}, {self.heightInPixels})'
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from typing import override
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
-from ptychodus.api.patterns import PixelGeometry
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.visualization import NumberArrayType, VisualizationProduct
 
 from .colorAxis import ColorAxis

@@ -8,10 +8,13 @@ import threading
 import numpy
 import numpy.typing
 
-from ...api.patterns import (DiffractionDataset, DiffractionMetadata, DiffractionPatternArray,
-                             DiffractionPatternArrayType, DiffractionPatternIndexes,
-                             DiffractionPatternState, ImageExtent, SimpleDiffractionPatternArray)
-from ...api.tree import SimpleTreeNode
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.patterns import (DiffractionDataset, DiffractionMetadata,
+                                    DiffractionPatternArray, DiffractionPatternArrayType,
+                                    DiffractionPatternIndexes, DiffractionPatternState,
+                                    SimpleDiffractionPatternArray)
+from ptychodus.api.tree import SimpleTreeNode
+
 from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
 from .sizer import PatternSizer
 

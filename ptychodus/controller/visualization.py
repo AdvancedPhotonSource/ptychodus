@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import override
 import logging
 
 import numpy
@@ -6,8 +7,8 @@ import numpy
 from PyQt5.QtCore import Qt, QLineF, QRectF
 from PyQt5.QtWidgets import QGraphicsScene, QGraphicsView, QStatusBar
 
-from ptychodus.api.geometry import Box2D, Line2D, Point2D
-from ptychodus.api.patterns import PixelGeometry
+from ptychodus.api.geometry import Box2D, Line2D, PixelGeometry, Point2D
+from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.visualization import NumberArrayType
 
 from ..model.visualization import VisualizationEngine
@@ -18,14 +19,15 @@ from .data import FileDialogFactory
 logger = logging.getLogger(__name__)
 
 
-class VisualizationController:
+class VisualizationController(Observer):
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
     def __init__(self, engine: VisualizationEngine, view: QGraphicsView, item: ImageItem,
                  statusBar: QStatusBar, fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._engine = engine
         self._view = view
-        self._item = ImageItem(ImageItemEvents(), statusBar)
+        self._item = item
         self._statusBar = statusBar
         self._fileDialogFactory = fileDialogFactory
         self._lineCutDialog = LineCutDialog.createInstance(view)
@@ -38,6 +40,8 @@ class VisualizationController:
         itemEvents = ImageItemEvents()
         item = ImageItem(itemEvents, statusBar)
         controller = cls(engine, view, item, statusBar, fileDialogFactory)
+        engine.addObserver(controller)
+
         itemEvents.lineCutFinished.connect(controller._analyzeLineCut)
         itemEvents.rectangleFinished.connect(controller._analyzeRegion)
 
@@ -129,3 +133,11 @@ class VisualizationController:
         boundingRect = scene.itemsBoundingRect()
         scene.setSceneRect(boundingRect)
         self._view.fitInView(scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+
+    def _rerenderImage(self) -> None:
+        print('RE-RENDER!')  # FIXME !!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    @override
+    def update(self, observable: Observable) -> None:
+        if observable is self._engine:
+            self._rerenderImage()

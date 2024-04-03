@@ -1,11 +1,12 @@
 from __future__ import annotations
+from decimal import Decimal
 import logging
 
 from PyQt5.QtCore import QStringListModel
 from PyQt5.QtWidgets import QButtonGroup, QDialog, QStatusBar
 
+from ptychodus.api.geometry import Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.patterns import PixelGeometry
 from ptychodus.api.visualization import NumberArrayType
 
 from ..model.visualization import VisualizationEngine
@@ -135,22 +136,30 @@ class ImageDataRangeController(Observer):
         return controller
 
     def _autoDisplayRange(self) -> None:
-        pass  # FIXME set display range to data range
+        # FIXME set display range to data range
+        # FIXME self._displayRangeDialog.minValueLineEdit.setValue(lowerLimit)
+        # FIXME self._displayRangeDialog.maxValueLineEdit.setValue(upperLimit)
+        pass
 
     def _finishEditingDisplayRange(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
-            lower = float(self._displayRangeDialog.minValue())
-            upper = float(self._displayRangeDialog.maxValue())
+            lower = float(self._displayRangeDialog.minValueLineEdit.getValue())
+            upper = float(self._displayRangeDialog.maxValueLineEdit.getValue())
             self._engine.setDisplayValueRange(lower, upper)
 
     def _syncModelToView(self) -> None:
-        minDisplayValue = self._engine.getMinDisplayValue()
-        maxDisplayValue = self._engine.getMaxDisplayValue()
+        minDisplayValue = Decimal(repr(self._engine.getMinDisplayValue()))
+        maxDisplayValue = Decimal(repr(self._engine.getMaxDisplayValue()))
 
-        # FIXME self._view.minDisplayValueSlider.setValueAndRange(Decimal(repr(minDisplayValue)), displayRangeLimits)
-        # FIXME self._view.maxDisplayValueSlider.setValueAndRange(Decimal(repr(maxDisplayValue)), displayRangeLimits)
-        # FIXME self._displayRangeDialog.setMinAndMaxValues(displayRangeLimits.lower, displayRangeLimits.upper)
-        self._imageWidget.setColorLegendRange(minDisplayValue, maxDisplayValue)
+        lowerLimit = min(self._displayRangeDialog.minValueLineEdit.getValue(), minDisplayValue)
+        upperLimit = max(self._displayRangeDialog.maxValueLineEdit.getValue(), maxDisplayValue)
+        displayRangeLimits = Interval[Decimal](lowerLimit, upperLimit)
+
+        self._view.minDisplayValueSlider.setValueAndRange(minDisplayValue, displayRangeLimits)
+        self._view.maxDisplayValueSlider.setValueAndRange(maxDisplayValue, displayRangeLimits)
+        self._displayRangeDialog.minValueLineEdit.setValue(lowerLimit)
+        self._displayRangeDialog.maxValueLineEdit.setValue(upperLimit)
+        self._imageWidget.setColorLegendRange(float(minDisplayValue), float(maxDisplayValue))
 
         # FIXME xArray = numpy.linspace(0., 1., 256)
         # FIXME rgbaArray = self._engine.getColorSamples(xArray)

@@ -4,8 +4,9 @@ import logging
 
 import numpy
 
-from ...api.object import ObjectArrayType
-from ...api.patterns import PixelGeometry
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.object import ObjectArrayType
+
 from ..product import ObjectRepository
 
 logger = logging.getLogger(__name__)

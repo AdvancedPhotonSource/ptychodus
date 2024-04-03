@@ -3,9 +3,10 @@ import logging
 
 import numpy
 
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader,
                                     DiffractionFileWriter, DiffractionMetadata,
-                                    DiffractionPatternState, ImageExtent, SimpleDiffractionDataset,
+                                    DiffractionPatternState, SimpleDiffractionDataset,
                                     SimpleDiffractionPatternArray)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode

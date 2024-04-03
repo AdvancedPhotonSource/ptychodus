@@ -3,9 +3,11 @@ import logging
 
 import h5py
 
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                    ImageExtent, PixelGeometry, SimpleDiffractionDataset)
+                                    SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
+
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)

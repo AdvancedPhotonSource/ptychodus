@@ -68,6 +68,7 @@ class ImageItem(QGraphicsPixmapItem):
         self.setPixmap(pixmap)
 
     def clearProduct(self) -> None:  # FIXME test and verify
+        print('clearProduct!')  # FIXME
         self._product = None
         self.setPixmap(QPixmap())
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from ...api.geometry import Interval
-from ...api.observer import Observable, Observer
-from ...api.patterns import DiffractionPatternArrayType, ImageExtent
+from ptychodus.api.geometry import ImageExtent, Interval
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.patterns import DiffractionPatternArrayType
+
 from .detector import Detector
 from .settings import DiffractionPatternSettings
 

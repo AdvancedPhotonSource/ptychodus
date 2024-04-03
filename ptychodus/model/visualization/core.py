@@ -3,8 +3,8 @@ from collections.abc import Iterator
 from typing import override
 import logging
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.patterns import PixelGeometry
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.visualization import NumberArrayType, VisualizationProduct
 
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class VisualizationEngine(Observable, Observer):
 
     def __init__(self, *, isComplex: bool) -> None:
+        super().__init__()
         self._rendererChooser = PluginChooser[Renderer]()
         self._transformation = ScalarTransformationParameter()
         self._colorAxis = ColorAxis()
@@ -69,6 +70,7 @@ class VisualizationEngine(Observable, Observer):
                 displayName='Complex',
             )
 
+        self._rendererChooser.addObserver(self)
         self._rendererPlugin = self._rendererChooser.currentPlugin
         self._rendererPlugin.strategy.addObserver(self)
 

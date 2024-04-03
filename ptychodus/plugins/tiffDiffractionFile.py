@@ -7,9 +7,10 @@ import sys
 from tifffile import TiffFile
 import numpy
 
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
                                     DiffractionPatternArray, DiffractionPatternArrayType,
-                                    DiffractionPatternState, ImageExtent, SimpleDiffractionDataset)
+                                    DiffractionPatternState, SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
