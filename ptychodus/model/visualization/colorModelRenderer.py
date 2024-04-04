@@ -41,14 +41,15 @@ class CylindricalColorModelRenderer(Renderer):
     def isCyclic(self) -> bool:
         return True
 
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
+    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
+               autoscaleColorAxis: bool) -> VisualizationProduct:
         amplitude = self._amplitudeComponent.calculate(array)
         phaseInRadians = self._phaseComponent.calculate(array)
 
         transform = self._transformation.getPlugin()
         amplitudeTransformed = transform(amplitude)
 
-        if False:  # FIXME autoscaleColorAxis:
+        if autoscaleColorAxis:
             self._colorAxis.setToDataRange(amplitudeTransformed)
 
         norm = Normalize(vmin=self._colorAxis.lower.getValue(),

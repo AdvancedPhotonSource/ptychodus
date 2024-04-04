@@ -120,7 +120,8 @@ class VisualizationEngine(Observable, Observer):
         self._colorAxis.setRange(lower, upper)
 
     def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
-        return self._rendererPlugin.strategy.render(array, pixelGeometry)
+        return self._rendererPlugin.strategy.render(array, pixelGeometry,
+                                                    autoscaleColorAxis=False)  # FIXME verify
 
     def update(self, observable: Observable) -> None:
         if observable is self._rendererChooser:

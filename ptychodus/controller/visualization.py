@@ -134,7 +134,10 @@ class VisualizationController(Observer):
         self._view.fitInView(scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def _rerenderImage(self) -> None:
-        print('RE-RENDER!')  # FIXME !!!!!!!!!!!!!!!!!!!!!!!!!!
+        product = self._item.getProduct()
+
+        if product is not None:
+            self.setArray(product.getValues(), product.getPixelGeometry())
 
     def update(self, observable: Observable) -> None:
         if observable is self._engine:
