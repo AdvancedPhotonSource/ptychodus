@@ -5,7 +5,7 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeFileReader, ProbeFileWriter
 
-from ...patterns import ActiveDiffractionDataset
+from ...patterns import ActiveDiffractionDataset, Detector
 from .averagePattern import AveragePatternProbeBuilder
 from .builder import FromFileProbeBuilder, ProbeBuilder
 from .disk import DiskProbeBuilder
@@ -19,11 +19,12 @@ logger = logging.getLogger(__name__)
 
 class ProbeBuilderFactory(Iterable[str]):
 
-    def __init__(self, patterns: ActiveDiffractionDataset,
+    def __init__(self, detector: Detector, patterns: ActiveDiffractionDataset,
                  fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
                  fileReaderChooser: PluginChooser[ProbeFileReader],
                  fileWriterChooser: PluginChooser[ProbeFileWriter]) -> None:
         super().__init__()
+        self._detector = detector
         self._patterns = patterns
         self._fresnelZonePlateChooser = fresnelZonePlateChooser
         self._fileReaderChooser = fileReaderChooser
@@ -49,7 +50,7 @@ class ProbeBuilderFactory(Iterable[str]):
         return factory()
 
     def _createAveragePatternBuilder(self) -> ProbeBuilder:
-        return AveragePatternProbeBuilder(self._patterns)
+        return AveragePatternProbeBuilder(self._detector, self._patterns)
 
     def _createFresnelZonePlateBuilder(self) -> ProbeBuilder:
         return FresnelZonePlateProbeBuilder(self._fresnelZonePlateChooser)

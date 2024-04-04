@@ -1,7 +1,5 @@
 from __future__ import annotations
 from collections.abc import Iterator
-from typing import override
-
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
@@ -29,23 +27,18 @@ class ColormapRenderer(Renderer):
         self._colormap = colormap
         self._registerParameter('colormap', colormap)
 
-    @override
     def variants(self) -> Iterator[str]:
         return self._colormap.choices()
 
-    @override
     def getVariant(self) -> str:
         return self._colormap.getValue()
 
-    @override
     def setVariant(self, variant: str) -> None:
         self._colormap.setValue(variant)
 
-    @override
     def isCyclic(self) -> bool:
         return self._component.isCyclic
 
-    @override
     def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
         values = self._component.calculate(array)
 

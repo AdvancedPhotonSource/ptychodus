@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import override
 import logging
 
 import numpy
@@ -137,7 +136,6 @@ class VisualizationController(Observer):
     def _rerenderImage(self) -> None:
         print('RE-RENDER!')  # FIXME !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    @override
     def update(self, observable: Observable) -> None:
         if observable is self._engine:
             self._rerenderImage()

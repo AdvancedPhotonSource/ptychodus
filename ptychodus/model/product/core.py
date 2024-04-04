@@ -8,7 +8,7 @@ from ptychodus.api.probe import FresnelZonePlate, ProbeFileReader, ProbeFileWrit
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.scan import ScanFileReader, ScanFileWriter
 
-from ..patterns import ActiveDiffractionDataset, DiffractionDatasetSettings, PatternSizer
+from ..patterns import ActiveDiffractionDataset, Detector, DiffractionDatasetSettings, PatternSizer
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory
 from .objectRepository import ObjectRepository
 from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory
@@ -23,6 +23,7 @@ class ProductCore:
     def __init__(
         self,
         rng: numpy.random.Generator,
+        detector: Detector,
         datasetSettings: DiffractionDatasetSettings,
         patternSizer: PatternSizer,
         patterns: ActiveDiffractionDataset,
@@ -38,7 +39,8 @@ class ProductCore:
     ) -> None:
         self._scanBuilderFactory = ScanBuilderFactory(scanFileReaderChooser, scanFileWriterChooser)
         self._scanRepositoryItemFactory = ScanRepositoryItemFactory(rng)
-        self._probeBuilderFactory = ProbeBuilderFactory(patterns, fresnelZonePlateChooser,
+        self._probeBuilderFactory = ProbeBuilderFactory(detector, patterns,
+                                                        fresnelZonePlateChooser,
                                                         probeFileReaderChooser,
                                                         probeFileWriterChooser)
         self._probeRepositoryItemFactory = ProbeRepositoryItemFactory(rng)

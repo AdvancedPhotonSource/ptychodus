@@ -1,7 +1,5 @@
 from __future__ import annotations
 from collections.abc import Iterator
-from typing import override
-
 from matplotlib.colors import Normalize
 import numpy
 
@@ -31,23 +29,18 @@ class CylindricalColorModelRenderer(Renderer):
         self._colorModel = colorModel
         self._registerParameter('color_model', colorModel)
 
-    @override
     def variants(self) -> Iterator[str]:
         return self._colorModel.choices()
 
-    @override
     def getVariant(self) -> str:
         return self._colorModel.getValue()
 
-    @override
     def setVariant(self, variant: str) -> None:
         self._colorModel.setValue(variant)
 
-    @override
     def isCyclic(self) -> bool:
         return True
 
-    @override
     def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
         amplitude = self._amplitudeComponent.calculate(array)
         phaseInRadians = self._phaseComponent.calculate(array)

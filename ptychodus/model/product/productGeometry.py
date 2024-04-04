@@ -48,12 +48,16 @@ class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometry
             return 0.
 
     @property
+    def detectorDistanceInMeters(self) -> float:
+        return self._metadata.detectorDistanceInMeters.getValue()
+
+    @property
     def probePowerInWatts(self) -> float:
         return self.probeEnergyInJoules * self._metadata.probePhotonsPerSecond.getValue()
 
     @property
     def _lambdaZInSquareMeters(self) -> float:
-        return self.probeWavelengthInMeters * self._metadata.detectorDistanceInMeters.getValue()
+        return self.probeWavelengthInMeters * self.detectorDistanceInMeters
 
     @property
     def objectPlanePixelWidthInMeters(self) -> float:

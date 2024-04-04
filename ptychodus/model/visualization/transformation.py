@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import override
 
 import numpy
 
@@ -28,22 +27,18 @@ class ScalarTransformation(ABC):
 
 class IdentityScalarTransformation(ScalarTransformation):
 
-    @override
     def decorateText(self, text: str) -> str:
         return text
 
-    @override
     def __call__(self, array: RealArrayType) -> RealArrayType:
         return array
 
 
 class SquareRootScalarTransformation(ScalarTransformation):
 
-    @override
     def decorateText(self, text: str) -> str:
         return f'$\\sqrt{{\\mathrm{{{text}}}}}$'
 
-    @override
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
         return numpy.sqrt(array, out=nil, where=(array > 0))
@@ -51,11 +46,9 @@ class SquareRootScalarTransformation(ScalarTransformation):
 
 class Log2ScalarTransformation(ScalarTransformation):
 
-    @override
     def decorateText(self, text: str) -> str:
         return f'$\\log_2{{\\left(\\mathrm{{{text}}}\\right)}}$'
 
-    @override
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
         return numpy.log2(array, out=nil, where=(array > 0))
@@ -63,11 +56,9 @@ class Log2ScalarTransformation(ScalarTransformation):
 
 class LogScalarTransformation(ScalarTransformation):
 
-    @override
     def decorateText(self, text: str) -> str:
         return f'$\\ln{{\\left(\\mathrm{{{text}}}\\right)}}$'
 
-    @override
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
         return numpy.log(array, out=nil, where=(array > 0))
@@ -75,11 +66,9 @@ class LogScalarTransformation(ScalarTransformation):
 
 class Log10ScalarTransformation(ScalarTransformation):
 
-    @override
     def decorateText(self, text: str) -> str:
         return f'$\\log_{{10}}{{\\left(\\mathrm{{{text}}}\\right)}}$'
 
-    @override
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
         return numpy.log10(array, out=nil, where=(array > 0))
@@ -122,7 +111,6 @@ class ScalarTransformationParameter(Parameter[str], Observer):
         for name in self._chooser.getDisplayNameList():
             yield name
 
-    @override
     def setValue(self, value: str, *, notify: bool = True) -> None:
         self._chooser.setCurrentPluginByName(value)
         super().setValue(self._chooser.currentPlugin.displayName, notify=notify)
@@ -130,7 +118,6 @@ class ScalarTransformationParameter(Parameter[str], Observer):
     def getPlugin(self) -> ScalarTransformation:
         return self._chooser.currentPlugin.strategy
 
-    @override
     def update(self, observable: Observable) -> None:
         if observable is self._chooser:
             super().setValue(self._chooser.currentPlugin.displayName)

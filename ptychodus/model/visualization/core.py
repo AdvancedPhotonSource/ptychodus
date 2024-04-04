@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Iterator
-from typing import override
 import logging
 
 from ptychodus.api.geometry import PixelGeometry
@@ -123,7 +122,6 @@ class VisualizationEngine(Observable, Observer):
     def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
         return self._rendererPlugin.strategy.render(array, pixelGeometry)
 
-    @override
     def update(self, observable: Observable) -> None:
         if observable is self._rendererChooser:
             self._rendererPlugin.strategy.removeObserver(self)

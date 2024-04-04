@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import override, Final
+from typing import Final
 
 from matplotlib.colors import Colormap
 import matplotlib
@@ -30,7 +30,6 @@ class ColormapParameter(Parameter[str], Observer):
         for name in self._chooser.getDisplayNameList():
             yield name
 
-    @override
     def setValue(self, value: str, *, notify: bool = True) -> None:
         self._chooser.setCurrentPluginByName(value)
         super().setValue(self._chooser.currentPlugin.displayName, notify=notify)
@@ -38,7 +37,6 @@ class ColormapParameter(Parameter[str], Observer):
     def getPlugin(self) -> Colormap:
         return self._chooser.currentPlugin.strategy
 
-    @override
     def update(self, observable: Observable) -> None:
         if observable is self._chooser:
             super().setValue(self._chooser.currentPlugin.displayName)

@@ -10,7 +10,7 @@ import numpy.typing
 
 from .geometry import ImageExtent, PixelGeometry
 
-ProbeArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+WavefieldArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,11 @@ class ProbeGeometryProvider(ABC):
 
     @property
     @abstractmethod
+    def detectorDistanceInMeters(self) -> float:
+        pass
+
+    @property
+    @abstractmethod
     def probeWavelengthInMeters(self) -> float:
         pass
 
@@ -70,7 +75,7 @@ class ProbeGeometryProvider(ABC):
 class Probe:
 
     @staticmethod
-    def _calculateModeRelativePower(array: ProbeArrayType) -> Sequence[float]:
+    def _calculateModeRelativePower(array: WavefieldArrayType) -> Sequence[float]:
         power = numpy.sum((array * array.conj()).real, axis=(-2, -1))
         powersum = power.sum()
 
@@ -80,7 +85,7 @@ class Probe:
         return power.tolist()
 
     def __init__(self,
-                 array: ProbeArrayType | None = None,
+                 array: WavefieldArrayType | None = None,
                  *,
                  pixelWidthInMeters: float = 0.,
                  pixelHeightInMeters: float = 0.) -> None:
@@ -109,7 +114,7 @@ class Probe:
         )
 
     @property
-    def array(self) -> ProbeArrayType:
+    def array(self) -> WavefieldArrayType:
         return self._array
 
     @property
@@ -160,10 +165,10 @@ class Probe:
             heightInPixels=self.heightInPixels,
         )
 
-    def getMode(self, number: int) -> ProbeArrayType:
+    def getMode(self, number: int) -> WavefieldArrayType:
         return self._array[number, :, :]
 
-    def getModesFlattened(self) -> ProbeArrayType:
+    def getModesFlattened(self) -> WavefieldArrayType:
         if self._array.size > 0:
             return self._array.transpose((1, 0, 2)).reshape(self._array.shape[-2], -1)
         else:

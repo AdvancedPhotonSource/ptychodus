@@ -7,7 +7,7 @@ import numpy
 import scipy.linalg
 
 from ptychodus.api.parametric import ParameterRepository
-from ptychodus.api.probe import Probe, ProbeArrayType
+from ptychodus.api.probe import Probe, WavefieldArrayType
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ class MultimodalProbeBuilder(ParameterRepository):
         builder.modeDecayRatio.setValue(self.modeDecayRatio.getValue())
         return builder
 
-    def _initializeModes(self, probe: ProbeArrayType) -> ProbeArrayType:
-        modeList: list[ProbeArrayType] = list()
+    def _initializeModes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
+        modeList: list[WavefieldArrayType] = list()
 
         if probe.ndim == 2:
             modeList.append(probe)
@@ -68,7 +68,7 @@ class MultimodalProbeBuilder(ParameterRepository):
 
         return numpy.stack(modeList)
 
-    def _orthogonalizeModes(self, probe: ProbeArrayType) -> ProbeArrayType:
+    def _orthogonalizeModes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
         probeModesAsRows = probe.reshape(probe.shape[-3], -1)
         probeModesAsCols = probeModesAsRows.T
         probeModesAsOrthoCols = scipy.linalg.orth(probeModesAsCols)
@@ -94,7 +94,7 @@ class MultimodalProbeBuilder(ParameterRepository):
 
         return [1.] + [0.] * (totalNumberOfModes - 1)
 
-    def _adjustRelativePower(self, probe: ProbeArrayType) -> ProbeArrayType:
+    def _adjustRelativePower(self, probe: WavefieldArrayType) -> WavefieldArrayType:
         modeWeights = self._getModeWeights(probe.shape[-3])
         power0 = numpy.sum(numpy.square(numpy.abs(probe[0, ...])))
         adjustedProbe = probe.copy()

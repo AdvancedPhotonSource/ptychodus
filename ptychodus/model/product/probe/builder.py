@@ -9,8 +9,8 @@ import numpy
 import numpy.typing
 
 from ptychodus.api.parametric import ParameterRepository
-from ptychodus.api.probe import (Probe, ProbeArrayType, ProbeFileReader, ProbeGeometry,
-                                 ProbeGeometryProvider)
+from ptychodus.api.probe import (Probe, ProbeFileReader, ProbeGeometry, ProbeGeometryProvider,
+                                 WavefieldArrayType)
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class ProbeBuilder(ParameterRepository):
             positionYInMeters=positionYInMeters,
         )
 
-    def normalize(self, array: ProbeArrayType) -> ProbeArrayType:
+    def normalize(self, array: WavefieldArrayType) -> WavefieldArrayType:
         return array / numpy.sqrt(numpy.sum(numpy.abs(array)**2))
 
     def getName(self) -> str:

@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import override
 
 from skimage.restoration import unwrap_phase
 import numpy
@@ -31,7 +30,6 @@ class RealArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
         super().__init__('real', isCyclic=False)
 
-    @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:
         return numpy.real(array).astype(numpy.single)
 
@@ -41,7 +39,6 @@ class ImaginaryArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
         super().__init__('imaginary', isCyclic=False)
 
-    @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:
         return numpy.imag(array).astype(numpy.single)
 
@@ -51,7 +48,6 @@ class AmplitudeArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
         super().__init__('amplitude', isCyclic=False)
 
-    @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:
         return numpy.absolute(array).astype(numpy.single)
 
@@ -61,7 +57,6 @@ class PhaseInRadiansArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
         super().__init__('phase', isCyclic=True)
 
-    @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:
         return numpy.angle(array).astype(numpy.single)
 
@@ -71,7 +66,6 @@ class UnwrappedPhaseInRadiansArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
         super().__init__('unwrapped_phase', isCyclic=False)
 
-    @override
     def calculate(self, array: NumberArrayType) -> RealArrayType:
         phaseInRadians = numpy.angle(array).astype(numpy.single)
         return unwrap_phase(phaseInRadians)

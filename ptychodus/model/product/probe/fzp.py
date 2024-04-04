@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Iterator
-from typing import Any
 
 import numpy
 import numpy.typing
@@ -8,50 +7,8 @@ import numpy.typing
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
 
+from ...propagator import fresnel_propagator
 from .builder import ProbeBuilder
-
-
-def fresnel_propagation(input: numpy.typing.NDArray[Any], dxy: float, z: float,
-                        wavelength: float) -> numpy.typing.NDArray[Any]:
-    """
-    This is the python version code for fresnel propagation
-    Summary of this function goes here
-    Parameters:    dx,dy  -> the pixel pitch of the object
-                z      -> the distance of the propagation
-                lambda -> the wave length
-                X,Y    -> meshgrid of coordinate
-                input     -> input object
-    """
-
-    (M, N) = input.shape
-    k = 2 * numpy.pi / wavelength
-
-    # the coordinate grid
-    M_grid = numpy.arange(-1 * numpy.floor(M / 2), numpy.ceil(M / 2))
-    N_grid = numpy.arange(-1 * numpy.floor(N / 2), numpy.ceil(N / 2))
-    lx = M_grid * dxy
-    ly = N_grid * dxy
-
-    XX, YY = numpy.meshgrid(lx, ly)
-
-    # the coordinate grid on the output plane
-    fu = wavelength * z / dxy
-    lu = M_grid * fu / M
-    lv = N_grid * fu / N
-    Fx, Fy = numpy.meshgrid(lu, lv)
-
-    if z > 0:
-        pf = numpy.exp(1j * k * z) * numpy.exp(1j * k * (Fx**2 + Fy**2) / 2 / z)
-        kern = input * numpy.exp(1j * k * (XX**2 + YY**2) / 2 / z)
-        cgh = numpy.fft.fft2(numpy.fft.fftshift(kern))
-        OUT = numpy.fft.fftshift(cgh * numpy.fft.fftshift(pf))
-    else:
-        pf = numpy.exp(1j * k * z) * numpy.exp(1j * k * (XX**2 + YY**2) / 2 / z)
-        cgh = numpy.fft.ifft2(
-            numpy.fft.fftshift(input * numpy.exp(1j * k * (Fx**2 + Fy**2) / 2 / z)))
-        OUT = numpy.fft.fftshift(cgh) * pf
-
-    return OUT
 
 
 class FresnelZonePlateProbeBuilder(ProbeBuilder):
@@ -133,8 +90,8 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         H = RR_FZP >= zonePlate.centralBeamstopDiameterInMeters / 2
         fzpTransmissionFunction = T * C * H
 
-        array = fresnel_propagation(fzpTransmissionFunction, dx_fzp,
-                                    FL + self.defocusDistanceInMeters.getValue(), wavelength)
+        array = fresnel_propagator(fzpTransmissionFunction, dx_fzp,
+                                   FL + self.defocusDistanceInMeters.getValue(), wavelength)
 
         return Probe(
             array=self.normalize(array),
