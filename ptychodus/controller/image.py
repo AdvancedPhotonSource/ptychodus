@@ -107,17 +107,21 @@ class ImageRendererController(Observer):
 class ImageDataRangeController(Observer):
 
     def __init__(self, engine: VisualizationEngine, view: ImageDataRangeGroupBox,
-                 imageWidget: ImageWidget, displayRangeDialog: ImageDisplayRangeDialog) -> None:
+                 imageWidget: ImageWidget, displayRangeDialog: ImageDisplayRangeDialog,
+                 visualizationController: VisualizationController) -> None:
         self._engine = engine
         self._view = view
         self._imageWidget = imageWidget
         self._displayRangeDialog = displayRangeDialog
+        self._visualizationController = visualizationController
 
     @classmethod
-    def createInstance(cls, engine: VisualizationEngine, view: ImageDataRangeGroupBox,
-                       imageWidget: ImageWidget) -> ImageDataRangeController:
+    def createInstance(
+            cls, engine: VisualizationEngine, view: ImageDataRangeGroupBox,
+            imageWidget: ImageWidget,
+            visualizationController: VisualizationController) -> ImageDataRangeController:
         displayRangeDialog = ImageDisplayRangeDialog.createInstance(view)
-        controller = cls(engine, view, imageWidget, displayRangeDialog)
+        controller = cls(engine, view, imageWidget, displayRangeDialog, visualizationController)
         controller._syncModelToView()
         engine.addObserver(controller)
 
@@ -136,10 +140,7 @@ class ImageDataRangeController(Observer):
         return controller
 
     def _autoDisplayRange(self) -> None:
-        # FIXME set display range to data range
-        # FIXME self._displayRangeDialog.minValueLineEdit.setValue(lowerLimit)
-        # FIXME self._displayRangeDialog.maxValueLineEdit.setValue(upperLimit)
-        pass
+        self._visualizationController.rerenderImage(autoscaleColorAxis=True)
 
     def _finishEditingDisplayRange(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
@@ -148,6 +149,7 @@ class ImageDataRangeController(Observer):
             self._engine.setDisplayValueRange(lower, upper)
 
     def _syncModelToView(self) -> None:
+        print('syncModelToView') # FIXME
         minDisplayValue = Decimal(repr(self._engine.getMinDisplayValue()))
         maxDisplayValue = Decimal(repr(self._engine.getMaxDisplayValue()))
 
@@ -180,7 +182,7 @@ class ImageController:
         self._rendererController = ImageRendererController.createInstance(
             engine, view.imageRibbon.colormapGroupBox)
         self._dataRangeController = ImageDataRangeController.createInstance(
-            engine, view.imageRibbon.dataRangeGroupBox, view.imageWidget)
+            engine, view.imageRibbon.dataRangeGroupBox, view.imageWidget, visualizationController)
 
     @classmethod
     def createInstance(cls, engine: VisualizationEngine, view: ImageView, statusBar: QStatusBar,

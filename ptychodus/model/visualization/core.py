@@ -119,9 +119,11 @@ class VisualizationEngine(Observable, Observer):
     def setDisplayValueRange(self, lower: float, upper: float) -> None:
         self._colorAxis.setRange(lower, upper)
 
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> VisualizationProduct:
-        return self._rendererPlugin.strategy.render(array, pixelGeometry,
-                                                    autoscaleColorAxis=False)  # FIXME verify
+    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
+               autoscaleColorAxis: bool) -> VisualizationProduct:
+        return self._rendererPlugin.strategy.render(array,
+                                                    pixelGeometry,
+                                                    autoscaleColorAxis=autoscaleColorAxis)
 
     def update(self, observable: Observable) -> None:
         if observable is self._rendererChooser:

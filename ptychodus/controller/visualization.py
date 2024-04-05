@@ -53,8 +53,12 @@ class VisualizationController(Observer):
 
         return controller
 
-    def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
-        product = self._engine.render(array, pixelGeometry)
+    def setArray(self,
+                 array: NumberArrayType,
+                 pixelGeometry: PixelGeometry,
+                 *,
+                 autoscaleColorAxis: bool = False) -> None:
+        product = self._engine.render(array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis)
         self._item.setProduct(product)
 
     def clearArray(self) -> None:
@@ -133,12 +137,14 @@ class VisualizationController(Observer):
         scene.setSceneRect(boundingRect)
         self._view.fitInView(scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
-    def _rerenderImage(self) -> None:
+    def rerenderImage(self, *, autoscaleColorAxis: bool = False) -> None:
         product = self._item.getProduct()
 
         if product is not None:
-            self.setArray(product.getValues(), product.getPixelGeometry())
+            self.setArray(product.getValues(),
+                          product.getPixelGeometry(),
+                          autoscaleColorAxis=autoscaleColorAxis)
 
     def update(self, observable: Observable) -> None:
         if observable is self._engine:
-            self._rerenderImage()
+            self.rerenderImage()
