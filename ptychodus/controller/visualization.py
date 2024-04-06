@@ -114,17 +114,22 @@ class VisualizationController(Observer):
 
         valueLabel = product.getValueLabel()
         kde = product.estimateKernelDensity(box)
-        values = numpy.arange(kde.valueLower, kde.valueUpper, 1000)
+        values = numpy.linspace(kde.valueLower, kde.valueUpper, 1000)
 
         ax = self._histogramDialog.axes
         ax.clear()
         ax.plot(values, kde.kde(values), '.-', linewidth=1.5)
-        ax.set_xlabel('Distance [m]')
-        ax.set_ylabel(valueLabel)
+        ax.set_xlabel(valueLabel)
+        ax.set_ylabel('Density')
         ax.grid(True)
         self._histogramDialog.figureCanvas.draw()
 
-        # FIXME display rect in histogram dialog
+        rectangleView = self._histogramDialog.rectangleView
+        rectCenter = rect.center()
+        rectangleView.centerXLineEdit.setText(f'{rectCenter.x():.1f}')
+        rectangleView.centerYLineEdit.setText(f'{rectCenter.y():.1f}')
+        rectangleView.widthLineEdit.setText(f'{rect.width():.1f}')
+        rectangleView.heightLineEdit.setText(f'{rect.height():.1f}')
 
         self._histogramDialog.open()
 

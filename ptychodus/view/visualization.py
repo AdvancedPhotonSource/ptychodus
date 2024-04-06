@@ -5,10 +5,11 @@ import logging
 import numpy
 
 from PyQt5.QtCore import (pyqtSignal, Qt, QObject, QPointF, QLineF, QRectF, QSizeF)
-from PyQt5.QtGui import QImage, QPen, QPixmap, QWheelEvent
-from PyQt5.QtWidgets import (QApplication, QDialog, QGraphicsLineItem, QGraphicsPixmapItem,
-                             QGraphicsRectItem, QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent,
-                             QGraphicsView, QStatusBar, QVBoxLayout, QWidget)
+from PyQt5.QtGui import QImage, QPalette, QPen, QPixmap, QWheelEvent
+from PyQt5.QtWidgets import (QApplication, QDialog, QFormLayout, QGraphicsLineItem,
+                             QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsSceneHoverEvent,
+                             QGraphicsSceneMouseEvent, QGraphicsView, QGroupBox, QLineEdit,
+                             QStatusBar, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -67,8 +68,7 @@ class ImageItem(QGraphicsPixmapItem):
         self._product = product
         self.setPixmap(pixmap)
 
-    def clearProduct(self) -> None:  # FIXME test and verify
-        print('clearProduct!')  # FIXME
+    def clearProduct(self) -> None:
         self._product = None
         self.setPixmap(QPixmap())
 
@@ -202,9 +202,45 @@ class LineCutDialog(QDialog):
         view.setWindowTitle('Line-Cut Dialog')
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.navigationToolbar)
         layout.addWidget(view.figureCanvas)
+        view.setLayout(layout)
+
+        return view
+
+
+class RectangleView(QGroupBox):
+
+    @staticmethod
+    def _createReadOnlyLineEdit() -> QLineEdit:
+        lineEdit = QLineEdit()
+
+        palette = lineEdit.palette()
+        palette.setColor(QPalette.Base, palette.color(QPalette.Window))
+        palette.setColor(QPalette.Text, palette.color(QPalette.WindowText))
+        lineEdit.setPalette(palette)
+
+        lineEdit.setFocusPolicy(Qt.NoFocus)
+        lineEdit.setReadOnly(True)
+
+        return lineEdit
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__('Rectangle', parent)
+        self.centerXLineEdit = RectangleView._createReadOnlyLineEdit()
+        self.centerYLineEdit = RectangleView._createReadOnlyLineEdit()
+        self.widthLineEdit = RectangleView._createReadOnlyLineEdit()
+        self.heightLineEdit = RectangleView._createReadOnlyLineEdit()
+
+    @classmethod
+    def createInstance(cls, parent: QWidget | None = None) -> RectangleView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow('Center X:', view.centerXLineEdit)
+        layout.addRow('Center Y:', view.centerYLineEdit)
+        layout.addRow('Width:', view.widthLineEdit)
+        layout.addRow('Height:', view.heightLineEdit)
         view.setLayout(layout)
 
         return view
@@ -218,7 +254,7 @@ class HistogramDialog(QDialog):
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
-        # FIXME add rectangle coordinates
+        self.rectangleView = RectangleView.createInstance()
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> HistogramDialog:
@@ -226,9 +262,9 @@ class HistogramDialog(QDialog):
         view.setWindowTitle('Histogram')
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.navigationToolbar)
-        layout.addWidget(view.figureCanvas)
+        layout.addWidget(view.figureCanvas, 1)
+        layout.addWidget(view.rectangleView)
         view.setLayout(layout)
 
         return view

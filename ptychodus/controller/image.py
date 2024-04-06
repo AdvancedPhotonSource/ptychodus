@@ -149,7 +149,7 @@ class ImageDataRangeController(Observer):
             self._engine.setDisplayValueRange(lower, upper)
 
     def _syncModelToView(self) -> None:
-        print('syncModelToView') # FIXME
+        print('syncModelToView')  # FIXME
         minDisplayValue = Decimal(repr(self._engine.getMinDisplayValue()))
         maxDisplayValue = Decimal(repr(self._engine.getMaxDisplayValue()))
 
