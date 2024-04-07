@@ -6,17 +6,17 @@ from typing import Any
 import logging
 
 import h5py
-import numpy
 
-from ...api.geometry import Interval
-from ...api.observer import Observable, Observer
-from ...api.patterns import DiffractionFileReader, DiffractionPatternArrayType, DiffractionPatternState
-from ...api.plugins import PluginChooser
-from ...api.settings import SettingsRegistry
-from ...api.state import DiffractionPatternStateData, StatefulCore
-from ...api.tree import SimpleTreeNode
+from ptychodus.api.geometry import Interval
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.patterns import (DiffractionFileReader, DiffractionFileWriter,
+                                    DiffractionPatternArrayType, DiffractionPatternState)
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.tree import SimpleTreeNode
+
 from .active import ActiveDiffractionDataset
-from .api import DiffractionDataAPI
+from .api import PatternsAPI
 from .builder import ActiveDiffractionDatasetBuilder
 from .detector import Detector, DetectorPresenter
 from .io import DiffractionDatasetInputOutputPresenter
@@ -136,10 +136,11 @@ class DiffractionDatasetPresenter(Observable, Observer):
             self.notifyObservers()
 
 
-class PatternsCore(StatefulCore[DiffractionPatternStateData]):
+class PatternsCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry,
-                 fileReaderChooser: PluginChooser[DiffractionFileReader]) -> None:
+                 fileReaderChooser: PluginChooser[DiffractionFileReader],
+                 fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
         self.detector = Detector.createInstance(settingsRegistry)
         self.detectorPresenter = DetectorPresenter.createInstance(self.detector)
         self.datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
@@ -147,6 +148,7 @@ class PatternsCore(StatefulCore[DiffractionPatternStateData]):
 
         # TODO vvv refactor vvv
         fileReaderChooser.setCurrentPluginByName(self.datasetSettings.fileType.value)
+        fileWriterChooser.setCurrentPluginByName(self.datasetSettings.fileType.value)
 
         self.patternSizer = PatternSizer.createInstance(self._patternSettings, self.detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
@@ -155,7 +157,8 @@ class PatternsCore(StatefulCore[DiffractionPatternStateData]):
         self.dataset = ActiveDiffractionDataset(self.datasetSettings, self._patternSettings,
                                                 self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self.datasetSettings, self.dataset)
-        self.dataAPI = DiffractionDataAPI(self._builder, fileReaderChooser)
+        self.patternsAPI = PatternsAPI(self._builder, self.dataset, fileReaderChooser,
+                                       fileWriterChooser)
 
         self.metadataPresenter = DiffractionMetadataPresenter(self.dataset, self.detector,
                                                               self.datasetSettings,
@@ -163,19 +166,7 @@ class PatternsCore(StatefulCore[DiffractionPatternStateData]):
         self.datasetPresenter = DiffractionDatasetPresenter.createInstance(
             self.datasetSettings, self.dataset)
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter.createInstance(
-            self.datasetSettings, self.dataset, self.dataAPI, settingsRegistry)
-
-    def getStateData(self) -> DiffractionPatternStateData:
-        return DiffractionPatternStateData(
-            indexes=numpy.array(self.dataset.getAssembledIndexes()),
-            array=self.dataset.getAssembledData(),
-        )
-
-    def setStateData(self, stateData: DiffractionPatternStateData, stateFilePath: Path) -> None:
-        if self._builder.isAssembling:
-            self._builder.stop(finishAssembling=False)
-
-        self.dataset.setAssembledData(stateData.array, stateData.indexes)
+            self.datasetSettings, self.dataset, self.patternsAPI, settingsRegistry)
 
     def start(self) -> None:
         pass

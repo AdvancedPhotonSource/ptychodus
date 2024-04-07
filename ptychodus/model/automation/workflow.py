@@ -3,8 +3,7 @@ from pathlib import Path
 import logging
 import re
 
-from ...api.state import StateDataRegistry
-from ..patterns import DiffractionDataAPI
+from ..patterns import PatternsAPI
 from ..workflow import WorkflowCore
 
 logger = logging.getLogger(__name__)
@@ -21,8 +20,8 @@ class AutomationDatasetWorkflow(ABC):
 
 class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, dataAPI: DiffractionDataAPI, workflowCore: WorkflowCore) -> None:
-        self._dataAPI = dataAPI
+    def __init__(self, patternsAPI: PatternsAPI, workflowCore: WorkflowCore) -> None:
+        self._patternsAPI = patternsAPI
         self._workflowCore = workflowCore
 
     def execute(self, filePath: Path) -> None:
@@ -38,7 +37,7 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
             if digits != 0:
                 break
 
-        self._dataAPI.loadDiffractionDataset(diffractionFilePath, fileType='HDF5')
+        self._patternsAPI.openPatterns(diffractionFilePath, fileType='HDF5')
         # FIXME self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='MDA', selectItem=True)
         # NOTE reuse probe
         # FIXME self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
@@ -47,8 +46,8 @@ class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
 class S2AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, dataAPI: DiffractionDataAPI, workflowCore: WorkflowCore) -> None:
-        self._dataAPI = dataAPI
+    def __init__(self, patternsAPI: PatternsAPI, workflowCore: WorkflowCore) -> None:
+        self._patternsAPI = patternsAPI
         self._workflowCore = workflowCore
 
     def execute(self, filePath: Path) -> None:
@@ -57,7 +56,7 @@ class S2AutomationDatasetWorkflow(AutomationDatasetWorkflow):
         # FIXME flowLabel = f'scan{scanID}'
 
         diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
-        self._dataAPI.loadDiffractionDataset(diffractionFilePath, fileType='NeXus')
+        self._patternsAPI.openPatterns(diffractionFilePath, fileType='NeXus')
         # FIXME self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='CSV', selectItem=True)
         # NOTE reuse probe
         # FIXME self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
@@ -66,11 +65,11 @@ class S2AutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
 class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
 
-    def __init__(self, registry: StateDataRegistry) -> None:
-        self._registry = registry
+    def __init__(self, patternsAPI: PatternsAPI) -> None:
+        self._patternsAPI = patternsAPI
 
     def execute(self, filePath: Path) -> None:
         # TODO watch for ptychodus NPZ files
-        self._registry.openStateData(filePath)
+        self._patternsAPI.openPatterns(filePath, fileType='NPZ')
         # FIXME self._reconstructor.ingestTrainingData()
         # FIXME self._reconstructor.train()

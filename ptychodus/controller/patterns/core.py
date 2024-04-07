@@ -10,6 +10,7 @@ from ...model.patterns import (DetectorPresenter, DiffractionDatasetInputOutputP
                                DiffractionDatasetPresenter, DiffractionMetadataPresenter,
                                DiffractionPatternPresenter)
 from ...view.patterns import PatternsView
+from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .detector import DetectorController
@@ -85,7 +86,11 @@ class PatternsController(Observer):
             selectedNameFilter=self._ioPresenter.getSaveFileFilter())
 
         if filePath:
-            self._ioPresenter.saveDiffractionFile(filePath)
+            try:
+                self._ioPresenter.saveDiffractionFile(filePath, nameFilter)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException('File Writer', err)
 
     def _openPatternsInfo(self) -> None:
         PatternsInfoViewController.showInfo(self._datasetPresenter, self._view)

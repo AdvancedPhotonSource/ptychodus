@@ -36,7 +36,7 @@ class ReconstructionThread(threading.Thread):
                 logging.debug('ReconstructionThread: Begin assembling scan positions')
                 self._ptychodus.finalizeStreamingWorkflow()
                 logging.debug('ReconstructionThread: End assembling scan positions')
-                self._ptychodus.batchModeReconstruct(self._resultsFilePath)
+                self._ptychodus.batchModeReconstruct(self._resultsFilePath)  # FIXME
                 self._reconstructEvent.clear()
                 # reconstruction done; indicate that results are ready
                 self._channel.put(0)
@@ -62,11 +62,10 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         super().__init__(configDict)
 
         self.logger.debug(f'{ptychodus.__name__.title()} ({ptychodus.__version__})')
-        settingsFilePath = configDict['settingsFilePath']
 
         modelArgs = ptychodus.model.ModelArgs(
-            restartFilePath=None,
-            settingsFilePath=Path(settingsFilePath) if settingsFilePath else None,
+            settingsFile=configDict.get('settingsFile'),
+            patternsFile=None,
             replacementPathPrefix=configDict.get('replacementPathPrefix'),
         )
 

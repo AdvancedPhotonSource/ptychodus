@@ -54,6 +54,12 @@ def main() -> int:
         type=argparse.FileType('w'),
     )
     parser.add_argument(
+        '-p',
+        '--patterns',
+        help='use diffraction patterns from file',
+        type=argparse.FileType('r'),
+    )
+    parser.add_argument(
         '-s',
         '--settings',
         help='use settings from file',
@@ -69,6 +75,7 @@ def main() -> int:
 
     modelArgs = ModelArgs(
         settingsFile=Path(parsedArgs.settings.name) if parsedArgs.settings else None,
+        patternsFile=Path(parsedArgs.patterns.name) if parsedArgs.patterns else None,
         replacementPathPrefix=parsedArgs.file_prefix,
     )
 

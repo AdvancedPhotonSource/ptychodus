@@ -185,17 +185,17 @@ def registerPlugins(registry: PluginRegistry) -> None:
         displayName='Hierarchical Data Format 5 Files (*.h5 *.hdf5)',
     )
     registry.diffractionFileReaders.registerPlugin(
+        H5DiffractionFileReader(dataPath='/entry/measurement/Eiger/data'),
+        simpleName='NanoMax',
+        displayName='NanoMax Diffraction Files (*.h5 *.hdf5)',
+    )
+    registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/dp'),
         simpleName='PtychoShelves',
         displayName='PtychoShelves Diffraction Files (*.h5 *.hdf5)',
     )
-    registry.diffractionFileReaders.registerPlugin(
-        H5DiffractionFileReader(dataPath='/entry/measurement/Eiger/data'),
-        simpleName='NanoMax',
-        displayName='NanoMax DiffractionEndStation Files (*.h5 *.hdf5)',
-    )
     registry.diffractionFileWriters.registerPlugin(
         H5DiffractionFileWriter(dataPath='/dp'),
         simpleName='PtychoShelves',
-        displayName='PtychoShelves Diffraction Data Files (*.h5 *.hdf5)',
+        displayName='PtychoShelves Diffraction Files (*.h5 *.hdf5)',
     )

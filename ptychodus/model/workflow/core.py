@@ -7,10 +7,11 @@ from uuid import UUID
 import logging
 import threading
 
-from ...api.geometry import Interval
-from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry
-from ...api.state import StateDataRegistry
+from ptychodus.api.geometry import Interval
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry
+
+from ..patterns import PatternsAPI
 from ..product import ProductRepository
 from .authorizer import WorkflowAuthorizer
 from .executor import WorkflowExecutor
@@ -184,8 +185,8 @@ class WorkflowExecutionPresenter:
 
 class WorkflowCore:
 
-    def __init__(self, productRepository: ProductRepository, settingsRegistry: SettingsRegistry,
-                 stateDataRegistry: StateDataRegistry) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
+                 productRepository: ProductRepository) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
         self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Input')
         self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group,
@@ -196,7 +197,7 @@ class WorkflowCore:
         self._statusRepository = WorkflowStatusRepository()
         self._executor = WorkflowExecutor(self._settings, self._inputDataLocator,
                                           self._computeDataLocator, self._outputDataLocator,
-                                          productRepository, settingsRegistry, stateDataRegistry)
+                                          settingsRegistry, patternsAPI, productRepository)
         self._thread: threading.Thread | None = None
 
         try:

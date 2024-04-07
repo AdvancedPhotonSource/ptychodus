@@ -6,21 +6,21 @@ Ptychodus
 Standard Installation
 ---------------------
 
-1. Install `miniforge <https://github.com/conda-forge/miniforge>`_, the conda disribution that uses faster default settings than the Anaconda installer.
+1. Install `miniforge <https://github.com/conda-forge/miniforge>`_.
 
 2. Install ptychodus.
-
-   * To install `ptychodus` with the GUI and no optional packages:
-
-     .. code-block:: shell
-
-           $ conda create -c conda-forge -n ptychodus ptychodus
 
    * To install `ptychodus` with the GUI and all optional packages:
 
      .. code-block:: shell
 
            $ conda create -c conda-forge -n ptychodus ptychodus-all
+
+   * To install `ptychodus` with the GUI and no optional packages:
+
+     .. code-block:: shell
+
+           $ conda create -c conda-forge -n ptychodus ptychodus
 
    * To install `ptychodus` without the GUI or optional packages:
 
@@ -31,24 +31,29 @@ Standard Installation
 3. Activate the `ptychodus` conda environment to run ptychodus.
 
    .. code-block:: shell
+
        $ conda activate ptychodus
        $ ptychodus -h
-       usage: ptychodus [-h] [-b RESULTS_FILE] [-f PREFIX] [-p PORT] [-r RESTART_FILE] [-s SETTINGS_FILE] [-v]
+        usage: ptychodus [-h] [-b {reconstruct,train}] [-f FILE_PREFIX] [-i INPUT_FILE] [-o OUTPUT_FILE] [-p PATTERNS] [-s SETTINGS] [-v]
 
-       ptychodus is a ptychography analysis application
+        ptychodus is a ptychography analysis application
 
-       options:
-         -h, --help            show this help message and exit
-         -b RESULTS_FILE, --batch RESULTS_FILE
-                               run reconstruction non-interactively
-         -f PREFIX, --file-prefix PREFIX
-                               replace file path prefix
-         -p PORT, --port PORT  remote process communication port number
-         -r RESTART_FILE, --restart RESTART_FILE
-                               use restart data from file
-         -s SETTINGS_FILE, --settings SETTINGS_FILE
-                               use settings from file
-         -v, --version         show program's version number and exit
+        options:
+          -h, --help            show this help message and exit
+          -b {reconstruct,train}, --batch {reconstruct,train}
+                                run action non-interactively
+          -f FILE_PREFIX, --file-prefix FILE_PREFIX
+                                replace file path prefix in settings
+          -i INPUT_FILE, --input INPUT_FILE
+                                input data product file
+          -o OUTPUT_FILE, --output OUTPUT_FILE
+                                output data product file
+          -p PATTERNS, --patterns PATTERNS
+                                use diffraction patterns from file
+          -s SETTINGS, --settings SETTINGS
+                                use settings from file
+          -v, --version         show program's version number and exit
+
        $ ptychodus
 
 
@@ -76,26 +81,12 @@ Developer Installation
 
    $ conda install -n ptychodus -c conda-forge ptychonn pytorch-gpu
 
-* To launch the `ptychodus` GUI (with the "ptychodus" conda environment activated):
+* Launch `ptychodus`:
 
 .. code-block:: shell
 
+   $ conda activate ptychodus
    $ ptychodus
-
-Tips
-----
-
-* This project is experimenting with `type hints <https://docs.python.org/3/library/typing.html>`_ which can be checked using `mypy <http://mypy-lang.org>`_.
-
-.. code-block:: shell
-
-  $ mypy ptychodus
-
-* Stubs to support PyQt5 type hinting can be installed within the conda environment.
-
-.. code-block:: shell
-
-   $ pip install PyQt5-stubs
 
 Reporting bugs
 -------------

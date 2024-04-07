@@ -17,10 +17,10 @@ except ModuleNotFoundError:
 import h5py
 import numpy
 
-from ..api.patterns import DiffractionMetadata, DiffractionPatternArray
-from ..api.plugins import PluginRegistry
-from ..api.settings import SettingsRegistry
-from ..api.state import StateDataRegistry
+from ptychodus.api.patterns import DiffractionMetadata, DiffractionPatternArray
+from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.settings import SettingsRegistry
+
 from .analysis import AnalysisCore, DichroicAnalyzer, FourierRingCorrelator, ProbePropagator
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .memory import MemoryPresenter
@@ -58,7 +58,8 @@ def configureLogger() -> None:
 @dataclass(frozen=True)
 class ModelArgs:
     settingsFile: Path | None
-    replacementPathPrefix: str | None = None
+    patternsFile: Path | None
+    replacementPathPrefix: str | None
 
 
 class ModelCore:
@@ -72,7 +73,8 @@ class ModelCore:
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
         self._patternsCore = PatternsCore(self.settingsRegistry,
-                                          self._pluginRegistry.diffractionFileReaders)
+                                          self._pluginRegistry.diffractionFileReaders,
+                                          self._pluginRegistry.diffractionFileWriters)
         self._productCore = ProductCore(
             self.rng, self._patternsCore.detector, self._patternsCore.datasetSettings,
             self._patternsCore.patternSizer, self._patternsCore.dataset,
@@ -101,19 +103,20 @@ class ModelCore:
         )
         self._analysisCore = AnalysisCore(self._productCore.probeRepository,
                                           self._productCore.objectRepository)
-        self._stateDataRegistry = StateDataRegistry(self._patternsCore)
-        self._workflowCore = WorkflowCore(self._productCore.productRepository,
-                                          self.settingsRegistry, self._stateDataRegistry)
-        self._automationCore = AutomationCore(self.settingsRegistry, self._patternsCore.dataAPI,
-                                              self._workflowCore)
+        self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
+                                          self._productCore.productRepository)
+        self._automationCore = AutomationCore(self.settingsRegistry,
+                                              self._patternsCore.patternsAPI, self._workflowCore)
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFile:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFile)
 
-        if self._patternsCore.dataAPI.getAssemblyQueueSize() > 0:
-            self._patternsCore.dataAPI.startAssemblingDiffractionPatterns()
-            self._patternsCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
+        if self._modelArgs.patternsFile:
+            patternsFile = self._modelArgs.patternsFile
+            self._patternsCore.patternsAPI.openPatterns(patternsFile,
+                                                        patternsFile.suffix[1:],
+                                                        assemble=True)
 
         self._patternsCore.start()
         self._workflowCore.start()
@@ -169,12 +172,12 @@ class ModelCore:
         return self._productCore.objectRepository
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self._patternsCore.dataAPI.initializeStreaming(metadata)
-        self._patternsCore.dataAPI.startAssemblingDiffractionPatterns()
+        self._patternsCore.patternsAPI.initializeStreaming(metadata)
+        self._patternsCore.patternsAPI.startAssemblingDiffractionPatterns()
         self._scanCore.scanAPI.initializeStreamingScan()  # FIXME
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
-        self._patternsCore.dataAPI.assemble(array)
+        self._patternsCore.patternsAPI.assemble(array)
         self._scanCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)  # FIXME
 
     def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
@@ -187,10 +190,10 @@ class ModelCore:
 
     def finalizeStreamingWorkflow(self) -> None:
         self._scanCore.scanAPI.finalizeStreamingScan()  # FIXME
-        self._patternsCore.dataAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
+        self._patternsCore.patternsAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:
-        return self._patternsCore.dataAPI.getAssemblyQueueSize()
+        return self._patternsCore.patternsAPI.getAssemblyQueueSize()
 
     def refreshActiveDataset(self) -> None:
         self._patternsCore.dataset.notifyObserversIfDatasetChanged()
@@ -198,14 +201,7 @@ class ModelCore:
     def refreshAutomationDatasets(self) -> None:
         self._automationCore.repository.notifyObserversIfRepositoryChanged()
 
-    def saveStateData(self, filePath: Path, *, restartable: bool) -> None:
-        self._stateDataRegistry.saveStateData(filePath, restartable=restartable)
-
-    def openStateData(self, filePath: Path) -> None:
-        self._stateDataRegistry.openStateData(filePath)
-
     def batchModeReconstruct(self, inputFilePath: Path, outputFilePath: Path) -> int:
-        # FIXME need to transfer/load diffraction patterns
         inputProductIndex = self._productCore.openProduct(inputFilePath)
 
         if inputProductIndex < 0:
@@ -225,7 +221,6 @@ class ModelCore:
         return 0
 
     def batchModeTrain(self, inputFilePath: Path, outputFilePath: Path) -> int:
-        # FIXME need to transfer/load diffraction patterns
         inputProductIndex = self._productCore.openProduct(inputFilePath)
 
         if inputProductIndex < 0:

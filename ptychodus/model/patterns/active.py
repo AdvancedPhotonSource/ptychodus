@@ -113,11 +113,11 @@ class ActiveDiffractionDataset(DiffractionDataset):
             if self._patternSettings.valueUpperBoundEnabled.value:
                 valueLowerBound = self._patternSettings.valueLowerBound.value
                 valueUpperBound = self._patternSettings.valueUpperBound.value
-                data[data >= valueUpperBound] = valueLowerBound
+                data[data >= valueUpperBound] = 0
 
             if self._patternSettings.valueLowerBoundEnabled.value:
                 valueLowerBound = self._patternSettings.valueLowerBound.value
-                data[data < valueLowerBound] = valueLowerBound
+                data[data < valueLowerBound] = 0
 
             if self._patternSettings.flipXEnabled.value:
                 data = numpy.flip(data, axis=-1)

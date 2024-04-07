@@ -27,6 +27,8 @@ ScopeAuthorizerMapping: TypeAlias = Mapping[str, AuthorizerTypes]
 
 PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
+# FIXME add review consents fix
+
 
 def ptychodus_reconstruct(**data: str) -> None:
     import sys
@@ -40,13 +42,14 @@ def ptychodus_reconstruct(**data: str) -> None:
 
     modelArgs = ModelArgs(
         settingsFile=Path(data['ptychodus_settings_file']),
+        patternsFile=Path(data['ptychodus_patterns_file']),
         replacementPathPrefix=data.get('ptychodus_path_prefix'),
     )
 
     with ModelCore(modelArgs) as model:
-        if action == 'reconstruct':
+        if action.lower() == 'reconstruct':
             model.batchModeReconstruct(inputFile, outputFile)
-        elif action == 'train':
+        elif action.lower() == 'train':
             model.batchModeTrain(inputFile, outputFile)
         else:
             print(f'Unknown batch mode action \"{action}\"!', file=sys.stderr)
@@ -59,6 +62,7 @@ class PtychodusReconstruct(gladier.GladierBaseTool):
         'ptychodus_action',
         'ptychodus_input_file',
         'ptychodus_output_file',
+        'ptychodus_patterns_file',
         'ptychodus_settings_file',
     ]
 

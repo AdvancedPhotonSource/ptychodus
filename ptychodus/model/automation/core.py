@@ -6,7 +6,7 @@ import queue
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
 from ...api.settings import SettingsRegistry
-from ..patterns import DiffractionDataAPI
+from ..patterns import PatternsAPI
 from ..workflow import WorkflowCore
 from .buffer import AutomationDatasetBuffer
 from .processor import AutomationDatasetProcessor
@@ -144,11 +144,11 @@ class AutomationProcessingPresenter(Observable, Observer):
 
 class AutomationCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry, dataAPI: DiffractionDataAPI,
+    def __init__(self, settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
                  workflowCore: WorkflowCore) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
-        self._workflow = S2AutomationDatasetWorkflow(dataAPI, workflowCore)
+        self._workflow = S2AutomationDatasetWorkflow(patternsAPI, workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
                                                      self._workflow, self._processingQueue)

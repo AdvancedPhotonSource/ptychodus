@@ -4,8 +4,9 @@ from typing import Any
 import logging
 import queue
 
-from ...api.settings import SettingsRegistry
-from ...api.state import StateDataRegistry
+from ptychodus.api.settings import SettingsRegistry
+
+from ..patterns import PatternsAPI
 from ..product import ProductRepository
 from .locator import DataLocator
 from .settings import WorkflowSettings
@@ -23,8 +24,8 @@ class WorkflowExecutor:
 
     def __init__(self, settings: WorkflowSettings, inputDataLocator: DataLocator,
                  computeDataLocator: DataLocator, outputDataLocator: DataLocator,
-                 productRepository: ProductRepository, settingsRegistry: SettingsRegistry,
-                 stateDataRegistry: StateDataRegistry) -> None:
+                 settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
+                 productRepository: ProductRepository) -> None:
         super().__init__()
         self._settings = settings
         self._inputDataLocator = inputDataLocator
@@ -32,14 +33,19 @@ class WorkflowExecutor:
         self._outputDataLocator = outputDataLocator
         self._productRepository = productRepository
         self._settingsRegistry = settingsRegistry
-        self._stateDataRegistry = stateDataRegistry
+        self._patternsAPI = patternsAPI
         self.jobQueue: queue.Queue[WorkflowJob] = queue.Queue()
 
     def runFlow(self, inputProductIndex: int) -> None:
         transferSyncLevel = 3  # Copy files if checksums of the source and destination mismatch
         ptychodusAction = 'reconstruct'  # TODO or 'train'
 
-        inputProductItem = self._productRepository[inputProductIndex]
+        try:
+            inputProductItem = self._productRepository[inputProductIndex]
+        except IndexError:
+            logger.warning(f'Failed access product for flow ({inputProductIndex=})!')
+            return
+
         flowLabel = inputProductItem.getName()
 
         inputDataPosixPath = self._inputDataLocator.getPosixPath() / flowLabel
@@ -49,19 +55,22 @@ class WorkflowExecutor:
         computeDataGlobusPath = f'{self._computeDataLocator.getGlobusPath()}/{flowLabel}'
         outputDataGlobusPath = f'{self._outputDataLocator.getGlobusPath()}/{flowLabel}'
 
-        settingsFile = 'input.ini'
-        inputFile = 'input.npz'
-        outputFile = 'output.npz'
+        settingsFile = 'settings.ini'
+        patternsFile = 'patterns.npz'
+        inputFile = 'product-in.npz'
+        outputFile = 'product-out.npz'
+        productFileFilter = 'NPZ'
 
         try:
             inputDataPosixPath.mkdir(mode=0o755, parents=True, exist_ok=True)
         except FileExistsError:
-            logger.error('Input data POSIX path must be a directory!')
+            logger.warning('Input data POSIX path must be a directory!')
             return
 
         self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFile)
-        # FIXME stateDataRegistry -> productRepository
-        self._stateDataRegistry.saveStateData(inputDataPosixPath / inputFile, restartable=True)
+        self._patternsAPI.savePatterns(inputDataPosixPath / patternsFile, productFileFilter)
+        self._productRepository.saveProduct(inputProductIndex, inputDataPosixPath / inputFile,
+                                            productFileFilter)
 
         flowInput = {
             'input_data_transfer_source_endpoint_id':
@@ -80,12 +89,14 @@ class WorkflowExecutor:
             str(self._settings.computeEndpointID.value),
             'ptychodus_action':
             ptychodusAction,
+            'ptychodus_settings_file':
+            str(computeDataPosixPath / settingsFile),
+            'ptychodus_patterns_file':
+            str(computeDataPosixPath / patternsFile),
             'ptychodus_input_file':
             str(computeDataPosixPath / inputFile),
             'ptychodus_output_file':
             str(computeDataPosixPath / outputFile),
-            'ptychodus_settings_file':
-            str(computeDataPosixPath / settingsFile),
             'output_data_transfer_source_endpoint_id':
             str(self._computeDataLocator.getEndpointID()),
             'output_data_transfer_source_path':

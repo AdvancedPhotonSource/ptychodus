@@ -3,11 +3,10 @@ from collections.abc import Sequence
 from pathlib import Path
 import logging
 
-import numpy
+from ptychodus.api.observer import Observable, Observer
 
-from ...api.observer import Observable, Observer
 from .active import ActiveDiffractionDataset
-from .api import DiffractionDataAPI
+from .api import PatternsAPI
 from .settings import DiffractionDatasetSettings
 
 logger = logging.getLogger(__name__)
@@ -16,32 +15,32 @@ logger = logging.getLogger(__name__)
 class DiffractionDatasetInputOutputPresenter(Observable, Observer):
 
     def __init__(self, settings: DiffractionDatasetSettings, dataset: ActiveDiffractionDataset,
-                 dataAPI: DiffractionDataAPI, reinitObservable: Observable) -> None:
+                 patternsAPI: PatternsAPI, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._dataset = dataset
-        self._dataAPI = dataAPI
+        self._patternsAPI = patternsAPI
         self._reinitObservable = reinitObservable
 
     @classmethod
     def createInstance(cls, settings: DiffractionDatasetSettings,
-                       dataset: ActiveDiffractionDataset, dataAPI: DiffractionDataAPI,
+                       dataset: ActiveDiffractionDataset, patternsAPI: PatternsAPI,
                        reinitObservable: Observable) -> DiffractionDatasetInputOutputPresenter:
-        presenter = cls(settings, dataset, dataAPI, reinitObservable)
+        presenter = cls(settings, dataset, patternsAPI, reinitObservable)
         reinitObservable.addObserver(presenter)
         return presenter
 
     def getOpenFileFilterList(self) -> Sequence[str]:
-        return self._dataAPI.getOpenFileFilterList()
+        return self._patternsAPI.getOpenFileFilterList()
 
     def getOpenFileFilter(self) -> str:
-        return self._dataAPI.getOpenFileFilter()
+        return self._patternsAPI.getOpenFileFilter()
 
     def openDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
         try:
-            fileType = self._dataAPI.loadDiffractionDataset(filePath=filePath,
-                                                            fileType=fileFilter,
-                                                            assemble=False)
+            fileType = self._patternsAPI.openPatterns(filePath=filePath,
+                                                      fileType=fileFilter,
+                                                      assemble=False)
         except Exception:
             logger.exception('Failed to load diffraction dataset.')
             return
@@ -55,26 +54,24 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         self.notifyObservers()
 
     def _openDiffractionFileFromSettings(self) -> None:
-        self._dataAPI.loadDiffractionDataset(filePath=self._settings.filePath.value,
-                                             fileType=self._settings.fileType.value,
-                                             assemble=True)
+        self._patternsAPI.openPatterns(filePath=self._settings.filePath.value,
+                                       fileType=self._settings.fileType.value,
+                                       assemble=True)
 
     def startAssemblingDiffractionPatterns(self) -> None:
-        self._dataAPI.startAssemblingDiffractionPatterns()
+        self._patternsAPI.startAssemblingDiffractionPatterns()
 
     def stopAssemblingDiffractionPatterns(self, finishAssembling: bool) -> None:
-        self._dataAPI.stopAssemblingDiffractionPatterns(finishAssembling)
+        self._patternsAPI.stopAssemblingDiffractionPatterns(finishAssembling)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
-        return [self.getSaveFileFilter()]
+        return self._patternsAPI.getSaveFileFilterList()
 
     def getSaveFileFilter(self) -> str:
-        return 'NumPy Binary Files (*.npy)'
+        return self._patternsAPI.getSaveFileFilter()
 
-    def saveDiffractionFile(self, filePath: Path) -> None:
-        logger.debug(f'Writing \"{filePath}\" as \"NPY\"')
-        array = self._dataset.getAssembledData()
-        numpy.save(filePath, array)
+    def saveDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
+        self._patternsAPI.savePatterns(filePath, fileFilter)
 
     def update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
