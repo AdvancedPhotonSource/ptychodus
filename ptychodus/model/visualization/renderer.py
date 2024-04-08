@@ -3,7 +3,7 @@ from collections.abc import Iterator
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.parametric import ParameterRepository
-from ptychodus.api.visualization import NumberArrayType, VisualizationProduct
+from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
 
 
 class Renderer(ParameterRepository):
@@ -29,6 +29,10 @@ class Renderer(ParameterRepository):
 
     @abstractmethod
     def isCyclic(self) -> bool:
+        pass
+
+    @abstractmethod
+    def colorize(self, array: NumberArrayType) -> RealArrayType:
         pass
 
     @abstractmethod

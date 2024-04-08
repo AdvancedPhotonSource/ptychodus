@@ -2,6 +2,8 @@ from __future__ import annotations
 from decimal import Decimal
 import logging
 
+import numpy
+
 from PyQt5.QtCore import QStringListModel
 from PyQt5.QtWidgets import QButtonGroup, QDialog, QStatusBar
 
@@ -114,6 +116,7 @@ class ImageDataRangeController(Observer):
         self._imageWidget = imageWidget
         self._displayRangeDialog = displayRangeDialog
         self._visualizationController = visualizationController
+        self._displayRangeIsLocked = True
 
     @classmethod
     def createInstance(
@@ -140,32 +143,44 @@ class ImageDataRangeController(Observer):
         return controller
 
     def _autoDisplayRange(self) -> None:
+        self._displayRangeIsLocked = False
         self._visualizationController.rerenderImage(autoscaleColorAxis=True)
+        self._displayRangeIsLocked = True
 
     def _finishEditingDisplayRange(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
             lower = float(self._displayRangeDialog.minValueLineEdit.getValue())
             upper = float(self._displayRangeDialog.maxValueLineEdit.getValue())
+
+            self._displayRangeIsLocked = False
             self._engine.setDisplayValueRange(lower, upper)
+            self._displayRangeIsLocked = True
+
+    def _syncColorLegendToView(self) -> None:
+        values = numpy.linspace(self._engine.getMinDisplayValue(),
+                                self._engine.getMaxDisplayValue(), 1000)
+        self._imageWidget.setColorLegendColors(
+            values,
+            self._engine.colorize(values),
+            self._engine.isRendererCyclic(),
+        )
 
     def _syncModelToView(self) -> None:
-        print('syncModelToView')  # FIXME
-        minDisplayValue = Decimal(repr(self._engine.getMinDisplayValue()))
-        maxDisplayValue = Decimal(repr(self._engine.getMaxDisplayValue()))
+        minValue = Decimal(repr(self._engine.getMinDisplayValue()))
+        maxValue = Decimal(repr(self._engine.getMaxDisplayValue()))
 
-        lowerLimit = min(self._displayRangeDialog.minValueLineEdit.getValue(), minDisplayValue)
-        upperLimit = max(self._displayRangeDialog.maxValueLineEdit.getValue(), maxDisplayValue)
-        displayRangeLimits = Interval[Decimal](lowerLimit, upperLimit)
+        self._displayRangeDialog.minValueLineEdit.setValue(minValue)
+        self._displayRangeDialog.maxValueLineEdit.setValue(maxValue)
 
-        self._view.minDisplayValueSlider.setValueAndRange(minDisplayValue, displayRangeLimits)
-        self._view.maxDisplayValueSlider.setValueAndRange(maxDisplayValue, displayRangeLimits)
-        self._displayRangeDialog.minValueLineEdit.setValue(lowerLimit)
-        self._displayRangeDialog.maxValueLineEdit.setValue(upperLimit)
-        self._imageWidget.setColorLegendRange(float(minDisplayValue), float(maxDisplayValue))
+        if self._displayRangeIsLocked:
+            self._view.minDisplayValueSlider.setValue(minValue)
+            self._view.maxDisplayValueSlider.setValue(maxValue)
+        else:
+            displayRangeLimits = Interval[Decimal](minValue, maxValue)
+            self._view.minDisplayValueSlider.setValueAndRange(minValue, displayRangeLimits)
+            self._view.maxDisplayValueSlider.setValueAndRange(maxValue, displayRangeLimits)
 
-        # FIXME xArray = numpy.linspace(0., 1., 256)
-        # FIXME rgbaArray = self._engine.getColorSamples(xArray)
-        # FIXME self._imageWidget.setColorLegendColors(xArray, rgbaArray, self._engine.isRendererCyclic())
+        self._syncColorLegendToView()
 
     def update(self, observable: Observable) -> None:
         if observable is self._engine:

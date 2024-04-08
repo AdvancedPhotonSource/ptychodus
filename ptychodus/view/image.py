@@ -1,6 +1,8 @@
 from __future__ import annotations
 from collections.abc import Iterator
 
+import numpy
+
 from PyQt5.QtCore import Qt, QPoint, QRect, QRectF, QSize
 from PyQt5.QtGui import QColor, QConicalGradient, QIcon, QLinearGradient, QPainter, QPen
 from PyQt5.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
@@ -197,22 +199,23 @@ class ImageWidget(VisualizationView):
         self._isColorLegendVisible = False
         self._isColorLegendCyclic = False
 
-    def setColorLegendColors(self, xArray: RealArrayType, rgbaArray: RealArrayType,
+    def setColorLegendColors(self, values: RealArrayType, rgbaArray: RealArrayType,
                              isCyclic: bool) -> None:
         colorLegendStopPoints: list[tuple[float, QColor]] = list()
+        self._colorLegendMinValue = values.min()
+        self._colorLegendMaxValue = values.max()
 
-        for x, rgba in zip(xArray, rgbaArray):
+        valueRange = self._colorLegendMaxValue - self._colorLegendMinValue
+        normalizedValues = (values - self._colorLegendMinValue) / valueRange if valueRange > 0 \
+                else numpy.full_like(values, 0.5)
+
+        for x, rgba in zip(normalizedValues.clip(0, 1), rgbaArray):
             color = QColor()
             color.setRgbF(rgba[0], rgba[1], rgba[2], rgba[3])
             colorLegendStopPoints.append((x, color))
 
         self._colorLegendStopPoints = colorLegendStopPoints
         self._isColorLegendCyclic = isCyclic
-        self.scene().update()
-
-    def setColorLegendRange(self, minValue: float, maxValue: float) -> None:
-        self._colorLegendMinValue = minValue
-        self._colorLegendMaxValue = maxValue
         self.scene().update()
 
     def setColorLegendVisible(self, visible: bool) -> None:

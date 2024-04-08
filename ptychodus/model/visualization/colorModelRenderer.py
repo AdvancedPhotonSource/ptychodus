@@ -4,7 +4,7 @@ from matplotlib.colors import Normalize
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import NumberArrayType, VisualizationProduct
+from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
 
 from .colorAxis import ColorAxis
 from .colorModel import CylindricalColorModelParameter
@@ -41,25 +41,34 @@ class CylindricalColorModelRenderer(Renderer):
     def isCyclic(self) -> bool:
         return True
 
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
-               autoscaleColorAxis: bool) -> VisualizationProduct:
-        amplitude = self._amplitudeComponent.calculate(array)
-        phaseInRadians = self._phaseComponent.calculate(array)
-
-        transform = self._transformation.getPlugin()
-        amplitudeTransformed = transform(amplitude)
-
-        if autoscaleColorAxis:
-            self._colorAxis.setToDataRange(amplitudeTransformed)
-
-        norm = Normalize(vmin=self._colorAxis.lower.getValue(),
-                         vmax=self._colorAxis.upper.getValue(),
-                         clip=False)
+    def _colorize(self, amplitudeTransformed: RealArrayType,
+                  phaseInRadians: RealArrayType) -> RealArrayType:
+        vrange = self._colorAxis.getRange()
+        norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
 
         model = numpy.vectorize(self._colorModel.getPlugin())
         h = (phaseInRadians + numpy.pi) / (2 * numpy.pi)
         r, g, b, a = model(h, norm(amplitudeTransformed))
-        rgba = numpy.stack((r, g, b, a), axis=-1)
+        return numpy.stack((r, g, b, a), axis=-1)
+
+    def colorize(self, array: NumberArrayType) -> RealArrayType:
+        amplitude = self._amplitudeComponent.calculate(array)
+        transform = self._transformation.getPlugin()
+        amplitudeTransformed = transform(amplitude)
+        phaseInRadians = self._phaseComponent.calculate(array)
+        return self._colorize(amplitudeTransformed, phaseInRadians)
+
+    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
+               autoscaleColorAxis: bool) -> VisualizationProduct:
+        amplitude = self._amplitudeComponent.calculate(array)
+        transform = self._transformation.getPlugin()
+        amplitudeTransformed = transform(amplitude)
+        phaseInRadians = self._phaseComponent.calculate(array)
+
+        if autoscaleColorAxis:
+            self._colorAxis.setToDataRange(amplitudeTransformed)
+
+        rgba = self._colorize(amplitudeTransformed, phaseInRadians)
 
         return VisualizationProduct(
             valueLabel=transform.decorateText(self._amplitudeComponent.name),

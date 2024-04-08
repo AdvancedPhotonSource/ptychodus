@@ -5,7 +5,7 @@ import logging
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.visualization import NumberArrayType, VisualizationProduct
+from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
 
 from .colorAxis import ColorAxis
 from .colorModel import CylindricalColorModelParameter
@@ -118,6 +118,9 @@ class VisualizationEngine(Observable, Observer):
 
     def setDisplayValueRange(self, lower: float, upper: float) -> None:
         self._colorAxis.setRange(lower, upper)
+
+    def colorize(self, array: NumberArrayType) -> RealArrayType:
+        return self._rendererPlugin.strategy.colorize(array)
 
     def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
                autoscaleColorAxis: bool) -> VisualizationProduct:

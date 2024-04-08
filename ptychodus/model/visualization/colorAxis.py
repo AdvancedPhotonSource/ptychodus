@@ -2,6 +2,7 @@ import logging
 
 import numpy
 
+from ptychodus.api.geometry import Interval
 from ptychodus.api.parametric import ParameterRepository
 from ptychodus.api.visualization import RealArrayType
 
@@ -14,6 +15,12 @@ class ColorAxis(ParameterRepository):
         super().__init__('color_axis')
         self.lower = self._registerRealParameter('lower', 0.)
         self.upper = self._registerRealParameter('upper', 1.)
+
+    def getRange(self) -> Interval[float]:
+        return Interval[float].createProper(
+            self.lower.getValue(),
+            self.upper.getValue(),
+        )
 
     def setRange(self, lower: float, upper: float):
         self.lower.setValue(lower, notify=False)
@@ -35,8 +42,6 @@ class ColorAxis(ParameterRepository):
                 lower = 0.
                 upper = 1.
 
-            self.lower.setValue(lower, notify=False)
-            self.upper.setValue(upper, notify=False)
-            self.notifyObservers()
+            self.setRange(lower, upper)
         else:
             logger.warning('Array has zero size!')

@@ -280,3 +280,5 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable in self._parameterDict.values():
             self.notifyObservers()
+        elif observable in self._repositoryList:
+            self.notifyObservers()

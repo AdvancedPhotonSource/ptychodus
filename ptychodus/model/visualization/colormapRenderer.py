@@ -4,7 +4,7 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import NumberArrayType, VisualizationProduct
+from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
 
 from .colorAxis import ColorAxis
 from .colormap import ColormapParameter
@@ -39,22 +39,29 @@ class ColormapRenderer(Renderer):
     def isCyclic(self) -> bool:
         return self._component.isCyclic
 
+    def _colorize(self, valuesTransformed: RealArrayType) -> RealArrayType:
+        vrange = self._colorAxis.getRange()
+        norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
+        cmap = self._colormap.getPlugin()
+        scalarMappable = ScalarMappable(norm, cmap)
+        return scalarMappable.to_rgba(valuesTransformed)
+
+    def colorize(self, array: NumberArrayType) -> RealArrayType:
+        values = self._component.calculate(array)
+        transform = self._transformation.getPlugin()
+        valuesTransformed = transform(values)
+        return self._colorize(valuesTransformed)
+
     def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
                autoscaleColorAxis: bool) -> VisualizationProduct:
         values = self._component.calculate(array)
-
         transform = self._transformation.getPlugin()
         valuesTransformed = transform(values)
 
         if autoscaleColorAxis:
             self._colorAxis.setToDataRange(valuesTransformed)
 
-        norm = Normalize(vmin=self._colorAxis.lower.getValue(),
-                         vmax=self._colorAxis.upper.getValue(),
-                         clip=False)
-        cmap = self._colormap.getPlugin()
-        scalarMappable = ScalarMappable(norm, cmap)
-        rgba = scalarMappable.to_rgba(valuesTransformed)
+        rgba = self._colorize(valuesTransformed)
 
         return VisualizationProduct(
             valueLabel=transform.decorateText(self._component.name),
