@@ -1,5 +1,7 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 import logging
 
 import numpy
@@ -20,7 +22,7 @@ class DichroicResult:
     polarRatio: ObjectArrayType
 
 
-class DichroicAnalyzer:
+class DichroicAnalyzer:  # FIXME control visualizationView and visualizationParametersView
     # TODO feature request: want ability to align/add reconstructed slices of
     #      repeat scans for each polarization separately to improve statistics
 
@@ -53,4 +55,26 @@ class DichroicAnalyzer:
             polarDifference=polarDifference,
             polarSum=polarSum,
             polarRatio=polarRatio,
+        )
+
+    def getSaveFileFilterList(self) -> Sequence[str]:
+        return [self.getSaveFileFilter()]
+
+    def getSaveFileFilter(self) -> str:
+        return 'NumPy Zipped Archive (*.npz)'
+
+    def saveResult(self, filePath: Path, lcircItemIndex: int, rcircItemIndex: int) -> None:
+        result = self.analyze(lcircItemIndex, rcircItemIndex)
+        numpy.savez(
+            filePath,
+            'pixel_height_m',
+            result.pixelGeometry.heightInMeters,
+            'pixel_width_m',
+            result.pixelGeometry.widthInMeters,
+            'polar_difference',
+            result.polarDifference,
+            'polar_sum',
+            result.polarSum,
+            'polar_ratio',
+            result.polarRatio,
         )

@@ -65,8 +65,8 @@ class DichroicParametersView(QGroupBox):
         self.polarizationGroupBox = QGroupBox('Polarization')
         self.lcircComboBox = QComboBox()
         self.rcircComboBox = QComboBox()
-        self.visualizationParametersView = VisualizationParametersView.createInstance()
         self.saveButton = QPushButton('Save')
+        self.visualizationParametersView = VisualizationParametersView.createInstance()
 
     @classmethod
     def createInstance(cls, title: str, parent: QWidget | None = None) -> DichroicParametersView:
@@ -76,13 +76,13 @@ class DichroicParametersView(QGroupBox):
         polarizationLayout = QFormLayout()
         polarizationLayout.addRow('Left Circular:', view.lcircComboBox)
         polarizationLayout.addRow('Right Circular:', view.rcircComboBox)
+        polarizationLayout.addRow(view.saveButton)
         view.polarizationGroupBox.setLayout(polarizationLayout)
 
         layout = QVBoxLayout()
         layout.addWidget(view.polarizationGroupBox)
         layout.addWidget(view.visualizationParametersView)
         layout.addStretch()
-        layout.addWidget(view.saveButton)
         view.setLayout(layout)
 
         return view

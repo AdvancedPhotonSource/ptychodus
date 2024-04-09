@@ -4,7 +4,7 @@ import logging
 import numpy
 
 from PyQt5.QtCore import Qt, QLineF, QRectF
-from PyQt5.QtWidgets import QGraphicsScene, QGraphicsView, QStatusBar
+from PyQt5.QtWidgets import QGraphicsScene, QStatusBar
 
 from ptychodus.api.geometry import Box2D, Line2D, PixelGeometry, Point2D
 from ptychodus.api.observer import Observable, Observer
@@ -12,7 +12,7 @@ from ptychodus.api.visualization import NumberArrayType
 
 from ..model.visualization import VisualizationEngine
 from ..view.visualization import (HistogramDialog, ImageItem, ImageItemEvents, ImageMouseTool,
-                                  LineCutDialog)
+                                  LineCutDialog, VisualizationView)
 from .data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class VisualizationController(Observer):
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
-    def __init__(self, engine: VisualizationEngine, view: QGraphicsView, item: ImageItem,
+    def __init__(self, engine: VisualizationEngine, view: VisualizationView, item: ImageItem,
                  statusBar: QStatusBar, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._engine = engine
@@ -33,7 +33,7 @@ class VisualizationController(Observer):
         self._histogramDialog = HistogramDialog.createInstance(view)
 
     @classmethod
-    def createInstance(cls, engine: VisualizationEngine, view: QGraphicsView,
+    def createInstance(cls, engine: VisualizationEngine, view: VisualizationView,
                        statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> VisualizationController:
         itemEvents = ImageItemEvents()

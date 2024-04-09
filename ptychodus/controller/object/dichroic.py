@@ -21,11 +21,14 @@ class DichroicViewController:
         super().__init__()
         self._analyzer = analyzer
         self._engine = engine
+        self._fileDialogFactory = fileDialogFactory
         self._dialog = DichroicDialog.createInstance(parent)
         self._dialog.parametersView.lcircComboBox.setModel(treeModel)
         self._dialog.parametersView.lcircComboBox.currentIndexChanged.connect(self._analyze)
         self._dialog.parametersView.rcircComboBox.setModel(treeModel)
         self._dialog.parametersView.rcircComboBox.currentIndexChanged.connect(self._analyze)
+        self._dialog.parametersView.saveButton.clicked.connect(self._saveResult)
+
         self._differenceVisualizationController = VisualizationController.createInstance(
             engine, self._dialog.differenceWidget.visualizationView, statusBar, fileDialogFactory)
         self._sumVisualizationController = VisualizationController.createInstance(
@@ -59,3 +62,24 @@ class DichroicViewController:
         self._dialog.parametersView.rcircComboBox.setCurrentIndex(rcircItemIndex)
         self._analyze()
         self._dialog.open()
+
+    def _saveResult(self) -> None:
+        lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()
+        rcircItemIndex = self._dialog.parametersView.rcircComboBox.currentIndex()
+
+        if lcircItemIndex < 0 or rcircItemIndex < 0:
+            return
+
+        title = 'Save Result'
+        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+            self._dialog,
+            title,
+            nameFilters=self._analyzer.getSaveFileFilterList(),
+            selectedNameFilter=self._analyzer.getSaveFileFilter())
+
+        if filePath:
+            try:
+                self._analyzer.saveResult(filePath, lcircItemIndex, rcircItemIndex)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException(title, err)
