@@ -13,17 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class DichroicAnalysis:
+class DichroicResult:
     pixelGeometry: PixelGeometry
     polarDifference: ObjectArrayType
     polarSum: ObjectArrayType
-
-    @property
-    def polarRatio(self) -> ObjectArrayType:
-        return numpy.divide(self.polarDifference,
-                            self.polarSum,
-                            out=numpy.zeros_like(self.polarSum),
-                            where=(self.polarSum > 0.))
+    polarRatio: ObjectArrayType
 
 
 class DichroicAnalyzer:
@@ -33,7 +27,7 @@ class DichroicAnalyzer:
     def __init__(self, repository: ObjectRepository) -> None:
         self._repository = repository
 
-    def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> DichroicAnalysis:
+    def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> DichroicResult:
         lcircObject = self._repository[lcircItemIndex].getObject()
         rcircObject = self._repository[rcircItemIndex].getObject()
 
@@ -44,11 +38,19 @@ class DichroicAnalyzer:
         lcircAmp = numpy.absolute(lcircObject.array)
         rcircAmp = numpy.absolute(rcircObject.array)
 
-        lcircLogAmp = numpy.log(lcircAmp, out=numpy.zeros_like(lcircAmp), where=(lcircAmp > 0.))
-        rcircLogAmp = numpy.log(rcircAmp, out=numpy.zeros_like(rcircAmp), where=(rcircAmp > 0.))
+        lcircLogAmp = numpy.log(lcircAmp, out=numpy.zeros_like(lcircAmp), where=(lcircAmp > 0))
+        rcircLogAmp = numpy.log(rcircAmp, out=numpy.zeros_like(rcircAmp), where=(rcircAmp > 0))
 
-        return DichroicAnalysis(
+        polarDifference = lcircLogAmp - rcircLogAmp
+        polarSum = lcircLogAmp + rcircLogAmp
+        polarRatio = numpy.divide(polarDifference,
+                                  polarSum,
+                                  out=numpy.zeros_like(polarSum),
+                                  where=(polarSum > 0))
+
+        return DichroicResult(
             pixelGeometry=pixelGeometry,
-            polarDifference=lcircLogAmp - rcircLogAmp,
-            polarSum=lcircLogAmp + rcircLogAmp,
+            polarDifference=polarDifference,
+            polarSum=polarSum,
+            polarRatio=polarRatio,
         )

@@ -1,65 +1,12 @@
 from __future__ import annotations
 
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QAbstractButton, QAction, QComboBox, QDialog, QDialogButtonBox,
-                             QFormLayout, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
-                             QSlider, QSpinBox, QToolBar, QVBoxLayout, QWidget)
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
+                             QGroupBox, QHBoxLayout, QLabel, QPushButton, QSlider, QSpinBox,
+                             QVBoxLayout, QWidget)
 
-from .visualization import VisualizationView
-from .widgets import DecimalLineEdit, LengthWidget
-
-
-class ProbePropagationCrossSectionView(QGroupBox):
-
-    def __init__(self, title: str, parent: QWidget | None) -> None:
-        super().__init__(title, parent)
-        self.toolBar = QToolBar('Tools')
-        self.homeAction = QAction(QIcon(':/icons/home'), 'Home')
-        self.saveAction = QAction(QIcon(':/icons/save'), 'Save Image')
-        self.graphicsView = VisualizationView()
-
-    @classmethod
-    def createInstance(cls,
-                       title: str,
-                       parent: QWidget | None = None) -> ProbePropagationCrossSectionView:
-        view = cls(title, parent)
-        view.setAlignment(Qt.AlignHCenter)
-
-        view.toolBar.setFloatable(False)
-        view.toolBar.setIconSize(QSize(32, 32))
-        view.toolBar.addAction(view.homeAction)
-        view.toolBar.addAction(view.saveAction)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.toolBar)
-        layout.addWidget(view.graphicsView)
-        view.setLayout(layout)
-
-        return view
-
-
-class DisplayRangeWidget(QWidget):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.minValueLineEdit = DecimalLineEdit.createInstance()
-        self.maxValueLineEdit = DecimalLineEdit.createInstance()
-        self.autoButton = QPushButton('Auto')
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> DisplayRangeWidget:
-        widget = DisplayRangeWidget(parent)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(widget.minValueLineEdit)
-        layout.addWidget(widget.maxValueLineEdit)
-        layout.addWidget(widget.autoButton)
-        widget.setLayout(layout)
-
-        return widget
+from .visualization import VisualizationParametersView, VisualizationWidget
+from .widgets import LengthWidget
 
 
 class ProbePropagationParametersView(QGroupBox):
@@ -71,12 +18,7 @@ class ProbePropagationParametersView(QGroupBox):
         self.startCoordinateWidget = LengthWidget.createInstance()
         self.stopCoordinateWidget = LengthWidget.createInstance()
         self.numberOfStepsSpinBox = QSpinBox()
-
-        self.visualizationGroupBox = QGroupBox('Visualization')
-        self.colorizerComboBox = QComboBox()
-        self.scalarTransformComboBox = QComboBox()
-        self.variantComboBox = QComboBox()
-        self.displayRangeWidget = DisplayRangeWidget.createInstance()
+        self.visualizationParametersView = VisualizationParametersView.createInstance()
 
     @classmethod
     def createInstance(cls,
@@ -91,16 +33,9 @@ class ProbePropagationParametersView(QGroupBox):
         propagationLayout.addRow('Number of Steps:', view.numberOfStepsSpinBox)
         view.propagationGroupBox.setLayout(propagationLayout)
 
-        visualizationLayout = QFormLayout()
-        visualizationLayout.addRow('Colorizer:', view.colorizerComboBox)
-        visualizationLayout.addRow('Transform:', view.scalarTransformComboBox)
-        visualizationLayout.addRow('Variant:', view.variantComboBox)
-        visualizationLayout.addRow('Display Range:', view.displayRangeWidget)
-        view.visualizationGroupBox.setLayout(visualizationLayout)
-
         layout = QVBoxLayout()
         layout.addWidget(view.propagationGroupBox)
-        layout.addWidget(view.visualizationGroupBox)
+        layout.addWidget(view.visualizationParametersView)
         layout.addStretch()
         view.setLayout(layout)
 
@@ -111,10 +46,10 @@ class ProbePropagationDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.xyView = ProbePropagationCrossSectionView.createInstance('XY Plane')
-        self.zxView = ProbePropagationCrossSectionView.createInstance('ZX Plane')
+        self.xyView = VisualizationWidget.createInstance('XY Plane')
+        self.zxView = VisualizationWidget.createInstance('ZX Plane')
         self.parametersView = ProbePropagationParametersView.createInstance('Parameters')
-        self.zyView = ProbePropagationCrossSectionView.createInstance('ZY Plane')
+        self.zyView = VisualizationWidget.createInstance('ZY Plane')
         self.propagateButton = QPushButton('Propagate')
         self.saveButton = QPushButton('Save')
         self.coordinateSlider = QSlider(Qt.Orientation.Horizontal)

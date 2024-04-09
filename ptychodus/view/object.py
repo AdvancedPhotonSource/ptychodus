@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGraphicsView, QGridLayout, QGroupBox, QLabel, QPushButton,
-                             QStatusBar, QVBoxLayout, QWidget)
+                             QGridLayout, QGroupBox, QLabel, QPushButton, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from .image import ImageView
+from .visualization import VisualizationParametersView, VisualizationWidget
 
 
 class FourierRingCorrelationDialog(QDialog):
@@ -58,56 +57,15 @@ class FourierRingCorrelationDialog(QDialog):
             self.reject()
 
 
-class DichroicGraphicsView(QGroupBox):  # TODO remove when able
-
-    def __init__(self, title: str, statusBar: QStatusBar, parent: QWidget | None) -> None:
-        super().__init__(title, parent)
-        self.graphicsView = QGraphicsView()
-
-    @classmethod
-    def createInstance(cls,
-                       title: str,
-                       statusBar: QStatusBar,
-                       parent: QWidget | None = None) -> DichroicGraphicsView:
-        view = cls(title, statusBar, parent)
-        view.setAlignment(Qt.AlignHCenter)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.graphicsView)
-        view.setLayout(layout)
-
-        return view
-
-
-class DichroicImageView(QGroupBox):
-
-    def __init__(self, title: str, statusBar: QStatusBar, parent: QWidget | None) -> None:
-        super().__init__(title, parent)
-        self.imageView = ImageView.createInstance(statusBar)
-
-    @classmethod
-    def createInstance(cls,
-                       title: str,
-                       statusBar: QStatusBar,
-                       parent: QWidget | None = None) -> DichroicImageView:
-        view = cls(title, statusBar, parent)
-        view.setAlignment(Qt.AlignHCenter)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.imageView)
-        view.setLayout(layout)
-
-        return view
-
-
 class DichroicParametersView(QGroupBox):
 
     def __init__(self, title: str, parent: QWidget | None) -> None:
         super().__init__(title, parent)
+
+        self.polarizationGroupBox = QGroupBox('Polarization')
         self.lcircComboBox = QComboBox()
         self.rcircComboBox = QComboBox()
+        self.visualizationParametersView = VisualizationParametersView.createInstance()
         self.saveButton = QPushButton('Save')
 
     @classmethod
@@ -115,10 +73,16 @@ class DichroicParametersView(QGroupBox):
         view = cls(title, parent)
         view.setAlignment(Qt.AlignHCenter)
 
-        layout = QFormLayout()
-        layout.addRow('Left Circular:', view.lcircComboBox)
-        layout.addRow('Right Circular:', view.rcircComboBox)
-        layout.addRow(view.saveButton)
+        polarizationLayout = QFormLayout()
+        polarizationLayout.addRow('Left Circular:', view.lcircComboBox)
+        polarizationLayout.addRow('Right Circular:', view.rcircComboBox)
+        view.polarizationGroupBox.setLayout(polarizationLayout)
+
+        layout = QVBoxLayout()
+        layout.addWidget(view.polarizationGroupBox)
+        layout.addWidget(view.visualizationParametersView)
+        layout.addStretch()
+        layout.addWidget(view.saveButton)
         view.setLayout(layout)
 
         return view
@@ -126,28 +90,26 @@ class DichroicParametersView(QGroupBox):
 
 class DichroicDialog(QDialog):
 
-    def __init__(self, statusBar: QStatusBar, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.numeratorImageView = DichroicGraphicsView.createInstance('Numerator', statusBar)
-        self.ratioImageView = DichroicImageView.createInstance('Ratio', statusBar)
-        self.denominatorImageView = DichroicGraphicsView.createInstance('Denominator', statusBar)
+        self.differenceWidget = VisualizationWidget.createInstance('Difference')
+        self.ratioWidget = VisualizationWidget.createInstance('Ratio')
+        self.sumWidget = VisualizationWidget.createInstance('Sum')
         self.parametersView = DichroicParametersView.createInstance('Parameters')
         self.buttonBox = QDialogButtonBox()
 
     @classmethod
-    def createInstance(cls,
-                       statusBar: QStatusBar,
-                       parent: QWidget | None = None) -> DichroicDialog:
-        view = cls(statusBar, parent)
+    def createInstance(cls, parent: QWidget | None = None) -> DichroicDialog:
+        view = cls(parent)
         view.setWindowTitle('Dichroic Analysis')
 
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         contentsLayout = QGridLayout()
-        contentsLayout.addWidget(view.numeratorImageView, 0, 0)
-        contentsLayout.addWidget(view.ratioImageView, 0, 1)
-        contentsLayout.addWidget(view.denominatorImageView, 1, 0)
+        contentsLayout.addWidget(view.differenceWidget, 0, 0)
+        contentsLayout.addWidget(view.ratioWidget, 0, 1)
+        contentsLayout.addWidget(view.sumWidget, 1, 0)
         contentsLayout.addWidget(view.parametersView, 1, 1)
 
         layout = QVBoxLayout()

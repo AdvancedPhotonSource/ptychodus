@@ -4,18 +4,21 @@ import logging
 
 import numpy
 
-from PyQt5.QtCore import (pyqtSignal, Qt, QObject, QPointF, QLineF, QRectF, QSizeF)
-from PyQt5.QtGui import QImage, QPalette, QPen, QPixmap, QWheelEvent
-from PyQt5.QtWidgets import (QApplication, QDialog, QFormLayout, QGraphicsLineItem,
-                             QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsSceneHoverEvent,
-                             QGraphicsSceneMouseEvent, QGraphicsView, QGroupBox, QLineEdit,
-                             QStatusBar, QVBoxLayout, QWidget)
+from PyQt5.QtCore import pyqtSignal, Qt, QObject, QPointF, QLineF, QRectF, QSize, QSizeF
+from PyQt5.QtGui import QIcon, QImage, QPalette, QPen, QPixmap, QWheelEvent
+from PyQt5.QtWidgets import (QAction, QApplication, QComboBox, QDialog, QFormLayout,
+                             QGraphicsLineItem, QGraphicsPixmapItem, QGraphicsRectItem,
+                             QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
+                             QGroupBox, QHBoxLayout, QLineEdit, QPushButton, QStatusBar, QToolBar,
+                             QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 from ptychodus.api.visualization import VisualizationProduct
+
+from .widgets import DecimalLineEdit
 
 logger = logging.getLogger(__name__)
 
@@ -283,3 +286,77 @@ class VisualizationView(QGraphicsView):
 
         deltaPosition = newPosition - oldPosition
         self.translate(deltaPosition.x(), deltaPosition.y())
+
+
+class VisualizationWidget(QGroupBox):
+
+    def __init__(self, title: str, parent: QWidget | None) -> None:
+        super().__init__(title, parent)
+        self.toolBar = QToolBar('Tools')
+        self.homeAction = QAction(QIcon(':/icons/home'), 'Home')
+        self.saveAction = QAction(QIcon(':/icons/save'), 'Save Image')
+        self.visualizationView = VisualizationView()
+
+    @classmethod
+    def createInstance(cls, title: str, parent: QWidget | None = None) -> VisualizationWidget:
+        view = cls(title, parent)
+        view.setAlignment(Qt.AlignHCenter)
+
+        view.toolBar.setFloatable(False)
+        view.toolBar.setIconSize(QSize(32, 32))
+        view.toolBar.addAction(view.homeAction)
+        view.toolBar.addAction(view.saveAction)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view.toolBar)
+        layout.addWidget(view.visualizationView)
+        view.setLayout(layout)
+
+        return view
+
+
+class DisplayRangeWidget(QWidget):
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__(parent)
+        self.minValueLineEdit = DecimalLineEdit.createInstance()
+        self.maxValueLineEdit = DecimalLineEdit.createInstance()
+        self.autoButton = QPushButton('Auto')
+
+    @classmethod
+    def createInstance(cls, parent: QWidget | None = None) -> DisplayRangeWidget:
+        widget = DisplayRangeWidget(parent)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(widget.minValueLineEdit)
+        layout.addWidget(widget.maxValueLineEdit)
+        layout.addWidget(widget.autoButton)
+        widget.setLayout(layout)
+
+        return widget
+
+
+class VisualizationParametersView(QGroupBox):
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__('Visualization', parent)
+
+        self.colorizerComboBox = QComboBox()
+        self.scalarTransformComboBox = QComboBox()
+        self.variantComboBox = QComboBox()
+        self.displayRangeWidget = DisplayRangeWidget.createInstance()
+
+    @classmethod
+    def createInstance(cls, parent: QWidget | None = None) -> VisualizationParametersView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow('Colorizer:', view.colorizerComboBox)
+        layout.addRow('Transform:', view.scalarTransformComboBox)
+        layout.addRow('Variant:', view.variantComboBox)
+        layout.addRow('Display Range:', view.displayRangeWidget)
+        view.setLayout(layout)
+
+        return view
