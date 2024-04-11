@@ -13,6 +13,7 @@ from ptychodus.api.visualization import NumberArrayType
 from ..model.visualization import VisualizationEngine
 from ..view.visualization import (HistogramDialog, ImageItem, ImageItemEvents, ImageMouseTool,
                                   LineCutDialog, VisualizationView)
+from ..view.widgets import ExceptionDialog
 from .data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
@@ -58,8 +59,13 @@ class VisualizationController(Observer):
                  pixelGeometry: PixelGeometry,
                  *,
                  autoscaleColorAxis: bool = False) -> None:
-        product = self._engine.render(array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis)
-        self._item.setProduct(product)
+        try:
+            product = self._engine.render(array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis)
+        except ValueError as err:
+            logger.exception(err)
+            ExceptionDialog.showException('Renderer', err)
+        else:
+            self._item.setProduct(product)
 
     def clearArray(self) -> None:
         self._item.clearProduct()

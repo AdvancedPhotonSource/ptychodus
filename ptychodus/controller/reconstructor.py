@@ -160,7 +160,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(err)
             ExceptionDialog.showException('Clear', err)
 
-    def _redrawPlot(self) -> None:  # FIXME verify that this works
+    def _redrawPlot(self) -> None:
         productIndex = self._view.reconstructorView.productComboBox.currentIndex()
 
         if productIndex < 0:
