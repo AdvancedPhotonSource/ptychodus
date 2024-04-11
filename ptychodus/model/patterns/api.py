@@ -85,6 +85,3 @@ class PatternsAPI:
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, self._dataset)
-        # FIXME indexes = numpy.array(self.dataset.getAssembledIndexes()),
-        # FIXME array = self._dataset.getAssembledData()
-        # FIXME numpy.save(filePath, array)

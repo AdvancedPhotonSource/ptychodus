@@ -226,7 +226,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     entry = EntryGroup.read(h5File['entry'])
                     h5Dataset = h5File['/entry/data/data_000001']
                 except KeyError:
-                    logger.info(f'File {filePath} is not a NeXus data file.')
+                    logger.warning(f'File {filePath} is not a NeXus data file.')
                 else:
                     detector = entry.instrument.detector
                     detectorPixelGeometry = PixelGeometry(
@@ -263,6 +263,6 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 # vvv TODO This is a hack; remove when able! vvv
                 self.stageRotationInDegrees = entry.sample.goniometer.chiDeg
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return dataset

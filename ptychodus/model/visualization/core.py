@@ -68,6 +68,7 @@ class VisualizationEngine(Observable, Observer):
                                               self._transformation, self._colorAxis, colorModel),
                 displayName='Complex',
             )
+            self._rendererChooser.setCurrentPluginByName('Complex')
 
         self._rendererChooser.addObserver(self)
         self._rendererPlugin = self._rendererChooser.currentPlugin

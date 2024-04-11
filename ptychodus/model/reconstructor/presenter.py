@@ -85,7 +85,7 @@ class ReconstructorPresenter(Observable, Observer):
                     pointList.append(point)
                     break
 
-        probe = inputProduct.probe  # FIXME remap if needed
+        probe = inputProduct.probe  # TODO remap if needed
 
         product = Product(
             metadata=inputProduct.metadata,

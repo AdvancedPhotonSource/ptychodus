@@ -146,7 +146,7 @@ class TikeReconstructor:
         logger.debug(f'num_gpu={numGpus}')
 
         exitwave_options = tike.ptycho.ExitWaveOptions(
-            # FIXME: Use a user supplied `measured_pixels` instead
+            # TODO: Use a user supplied `measured_pixels` instead
             measured_pixels=numpy.ones(probeInputArray.shape[-2:], dtype=numpy.bool_),
             noise_model=self._settings.noiseModel.value,
         )

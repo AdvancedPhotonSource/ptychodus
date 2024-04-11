@@ -21,7 +21,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
                     ppX = numpy.squeeze(h5File['/ppX'])
                     ppY = numpy.squeeze(h5File['/ppY'])
                 except KeyError:
-                    logger.debug('Unable to find data.')
+                    logger.warning('Unable to find data.')
                 else:
                     if ppX.shape == ppY.shape:
                         logger.debug(f'Coordinate arrays have shape {ppX.shape}.')
@@ -32,7 +32,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
                         point = ScanPoint(idx, x, y)
                         pointList.append(point)
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return Scan(pointList)
 

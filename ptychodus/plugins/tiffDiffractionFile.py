@@ -85,7 +85,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             with TiffFile(filePath) as tiff:
                 data = tiff.asarray()
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
         else:
             if data.ndim == 2:
                 data = data[numpy.newaxis, :, :]

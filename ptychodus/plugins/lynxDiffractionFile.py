@@ -30,7 +30,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
                     data = h5File[self._dataPath]
                     pixelSize = float(data.attrs['Pixel_size'].item())
                 except KeyError:
-                    logger.debug('Unable to load data.')
+                    logger.warning('Unable to load data.')
                 else:
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
@@ -52,7 +52,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
                     dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return dataset
 

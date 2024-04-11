@@ -140,7 +140,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
                 try:
                     data = h5File[self._dataPath]
                 except KeyError:
-                    logger.debug('Unable to find data.')
+                    logger.warning('Unable to find data.')
                 else:
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
@@ -161,7 +161,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
                 dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return dataset
 

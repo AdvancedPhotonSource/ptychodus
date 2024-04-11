@@ -19,7 +19,7 @@ class CXIProbeFileReader(ProbeFileReader):
             try:
                 array = h5File['/entry_1/instrument_1/source_1/illumination'][()]
             except KeyError:
-                logger.debug('Unable to load probe.')
+                logger.warning('Unable to load probe.')
 
         return Probe(array)
 

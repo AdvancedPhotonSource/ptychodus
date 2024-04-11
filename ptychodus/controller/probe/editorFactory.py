@@ -82,7 +82,7 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._orderSpinBox.setRange(1, 100)
         self._orderSpinBox.setValue(self._probeBuilder.getOrder())
 
-        self._coefficientsTableModel.beginResetModel()  # FIXME clean up
+        self._coefficientsTableModel.beginResetModel()  # TODO clean up
         self._coefficientsTableModel.endResetModel()
 
     def update(self, observable: Observable) -> None:

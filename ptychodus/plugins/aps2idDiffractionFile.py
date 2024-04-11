@@ -52,7 +52,7 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
                 try:
                     h5data = h5File[dataPath]
                 except KeyError:
-                    logger.info(f'File {filePath} is not an APS 2-ID data file.')
+                    logger.warning(f'File {filePath} is not an APS 2-ID data file.')
                 else:
                     numberOfPatternsPerArray, detectorHeight, detectorWidth = h5data.shape
                     metadata = DiffractionMetadata(
@@ -65,7 +65,7 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
 
                     dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return dataset
 
