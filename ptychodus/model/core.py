@@ -76,7 +76,7 @@ class ModelCore:
                                           self._pluginRegistry.diffractionFileReaders,
                                           self._pluginRegistry.diffractionFileWriters)
         self._productCore = ProductCore(
-            self.rng, self._patternsCore.detector, self._patternsCore.datasetSettings,
+            self.rng, self._patternsCore.detector, self._patternsCore.productSettings,
             self._patternsCore.patternSizer, self._patternsCore.dataset,
             self._pluginRegistry.scanFileReaders, self._pluginRegistry.scanFileWriters,
             self._pluginRegistry.fresnelZonePlates, self._pluginRegistry.probeFileReaders,

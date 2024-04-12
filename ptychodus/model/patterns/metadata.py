@@ -1,22 +1,22 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from ...api.observer import Observable, Observer
-from ...api.patterns import DiffractionDataset, DiffractionMetadata
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.patterns import DiffractionDataset, DiffractionMetadata
+
 from .detector import Detector
-from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
+from .settings import PatternSettings, ProductSettings
 
 
 class DiffractionMetadataPresenter(Observable, Observer):
 
     def __init__(self, diffractionDataset: DiffractionDataset, detector: Detector,
-                 datasetSettings: DiffractionDatasetSettings,
-                 patternSettings: DiffractionPatternSettings) -> None:
+                 patternSettings: PatternSettings, productSettings: ProductSettings) -> None:
         super().__init__()
         self._diffractionDataset = diffractionDataset
         self._detector = detector
-        self._datasetSettings = datasetSettings
         self._patternSettings = patternSettings
+        self._productSettings = productSettings
 
         diffractionDataset.addObserver(self)
 
@@ -96,7 +96,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
         energyInElectronVolts = self._metadata.probeEnergyInElectronVolts
 
         if energyInElectronVolts:
-            self._datasetSettings.probeEnergyInElectronVolts.value = \
+            self._productSettings.probeEnergyInElectronVolts.value = \
                     Decimal.from_float(energyInElectronVolts)
 
     def canSyncDetectorDistance(self) -> bool:
@@ -106,7 +106,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
         distanceInMeters = self._metadata.detectorDistanceInMeters
 
         if distanceInMeters:
-            self._datasetSettings.detectorDistanceInMeters.value = \
+            self._productSettings.detectorDistanceInMeters.value = \
                     Decimal.from_float(distanceInMeters)
 
     def update(self, observable: Observable) -> None:

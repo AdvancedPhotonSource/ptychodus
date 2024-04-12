@@ -7,32 +7,36 @@ from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
 from ptychodus.api.scan import ScanBoundingBox
 from ptychodus.api.constants import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
 
-from ..patterns import PatternSizer
+from ..patterns import PatternSizer, ProductSettings
 from .metadata import MetadataRepositoryItem
 from .scan import ScanRepositoryItem
 
 
 class ProductGeometry(ParameterRepository, ProbeGeometryProvider, ObjectGeometryProvider):
 
-    def __init__(self, metadata: MetadataRepositoryItem, scan: ScanRepositoryItem,
-                 patternSizer: PatternSizer) -> None:
+    def __init__(self, settings: ProductSettings, patternSizer: PatternSizer,
+                 metadata: MetadataRepositoryItem, scan: ScanRepositoryItem) -> None:
         super().__init__('sizer')
+        self._settings = settings
+        self._patternSizer = patternSizer
         self._metadata = metadata
         self._scan = scan
-        self._patternSizer = patternSizer
 
         self._metadata.addObserver(self)
         self._scan.addObserver(self)
         self._patternSizer.addObserver(self)
 
         # FIXME to GUI
-        self.expandScanBoundingBox = self._registerBooleanParameter('expand_scan_bbox', False)
-        self.scanBoundingBoxMinimumXInMeters = self._registerRealParameter('scan_bbox_xmin_m', 0.)
+        self.expandScanBoundingBox = self._registerBooleanParameter(
+            'expand_scan_bbox', self._settings.expandScanBoundingBox.value)
+        self.scanBoundingBoxMinimumXInMeters = self._registerRealParameter(
+            'scan_bbox_xmin_m', float(self._settings.scanBoundingBoxMinimumXInMeters.value))
         self.scanBoundingBoxMaximumXInMeters = self._registerRealParameter(
-            'scan_bbox_xmax_m', 1e-5)
-        self.scanBoundingBoxMinimumYInMeters = self._registerRealParameter('scan_bbox_ymin_m', 0.)
+            'scan_bbox_xmax_m', float(self._settings.scanBoundingBoxMaximumXInMeters.value))
+        self.scanBoundingBoxMinimumYInMeters = self._registerRealParameter(
+            'scan_bbox_ymin_m', float(self._settings.scanBoundingBoxMinimumYInMeters.value))
         self.scanBoundingBoxMaximumYInMeters = self._registerRealParameter(
-            'scan_bbox_ymax_m', 1e-5)
+            'scan_bbox_ymax_m', float(self._settings.scanBoundingBoxMaximumYInMeters.value))
 
     @property
     def probeEnergyInJoules(self) -> float:

@@ -15,7 +15,7 @@ from ptychodus.api.patterns import (DiffractionDataset, DiffractionMetadata,
                                     SimpleDiffractionPatternArray)
 from ptychodus.api.tree import SimpleTreeNode
 
-from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
+from .settings import PatternSettings
 from .sizer import PatternSizer
 
 __all__ = [
@@ -27,12 +27,9 @@ logger = logging.getLogger(__name__)
 
 class ActiveDiffractionDataset(DiffractionDataset):
 
-    def __init__(self, datasetSettings: DiffractionDatasetSettings,
-                 patternSettings: DiffractionPatternSettings,
-                 diffractionPatternSizer: PatternSizer) -> None:
+    def __init__(self, settings: PatternSettings, diffractionPatternSizer: PatternSizer) -> None:
         super().__init__()
-        self._datasetSettings = datasetSettings
-        self._patternSettings = patternSettings
+        self._settings = settings
         self._diffractionPatternSizer = diffractionPatternSizer
 
         self._metadata = DiffractionMetadata.createNullInstance()
@@ -91,8 +88,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
         with self._arrayListLock:
             self._arrayList.clear()
 
-            if self._datasetSettings.memmapEnabled.value:
-                scratchDirectory = self._datasetSettings.scratchDirectory.value
+            if self._settings.memmapEnabled.value:
+                scratchDirectory = self._settings.scratchDirectory.value
                 scratchDirectory.mkdir(mode=0o755, parents=True, exist_ok=True)
                 npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
                 logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
@@ -110,19 +107,19 @@ class ActiveDiffractionDataset(DiffractionDataset):
         if array.getState() == DiffractionPatternState.LOADED:
             data = self._diffractionPatternSizer(array.getData())
 
-            if self._patternSettings.valueUpperBoundEnabled.value:
-                valueLowerBound = self._patternSettings.valueLowerBound.value
-                valueUpperBound = self._patternSettings.valueUpperBound.value
+            if self._settings.valueUpperBoundEnabled.value:
+                valueLowerBound = self._settings.valueLowerBound.value
+                valueUpperBound = self._settings.valueUpperBound.value
                 data[data >= valueUpperBound] = 0
 
-            if self._patternSettings.valueLowerBoundEnabled.value:
-                valueLowerBound = self._patternSettings.valueLowerBound.value
+            if self._settings.valueLowerBoundEnabled.value:
+                valueLowerBound = self._settings.valueLowerBound.value
                 data[data < valueLowerBound] = 0
 
-            if self._patternSettings.flipXEnabled.value:
+            if self._settings.flipXEnabled.value:
                 data = numpy.flip(data, axis=-1)
 
-            if self._patternSettings.flipYEnabled.value:
+            if self._settings.flipYEnabled.value:
                 data = numpy.flip(data, axis=-2)
 
             offset = self._metadata.numberOfPatternsPerArray * array.getIndex()

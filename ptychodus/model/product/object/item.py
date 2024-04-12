@@ -7,6 +7,7 @@ from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterRepository
 
+from ...patterns import ProductSettings
 from .builder import ObjectBuilder
 
 logger = logging.getLogger(__name__)
@@ -14,9 +15,11 @@ logger = logging.getLogger(__name__)
 
 class ObjectRepositoryItem(ParameterRepository):
 
-    def __init__(self, geometryProvider: ObjectGeometryProvider, builder: ObjectBuilder) -> None:
+    def __init__(self, geometryProvider: ObjectGeometryProvider, settings: ProductSettings,
+                 builder: ObjectBuilder) -> None:
         super().__init__('Object')
         self._geometryProvider = geometryProvider
+        self._settings = settings
         self._builder = builder
         self._object = Object()
 
@@ -37,7 +40,7 @@ class ObjectRepositoryItem(ParameterRepository):
         numRequested = max(1, number)
         distanceInMeters = list(self.layerDistanceInMeters.getValue())
         numExisting = len(distanceInMeters)
-        defaultDistanceInMeters = 1e-6  # FIXME from settings
+        defaultDistanceInMeters = float(self._settings.objectLayerDistanceInMeters.value)
 
         if numExisting < 2:
             distanceInMeters = [defaultDistanceInMeters] * numRequested

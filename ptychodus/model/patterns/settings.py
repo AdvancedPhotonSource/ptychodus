@@ -1,62 +1,71 @@
 from __future__ import annotations
 from pathlib import Path
 
-from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry, SettingsGroup
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry
 
 
-class DiffractionDatasetSettings(Observable, Observer):
+class PatternSettings(Observable, Observer):
 
-    def __init__(self, settingsGroup: SettingsGroup) -> None:
+    def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = settingsGroup
-        self.fileType = settingsGroup.createStringEntry('FileType', 'HDF5')
-        self.filePath = settingsGroup.createPathEntry('FilePath', Path('/path/to/data.h5'))
-        self.memmapEnabled = settingsGroup.createBooleanEntry('MemmapEnabled', False)
-        self.scratchDirectory = settingsGroup.createPathEntry('ScratchDirectory',
-                                                              Path.home() / '.ptychodus')
-        self.numberOfDataThreads = settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)
-        self.detectorDistanceInMeters = settingsGroup.createRealEntry(
-            'DetectorDistanceInMeters', '1')
-        self.probeEnergyInElectronVolts = settingsGroup.createRealEntry(
-            'ProbeEnergyInElectronVolts', '10000')
-        self.probePhotonsPerSecond = settingsGroup.createRealEntry('ProbePhotonsPerSecond', '0')
+        self._settingsGroup = registry.createGroup('Patterns')
+        self._settingsGroup.addObserver(self)
 
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> DiffractionDatasetSettings:
-        settings = cls(settingsRegistry.createGroup('Diffraction Dataset'))
-        settings._settingsGroup.addObserver(settings)
-        return settings
+        self.fileType = self._settingsGroup.createStringEntry('FileType', 'HDF5')
+        self.filePath = self._settingsGroup.createPathEntry('FilePath', Path('/path/to/data.h5'))
+        self.memmapEnabled = self._settingsGroup.createBooleanEntry('MemmapEnabled', False)
+        self.scratchDirectory = self._settingsGroup.createPathEntry('ScratchDirectory',
+                                                                    Path.home() / '.ptychodus')
+        self.numberOfDataThreads = self._settingsGroup.createIntegerEntry('NumberOfDataThreads', 8)
+
+        self.cropEnabled = self._settingsGroup.createBooleanEntry('CropEnabled', True)
+        self.cropCenterXInPixels = self._settingsGroup.createIntegerEntry(
+            'CropCenterXInPixels', 32)
+        self.cropCenterYInPixels = self._settingsGroup.createIntegerEntry(
+            'CropCenterYInPixels', 32)
+        self.cropWidthInPixels = self._settingsGroup.createIntegerEntry('CropWidthInPixels', 64)
+        self.cropHeightInPixels = self._settingsGroup.createIntegerEntry('CropHeightInPixels', 64)
+        self.flipXEnabled = self._settingsGroup.createBooleanEntry('FlipXEnabled', False)
+        self.flipYEnabled = self._settingsGroup.createBooleanEntry('FlipYEnabled', False)
+        self.valueLowerBoundEnabled = self._settingsGroup.createBooleanEntry(
+            'ValueLowerBoundEnabled', False)
+        self.valueLowerBound = self._settingsGroup.createIntegerEntry('ValueLowerBound', 0)
+        self.valueUpperBoundEnabled = self._settingsGroup.createBooleanEntry(
+            'ValueUpperBoundEnabled', False)
+        self.valueUpperBound = self._settingsGroup.createIntegerEntry('ValueUpperBound', 65535)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
             self.notifyObservers()
 
 
-class DiffractionPatternSettings(Observable, Observer):
+class ProductSettings(Observable, Observer):
 
-    def __init__(self, settingsGroup: SettingsGroup) -> None:
+    def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = settingsGroup
-        self.cropEnabled = settingsGroup.createBooleanEntry('CropEnabled', True)
-        self.cropCenterXInPixels = settingsGroup.createIntegerEntry('CropCenterXInPixels', 32)
-        self.cropCenterYInPixels = settingsGroup.createIntegerEntry('CropCenterYInPixels', 32)
-        self.cropWidthInPixels = settingsGroup.createIntegerEntry('CropWidthInPixels', 64)
-        self.cropHeightInPixels = settingsGroup.createIntegerEntry('CropHeightInPixels', 64)
-        self.flipXEnabled = settingsGroup.createBooleanEntry('FlipXEnabled', False)
-        self.flipYEnabled = settingsGroup.createBooleanEntry('FlipYEnabled', False)
-        self.valueLowerBoundEnabled = settingsGroup.createBooleanEntry(
-            'ValueLowerBoundEnabled', False)
-        self.valueLowerBound = settingsGroup.createIntegerEntry('ValueLowerBound', 0)
-        self.valueUpperBoundEnabled = settingsGroup.createBooleanEntry(
-            'ValueUpperBoundEnabled', False)
-        self.valueUpperBound = settingsGroup.createIntegerEntry('ValueUpperBound', 65535)
+        self._settingsGroup = registry.createGroup('Products')
+        self._settingsGroup.addObserver(self)
 
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> DiffractionPatternSettings:
-        settings = cls(settingsRegistry.createGroup('Diffraction Pattern'))
-        settings._settingsGroup.addObserver(settings)
-        return settings
+        self.detectorDistanceInMeters = self._settingsGroup.createRealEntry(
+            'DetectorDistanceInMeters', '1')
+        self.probeEnergyInElectronVolts = self._settingsGroup.createRealEntry(
+            'ProbeEnergyInElectronVolts', '10000')
+        self.probePhotonsPerSecond = self._settingsGroup.createRealEntry(
+            'ProbePhotonsPerSecond', '0')
+        self.objectLayerDistanceInMeters = self._settingsGroup.createRealEntry(
+            'ObjectLayerDistanceInMeters', '1e-6')
+
+        self.expandScanBoundingBox = self._settingsGroup.createBooleanEntry(
+            'ExpandScanBoundingBox', False)
+        self.scanBoundingBoxMinimumXInMeters = self._settingsGroup.createRealEntry(
+            'ScanBoundingBoxMinimumXInMeters', '0')
+        self.scanBoundingBoxMaximumXInMeters = self._settingsGroup.createRealEntry(
+            'ScanBoundingBoxMaximumXInMeters', '1e-5')
+        self.scanBoundingBoxMinimumYInMeters = self._settingsGroup.createRealEntry(
+            'ScanBoundingBoxMinimumYInMeters', '0')
+        self.scanBoundingBoxMaximumYInMeters = self._settingsGroup.createRealEntry(
+            'ScanBoundingBoxMaximumYInMeters', '1e-5')
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

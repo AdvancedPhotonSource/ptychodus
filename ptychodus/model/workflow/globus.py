@@ -27,7 +27,7 @@ ScopeAuthorizerMapping: TypeAlias = Mapping[str, AuthorizerTypes]
 
 PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
-# FIXME add review consents fix
+# TODO add review consents fix
 
 
 def ptychodus_reconstruct(**data: str) -> None:

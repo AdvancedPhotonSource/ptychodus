@@ -4,26 +4,23 @@ from typing import Final
 
 from ptychodus.api.geometry import ImageExtent, Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry, SettingsGroup
+from ptychodus.api.settings import SettingsRegistry
 
 
 class Detector(Observable, Observer):
 
-    def __init__(self, settingsGroup: SettingsGroup) -> None:
+    def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = settingsGroup
-        self._widthInPixels = settingsGroup.createIntegerEntry('WidthInPixels', 1024)
-        self._pixelWidthInMeters = settingsGroup.createRealEntry('PixelWidthInMeters', '75e-6')
-        self._heightInPixels = settingsGroup.createIntegerEntry('HeightInPixels', 1024)
-        self._pixelHeightInMeters = settingsGroup.createRealEntry('PixelHeightInMeters', '75e-6')
-        self._bitDepth = settingsGroup.createIntegerEntry('BitDepth', 8)
+        self._settingsGroup = registry.createGroup('Detector')
+        self._settingsGroup.addObserver(self)
 
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> Detector:
-        settingsGroup = settingsRegistry.createGroup('Detector')
-        detector = cls(settingsGroup)
-        settingsGroup.addObserver(detector)
-        return detector
+        self._widthInPixels = self._settingsGroup.createIntegerEntry('WidthInPixels', 1024)
+        self._pixelWidthInMeters = self._settingsGroup.createRealEntry(
+            'PixelWidthInMeters', '75e-6')
+        self._heightInPixels = self._settingsGroup.createIntegerEntry('HeightInPixels', 1024)
+        self._pixelHeightInMeters = self._settingsGroup.createRealEntry(
+            'PixelHeightInMeters', '75e-6')
+        self._bitDepth = self._settingsGroup.createIntegerEntry('BitDepth', 8)
 
     def getWidthInPixels(self) -> int:
         return max(0, self._widthInPixels.value)

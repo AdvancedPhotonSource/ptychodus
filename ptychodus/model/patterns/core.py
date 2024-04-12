@@ -22,7 +22,7 @@ from .detector import Detector, DetectorPresenter
 from .io import DiffractionDatasetInputOutputPresenter
 from .metadata import DiffractionMetadataPresenter
 from .patterns import DiffractionPatternPresenter
-from .settings import DiffractionDatasetSettings, DiffractionPatternSettings
+from .settings import PatternSettings, ProductSettings
 from .sizer import PatternSizer
 
 logger = logging.getLogger(__name__)
@@ -41,14 +41,13 @@ class DiffractionPatternArrayPresenter:
 
 class DiffractionDatasetPresenter(Observable, Observer):
 
-    def __init__(self, settings: DiffractionDatasetSettings,
-                 dataset: ActiveDiffractionDataset) -> None:
+    def __init__(self, settings: PatternSettings, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
         self._dataset = dataset
 
     @classmethod
-    def createInstance(cls, settings: DiffractionDatasetSettings,
+    def createInstance(cls, settings: PatternSettings,
                        dataset: ActiveDiffractionDataset) -> DiffractionDatasetPresenter:
         presenter = cls(settings, dataset)
         settings.addObserver(presenter)
@@ -141,32 +140,31 @@ class PatternsCore:
     def __init__(self, settingsRegistry: SettingsRegistry,
                  fileReaderChooser: PluginChooser[DiffractionFileReader],
                  fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
-        self.detector = Detector.createInstance(settingsRegistry)
+        self.detector = Detector(settingsRegistry)
         self.detectorPresenter = DetectorPresenter.createInstance(self.detector)
-        self.datasetSettings = DiffractionDatasetSettings.createInstance(settingsRegistry)
-        self._patternSettings = DiffractionPatternSettings.createInstance(settingsRegistry)
+        self.patternSettings = PatternSettings(settingsRegistry)
+        self.productSettings = ProductSettings(settingsRegistry)
 
         # TODO vvv refactor vvv
-        fileReaderChooser.setCurrentPluginByName(self.datasetSettings.fileType.value)
-        fileWriterChooser.setCurrentPluginByName(self.datasetSettings.fileType.value)
+        fileReaderChooser.setCurrentPluginByName(self.patternSettings.fileType.value)
+        fileWriterChooser.setCurrentPluginByName(self.patternSettings.fileType.value)
 
-        self.patternSizer = PatternSizer.createInstance(self._patternSettings, self.detector)
+        self.patternSizer = PatternSizer.createInstance(self.patternSettings, self.detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
-            self._patternSettings, self.patternSizer)
+            self.patternSettings, self.patternSizer)
 
-        self.dataset = ActiveDiffractionDataset(self.datasetSettings, self._patternSettings,
-                                                self.patternSizer)
-        self._builder = ActiveDiffractionDatasetBuilder(self.datasetSettings, self.dataset)
+        self.dataset = ActiveDiffractionDataset(self.patternSettings, self.patternSizer)
+        self._builder = ActiveDiffractionDatasetBuilder(self.patternSettings, self.dataset)
         self.patternsAPI = PatternsAPI(self._builder, self.dataset, fileReaderChooser,
                                        fileWriterChooser)
 
         self.metadataPresenter = DiffractionMetadataPresenter(self.dataset, self.detector,
-                                                              self.datasetSettings,
-                                                              self._patternSettings)
+                                                              self.patternSettings,
+                                                              self.productSettings)
         self.datasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self.datasetSettings, self.dataset)
+            self.patternSettings, self.dataset)
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter.createInstance(
-            self.datasetSettings, self.dataset, self.patternsAPI, settingsRegistry)
+            self.patternSettings, self.dataset, self.patternsAPI, settingsRegistry)
 
     def start(self) -> None:
         pass

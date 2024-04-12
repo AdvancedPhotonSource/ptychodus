@@ -8,7 +8,7 @@ import sys
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 
-from ..patterns import ActiveDiffractionDataset, DiffractionDatasetSettings, PatternSizer
+from ..patterns import ActiveDiffractionDataset, PatternSizer, ProductSettings
 from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
 from .metadataFactory import MetadataRepositoryItemFactory
 from .object import ObjectRepositoryItemFactory
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemObserver):
 
-    def __init__(self, datasetSettings: DiffractionDatasetSettings, patternSizer: PatternSizer,
+    def __init__(self, settings: ProductSettings, patternSizer: PatternSizer,
                  patterns: ActiveDiffractionDataset,
                  scanRepositoryItemFactory: ScanRepositoryItemFactory,
                  probeRepositoryItemFactory: ProbeRepositoryItemFactory,
@@ -30,6 +30,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
                  fileReaderChooser: PluginChooser[ProductFileReader],
                  fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
         super().__init__()
+        self._settings = settings
         self._patternSizer = patternSizer
         self._patterns = patterns
         self._scanRepositoryItemFactory = scanRepositoryItemFactory
@@ -38,7 +39,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._itemList: list[ProductRepositoryItem] = list()
-        self._metadataRepositoryItemFactory = MetadataRepositoryItemFactory(self, datasetSettings)
+        self._metadataRepositoryItemFactory = MetadataRepositoryItemFactory(self, settings)
         self._observerList: list[ProductRepositoryObserver] = [
             self._metadataRepositoryItemFactory,  # NOTE must be first!
         ]
@@ -70,12 +71,11 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
     def createNewProduct(self, name: str = 'Unnamed', *, likeIndex: int = -1) -> int:
         metadataItem = self._metadataRepositoryItemFactory.createDefault(name)
         scanItem = self._scanRepositoryItemFactory.createDefault()
-        geometry = ProductGeometry(metadataItem, scanItem, self._patternSizer)
+        geometry = ProductGeometry(self._settings, self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.create(geometry)
         objectItem = self._objectRepositoryItemFactory.create(geometry)
 
         if likeIndex >= 0:
-            # FIXME verify name
             sourceItem = self._itemList[likeIndex]
             metadataItem.assign(sourceItem.getMetadata())
             scanItem.assign(sourceItem.getScan())
@@ -98,7 +98,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
     def insertProduct(self, product: Product) -> int:
         metadataItem = self._metadataRepositoryItemFactory.create(product.metadata)
         scanItem = self._scanRepositoryItemFactory.create(product.scan)
-        geometry = ProductGeometry(metadataItem, scanItem, self._patternSizer)
+        geometry = ProductGeometry(self._settings, self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.create(geometry, product.probe)
         objectItem = self._objectRepositoryItemFactory.create(geometry, product.object_)
 

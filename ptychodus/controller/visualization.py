@@ -60,7 +60,9 @@ class VisualizationController(Observer):
                  *,
                  autoscaleColorAxis: bool = False) -> None:
         try:
-            product = self._engine.render(array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis)
+            product = self._engine.render(array,
+                                          pixelGeometry,
+                                          autoscaleColorAxis=autoscaleColorAxis)
         except ValueError as err:
             logger.exception(err)
             ExceptionDialog.showException('Renderer', err)

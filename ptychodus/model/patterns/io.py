@@ -7,14 +7,14 @@ from ptychodus.api.observer import Observable, Observer
 
 from .active import ActiveDiffractionDataset
 from .api import PatternsAPI
-from .settings import DiffractionDatasetSettings
+from .settings import PatternSettings
 
 logger = logging.getLogger(__name__)
 
 
 class DiffractionDatasetInputOutputPresenter(Observable, Observer):
 
-    def __init__(self, settings: DiffractionDatasetSettings, dataset: ActiveDiffractionDataset,
+    def __init__(self, settings: PatternSettings, dataset: ActiveDiffractionDataset,
                  patternsAPI: PatternsAPI, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
@@ -23,8 +23,8 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         self._reinitObservable = reinitObservable
 
     @classmethod
-    def createInstance(cls, settings: DiffractionDatasetSettings,
-                       dataset: ActiveDiffractionDataset, patternsAPI: PatternsAPI,
+    def createInstance(cls, settings: PatternSettings, dataset: ActiveDiffractionDataset,
+                       patternsAPI: PatternsAPI,
                        reinitObservable: Observable) -> DiffractionDatasetInputOutputPresenter:
         presenter = cls(settings, dataset, patternsAPI, reinitObservable)
         reinitObservable.addObserver(presenter)

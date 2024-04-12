@@ -3,7 +3,7 @@ import logging
 
 from ptychodus.api.product import ProductMetadata
 
-from ..patterns import DiffractionDatasetSettings
+from ..patterns import ProductSettings
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver):
 
     def __init__(self, repository: Sequence[ProductRepositoryItem],
-                 settings: DiffractionDatasetSettings) -> None:
+                 settings: ProductSettings) -> None:
         self._repository = repository
         self._settings = settings
 

@@ -8,7 +8,7 @@ import numpy
 from ...api.patterns import (DiffractionDataset, DiffractionPatternArray, DiffractionPatternState,
                              SimpleDiffractionPatternArray)
 from .active import ActiveDiffractionDataset
-from .settings import DiffractionDatasetSettings
+from .settings import PatternSettings
 
 __all__ = [
     'ActiveDiffractionDatasetBuilder',
@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__)
 
 class ActiveDiffractionDatasetBuilder:
 
-    def __init__(self, settings: DiffractionDatasetSettings,
-                 dataset: ActiveDiffractionDataset) -> None:
+    def __init__(self, settings: PatternSettings, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
         self._dataset = dataset

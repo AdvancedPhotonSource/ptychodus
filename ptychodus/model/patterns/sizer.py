@@ -5,12 +5,12 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.patterns import DiffractionPatternArrayType
 
 from .detector import Detector
-from .settings import DiffractionPatternSettings
+from .settings import PatternSettings
 
 
 class PatternSizer(Observable, Observer):
 
-    def __init__(self, settings: DiffractionPatternSettings, detector: Detector) -> None:
+    def __init__(self, settings: PatternSettings, detector: Detector) -> None:
         super().__init__()
         self._settings = settings
         self._detector = detector
@@ -18,8 +18,7 @@ class PatternSizer(Observable, Observer):
         self._sliceY = slice(0)
 
     @classmethod
-    def createInstance(cls, settings: DiffractionPatternSettings,
-                       detector: Detector) -> PatternSizer:
+    def createInstance(cls, settings: PatternSettings, detector: Detector) -> PatternSizer:
         sizer = cls(settings, detector)
         sizer._updateSlicesAndNotifyObservers()
         settings.addObserver(sizer)
