@@ -7,7 +7,7 @@ from ...model.visualization import VisualizationEngine
 from ...view.object import DichroicDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..visualization import VisualizationController
+from ..visualization import VisualizationParametersController, VisualizationWidgetController
 from .treeModel import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
@@ -29,12 +29,14 @@ class DichroicViewController:
         self._dialog.parametersView.rcircComboBox.currentIndexChanged.connect(self._analyze)
         self._dialog.parametersView.saveButton.clicked.connect(self._saveResult)
 
-        self._differenceVisualizationController = VisualizationController.createInstance(
-            engine, self._dialog.differenceWidget.visualizationView, statusBar, fileDialogFactory)
-        self._sumVisualizationController = VisualizationController.createInstance(
-            engine, self._dialog.sumWidget.visualizationView, statusBar, fileDialogFactory)
-        self._ratioVisualizationController = VisualizationController.createInstance(
-            engine, self._dialog.ratioWidget.visualizationView, statusBar, fileDialogFactory)
+        self._differenceVisualizationWidgetController = VisualizationWidgetController(
+            engine, self._dialog.differenceWidget, statusBar, fileDialogFactory)
+        self._sumVisualizationWidgetController = VisualizationWidgetController(
+            engine, self._dialog.sumWidget, statusBar, fileDialogFactory)
+        self._ratioVisualizationWidgetController = VisualizationWidgetController(
+            engine, self._dialog.ratioWidget, statusBar, fileDialogFactory)
+        self._visualizationParametersController = VisualizationParametersController.createInstance(
+            engine, self._dialog.parametersView.visualizationParametersView)
 
     def _analyze(self) -> None:
         lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()
@@ -51,11 +53,12 @@ class DichroicViewController:
             return
 
         # TODO support multi-layer objects
-        self._differenceVisualizationController.setArray(result.polarDifference[0, :, :],
-                                                         result.pixelGeometry)
-        self._sumVisualizationController.setArray(result.polarSum[0, :, :], result.pixelGeometry)
-        self._ratioVisualizationController.setArray(result.polarRatio[0, :, :],
-                                                    result.pixelGeometry)
+        self._differenceVisualizationWidgetController.setArray(result.polarDifference[0, :, :],
+                                                               result.pixelGeometry)
+        self._sumVisualizationWidgetController.setArray(result.polarSum[0, :, :],
+                                                        result.pixelGeometry)
+        self._ratioVisualizationWidgetController.setArray(result.polarRatio[0, :, :],
+                                                          result.pixelGeometry)
 
     def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> None:
         self._dialog.parametersView.lcircComboBox.setCurrentIndex(lcircItemIndex)

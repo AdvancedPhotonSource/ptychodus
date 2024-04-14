@@ -36,7 +36,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._editorFactory = ProbeEditorViewControllerFactory()
 
         self._propagationViewController = ProbePropagationViewController(
-            propagator, propagatorVisualizationEngine, fileDialogFactory, statusBar, view)
+            propagator, propagatorVisualizationEngine, statusBar, fileDialogFactory, view)
 
     @classmethod
     def createInstance(cls, repository: ProbeRepository, imageController: ImageController,

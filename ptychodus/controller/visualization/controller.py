@@ -10,11 +10,11 @@ from ptychodus.api.geometry import Box2D, Line2D, PixelGeometry, Point2D
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.visualization import NumberArrayType
 
-from ..model.visualization import VisualizationEngine
-from ..view.visualization import (HistogramDialog, ImageItem, ImageItemEvents, ImageMouseTool,
-                                  LineCutDialog, VisualizationView)
-from ..view.widgets import ExceptionDialog
-from .data import FileDialogFactory
+from ...model.visualization import VisualizationEngine
+from ...view.visualization import (HistogramDialog, ImageItem, ImageItemEvents, ImageMouseTool,
+                                   LineCutDialog, VisualizationView)
+from ...view.widgets import ExceptionDialog
+from ..data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
 

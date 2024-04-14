@@ -9,8 +9,7 @@ from PyQt5.QtGui import QIcon, QImage, QPalette, QPen, QPixmap, QWheelEvent
 from PyQt5.QtWidgets import (QAction, QApplication, QComboBox, QDialog, QFormLayout,
                              QGraphicsLineItem, QGraphicsPixmapItem, QGraphicsRectItem,
                              QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
-                             QGroupBox, QHBoxLayout, QLineEdit, QPushButton, QStatusBar, QToolBar,
-                             QVBoxLayout, QWidget)
+                             QGroupBox, QLineEdit, QStatusBar, QToolBar, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -295,6 +294,7 @@ class VisualizationWidget(QGroupBox):
         self.toolBar = QToolBar('Tools')
         self.homeAction = QAction(QIcon(':/icons/home'), 'Home')
         self.saveAction = QAction(QIcon(':/icons/save'), 'Save Image')
+        self.autoscaleAction = QAction(QIcon(':/icons/autoscale'), 'Autoscale Color Axis')
         self.visualizationView = VisualizationView()
 
     @classmethod
@@ -306,6 +306,7 @@ class VisualizationWidget(QGroupBox):
         view.toolBar.setIconSize(QSize(32, 32))
         view.toolBar.addAction(view.homeAction)
         view.toolBar.addAction(view.saveAction)
+        view.toolBar.addAction(view.autoscaleAction)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -316,47 +317,27 @@ class VisualizationWidget(QGroupBox):
         return view
 
 
-class DisplayRangeWidget(QWidget):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.minValueLineEdit = DecimalLineEdit.createInstance()
-        self.maxValueLineEdit = DecimalLineEdit.createInstance()
-        self.autoButton = QPushButton('Auto')
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> DisplayRangeWidget:
-        widget = DisplayRangeWidget(parent)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(widget.minValueLineEdit)
-        layout.addWidget(widget.maxValueLineEdit)
-        layout.addWidget(widget.autoButton)
-        widget.setLayout(layout)
-
-        return widget
-
-
 class VisualizationParametersView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Visualization', parent)
 
-        self.colorizerComboBox = QComboBox()
-        self.scalarTransformComboBox = QComboBox()
+        self.rendererComboBox = QComboBox()
+        self.transformationComboBox = QComboBox()
         self.variantComboBox = QComboBox()
-        self.displayRangeWidget = DisplayRangeWidget.createInstance()
+        self.minDisplayValueLineEdit = DecimalLineEdit.createInstance()
+        self.maxDisplayValueLineEdit = DecimalLineEdit.createInstance()
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> VisualizationParametersView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Colorizer:', view.colorizerComboBox)
-        layout.addRow('Transform:', view.scalarTransformComboBox)
+        layout.addRow('Renderer:', view.rendererComboBox)
+        layout.addRow('Transform:', view.transformationComboBox)
         layout.addRow('Variant:', view.variantComboBox)
-        layout.addRow('Display Range:', view.displayRangeWidget)
+        layout.addRow('Min Display Value:', view.minDisplayValueLineEdit)
+        layout.addRow('Max Display Value:', view.maxDisplayValueLineEdit)
         view.setLayout(layout)
 
         return view
