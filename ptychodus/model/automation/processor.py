@@ -34,6 +34,19 @@ class AutomationDatasetProcessor:
         self._repository.put(filePath, AutomationDatasetState.WAITING)
         self._processingQueue.put(filePath)
 
+    def runOnce(self) -> None:
+        try:
+            filePath = self._processingQueue.get(block=False)
+
+            try:
+                self._repository.put(filePath, AutomationDatasetState.PROCESSING)
+                self._workflow.execute(self._workflowAPI, filePath)
+                self._repository.put(filePath, AutomationDatasetState.COMPLETE)
+            finally:
+                self._processingQueue.task_done()
+        except queue.Empty:
+            pass
+
     def _run(self) -> None:
         while not self._stopWorkEvent.is_set():
             try:

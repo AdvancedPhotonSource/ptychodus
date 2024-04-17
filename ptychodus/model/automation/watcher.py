@@ -11,6 +11,7 @@ from ptychodus.api.observer import Observable, Observer
 
 from .buffer import AutomationDatasetBuffer
 from .settings import AutomationSettings
+from .workflow import CurrentFileBasedWorkflow
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
 
 class DataDirectoryWatcher(Observable, Observer):
 
-    def __init__(self, settings: AutomationSettings, workflow: FileBasedWorkflow,
+    def __init__(self, settings: AutomationSettings, workflow: CurrentFileBasedWorkflow,
                  datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
         self._settings = settings
@@ -48,7 +49,7 @@ class DataDirectoryWatcher(Observable, Observer):
         self._observer: watchdog.observers.api.BaseObserver = watchdog.observers.Observer()
 
         settings.addObserver(self)
-        # FIXME make observable: workflow.addObserver(self)
+        workflow.addObserver(self)
 
     @property
     def isAlive(self) -> bool:

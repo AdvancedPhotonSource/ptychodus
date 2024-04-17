@@ -106,7 +106,10 @@ class ModelCore:
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
                                           self._productCore.productRepository)
         self._automationCore = AutomationCore(self.settingsRegistry,
-                                              self._patternsCore.patternsAPI, self._workflowCore)
+                                              self._patternsCore.patternsAPI,
+                                              self._productCore.productRepository,
+                                              self._workflowCore,
+                                              self._pluginRegistry.fileBasedWorkflows)
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFile:

@@ -8,14 +8,13 @@ from PyQt5.QtGui import QFont
 from ..api.observer import Observable, Observer
 from ..model.automation import (AutomationCore, AutomationDatasetState, AutomationPresenter,
                                 AutomationProcessingPresenter)
-from ..view.automation import (AutomationView, AutomationParametersView, AutomationProcessingView,
-                               AutomationWatchdogView)
+from ..view.automation import AutomationView, AutomationProcessingView, AutomationWatchdogView
 from .data import FileDialogFactory
 
 
-class AutomationParametersController(Observer):
+class AutomationProcessingController(Observer):
 
-    def __init__(self, presenter: AutomationPresenter, view: AutomationParametersView,
+    def __init__(self, presenter: AutomationPresenter, view: AutomationProcessingView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
@@ -23,8 +22,8 @@ class AutomationParametersController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, presenter: AutomationPresenter, view: AutomationParametersView,
-                       fileDialogFactory: FileDialogFactory) -> AutomationParametersController:
+    def createInstance(cls, presenter: AutomationPresenter, view: AutomationProcessingView,
+                       fileDialogFactory: FileDialogFactory) -> AutomationProcessingController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
@@ -35,7 +34,6 @@ class AutomationParametersController(Observer):
         view.directoryLineEdit.editingFinished.connect(controller._syncDirectoryToModel)
         view.directoryBrowseButton.clicked.connect(controller._browseDirectory)
         view.intervalSpinBox.valueChanged.connect(presenter.setProcessingIntervalInSeconds)
-        view.executeButton.clicked.connect(presenter.execute)
 
         controller._syncModelToView()
 
@@ -90,11 +88,9 @@ class AutomationWatchdogController(Observer):
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
-        view.watchButton.setCheckable(True)
         view.delaySpinBox.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
         view.usePollingObserverCheckBox.toggled.connect(
             presenter.setWatchdogPollingObserverEnabled)
-        view.watchButton.toggled.connect(presenter.setWatchdogEnabled)
 
         controller._syncModelToView()
 
@@ -110,7 +106,6 @@ class AutomationWatchdogController(Observer):
 
         self._view.usePollingObserverCheckBox.setChecked(
             self._presenter.isWatchdogPollingObserverEnabled())
-        self._view.watchButton.setChecked(self._presenter.isWatchdogEnabled())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -144,51 +139,21 @@ class AutomationProcessingListModel(QAbstractListModel):
         return self._presenter.getNumberOfDatasets()
 
 
-class AutomationProcessingController(Observer):
-
-    def __init__(self, presenter: AutomationProcessingPresenter,
-                 view: AutomationProcessingView) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-        self._listModel = AutomationProcessingListModel(presenter)
-
-    @classmethod
-    def createInstance(cls, presenter: AutomationProcessingPresenter,
-                       view: AutomationProcessingView) -> AutomationProcessingController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-
-        view.listView.setModel(controller._listModel)
-        view.processButton.setCheckable(True)
-        view.processButton.toggled.connect(presenter.setProcessingEnabled)
-
-        controller._syncModelToView()
-
-        return controller
-
-    def _syncModelToView(self) -> None:
-        self._view.processButton.setChecked(self._presenter.isProcessingEnabled())
-        self._listModel.beginResetModel()
-        self._listModel.endResetModel()
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
-
-
-class AutomationController:
+class AutomationController(Observer):
 
     def __init__(self, core: AutomationCore, presenter: AutomationPresenter,
                  processingPresenter: AutomationProcessingPresenter, view: AutomationView,
                  fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__()
         self._core = core
-        self._parametersController = AutomationParametersController.createInstance(
-            presenter, view.parametersView, fileDialogFactory)
+        self._presenter = presenter
+        self._processingController = AutomationProcessingController.createInstance(
+            presenter, view.processingView, fileDialogFactory)
         self._watchdogController = AutomationWatchdogController.createInstance(
             presenter, view.watchdogView)
-        self._processingController = AutomationProcessingController.createInstance(
-            processingPresenter, view.processingView)
+        self._processingPresenter = processingPresenter
+        self._listModel = AutomationProcessingListModel(processingPresenter)
+        self._view = view
         self._timer = QTimer()
 
     @classmethod
@@ -196,10 +161,31 @@ class AutomationController:
                        processingPresenter: AutomationProcessingPresenter, view: AutomationView,
                        fileDialogFactory: FileDialogFactory) -> AutomationController:
         controller = cls(core, presenter, processingPresenter, view, fileDialogFactory)
+        processingPresenter.addObserver(controller)
 
+        view.processingListView.setModel(controller._listModel)
+
+        view.loadButton.clicked.connect(presenter.loadExistingDatasetsToBuffer)
+        view.watchButton.setCheckable(True)
+        view.watchButton.toggled.connect(presenter.setWatchdogEnabled)
+        view.processButton.setCheckable(True)
+        view.processButton.toggled.connect(processingPresenter.setProcessingEnabled)
+        view.clearButton.clicked.connect(presenter.clearDatasetBuffer)
+
+        controller._syncModelToView()
         controller._timer.timeout.connect(core.executeWaitingTasks)
         controller._timer.start(60 * 1000)  # TODO customize (in milliseconds)
 
-        view.processingView.processButton.setEnabled(False)  # TODO
-
         return controller
+
+    def _syncModelToView(self) -> None:
+        self._view.processButton.setChecked(self._processingPresenter.isProcessingEnabled())
+        self._listModel.beginResetModel()
+        self._listModel.endResetModel()
+
+        self._view.watchButton.setChecked(self._presenter.isWatchdogEnabled())
+        self._view.processButton.setChecked(self._processingPresenter.isProcessingEnabled())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._processingPresenter:
+            self._syncModelToView()

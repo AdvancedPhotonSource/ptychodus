@@ -6,42 +6,42 @@ import queue
 from ptychodus.api.automation import FileBasedWorkflow
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import PatternsAPI
+from ..product import ProductRepository
 from ..workflow import WorkflowCore
+from .api import ConcreteWorkflowAPI
 from .buffer import AutomationDatasetBuffer
 from .processor import AutomationDatasetProcessor
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
 from .watcher import DataDirectoryWatcher
+from .workflow import CurrentFileBasedWorkflow
 
 
 class AutomationPresenter(Observable, Observer):
 
-    def __init__(self, settings: AutomationSettings, watcher: DataDirectoryWatcher,
-                 datasetBuffer: AutomationDatasetBuffer) -> None:
+    def __init__(self, settings: AutomationSettings, workflow: CurrentFileBasedWorkflow,
+                 watcher: DataDirectoryWatcher, datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
         self._settings = settings
+        self._workflow = workflow
         self._watcher = watcher
         self._datasetBuffer = datasetBuffer
 
-    @classmethod
-    def createInstance(cls, settings: AutomationSettings, watcher: DataDirectoryWatcher,
-                       datasetBuffer: AutomationDatasetBuffer) -> AutomationPresenter:
-        presenter = cls(settings, watcher, datasetBuffer)
-        settings.addObserver(presenter)
-        watcher.addObserver(presenter)
-        return presenter
+        settings.addObserver(self)
+        watcher.addObserver(self)
 
     def getStrategyList(self) -> Sequence[str]:
-        pass  # FIXME
+        return self._workflow.getAvailableWorkflows()
 
     def getStrategy(self) -> str:
-        return self._settings.strategy.value  # FIXME
+        return self._workflow.getWorkflow()
 
     def setStrategy(self, strategy: str) -> None:
-        self._settings.strategy.value = strategy  # FIXME
+        self._workflow.setWorkflow(strategy)
 
     def getDataDirectory(self) -> Path:
         return self._settings.dataDirectory.value
@@ -59,7 +59,7 @@ class AutomationPresenter(Observable, Observer):
     def setProcessingIntervalInSeconds(self, value: int) -> None:
         self._settings.processingIntervalInSeconds.value = value
 
-    def execute(self) -> None:
+    def loadExistingDatasetsToBuffer(self) -> None:
         dataDirectory = self.getDataDirectory()
         scanFileGlob: Generator[Path, None, None] = \
                                         dataDirectory.glob(self._workflow.getFilePattern())
@@ -67,10 +67,13 @@ class AutomationPresenter(Observable, Observer):
         for scanFile in scanFileGlob:
             self._datasetBuffer.put(scanFile)
 
+    def clearDatasetBuffer(self) -> None:
+        self._datasetBuffer.clear()
+
     def isWatchdogEnabled(self) -> bool:
         return self._watcher.isAlive
 
-    def setWatchdogEnabled(self, enable: bool) -> None:
+    def setWatchdogEnabled(self, enable: bool) -> None:  # FIXME try/except
         if enable:
             self._watcher.start()
         else:
@@ -144,18 +147,21 @@ class AutomationProcessingPresenter(Observable, Observer):
 class AutomationCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
-                 workflowCore: WorkflowCore) -> None:
-        self._settings = AutomationSettings.createInstance(settingsRegistry)
+                 productRepository: ProductRepository, workflowCore: WorkflowCore,
+                 workflowChooser: PluginChooser[FileBasedWorkflow]) -> None:
+        self._settings = AutomationSettings(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
-        self._workflow = FileBasedWorkflow(patternsAPI, workflowCore)  # FIXME
+        self._workflow = CurrentFileBasedWorkflow(self._settings, workflowChooser)
+        self._workflowAPI = ConcreteWorkflowAPI(patternsAPI, productRepository, workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
-                                                     self._workflow, self._processingQueue)
+                                                     self._workflow, self._workflowAPI,
+                                                     self._processingQueue)
         self._datasetBuffer = AutomationDatasetBuffer(self._settings, self.repository,
                                                       self._processor)
-        self._watcher = DataDirectoryWatcher.createInstance(self._settings, self._datasetBuffer)
-        self.presenter = AutomationPresenter.createInstance(self._settings, self._watcher,
-                                                            self._datasetBuffer)
+        self._watcher = DataDirectoryWatcher(self._settings, self._workflow, self._datasetBuffer)
+        self.presenter = AutomationPresenter(self._settings, self._workflow, self._watcher,
+                                             self._datasetBuffer)
         self.processingPresenter = AutomationProcessingPresenter.createInstance(
             self._settings, self.repository, self._processor)
 
@@ -163,18 +169,7 @@ class AutomationCore:
         self._datasetBuffer.start()
 
     def executeWaitingTasks(self) -> None:
-        # TODO this belongs in AutomationDatasetProcessor
-        try:
-            filePath = self._processingQueue.get(block=False)
-
-            try:
-                self.repository.put(filePath, AutomationDatasetState.PROCESSING)
-                self._workflow.execute(filePath)
-                self.repository.put(filePath, AutomationDatasetState.COMPLETE)
-            finally:
-                self._processingQueue.task_done()
-        except queue.Empty:
-            pass
+        self._processor.runOnce()
 
     def stop(self) -> None:
         self._processor.stop()
