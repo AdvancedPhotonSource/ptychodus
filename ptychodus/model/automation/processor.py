@@ -4,9 +4,10 @@ import logging
 import queue
 import threading
 
+from ptychodus.api.automation import FileBasedWorkflow, WorkflowAPI
+
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
-from .workflow import AutomationDatasetWorkflow
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +15,12 @@ logger = logging.getLogger(__name__)
 class AutomationDatasetProcessor:
 
     def __init__(self, settings: AutomationSettings, repository: AutomationDatasetRepository,
-                 workflow: AutomationDatasetWorkflow, processingQueue: queue.Queue[Path]) -> None:
+                 workflow: FileBasedWorkflow, workflowAPI: WorkflowAPI,
+                 processingQueue: queue.Queue[Path]) -> None:
         self._settings = settings
         self._repository = repository
         self._workflow = workflow
+        self._workflowAPI = workflowAPI
         self._processingQueue = processingQueue
         self._stopWorkEvent = threading.Event()
         self._worker = threading.Thread()
@@ -45,7 +48,7 @@ class AutomationDatasetProcessor:
 
             try:
                 self._repository.put(filePath, AutomationDatasetState.PROCESSING)
-                self._workflow.execute(filePath)
+                self._workflow.execute(self._workflowAPI, filePath)
                 self._repository.put(filePath, AutomationDatasetState.COMPLETE)
             except Exception:
                 logger.exception('Error while processing dataset!')

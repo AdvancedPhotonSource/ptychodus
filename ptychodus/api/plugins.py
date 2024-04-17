@@ -8,11 +8,12 @@ import logging
 import pkgutil
 import re
 
-from .product import ProductFileReader, ProductFileWriter
+from .automation import FileBasedWorkflow
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
+from .product import ProductFileReader, ProductFileWriter
 from .scan import ScanFileReader, ScanFileWriter
 
 __all__ = [
@@ -109,6 +110,7 @@ class PluginRegistry:
         self.objectFileWriters = PluginChooser[ObjectFileWriter]()
         self.productFileReaders = PluginChooser[ProductFileReader]()
         self.productFileWriters = PluginChooser[ProductFileWriter]()
+        self.fileBasedWorkflows = PluginChooser[FileBasedWorkflow]()
 
     @classmethod
     def loadPlugins(cls) -> PluginRegistry:

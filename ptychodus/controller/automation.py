@@ -31,13 +31,13 @@ class AutomationParametersController(Observer):
         for strategy in presenter.getStrategyList():
             view.strategyComboBox.addItem(strategy)
 
-        controller._syncModelToView()
-
         view.strategyComboBox.textActivated.connect(presenter.setStrategy)
         view.directoryLineEdit.editingFinished.connect(controller._syncDirectoryToModel)
         view.directoryBrowseButton.clicked.connect(controller._browseDirectory)
         view.intervalSpinBox.valueChanged.connect(presenter.setProcessingIntervalInSeconds)
         view.executeButton.clicked.connect(presenter.execute)
+
+        controller._syncModelToView()
 
         return controller
 
@@ -89,12 +89,14 @@ class AutomationWatchdogController(Observer):
                        view: AutomationWatchdogView) -> AutomationWatchdogController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
-        controller._syncModelToView()
 
+        view.watchButton.setCheckable(True)
         view.delaySpinBox.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
         view.usePollingObserverCheckBox.toggled.connect(
             presenter.setWatchdogPollingObserverEnabled)
         view.watchButton.toggled.connect(presenter.setWatchdogEnabled)
+
+        controller._syncModelToView()
 
         return controller
 
@@ -159,8 +161,9 @@ class AutomationProcessingController(Observer):
 
         view.listView.setModel(controller._listModel)
         view.processButton.setCheckable(True)
-        controller._syncModelToView()
         view.processButton.toggled.connect(presenter.setProcessingEnabled)
+
+        controller._syncModelToView()
 
         return controller
 

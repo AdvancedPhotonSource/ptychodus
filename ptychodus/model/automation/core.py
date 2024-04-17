@@ -3,9 +3,11 @@ from collections.abc import Generator, Sequence
 from pathlib import Path
 import queue
 
-from ...api.geometry import Interval
-from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry
+from ptychodus.api.automation import FileBasedWorkflow
+from ptychodus.api.geometry import Interval
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry
+
 from ..patterns import PatternsAPI
 from ..workflow import WorkflowCore
 from .buffer import AutomationDatasetBuffer
@@ -13,7 +15,6 @@ from .processor import AutomationDatasetProcessor
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings
 from .watcher import DataDirectoryWatcher
-from .workflow import S2AutomationDatasetWorkflow
 
 
 class AutomationPresenter(Observable, Observer):
@@ -34,16 +35,13 @@ class AutomationPresenter(Observable, Observer):
         return presenter
 
     def getStrategyList(self) -> Sequence[str]:
-        return [
-            'LYNX Catalyst Particle',
-            'CNM/APS Hard X-Ray Nanoprobe',
-        ]
+        pass  # FIXME
 
     def getStrategy(self) -> str:
-        return self._settings.strategy.value
+        return self._settings.strategy.value  # FIXME
 
     def setStrategy(self, strategy: str) -> None:
-        self._settings.strategy.value = strategy
+        self._settings.strategy.value = strategy  # FIXME
 
     def getDataDirectory(self) -> Path:
         return self._settings.dataDirectory.value
@@ -61,9 +59,10 @@ class AutomationPresenter(Observable, Observer):
     def setProcessingIntervalInSeconds(self, value: int) -> None:
         self._settings.processingIntervalInSeconds.value = value
 
-    def execute(self) -> None:  # TODO generalize
+    def execute(self) -> None:
         dataDirectory = self.getDataDirectory()
-        scanFileGlob: Generator[Path, None, None] = dataDirectory.glob('*.csv')
+        scanFileGlob: Generator[Path, None, None] = \
+                                        dataDirectory.glob(self._workflow.getFilePattern())
 
         for scanFile in scanFileGlob:
             self._datasetBuffer.put(scanFile)
@@ -148,7 +147,7 @@ class AutomationCore:
                  workflowCore: WorkflowCore) -> None:
         self._settings = AutomationSettings.createInstance(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
-        self._workflow = S2AutomationDatasetWorkflow(patternsAPI, workflowCore)
+        self._workflow = FileBasedWorkflow(patternsAPI, workflowCore)  # FIXME
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
                                                      self._workflow, self._processingQueue)
