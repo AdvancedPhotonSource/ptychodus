@@ -7,7 +7,7 @@ import numpy.typing
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
 
-from ...propagator import fresnel_propagator
+from ...propagator import fresnel_propagate
 from .builder import ProbeBuilder
 
 
@@ -90,8 +90,8 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         H = RR_FZP >= zonePlate.centralBeamstopDiameterInMeters / 2
         fzpTransmissionFunction = T * C * H
 
-        array = fresnel_propagator(fzpTransmissionFunction, dx_fzp,
-                                   FL + self.defocusDistanceInMeters.getValue(), wavelength)
+        array = fresnel_propagate(fzpTransmissionFunction, dx_fzp,
+                                  FL + self.defocusDistanceInMeters.getValue(), wavelength)
 
         return Probe(
             array=self.normalize(array),

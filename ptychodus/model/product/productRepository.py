@@ -1,12 +1,10 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from pathlib import Path
 from typing import overload
 import logging
 import sys
 
-from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
+from ptychodus.api.product import Product
 
 from ..patterns import ActiveDiffractionDataset, PatternSizer, ProductSettings
 from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
@@ -26,9 +24,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
                  patterns: ActiveDiffractionDataset,
                  scanRepositoryItemFactory: ScanRepositoryItemFactory,
                  probeRepositoryItemFactory: ProbeRepositoryItemFactory,
-                 objectRepositoryItemFactory: ObjectRepositoryItemFactory,
-                 fileReaderChooser: PluginChooser[ProductFileReader],
-                 fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
+                 objectRepositoryItemFactory: ObjectRepositoryItemFactory) -> None:
         super().__init__()
         self._settings = settings
         self._patternSizer = patternSizer
@@ -36,8 +32,6 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         self._scanRepositoryItemFactory = scanRepositoryItemFactory
         self._probeRepositoryItemFactory = probeRepositoryItemFactory
         self._objectRepositoryItemFactory = objectRepositoryItemFactory
-        self._fileReaderChooser = fileReaderChooser
-        self._fileWriterChooser = fileWriterChooser
         self._itemList: list[ProductRepositoryItem] = list()
         self._metadataRepositoryItemFactory = MetadataRepositoryItemFactory(self, settings)
         self._observerList: list[ProductRepositoryObserver] = [
@@ -68,7 +62,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         return index
 
-    def createNewProduct(self, name: str = 'Unnamed', *, likeIndex: int = -1) -> int:
+    def createNewProduct(self, name: str, *, likeIndex: int) -> int:
         metadataItem = self._metadataRepositoryItemFactory.createDefault(name)
         scanItem = self._scanRepositoryItemFactory.createDefault()
         geometry = ProductGeometry(self._settings, self._patternSizer, metadataItem, scanItem)
@@ -124,49 +118,6 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         for observer in self._observerList:
             observer.handleItemRemoved(index, item)
-
-    def getOpenFileFilterList(self) -> Sequence[str]:
-        return self._fileReaderChooser.getDisplayNameList()
-
-    def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.currentPlugin.displayName
-
-    def openProduct(self, filePath: Path, fileFilter: str) -> int:
-        if filePath.is_file():
-            self._fileReaderChooser.setCurrentPluginByName(fileFilter)
-            fileType = self._fileReaderChooser.currentPlugin.simpleName
-            logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
-            fileReader = self._fileReaderChooser.currentPlugin.strategy
-
-            try:
-                product = fileReader.read(filePath)
-            except Exception as exc:
-                raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
-            else:
-                return self.insertProduct(product)
-        else:
-            logger.debug(f'Refusing to create product with invalid file path \"{filePath}\"')
-
-        return -1
-
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileWriterChooser.getDisplayNameList()
-
-    def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.currentPlugin.displayName
-
-    def saveProduct(self, index: int, filePath: Path, fileFilter: str) -> None:
-        try:
-            item = self._itemList[index]
-        except IndexError:
-            logger.debug(f'Failed to save product {index}!')
-            return
-
-        self._fileWriterChooser.setCurrentPluginByName(fileFilter)
-        fileType = self._fileWriterChooser.currentPlugin.simpleName
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
-        writer = self._fileWriterChooser.currentPlugin.strategy
-        writer.write(filePath, item.getProduct())
 
     def getInfoText(self) -> str:
         sizeInMB = sum(sys.getsizeof(prod) for prod in self._itemList) / (1024 * 1024)

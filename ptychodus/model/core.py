@@ -27,8 +27,8 @@ from .memory import MemoryPresenter
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
                        DiffractionDatasetPresenter, DiffractionMetadataPresenter,
                        DiffractionPatternPresenter, PatternsCore)
-from .product import (ObjectRepository, ProbeRepository, ProductCore, ProductRepository,
-                      ScanRepository)
+from .product import (ObjectRepository, ProbeRepository, ProductAPI, ProductCore,
+                      ProductRepository, ScanRepository)
 from .ptychonn import PtychoNNReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .tike import TikeReconstructorLibrary
@@ -101,14 +101,13 @@ class ModelCore:
                 self.ptychonnReconstructorLibrary,
             ],
         )
-        self._analysisCore = AnalysisCore(self._productCore.probeRepository,
+        self._analysisCore = AnalysisCore(self._productCore.productRepository,
                                           self._productCore.objectRepository)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
-                                          self._productCore.productRepository)
+                                          self._productCore.productAPI)
         self._automationCore = AutomationCore(self.settingsRegistry,
                                               self._patternsCore.patternsAPI,
-                                              self._productCore.productRepository,
-                                              self._workflowCore,
+                                              self._productCore.productAPI, self._workflowCore,
                                               self._pluginRegistry.fileBasedWorkflows)
 
     def __enter__(self) -> ModelCore:
@@ -163,6 +162,10 @@ class ModelCore:
         return self._productCore.productRepository
 
     @property
+    def productAPI(self) -> ProductAPI:
+        return self._productCore.productAPI
+
+    @property
     def scanRepository(self) -> ScanRepository:
         return self._productCore.scanRepository
 
@@ -205,7 +208,7 @@ class ModelCore:
         self._automationCore.repository.notifyObserversIfRepositoryChanged()
 
     def batchModeReconstruct(self, inputFilePath: Path, outputFilePath: Path) -> int:
-        inputProductIndex = self._productCore.openProduct(inputFilePath)
+        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, 'NPZ')
 
         if inputProductIndex < 0:
             logger.error(f'Failed to open product \"{inputFilePath}\"')
@@ -219,12 +222,12 @@ class ModelCore:
             logger.error(f'Failed to reconstruct product index=\"{inputProductIndex}\"')
             return -1
 
-        self._productCore.saveProduct(outputProductIndex, outputFilePath)
+        self._productCore.productAPI.saveProduct(outputProductIndex, outputFilePath, 'NPZ')
 
         return 0
 
     def batchModeTrain(self, inputFilePath: Path, outputFilePath: Path) -> int:
-        inputProductIndex = self._productCore.openProduct(inputFilePath)
+        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, 'NPZ')
 
         if inputProductIndex < 0:
             logger.error(f'Failed to open product \"{inputFilePath}\"')

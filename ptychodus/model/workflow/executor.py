@@ -7,7 +7,7 @@ import queue
 from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import PatternsAPI
-from ..product import ProductRepository
+from ..product import ProductAPI
 from .locator import DataLocator
 from .settings import WorkflowSettings
 
@@ -25,13 +25,13 @@ class WorkflowExecutor:
     def __init__(self, settings: WorkflowSettings, inputDataLocator: DataLocator,
                  computeDataLocator: DataLocator, outputDataLocator: DataLocator,
                  settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
-                 productRepository: ProductRepository) -> None:
+                 productAPI: ProductAPI) -> None:
         super().__init__()
         self._settings = settings
         self._inputDataLocator = inputDataLocator
         self._computeDataLocator = computeDataLocator
         self._outputDataLocator = outputDataLocator
-        self._productRepository = productRepository
+        self._productAPI = productAPI
         self._settingsRegistry = settingsRegistry
         self._patternsAPI = patternsAPI
         self.jobQueue: queue.Queue[WorkflowJob] = queue.Queue()
@@ -41,12 +41,10 @@ class WorkflowExecutor:
         ptychodusAction = 'reconstruct'  # TODO or 'train'
 
         try:
-            inputProductItem = self._productRepository[inputProductIndex]
+            flowLabel = self._productAPI.getItemName(inputProductIndex)
         except IndexError:
             logger.warning(f'Failed access product for flow ({inputProductIndex=})!')
             return
-
-        flowLabel = inputProductItem.getName()
 
         inputDataPosixPath = self._inputDataLocator.getPosixPath() / flowLabel
         computeDataPosixPath = self._computeDataLocator.getPosixPath() / flowLabel
@@ -69,8 +67,8 @@ class WorkflowExecutor:
 
         self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFile)
         self._patternsAPI.savePatterns(inputDataPosixPath / patternsFile, productFileFilter)
-        self._productRepository.saveProduct(inputProductIndex, inputDataPosixPath / inputFile,
-                                            productFileFilter)
+        self._productAPI.saveProduct(inputProductIndex, inputDataPosixPath / inputFile,
+                                     productFileFilter)
 
         flowInput = {
             'input_data_transfer_source_endpoint_id':

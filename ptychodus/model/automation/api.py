@@ -5,15 +5,15 @@ from typing import Any
 from ptychodus.api.automation import WorkflowAPI, WorkflowProductAPI
 
 from ..patterns import PatternsAPI
-from ..product import ProductRepository
+from ..product import ProductAPI
 from ..workflow import WorkflowCore
 
 
 class ConcreteWorkflowProductAPI(WorkflowProductAPI):
 
-    def __init__(self, productRepository: ProductRepository, workflowCore: WorkflowCore,
+    def __init__(self, productAPI: ProductAPI, workflowCore: WorkflowCore,
                  productIndex: int) -> None:
-        self._productRepository = productRepository
+        self._productAPI = productAPI
         self._workflowCore = workflowCore
         self._productIndex = productIndex
 
@@ -30,28 +30,27 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._workflowCore.executeWorkflow(self._productIndex)
 
     def saveProduct(self, filePath: Path, fileType: str) -> None:
-        self._productRepository.saveProduct(self._productIndex, filePath, fileType)
+        self._productAPI.saveProduct(self._productIndex, filePath, fileType)
 
 
 class ConcreteWorkflowAPI(WorkflowAPI):
 
-    def __init__(self, patternsAPI: PatternsAPI, productRepository: ProductRepository,
+    def __init__(self, patternsAPI: PatternsAPI, productAPI: ProductAPI,
                  workflowCore: WorkflowCore) -> None:
         self._patternsAPI = patternsAPI
-        self._productRepository = productRepository
+        self._productAPI = productAPI
         self._workflowCore = workflowCore
 
     def _createProductAPI(self, productIndex: int) -> WorkflowProductAPI:
-        return ConcreteWorkflowProductAPI(self._productRepository, self._workflowCore,
-                                          productIndex)
+        return ConcreteWorkflowProductAPI(self._productAPI, self._workflowCore, productIndex)
 
     def openPatterns(self, filePath: Path, fileType: str) -> None:
         self._patternsAPI.openPatterns(filePath, fileType)
 
     def openProduct(self, filePath: Path, fileType: str) -> WorkflowProductAPI:
-        productIndex = self._productRepository.openProduct(filePath, fileType)
+        productIndex = self._productAPI.openProduct(filePath, fileType)
         return self._createProductAPI(productIndex)
 
     def createProduct(self, name: str) -> WorkflowProductAPI:
-        productIndex = self._productRepository.createNewProduct(name)
+        productIndex = self._productAPI.createNewProduct(name)
         return self._createProductAPI(productIndex)

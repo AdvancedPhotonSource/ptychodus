@@ -12,7 +12,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import PatternsAPI
-from ..product import ProductRepository
+from ..product import ProductAPI
 from .authorizer import WorkflowAuthorizer
 from .executor import WorkflowExecutor
 from .locator import DataLocator, OutputDataLocator, SimpleDataLocator
@@ -186,7 +186,7 @@ class WorkflowExecutionPresenter:
 class WorkflowCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
-                 productRepository: ProductRepository) -> None:
+                 productAPI: ProductAPI) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
         self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Input')
         self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group,
@@ -197,7 +197,7 @@ class WorkflowCore:
         self._statusRepository = WorkflowStatusRepository()
         self._executor = WorkflowExecutor(self._settings, self._inputDataLocator,
                                           self._computeDataLocator, self._outputDataLocator,
-                                          settingsRegistry, patternsAPI, productRepository)
+                                          settingsRegistry, patternsAPI, productAPI)
         self._thread: threading.Thread | None = None
 
         try:

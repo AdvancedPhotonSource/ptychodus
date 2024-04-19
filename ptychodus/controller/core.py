@@ -45,6 +45,7 @@ class ControllerCore:
             model.patternPresenter, self._patternsImageController, view.patternsView,
             self._fileDialogFactory)
         self._productController = ProductController.createInstance(model.productRepository,
+                                                                   model.productAPI,
                                                                    view.productView,
                                                                    self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepository, view.scanView,

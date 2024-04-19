@@ -2,9 +2,10 @@ import logging
 
 from PyQt5.QtWidgets import QStatusBar, QWidget
 
-from ...model.analysis import ProbePropagator
+from ...model.analysis import ProbePropagator, PropagatedProbe
 from ...model.visualization import VisualizationEngine
 from ...view.probe import ProbePropagationDialog
+from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..visualization import VisualizationParametersController, VisualizationWidgetController
 
@@ -27,15 +28,29 @@ class ProbePropagationViewController:
             engine, self._dialog.parametersView.visualizationParametersView)
         self._zyVisualizationWidgetController = VisualizationWidgetController(
             engine, self._dialog.zyView, statusBar, fileDialogFactory)
+        self._result: PropagatedProbe | None = None
 
+        # FIXME init self._dialog.parametersView
         # FIXME view.propagateButton = QPushButton('Propagate')
         # FIXME view.saveButton = QPushButton('Save')
         # FIXME view.coordinateSlider = QSlider(Qt.Orientation.Horizontal)
         # FIXME view.coordinateLabel = QLabel()
 
     def propagate(self, itemIndex: int) -> None:
-        itemName = self._propagator.getName(itemIndex)
-        _ = self._propagator.propagate(itemIndex)  # FIXME start, stop, count
-        # FIXME do something with result
-        self._dialog.setWindowTitle(f'Propagate Probe: {itemName}')
+        parametersView = self._dialog.parametersView
+        beginCoordinateInMeters = parametersView.beginCoordinateWidget.getLengthInMeters()
+        endCoordinateInMeters = parametersView.endCoordinateWidget.getLengthInMeters()
+        numberOfSteps = parametersView.numberOfStepsSpinBox.value()
+
+        try:
+            result = self._propagator.propagate(itemIndex, float(beginCoordinateInMeters),
+                                                float(endCoordinateInMeters), numberOfSteps)
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.showException('Propagator', err)
+            return
+
+        self._result = result
+        # FIXME result to view
+        self._dialog.setWindowTitle(f'Propagate Probe: {result.itemName}')
         self._dialog.open()

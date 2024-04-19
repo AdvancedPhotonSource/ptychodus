@@ -3,7 +3,7 @@ from .dichroic import DichroicAnalyzer
 from .frc import FourierRingCorrelator
 from .objectInterpolator import ObjectLinearInterpolator
 from .objectStitcher import ObjectStitcher
-from .propagator import ProbePropagator
+from .propagator import PropagatedProbe, ProbePropagator
 
 __all__ = [
     'AnalysisCore',
@@ -12,4 +12,5 @@ __all__ = [
     'ObjectLinearInterpolator',
     'ObjectStitcher',
     'ProbePropagator',
+    'PropagatedProbe',
 ]

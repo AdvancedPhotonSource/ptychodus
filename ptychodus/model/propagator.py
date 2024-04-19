@@ -3,9 +3,9 @@ import numpy
 from ptychodus.api.probe import WavefieldArrayType
 
 
-def fresnel_propagator(inputWavefield: WavefieldArrayType, inputPixelSizeInMeters: float,
-                       propagationDistanceInMeters: float,
-                       wavelengthInMeters: float) -> WavefieldArrayType:
+def fresnel_propagate(inputWavefield: WavefieldArrayType, inputPixelSizeInMeters: float,
+                      propagationDistanceInMeters: float,
+                      wavelengthInMeters: float) -> WavefieldArrayType:
     (M, N) = inputWavefield.shape
     k = 2 * numpy.pi / wavelengthInMeters
 

@@ -6,7 +6,8 @@ import logging
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
-from ...model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
+from ...model.product import (ProductAPI, ProductRepository, ProductRepositoryItem,
+                              ProductRepositoryObserver)
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
@@ -129,12 +130,13 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
 class ProductController(ProductRepositoryObserver):
 
-    def __init__(self, repository: ProductRepository, view: ProductView,
+    def __init__(self, repository: ProductRepository, api: ProductAPI, view: ProductView,
                  fileDialogFactory: FileDialogFactory, duplicateAction: QAction,
                  tableModel: ProductRepositoryTableModel,
                  tableProxyModel: QSortFilterProxyModel) -> None:
         super().__init__()
         self._repository = repository
+        self._api = api
         self._view = view
         self._fileDialogFactory = fileDialogFactory
         self._duplicateAction = duplicateAction
@@ -142,7 +144,7 @@ class ProductController(ProductRepositoryObserver):
         self._tableProxyModel = tableProxyModel
 
     @classmethod
-    def createInstance(cls, repository: ProductRepository, view: ProductView,
+    def createInstance(cls, repository: ProductRepository, api: ProductAPI, view: ProductView,
                        fileDialogFactory: FileDialogFactory) -> ProductController:
         openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
         createNewAction = view.buttonBox.insertMenu.addAction('Create New')
@@ -152,7 +154,7 @@ class ProductController(ProductRepositoryObserver):
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
-        controller = cls(repository, view, fileDialogFactory, duplicateAction, tableModel,
+        controller = cls(repository, api, view, fileDialogFactory, duplicateAction, tableModel,
                          tableProxyModel)
         repository.addObserver(controller)
         controller._updateInfoText()
@@ -183,14 +185,14 @@ class ProductController(ProductRepositoryObserver):
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Product',
-            nameFilters=self._repository.getOpenFileFilterList(),
-            selectedNameFilter=self._repository.getOpenFileFilter())
+            nameFilters=self._api.getOpenFileFilterList(),
+            selectedNameFilter=self._api.getOpenFileFilter())
 
         if filePath:
-            self._repository.openProduct(filePath, nameFilter)
+            self._api.openProduct(filePath, nameFilter)
 
     def _createNewProduct(self) -> None:
-        self._repository.createNewProduct()
+        self._api.createNewProduct()
 
     def _saveCurrentProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
@@ -199,12 +201,12 @@ class ProductController(ProductRepositoryObserver):
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
                 self._view,
                 'Save Product',
-                nameFilters=self._repository.getSaveFileFilterList(),
-                selectedNameFilter=self._repository.getSaveFileFilter())
+                nameFilters=self._api.getSaveFileFilterList(),
+                selectedNameFilter=self._api.getSaveFileFilter())
 
             if filePath:
                 try:
-                    self._repository.saveProduct(current.row(), filePath, nameFilter)
+                    self._api.saveProduct(current.row(), filePath, nameFilter)
                 except Exception as err:
                     logger.exception(err)
                     ExceptionDialog.showException('File Writer', err)
@@ -215,7 +217,7 @@ class ProductController(ProductRepositoryObserver):
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
-            self._repository.createNewProduct(likeIndex=current.row())
+            self._api.createNewProduct(likeIndex=current.row())
         else:
             logger.error('No current item!')
 

@@ -15,8 +15,8 @@ class ProbePropagationParametersView(QGroupBox):
         super().__init__(title, parent)
 
         self.propagationGroupBox = QGroupBox('Propagation')
-        self.startCoordinateWidget = LengthWidget.createInstance()
-        self.stopCoordinateWidget = LengthWidget.createInstance()
+        self.beginCoordinateWidget = LengthWidget.createInstance()
+        self.endCoordinateWidget = LengthWidget.createInstance()
         self.numberOfStepsSpinBox = QSpinBox()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
 
@@ -28,8 +28,8 @@ class ProbePropagationParametersView(QGroupBox):
         view.setAlignment(Qt.AlignHCenter)
 
         propagationLayout = QFormLayout()
-        propagationLayout.addRow('Start Coordinate:', view.startCoordinateWidget)
-        propagationLayout.addRow('Stop Coordinate:', view.stopCoordinateWidget)
+        propagationLayout.addRow('Begin Coordinate:', view.beginCoordinateWidget)
+        propagationLayout.addRow('End Coordinate:', view.endCoordinateWidget)
         propagationLayout.addRow('Number of Steps:', view.numberOfStepsSpinBox)
         view.propagationGroupBox.setLayout(propagationLayout)
 

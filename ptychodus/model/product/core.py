@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import numpy
 
 from ptychodus.api.object import ObjectFileReader, ObjectFileWriter
@@ -9,6 +7,7 @@ from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.scan import ScanFileReader, ScanFileWriter
 
 from ..patterns import ActiveDiffractionDataset, Detector, PatternSizer, ProductSettings
+from .api import ProductAPI
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory
 from .objectRepository import ObjectRepository
 from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory
@@ -51,18 +50,10 @@ class ProductCore:
         self.productRepository = ProductRepository(settings, patternSizer, patterns,
                                                    self._scanRepositoryItemFactory,
                                                    self._probeRepositoryItemFactory,
-                                                   self._objectRepositoryItemFactory,
-                                                   productFileReaderChooser,
-                                                   productFileWriterChooser)
+                                                   self._objectRepositoryItemFactory)
+        self.productAPI = ProductAPI(self.productRepository, productFileReaderChooser,
+                                     productFileWriterChooser)
         self.scanRepository = ScanRepository(self.productRepository, self._scanBuilderFactory)
         self.probeRepository = ProbeRepository(self.productRepository, self._probeBuilderFactory)
         self.objectRepository = ObjectRepository(self.productRepository,
                                                  self._objectBuilderFactory)
-
-    def openProduct(self, filePath: Path) -> int:
-        fileFilter = ''  # FIXME
-        return self.productRepository.openProduct(filePath, fileFilter)
-
-    def saveProduct(self, productIndex: int, filePath: Path) -> None:
-        fileFilter = ''  # FIXME
-        self.productRepository.saveProduct(productIndex, filePath, fileFilter)
