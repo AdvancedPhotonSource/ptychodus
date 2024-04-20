@@ -57,12 +57,17 @@ class DataDirectoryWatcher(Observable, Observer):
 
     def _updateWatch(self) -> None:
         self._observer.unschedule_all()
-        observedWatch = self._observer.schedule(
-            event_handler=DataDirectoryEventHandler(self._workflow, self._datasetBuffer),
-            path=self._settings.dataDirectory.value,
-            recursive=False,  # TODO generalize
-        )
-        logger.debug(observedWatch)
+        dataDirectory = self._settings.dataDirectory.value
+
+        if dataDirectory.exists():
+            observedWatch = self._observer.schedule(
+                event_handler=DataDirectoryEventHandler(self._workflow, self._datasetBuffer),
+                path=dataDirectory,
+                recursive=False,  # TODO generalize
+            )
+            logger.debug(observedWatch)
+        else:
+            logger.warning(f'Data directory \"{dataDirectory}\" does not exist!')
 
     def start(self) -> None:
         if self.isAlive:

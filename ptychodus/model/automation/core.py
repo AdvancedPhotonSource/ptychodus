@@ -73,7 +73,7 @@ class AutomationPresenter(Observable, Observer):
     def isWatchdogEnabled(self) -> bool:
         return self._watcher.isAlive
 
-    def setWatchdogEnabled(self, enable: bool) -> None:  # FIXME try/except
+    def setWatchdogEnabled(self, enable: bool) -> None:
         if enable:
             self._watcher.start()
         else:

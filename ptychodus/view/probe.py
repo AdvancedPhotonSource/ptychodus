@@ -13,8 +13,6 @@ class ProbePropagationParametersView(QGroupBox):
 
     def __init__(self, title: str, parent: QWidget | None) -> None:
         super().__init__(title, parent)
-
-        self.propagationGroupBox = QGroupBox('Propagation')
         self.beginCoordinateWidget = LengthWidget.createInstance()
         self.endCoordinateWidget = LengthWidget.createInstance()
         self.numberOfStepsSpinBox = QSpinBox()
@@ -31,10 +29,12 @@ class ProbePropagationParametersView(QGroupBox):
         propagationLayout.addRow('Begin Coordinate:', view.beginCoordinateWidget)
         propagationLayout.addRow('End Coordinate:', view.endCoordinateWidget)
         propagationLayout.addRow('Number of Steps:', view.numberOfStepsSpinBox)
-        view.propagationGroupBox.setLayout(propagationLayout)
+
+        propagationGroupBox = QGroupBox('Propagation')
+        propagationGroupBox.setLayout(propagationLayout)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.propagationGroupBox)
+        layout.addWidget(propagationGroupBox)
         layout.addWidget(view.visualizationParametersView)
         layout.addStretch()
         view.setLayout(layout)

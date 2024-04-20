@@ -42,6 +42,8 @@ class AutomationDatasetProcessor:
                 self._repository.put(filePath, AutomationDatasetState.PROCESSING)
                 self._workflow.execute(self._workflowAPI, filePath)
                 self._repository.put(filePath, AutomationDatasetState.COMPLETE)
+            except Exception:
+                logger.exception('Error while processing dataset!')
             finally:
                 self._processingQueue.task_done()
         except queue.Empty:

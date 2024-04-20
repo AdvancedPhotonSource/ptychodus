@@ -33,18 +33,18 @@ class DichroicAnalyzer:  # FIXME control visualizationView and visualizationPara
         lcircObject = self._repository[lcircItemIndex].getObject()
         rcircObject = self._repository[rcircItemIndex].getObject()
 
-        # TODO geometry checks
+        # FIXME geometry checks
         pixelGeometry = rcircObject.getPixelGeometry()
         # TODO align lcircArray/rcircArray
 
         lcircAmp = numpy.absolute(lcircObject.array)
         rcircAmp = numpy.absolute(rcircObject.array)
 
-        lcircLogAmp = numpy.log(lcircAmp, out=numpy.zeros_like(lcircAmp), where=(lcircAmp > 0))
-        rcircLogAmp = numpy.log(rcircAmp, out=numpy.zeros_like(rcircAmp), where=(rcircAmp > 0))
+        ratio = lcircAmp / rcircAmp
+        product = lcircAmp * rcircAmp
 
-        polarDifference = lcircLogAmp - rcircLogAmp
-        polarSum = lcircLogAmp + rcircLogAmp
+        polarDifference = numpy.log(ratio, out=numpy.zeros_like(ratio), where=(ratio > 0))
+        polarSum = numpy.log(product, out=numpy.zeros_like(product), where=(product > 0))
         polarRatio = numpy.divide(polarDifference,
                                   polarSum,
                                   out=numpy.zeros_like(polarSum),
