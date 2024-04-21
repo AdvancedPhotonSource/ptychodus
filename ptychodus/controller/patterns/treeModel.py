@@ -48,7 +48,7 @@ class DatasetTreeNode:
         if self._presenter.data is None:
             return None
         elif self._frameIndex < 0:
-            return self._presenter.data.sum(axis=0)
+            return self._presenter.data.mean(axis=0)
 
         return self._presenter.data[self._frameIndex]
 

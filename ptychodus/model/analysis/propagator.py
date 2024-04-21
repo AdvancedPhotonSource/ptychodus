@@ -7,7 +7,7 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.probe import ProbeGeometry, WavefieldArrayType
+from ptychodus.api.probe import WavefieldArrayType
 
 from ..product import ProductRepository
 from ..propagator import fresnel_propagate
@@ -32,15 +32,15 @@ class PropagatedProbe:
 
     def getZXProjection(self) -> WavefieldArrayType:
         sz = self.wavefield.shape[-2]
-        lhs = (sz - 1) // 2
-        rhs = sz // 2
-        return numpy.add(self.wavefield[:, lhs, :], self.wavefield[:, rhs, :]) / 2
+        arrayL = self.wavefield[:, (sz - 1) // 2, :]
+        arrayR = self.wavefield[:, sz // 2, :]
+        return numpy.transpose(arrayL + arrayR) / 2
 
     def getZYProjection(self) -> WavefieldArrayType:
         sz = self.wavefield.shape[-1]
-        lhs = (sz - 1) // 2
-        rhs = sz // 2
-        return numpy.add(self.wavefield[:, :, lhs], self.wavefield[:, :, rhs]) / 2
+        arrayL = self.wavefield[:, :, (sz - 1) // 2]
+        arrayR = self.wavefield[:, :, sz // 2]
+        return numpy.transpose(arrayL + arrayR) / 2
 
 
 class ProbePropagator:
@@ -53,20 +53,15 @@ class ProbePropagator:
         item = self._repository[itemIndex]
         distanceInMeters = numpy.linspace(beginCoordinateInMeters, endCoordinateInMeters,
                                           numberOfSteps)
-
         probe = item.getProbe().getProbe()
         probeArray = probe.array
-        probeGeometry = probe.getGeometry()
-
-        # TODO non-square pixels are unsupported
-        pixelSizeInMeters = probeGeometry.pixelWidthInMeters
-
+        pixelGeometry = probe.getPixelGeometry()
         wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
         wavefield = numpy.zeros((numberOfSteps, probeArray.shape[-2], probeArray.shape[-1]),
                                 dtype=probeArray.dtype)
 
         for idx, zInMeters in enumerate(distanceInMeters):
-            wf = fresnel_propagate(probeArray[0], pixelSizeInMeters, zInMeters, wavelengthInMeters)
+            wf = fresnel_propagate(probeArray[0], pixelGeometry, zInMeters, wavelengthInMeters)
             wavefield[idx, :, :] = wf
 
         return PropagatedProbe(

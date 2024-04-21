@@ -13,8 +13,8 @@ class ProbePropagationParametersView(QGroupBox):
 
     def __init__(self, title: str, parent: QWidget | None) -> None:
         super().__init__(title, parent)
-        self.beginCoordinateWidget = LengthWidget.createInstance()
-        self.endCoordinateWidget = LengthWidget.createInstance()
+        self.beginCoordinateWidget = LengthWidget.createInstance(isSigned=True)
+        self.endCoordinateWidget = LengthWidget.createInstance(isSigned=True)
         self.numberOfStepsSpinBox = QSpinBox()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
 

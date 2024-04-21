@@ -22,9 +22,9 @@ class DichroicResult:
     polarRatio: ObjectArrayType
 
 
-class DichroicAnalyzer:  # FIXME control visualizationView and visualizationParametersView
-    # TODO feature request: want ability to align/add reconstructed slices of
-    #      repeat scans for each polarization separately to improve statistics
+class DichroicAnalyzer:
+    # TODO feature request: want ability to align/add reconstructed slices
+    #      of repeat scans for each polarization separately to improve statistics
 
     def __init__(self, repository: ObjectRepository) -> None:
         self._repository = repository
@@ -34,14 +34,16 @@ class DichroicAnalyzer:  # FIXME control visualizationView and visualizationPara
         rcircObject = self._repository[rcircItemIndex].getObject()
 
         # FIXME geometry checks
+
         pixelGeometry = rcircObject.getPixelGeometry()
+
         # TODO align lcircArray/rcircArray
 
         lcircAmp = numpy.absolute(lcircObject.array)
         rcircAmp = numpy.absolute(rcircObject.array)
 
-        ratio = lcircAmp / rcircAmp
-        product = lcircAmp * rcircAmp
+        ratio = numpy.divide(lcircAmp, rcircAmp)
+        product = numpy.multiply(lcircAmp, rcircAmp)
 
         polarDifference = numpy.log(ratio, out=numpy.zeros_like(ratio), where=(ratio > 0))
         polarSum = numpy.log(product, out=numpy.zeros_like(product), where=(product > 0))
@@ -63,8 +65,7 @@ class DichroicAnalyzer:  # FIXME control visualizationView and visualizationPara
     def getSaveFileFilter(self) -> str:
         return 'NumPy Zipped Archive (*.npz)'
 
-    def saveResult(self, filePath: Path, lcircItemIndex: int, rcircItemIndex: int) -> None:
-        result = self.analyze(lcircItemIndex, rcircItemIndex)
+    def saveResult(self, filePath: Path, result: DichroicResult) -> None:
         numpy.savez(
             filePath,
             'pixel_height_m',

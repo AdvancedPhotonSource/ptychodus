@@ -4,6 +4,7 @@ from collections.abc import Iterator
 import numpy
 import numpy.typing
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
 
@@ -57,44 +58,42 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         self.centralBeamstopDiameterInMeters.setValue(fzp.centralBeamstopDiameterInMeters)
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        geometry = geometryProvider.getProbeGeometry()
-
-        # central wavelength
-        wavelength = geometryProvider.probeWavelengthInMeters
-
-        # pixel size on sample plane (TODO non-square pixels are unsupported)
-        dx = geometry.pixelWidthInMeters
-
+        wavelengthInMeters = geometryProvider.probeWavelengthInMeters
         zonePlate = FresnelZonePlate(
             zonePlateDiameterInMeters=self.zonePlateDiameterInMeters.getValue(),
             outermostZoneWidthInMeters=self.outermostZoneWidthInMeters.getValue(),
             centralBeamstopDiameterInMeters=self.centralBeamstopDiameterInMeters.getValue(),
         )
-        FL = zonePlate.getFocalLengthInMeters(wavelength)
-        probeSize = geometry.widthInPixels  # FIXME verify
-
-        # pixel size on FZP plane
-        dis_defocus = self.defocusDistanceInMeters.getValue()
-        dx_fzp = wavelength * (FL + dis_defocus) / probeSize / dx
+        focalLengthInMeters = zonePlate.getFocalLengthInMeters(wavelengthInMeters)
+        distanceInMeters = focalLengthInMeters + self.defocusDistanceInMeters.getValue()
+        samplePlaneGeometry = geometryProvider.getProbeGeometry()
+        fzpHalfWidth = (samplePlaneGeometry.widthInPixels + 1) // 2
+        fzpHalfHeight = (samplePlaneGeometry.heightInPixels + 1) // 2
+        fzpPlanePixelSizeNumerator = wavelengthInMeters * distanceInMeters
+        fzpPixelGeometry = PixelGeometry(
+            widthInMeters=fzpPlanePixelSizeNumerator / samplePlaneGeometry.widthInMeters,
+            heightInMeters=fzpPlanePixelSizeNumerator / samplePlaneGeometry.heightInMeters,
+        )
 
         # coordinate on FZP plane
-        lx_fzp = -dx_fzp * numpy.arange(-1 * numpy.floor(probeSize / 2), numpy.ceil(probeSize / 2))
+        lx_fzp = -fzpPixelGeometry.widthInMeters * numpy.arange(-fzpHalfWidth, fzpHalfWidth)
+        ly_fzp = -fzpPixelGeometry.heightInMeters * numpy.arange(-fzpHalfHeight, fzpHalfHeight)
 
-        # FIXME y, x = numpy.mgrid[:ny,:nx]
-        XX_FZP, YY_FZP = numpy.meshgrid(lx_fzp, lx_fzp)
+        YY_FZP, XX_FZP = numpy.meshgrid(ly_fzp, lx_fzp)
         RR_FZP = numpy.hypot(XX_FZP, YY_FZP)
 
         # transmission function of FZP
-        T = numpy.exp(-1j * 2 * numpy.pi / wavelength * (XX_FZP**2 + YY_FZP**2) / 2 / FL)
+        T = numpy.exp(-2j * numpy.pi / wavelengthInMeters * (XX_FZP**2 + YY_FZP**2) / 2 /
+                      focalLengthInMeters)
         C = RR_FZP <= zonePlate.zonePlateDiameterInMeters / 2
         H = RR_FZP >= zonePlate.centralBeamstopDiameterInMeters / 2
         fzpTransmissionFunction = T * C * H
 
-        array = fresnel_propagate(fzpTransmissionFunction, dx_fzp,
-                                  FL + self.defocusDistanceInMeters.getValue(), wavelength)
+        array = fresnel_propagate(fzpTransmissionFunction, fzpPixelGeometry, distanceInMeters,
+                                  wavelengthInMeters)
 
         return Probe(
             array=self.normalize(array),
-            pixelWidthInMeters=geometry.pixelWidthInMeters,
-            pixelHeightInMeters=geometry.pixelHeightInMeters,
+            pixelWidthInMeters=samplePlaneGeometry.pixelWidthInMeters,
+            pixelHeightInMeters=samplePlaneGeometry.pixelHeightInMeters,
         )

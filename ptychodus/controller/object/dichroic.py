@@ -2,7 +2,7 @@ import logging
 
 from PyQt5.QtWidgets import QStatusBar, QWidget
 
-from ...model.analysis import DichroicAnalyzer
+from ...model.analysis import DichroicAnalyzer, DichroicResult
 from ...model.visualization import VisualizationEngine
 from ...view.object import DichroicDialog
 from ...view.widgets import ExceptionDialog
@@ -37,6 +37,7 @@ class DichroicViewController:
             engine, self._dialog.ratioWidget, statusBar, fileDialogFactory)
         self._visualizationParametersController = VisualizationParametersController.createInstance(
             engine, self._dialog.parametersView.visualizationParametersView)
+        self._result: DichroicResult | None = None  # FIXME use this
 
     def _analyze(self) -> None:
         lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()
@@ -52,11 +53,12 @@ class DichroicViewController:
             ExceptionDialog.showException('Dichroic Analysis', err)
             return
 
-        # TODO support multi-layer objects
+        self._result = result
         self._differenceVisualizationWidgetController.setArray(result.polarDifference[0, :, :],
                                                                result.pixelGeometry)
         self._sumVisualizationWidgetController.setArray(result.polarSum[0, :, :],
                                                         result.pixelGeometry)
+        # TODO support multi-layer objects
         self._ratioVisualizationWidgetController.setArray(result.polarRatio[0, :, :],
                                                           result.pixelGeometry)
 
@@ -67,10 +69,8 @@ class DichroicViewController:
         self._dialog.open()
 
     def _saveResult(self) -> None:
-        lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()
-        rcircItemIndex = self._dialog.parametersView.rcircComboBox.currentIndex()
-
-        if lcircItemIndex < 0 or rcircItemIndex < 0:
+        if self._result is None:
+            logger.debug('No result to save!')
             return
 
         title = 'Save Result'
@@ -82,7 +82,7 @@ class DichroicViewController:
 
         if filePath:
             try:
-                self._analyzer.saveResult(filePath, lcircItemIndex, rcircItemIndex)
+                self._analyzer.saveResult(filePath, self._result)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException(title, err)

@@ -20,11 +20,10 @@ class AveragePatternProbeBuilder(ProbeBuilder):
         return AveragePatternProbeBuilder(self._detector, self._patterns)
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        detectorPixelSizeInMeters = float(self._detector.getPixelWidthInMeters())
         geometry = geometryProvider.getProbeGeometry()
         detectorIntensity = numpy.average(self._patterns.getAssembledData(), axis=0)
         probeIntensity = fresnel_propagate(detectorIntensity.astype(complex),
-                                           detectorPixelSizeInMeters,
+                                           self._detector.getPixelGeometry(),
                                            -geometryProvider.detectorDistanceInMeters,
                                            geometryProvider.probeWavelengthInMeters)
         array = numpy.sqrt(probeIntensity)

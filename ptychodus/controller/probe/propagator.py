@@ -1,3 +1,4 @@
+from decimal import Decimal
 import logging
 
 from PyQt5.QtWidgets import QStatusBar, QWidget
@@ -22,9 +23,12 @@ class ProbePropagationViewController:
         self._fileDialogFactory = fileDialogFactory
 
         self._dialog = ProbePropagationDialog.createInstance(parent)
+        self._dialog.parametersView.beginCoordinateWidget.setLengthInMeters(Decimal('-0.01'))
+        self._dialog.parametersView.endCoordinateWidget.setLengthInMeters(Decimal('+0.01'))
+        self._dialog.parametersView.numberOfStepsSpinBox.setRange(1, 999)
         self._dialog.propagateButton.clicked.connect(self._repropagate)
         self._dialog.saveButton.clicked.connect(self._saveResult)
-        self._dialog.coordinateSlider.valueChanged.connect(self._updateCoordinateLabel)
+        self._dialog.coordinateSlider.valueChanged.connect(self._updateCurrentCoordinate)
 
         self._xyVisualizationWidgetController = VisualizationWidgetController(
             engine, self._dialog.xyView, statusBar, fileDialogFactory)
@@ -36,44 +40,49 @@ class ProbePropagationViewController:
             engine, self._dialog.zyView, statusBar, fileDialogFactory)
         self._result: PropagatedProbe | None = None
 
-    def _updateCoordinateLabel(self, value: int) -> None:
+    def _updateCurrentCoordinate(self, step: int) -> None:
+        result = self._result
         lerpValue = 0.
 
-        if self._result is not None:
+        if result is not None:
             slider = self._dialog.coordinateSlider
-            upper = value - slider.minimum()
+            upper = step - slider.minimum()
             lower = slider.maximum() - slider.minimum()
-            alpha = upper / lower
 
-            beginValue = self._result.beginCoordinateInMeters
-            endValue = self._result.endCoordinateInMeters
-            lerpValue = (1 - alpha) * beginValue + alpha * endValue
+            if lower > 0:
+                alpha = upper / lower
+                lerpValue = (1 - alpha) * result.beginCoordinateInMeters \
+                        + alpha * result.endCoordinateInMeters
+            else:
+                logger.error('Bad slider range!')
+
+            self._xyVisualizationWidgetController.setArray(result.getXYProjection(step),
+                                                           result.pixelGeometry)
 
         self._dialog.coordinateLabel.setText(f'{lerpValue:.4g}')
 
     def _propagate(self, itemIndex: int) -> None:
         parametersView = self._dialog.parametersView
-        beginCoordinateInMeters = parametersView.beginCoordinateWidget.getLengthInMeters()
-        endCoordinateInMeters = parametersView.endCoordinateWidget.getLengthInMeters()
+        beginCoordinateInMeters = float(parametersView.beginCoordinateWidget.getLengthInMeters())
+        endCoordinateInMeters = float(parametersView.endCoordinateWidget.getLengthInMeters())
         numberOfSteps = parametersView.numberOfStepsSpinBox.value()
-        step = self._dialog.coordinateSlider.value()  # FIXME verify
 
         try:
-            result = self._propagator.propagate(itemIndex, float(beginCoordinateInMeters),
-                                                float(endCoordinateInMeters), numberOfSteps)
+            result = self._propagator.propagate(itemIndex, beginCoordinateInMeters,
+                                                endCoordinateInMeters, numberOfSteps)
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Propagator', err)
+            self._result = None
             return
 
         self._result = result
-        self._xyVisualizationWidgetController.setArray(result.getXYProjection(step),
-                                                       result.pixelGeometry)
         self._zxVisualizationWidgetController.setArray(result.getZXProjection(),
                                                        result.pixelGeometry)
         self._zyVisualizationWidgetController.setArray(result.getZYProjection(),
                                                        result.pixelGeometry)
-        self._dialog.coordinateSlider.setRange(0, self._result.getNumberOfSteps())
+        self._dialog.coordinateSlider.setRange(0, self._result.getNumberOfSteps() - 1)
+        self._updateCurrentCoordinate(self._dialog.coordinateSlider.value())
 
     def _repropagate(self) -> None:
         if self._result is None:
@@ -82,25 +91,25 @@ class ProbePropagationViewController:
             self._propagate(self._result.itemIndex)
 
     def propagate(self, itemIndex: int) -> None:
-        # FIXME initialize self._dialog.parametersView
-        self._dialog.parametersView.numberOfStepsSpinBox.setRange(1, 99)  # FIXME
         self._propagate(itemIndex)
 
         if self._result is None:
             logger.debug('No result to show!')
-        else:
-            itemName = self._result.itemName
-            self._dialog.setWindowTitle(f'Propagate Probe: {itemName}')
-            self._dialog.open()
+            return
+
+        itemName = self._result.itemName
+        self._dialog.setWindowTitle(f'Propagate Probe: {itemName}')
+        self._dialog.open()
 
     def _saveResult(self) -> None:
         if self._result is None:
             logger.debug('No result to save!')
             return
 
+        title = 'Save Propagated Probe'
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
-            'Save Propagated Probe',
+            title,
             nameFilters=self._propagator.getSaveFileFilterList(),
             selectedNameFilter=self._propagator.getSaveFileFilter())
 
@@ -109,4 +118,4 @@ class ProbePropagationViewController:
                 self._propagator.savePropagatedProbe(filePath, self._result)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Writer', err)
+                ExceptionDialog.showException(title, err)
