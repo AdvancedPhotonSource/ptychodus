@@ -24,12 +24,14 @@ from .workflow import CurrentFileBasedWorkflow
 class AutomationPresenter(Observable, Observer):
 
     def __init__(self, settings: AutomationSettings, workflow: CurrentFileBasedWorkflow,
-                 watcher: DataDirectoryWatcher, datasetBuffer: AutomationDatasetBuffer) -> None:
+                 watcher: DataDirectoryWatcher, datasetBuffer: AutomationDatasetBuffer,
+                 datasetRepository: AutomationDatasetRepository) -> None:
         super().__init__()
         self._settings = settings
         self._workflow = workflow
         self._watcher = watcher
         self._datasetBuffer = datasetBuffer
+        self._datasetRepository = datasetRepository
 
         settings.addObserver(self)
         watcher.addObserver(self)
@@ -59,7 +61,7 @@ class AutomationPresenter(Observable, Observer):
     def setProcessingIntervalInSeconds(self, value: int) -> None:
         self._settings.processingIntervalInSeconds.value = value
 
-    def loadExistingDatasetsToBuffer(self) -> None:
+    def loadExistingDatasetsToRepository(self) -> None:
         dataDirectory = self.getDataDirectory()
         scanFileGlob: Generator[Path, None, None] = \
                                         dataDirectory.glob(self._workflow.getFilePattern())
@@ -67,8 +69,8 @@ class AutomationPresenter(Observable, Observer):
         for scanFile in scanFileGlob:
             self._datasetBuffer.put(scanFile)
 
-    def clearDatasetBuffer(self) -> None:
-        self._datasetBuffer.clear()
+    def clearDatasetRepository(self) -> None:
+        self._datasetRepository.clear()
 
     def isWatchdogEnabled(self) -> bool:
         return self._watcher.isAlive
@@ -161,7 +163,7 @@ class AutomationCore:
                                                       self._processor)
         self._watcher = DataDirectoryWatcher(self._settings, self._workflow, self._datasetBuffer)
         self.presenter = AutomationPresenter(self._settings, self._workflow, self._watcher,
-                                             self._datasetBuffer)
+                                             self._datasetBuffer, self.repository)
         self.processingPresenter = AutomationProcessingPresenter.createInstance(
             self._settings, self.repository, self._processor)
 

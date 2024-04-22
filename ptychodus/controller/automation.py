@@ -165,12 +165,12 @@ class AutomationController(Observer):
 
         view.processingListView.setModel(controller._listModel)
 
-        view.loadButton.clicked.connect(presenter.loadExistingDatasetsToBuffer)
+        view.loadButton.clicked.connect(presenter.loadExistingDatasetsToRepository)
         view.watchButton.setCheckable(True)
         view.watchButton.toggled.connect(presenter.setWatchdogEnabled)
         view.processButton.setCheckable(True)
         view.processButton.toggled.connect(processingPresenter.setProcessingEnabled)
-        view.clearButton.clicked.connect(presenter.clearDatasetBuffer)
+        view.clearButton.clicked.connect(presenter.clearDatasetRepository)
 
         controller._syncModelToView()
         controller._timer.timeout.connect(core.executeWaitingTasks)

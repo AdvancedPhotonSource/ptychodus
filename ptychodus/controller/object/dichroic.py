@@ -37,7 +37,7 @@ class DichroicViewController:
             engine, self._dialog.ratioWidget, statusBar, fileDialogFactory)
         self._visualizationParametersController = VisualizationParametersController.createInstance(
             engine, self._dialog.parametersView.visualizationParametersView)
-        self._result: DichroicResult | None = None  # FIXME use this
+        self._result: DichroicResult | None = None
 
     def _analyze(self) -> None:
         lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()

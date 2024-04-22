@@ -30,9 +30,6 @@ class AutomationDatasetBuffer:
 
         self._repository.put(filePath, AutomationDatasetState.EXISTS)
 
-    def clear(self) -> None:
-        pass  # FIXME
-
     def _process(self) -> None:
         while not self._stopWorkEvent.is_set():
             isFileReadyForProcessing = False

@@ -1,5 +1,6 @@
 from typing import Final
 
+from scipy.fft import fft2, fftshift, ifft2
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
@@ -36,13 +37,12 @@ def fresnel_propagate(inputWavefield: WavefieldArrayType, pixelGeometry: PixelGe
     if z > EPS:
         pf = numpy.exp(1j * k * z) * numpy.exp(1j * k * (Fx**2 + Fy**2) / 2 / z)
         kern = inputWavefield * numpy.exp(1j * k * (XX**2 + YY**2) / 2 / z)
-        cgh = numpy.fft.fft2(numpy.fft.fftshift(kern))
-        outputWavefield = numpy.fft.fftshift(cgh * numpy.fft.fftshift(pf))
+        cgh = fft2(fftshift(kern))
+        outputWavefield = fftshift(cgh * fftshift(pf))
     elif z < -EPS:  # FIXME BROKEN
         pf = numpy.exp(1j * k * z) * numpy.exp(1j * k * (XX**2 + YY**2) / 2 / z)
-        cgh = numpy.fft.ifft2(
-            numpy.fft.fftshift(inputWavefield * numpy.exp(1j * k * (Fx**2 + Fy**2) / 2 / z)))
-        outputWavefield = numpy.fft.fftshift(cgh) * pf
+        cgh = ifft2(fftshift(inputWavefield * numpy.exp(1j * k * (Fx**2 + Fy**2) / 2 / z)))
+        outputWavefield = fftshift(cgh) * pf
     else:
         outputWavefield = inputWavefield
 
