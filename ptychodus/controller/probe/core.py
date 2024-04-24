@@ -8,7 +8,7 @@ from ptychodus.api.observer import SequenceObserver
 
 from ...model.analysis import ProbePropagator
 from ...model.product import ProbeRepository
-from ...model.product.probe import ProbeRepositoryItem
+from ...model.product.probe import ProbeAPI, ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog, ProgressBarItemDelegate
@@ -23,12 +23,14 @@ logger = logging.getLogger(__name__)
 
 class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
-    def __init__(self, repository: ProbeRepository, imageController: ImageController,
-                 propagator: ProbePropagator, propagatorVisualizationEngine: VisualizationEngine,
-                 view: RepositoryTreeView, statusBar: QStatusBar,
-                 fileDialogFactory: FileDialogFactory, treeModel: ProbeTreeModel) -> None:
+    def __init__(self, repository: ProbeRepository, api: ProbeAPI,
+                 imageController: ImageController, propagator: ProbePropagator,
+                 propagatorVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
+                 statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
+                 treeModel: ProbeTreeModel) -> None:
         super().__init__()
         self._repository = repository
+        self._api = api
         self._imageController = imageController
         self._view = view
         self._fileDialogFactory = fileDialogFactory
@@ -39,19 +41,20 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             propagator, propagatorVisualizationEngine, statusBar, fileDialogFactory, view)
 
     @classmethod
-    def createInstance(cls, repository: ProbeRepository, imageController: ImageController,
-                       propagator: ProbePropagator,
+    def createInstance(cls, repository: ProbeRepository, api: ProbeAPI,
+                       imageController: ImageController, propagator: ProbePropagator,
                        propagatorVisualizationEngine: VisualizationEngine,
                        view: RepositoryTreeView, statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
-        treeModel = ProbeTreeModel(repository)
-        controller = cls(repository, imageController, propagator, propagatorVisualizationEngine,
-                         view, statusBar, fileDialogFactory, treeModel)
+        treeModel = ProbeTreeModel(repository, api)
+        controller = cls(repository, api, imageController, propagator,
+                         propagatorVisualizationEngine, view, statusBar, fileDialogFactory,
+                         treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
-        builderListModel.setStringList([name for name in repository.builderNames()])
+        builderListModel.setStringList([name for name in api.builderNames()])
         builderItemDelegate = ComboBoxItemDelegate(builderListModel, view.treeView)
 
         view.treeView.setModel(treeModel)
@@ -105,12 +108,12 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Probe',
-            nameFilters=self._repository.getOpenFileFilterList(),
-            selectedNameFilter=self._repository.getOpenFileFilter())
+            nameFilters=self._api.getOpenFileFilterList(),
+            selectedNameFilter=self._api.getOpenFileFilter())
 
         if filePath:
             try:
-                self._repository.openProbe(itemIndex, filePath, nameFilter)
+                self._api.openProbe(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)
@@ -126,7 +129,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
             destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
-            self._repository.copyProbe(sourceIndex, destinationIndex)
+            self._api.copyProbe(sourceIndex, destinationIndex)
 
     def _editCurrentProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -148,12 +151,12 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Probe',
-            nameFilters=self._repository.getSaveFileFilterList(),
-            selectedNameFilter=self._repository.getSaveFileFilter())
+            nameFilters=self._api.getSaveFileFilterList(),
+            selectedNameFilter=self._api.getSaveFileFilter())
 
         if filePath:
             try:
-                self._repository.saveProbe(itemIndex, filePath, nameFilter)
+                self._api.saveProbe(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)

@@ -46,7 +46,7 @@ class ProductAPI:
             else:
                 return self._repository.insertProduct(product)
         else:
-            logger.debug(f'Refusing to create product with invalid file path \"{filePath}\"')
+            logger.warning(f'Refusing to create product with invalid file path \"{filePath}\"')
 
         return -1
 
@@ -60,7 +60,7 @@ class ProductAPI:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.debug(f'Failed to save product {index}!')
+            logger.warning(f'Failed to save product {index}!')
             return
 
         self._fileWriterChooser.setCurrentPluginByName(fileFilter)

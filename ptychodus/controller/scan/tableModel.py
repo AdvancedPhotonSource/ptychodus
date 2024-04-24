@@ -3,14 +3,18 @@ from typing import Any
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
 
 from ...model.product import ScanRepository
-from ...model.product.scan import ScanRepositoryItem
+from ...model.product.scan import ScanAPI, ScanRepositoryItem
 
 
 class ScanTableModel(QAbstractTableModel):
 
-    def __init__(self, repository: ScanRepository, parent: QObject | None = None) -> None:
+    def __init__(self,
+                 repository: ScanRepository,
+                 api: ScanAPI,
+                 parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._repository = repository
+        self._api = api
         self._header = ['Name', 'Plot', 'Builder', 'Points', 'Length [m]', 'Size [MB]']
         self._checkedItemIndexes: set[int] = set()
 
@@ -86,7 +90,7 @@ class ScanTableModel(QAbstractTableModel):
                 self._repository.setName(index.row(), str(value))
                 return True
             elif index.column() == 2:
-                self._repository.setBuilderByName(index.row(), str(value))
+                self._api.buildScan(index.row(), str(value))
                 return True
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:

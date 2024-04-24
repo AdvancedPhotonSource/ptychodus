@@ -6,7 +6,7 @@ import numpy
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
 from ...model.product import ProbeRepository
-from ...model.product.probe import ProbeRepositoryItem
+from ...model.product.probe import ProbeAPI, ProbeRepositoryItem
 
 
 class ProbeTreeNode:
@@ -29,9 +29,13 @@ class ProbeTreeNode:
 
 class ProbeTreeModel(QAbstractItemModel):
 
-    def __init__(self, repository: ProbeRepository, parent: QObject | None = None) -> None:
+    def __init__(self,
+                 repository: ProbeRepository,
+                 api: ProbeAPI,
+                 parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._repository = repository
+        self._api = api
         self._treeRoot = ProbeTreeNode()
         self._header = [
             'Name', 'Relative Power', 'Builder', 'Data Type', 'Width [px]', 'Height [px]',
@@ -189,7 +193,7 @@ class ProbeTreeModel(QAbstractItemModel):
                     self._repository.setName(index.row(), str(value))
                     return True
                 elif index.column() == 2:
-                    self._repository.setBuilderByName(index.row(), str(value))
+                    self._api.buildProbe(index.row(), str(value))
                     return True
 
         return False

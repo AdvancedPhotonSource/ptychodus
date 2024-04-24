@@ -11,6 +11,9 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import PatternsAPI
 from ..product import ProductAPI
+from ..product.object import ObjectAPI
+from ..product.probe import ProbeAPI
+from ..product.scan import ScanAPI
 from ..workflow import WorkflowCore
 from .api import ConcreteWorkflowAPI
 from .buffer import AutomationDatasetBuffer
@@ -149,12 +152,14 @@ class AutomationProcessingPresenter(Observable, Observer):
 class AutomationCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
-                 productAPI: ProductAPI, workflowCore: WorkflowCore,
+                 productAPI: ProductAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
+                 objectAPI: ObjectAPI, workflowCore: WorkflowCore,
                  workflowChooser: PluginChooser[FileBasedWorkflow]) -> None:
         self._settings = AutomationSettings(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
         self._workflow = CurrentFileBasedWorkflow(self._settings, workflowChooser)
-        self._workflowAPI = ConcreteWorkflowAPI(patternsAPI, productAPI, workflowCore)
+        self._workflowAPI = ConcreteWorkflowAPI(patternsAPI, productAPI, scanAPI, probeAPI,
+                                                objectAPI, workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
                                                      self._workflow, self._workflowAPI,

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ...api.observer import SequenceObserver
 from ...model.product import ScanRepository
-from ...model.product.scan import ScanRepositoryItem
+from ...model.product.scan import ScanAPI, ScanRepositoryItem
 from ...view.repository import RepositoryTableView
 from ...view.scan import ScanPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
@@ -19,11 +19,12 @@ logger = logging.getLogger(__name__)
 
 class ScanController(SequenceObserver[ScanRepositoryItem]):
 
-    def __init__(self, repository: ScanRepository, view: RepositoryTableView,
+    def __init__(self, repository: ScanRepository, api: ScanAPI, view: RepositoryTableView,
                  plotView: ScanPlotView, fileDialogFactory: FileDialogFactory,
                  tableModel: ScanTableModel, proxyModel: QSortFilterProxyModel) -> None:
         super().__init__()
         self._repository = repository
+        self._api = api
         self._view = view
         self._plotView = plotView
         self._fileDialogFactory = fileDialogFactory
@@ -32,19 +33,20 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._editorFactory = ScanEditorViewControllerFactory()
 
     @classmethod
-    def createInstance(cls, repository: ScanRepository, view: RepositoryTableView,
+    def createInstance(cls, repository: ScanRepository, api: ScanAPI, view: RepositoryTableView,
                        plotView: ScanPlotView,
                        fileDialogFactory: FileDialogFactory) -> ScanController:
-        tableModel = ScanTableModel(repository)
+        tableModel = ScanTableModel(repository, api)
         proxyModel = QSortFilterProxyModel()
         proxyModel.setSourceModel(tableModel)
-        controller = cls(repository, view, plotView, fileDialogFactory, tableModel, proxyModel)
+        controller = cls(repository, api, view, plotView, fileDialogFactory, tableModel,
+                         proxyModel)
         proxyModel.dataChanged.connect(
             lambda topLeft, bottomRight, roles: controller._redrawPlot())
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
-        builderListModel.setStringList([name for name in repository.builderNames()])
+        builderListModel.setStringList([name for name in api.builderNames()])
         builderItemDelegate = ComboBoxItemDelegate(builderListModel, view.tableView)
 
         view.tableView.setModel(proxyModel)
@@ -92,12 +94,12 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Scan',
-            nameFilters=self._repository.getOpenFileFilterList(),
-            selectedNameFilter=self._repository.getOpenFileFilter())
+            nameFilters=self._api.getOpenFileFilterList(),
+            selectedNameFilter=self._api.getOpenFileFilter())
 
         if filePath:
             try:
-                self._repository.openScan(itemIndex, filePath, nameFilter)
+                self._api.openScan(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)
@@ -113,7 +115,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
             destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
-            self._repository.copyScan(sourceIndex, destinationIndex)
+            self._api.copyScan(sourceIndex, destinationIndex)
 
     def _editCurrentScan(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -135,12 +137,12 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Scan',
-            nameFilters=self._repository.getSaveFileFilterList(),
-            selectedNameFilter=self._repository.getSaveFileFilter())
+            nameFilters=self._api.getSaveFileFilterList(),
+            selectedNameFilter=self._api.getSaveFileFilter())
 
         if filePath:
             try:
-                self._repository.saveScan(itemIndex, filePath, nameFilter)
+                self._api.saveScan(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)

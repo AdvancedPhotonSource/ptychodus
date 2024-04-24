@@ -29,6 +29,9 @@ from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter
                        DiffractionPatternPresenter, PatternsCore)
 from .product import (ObjectRepository, ProbeRepository, ProductAPI, ProductCore,
                       ProductRepository, ScanRepository)
+from .product.object import ObjectAPI
+from .product.probe import ProbeAPI
+from .product.scan import ScanAPI
 from .ptychonn import PtychoNNReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .tike import TikeReconstructorLibrary
@@ -105,10 +108,10 @@ class ModelCore:
                                           self._productCore.objectRepository)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
                                           self._productCore.productAPI)
-        self._automationCore = AutomationCore(self.settingsRegistry,
-                                              self._patternsCore.patternsAPI,
-                                              self._productCore.productAPI, self._workflowCore,
-                                              self._pluginRegistry.fileBasedWorkflows)
+        self._automationCore = AutomationCore(
+            self.settingsRegistry, self._patternsCore.patternsAPI, self._productCore.productAPI,
+            self._productCore.scanAPI, self._productCore.probeAPI, self._productCore.objectAPI,
+            self._workflowCore, self._pluginRegistry.fileBasedWorkflows)
 
     def __enter__(self) -> ModelCore:
         if self._modelArgs.settingsFile:
@@ -170,12 +173,24 @@ class ModelCore:
         return self._productCore.scanRepository
 
     @property
+    def scanAPI(self) -> ScanAPI:
+        return self._productCore.scanAPI
+
+    @property
     def probeRepository(self) -> ProbeRepository:
         return self._productCore.probeRepository
 
     @property
+    def probeAPI(self) -> ProbeAPI:
+        return self._productCore.probeAPI
+
+    @property
     def objectRepository(self) -> ObjectRepository:
         return self._productCore.objectRepository
+
+    @property
+    def objectAPI(self) -> ObjectAPI:
+        return self._productCore.objectAPI
 
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
         self._patternsCore.patternsAPI.initializeStreaming(metadata)
@@ -214,7 +229,7 @@ class ModelCore:
             logger.error(f'Failed to open product \"{inputFilePath}\"')
             return -1
 
-        outputProductName = 'Batch'  # FIXME
+        outputProductName = self._productCore.productAPI.getItemName(inputProductIndex)
         outputProductIndex = self._reconstructorCore.presenter.reconstruct(
             inputProductIndex, outputProductName)
 

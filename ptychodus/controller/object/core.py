@@ -8,7 +8,7 @@ from ptychodus.api.observer import SequenceObserver
 
 from ...model.analysis import DichroicAnalyzer, FourierRingCorrelator
 from ...model.product import ObjectRepository
-from ...model.product.object import ObjectRepositoryItem
+from ...model.product.object import ObjectAPI, ObjectRepositoryItem
 from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
@@ -24,13 +24,15 @@ logger = logging.getLogger(__name__)
 
 class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
-    def __init__(self, repository: ObjectRepository, imageController: ImageController,
-                 correlator: FourierRingCorrelator, dichroicAnalyzer: DichroicAnalyzer,
+    def __init__(self, repository: ObjectRepository, api: ObjectAPI,
+                 imageController: ImageController, correlator: FourierRingCorrelator,
+                 dichroicAnalyzer: DichroicAnalyzer,
                  dichroicVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
                  statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
                  treeModel: ObjectTreeModel) -> None:
         super().__init__()
         self._repository = repository
+        self._api = api
         self._imageController = imageController
         self._view = view
         self._fileDialogFactory = fileDialogFactory
@@ -44,20 +46,21 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                                                               statusBar, view)
 
     @classmethod
-    def createInstance(cls, repository: ObjectRepository, imageController: ImageController,
-                       correlator: FourierRingCorrelator, dichroicAnalyzer: DichroicAnalyzer,
+    def createInstance(cls, repository: ObjectRepository, api: ObjectAPI,
+                       imageController: ImageController, correlator: FourierRingCorrelator,
+                       dichroicAnalyzer: DichroicAnalyzer,
                        dichroicVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
                        statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
-        treeModel = ObjectTreeModel(repository)
-        controller = cls(repository, imageController, correlator, dichroicAnalyzer,
+        treeModel = ObjectTreeModel(repository, api)
+        controller = cls(repository, api, imageController, correlator, dichroicAnalyzer,
                          dichroicVisualizationEngine, view, statusBar, fileDialogFactory,
                          treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
-        builderListModel.setStringList([name for name in repository.builderNames()])
+        builderListModel.setStringList([name for name in api.builderNames()])
         builderItemDelegate = ComboBoxItemDelegate(builderListModel, view.treeView)
 
         view.treeView.setModel(treeModel)
@@ -112,12 +115,12 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Object',
-            nameFilters=self._repository.getOpenFileFilterList(),
-            selectedNameFilter=self._repository.getOpenFileFilter())
+            nameFilters=self._api.getOpenFileFilterList(),
+            selectedNameFilter=self._api.getOpenFileFilter())
 
         if filePath:
             try:
-                self._repository.openObject(itemIndex, filePath, nameFilter)
+                self._api.openObject(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)
@@ -133,7 +136,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
             destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
-            self._repository.copyObject(sourceIndex, destinationIndex)
+            self._api.copyObject(sourceIndex, destinationIndex)
 
     def _editCurrentObject(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -155,12 +158,12 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Object',
-            nameFilters=self._repository.getSaveFileFilterList(),
-            selectedNameFilter=self._repository.getSaveFileFilter())
+            nameFilters=self._api.getSaveFileFilterList(),
+            selectedNameFilter=self._api.getSaveFileFilter())
 
         if filePath:
             try:
-                self._repository.saveObject(itemIndex, filePath, nameFilter)
+                self._api.saveObject(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)

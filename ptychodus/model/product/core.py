@@ -8,12 +8,12 @@ from ptychodus.api.scan import ScanFileReader, ScanFileWriter
 
 from ..patterns import ActiveDiffractionDataset, Detector, PatternSizer, ProductSettings
 from .api import ProductAPI
-from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory
+from .object import ObjectAPI, ObjectBuilderFactory, ObjectRepositoryItemFactory
 from .objectRepository import ObjectRepository
-from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory
+from .probe import ProbeAPI, ProbeBuilderFactory, ProbeRepositoryItemFactory
 from .probeRepository import ProbeRepository
 from .productRepository import ProductRepository
-from .scan import ScanBuilderFactory, ScanRepositoryItemFactory
+from .scan import ScanAPI, ScanBuilderFactory, ScanRepositoryItemFactory
 from .scanRepository import ScanRepository
 
 
@@ -53,7 +53,9 @@ class ProductCore:
                                                    self._objectRepositoryItemFactory)
         self.productAPI = ProductAPI(self.productRepository, productFileReaderChooser,
                                      productFileWriterChooser)
-        self.scanRepository = ScanRepository(self.productRepository, self._scanBuilderFactory)
-        self.probeRepository = ProbeRepository(self.productRepository, self._probeBuilderFactory)
-        self.objectRepository = ObjectRepository(self.productRepository,
-                                                 self._objectBuilderFactory)
+        self.scanRepository = ScanRepository(self.productRepository)
+        self.scanAPI = ScanAPI(self.scanRepository, self._scanBuilderFactory)
+        self.probeRepository = ProbeRepository(self.productRepository)
+        self.probeAPI = ProbeAPI(self.probeRepository, self._probeBuilderFactory)
+        self.objectRepository = ObjectRepository(self.productRepository)
+        self.objectAPI = ObjectAPI(self.objectRepository, self._objectBuilderFactory)

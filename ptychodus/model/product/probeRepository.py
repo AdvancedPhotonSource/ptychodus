@@ -1,5 +1,4 @@
-from collections.abc import Iterator, Sequence
-from pathlib import Path
+from collections.abc import Sequence
 from typing import overload
 import logging
 
@@ -8,7 +7,7 @@ from ptychodus.api.observer import ObservableSequence
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
-from .probe import ProbeBuilderFactory, ProbeRepositoryItem
+from .probe import ProbeRepositoryItem
 from .productRepository import ProductRepository
 from .scan import ScanRepositoryItem
 
@@ -17,11 +16,10 @@ logger = logging.getLogger(__name__)
 
 class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepositoryObserver):
 
-    def __init__(self, repository: ProductRepository, factory: ProbeBuilderFactory) -> None:
+    def __init__(self, repository: ProductRepository) -> None:
         super().__init__()
         self._repository = repository
         self._repository.addObserver(self)
-        self._factory = factory
 
     def getName(self, index: int) -> str:
         return self._repository[index].getName()
@@ -46,59 +44,6 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
 
     def __len__(self) -> int:
         return len(self._repository)
-
-    def builderNames(self) -> Iterator[str]:
-        return iter(self._factory)
-
-    def setBuilderByName(self, index: int, builderName: str) -> bool:
-        try:
-            item = self._repository[index]
-        except IndexError:
-            logger.warning(f'Failed to access item {index}!')
-            return False
-
-        try:
-            builder = self._factory.create(builderName)
-        except KeyError:
-            logger.warning(f'Failed to create builder {builderName}!')
-            return False
-
-        item.getProbe().setBuilder(builder)
-        return True
-
-    def getOpenFileFilterList(self) -> Sequence[str]:
-        return self._factory.getOpenFileFilterList()
-
-    def getOpenFileFilter(self) -> str:
-        return self._factory.getOpenFileFilter()
-
-    def openProbe(self, index: int, filePath: Path, fileFilter: str) -> None:
-        builder = self._factory.createProbeFromFile(filePath, fileFilter)
-
-        try:
-            item = self[index]
-        except IndexError:
-            logger.warning(f'Failed to open probe {index}!')
-        else:
-            item.setBuilder(builder)
-
-    def copyProbe(self, sourceIndex: int, destinationIndex: int) -> None:
-        logger.debug(f'Copy {sourceIndex} -> {destinationIndex}')
-        self[destinationIndex].assign(self[sourceIndex])
-
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._factory.getSaveFileFilterList()
-
-    def getSaveFileFilter(self) -> str:
-        return self._factory.getSaveFileFilter()
-
-    def saveProbe(self, index: int, filePath: Path, fileFilter: str) -> None:
-        try:
-            item = self[index]
-        except IndexError:
-            logger.warning(f'Failed to save probe {index}!')
-        else:
-            self._factory.saveProbe(filePath, fileFilter, item.getProbe())
 
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
         self.notifyObserversItemInserted(index, item.getProbe())

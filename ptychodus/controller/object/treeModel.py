@@ -4,7 +4,7 @@ from typing import Any, overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
 from ...model.product import ObjectRepository
-from ...model.product.object import ObjectRepositoryItem
+from ...model.product.object import ObjectAPI, ObjectRepositoryItem
 
 
 class ObjectTreeNode:
@@ -27,9 +27,13 @@ class ObjectTreeNode:
 
 class ObjectTreeModel(QAbstractItemModel):
 
-    def __init__(self, repository: ObjectRepository, parent: QObject | None = None) -> None:
+    def __init__(self,
+                 repository: ObjectRepository,
+                 api: ObjectAPI,
+                 parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._repository = repository
+        self._api = api
         self._treeRoot = ObjectTreeNode()
         self._header = [
             'Name', 'Distance [m]', 'Builder', 'Data Type', 'Width [px]', 'Height [px]',
@@ -197,7 +201,7 @@ class ObjectTreeModel(QAbstractItemModel):
                     self._repository.setName(index.row(), str(value))
                     return True
                 elif index.column() == 2:
-                    self._repository.setBuilderByName(index.row(), str(value))
+                    self._api.buildObject(index.row(), str(value))
                     return True
 
         return False

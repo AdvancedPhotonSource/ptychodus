@@ -11,11 +11,23 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildProbe(self, builderName: str, builderParameters: Mapping[str, Any]) -> None:
+    def buildScan(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
         pass
 
     @abstractmethod
-    def buildObject(self, builderName: str, builderParameters: Mapping[str, Any]) -> None:
+    def openProbe(self, filePath: Path, fileType: str) -> None:
+        pass
+
+    @abstractmethod
+    def buildProbe(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
+        pass
+
+    @abstractmethod
+    def openObject(self, filePath: Path, fileType: str) -> None:
+        pass
+
+    @abstractmethod
+    def buildObject(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
         pass
 
     @abstractmethod

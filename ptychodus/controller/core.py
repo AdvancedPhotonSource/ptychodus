@@ -48,24 +48,24 @@ class ControllerCore:
                                                                    model.productAPI,
                                                                    view.productView,
                                                                    self._fileDialogFactory)
-        self._scanController = ScanController.createInstance(model.scanRepository, view.scanView,
-                                                             view.scanPlotView,
+        self._scanController = ScanController.createInstance(model.scanRepository, model.scanAPI,
+                                                             view.scanView, view.scanPlotView,
                                                              self._fileDialogFactory)
         self._probeImageController = ImageController.createInstance(model.probeVisualizationEngine,
                                                                     view.probeImageView,
                                                                     view.statusBar(),
                                                                     self._fileDialogFactory)
         self._probeController = ProbeController.createInstance(
-            model.probeRepository, self._probeImageController,
+            model.probeRepository, model.probeAPI, self._probeImageController,
             model.probePropagator, model.probePropagatorVisualizationEngine, view.probeView,
             view.statusBar(), self._fileDialogFactory)
         self._objectImageController = ImageController.createInstance(
             model.objectVisualizationEngine, view.objectImageView, view.statusBar(),
             self._fileDialogFactory)
         self._objectController = ObjectController.createInstance(
-            model.objectRepository, self._objectImageController, model.fourierRingCorrelator,
-            model.dichroicAnalyzer, model.dichroicVisualizationEngine, view.objectView,
-            view.statusBar(), self._fileDialogFactory)
+            model.objectRepository, model.objectAPI, self._objectImageController,
+            model.fourierRingCorrelator, model.dichroicAnalyzer, model.dichroicVisualizationEngine,
+            view.objectView, view.statusBar(), self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,

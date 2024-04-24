@@ -18,8 +18,8 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
         workflowAPI.openPatterns(diffractionFilePath, fileType='NeXus')
         productAPI = workflowAPI.createProduct(f'scan{scanID}')
         productAPI.openScan(filePath, fileType='CSV')
-        productAPI.buildProbe('Disk', {})  # FIXME reuse probe
-        productAPI.buildObject('Random', {})  # FIXME
+        productAPI.buildProbe('Disk')
+        productAPI.buildObject('Random')
         productAPI.reconstruct()
 
 
@@ -43,8 +43,8 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
         workflowAPI.openPatterns(diffractionFilePath, fileType='HDF5')
         productAPI = workflowAPI.createProduct(f'scan_{scanID}')
         productAPI.openScan(filePath, fileType='MDA')
-        productAPI.buildProbe('Disk', {})  # FIXME reuse probe
-        productAPI.buildObject('Random', {})  # FIXME
+        productAPI.buildProbe('Disk')
+        productAPI.buildObject('Random')
         productAPI.reconstruct()
 
 
