@@ -1,4 +1,3 @@
-from __future__ import annotations
 from pathlib import Path
 
 from ptychodus.api.observer import Observable, Observer
@@ -53,19 +52,6 @@ class ProductSettings(Observable, Observer):
             'ProbeEnergyInElectronVolts', '10000')
         self.probePhotonsPerSecond = self._settingsGroup.createRealEntry(
             'ProbePhotonsPerSecond', '0')
-        self.objectLayerDistanceInMeters = self._settingsGroup.createRealEntry(
-            'ObjectLayerDistanceInMeters', '1e-6')
-
-        self.expandScanBoundingBox = self._settingsGroup.createBooleanEntry(  # FIXME use this
-            'ExpandScanBoundingBox', False)
-        self.scanBoundingBoxMinimumXInMeters = self._settingsGroup.createRealEntry(
-            'ScanBoundingBoxMinimumXInMeters', '0')
-        self.scanBoundingBoxMaximumXInMeters = self._settingsGroup.createRealEntry(
-            'ScanBoundingBoxMaximumXInMeters', '1e-5')
-        self.scanBoundingBoxMinimumYInMeters = self._settingsGroup.createRealEntry(
-            'ScanBoundingBoxMinimumYInMeters', '0')
-        self.scanBoundingBoxMaximumYInMeters = self._settingsGroup.createRealEntry(
-            'ScanBoundingBoxMaximumYInMeters', '1e-5')
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

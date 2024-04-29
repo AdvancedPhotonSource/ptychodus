@@ -3,20 +3,24 @@ import numpy
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
 from .builder import FromMemoryProbeBuilder
-from .disk import DiskProbeBuilder
+from .builderFactory import ProbeBuilderFactory
 from .item import ProbeRepositoryItem
 from .multimodal import MultimodalProbeBuilder
+from .settings import ProbeSettings
 
 
 class ProbeRepositoryItemFactory:
 
-    def __init__(self, rng: numpy.random.Generator) -> None:
+    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings,
+                 builderFactory: ProbeBuilderFactory) -> None:
         self._rng = rng
+        self._settings = settings
+        self._builderFactory = builderFactory
 
     def create(self,
                geometryProvider: ProbeGeometryProvider,
                probe: Probe | None = None) -> ProbeRepositoryItem:
-        builder = DiskProbeBuilder() if probe is None \
+        builder = self._builderFactory.createDefault() if probe is None \
                 else FromMemoryProbeBuilder(probe)
-        multimodalBuilder = MultimodalProbeBuilder(self._rng)
+        multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)
         return ProbeRepositoryItem(geometryProvider, builder, multimodalBuilder)

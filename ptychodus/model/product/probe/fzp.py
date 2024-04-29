@@ -10,36 +10,39 @@ from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
 
 from ...propagator import fresnel_propagate
 from .builder import ProbeBuilder
+from .settings import ProbeSettings
 
 
 class FresnelZonePlateProbeBuilder(ProbeBuilder):
 
-    def __init__(self, fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]) -> None:
+    def __init__(self, settings: ProbeSettings,
+                 fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]) -> None:
         super().__init__('fresnel_zone_plate')
+        self._settings = settings
         self._fresnelZonePlateChooser = fresnelZonePlateChooser
 
         self.zonePlateDiameterInMeters = self._registerRealParameter(
             'zone_plate_diameter_m',
-            180e-6,
+            float(settings.zonePlateDiameterInMeters.value),
             minimum=0.,
         )
         self.outermostZoneWidthInMeters = self._registerRealParameter(
             'outermost_zone_width_m',
-            50e-9,
+            float(settings.outermostZoneWidthInMeters.value),
             minimum=0.,
         )
         self.centralBeamstopDiameterInMeters = self._registerRealParameter(
             'central_beamstop_diameter_m',
-            60e-6,
+            float(settings.centralBeamstopDiameterInMeters.value),
             minimum=0.,
         )
         self.defocusDistanceInMeters = self._registerRealParameter(
             'defocus_distance_m',
-            800e-6,
+            float(settings.defocusDistanceInMeters.value),
         )  # from sample to the focal plane
 
     def copy(self) -> FresnelZonePlateProbeBuilder:
-        builder = FresnelZonePlateProbeBuilder(self._fresnelZonePlateChooser)
+        builder = FresnelZonePlateProbeBuilder(self._settings, self._fresnelZonePlateChooser)
         builder.zonePlateDiameterInMeters.setValue(self.zonePlateDiameterInMeters.getValue())
         builder.outermostZoneWidthInMeters.setValue(self.outermostZoneWidthInMeters.getValue())
         builder.centralBeamstopDiameterInMeters.setValue(

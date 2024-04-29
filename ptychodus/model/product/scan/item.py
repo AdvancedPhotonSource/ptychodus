@@ -10,6 +10,7 @@ from ptychodus.api.scan import Scan, ScanBoundingBox, ScanPoint
 
 from .boundingBox import ScanBoundingBoxBuilder
 from .builder import ScanBuilder
+from .settings import ScanSettings
 from .transform import ScanPointTransform
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 class ScanRepositoryItem(ParameterRepository):
 
-    def __init__(self, builder: ScanBuilder, transform: ScanPointTransform) -> None:
+    def __init__(self, settings: ScanSettings, builder: ScanBuilder,
+                 transform: ScanPointTransform) -> None:
         super().__init__('Scan')
         self._builder = builder
         self._transform = transform
@@ -30,15 +32,16 @@ class ScanRepositoryItem(ParameterRepository):
         self._addParameterRepository(builder, observe=True)
         self._addParameterRepository(transform, observe=True)
 
-        self.expandBoundingBox = self._registerBooleanParameter('expand_bbox', False)
+        self.expandBoundingBox = self._registerBooleanParameter('expand_bbox',
+                                                                settings.expandBoundingBox.value)
         self.expandedBoundingBoxMinimumXInMeters = self._registerRealParameter(
-            'expanded_bbox_xmin_m', -5e-7)
+            'expanded_bbox_xmin_m', float(settings.expandedBoundingBoxMinimumXInMeters.value))
         self.expandedBoundingBoxMaximumXInMeters = self._registerRealParameter(
-            'expanded_bbox_xmax_m', +5e-7)
+            'expanded_bbox_xmax_m', float(settings.expandedBoundingBoxMaximumXInMeters.value))
         self.expandedBoundingBoxMinimumYInMeters = self._registerRealParameter(
-            'expanded_bbox_ymin_m', -5e-7)
+            'expanded_bbox_ymin_m', float(settings.expandedBoundingBoxMinimumYInMeters.value))
         self.expandedBoundingBoxMaximumYInMeters = self._registerRealParameter(
-            'expanded_bbox_ymax_m', +5e-7)
+            'expanded_bbox_ymax_m', float(settings.expandedBoundingBoxMaximumYInMeters.value))
 
         self._rebuild()
 
@@ -50,9 +53,6 @@ class ScanRepositoryItem(ParameterRepository):
         self._addParameterRepository(self._transform)
 
         self.setBuilder(item.getBuilder().copy())
-
-    def getUntransformedScan(self) -> Scan:
-        return self._untransformedScan
 
     def getScan(self) -> Scan:
         return self._transformedScan

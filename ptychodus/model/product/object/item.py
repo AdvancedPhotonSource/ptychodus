@@ -7,15 +7,15 @@ from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterRepository
 
-from ...patterns import ProductSettings
 from .builder import ObjectBuilder
+from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
 
 
 class ObjectRepositoryItem(ParameterRepository):
 
-    def __init__(self, geometryProvider: ObjectGeometryProvider, settings: ProductSettings,
+    def __init__(self, geometryProvider: ObjectGeometryProvider, settings: ObjectSettings,
                  builder: ObjectBuilder) -> None:
         super().__init__('Object')
         self._geometryProvider = geometryProvider

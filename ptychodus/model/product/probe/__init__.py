@@ -7,6 +7,7 @@ from .item import ProbeRepositoryItem
 from .itemFactory import ProbeRepositoryItemFactory
 from .multimodal import MultimodalProbeBuilder, ProbeModeDecayType
 from .rect import RectangularProbeBuilder
+from .settings import ProbeSettings
 from .superGaussian import SuperGaussianProbeBuilder
 from .zernike import ZernikeProbeBuilder
 
@@ -22,6 +23,7 @@ __all__ = [
     'ProbeRepositoryItem',
     'ProbeRepositoryItemFactory',
     'ProbeRepositoryPresenter',
+    'ProbeSettings',
     'RectangularProbeBuilder',
     'SuperGaussianProbeBuilder',
     'ZernikeProbeBuilder',

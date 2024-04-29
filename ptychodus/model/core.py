@@ -76,13 +76,13 @@ class ModelCore:
                                           self._pluginRegistry.diffractionFileReaders,
                                           self._pluginRegistry.diffractionFileWriters)
         self._productCore = ProductCore(
-            self.rng, self._patternsCore.detector, self._patternsCore.productSettings,
-            self._patternsCore.patternSizer, self._patternsCore.dataset,
-            self._pluginRegistry.scanFileReaders, self._pluginRegistry.scanFileWriters,
-            self._pluginRegistry.fresnelZonePlates, self._pluginRegistry.probeFileReaders,
-            self._pluginRegistry.probeFileWriters, self._pluginRegistry.objectFileReaders,
-            self._pluginRegistry.objectFileWriters, self._pluginRegistry.productFileReaders,
-            self._pluginRegistry.productFileWriters)
+            self.rng, self.settingsRegistry, self._patternsCore.detector,
+            self._patternsCore.productSettings, self._patternsCore.patternSizer,
+            self._patternsCore.dataset, self._pluginRegistry.scanFileReaders,
+            self._pluginRegistry.scanFileWriters, self._pluginRegistry.fresnelZonePlates,
+            self._pluginRegistry.probeFileReaders, self._pluginRegistry.probeFileWriters,
+            self._pluginRegistry.objectFileReaders, self._pluginRegistry.objectFileWriters,
+            self._pluginRegistry.productFileReaders, self._pluginRegistry.productFileWriters)
 
         self.patternVisualizationEngine = VisualizationEngine(isComplex=False)
         self.probeVisualizationEngine = VisualizationEngine(isComplex=True)

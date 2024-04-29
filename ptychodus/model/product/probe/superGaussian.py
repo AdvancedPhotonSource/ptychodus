@@ -5,31 +5,33 @@ import numpy
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
 from .builder import ProbeBuilder
+from .settings import ProbeSettings
 
 
 class SuperGaussianProbeBuilder(ProbeBuilder):
 
-    def __init__(self) -> None:
+    def __init__(self, settings: ProbeSettings) -> None:
         super().__init__('super_gaussian')
+        self._settings = settings
 
         self.annularRadiusInMeters = self._registerRealParameter(
             'annular_radius_m',
-            0.,
+            float(settings.superGaussianAnnularRadiusInMeters.value),
             minimum=0.,
         )
         self.fwhmInMeters = self._registerRealParameter(
             'full_width_at_half_maximum_m',
-            1.e-6,
+            float(settings.superGaussianWidthInMeters.value),
             minimum=0.,
         )
         self.orderParameter = self._registerRealParameter(
             'order_parameter',
-            1.,
+            float(settings.superGaussianOrderParameter.value),
             minimum=1.,
         )
 
     def copy(self) -> SuperGaussianProbeBuilder:
-        builder = SuperGaussianProbeBuilder()
+        builder = SuperGaussianProbeBuilder(self._settings)
         builder.annularRadiusInMeters.setValue(self.annularRadiusInMeters.getValue())
         builder.fwhmInMeters.setValue(self.fwhmInMeters.getValue())
         builder.orderParameter.setValue(self.orderParameter.getValue())

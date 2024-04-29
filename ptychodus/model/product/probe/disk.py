@@ -5,21 +5,23 @@ import numpy
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
 from .builder import ProbeBuilder
+from .settings import ProbeSettings
 
 
 class DiskProbeBuilder(ProbeBuilder):
 
-    def __init__(self) -> None:
+    def __init__(self, settings: ProbeSettings) -> None:
         super().__init__('disk')
+        self._settings = settings
 
         self.diameterInMeters = self._registerRealParameter(
             'diameter_m',
-            1.e-6,
+            float(settings.diskDiameterInMeters.value),
             minimum=0.,
         )
 
     def copy(self) -> DiskProbeBuilder:
-        builder = DiskProbeBuilder()
+        builder = DiskProbeBuilder(self._settings)
         builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
         return builder
 

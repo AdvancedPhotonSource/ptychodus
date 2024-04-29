@@ -11,6 +11,7 @@ from .builder import FromFileProbeBuilder, ProbeBuilder
 from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
 from .rect import RectangularProbeBuilder
+from .settings import ProbeSettings
 from .superGaussian import SuperGaussianProbeBuilder
 from .zernike import ZernikeProbeBuilder
 
@@ -19,11 +20,13 @@ logger = logging.getLogger(__name__)
 
 class ProbeBuilderFactory(Iterable[str]):
 
-    def __init__(self, detector: Detector, patterns: ActiveDiffractionDataset,
+    def __init__(self, settings: ProbeSettings, detector: Detector,
+                 patterns: ActiveDiffractionDataset,
                  fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
                  fileReaderChooser: PluginChooser[ProbeFileReader],
                  fileWriterChooser: PluginChooser[ProbeFileWriter]) -> None:
         super().__init__()
+        self._settings = settings
         self._detector = detector
         self._patterns = patterns
         self._fresnelZonePlateChooser = fresnelZonePlateChooser
@@ -31,11 +34,11 @@ class ProbeBuilderFactory(Iterable[str]):
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[], ProbeBuilder]] = {
             'average_pattern': self._createAveragePatternBuilder,
-            'disk': lambda: DiskProbeBuilder(),
+            'disk': lambda: DiskProbeBuilder(settings),
             'fresnel_zone_plate': self._createFresnelZonePlateBuilder,
-            'rectangular': lambda: RectangularProbeBuilder(),
-            'super_gaussian': lambda: SuperGaussianProbeBuilder(),
-            'zernike': lambda: ZernikeProbeBuilder(),
+            'rectangular': lambda: RectangularProbeBuilder(settings),
+            'super_gaussian': lambda: SuperGaussianProbeBuilder(settings),
+            'zernike': lambda: ZernikeProbeBuilder(settings),
         }
 
     def __iter__(self) -> Iterator[str]:
@@ -49,11 +52,32 @@ class ProbeBuilderFactory(Iterable[str]):
 
         return factory()
 
+    def createDefault(self) -> ProbeBuilder:
+        return next(iter(self._builders.values()))()
+
+    def createFromSettings(self) -> ProbeBuilder:  # FIXME call this
+        name = self._settings.builder.value
+        nameRepaired = name.casefold()
+
+        if nameRepaired == 'from_file':
+            builder = self.createProbeFromFile(
+                self._settings.inputFilePath.value,
+                self._settings.inputFileType.value,
+            )
+        else:
+            try:
+                builder = self.create(nameRepaired)
+            except KeyError:
+                logger.warning(f'Unknown builder \"{name}\"!')
+                return self.createDefault()
+
+        return builder
+
     def _createAveragePatternBuilder(self) -> ProbeBuilder:
         return AveragePatternProbeBuilder(self._detector, self._patterns)
 
     def _createFresnelZonePlateBuilder(self) -> ProbeBuilder:
-        return FresnelZonePlateProbeBuilder(self._fresnelZonePlateChooser)
+        return FresnelZonePlateProbeBuilder(self._settings, self._fresnelZonePlateChooser)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()

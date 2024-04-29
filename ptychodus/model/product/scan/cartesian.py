@@ -6,6 +6,7 @@ import numpy
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
+from .settings import ScanSettings
 
 
 class CartesianScanVariant(IntEnum):
@@ -33,16 +34,34 @@ class CartesianScanVariant(IntEnum):
 
 class CartesianScanBuilder(ScanBuilder):
 
-    def __init__(self, variant: CartesianScanVariant) -> None:
+    def __init__(self, variant: CartesianScanVariant, settings: ScanSettings) -> None:
         super().__init__(variant.name.lower())
         self._variant = variant
-        self.numberOfPointsX = self._registerIntegerParameter('number_of_points_x', 10, minimum=0)
-        self.numberOfPointsY = self._registerIntegerParameter('number_of_points_y', 10, minimum=0)
-        self.stepSizeXInMeters = self._registerRealParameter('step_size_x_m', 1e-6, minimum=0.)
-        self.stepSizeYInMeters = self._registerRealParameter('step_size_y_m', 1e-6, minimum=0.)
+        self._settings = settings
+
+        self.numberOfPointsX = self._registerIntegerParameter(
+            'number_of_points_x',
+            settings.numberOfPointsX.value,
+            minimum=0,
+        )
+        self.numberOfPointsY = self._registerIntegerParameter(
+            'number_of_points_y',
+            settings.numberOfPointsY.value,
+            minimum=0,
+        )
+        self.stepSizeXInMeters = self._registerRealParameter(
+            'step_size_x_m',
+            float(settings.stepSizeXInMeters.value),
+            minimum=0.,
+        )
+        self.stepSizeYInMeters = self._registerRealParameter(
+            'step_size_y_m',
+            float(settings.stepSizeYInMeters.value),
+            minimum=0.,
+        )
 
     def copy(self) -> CartesianScanBuilder:
-        builder = CartesianScanBuilder(self._variant)
+        builder = CartesianScanBuilder(self._variant, self._settings)
         builder.numberOfPointsX.setValue(self.numberOfPointsX.getValue())
         builder.numberOfPointsY.setValue(self.numberOfPointsY.getValue())
         builder.stepSizeXInMeters.setValue(self.stepSizeXInMeters.getValue())

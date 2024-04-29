@@ -38,8 +38,8 @@ class ScanTransformViewController(ParameterViewController):
         self._affineAYViewController = DecimalLineEditParameterViewController(transform.affineAY,
                                                                               isSigned=True)
         self._labelAY = QLabel('y +')
-        self._affineATViewController = LengthWidgetParameterViewController(transform.affineAT,
-                                                                           isSigned=True)
+        self._affineATViewController = LengthWidgetParameterViewController(
+            transform.affineATInMeters, isSigned=True)
 
         self._labelYP = QLabel('y\u2032 =')
         self._labelYP.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -49,8 +49,8 @@ class ScanTransformViewController(ParameterViewController):
         self._affineBYViewController = DecimalLineEditParameterViewController(transform.affineBY,
                                                                               isSigned=True)
         self._labelBY = QLabel('y +')
-        self._affineBTViewController = LengthWidgetParameterViewController(transform.affineBT,
-                                                                           isSigned=True)
+        self._affineBTViewController = LengthWidgetParameterViewController(
+            transform.affineBTInMeters, isSigned=True)
 
         self._jitterRadiusLabel = QLabel('Jitter Radius:')
         self._jitterRadiusViewController = LengthWidgetParameterViewController(

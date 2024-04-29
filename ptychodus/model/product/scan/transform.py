@@ -6,35 +6,44 @@ import numpy
 from ptychodus.api.parametric import ParameterRepository
 from ptychodus.api.scan import ScanPoint
 
+from .settings import ScanSettings
+
 
 class ScanPointTransform(ParameterRepository):
 
-    def __init__(self, rng: numpy.random.Generator) -> None:
+    def __init__(self, rng: numpy.random.Generator, settings: ScanSettings) -> None:
         super().__init__('transform')
         self._rng = rng
+        self._settings = settings
 
-        self.affineAX = self._registerRealParameter('affine_ax', 1.)
-        self.affineAY = self._registerRealParameter('affine_ay', 0.)
-        self.affineAT = self._registerRealParameter('affine_at', 0.)
+        self.affineAX = self._registerRealParameter('affine_ax',
+                                                    float(settings.affineTransformAX.value))
+        self.affineAY = self._registerRealParameter('affine_ay',
+                                                    float(settings.affineTransformAY.value))
+        self.affineATInMeters = self._registerRealParameter(
+            'affine_at_m', float(settings.affineTransformATInMeters.value))
 
-        self.affineBX = self._registerRealParameter('affine_bx', 0.)
-        self.affineBY = self._registerRealParameter('affine_by', 1.)
-        self.affineBT = self._registerRealParameter('affine_bt', 0.)
+        self.affineBX = self._registerRealParameter('affine_bx',
+                                                    float(settings.affineTransformBX.value))
+        self.affineBY = self._registerRealParameter('affine_by',
+                                                    float(settings.affineTransformBY.value))
+        self.affineBTInMeters = self._registerRealParameter(
+            'affine_bt_m', float(settings.affineTransformBTInMeters.value))
 
         self.jitterRadiusInMeters = self._registerRealParameter(
             'jitter_radius_m',
-            0.,
+            float(settings.jitterRadiusInMeters.value),
             minimum=0.,
         )
 
     def copy(self) -> ScanPointTransform:
-        transform = ScanPointTransform(self._rng)
+        transform = ScanPointTransform(self._rng, self._settings)
         transform.affineAX.setValue(self.affineAX.getValue())
         transform.affineAY.setValue(self.affineAY.getValue())
-        transform.affineAT.setValue(self.affineAT.getValue())
+        transform.affineATInMeters.setValue(self.affineATInMeters.getValue())
         transform.affineBX.setValue(self.affineBX.getValue())
         transform.affineBY.setValue(self.affineBY.getValue())
-        transform.affineBT.setValue(self.affineBT.getValue())
+        transform.affineBTInMeters.setValue(self.affineBTInMeters.getValue())
         transform.jitterRadiusInMeters.setValue(self.jitterRadiusInMeters.getValue())
         return transform
 
@@ -72,14 +81,14 @@ class ScanPointTransform(ParameterRepository):
     def __call__(self, point: ScanPoint) -> ScanPoint:
         ax = self.affineAX.getValue()
         ay = self.affineAY.getValue()
-        at = self.affineAT.getValue()
+        at_m = self.affineATInMeters.getValue()
 
         bx = self.affineBX.getValue()
         by = self.affineBY.getValue()
-        bt = self.affineBT.getValue()
+        bt_m = self.affineBTInMeters.getValue()
 
-        posX = ax * point.positionXInMeters + ay * point.positionYInMeters + at
-        posY = bx * point.positionXInMeters + by * point.positionYInMeters + bt
+        posX = ax * point.positionXInMeters + ay * point.positionYInMeters + at_m
+        posY = bx * point.positionXInMeters + by * point.positionYInMeters + bt_m
 
         rad = self.jitterRadiusInMeters.getValue()
 

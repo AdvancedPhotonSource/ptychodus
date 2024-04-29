@@ -9,20 +9,21 @@ from ptychodus.api.plugins import PluginChooser
 
 from .builder import FromFileObjectBuilder, ObjectBuilder
 from .random import RandomObjectBuilder
+from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
 
 
 class ObjectBuilderFactory(Iterable[str]):
 
-    def __init__(self, rng: numpy.random.Generator,
+    def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings,
                  fileReaderChooser: PluginChooser[ObjectFileReader],
                  fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
-        self._rng = rng
+        self._settings = settings
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[], ObjectBuilder]] = {
-            'random': self._createRandomBuilder,
+            'random': lambda: RandomObjectBuilder(rng, settings),
         }
 
     def __iter__(self) -> Iterator[str]:
@@ -36,8 +37,26 @@ class ObjectBuilderFactory(Iterable[str]):
 
         return factory()
 
-    def _createRandomBuilder(self) -> ObjectBuilder:
-        return RandomObjectBuilder(self._rng)
+    def createDefault(self) -> ObjectBuilder:
+        return next(iter(self._builders.values()))()
+
+    def createFromSettings(self) -> ObjectBuilder:  # FIXME call this
+        name = self._settings.builder.value
+        nameRepaired = name.casefold()
+
+        if nameRepaired == 'from_file':
+            builder = self.createObjectFromFile(
+                self._settings.inputFilePath.value,
+                self._settings.inputFileType.value,
+            )
+        else:
+            try:
+                builder = self.create(nameRepaired)
+            except KeyError:
+                logger.warning(f'Unknown builder \"{name}\"!')
+                return self.createDefault()
+
+        return builder
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()

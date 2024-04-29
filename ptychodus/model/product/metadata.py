@@ -17,7 +17,11 @@ class UniqueNameFactory(ABC):
 
 class MetadataRepositoryItem(ParameterRepository):
 
-    def __init__(self, parent: UniqueNameFactory, metadata: ProductMetadata) -> None:
+    def __init__(self, parent: UniqueNameFactory,
+                 metadata: ProductMetadata) -> None:
+        # FIXME init from productSettings?
+        # FIXME how to save settings for active product?
+        # FIXME create product on settings load
         super().__init__('metadata')
         self._parent = parent
         self._name = self._registerStringParameter('name', parent.createUniqueName(metadata.name))

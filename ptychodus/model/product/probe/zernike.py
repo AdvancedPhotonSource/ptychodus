@@ -10,6 +10,7 @@ import scipy.special
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
 from .builder import ProbeBuilder
+from .settings import ProbeSettings
 
 RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 
@@ -71,22 +72,24 @@ class ZernikePolynomial:
 
 class ZernikeProbeBuilder(ProbeBuilder):
 
-    def __init__(self) -> None:
+    def __init__(self, settings: ProbeSettings) -> None:
         super().__init__('zernike')
+        self._settings = settings
         self._polynomials: list[ZernikePolynomial] = list()
         self._order = 0
 
         self.diameterInMeters = self._registerRealParameter(
             'diameter_m',
-            1.e-6,
+            float(settings.diskDiameterInMeters.value),
             minimum=0.,
         )
+        # TODO init zernike coefficients from settings
         self.coefficients = self._registerComplexArrayParameter('coefficients', [1 + 0j])
 
         self.setOrder(1)
 
     def copy(self) -> ZernikeProbeBuilder:
-        builder = ZernikeProbeBuilder()
+        builder = ZernikeProbeBuilder(self._settings)
         builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
         builder.coefficients.setValue(self.coefficients.getValue())
         builder.setOrder(self.getOrder())

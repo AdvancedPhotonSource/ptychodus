@@ -5,6 +5,7 @@ from .concentric import ConcentricScanBuilder
 from .item import ScanRepositoryItem
 from .itemFactory import ScanRepositoryItemFactory
 from .lissajous import LissajousScanBuilder
+from .settings import ScanSettings
 from .spiral import SpiralScanBuilder
 from .transform import ScanPointTransform
 
@@ -18,5 +19,6 @@ __all__ = [
     'ScanPointTransform',
     'ScanRepositoryItem',
     'ScanRepositoryItemFactory',
+    'ScanSettings',
     'SpiralScanBuilder',
 ]

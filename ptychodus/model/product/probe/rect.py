@@ -5,26 +5,28 @@ import numpy
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
 from .builder import ProbeBuilder
+from .settings import ProbeSettings
 
 
 class RectangularProbeBuilder(ProbeBuilder):
 
-    def __init__(self) -> None:
+    def __init__(self, settings: ProbeSettings) -> None:
         super().__init__('rectangular')
+        self._settings = settings
 
         self.widthInMeters = self._registerRealParameter(
             'width_m',
-            1.e-6,
+            float(settings.rectangleWidthInMeters.value),
             minimum=0.,
         )
         self.heightInMeters = self._registerRealParameter(
             'height_m',
-            1.e-6,
+            float(settings.rectangleHeightInMeters.value),
             minimum=0.,
         )
 
     def copy(self) -> RectangularProbeBuilder:
-        builder = RectangularProbeBuilder()
+        builder = RectangularProbeBuilder(self._settings)
         builder.widthInMeters.setValue(self.widthInMeters.getValue())
         builder.heightInMeters.setValue(self.heightInMeters.getValue())
         return builder

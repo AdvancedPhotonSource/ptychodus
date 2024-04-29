@@ -6,38 +6,44 @@ import numpy
 from ptychodus.api.object import Object, ObjectGeometryProvider
 
 from .builder import ObjectBuilder
+from .settings import ObjectSettings
 
 
 class RandomObjectBuilder(ObjectBuilder):
 
-    def __init__(self, rng: numpy.random.Generator) -> None:
+    def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings) -> None:
         super().__init__('random')
         self._rng = rng
+        self._settings = settings
 
-        self.extraPaddingX = self._registerIntegerParameter('extra_padding_x', 1, minimum=0)
-        self.extraPaddingY = self._registerIntegerParameter('extra_padding_y', 1, minimum=0)
+        self.extraPaddingX = self._registerIntegerParameter('extra_padding_x',
+                                                            settings.extraPaddingX.value,
+                                                            minimum=0)
+        self.extraPaddingY = self._registerIntegerParameter('extra_padding_y',
+                                                            settings.extraPaddingY.value,
+                                                            minimum=0)
 
         self.amplitudeMean = self._registerRealParameter(
             'amplitude_mean',
-            0.5,
+            float(settings.amplitudeMean.value),
             minimum=0.,
             maximum=1.,
         )
         self.amplitudeDeviation = self._registerRealParameter(
             'amplitude_deviation',
-            0.,
+            float(settings.amplitudeDeviation.value),
             minimum=0.,
             maximum=1.,
         )
         self.phaseDeviation = self._registerRealParameter(
             'phase_deviation',
-            0.,
+            float(settings.phaseDeviation.value),
             minimum=0.,
             maximum=numpy.pi,
         )
 
     def copy(self) -> RandomObjectBuilder:
-        builder = RandomObjectBuilder(self._rng)
+        builder = RandomObjectBuilder(self._rng, self._settings)
         builder.extraPaddingX.setValue(self.extraPaddingX.getValue())
         builder.extraPaddingY.setValue(self.extraPaddingY.getValue())
         builder.amplitudeMean.setValue(self.amplitudeMean.getValue())

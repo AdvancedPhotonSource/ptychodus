@@ -5,29 +5,45 @@ import numpy
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
+from .settings import ScanSettings
 
 
 class LissajousScanBuilder(ScanBuilder):
 
-    def __init__(self) -> None:
+    def __init__(self, settings: ScanSettings) -> None:
         super().__init__('lissajous')
-        self.numberOfPoints = self._registerIntegerParameter('number_of_points', 100, minimum=0)
+        self._settings = settings
+
+        self.numberOfPoints = self._registerIntegerParameter(
+            'number_of_points',
+            settings.numberOfPoints,
+            minimum=0,
+        )
         self.amplitudeXInMeters = self._registerRealParameter(
             'amplitude_x_m',
-            4.5e-6,
+            float(settings.amplitudeXInMeters.value),
             minimum=0.,
         )
         self.amplitudeYInMeters = self._registerRealParameter(
             'amplitude_y_m',
-            4.5e-6,
+            float(settings.amplitudeYInMeters.value),
             minimum=0.,
         )
-        self.angularStepXInTurns = self._registerRealParameter('angular_step_x_tr', 0.03)
-        self.angularStepYInTurns = self._registerRealParameter('angular_step_y_tr', 0.04)
-        self.angularShiftInTurns = self._registerRealParameter('angular_shift_tr', 0.25)
+        self.angularStepXInTurns = self._registerRealParameter(
+            'angular_step_x_tr',
+            float(settings.angularStepXInTurns.value),
+        )
+        self.angularStepYInTurns = self._registerRealParameter(
+            'angular_step_y_tr',
+            float(settings.angularStepYInTurns.value),
+        )
+        self.angularShiftInTurns = self._registerRealParameter(
+            'angular_shift_tr',
+            float(settings.angularShiftInTurns.value),
+        )
 
     def copy(self) -> LissajousScanBuilder:
-        builder = LissajousScanBuilder()
+        builder = LissajousScanBuilder(self._settings)
         builder.numberOfPoints.setValue(self.numberOfPoints.getValue())
         builder.amplitudeXInMeters.setValue(self.amplitudeXInMeters.getValue())
         builder.amplitudeYInMeters.setValue(self.amplitudeYInMeters.getValue())

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from pathlib import Path
 import logging
 
@@ -9,6 +9,7 @@ from .builder import FromFileScanBuilder, ScanBuilder
 from .cartesian import CartesianScanBuilder, CartesianScanVariant
 from .concentric import ConcentricScanBuilder
 from .lissajous import LissajousScanBuilder
+from .settings import ScanSettings
 from .spiral import SpiralScanBuilder
 
 logger = logging.getLogger(__name__)
@@ -16,25 +17,21 @@ logger = logging.getLogger(__name__)
 
 class ScanBuilderFactory(Iterable[str]):
 
-    @classmethod
-    def _createBuilders(cls) -> Mapping[str, Callable[[], ScanBuilder]]:
-        builders: dict[str, Callable[[], ScanBuilder]] = {
-            variant.name.lower():
-            lambda variant=variant: CartesianScanBuilder(variant)  # type: ignore
-            for variant in CartesianScanVariant
-        }
-        builders.update({
-            'concentric': lambda: ConcentricScanBuilder(),
-            'spiral': lambda: SpiralScanBuilder(),
-            'lissajous': lambda: LissajousScanBuilder(),
-        })
-        return builders
-
-    def __init__(self, fileReaderChooser: PluginChooser[ScanFileReader],
+    def __init__(self, settings: ScanSettings, fileReaderChooser: PluginChooser[ScanFileReader],
                  fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
+        self._settings = settings
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
-        self._builders = ScanBuilderFactory._createBuilders()
+        self._builders: dict[str, Callable[[], ScanBuilder]] = {
+            variant.name.lower():
+            lambda variant=variant: CartesianScanBuilder(variant, settings)  # type: ignore
+            for variant in CartesianScanVariant
+        }
+        self._builders.update({
+            'concentric': lambda: ConcentricScanBuilder(settings),
+            'spiral': lambda: SpiralScanBuilder(settings),
+            'lissajous': lambda: LissajousScanBuilder(settings),
+        })
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._builders)
@@ -47,14 +44,35 @@ class ScanBuilderFactory(Iterable[str]):
 
         return factory()
 
+    def createDefault(self) -> ScanBuilder:
+        return next(iter(self._builders.values()))()
+
+    def createFromSettings(self) -> ScanBuilder:  # FIXME call this
+        name = self._settings.builder.value
+        nameRepaired = name.casefold()
+
+        if nameRepaired == 'from_file':
+            builder = self.createScanFromFile(
+                self._settings.inputFilePath.value,
+                self._settings.inputFileType.value,
+            )
+        else:
+            try:
+                builder = self.create(nameRepaired)
+            except KeyError:
+                logger.warning(f'Unknown builder \"{name}\"!')
+                return self.createDefault()
+
+        return builder
+
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
 
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.currentPlugin.displayName
 
-    def createScanFromFile(self, filePath: Path, fileFilter: str) -> ScanBuilder:
-        self._fileReaderChooser.setCurrentPluginByName(fileFilter)
+    def createScanFromFile(self, filePath: Path, fileType: str) -> ScanBuilder:
+        self._fileReaderChooser.setCurrentPluginByName(fileType)
         fileType = self._fileReaderChooser.currentPlugin.simpleName
         fileReader = self._fileReaderChooser.currentPlugin.strategy
         return FromFileScanBuilder(filePath, fileType, fileReader)
@@ -65,8 +83,8 @@ class ScanBuilderFactory(Iterable[str]):
     def getSaveFileFilter(self) -> str:
         return self._fileWriterChooser.currentPlugin.displayName
 
-    def saveScan(self, filePath: Path, fileFilter: str, scan: Scan) -> None:
-        self._fileWriterChooser.setCurrentPluginByName(fileFilter)
+    def saveScan(self, filePath: Path, fileType: str, scan: Scan) -> None:
+        self._fileWriterChooser.setCurrentPluginByName(fileType)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         fileWriter = self._fileWriterChooser.currentPlugin.strategy
