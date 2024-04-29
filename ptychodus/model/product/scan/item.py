@@ -30,6 +30,16 @@ class ScanRepositoryItem(ParameterRepository):
         self._addParameterRepository(builder, observe=True)
         self._addParameterRepository(transform, observe=True)
 
+        self.expandBoundingBox = self._registerBooleanParameter('expand_bbox', False)
+        self.expandedBoundingBoxMinimumXInMeters = self._registerRealParameter(
+            'expanded_bbox_xmin_m', -5e-7)
+        self.expandedBoundingBoxMaximumXInMeters = self._registerRealParameter(
+            'expanded_bbox_xmax_m', +5e-7)
+        self.expandedBoundingBoxMinimumYInMeters = self._registerRealParameter(
+            'expanded_bbox_ymin_m', -5e-7)
+        self.expandedBoundingBoxMaximumYInMeters = self._registerRealParameter(
+            'expanded_bbox_ymax_m', +5e-7)
+
         self._rebuild()
 
     def assign(self, item: ScanRepositoryItem) -> None:
@@ -59,7 +69,18 @@ class ScanRepositoryItem(ParameterRepository):
         self._rebuild()
 
     def getBoundingBox(self) -> ScanBoundingBox | None:
-        return self._boundingBoxBuilder.getBoundingBox()
+        bbox = self._boundingBoxBuilder.getBoundingBox()
+
+        if self.expandBoundingBox.getValue():
+            expandedBoundingBox = ScanBoundingBox(
+                minimumXInMeters=self.expandedBoundingBoxMinimumXInMeters.getValue(),
+                maximumXInMeters=self.expandedBoundingBoxMaximumXInMeters.getValue(),
+                minimumYInMeters=self.expandedBoundingBoxMinimumYInMeters.getValue(),
+                maximumYInMeters=self.expandedBoundingBoxMaximumYInMeters.getValue(),
+            )
+            bbox = expandedBoundingBox if bbox is None else bbox.hull(expandedBoundingBox)
+
+        return bbox
 
     def getLengthInMeters(self) -> float:
         return self._lengthInMeters

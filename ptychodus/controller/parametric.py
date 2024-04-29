@@ -8,9 +8,10 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
                              QGroupBox, QSpinBox, QVBoxLayout, QWidget)
 
-from ..api.geometry import Interval
-from ..api.observer import Observable, Observer
-from ..api.parametric import BooleanParameter, IntegerParameter, RealParameter
+from ptychodus.api.geometry import Interval
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parametric import BooleanParameter, IntegerParameter, RealParameter
+
 from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWidget
 
 logger = logging.getLogger(__name__)

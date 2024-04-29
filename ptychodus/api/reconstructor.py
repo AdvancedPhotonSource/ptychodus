@@ -46,11 +46,11 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def getSaveFileFilterList(self) -> Sequence[str]:
+    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         pass
 
     @abstractmethod
-    def getSaveFileFilter(self) -> str:
+    def getSaveTrainingDataFileFilter(self) -> str:
         pass
 
     @abstractmethod
@@ -65,8 +65,17 @@ class TrainableReconstructor(Reconstructor):
     def clearTrainingData(self) -> None:
         pass
 
+    @abstractmethod
+    def getSaveModelFileFilterList(self) -> Sequence[str]:
+        pass
+
+    @abstractmethod
+    def getSaveModelFileFilter(self) -> str:
+        pass
+
+    @abstractmethod
     def saveModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # FIXME
+        pass
 
 
 class NullReconstructor(TrainableReconstructor):
@@ -84,10 +93,10 @@ class NullReconstructor(TrainableReconstructor):
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         pass
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
+    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         return list()
 
-    def getSaveFileFilter(self) -> str:
+    def getSaveTrainingDataFileFilter(self) -> str:
         return str()
 
     def saveTrainingData(self, filePath: Path) -> None:
@@ -97,6 +106,15 @@ class NullReconstructor(TrainableReconstructor):
         return TrainOutput([], [], 0)
 
     def clearTrainingData(self) -> None:
+        pass
+
+    def getSaveModelFileFilterList(self) -> Sequence[str]:
+        return list()
+
+    def getSaveModelFileFilter(self) -> str:
+        return str()
+
+    def saveModel(self, filePath: Path) -> None:
         pass
 
 

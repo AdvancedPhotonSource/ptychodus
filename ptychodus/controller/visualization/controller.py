@@ -139,9 +139,8 @@ class VisualizationController(Observer):
         rectangleView.widthLineEdit.setText(f'{rect.width():.1f}')
         rectangleView.heightLineEdit.setText(f'{rect.height():.1f}')
 
+        # TODO use rect for crop
         self._histogramDialog.open()
-
-        print(rect)  # TODO use for crop
 
     def zoomToFit(self) -> None:
         self._item.setPos(0, 0)

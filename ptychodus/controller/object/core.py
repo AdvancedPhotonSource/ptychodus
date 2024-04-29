@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 from ptychodus.api.observer import SequenceObserver
 
 from ...model.analysis import DichroicAnalyzer, FourierRingCorrelator
-from ...model.product import ObjectRepository
-from ...model.product.object import ObjectAPI, ObjectRepositoryItem
+from ...model.product import ObjectAPI, ObjectRepository
+from ...model.product.object import ObjectRepositoryItem
 from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog

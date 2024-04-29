@@ -1,4 +1,3 @@
-from .api import ScanAPI
 from .builder import FromFileScanBuilder, FromMemoryScanBuilder
 from .builderFactory import ScanBuilderFactory
 from .cartesian import CartesianScanBuilder
@@ -15,7 +14,6 @@ __all__ = [
     'FromFileScanBuilder',
     'FromMemoryScanBuilder',
     'LissajousScanBuilder',
-    'ScanAPI',
     'ScanBuilderFactory',
     'ScanPointTransform',
     'ScanRepositoryItem',

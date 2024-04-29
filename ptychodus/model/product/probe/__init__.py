@@ -1,4 +1,3 @@
-from .api import ProbeAPI
 from .averagePattern import AveragePatternProbeBuilder
 from .builder import ProbeBuilder
 from .builderFactory import ProbeBuilderFactory
@@ -16,7 +15,6 @@ __all__ = [
     'DiskProbeBuilder',
     'FresnelZonePlateProbeBuilder',
     'MultimodalProbeBuilder',
-    'ProbeAPI',
     'ProbeBuilder',
     'ProbeBuilderFactory',
     'ProbeModeDecayType',

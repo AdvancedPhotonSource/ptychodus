@@ -188,18 +188,20 @@ class VisualizationProduct:
         return LineCut(distances, values)
 
     def estimateKernelDensity(self, box: Box2D) -> KernelDensityEstimate:
-        x_begin = int(box.x_begin)
-        x_end = int(box.x_end) + 1
-        y_begin = int(box.y_begin)
-        y_end = int(box.y_end) + 1
+        x_range = Interval[int](0, self._values.shape[-1])
+        x_begin = x_range.clamp(int(box.x_begin))
+        x_end = x_range.clamp(int(box.x_end) + 1)
 
-        # FIXME clamp {xy}_begin, {xy}_end to data
-        # FIXME check complex values, multimodal probes, multilayer objects
+        y_range = Interval[int](0, self._values.shape[-2])
+        y_begin = y_range.clamp(int(box.y_begin))
+        y_end = y_range.clamp(int(box.y_end) + 1)
 
-        # FIXME Datapoints to estimate from. In case of univariate data this is a 1-D array,
-        # FIXME otherwise a 2-D array with shape (# of dims, # of data).
-        values = self._values[y_begin:y_end, x_begin:x_end]
-        values = values.reshape(values.shape[0], -1) if values.ndim == 3 \
+        values = self._values[..., y_begin:y_end, x_begin:x_end]
+        values = values.reshape(values.shape[-3], -1) if values.ndim > 2 \
                 else values.reshape(-1)
-        kde = gaussian_kde(values)
-        return KernelDensityEstimate(values.min(), values.max(), kde)
+
+        if numpy.iscomplexobj(values):
+            # TODO improve KDE for complex values
+            values = numpy.absolute(values)
+
+        return KernelDensityEstimate(values.min(), values.max(), gaussian_kde(values))

@@ -27,11 +27,8 @@ from .memory import MemoryPresenter
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
                        DiffractionDatasetPresenter, DiffractionMetadataPresenter,
                        DiffractionPatternPresenter, PatternsCore)
-from .product import (ObjectRepository, ProbeRepository, ProductAPI, ProductCore,
-                      ProductRepository, ScanRepository)
-from .product.object import ObjectAPI
-from .product.probe import ProbeAPI
-from .product.scan import ScanAPI
+from .product import (ObjectAPI, ObjectRepository, ProbeAPI, ProbeRepository, ProductAPI,
+                      ProductCore, ProductRepository, ScanAPI, ScanRepository)
 from .ptychonn import PtychoNNReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .tike import TikeReconstructorLibrary

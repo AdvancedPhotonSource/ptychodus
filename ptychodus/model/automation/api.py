@@ -5,10 +5,7 @@ from typing import Any
 from ptychodus.api.automation import WorkflowAPI, WorkflowProductAPI
 
 from ..patterns import PatternsAPI
-from ..product import ProductAPI
-from ..product.object import ObjectAPI
-from ..product.probe import ProbeAPI
-from ..product.scan import ScanAPI
+from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
 from ..workflow import WorkflowCore
 
 

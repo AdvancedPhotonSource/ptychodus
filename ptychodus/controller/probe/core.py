@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 from ptychodus.api.observer import SequenceObserver
 
 from ...model.analysis import ProbePropagator
-from ...model.product import ProbeRepository
-from ...model.product.probe import ProbeAPI, ProbeRepositoryItem
+from ...model.product import ProbeAPI, ProbeRepository
+from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog, ProgressBarItemDelegate

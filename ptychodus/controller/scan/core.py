@@ -5,8 +5,8 @@ from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ...api.observer import SequenceObserver
-from ...model.product import ScanRepository
-from ...model.product.scan import ScanAPI, ScanRepositoryItem
+from ...model.product import ScanAPI, ScanRepository
+from ...model.product.scan import ScanRepositoryItem
 from ...view.repository import RepositoryTableView
 from ...view.scan import ScanPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog

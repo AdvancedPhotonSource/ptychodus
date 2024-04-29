@@ -65,7 +65,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
     def createNewProduct(self, name: str, *, likeIndex: int) -> int:
         metadataItem = self._metadataRepositoryItemFactory.createDefault(name)
         scanItem = self._scanRepositoryItemFactory.createDefault()
-        geometry = ProductGeometry(self._settings, self._patternSizer, metadataItem, scanItem)
+        geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.create(geometry)
         objectItem = self._objectRepositoryItemFactory.create(geometry)
 
@@ -92,7 +92,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
     def insertProduct(self, product: Product) -> int:
         metadataItem = self._metadataRepositoryItemFactory.create(product.metadata)
         scanItem = self._scanRepositoryItemFactory.create(product.scan)
-        geometry = ProductGeometry(self._settings, self._patternSizer, metadataItem, scanItem)
+        geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.create(geometry, product.probe)
         objectItem = self._objectRepositoryItemFactory.create(geometry, product.object_)
 

@@ -149,21 +149,21 @@ class ReconstructorPresenter(Observable, Observer):
         else:
             logger.warning('Reconstructor is not trainable!')
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
+    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveFileFilterList()
+            return reconstructor.getSaveTrainingDataFileFilterList()
         else:
             logger.warning('Reconstructor is not trainable!')
 
         return list()
 
-    def getSaveFileFilter(self) -> str:
+    def getSaveTrainingDataFileFilter(self) -> str:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveFileFilter()
+            return reconstructor.getSaveTrainingDataFileFilter()
         else:
             logger.warning('Reconstructor is not trainable!')
 

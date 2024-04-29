@@ -56,7 +56,7 @@ class ProductSettings(Observable, Observer):
         self.objectLayerDistanceInMeters = self._settingsGroup.createRealEntry(
             'ObjectLayerDistanceInMeters', '1e-6')
 
-        self.expandScanBoundingBox = self._settingsGroup.createBooleanEntry(
+        self.expandScanBoundingBox = self._settingsGroup.createBooleanEntry(  # FIXME use this
             'ExpandScanBoundingBox', False)
         self.scanBoundingBoxMinimumXInMeters = self._settingsGroup.createRealEntry(
             'ScanBoundingBoxMinimumXInMeters', '0')

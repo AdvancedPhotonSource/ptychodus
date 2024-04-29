@@ -136,8 +136,8 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Training Data',
-            nameFilters=self._presenter.getSaveFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveFileFilter())
+            nameFilters=self._presenter.getSaveTrainingDataFileFilterList(),
+            selectedNameFilter=self._presenter.getSaveTrainingDataFileFilter())
 
         if filePath:
             try:

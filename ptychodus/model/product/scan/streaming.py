@@ -2,6 +2,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 import logging
 
+from pvaccess import Channel
+
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
@@ -45,6 +47,7 @@ logger = logging.getLogger(__name__)
 # TODO             self._maximum = position
 
 # FIXME pvaccess.Channel.monitor
+# FIXME PvObjectQueue
 
 
 class StreamingScanBuilder(ScanBuilder):  # FIXME pvaccess
@@ -61,3 +64,20 @@ class StreamingScanBuilder(ScanBuilder):  # FIXME pvaccess
 
     def build(self) -> Scan:
         return Scan(self._pointList)
+
+
+# FIXME     def echo(self, value: int = 125) -> None:
+# FIXME         print(f'{value=}')
+# FIXME
+# FIXME     def foo(self) -> None:
+# FIXME         channelName = 'foo'
+# FIXME         ch = Channel(channelName)
+# FIXME         connected = ch.isConnected()
+# FIXME         isActive = ch.isMonitorActive()
+# FIXME         ch.subscribe('echo', self.echo)
+# FIXME         ch.setMonitorMaxQueueLength(3)
+# FIXME         ch.startMonitor()
+# FIXME         ch.stopMonitor()
+# FIXME         ch.unsubscribe('echo')
+# FIXME
+# FIXME         counterDict = ch.getMonitorCounters()

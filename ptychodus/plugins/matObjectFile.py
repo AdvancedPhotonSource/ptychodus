@@ -34,7 +34,7 @@ class MATObjectFileWriter(ObjectFileWriter):
     def write(self, filePath: Path, object_: Object) -> None:
         array = object_.array
         matDict = {'object': array.transpose(1, 2, 0)}
-        # FIXME layer distance to p.z_distance
+        # TODO layer distance to p.z_distance
         scipy.io.savemat(filePath, matDict)
 
 

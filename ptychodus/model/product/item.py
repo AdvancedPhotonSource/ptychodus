@@ -58,7 +58,6 @@ class ProductRepositoryItem(ParameterRepository):
 
         self._addParameterRepository(self._metadata, observe=True)
         self._addParameterRepository(self._scan, observe=True)
-        self._addParameterRepository(self._geometry, observe=False)
         self._addParameterRepository(self._probe, observe=True)
         self._addParameterRepository(self._object, observe=True)
 

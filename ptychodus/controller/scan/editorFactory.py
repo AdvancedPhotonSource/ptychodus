@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QDialog, QGridLayout, QLabel, QMessageBox, QWidget
+from PyQt5.QtWidgets import (QDialog, QFormLayout, QGridLayout, QGroupBox, QLabel, QMessageBox,
+                             QWidget)
+
+from ptychodus.api.observer import Observable, Observer
 
 from ...model.product.scan import (CartesianScanBuilder, ConcentricScanBuilder,
                                    FromFileScanBuilder, FromMemoryScanBuilder,
@@ -77,11 +80,51 @@ class ScanTransformViewController(ParameterViewController):
         return self._widget
 
 
+class ScanBoundingBoxViewController(ParameterViewController, Observer):
+
+    def __init__(self, item: ScanRepositoryItem) -> None:
+        super().__init__()
+        self._parameter = item.expandBoundingBox
+        self._widget = QGroupBox('Expand Bounding Box')
+        self._widget.setCheckable(True)
+
+        self._minimumXController = LengthWidgetParameterViewController(
+            item.expandedBoundingBoxMinimumXInMeters, isSigned=True)
+        self._maximumXController = LengthWidgetParameterViewController(
+            item.expandedBoundingBoxMaximumXInMeters, isSigned=True)
+        self._minimumYController = LengthWidgetParameterViewController(
+            item.expandedBoundingBoxMinimumYInMeters, isSigned=True)
+        self._maximumYController = LengthWidgetParameterViewController(
+            item.expandedBoundingBoxMaximumYInMeters, isSigned=True)
+
+        layout = QFormLayout()
+        layout.addRow('Minimum X:', self._minimumXController.getWidget())
+        layout.addRow('Maximum X:', self._maximumXController.getWidget())
+        layout.addRow('Minimum Y:', self._minimumYController.getWidget())
+        layout.addRow('Maximum Y:', self._maximumYController.getWidget())
+        self._widget.setLayout(layout)
+
+        self._syncModelToView()
+        self._widget.toggled.connect(self._parameter.setValue)
+        self._parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncModelToView(self) -> None:
+        self._widget.setChecked(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
 class ScanEditorViewControllerFactory:
 
-    def _appendTransformControls(self, dialogBuilder: ParameterDialogBuilder,
-                                 transform: ScanPointTransform) -> None:
-        dialogBuilder.addViewControllerToBottom(ScanTransformViewController(transform))
+    def _appendCommonControls(self, dialogBuilder: ParameterDialogBuilder,
+                              item: ScanRepositoryItem) -> None:
+        dialogBuilder.addViewControllerToBottom(ScanTransformViewController(item.getTransform()))
+        dialogBuilder.addViewControllerToBottom(ScanBoundingBoxViewController(item))
 
     def createEditorDialog(self, itemName: str, item: ScanRepositoryItem,
                            parent: QWidget) -> QDialog:
@@ -103,7 +146,7 @@ class ScanEditorViewControllerFactory:
                 dialogBuilder.addLengthWidget(scanBuilder.stepSizeYInMeters, 'Step Size Y:',
                                               baseScanGroup)
 
-            self._appendTransformControls(dialogBuilder, item.getTransform())
+            self._appendCommonControls(dialogBuilder, item)
             return dialogBuilder.build(title, parent)
         elif isinstance(scanBuilder, ConcentricScanBuilder):
             dialogBuilder = ParameterDialogBuilder()
@@ -113,15 +156,15 @@ class ScanEditorViewControllerFactory:
                                      'Number of Points in First Shell:', baseScanGroup)
             dialogBuilder.addLengthWidget(scanBuilder.radialStepSizeInMeters, 'Radial Step Size:',
                                           baseScanGroup)
-            self._appendTransformControls(dialogBuilder, item.getTransform())
+            self._appendCommonControls(dialogBuilder, item)
             return dialogBuilder.build(title, parent)
         elif isinstance(scanBuilder, FromFileScanBuilder):
             dialogBuilder = ParameterDialogBuilder()
-            self._appendTransformControls(dialogBuilder, item.getTransform())
+            self._appendCommonControls(dialogBuilder, item)
             return dialogBuilder.build(title, parent)
         elif isinstance(scanBuilder, FromMemoryScanBuilder):
             dialogBuilder = ParameterDialogBuilder()
-            self._appendTransformControls(dialogBuilder, item.getTransform())
+            self._appendCommonControls(dialogBuilder, item)
             return dialogBuilder.build(title, parent)
         elif isinstance(scanBuilder, SpiralScanBuilder):
             dialogBuilder = ParameterDialogBuilder()
@@ -129,7 +172,7 @@ class ScanEditorViewControllerFactory:
                                      baseScanGroup)
             dialogBuilder.addLengthWidget(scanBuilder.radiusScalarInMeters, 'Radius Scalar:',
                                           baseScanGroup)
-            self._appendTransformControls(dialogBuilder, item.getTransform())
+            self._appendCommonControls(dialogBuilder, item)
             return dialogBuilder.build(title, parent)
         elif isinstance(scanBuilder, LissajousScanBuilder):
             dialogBuilder = ParameterDialogBuilder()
@@ -145,7 +188,7 @@ class ScanEditorViewControllerFactory:
                                          baseScanGroup)
             dialogBuilder.addAngleWidget(scanBuilder.angularShiftInTurns, 'Angular Shift:',
                                          baseScanGroup)
-            self._appendTransformControls(dialogBuilder, item.getTransform())
+            self._appendCommonControls(dialogBuilder, item)
             return dialogBuilder.build(title, parent)
 
         return QMessageBox(QMessageBox.Icon.Information, title,

@@ -97,7 +97,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
         self._enableAmplitude = enableAmplitude
-        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
+        self._trainingDataFileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
+        self._modelFileFilterList: list[str] = list()  # TODO
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -205,11 +206,11 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         for pattern in parameters.patterns.astype(numpy.float32):
             self._patternBuffer.append(pattern)
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
+    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
+        return self._trainingDataFileFilterList
 
-    def getSaveFileFilter(self) -> str:
-        return self._fileFilterList[0]
+    def getSaveTrainingDataFileFilter(self) -> str:
+        return self._trainingDataFileFilterList[0]
 
     def saveTrainingData(self, filePath: Path) -> None:
         logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
@@ -259,3 +260,12 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
     def clearTrainingData(self) -> None:
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
+
+    def getSaveModelFileFilterList(self) -> Sequence[str]:
+        return self._modelFileFilterList
+
+    def getSaveModelFileFilter(self) -> str:
+        return self._modelFileFilterList[0]
+
+    def saveModel(self, filePath: Path) -> None:
+        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # TODO
