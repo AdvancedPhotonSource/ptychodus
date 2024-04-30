@@ -192,7 +192,7 @@ class ProductController(ProductRepositoryObserver):
             self._api.openProduct(filePath, nameFilter)
 
     def _createNewProduct(self) -> None:
-        self._api.createNewProduct()
+        self._api.insertNewProduct()
 
     def _saveCurrentProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
@@ -217,7 +217,7 @@ class ProductController(ProductRepositoryObserver):
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
-            self._api.createNewProduct(likeIndex=current.row())
+            self._api.insertNewProduct(likeIndex=current.row())
         else:
             logger.error('No current item!')
 

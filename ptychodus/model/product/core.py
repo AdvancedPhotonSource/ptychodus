@@ -1,6 +1,7 @@
 import numpy
 
 from ptychodus.api.object import ObjectFileReader, ObjectFileWriter
+from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
@@ -18,7 +19,7 @@ from .scan import ScanBuilderFactory, ScanRepositoryItemFactory, ScanSettings
 from .scanRepository import ScanRepository
 
 
-class ProductCore:
+class ProductCore(Observer):
 
     def __init__(
         self,
@@ -37,7 +38,10 @@ class ProductCore:
         objectFileWriterChooser: PluginChooser[ObjectFileWriter],
         productFileReaderChooser: PluginChooser[ProductFileReader],
         productFileWriterChooser: PluginChooser[ProductFileWriter],
+        reinitObservable: Observable,
     ) -> None:
+        super().__init__()
+
         self._scanSettings = ScanSettings(settingsRegistry)
         self._scanBuilderFactory = ScanBuilderFactory(self._scanSettings, scanFileReaderChooser,
                                                       scanFileWriterChooser)
@@ -71,3 +75,10 @@ class ProductCore:
         self.probeAPI = ProbeAPI(self.probeRepository, self._probeBuilderFactory)
         self.objectRepository = ObjectRepository(self.productRepository)
         self.objectAPI = ObjectAPI(self.objectRepository, self._objectBuilderFactory)
+
+        self._reinitObservable = reinitObservable
+        reinitObservable.addObserver(self)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._reinitObservable:
+            self.productRepository.insertProductFromSettings()

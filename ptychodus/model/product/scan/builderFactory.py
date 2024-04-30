@@ -47,23 +47,17 @@ class ScanBuilderFactory(Iterable[str]):
     def createDefault(self) -> ScanBuilder:
         return next(iter(self._builders.values()))()
 
-    def createFromSettings(self) -> ScanBuilder:  # FIXME call this
+    def createFromSettings(self) -> ScanBuilder:
         name = self._settings.builder.value
         nameRepaired = name.casefold()
 
         if nameRepaired == 'from_file':
-            builder = self.createScanFromFile(
+            return self.createScanFromFile(
                 self._settings.inputFilePath.value,
                 self._settings.inputFileType.value,
             )
-        else:
-            try:
-                builder = self.create(nameRepaired)
-            except KeyError:
-                logger.warning(f'Unknown builder \"{name}\"!')
-                return self.createDefault()
 
-        return builder
+        return self.create(nameRepaired)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()

@@ -55,23 +55,17 @@ class ProbeBuilderFactory(Iterable[str]):
     def createDefault(self) -> ProbeBuilder:
         return next(iter(self._builders.values()))()
 
-    def createFromSettings(self) -> ProbeBuilder:  # FIXME call this
+    def createFromSettings(self) -> ProbeBuilder:
         name = self._settings.builder.value
         nameRepaired = name.casefold()
 
         if nameRepaired == 'from_file':
-            builder = self.createProbeFromFile(
+            return self.createProbeFromFile(
                 self._settings.inputFilePath.value,
                 self._settings.inputFileType.value,
             )
-        else:
-            try:
-                builder = self.create(nameRepaired)
-            except KeyError:
-                logger.warning(f'Unknown builder \"{name}\"!')
-                return self.createDefault()
 
-        return builder
+        return self.create(nameRepaired)
 
     def _createAveragePatternBuilder(self) -> ProbeBuilder:
         return AveragePatternProbeBuilder(self._detector, self._patterns)

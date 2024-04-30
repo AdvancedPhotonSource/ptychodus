@@ -68,5 +68,5 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         return self._createProductAPI(productIndex)
 
     def createProduct(self, name: str) -> WorkflowProductAPI:
-        productIndex = self._productAPI.createNewProduct(name)
+        productIndex = self._productAPI.insertNewProduct(name)
         return self._createProductAPI(productIndex)

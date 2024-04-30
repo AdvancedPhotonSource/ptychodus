@@ -278,8 +278,8 @@ class ProductAPI:
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
 
-    def createNewProduct(self, name: str = 'Unnamed', *, likeIndex: int = -1) -> int:
-        return self._repository.createNewProduct(name, likeIndex=likeIndex)
+    def insertNewProduct(self, name: str = 'Unnamed', *, likeIndex: int = -1) -> int:
+        return self._repository.insertNewProduct(name, likeIndex=likeIndex)
 
     def getItemName(self, productIndex: int) -> str:
         item = self._repository[productIndex]

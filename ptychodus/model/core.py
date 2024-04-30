@@ -82,7 +82,8 @@ class ModelCore:
             self._pluginRegistry.scanFileWriters, self._pluginRegistry.fresnelZonePlates,
             self._pluginRegistry.probeFileReaders, self._pluginRegistry.probeFileWriters,
             self._pluginRegistry.objectFileReaders, self._pluginRegistry.objectFileWriters,
-            self._pluginRegistry.productFileReaders, self._pluginRegistry.productFileWriters)
+            self._pluginRegistry.productFileReaders, self._pluginRegistry.productFileWriters,
+            self.settingsRegistry)
 
         self.patternVisualizationEngine = VisualizationEngine(isComplex=False)
         self.probeVisualizationEngine = VisualizationEngine(isComplex=True)

@@ -1,3 +1,5 @@
+import logging
+
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
@@ -6,6 +8,8 @@ from .builder import FromMemoryObjectBuilder
 from .builderFactory import ObjectBuilderFactory
 from .item import ObjectRepositoryItem
 from .settings import ObjectSettings
+
+logger = logging.getLogger(__name__)
 
 
 class ObjectRepositoryItemFactory:
@@ -21,4 +25,13 @@ class ObjectRepositoryItemFactory:
                object_: Object | None = None) -> ObjectRepositoryItem:
         builder = self._builderFactory.createDefault() if object_ is None \
                 else FromMemoryObjectBuilder(object_)
+        return ObjectRepositoryItem(geometryProvider, self._settings, builder)
+
+    def createFromSettings(self, geometryProvider: ObjectGeometryProvider) -> ObjectRepositoryItem:
+        try:
+            builder = self._builderFactory.createFromSettings()
+        except Exception as exc:
+            logger.error(''.join(exc.args))
+            builder = self._builderFactory.createDefault()
+
         return ObjectRepositoryItem(geometryProvider, self._settings, builder)

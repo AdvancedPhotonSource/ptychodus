@@ -33,9 +33,17 @@ class DichroicAnalyzer:
         lcircObject = self._repository[lcircItemIndex].getObject()
         rcircObject = self._repository[rcircItemIndex].getObject()
 
-        # FIXME geometry checks
+        if lcircObject.widthInPixels != rcircObject.widthInPixels:
+            raise ValueError('Object width mismatch!')
 
-        pixelGeometry = rcircObject.getPixelGeometry()
+        if lcircObject.heightInPixels != rcircObject.heightInPixels:
+            raise ValueError('Object height mismatch!')
+
+        if lcircObject.pixelWidthInMeters != rcircObject.pixelWidthInMeters:
+            raise ValueError('Object pixel width mismatch!')
+
+        if lcircObject.pixelHeightInMeters != rcircObject.pixelHeightInMeters:
+            raise ValueError('Object pixel height mismatch!')
 
         # TODO align lcircArray/rcircArray
 
@@ -53,7 +61,7 @@ class DichroicAnalyzer:
                                   where=(polarSum > 0))
 
         return DichroicResult(
-            pixelGeometry=pixelGeometry,
+            pixelGeometry=rcircObject.getPixelGeometry(),
             polarDifference=polarDifference,
             polarSum=polarSum,
             polarRatio=polarRatio,

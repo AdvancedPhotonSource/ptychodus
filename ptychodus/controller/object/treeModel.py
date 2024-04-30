@@ -40,6 +40,9 @@ class ObjectTreeModel(QAbstractItemModel):
             'Size [MB]'
         ]
 
+        for index, item in enumerate(repository):
+            self.insertItem(index, item)
+
     @staticmethod
     def _appendLayers(node: ObjectTreeNode, item: ObjectRepositoryItem) -> None:
         object_ = item.getObject()

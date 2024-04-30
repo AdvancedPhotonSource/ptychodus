@@ -1,56 +1,13 @@
-from __future__ import annotations
 from collections.abc import Sequence
-import logging
 
-from pvaccess import Channel
+# TODO from pvaccess import Channel, PvObjectQueue
 
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
 
-logger = logging.getLogger(__name__)
 
-# TODO class PositionStream:
-# TODO
-# TODO     def __init__(self) -> None:
-# TODO         self._indexes: list[int] = list()
-# TODO         self._positions: list[float] = list()
-# TODO         self._minimum = +numpy.inf
-# TODO         self._maximum = -numpy.inf
-# TODO         self._uniqueness = 0
-# TODO
-# TODO     @property
-# TODO     def minimum(self) -> float:
-# TODO         return self._minimum
-# TODO
-# TODO     @property
-# TODO     def maximum(self) -> float:
-# TODO         return self._maximum
-# TODO
-# TODO     def append(self, index: int, position: float) -> None:
-# TODO         lastIndex = self._indexes[-1]
-# TODO
-# TODO         if index > lastIndex:
-# TODO             self._uniqueness = 0
-# TODO             self._indexes.append(index)
-# TODO             self._positions.append(position)
-# TODO         elif index == lastIndex:  # online mean
-# TODO             self._uniqueness += 1
-# TODO             self._positions[-1] += (position - self._positions[-1]) / self._uniqueness
-# TODO         else:  # index < lastIndex
-# TODO             logger.warning(f'Discarding non-monotonic {index=}!')
-# TODO
-# TODO         if position < self._minimum:
-# TODO             self._minimum = position
-# TODO
-# TODO         if position > self._maximum:
-# TODO             self._maximum = position
-
-# FIXME pvaccess.Channel.monitor
-# FIXME PvObjectQueue
-
-
-class StreamingScanBuilder(ScanBuilder):  # FIXME pvaccess
+class StreamingScanBuilder(ScanBuilder):
 
     def __init__(self, pointSeq: Sequence[ScanPoint]) -> None:
         super().__init__('Streaming')
@@ -66,18 +23,18 @@ class StreamingScanBuilder(ScanBuilder):  # FIXME pvaccess
         return Scan(self._pointList)
 
 
-# FIXME     def echo(self, value: int = 125) -> None:
-# FIXME         print(f'{value=}')
-# FIXME
-# FIXME     def foo(self) -> None:
-# FIXME         channelName = 'foo'
-# FIXME         ch = Channel(channelName)
-# FIXME         connected = ch.isConnected()
-# FIXME         isActive = ch.isMonitorActive()
-# FIXME         ch.subscribe('echo', self.echo)
-# FIXME         ch.setMonitorMaxQueueLength(3)
-# FIXME         ch.startMonitor()
-# FIXME         ch.stopMonitor()
-# FIXME         ch.unsubscribe('echo')
-# FIXME
-# FIXME         counterDict = ch.getMonitorCounters()
+# TODO def echo(self, value: int = 125) -> None:
+# TODO     print(f'{value=}')
+# TODO
+# TODO def foo(self) -> None:
+# TODO     channelName = 'foo'
+# TODO     ch = Channel(channelName)
+# TODO     connected = ch.isConnected()
+# TODO     isActive = ch.isMonitorActive()
+# TODO     ch.setMonitorMaxQueueLength(3)
+# TODO     ch.subscribe('echo', self.echo)
+# TODO     ch.startMonitor()
+# TODO     ch.stopMonitor()
+# TODO     ch.unsubscribe('echo')
+# TODO
+# TODO     counterDict = ch.getMonitorCounters()

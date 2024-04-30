@@ -62,9 +62,9 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         return index
 
-    def createNewProduct(self, name: str, *, likeIndex: int) -> int:
+    def insertNewProduct(self, name: str, *, likeIndex: int) -> int:
         metadataItem = self._metadataRepositoryItemFactory.createDefault(name)
-        scanItem = self._scanRepositoryItemFactory.createDefault()
+        scanItem = self._scanRepositoryItemFactory.create()
         geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.create(geometry)
         objectItem = self._objectRepositoryItemFactory.create(geometry)
@@ -75,6 +75,27 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             scanItem.assign(sourceItem.getScan())
             probeItem.assign(sourceItem.getProbe())
             objectItem.assign(sourceItem.getObject())
+
+        item = ProductRepositoryItem(
+            parent=self,
+            metadata=metadataItem,
+            scan=scanItem,
+            geometry=geometry,
+            probe=probeItem,
+            object_=objectItem,
+            validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
+            costs=list(),
+        )
+
+        return self._insertProduct(item)
+
+    def insertProductFromSettings(self) -> int:
+        # FIXME how to sync product state to settings?
+        metadataItem = self._metadataRepositoryItemFactory.createDefault('FromSettings')
+        scanItem = self._scanRepositoryItemFactory.createFromSettings()
+        geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)
+        probeItem = self._probeRepositoryItemFactory.createFromSettings(geometry)
+        objectItem = self._objectRepositoryItemFactory.createFromSettings(geometry)
 
         item = ProductRepositoryItem(
             parent=self,

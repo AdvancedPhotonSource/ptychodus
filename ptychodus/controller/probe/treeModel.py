@@ -42,6 +42,9 @@ class ProbeTreeModel(QAbstractItemModel):
             'Size [MB]'
         ]
 
+        for index, item in enumerate(repository):
+            self.insertItem(index, item)
+
     @staticmethod
     def _appendModes(node: ProbeTreeNode, item: ProbeRepositoryItem) -> None:
         object_ = item.getProbe()

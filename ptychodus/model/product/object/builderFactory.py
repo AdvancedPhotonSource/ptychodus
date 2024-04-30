@@ -40,23 +40,17 @@ class ObjectBuilderFactory(Iterable[str]):
     def createDefault(self) -> ObjectBuilder:
         return next(iter(self._builders.values()))()
 
-    def createFromSettings(self) -> ObjectBuilder:  # FIXME call this
+    def createFromSettings(self) -> ObjectBuilder:
         name = self._settings.builder.value
         nameRepaired = name.casefold()
 
         if nameRepaired == 'from_file':
-            builder = self.createObjectFromFile(
+            return self.createObjectFromFile(
                 self._settings.inputFilePath.value,
                 self._settings.inputFileType.value,
             )
-        else:
-            try:
-                builder = self.create(nameRepaired)
-            except KeyError:
-                logger.warning(f'Unknown builder \"{name}\"!')
-                return self.createDefault()
 
-        return builder
+        return self.create(nameRepaired)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()

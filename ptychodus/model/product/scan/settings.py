@@ -11,7 +11,7 @@ class ScanSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('Scan')
         self._settingsGroup.addObserver(self)
 
-        self.builder = self._settingsGroup.createStringEntry('Builder', 'RectangularRaster')
+        self.builder = self._settingsGroup.createStringEntry('Builder', 'rectangular_raster')
         self.inputFilePath = self._settingsGroup.createPathEntry('InputFilePath',
                                                                  Path('/path/to/scan.csv'))
         self.inputFileType = self._settingsGroup.createStringEntry('InputFileType', 'CSV')
