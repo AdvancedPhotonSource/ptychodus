@@ -39,11 +39,11 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._treeModel = treeModel
         self._editorFactory = ObjectEditorViewControllerFactory()
 
-        self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel, view)
+        self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel, None)
         self._dichroicViewController = DichroicViewController(dichroicAnalyzer,
                                                               dichroicVisualizationEngine,
                                                               fileDialogFactory, treeModel,
-                                                              statusBar, view)
+                                                              statusBar, None)
 
     @classmethod
     def createInstance(cls, repository: ObjectRepository, api: ObjectAPI,

@@ -1,6 +1,6 @@
 from typing import Final
 
-from scipy.fft import fft2, fftshift, ifft2
+from scipy.fft import fft2, fftshift, ifft2, ifftshift
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
@@ -11,39 +11,38 @@ def fresnel_propagate(inputWavefield: WavefieldArrayType, pixelGeometry: PixelGe
                       propagationDistanceInMeters: float,
                       wavelengthInMeters: float) -> WavefieldArrayType:
     EPS: Final[float] = float(numpy.finfo(float).eps)
+    z = numpy.abs(propagationDistanceInMeters)
+
+    if z < EPS:
+        return inputWavefield
 
     halfWidth = (inputWavefield.shape[-1] + 1) // 2
     halfHeight = (inputWavefield.shape[-2] + 1) // 2
-    k = 2 * numpy.pi / wavelengthInMeters
 
-    # the coordinate grid
-    M_grid = numpy.arange(-halfWidth, halfWidth)
-    N_grid = numpy.arange(-halfHeight, halfHeight)
+    idx0 = numpy.arange(-halfWidth, halfWidth)
+    idx1 = numpy.arange(-halfHeight, halfHeight)
 
-    lx = M_grid * pixelGeometry.widthInMeters
-    ly = N_grid * pixelGeometry.heightInMeters
+    lambdaz = wavelengthInMeters * z
 
-    YY, XX = numpy.meshgrid(ly, lx)
+    # real space pixel size & coordinate grid
+    dx = pixelGeometry.widthInMeters
+    dy = pixelGeometry.heightInMeters
+    YY, XX = numpy.meshgrid(idx1 * dy, idx0 * dx)
 
-    # the coordinate grid on the output plane
-    fu = wavelengthInMeters * propagationDistanceInMeters / pixelGeometry.widthInMeters
-    lu = M_grid * fu / inputWavefield.shape[-1]
-    fv = wavelengthInMeters * propagationDistanceInMeters / pixelGeometry.heightInMeters
-    lv = N_grid * fv / inputWavefield.shape[-2]
-    Fy, Fx = numpy.meshgrid(lv, lu)
+    # reciprocal space pixel size & coordinate grid
+    rdx = lambdaz / dx / inputWavefield.shape[-1]
+    rdy = lambdaz / dy / inputWavefield.shape[-2]
+    FY, FX = numpy.meshgrid(idx1 * rdy, idx0 * rdx)
 
-    z = propagationDistanceInMeters
+    # common quantities
+    ik = 2j * numpy.pi / wavelengthInMeters
+    ik_2z = ik / (2 * z)
+    A = numpy.exp(ik * z) / (1j * lambdaz)
+    B = numpy.exp(ik_2z * (FX**2 + FY**2))
+    C = numpy.exp(ik_2z * (XX**2 + YY**2))
+    D = A * B
 
-    if z > EPS:
-        pf = numpy.exp(1j * k * z) * numpy.exp(1j * k * (Fx**2 + Fy**2) / 2 / z)
-        kern = inputWavefield * numpy.exp(1j * k * (XX**2 + YY**2) / 2 / z)
-        cgh = fft2(fftshift(kern))
-        outputWavefield = fftshift(cgh * fftshift(pf))
-    elif z < -EPS:  # FIXME BROKEN
-        pf = numpy.exp(1j * k * z) * numpy.exp(1j * k * (XX**2 + YY**2) / 2 / z)
-        cgh = ifft2(fftshift(inputWavefield * numpy.exp(1j * k * (Fx**2 + Fy**2) / 2 / z)))
-        outputWavefield = fftshift(cgh) * pf
-    else:
-        outputWavefield = inputWavefield
+    if propagationDistanceInMeters < 0:
+        return fftshift(ifft2(ifftshift(inputWavefield / D), norm='ortho')) / C
 
-    return outputWavefield
+    return D * fftshift(fft2(ifftshift(inputWavefield * C), norm='ortho'))
