@@ -1,10 +1,20 @@
-from typing import Final
+from typing import Any, Final, TypeAlias
 
-from scipy.fft import fft2, fftshift, ifft2, ifftshift
+from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import WavefieldArrayType
+
+__all__ = [
+    'fresnel_propagate',
+]
+
+RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
+
+
+def _ifftshift_coords(sz: int, pixelSizeInMeters: float) -> RealArrayType:
+    return ifftshift(numpy.arange(-(sz // 2), (sz + 1) // 2)) * pixelSizeInMeters
 
 
 def fresnel_propagate(inputWavefield: WavefieldArrayType, pixelGeometry: PixelGeometry,
@@ -16,33 +26,31 @@ def fresnel_propagate(inputWavefield: WavefieldArrayType, pixelGeometry: PixelGe
     if z < EPS:
         return inputWavefield
 
-    halfWidth = (inputWavefield.shape[-1] + 1) // 2
-    halfHeight = (inputWavefield.shape[-2] + 1) // 2
-
-    idx0 = numpy.arange(-halfWidth, halfWidth)
-    idx1 = numpy.arange(-halfHeight, halfHeight)
-
-    lambdaz = wavelengthInMeters * z
-
-    # real space pixel size & coordinate grid
     dx = pixelGeometry.widthInMeters
     dy = pixelGeometry.heightInMeters
-    YY, XX = numpy.meshgrid(idx1 * dy, idx0 * dx)
+    lz = wavelengthInMeters * z
+
+    # real space pixel size & coordinate grid
+    x = _ifftshift_coords(inputWavefield.shape[-1], dx)
+    y = _ifftshift_coords(inputWavefield.shape[-2], dy)
+    YY, XX = numpy.meshgrid(y, x)
 
     # reciprocal space pixel size & coordinate grid
-    rdx = lambdaz / dx / inputWavefield.shape[-1]
-    rdy = lambdaz / dy / inputWavefield.shape[-2]
-    FY, FX = numpy.meshgrid(idx1 * rdy, idx0 * rdx)
+    fx = fftfreq(inputWavefield.shape[-1], d=dx / lz)
+    fy = fftfreq(inputWavefield.shape[-2], d=dy / lz)
+    FY, FX = numpy.meshgrid(fy, fx)
 
-    # common quantities
+    # common quantities in result
     ik = 2j * numpy.pi / wavelengthInMeters
-    ik_2z = ik / (2 * z)
-    A = numpy.exp(ik * z) / (1j * lambdaz)
+    ik_2z = ik / (2 * propagationDistanceInMeters)
+    A = numpy.exp(ik_2z * (XX**2 + YY**2))
     B = numpy.exp(ik_2z * (FX**2 + FY**2))
-    C = numpy.exp(ik_2z * (XX**2 + YY**2))
-    D = A * B
+    eikz = numpy.exp(ik * propagationDistanceInMeters)
+    shiftedWavefield = ifftshift(inputWavefield)
 
     if propagationDistanceInMeters < 0:
-        return fftshift(ifft2(ifftshift(inputWavefield / D), norm='ortho')) / C
+        result = fftshift(A * eikz * ifft2(B * shiftedWavefield, norm='ortho'))
+    else:
+        result = fftshift(B * eikz * fft2(A * shiftedWavefield, norm='ortho'))
 
-    return D * fftshift(fft2(ifftshift(inputWavefield * C), norm='ortho'))
+    return result
