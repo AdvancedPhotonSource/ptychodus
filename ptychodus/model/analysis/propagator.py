@@ -10,7 +10,7 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import WavefieldArrayType
 
 from ..product import ProductRepository
-from ..propagator import fresnel_propagate
+from ..propagator import FresnelPropagator
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +34,13 @@ class PropagatedProbe:
         sz = self.wavefield.shape[-2]
         arrayL = self.wavefield[:, (sz - 1) // 2, :]
         arrayR = self.wavefield[:, sz // 2, :]
-        return numpy.transpose(arrayL + arrayR) / 2
+        return numpy.transpose(arrayL + arrayR) / 2  # type: ignore
 
     def getZYProjection(self) -> WavefieldArrayType:
         sz = self.wavefield.shape[-1]
         arrayL = self.wavefield[:, :, (sz - 1) // 2]
         arrayR = self.wavefield[:, :, sz // 2]
-        return numpy.transpose(arrayL + arrayR) / 2
+        return numpy.transpose(arrayL + arrayR) / 2  # type: ignore
 
 
 class ProbePropagator:
@@ -61,7 +61,9 @@ class ProbePropagator:
                                 dtype=probeArray.dtype)
 
         for idx, zInMeters in enumerate(distanceInMeters):
-            wf = fresnel_propagate(probeArray[0], pixelGeometry, zInMeters, wavelengthInMeters)
+            propagator = FresnelPropagator(probeArray.shape[-2:], pixelGeometry, zInMeters,
+                                           wavelengthInMeters)
+            wf = propagator.propagate(probeArray[-2:])
             wavefield[idx, :, :] = wf
 
         return PropagatedProbe(

@@ -8,7 +8,7 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
 
-from ...propagator import fresnel_propagate
+from ...propagator import FresnelPropagator
 from .builder import ProbeBuilder
 from .settings import ProbeSettings
 
@@ -92,8 +92,9 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         H = RR_FZP >= zonePlate.centralBeamstopDiameterInMeters / 2
         fzpTransmissionFunction = T * C * H
 
-        array = fresnel_propagate(fzpTransmissionFunction, fzpPixelGeometry, distanceInMeters,
-                                  wavelengthInMeters)
+        propagator = FresnelPropagator(fzpTransmissionFunction.shape, fzpPixelGeometry,
+                                       distanceInMeters, wavelengthInMeters)
+        array = propagator.propagate(fzpTransmissionFunction)
 
         return Probe(
             array=self.normalize(array),

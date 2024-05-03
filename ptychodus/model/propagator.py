@@ -13,44 +13,46 @@ __all__ = [
 RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 
 
-def _ifftshift_coords(sz: int, pixelSizeInMeters: float) -> RealArrayType:
-    return ifftshift(numpy.arange(-(sz // 2), (sz + 1) // 2)) * pixelSizeInMeters
-
-
-def fresnel_propagate(inputWavefield: WavefieldArrayType, pixelGeometry: PixelGeometry,
-                      propagationDistanceInMeters: float,
-                      wavelengthInMeters: float) -> WavefieldArrayType:
+class FresnelPropagator:
     EPS: Final[float] = float(numpy.finfo(float).eps)
-    z = numpy.abs(propagationDistanceInMeters)
 
-    if z < EPS:
+    @staticmethod
+    def _ifftshift_coords(sz: int, pixelSizeInMeters: float) -> RealArrayType:
+        return ifftshift(numpy.arange(-(sz // 2), (sz + 1) // 2)) * pixelSizeInMeters
+
+    def __init__(self, arrayShape: tuple[int, ...], pixelGeometry: PixelGeometry,
+                 propagationDistanceInMeters: float, wavelengthInMeters: float) -> None:
+        dx = pixelGeometry.widthInMeters
+        dy = pixelGeometry.heightInMeters
+        lz = wavelengthInMeters * numpy.abs(propagationDistanceInMeters)
+        ik = 2j * numpy.pi / wavelengthInMeters
+        ik_2z = ik / (2 * propagationDistanceInMeters)
+
+        # real space pixel size & coordinate grid
+        x = self._ifftshift_coords(arrayShape[-1], dx)
+        y = self._ifftshift_coords(arrayShape[-2], dy)
+        YY, XX = numpy.meshgrid(y, x)
+
+        # reciprocal space pixel size & coordinate grid
+        fx = fftfreq(arrayShape[-1], d=dx / lz)
+        fy = fftfreq(arrayShape[-2], d=dy / lz)
+        FY, FX = numpy.meshgrid(fy, fx)
+
+        # propagation quantities
+        self._propagationDistanceInMeters = propagationDistanceInMeters
+        self._A = numpy.exp(ik_2z * (XX**2 + YY**2))
+        self._B = numpy.exp(ik_2z * (FX**2 + FY**2))
+        self._eikz = numpy.exp(ik * propagationDistanceInMeters)
+
+    def propagate(self, inputWavefield: WavefieldArrayType) -> WavefieldArrayType:
+        shiftedWavefield = ifftshift(inputWavefield)
+
+        if self._propagationDistanceInMeters > FresnelPropagator.EPS:
+            Beikz = self._B * self._eikz
+            return fftshift(Beikz * fft2(self._A * shiftedWavefield, norm='ortho'))
+
+        if self._propagationDistanceInMeters < -FresnelPropagator.EPS:
+            Aeikz = self._A * self._eikz
+            return fftshift(Aeikz * ifft2(self._B * shiftedWavefield, norm='ortho'))
+
         return inputWavefield
-
-    dx = pixelGeometry.widthInMeters
-    dy = pixelGeometry.heightInMeters
-    lz = wavelengthInMeters * z
-
-    # real space pixel size & coordinate grid
-    x = _ifftshift_coords(inputWavefield.shape[-1], dx)
-    y = _ifftshift_coords(inputWavefield.shape[-2], dy)
-    YY, XX = numpy.meshgrid(y, x)
-
-    # reciprocal space pixel size & coordinate grid
-    fx = fftfreq(inputWavefield.shape[-1], d=dx / lz)
-    fy = fftfreq(inputWavefield.shape[-2], d=dy / lz)
-    FY, FX = numpy.meshgrid(fy, fx)
-
-    # common quantities in result
-    ik = 2j * numpy.pi / wavelengthInMeters
-    ik_2z = ik / (2 * propagationDistanceInMeters)
-    A = numpy.exp(ik_2z * (XX**2 + YY**2))
-    B = numpy.exp(ik_2z * (FX**2 + FY**2))
-    eikz = numpy.exp(ik * propagationDistanceInMeters)
-    shiftedWavefield = ifftshift(inputWavefield)
-
-    if propagationDistanceInMeters < 0:
-        result = fftshift(A * eikz * ifft2(B * shiftedWavefield, norm='ortho'))
-    else:
-        result = fftshift(B * eikz * fft2(A * shiftedWavefield, norm='ortho'))
-
-    return result

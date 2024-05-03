@@ -193,22 +193,22 @@ class ModelCore:
     def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
         self._patternsCore.patternsAPI.initializeStreaming(metadata)
         self._patternsCore.patternsAPI.startAssemblingDiffractionPatterns()
-        self._scanCore.scanAPI.initializeStreamingScan()  # FIXME
+        self._productCore.scanAPI.initializeStreamingScan()  # FIXME
 
     def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
         self._patternsCore.patternsAPI.assemble(array)
-        self._scanCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)  # FIXME
+        self._productCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)  # FIXME
 
     def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
                                timeStamps: Sequence[float]) -> None:
-        self._scanCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)  # FIXME
+        self._productCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)  # FIXME
 
     def assembleScanPositionsY(self, valuesInMeters: Sequence[float],
                                timeStamps: Sequence[float]) -> None:
-        self._scanCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)  # FIXME
+        self._productCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)  # FIXME
 
     def finalizeStreamingWorkflow(self) -> None:
-        self._scanCore.scanAPI.finalizeStreamingScan()  # FIXME
+        self._productCore.scanAPI.finalizeStreamingScan()  # FIXME
         self._patternsCore.patternsAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
 
     def getDiffractionPatternAssemblyQueueSize(self) -> int:

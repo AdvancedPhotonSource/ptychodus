@@ -5,7 +5,7 @@ import numpy
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
 from ...patterns import ActiveDiffractionDataset, Detector
-from ...propagator import fresnel_propagate
+from ...propagator import FresnelPropagator
 from .builder import ProbeBuilder
 
 
@@ -22,11 +22,11 @@ class AveragePatternProbeBuilder(ProbeBuilder):
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         geometry = geometryProvider.getProbeGeometry()
         detectorIntensity = numpy.average(self._patterns.getAssembledData(), axis=0)
-        probeIntensity = fresnel_propagate(detectorIntensity.astype(complex),
-                                           self._detector.getPixelGeometry(),
-                                           -geometryProvider.detectorDistanceInMeters,
-                                           geometryProvider.probeWavelengthInMeters)
-        array = numpy.sqrt(probeIntensity)
+
+        propagator = FresnelPropagator(detectorIntensity.shape, self._detector.getPixelGeometry(),
+                                       -geometryProvider.detectorDistanceInMeters,
+                                       geometryProvider.probeWavelengthInMeters)
+        array = propagator.propagate(numpy.sqrt(detectorIntensity).astype(complex))
 
         return Probe(
             array=self.normalize(array),
