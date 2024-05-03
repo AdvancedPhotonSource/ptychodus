@@ -12,9 +12,8 @@ class ScanSettings(Observable, Observer):
         self._settingsGroup.addObserver(self)
 
         self.builder = self._settingsGroup.createStringEntry('Builder', 'rectangular_raster')
-        self.inputFilePath = self._settingsGroup.createPathEntry('InputFilePath',
-                                                                 Path('/path/to/scan.csv'))
-        self.inputFileType = self._settingsGroup.createStringEntry('InputFileType', 'CSV')
+        self.filePath = self._settingsGroup.createPathEntry('FilePath', Path('/path/to/scan.csv'))
+        self.fileType = self._settingsGroup.createStringEntry('FileType', 'CSV')
 
         self.affineTransformAX = self._settingsGroup.createRealEntry('AffineTransformAX', '1')
         self.affineTransformAY = self._settingsGroup.createRealEntry('AffineTransformAY', '0')

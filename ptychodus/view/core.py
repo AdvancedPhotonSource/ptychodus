@@ -126,7 +126,9 @@ class ViewCore(QMainWindow):
         view.setCentralWidget(view.splitter)
 
         # TODO make visible when complete
-        view.automationAction.setVisible(isDeveloperModeEnabled)
+        view.scanView.buttonBox.analyzeButton.setVisible(isDeveloperModeEnabled)
+        view.probeView.buttonBox.analyzeButton.setVisible(isDeveloperModeEnabled)
+        view.objectView.buttonBox.analyzeButton.setVisible(isDeveloperModeEnabled)
 
         desktopSize = QApplication.desktop().availableGeometry().size()
         preferredHeight = desktopSize.height() * 2 // 3

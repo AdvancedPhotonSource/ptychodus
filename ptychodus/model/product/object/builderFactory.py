@@ -46,8 +46,8 @@ class ObjectBuilderFactory(Iterable[str]):
 
         if nameRepaired == 'from_file':
             return self.createObjectFromFile(
-                self._settings.inputFilePath.value,
-                self._settings.inputFileType.value,
+                self._settings.filePath.value,
+                self._settings.fileType.value,
             )
 
         return self.create(nameRepaired)

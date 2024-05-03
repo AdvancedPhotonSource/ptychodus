@@ -189,7 +189,11 @@ class ProductController(ProductRepositoryObserver):
             selectedNameFilter=self._api.getOpenFileFilter())
 
         if filePath:
-            self._api.openProduct(filePath, nameFilter)
+            try:
+                self._api.openProduct(filePath, nameFilter)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException('File Reader', err)
 
     def _createNewProduct(self) -> None:
         self._api.insertNewProduct()

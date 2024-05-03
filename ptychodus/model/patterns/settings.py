@@ -46,6 +46,7 @@ class ProductSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('Products')
         self._settingsGroup.addObserver(self)
 
+        self.fileType = self._settingsGroup.createStringEntry('FileType', 'HDF5')
         self.detectorDistanceInMeters = self._settingsGroup.createRealEntry(
             'DetectorDistanceInMeters', '1')
         self.probeEnergyInElectronVolts = self._settingsGroup.createRealEntry(

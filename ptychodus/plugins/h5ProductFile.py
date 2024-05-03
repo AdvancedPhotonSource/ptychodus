@@ -44,8 +44,8 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
 
         with h5py.File(filePath, 'r') as h5File:
             metadata = ProductMetadata(
-                name=h5File.attrs[self.NAME].asstr()[()],
-                comments=h5File.attrs[self.COMMENTS].asstr()[()],
+                name=str(h5File.attrs[self.NAME]),
+                comments=str(h5File.attrs[self.COMMENTS]),
                 detectorDistanceInMeters=float(h5File.attrs[self.DETECTOR_OBJECT_DISTANCE]),
                 probeEnergyInElectronVolts=float(h5File.attrs[self.PROBE_ENERGY]),
                 probePhotonsPerSecond=float(h5File.attrs[self.PROBE_PHOTON_FLUX]),
@@ -71,10 +71,10 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             object_ = Object(
                 array=h5Object[()],
                 layerDistanceInMeters=h5ObjectLayerDistance[()],
-                pixelWidthInMeters=float(h5Object[self.OBJECT_PIXEL_WIDTH]),
-                pixelHeightInMeters=float(h5Object[self.OBJECT_PIXEL_HEIGHT]),
-                centerXInMeters=float(h5Object[self.OBJECT_CENTER_X]),
-                centerYInMeters=float(h5Object[self.OBJECT_CENTER_Y]),
+                pixelWidthInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_WIDTH]),
+                pixelHeightInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_HEIGHT]),
+                centerXInMeters=float(h5Object.attrs[self.OBJECT_CENTER_X]),
+                centerYInMeters=float(h5Object.attrs[self.OBJECT_CENTER_Y]),
             )
 
             h5Costs = h5File[self.COSTS_ARRAY]
@@ -106,7 +106,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5File.attrs[self.PROBE_ENERGY] = metadata.probeEnergyInElectronVolts
             h5File.attrs[self.PROBE_PHOTON_FLUX] = metadata.probePhotonsPerSecond
 
-            h5File.create_datset(self.PROBE_POSITION_INDEXES, data=scanIndexes)
+            h5File.create_dataset(self.PROBE_POSITION_INDEXES, data=scanIndexes)
             h5File.create_dataset(self.PROBE_POSITION_X, data=scanXInMeters)
             h5File.create_dataset(self.PROBE_POSITION_Y, data=scanYInMeters)
 

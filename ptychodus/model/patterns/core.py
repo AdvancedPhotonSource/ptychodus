@@ -148,6 +148,7 @@ class PatternsCore:
         # TODO vvv refactor vvv
         fileReaderChooser.setCurrentPluginByName(self.patternSettings.fileType.value)
         fileWriterChooser.setCurrentPluginByName(self.patternSettings.fileType.value)
+        # TODO ^^^^^^^^^^^^^^^^
 
         self.patternSizer = PatternSizer.createInstance(self.patternSettings, self.detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(

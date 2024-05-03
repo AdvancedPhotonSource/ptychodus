@@ -12,9 +12,8 @@ class ProbeSettings(Observable, Observer):
         self._settingsGroup.addObserver(self)
 
         self.builder = self._settingsGroup.createStringEntry('Builder', 'Disk')
-        self.inputFilePath = self._settingsGroup.createPathEntry('InputFilePath',
-                                                                 Path('/path/to/probe.npy'))
-        self.inputFileType = self._settingsGroup.createStringEntry('InputFileType', 'NPY')
+        self.filePath = self._settingsGroup.createPathEntry('FilePath', Path('/path/to/probe.npy'))
+        self.fileType = self._settingsGroup.createStringEntry('FileType', 'NPY')
 
         self.numberOfModes = self._settingsGroup.createIntegerEntry('NumberOfModes', 1)
         self.orthogonalizeModesEnabled = self._settingsGroup.createBooleanEntry(

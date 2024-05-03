@@ -43,19 +43,20 @@ def main() -> int:
         '-i',
         '--input',
         metavar='INPUT_FILE',
-        help='input data product file',
+        help='input data product file (batch mode)',
         type=argparse.FileType('r'),
     )
     parser.add_argument(
         '-o',
         '--output',
         metavar='OUTPUT_FILE',
-        help='output data product file',
+        help='output data product file (batch mode)',
         type=argparse.FileType('w'),
     )
     parser.add_argument(
         '-p',
         '--patterns',
+        metavar='PATTERNS_FILE',
         help='use diffraction patterns from file',
         type=argparse.FileType('r'),
     )

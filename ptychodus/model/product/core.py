@@ -41,7 +41,6 @@ class ProductCore(Observer):
         reinitObservable: Observable,
     ) -> None:
         super().__init__()
-
         self._scanSettings = ScanSettings(settingsRegistry)
         self._scanBuilderFactory = ScanBuilderFactory(self._scanSettings, scanFileReaderChooser,
                                                       scanFileWriterChooser)
@@ -75,6 +74,17 @@ class ProductCore(Observer):
         self.probeAPI = ProbeAPI(self.probeRepository, self._probeBuilderFactory)
         self.objectRepository = ObjectRepository(self.productRepository)
         self.objectAPI = ObjectAPI(self.objectRepository, self._objectBuilderFactory)
+
+        # TODO vvv refactor vvv
+        productFileReaderChooser.setCurrentPluginByName(settings.fileType.value)
+        productFileWriterChooser.setCurrentPluginByName(settings.fileType.value)
+        scanFileReaderChooser.setCurrentPluginByName(self._scanSettings.fileType.value)
+        scanFileWriterChooser.setCurrentPluginByName(self._scanSettings.fileType.value)
+        probeFileReaderChooser.setCurrentPluginByName(self._probeSettings.fileType.value)
+        probeFileWriterChooser.setCurrentPluginByName(self._probeSettings.fileType.value)
+        objectFileReaderChooser.setCurrentPluginByName(self._objectSettings.fileType.value)
+        objectFileWriterChooser.setCurrentPluginByName(self._objectSettings.fileType.value)
+        # TODO ^^^^^^^^^^^^^^^^
 
         self._reinitObservable = reinitObservable
         reinitObservable.addObserver(self)

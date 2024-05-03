@@ -12,9 +12,9 @@ class ObjectSettings(Observable, Observer):
         self._settingsGroup.addObserver(self)
 
         self.builder = self._settingsGroup.createStringEntry('Builder', 'Random')
-        self.inputFilePath = self._settingsGroup.createPathEntry('InputFilePath',
-                                                                 Path('/path/to/object.npy'))
-        self.inputFileType = self._settingsGroup.createStringEntry('InputFileType', 'NPY')
+        self.filePath = self._settingsGroup.createPathEntry('FilePath',
+                                                            Path('/path/to/object.npy'))
+        self.fileType = self._settingsGroup.createStringEntry('FileType', 'NPY')
 
         self.objectLayerDistanceInMeters = self._settingsGroup.createRealEntry(
             'ObjectLayerDistanceInMeters', '1e-6')

@@ -6,10 +6,6 @@ import numpy
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import WavefieldArrayType
 
-__all__ = [
-    'fresnel_propagate',
-]
-
 RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 
 
