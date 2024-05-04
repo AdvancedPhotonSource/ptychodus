@@ -3,6 +3,7 @@ Ptychodus
 
 `ptychodus`_ is a ptychography analysis application that supports multiple reconstruction libraries.
 
+
 Standard Installation
 ---------------------
 
@@ -34,25 +35,26 @@ Standard Installation
 
        $ conda activate ptychodus
        $ ptychodus -h
-        usage: ptychodus [-h] [-b {reconstruct,train}] [-f FILE_PREFIX] [-i INPUT_FILE] [-o OUTPUT_FILE] [-p PATTERNS] [-s SETTINGS] [-v]
 
-        ptychodus is a ptychography analysis application
+       usage: ptychodus [-h] [-b {reconstruct,train}] [-f FILE_PREFIX] [-i INPUT_FILE] [-o OUTPUT_FILE] [-p PATTERNS_FILE] [-s SETTINGS] [-v]
 
-        options:
-          -h, --help            show this help message and exit
-          -b {reconstruct,train}, --batch {reconstruct,train}
-                                run action non-interactively
-          -f FILE_PREFIX, --file-prefix FILE_PREFIX
-                                replace file path prefix in settings
-          -i INPUT_FILE, --input INPUT_FILE
-                                input data product file
-          -o OUTPUT_FILE, --output OUTPUT_FILE
-                                output data product file
-          -p PATTERNS, --patterns PATTERNS
-                                use diffraction patterns from file
-          -s SETTINGS, --settings SETTINGS
-                                use settings from file
-          -v, --version         show program's version number and exit
+       ptychodus is a ptychography analysis application
+
+       options:
+         -h, --help            show this help message and exit
+         -b {reconstruct,train}, --batch {reconstruct,train}
+                               run action non-interactively
+         -f FILE_PREFIX, --file-prefix FILE_PREFIX
+                               replace file path prefix in settings
+         -i INPUT_FILE, --input INPUT_FILE
+                               input data product file (batch mode)
+         -o OUTPUT_FILE, --output OUTPUT_FILE
+                               output data product file (batch mode)
+         -p PATTERNS_FILE, --patterns PATTERNS_FILE
+                               use diffraction patterns from file
+         -s SETTINGS, --settings SETTINGS
+                               use settings from file
+         -v, --version         show program's version number and exit
 
        $ ptychodus
 
@@ -88,8 +90,9 @@ Developer Installation
    $ conda activate ptychodus
    $ ptychodus
 
-Reporting bugs
--------------
+
+Reporting Bugs
+--------------
 
 Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
 
