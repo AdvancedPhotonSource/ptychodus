@@ -5,11 +5,12 @@ import re
 
 import h5py
 
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, SimpleDiffractionDataset)
-from ptychodus.api.image import ImageExtent
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                    DiffractionPatternArray, SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
+
 from .h5DiffractionFile import H5DiffractionPatternArray
 
 logger = logging.getLogger(__name__)
@@ -51,20 +52,20 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
                 try:
                     h5data = h5File[dataPath]
                 except KeyError:
-                    logger.info(f'File {filePath} is not an APS 2-ID data file.')
+                    logger.warning(f'File {filePath} is not an APS 2-ID data file.')
                 else:
                     numberOfPatternsPerArray, detectorHeight, detectorWidth = h5data.shape
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=numberOfPatternsPerArray,
                         numberOfPatternsTotal=numberOfPatternsPerArray * len(arrayList),
                         patternDataType=h5data.dtype,
-                        detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
+                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
                         filePath=filePath.parent / filePattern,
                     )
 
                     dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return dataset
 
@@ -73,5 +74,5 @@ def registerPlugins(registry: PluginRegistry) -> None:
     registry.diffractionFileReaders.registerPlugin(
         APS2IDDiffractionFileReader(),
         simpleName='2ID',
-        displayName='APS 2-ID HDF5 Files (*.h5 *.hdf5)',
+        displayName='APS 2-ID Diffraction Files (*.h5 *.hdf5)',
     )

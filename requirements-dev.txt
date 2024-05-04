@@ -4,10 +4,11 @@ matplotlib
 mypy
 numpy
 psutil
-pylint
 pyqt
+pyqt-stubs
 pytest
 python>=3.10
+ruff
 scikit-image
 scipy
 setuptools>=46.4.0

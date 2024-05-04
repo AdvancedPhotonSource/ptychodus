@@ -1,89 +1,44 @@
-from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from pathlib import Path
-import logging
-import re
 
-from ...api.state import StateDataRegistry
-from ..data import DiffractionDataAPI
-from ..object import ObjectAPI
-from ..probe import ProbeAPI
-from ..reconstructor import ReconstructorAPI
-from ..scan import ScanAPI
-from ..workflow import WorkflowCore
+from ptychodus.api.automation import FileBasedWorkflow, WorkflowAPI
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.observer import Observable, Observer
 
-logger = logging.getLogger(__name__)
+from .settings import AutomationSettings
 
 
-# TODO add parameter optimization workflow
-class AutomationDatasetWorkflow(ABC):
+class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
 
-    @abstractmethod
-    def execute(self, filePath: Path) -> None:
-        '''executes the workflow'''
-        pass
+    def __init__(self, settings: AutomationSettings,
+                 workflowChooser: PluginChooser[FileBasedWorkflow]) -> None:
+        super().__init__()
+        self._settings = settings
+        self._workflowChooser = workflowChooser
 
+        settings.addObserver(self)
+        workflowChooser.addObserver(self)
 
-class S26AutomationDatasetWorkflow(AutomationDatasetWorkflow):
+    def getAvailableWorkflows(self) -> Sequence[str]:
+        return self._workflowChooser.getDisplayNameList()
 
-    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
-                 objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
-        self._dataAPI = dataAPI
-        self._scanAPI = scanAPI
-        self._probeAPI = probeAPI
-        self._objectAPI = objectAPI
-        self._workflowCore = workflowCore
+    def getWorkflow(self) -> str:
+        return self._workflowChooser.currentPlugin.displayName
 
-    def execute(self, filePath: Path) -> None:
-        scanName = filePath.stem
-        scanID = int(re.findall(r'\d+', scanName)[-1])
-        flowLabel = f'scan_{scanID}'
+    def setWorkflow(self, name: str) -> None:
+        self._workflowChooser.setCurrentPluginByName(name)
+        self._settings.strategy.value = self._workflowChooser.currentPlugin.simpleName
 
-        diffractionDirPath = filePath.parents[1] / 'h5'
+    def getFilePattern(self) -> str:
+        workflow = self._workflowChooser.currentPlugin.strategy
+        return workflow.getFilePattern()
 
-        for diffractionFilePath in diffractionDirPath.glob(f'scan_{scanID}_*.h5'):
-            digits = int(re.findall(r'\d+', diffractionFilePath.stem)[-1])
+    def execute(self, api: WorkflowAPI, filePath: Path) -> None:
+        workflow = self._workflowChooser.currentPlugin.strategy
+        workflow.execute(api, filePath)
 
-            if digits != 0:
-                break
-
-        self._dataAPI.loadDiffractionDataset(diffractionFilePath, fileType='HDF5')
-        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='MDA', selectItem=True)
-        # NOTE reuse probe
-        self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
-        self._workflowCore.executeWorkflow(flowLabel)
-
-
-class S02AutomationDatasetWorkflow(AutomationDatasetWorkflow):
-
-    def __init__(self, dataAPI: DiffractionDataAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
-                 objectAPI: ObjectAPI, workflowCore: WorkflowCore) -> None:
-        self._dataAPI = dataAPI
-        self._scanAPI = scanAPI
-        self._probeAPI = probeAPI
-        self._objectAPI = objectAPI
-        self._workflowCore = workflowCore
-
-    def execute(self, filePath: Path) -> None:
-        scanName = filePath.stem
-        scanID = int(re.findall(r'\d+', scanName)[-1])
-        flowLabel = f'scan{scanID}'
-
-        diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
-        self._dataAPI.loadDiffractionDataset(diffractionFilePath, fileType='NeXus')
-        self._scanAPI.insertItemIntoRepositoryFromFile(filePath, fileType='CSV', selectItem=True)
-        # NOTE reuse probe
-        self._objectAPI.selectNewItemFromInitializerSimpleName('Random')
-        self._workflowCore.executeWorkflow(flowLabel)
-
-
-class PtychoNNTrainingAutomationDatasetWorkflow(AutomationDatasetWorkflow):
-
-    def __init__(self, registry: StateDataRegistry, reconstructorAPI: ReconstructorAPI) -> None:
-        self._registry = registry
-        self._reconstructorAPI = reconstructorAPI
-
-    def execute(self, filePath: Path) -> None:
-        # TODO watch for ptychodus NPZ files
-        self._registry.openStateData(filePath)
-        self._reconstructorAPI.ingestTrainingData()
-        self._reconstructorAPI.train()
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self.setWorkflow(self._settings.strategy.value)
+        if observable is self._workflowChooser:
+            self.notifyObservers()

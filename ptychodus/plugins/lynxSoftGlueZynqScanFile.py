@@ -1,11 +1,10 @@
-from collections import defaultdict
 from pathlib import Path
 from typing import Final
 import csv
 import logging
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
     ]
 
     def read(self, filePath: Path) -> Scan:
-        pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
+        pointList: list[ScanPoint] = list()
         scanName = self.SIMPLE_NAME
 
         with filePath.open(newline='') as csvFile:
@@ -67,14 +66,14 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
                 if len(row) != len(columnHeaderRow):
                     raise ScanPointParseError('Bad number of columns!')
 
-                detector_count = int(row[DETECTOR_COUNT])
                 point = ScanPoint(
-                    x=-float(row[X]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
-                    y=-float(row[Y]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
+                    int(row[DETECTOR_COUNT]),
+                    -float(row[X]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
+                    -float(row[Y]) * LYNXSoftGlueZynqScanFileReader.MICRONS_TO_METERS,
                 )
-                pointSeqMap[detector_count].append(point)
+                pointList.append(point)
 
-        return TabularScan.createFromMappedPointIterable(pointSeqMap)
+        return Scan(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

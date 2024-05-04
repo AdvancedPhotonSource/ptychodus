@@ -2,19 +2,21 @@ from __future__ import annotations
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, Mapping, TypeAlias
+from typing import TypeAlias
 import logging
 
-from ptychonn import ReconSmallModel, Tester, Trainer
-from scipy.ndimage import map_coordinates
 import numpy
 import numpy.typing
 
-from ...api.image import ImageExtent
-from ...api.object import ObjectArrayType, ObjectPatchAxis
-from ...api.plot import Plot2D, PlotAxis, PlotSeries
-from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
-from ..object import ObjectAPI
+from ptychonn import ReconSmallModel, Tester, Trainer
+
+from ptychodus.api.geometry import ImageExtent, Point2D
+from ptychodus.api.object import ObjectArrayType
+from ptychodus.api.product import Product
+from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
+                                         TrainableReconstructor, TrainOutput)
+
+from ..analysis import ObjectLinearInterpolator, ObjectStitcher
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 FloatArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]
@@ -89,15 +91,14 @@ class ObjectPatchCircularBuffer:
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def __init__(self, modelSettings: PtychoNNModelSettings,
-                 trainingSettings: PtychoNNTrainingSettings, objectAPI: ObjectAPI, *,
-                 enableAmplitude: bool) -> None:
+                 trainingSettings: PtychoNNTrainingSettings, *, enableAmplitude: bool) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
-        self._objectAPI = objectAPI
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
         self._enableAmplitude = enableAmplitude
-        self._fileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
+        self._trainingDataFileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
+        self._modelFileFilterList: list[str] = list()  # TODO
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -116,7 +117,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         # TODO data size/shape requirements to GUI
-        data = parameters.diffractionPatternArray
+        data = parameters.patterns
         dataSize = data.shape[-1]
 
         if dataSize != data.shape[-2]:
@@ -155,86 +156,61 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         objectPatches = tester.predictTestData(npz_save_path=npzSavePath)
 
         logger.debug('Stitching...')
-        objectInterpolator = parameters.objectInterpolator
-        objectGrid = objectInterpolator.getGrid()
-        objectArray = objectInterpolator.getArray()
-        objectArrayUpper = numpy.zeros_like(objectArray, dtype=complex)
-        objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
+        stitcher = ObjectStitcher(parameters.product.object_.getGeometry())
 
-        patchExtent = ImageExtent(
-            width=objectPatches.shape[-1],
-            height=objectPatches.shape[-2],
-        )
-
-        for scanPoint, objectPatchChannels in zip(parameters.scan.values(), objectPatches):
-            objectPatch = numpy.exp(1j * objectPatchChannels[0])
+        for scanPoint, objectPatchChannels in zip(parameters.product.scan, objectPatches):
+            patchCenter = Point2D(
+                x=scanPoint.positionXInMeters,
+                y=scanPoint.positionYInMeters,
+            )
+            patchArray = numpy.exp(1j * objectPatchChannels[0])
 
             if objectPatchChannels.shape[0] == 2:
-                objectPatch *= objectPatchChannels[1]
+                patchArray *= objectPatchChannels[1]
             else:
-                objectPatch *= 0.5
+                patchArray *= 0.5
 
-            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
-            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
+            stitcher.addPatch(patchCenter, patchArray)
 
-            pixelCentersX = patchAxisX.getObjectPixelCenters()
-            pixelCentersY = patchAxisY.getObjectPixelCenters()
-
-            xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
-            patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
-
-            # TODO consider inverse distance weighting
-            objectArrayUpper[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += patchValues
-            objectArrayCount[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += 1
-
-        objectArrayLower = numpy.maximum(objectArrayCount, 1)
-        objectArray = objectArrayUpper / objectArrayLower
-
-        return ReconstructOutput(
-            scan=None,
-            probeArray=None,
-            objectArray=objectArray,
-            objective=[[]],
-            plot2D=Plot2D.createNull(),  # TODO show something here?
-            result=0,
+        product = Product(
+            metadata=parameters.product.metadata,
+            scan=parameters.product.scan,
+            probe=parameters.product.probe,
+            object_=stitcher.build(),
+            costs=list(),  # TODO put something here?
         )
+
+        return ReconstructOutput(product, 0)
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        objectInterpolator = parameters.objectInterpolator
+        interpolator = ObjectLinearInterpolator(parameters.product.object_)
+        probeExtent = parameters.product.probe.getExtent()
 
         if self._patternBuffer.isZeroSized:
-            diffractionPatternExtent = parameters.diffractionPatternExtent
+            patternExtent = ImageExtent(widthInPixels=parameters.patterns.shape[-1],
+                                        heightInPixels=parameters.patterns.shape[-2])
             maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
-
             channels = 2 if self._enableAmplitude else 1
-            self._patternBuffer = PatternCircularBuffer(diffractionPatternExtent, maximumSize)
-            self._objectPatchBuffer = ObjectPatchCircularBuffer(diffractionPatternExtent, channels,
+            self._patternBuffer = PatternCircularBuffer(patternExtent, maximumSize)
+            self._objectPatchBuffer = ObjectPatchCircularBuffer(patternExtent, channels,
                                                                 maximumSize)
 
-        for scanIndex, scanPoint in parameters.scan.items():
-            objectPatch = objectInterpolator.getPatch(scanPoint, parameters.probeExtent)
+        for scanPoint in parameters.product.scan:
+            patchCenter = Point2D(
+                x=scanPoint.positionXInMeters,
+                y=scanPoint.positionYInMeters,
+            )
+            objectPatch = interpolator.getPatch(patchCenter, probeExtent)
             self._objectPatchBuffer.append(objectPatch.array)
 
-        for pattern in parameters.diffractionPatternArray.astype(numpy.float32):
+        for pattern in parameters.patterns.astype(numpy.float32):
             self._patternBuffer.append(pattern)
 
-    def _plotMetrics(self, metrics: Mapping[str, Any]) -> Plot2D:
-        trainingLoss = [losses[0] for losses in metrics['losses']]
-        validationLoss = [losses[0] for losses in metrics['val_losses']]
-        validationLossSeries = PlotSeries(label='Validation Loss', values=validationLoss)
-        trainingLossSeries = PlotSeries(label='Training Loss', values=trainingLoss)
-        seriesX = PlotSeries(label='Iteration', values=[*range(len(trainingLoss))])
+    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
+        return self._trainingDataFileFilterList
 
-        return Plot2D(
-            axisX=PlotAxis(label='Epoch', series=[seriesX]),
-            axisY=PlotAxis(label='Loss', series=[trainingLossSeries, validationLossSeries]),
-        )
-
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
-
-    def getSaveFileFilter(self) -> str:
-        return self._fileFilterList[0]
+    def getSaveTrainingDataFileFilter(self) -> str:
+        return self._trainingDataFileFilterList[0]
 
     def saveTrainingData(self, filePath: Path) -> None:
         logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
@@ -244,7 +220,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         }
         numpy.savez(filePath, **trainingData)
 
-    def train(self) -> Plot2D:
+    def train(self) -> TrainOutput:
         outputPath = self._trainingSettings.outputPath.value \
                 if self._trainingSettings.saveTrainingArtifacts.value else None
 
@@ -275,8 +251,21 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             output_frequency=self._trainingSettings.statusIntervalInEpochs.value,
         )
 
-        return self._plotMetrics(trainer.metrics)
+        return TrainOutput(
+            trainingLoss=[losses[0] for losses in trainer.metrics['losses']],
+            validationLoss=[losses[0] for losses in trainer.metrics['val_losses']],
+            result=0,
+        )
 
     def clearTrainingData(self) -> None:
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
+
+    def getSaveModelFileFilterList(self) -> Sequence[str]:
+        return self._modelFileFilterList
+
+    def getSaveModelFileFilter(self) -> str:
+        return self._modelFileFilterList[0]
+
+    def saveModel(self, filePath: Path) -> None:
+        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # TODO

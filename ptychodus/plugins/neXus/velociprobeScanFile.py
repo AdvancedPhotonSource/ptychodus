@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections import defaultdict
 from enum import IntEnum
 from pathlib import Path
 from typing import Final
@@ -7,7 +6,7 @@ import csv
 
 import numpy
 
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError
 from .neXusDiffractionFile import NeXusDiffractionFileReader
 
 __all__ = [
@@ -43,20 +42,22 @@ class VelociprobeScanFileReader(ScanFileReader):
         stageRotationInRadians = numpy.deg2rad(self._neXusReader.stageRotationInDegrees)
         stageRotationCosine = numpy.cos(stageRotationInRadians)
 
-        xMean = sum(p.x for p in scan.values()) / len(scan)
-        yMean = sum(p.y for p in scan.values()) / len(scan)
-        pointMap: dict[int, ScanPoint] = dict()
+        xMean = sum(p.positionXInMeters for p in scan) / len(scan)
+        yMean = sum(p.positionYInMeters for p in scan) / len(scan)
+        pointList: list[ScanPoint] = list()
 
-        for index, point in scan.items():
-            pointMap[index] = ScanPoint(
-                x=(point.x - xMean) * stageRotationCosine,
-                y=(point.y - yMean),
+        for untransformedPoint in scan:
+            point = ScanPoint(
+                untransformedPoint.index,
+                (untransformedPoint.positionXInMeters - xMean) * stageRotationCosine,
+                (untransformedPoint.positionYInMeters - yMean),
             )
+            pointList.append(point)
 
-        return TabularScan(pointMap)
+        return Scan(pointList)
 
     def read(self, filePath: Path) -> Scan:
-        pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
+        pointList: list[ScanPoint] = list()
         minimumColumnCount = max(col.value for col in VelociprobeScanFileColumn) + 1
 
         with filePath.open(newline='') as csvFile:
@@ -77,11 +78,12 @@ class VelociprobeScanFileReader(ScanFileReader):
                     y_nm = -y_nm
 
                 point = ScanPoint(
-                    x=x_nm * self.NANOMETERS_TO_METERS,
-                    y=y_nm * self.NANOMETERS_TO_METERS,
+                    trigger,
+                    x_nm * self.NANOMETERS_TO_METERS,
+                    y_nm * self.NANOMETERS_TO_METERS,
                 )
-                pointSeqMap[trigger].append(point)
+                pointList.append(point)
 
-        rawScan = TabularScan.createFromMappedPointIterable(pointSeqMap)
+        rawScan = Scan(pointList)
 
         return self._applyTransform(rawScan)

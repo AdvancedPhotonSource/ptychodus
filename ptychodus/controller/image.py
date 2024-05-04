@@ -1,18 +1,22 @@
 from __future__ import annotations
+from decimal import Decimal
 import logging
-
-from PyQt5.QtCore import QLineF, QRectF, QStringListModel
-from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import QButtonGroup
 
 import numpy
 
-from ..api.geometry import Line2D, Point2D
-from ..api.observer import Observable, Observer
-from ..model.image import ImagePresenter
-from ..view.image import (ImageColorizerGroupBox, ImageDataRangeGroupBox, ImageMouseTool,
+from PyQt5.QtCore import QStringListModel
+from PyQt5.QtWidgets import QButtonGroup, QDialog, QStatusBar
+
+from ptychodus.api.geometry import Interval, PixelGeometry
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.visualization import NumberArrayType
+
+from ..model.visualization import VisualizationEngine
+from ..view.image import (ImageDataRangeGroupBox, ImageDisplayRangeDialog, ImageRendererGroupBox,
                           ImageToolsGroupBox, ImageView, ImageWidget)
+from ..view.visualization import ImageMouseTool
 from .data import FileDialogFactory
+from .visualization import VisualizationController
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +24,15 @@ logger = logging.getLogger(__name__)
 class ImageToolsController:
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
-    def __init__(self, view: ImageToolsGroupBox, imageWidget: ImageWidget,
-                 fileDialogFactory: FileDialogFactory, mouseToolButtonGroup: QButtonGroup) -> None:
+    def __init__(self, view: ImageToolsGroupBox, visualizationController: VisualizationController,
+                 mouseToolButtonGroup: QButtonGroup) -> None:
         self._view = view
-        self._imageWidget = imageWidget
-        self._fileDialogFactory = fileDialogFactory
+        self._visualizationController = visualizationController
         self._mouseToolButtonGroup = mouseToolButtonGroup
 
     @classmethod
-    def createInstance(cls, view: ImageToolsGroupBox, imageWidget: ImageWidget,
-                       fileDialogFactory: FileDialogFactory) -> ImageToolsController:
+    def createInstance(cls, view: ImageToolsGroupBox,
+                       visualizationController: VisualizationController) -> ImageToolsController:
         view.moveButton.setCheckable(True)
         view.moveButton.setChecked(True)
         view.rulerButton.setCheckable(True)
@@ -42,96 +45,96 @@ class ImageToolsController:
         mouseToolButtonGroup.addButton(view.rectangleButton, ImageMouseTool.RECTANGLE_TOOL.value)
         mouseToolButtonGroup.addButton(view.lineCutButton, ImageMouseTool.LINE_CUT_TOOL.value)
 
-        controller = cls(view, imageWidget, fileDialogFactory, mouseToolButtonGroup)
-        view.homeButton.clicked.connect(imageWidget.zoomToFit)
-        view.saveButton.clicked.connect(controller._saveImage)
+        controller = cls(view, visualizationController, mouseToolButtonGroup)
+        view.homeButton.clicked.connect(visualizationController.zoomToFit)
+        view.saveButton.clicked.connect(visualizationController.saveImage)
         mouseToolButtonGroup.idToggled.connect(controller._setMouseTool)
         return controller
-
-    def _saveImage(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view, 'Save Image', mimeTypeFilters=ImageToolsController.MIME_TYPES)
-
-        if filePath:
-            pixmap = self._imageWidget.getPixmap()
-            pixmap.save(str(filePath))
 
     def _setMouseTool(self, toolId: int, checked: bool) -> None:
         if checked:
             mouseTool = ImageMouseTool(toolId)
-            self._imageWidget.setMouseTool(mouseTool)
+            self._visualizationController.setMouseTool(mouseTool)
 
 
-class ImageColorizerController(Observer):
+class ImageRendererController(Observer):
 
-    def __init__(self, presenter: ImagePresenter, view: ImageColorizerGroupBox) -> None:
+    def __init__(self, engine: VisualizationEngine, view: ImageRendererGroupBox) -> None:
         super().__init__()
-        self._presenter = presenter
+        self._engine = engine
         self._view = view
-        self._colorizerModel = QStringListModel()
-        self._scalarTransformModel = QStringListModel()
+        self._rendererModel = QStringListModel()
+        self._transformationModel = QStringListModel()
         self._variantModel = QStringListModel()
 
     @classmethod
-    def createInstance(cls, presenter: ImagePresenter,
-                       view: ImageColorizerGroupBox) -> ImageColorizerController:
-        controller = cls(presenter, view)
+    def createInstance(cls, engine: VisualizationEngine,
+                       view: ImageRendererGroupBox) -> ImageRendererController:
+        controller = cls(engine, view)
 
-        view.colorizerComboBox.setModel(controller._colorizerModel)
-        view.scalarTransformComboBox.setModel(controller._scalarTransformModel)
+        view.rendererComboBox.setModel(controller._rendererModel)
+        view.transformationComboBox.setModel(controller._transformationModel)
         view.variantComboBox.setModel(controller._variantModel)
 
         controller._syncModelToView()
-        presenter.addObserver(controller)
+        engine.addObserver(controller)
 
-        view.colorizerComboBox.textActivated.connect(presenter.setColorizerByName)
-        view.scalarTransformComboBox.textActivated.connect(presenter.setScalarTransformationByName)
-        view.variantComboBox.textActivated.connect(presenter.setVariantByName)
+        view.rendererComboBox.textActivated.connect(engine.setRenderer)
+        view.transformationComboBox.textActivated.connect(engine.setTransformation)
+        view.variantComboBox.textActivated.connect(engine.setVariant)
 
         return controller
 
     def _syncModelToView(self) -> None:
-        self._view.colorizerComboBox.blockSignals(True)
-        self._colorizerModel.setStringList(self._presenter.getColorizerNameList())
-        self._view.colorizerComboBox.setCurrentText(self._presenter.getColorizerName())
-        self._view.colorizerComboBox.blockSignals(False)
+        self._view.rendererComboBox.blockSignals(True)
+        self._rendererModel.setStringList([name for name in self._engine.renderers()])
+        self._view.rendererComboBox.setCurrentText(self._engine.getRenderer())
+        self._view.rendererComboBox.blockSignals(False)
 
-        self._view.scalarTransformComboBox.blockSignals(True)
-        self._scalarTransformModel.setStringList(self._presenter.getScalarTransformationNameList())
-        self._view.scalarTransformComboBox.setCurrentText(
-            self._presenter.getScalarTransformationName())
-        self._view.scalarTransformComboBox.blockSignals(False)
+        self._view.transformationComboBox.blockSignals(True)
+        self._transformationModel.setStringList([name for name in self._engine.transformations()])
+        self._view.transformationComboBox.setCurrentText(self._engine.getTransformation())
+        self._view.transformationComboBox.blockSignals(False)
 
         self._view.variantComboBox.blockSignals(True)
-        self._variantModel.setStringList(self._presenter.getVariantNameList())
-        self._view.variantComboBox.setCurrentText(self._presenter.getVariantName())
+        self._variantModel.setStringList([name for name in self._engine.variants()])
+        self._view.variantComboBox.setCurrentText(self._engine.getVariant())
         self._view.variantComboBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._engine:
             self._syncModelToView()
 
 
 class ImageDataRangeController(Observer):
 
-    def __init__(self, presenter: ImagePresenter, view: ImageDataRangeGroupBox,
-                 imageWidget: ImageWidget) -> None:
-        self._presenter = presenter
+    def __init__(self, engine: VisualizationEngine, view: ImageDataRangeGroupBox,
+                 imageWidget: ImageWidget, displayRangeDialog: ImageDisplayRangeDialog,
+                 visualizationController: VisualizationController) -> None:
+        self._engine = engine
         self._view = view
         self._imageWidget = imageWidget
+        self._displayRangeDialog = displayRangeDialog
+        self._visualizationController = visualizationController
+        self._displayRangeIsLocked = True
 
     @classmethod
-    def createInstance(cls, presenter: ImagePresenter, view: ImageDataRangeGroupBox,
-                       imageWidget: ImageWidget) -> ImageDataRangeController:
-        controller = cls(presenter, view, imageWidget)
-
+    def createInstance(
+            cls, engine: VisualizationEngine, view: ImageDataRangeGroupBox,
+            imageWidget: ImageWidget,
+            visualizationController: VisualizationController) -> ImageDataRangeController:
+        displayRangeDialog = ImageDisplayRangeDialog.createInstance(view)
+        controller = cls(engine, view, imageWidget, displayRangeDialog, visualizationController)
         controller._syncModelToView()
-        presenter.addObserver(controller)
+        engine.addObserver(controller)
 
-        view.minDisplayValueSlider.valueChanged.connect(presenter.setMinDisplayValue)
-        view.maxDisplayValueSlider.valueChanged.connect(presenter.setMaxDisplayValue)
-        view.autoButton.clicked.connect(presenter.setDisplayRangeToDataRange)
-        view.editButton.clicked.connect(controller._editDisplayRange)
+        view.minDisplayValueSlider.valueChanged.connect(
+            lambda value: engine.setMinDisplayValue(float(value)))
+        view.maxDisplayValueSlider.valueChanged.connect(
+            lambda value: engine.setMaxDisplayValue(float(value)))
+        view.autoButton.clicked.connect(controller._autoDisplayRange)
+        view.editButton.clicked.connect(displayRangeDialog.open)
+        displayRangeDialog.finished.connect(controller._finishEditingDisplayRange)
 
         view.colorLegendButton.setCheckable(True)
         imageWidget.setColorLegendVisible(view.colorLegendButton.isChecked())
@@ -139,88 +142,72 @@ class ImageDataRangeController(Observer):
 
         return controller
 
-    def _editDisplayRange(self) -> None:
-        if self._view.displayRangeDialog.exec_():
-            minValue = self._view.displayRangeDialog.minValue()
-            maxValue = self._view.displayRangeDialog.maxValue()
-            self._presenter.setCustomDisplayRange(minValue, maxValue)
+    def _autoDisplayRange(self) -> None:
+        self._displayRangeIsLocked = False
+        self._visualizationController.rerenderImage(autoscaleColorAxis=True)
+        self._displayRangeIsLocked = True
+
+    def _finishEditingDisplayRange(self, result: int) -> None:
+        if result == QDialog.DialogCode.Accepted:
+            lower = float(self._displayRangeDialog.minValueLineEdit.getValue())
+            upper = float(self._displayRangeDialog.maxValueLineEdit.getValue())
+
+            self._displayRangeIsLocked = False
+            self._engine.setDisplayValueRange(lower, upper)
+            self._displayRangeIsLocked = True
+
+    def _syncColorLegendToView(self) -> None:
+        values = numpy.linspace(self._engine.getMinDisplayValue(),
+                                self._engine.getMaxDisplayValue(), 1000)
+        self._imageWidget.setColorLegendColors(
+            values,
+            self._engine.colorize(values),
+            self._engine.isRendererCyclic(),
+        )
 
     def _syncModelToView(self) -> None:
-        displayRangeLimits = self._presenter.getDisplayRangeLimits()
-        minDisplayValue = self._presenter.getMinDisplayValue()
-        maxDisplayValue = self._presenter.getMaxDisplayValue()
+        minValue = Decimal(repr(self._engine.getMinDisplayValue()))
+        maxValue = Decimal(repr(self._engine.getMaxDisplayValue()))
 
-        self._view.minDisplayValueSlider.setValueAndRange(minDisplayValue, displayRangeLimits)
-        self._view.maxDisplayValueSlider.setValueAndRange(maxDisplayValue, displayRangeLimits)
-        self._view.displayRangeDialog.setMinAndMaxValues(displayRangeLimits.lower,
-                                                         displayRangeLimits.upper)
-        self._imageWidget.setColorLegendRange(float(minDisplayValue), float(maxDisplayValue))
+        self._displayRangeDialog.minValueLineEdit.setValue(minValue)
+        self._displayRangeDialog.maxValueLineEdit.setValue(maxValue)
 
-        xArray = numpy.linspace(0., 1., 256)
-        rgbaArray = self._presenter.getColorSamples(xArray)
-        self._imageWidget.setColorLegendColors(xArray, rgbaArray,
-                                               self._presenter.isColorizerCyclic())
+        if self._displayRangeIsLocked:
+            self._view.minDisplayValueSlider.setValue(minValue)
+            self._view.maxDisplayValueSlider.setValue(maxValue)
+        else:
+            displayRangeLimits = Interval[Decimal](minValue, maxValue)
+            self._view.minDisplayValueSlider.setValueAndRange(minValue, displayRangeLimits)
+            self._view.maxDisplayValueSlider.setValueAndRange(maxValue, displayRangeLimits)
+
+        self._syncColorLegendToView()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._engine:
             self._syncModelToView()
 
 
-class ImageController(Observer):
+class ImageController:
 
-    def __init__(self, presenter: ImagePresenter, view: ImageView,
-                 fileDialogFactory: FileDialogFactory) -> None:
-        self._presenter = presenter
-        self._view = view
+    def __init__(self, engine: VisualizationEngine, view: ImageView,
+                 visualizationController: VisualizationController) -> None:
+        self._visualizationController = visualizationController
         self._toolsController = ImageToolsController.createInstance(
-            view.imageRibbon.imageToolsGroupBox, view.imageWidget, fileDialogFactory)
-        self._colorizerController = ImageColorizerController.createInstance(
-            presenter, view.imageRibbon.colormapGroupBox)
+            view.imageRibbon.imageToolsGroupBox, visualizationController)
+        self._rendererController = ImageRendererController.createInstance(
+            engine, view.imageRibbon.colormapGroupBox)
         self._dataRangeController = ImageDataRangeController.createInstance(
-            presenter, view.imageRibbon.dataRangeGroupBox, view.imageWidget)
+            engine, view.imageRibbon.dataRangeGroupBox, view.imageWidget, visualizationController)
 
     @classmethod
-    def createInstance(cls, presenter: ImagePresenter, view: ImageView,
+    def createInstance(cls, engine: VisualizationEngine, view: ImageView, statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ImageController:
-        controller = cls(presenter, view, fileDialogFactory)
-        view.imageWidget.rectangleFinished.connect(controller._handleRectangle)
-        view.imageWidget.lineCutFinished.connect(controller._handleLineCut)
-        controller._syncModelToView()
-        presenter.addObserver(controller)
-        return controller
+        visualizationController = VisualizationController.createInstance(
+            engine, view.imageWidget, statusBar, fileDialogFactory)
+        return cls(engine, view, visualizationController)
 
-    def _handleRectangle(self, rect: QRectF) -> None:
-        print(rect)  # TODO use for crop
+    def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
+        self._visualizationController.setArray(array, pixelGeometry)
 
-    def _handleLineCut(self, line: QLineF) -> None:
-        p1 = Point2D[float](line.x1(), line.y1())
-        p2 = Point2D[float](line.x2(), line.y2())
-        line2D = Line2D[float](p1, p2)
-        lineCut = self._presenter.getLineCut(line2D)
-
-        ax = self._view.lineCutDialog.axes
-        ax.clear()
-        ax.plot(lineCut.distanceInMeters, lineCut.value, '.-', linewidth=1.5)
-        ax.set_xlabel('Distance [m]')
-        ax.set_ylabel(lineCut.valueLabel)
-        ax.grid(True)
-        self._view.lineCutDialog.figureCanvas.draw()
-        self._view.lineCutDialog.open()
-
-    def _syncModelToView(self) -> None:
-        realImage = self._presenter.getImage()
-        qpixmap = QPixmap()
-
-        if realImage is not None and numpy.size(realImage) > 0:
-            # NOTE .copy() ensures integerImage is not a view
-            integerImage = numpy.multiply(realImage, 255).astype(numpy.uint8).copy()
-
-            qimage = QImage(integerImage.data, integerImage.shape[1], integerImage.shape[0],
-                            integerImage.strides[0], QImage.Format_RGBA8888)
-            qpixmap = QPixmap.fromImage(qimage)
-
-        self._view.imageWidget.setPixmap(qpixmap)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
+    def clearArray(self) -> None:
+        self._visualizationController.clearArray()

@@ -7,27 +7,88 @@ T = TypeVar('T', int, float, Decimal)
 
 
 @dataclass(frozen=True)
-class Array2D(Generic[T]):  # TODO remove
-    x: T
-    y: T
+class PixelGeometry:
+    widthInMeters: float
+    heightInMeters: float
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})'
 
 
 @dataclass(frozen=True)
-class Point2D(Generic[T]):
-    x: T
-    y: T
+class ImageExtent:
+    widthInPixels: int
+    heightInPixels: int
+
+    @property
+    def size(self) -> int:
+        '''returns the number of pixels in the image'''
+        return self.widthInPixels * self.heightInPixels
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        '''returns the image shape (heightInPixels, widthInPixels) tuple'''
+        return self.heightInPixels, self.widthInPixels
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ImageExtent):
+            return (self.shape == other.shape)
+
+        return False
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.widthInPixels}, {self.heightInPixels})'
 
 
 @dataclass(frozen=True)
-class Line2D(Generic[T]):
-    begin: Point2D[T]
-    end: Point2D[T]
+class Point2D:
+    x: float
+    y: float
 
-    def lerp(self, alpha: T) -> Point2D[T]:
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.x}, {self.y})'
+
+
+@dataclass(frozen=True)
+class Line2D:
+    begin: Point2D
+    end: Point2D
+
+    def lerp(self, alpha: float) -> Point2D:
         beta = 1 - alpha
         x = beta * self.begin.x + alpha * self.end.x
         y = beta * self.begin.y + alpha * self.end.y
-        return Point2D[T](x, y)
+        return Point2D(x, y)
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.begin}, {self.end})'
+
+
+@dataclass(frozen=True)
+class Box2D:
+    x: float
+    y: float
+    width: float
+    height: float
+
+    @property
+    def x_begin(self) -> float:
+        return self.x
+
+    @property
+    def x_end(self) -> float:
+        return self.x + self.width
+
+    @property
+    def y_begin(self) -> float:
+        return self.y
+
+    @property
+    def y_end(self) -> float:
+        return self.y + self.height
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.x}, {self.y}, {self.width}, {self.height})'
 
 
 class Interval(Generic[T]):
@@ -50,11 +111,14 @@ class Interval(Generic[T]):
     def clamp(self, value: T) -> T:
         return max(self.lower, min(value, self.upper))
 
-    def hull(self, value: T) -> Interval[T]:
-        return Interval[T](min(self.lower, value), max(self.upper, value))
+    def hull(self, value: Interval[T] | T) -> Interval[T]:
+        if isinstance(value, Interval):
+            return Interval[T](min(self.lower, value.lower), max(self.upper, value.upper))
+        else:
+            return Interval[T](min(self.lower, value), max(self.upper, value))
 
     @property
-    def width(self) -> T:
+    def length(self) -> T:
         return self.upper - self.lower
 
     @property
@@ -70,16 +134,3 @@ class Interval(Generic[T]):
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.lower}, {self.upper})'
-
-
-@dataclass(frozen=True)
-class Box2D(Generic[T]):
-    rangeX: Interval[T]
-    rangeY: Interval[T]
-
-    @property
-    def midpoint(self) -> Point2D[T]:
-        return Point2D[T](self.rangeX.midrange, self.rangeY.midrange)
-
-    def hull(self, x: T, y: T) -> Box2D[T]:
-        return Box2D[T](self.rangeX.hull(x), self.rangeY.hull(y))

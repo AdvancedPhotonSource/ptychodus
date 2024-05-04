@@ -2,15 +2,17 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Union, overload
+from typing import overload
 from uuid import UUID
 import logging
 import threading
 
-from ...api.geometry import Interval
-from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry
-from ...api.state import StateDataRegistry
+from ptychodus.api.geometry import Interval
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry
+
+from ..patterns import PatternsAPI
+from ..product import ProductAPI
 from .authorizer import WorkflowAuthorizer
 from .executor import WorkflowExecutor
 from .locator import DataLocator, OutputDataLocator, SimpleDataLocator
@@ -159,8 +161,7 @@ class WorkflowStatusPresenter:
     def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]:
         ...
 
-    def __getitem__(self, index: Union[int, slice]) -> \
-            Union[WorkflowStatus, Sequence[WorkflowStatus]]:
+    def __getitem__(self, index: int | slice) -> WorkflowStatus | Sequence[WorkflowStatus]:
         return self._statusRepository[index]
 
     def __len__(self) -> int:
@@ -178,14 +179,14 @@ class WorkflowExecutionPresenter:
     def __init__(self, executor: WorkflowExecutor) -> None:
         self._executor = executor
 
-    def runFlow(self, flowLabel: str) -> None:
-        self._executor.runFlow(flowLabel=flowLabel)
+    def runFlow(self, inputProductIndex: int) -> None:
+        self._executor.runFlow(inputProductIndex)
 
 
 class WorkflowCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry,
-                 stateDataRegistry: StateDataRegistry) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
+                 productAPI: ProductAPI) -> None:
         self._settings = WorkflowSettings.createInstance(settingsRegistry)
         self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Input')
         self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group,
@@ -196,8 +197,8 @@ class WorkflowCore:
         self._statusRepository = WorkflowStatusRepository()
         self._executor = WorkflowExecutor(self._settings, self._inputDataLocator,
                                           self._computeDataLocator, self._outputDataLocator,
-                                          settingsRegistry, stateDataRegistry)
-        self._thread: Optional[threading.Thread] = None
+                                          settingsRegistry, patternsAPI, productAPI)
+        self._thread: threading.Thread | None = None
 
         try:
             from .globus import GlobusWorkflowThread
@@ -215,9 +216,9 @@ class WorkflowCore:
         self.statusPresenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
         self.executionPresenter = WorkflowExecutionPresenter(self._executor)
 
-    def executeWorkflow(self, flowLabel: str) -> None:
-        logger.debug(f'Execute Workflow: {flowLabel}')
-        self._executor.runFlow(flowLabel)
+    def executeWorkflow(self, inputProductIndex: int) -> None:
+        logger.debug(f'Execute Workflow: index={inputProductIndex}')
+        self._executor.runFlow(inputProductIndex)
 
     @property
     def areWorkflowsSupported(self) -> bool:

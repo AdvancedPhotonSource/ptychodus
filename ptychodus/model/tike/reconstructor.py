@@ -1,6 +1,5 @@
-from collections.abc import Sequence
 from importlib.metadata import version
-from typing import Any, Union
+from typing import Any
 import logging
 import pprint
 
@@ -9,12 +8,12 @@ import numpy.typing
 
 import tike.ptycho
 
-from ...api.object import ObjectArrayType
-from ...api.object import ObjectPoint
-from ...api.plot import PlotUncertain2D, PlotUncertainAxis, PlotUncertainSeries, PlotAxis, PlotSeries
-from ...api.probe import ProbeArrayType
+from ...api.geometry import Point2D
+from ...api.object import Object
+from ...api.probe import Probe
+from ...api.product import Product
 from ...api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
-from ...api.scan import Scan, ScanPoint, TabularScan
+from ...api.scan import Scan, ScanPoint
 from .multigrid import TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionSettings
@@ -95,7 +94,7 @@ class TikeReconstructor:
 
         return options
 
-    def getNumGpus(self) -> Union[int, tuple[int, ...]]:
+    def getNumGpus(self) -> int | tuple[int, ...]:
         numGpus = self._settings.numGpus.value
         onlyDigitsAndCommas = all(c.isdigit() or c == ',' for c in numGpus)
         hasDigit = any(c.isdigit() for c in numGpus)
@@ -108,88 +107,64 @@ class TikeReconstructor:
 
         return 1
 
-    def _plotCosts(self, costs: Sequence[Sequence[float]]) -> PlotUncertain2D:
-        plot = PlotUncertain2D.createNull()
-        numIterations = len(costs)
-
-        if numIterations > 0:
-            seriesX = PlotSeries(label='Iteration', values=[*range(numIterations)])
-            minCost: list[float] = list()
-            midCost: list[float] = list()
-            maxCost: list[float] = list()
-
-            seriesYList: list[PlotUncertainSeries] = list()
-
-            for values in costs:
-                minCost.append(min(values))
-                midCost.append(float(numpy.median(values)))
-                maxCost.append(max(values))
-
-            seriesYList = [
-                PlotUncertainSeries(
-                    label='Median',
-                    lo=minCost,
-                    values=midCost,
-                    hi=maxCost,
-                ),
-            ]
-
-            plot = PlotUncertain2D(
-                axisX=PlotAxis(label='Iteration', series=[seriesX]),
-                axisY=PlotUncertainAxis(label='Cost', series=seriesYList),
-            )
-
-        return plot
-
     def __call__(self, parameters: ReconstructInput,
                  algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> ReconstructOutput:
-        objectGrid = parameters.objectInterpolator.getGrid()
-        psi = parameters.objectInterpolator.getArray().astype('complex64')
-        probe = parameters.probeArray[numpy.newaxis, numpy.newaxis, ...].astype('complex64')
-        data = numpy.fft.ifftshift(parameters.diffractionPatternArray, axes=(-2, -1))
-        coordinateList: list[float] = list()
+        patternsArray = numpy.fft.ifftshift(parameters.patterns, axes=(-2, -1))
+
+        objectInput = parameters.product.object_
+        objectGeometry = objectInput.getGeometry()
+        # TODO change array[0] -> array when multislice is available
+        objectInputArray = objectInput.array[0].astype('complex64')
+
+        probeInput = parameters.product.probe
+        probeInputArray = probeInput.array[numpy.newaxis, numpy.newaxis, ...].astype('complex64')
+
+        scanInput = parameters.product.scan
+        scanInputCoords: list[float] = list()
 
         # Tike coordinate system origin is top-left corner; requires padding
-        ux = -probe.shape[-1] / 2
-        uy = -probe.shape[-2] / 2
+        ux = -probeInputArray.shape[-1] / 2
+        uy = -probeInputArray.shape[-2] / 2
 
-        for scanPoint in parameters.scan.values():
-            objectPoint = objectGrid.mapScanPointToObjectPoint(scanPoint)
-            coordinateList.append(objectPoint.y + uy)
-            coordinateList.append(objectPoint.x + ux)
+        for scanPoint in scanInput:
+            point = Point2D(scanPoint.positionXInMeters, scanPoint.positionYInMeters)
+            objectPoint = objectGeometry.mapScanPointToObjectPoint(point)
+            scanInputCoords.append(objectPoint.y + uy)
+            scanInputCoords.append(objectPoint.x + ux)
 
-        scan = numpy.array(coordinateList, dtype=numpy.float32).reshape(len(parameters.scan), 2)
-        scanMin = scan.min(axis=0)
-        scanMax = scan.max(axis=0)
+        scanInputArray = numpy.array(scanInputCoords,
+                                     dtype=numpy.float32).reshape(len(scanInput), 2)
+        scanMin = scanInputArray.min(axis=0)
+        scanMax = scanInputArray.max(axis=0)
         logger.debug(f'Scan range [px]: {scanMin} -> {scanMax}')
         numGpus = self.getNumGpus()
 
-        logger.debug(f'data shape={data.shape}')
-        logger.debug(f'scan shape={scan.shape}')
-        logger.debug(f'probe shape={probe.shape}')
-        logger.debug(f'object shape={psi.shape}')
+        logger.debug(f'data shape={patternsArray.shape}')
+        logger.debug(f'scan shape={scanInputArray.shape}')
+        logger.debug(f'probe shape={probeInputArray.shape}')
+        logger.debug(f'object shape={objectInputArray.shape}')
         logger.debug(f'num_gpu={numGpus}')
 
         exitwave_options = tike.ptycho.ExitWaveOptions(
-            # FIXME: Use a user supplied `measured_pixels` instead
-            measured_pixels=numpy.ones(probe.shape[-2:], dtype=numpy.bool_),
+            # TODO: Use a user supplied `measured_pixels` instead
+            measured_pixels=numpy.ones(probeInputArray.shape[-2:], dtype=numpy.bool_),
             noise_model=self._settings.noiseModel.value,
         )
 
         ptychoParameters = tike.ptycho.solvers.PtychoParameters(
-            probe=probe,
-            psi=psi,
-            scan=scan,
+            probe=probeInputArray,
+            psi=objectInputArray,
+            scan=scanInputArray,
             algorithm_options=algorithmOptions,
             probe_options=self.getProbeOptions(),
             object_options=self.getObjectOptions(),
-            position_options=self.getPositionOptions(scan),
+            position_options=self.getPositionOptions(scanInputArray),
             exitwave_options=exitwave_options,
         )
 
         if self._multigridSettings.useMultigrid.value:
             result = tike.ptycho.reconstruct_multigrid(
-                data=data,
+                data=patternsArray,
                 parameters=ptychoParameters,
                 num_gpu=numGpus,
                 use_mpi=False,
@@ -199,7 +174,7 @@ class TikeReconstructor:
         else:
             # TODO support interactive reconstructions
             with tike.ptycho.Reconstruction(
-                    data=data,
+                    data=patternsArray,
                     parameters=ptychoParameters,
                     num_gpu=numGpus,
                     use_mpi=False,
@@ -209,33 +184,48 @@ class TikeReconstructor:
 
         logger.debug(f'Result: {pprint.pformat(result)}')
 
-        scanOutput: Scan | None = None
-        probeOutputArray: ProbeArrayType | None = None
-        objectOutputArray: ObjectArrayType | None = None
-
         if self._positionCorrectionSettings.usePositionCorrection.value:
-            pointDict: dict[int, ScanPoint] = dict()
+            scanOutputPoints: list[ScanPoint] = list()
 
-            for index, xy in zip(parameters.scan, result.scan):
-                objectPoint = ObjectPoint(x=xy[1], y=xy[0])
-                pointDict[index] = objectGrid.mapObjectPointToScanPoint(objectPoint)
+            for uncorrectedPoint, xy in zip(scanInput, result.scan):
+                objectPoint = Point2D(x=xy[1], y=xy[0])
+                point = objectGeometry.mapObjectPointToScanPoint(objectPoint)
+                scanPoint = ScanPoint(uncorrectedPoint.index, point.x, point.y)
+                scanOutputPoints.append(scanPoint)
 
-            scanOutput = TabularScan(pointDict)
+            scanOutput = Scan(scanOutputPoints)
+        else:
+            scanOutput = scanInput.copy()
 
         if self._probeCorrectionSettings.useProbeCorrection.value:
-            probeOutputArray = result.probe[0, 0]
+            probeOutput = Probe(
+                array=result.probe[0, 0],
+                pixelWidthInMeters=probeInput.pixelWidthInMeters,
+                pixelHeightInMeters=probeInput.pixelHeightInMeters,
+            )
+        else:
+            probeOutput = probeInput.copy()
 
         if self._objectCorrectionSettings.useObjectCorrection.value:
-            objectOutputArray = result.psi
+            objectOutput = Object(
+                array=result.psi,
+                layerDistanceInMeters=objectInput.layerDistanceInMeters,
+                pixelWidthInMeters=objectInput.pixelWidthInMeters,
+                pixelHeightInMeters=objectInput.pixelHeightInMeters,
+                centerXInMeters=objectInput.centerXInMeters,
+                centerYInMeters=objectInput.centerYInMeters,
+            )
+        else:
+            objectOutput = objectInput.copy()
 
-        return ReconstructOutput(
+        product = Product(
+            metadata=parameters.product.metadata,
             scan=scanOutput,
-            probeArray=probeOutputArray,
-            objectArray=objectOutputArray,
-            objective=result.algorithm_options.costs,
-            plot2D=self._plotCosts(result.algorithm_options.costs),
-            result=0,
+            probe=probeOutput,
+            object_=objectOutput,
+            costs=[float(numpy.mean(values)) for values in result.algorithm_options.costs],
         )
+        return ReconstructOutput(product, 0)
 
 
 class RegularizedPIEReconstructor(Reconstructor):

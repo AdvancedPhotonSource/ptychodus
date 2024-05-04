@@ -1,240 +1,211 @@
 from __future__ import annotations
-from typing import overload
+from typing import Any, overload
 
 import numpy
 
-from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject, QVariant
+from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
-from ...api.probe import ProbeArrayType
-from ...model.probe import ProbeRepositoryItemPresenter
+from ...model.product import ProbeAPI, ProbeRepository
+from ...model.product.probe import ProbeRepositoryItem
 
 
 class ProbeTreeNode:
 
-    def __init__(self, parentNode: ProbeTreeNode | None,
-                 presenter: ProbeRepositoryItemPresenter | None, mode: int) -> None:
-        self.parentNode = parentNode
-        self.presenter = presenter
-        self.mode = mode
+    def __init__(self, parent: ProbeTreeNode | None = None) -> None:
+        self.parent = parent
         self.children: list[ProbeTreeNode] = list()
 
-    @classmethod
-    def createRoot(cls) -> ProbeTreeNode:
-        return cls(None, None, -1)
+    def insertNode(self, index: int = -1) -> ProbeTreeNode:
+        node = ProbeTreeNode(self)
+        self.children.insert(index, node)
+        return node
 
-    def populateModes(self) -> None:
-        if self.presenter is None:
-            return
-
-        self.children.clear()
-
-        for mode in range(self.presenter.item.getProbe().getNumberOfModes()):
-            childNode = ProbeTreeNode(self, self.presenter, mode)
-            self.children.append(childNode)
-
-    def createChild(self, presenter: ProbeRepositoryItemPresenter) -> ProbeTreeNode:
-        childNode = ProbeTreeNode(self, presenter, -1)
-        childNode.populateModes()
-        self.children.append(childNode)
-        return childNode
-
-    def getName(self) -> str:
-        if self.presenter is None:
-            return str()
-
-        return self.presenter.name
-
-    def getInitializerName(self) -> str:
-        if self.presenter is None:
-            return str()
-
-        return self.presenter.item.getInitializerSimpleName()
-
-    def getDataType(self) -> str:
-        if self.presenter is None:
-            return str()
-
-        return str(self.presenter.item.getProbe().getDataType())
-
-    def getNumberOfModes(self) -> int:
-        if self.presenter is None:
-            return 0
-
-        return self.presenter.item.getProbe().getNumberOfModes()
-
-    def getWidthInPixels(self) -> int:
-        if self.presenter is None:
-            return 0
-
-        return self.presenter.item.getProbe().getExtentInPixels().width
-
-    def getHeightInPixels(self) -> int:
-        if self.presenter is None:
-            return 0
-
-        return self.presenter.item.getProbe().getExtentInPixels().height
-
-    def getSizeInBytes(self) -> int:
-        if self.presenter is None:
-            return 0
-
-        return self.presenter.item.getProbe().getSizeInBytes()
-
-    def getArray(self) -> ProbeArrayType:
-        if self.presenter is None:
-            return numpy.zeros((0, 0, 0), dtype=complex)
-        elif self.mode < 0:
-            return self.presenter.item.getProbe().getModesFlattened()
-
-        return self.presenter.item.getProbe().getMode(self.mode)
-
-    def getRelativePowerPercent(self) -> int:
-        if self.presenter is None or self.mode < 0:
-            return -1
-
-        relativePower = self.presenter.item.getProbe().getModeRelativePower(self.mode)
-
-        if numpy.isfinite(relativePower):
-            return int(100. * relativePower)
-
-        return 0
+    def removeNode(self, index: int = -1) -> ProbeTreeNode:
+        return self.children.pop(index)
 
     def row(self) -> int:
-        if self.parentNode:
-            return self.parentNode.children.index(self)
-
-        return 0
+        return 0 if self.parent is None else self.parent.children.index(self)
 
 
 class ProbeTreeModel(QAbstractItemModel):
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(self,
+                 repository: ProbeRepository,
+                 api: ProbeAPI,
+                 parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._rootNode = ProbeTreeNode.createRoot()
+        self._repository = repository
+        self._api = api
+        self._treeRoot = ProbeTreeNode()
         self._header = [
-            'Name', 'Relative Power', 'Initializer', 'Data Type', 'Width [px]', 'Height [px]',
+            'Name', 'Relative Power', 'Builder', 'Data Type', 'Width [px]', 'Height [px]',
             'Size [MB]'
         ]
 
-    def setRootNode(self, rootNode: ProbeTreeNode) -> None:
-        self.beginResetModel()
-        self._rootNode = rootNode
-        self.endResetModel()
+        for index, item in enumerate(repository):
+            self.insertItem(index, item)
 
-    def refreshProbe(self, row: int) -> None:
-        topLeft = self.index(row, 0)
-        bottomRight = self.index(row, len(self._header))
+    @staticmethod
+    def _appendModes(node: ProbeTreeNode, item: ProbeRepositoryItem) -> None:
+        object_ = item.getProbe()
+
+        for layer in range(object_.numberOfModes):
+            node.insertNode()
+
+    def insertItem(self, index: int, item: ProbeRepositoryItem) -> None:
+        self.beginInsertRows(QModelIndex(), index, index)
+        ProbeTreeModel._appendModes(self._treeRoot.insertNode(index), item)
+        self.endInsertRows()
+
+    def updateItem(self, index: int, item: ProbeRepositoryItem) -> None:
+        topLeft = self.index(index, 0)
+        bottomRight = self.index(index, len(self._header))
         self.dataChanged.emit(topLeft, bottomRight)
 
-        node = self._rootNode.children[row]
+        node = self._treeRoot.children[index]
         numModesOld = len(node.children)
-        numModesNew = node.getNumberOfModes()
+        numModesNew = item.getProbe().numberOfModes
 
         if numModesOld < numModesNew:
             self.beginInsertRows(topLeft, numModesOld, numModesNew)
-            node.populateModes()
+
+            while len(node.children) < numModesNew:
+                node.insertNode()
+
             self.endInsertRows()
-        else:
+        elif numModesOld > numModesNew:
             self.beginRemoveRows(topLeft, numModesNew, numModesOld)
-            node.populateModes()
+
+            while len(node.children) > numModesNew:
+                node.removeNode()
+
             self.endRemoveRows()
 
         childTopLeft = self.index(0, 0, topLeft)
         childBottomRight = self.index(numModesNew, len(self._header), topLeft)
         self.dataChanged.emit(childTopLeft, childBottomRight)
 
+    def removeItem(self, index: int, item: ProbeRepositoryItem) -> None:
+        self.beginRemoveRows(QModelIndex(), index, index)
+        self._treeRoot.removeNode(index)
+        self.endRemoveRows()
+
+    def headerData(self,
+                   section: int,
+                   orientation: Qt.Orientation,
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+            return self._header[section]
+
     @overload
-    def parent(self, child: QModelIndex) -> QModelIndex:
+    def parent(self, index: QModelIndex) -> QModelIndex:
         ...
 
     @overload
     def parent(self) -> QObject:
         ...
 
-    def parent(self, child: QModelIndex | None = None) -> QModelIndex | QObject:
-        if child is None:
+    def parent(self, index: QModelIndex | None = None) -> QModelIndex | QObject:
+        if index is None:
             return super().parent()
-        else:
-            value = QModelIndex()
+        elif index.isValid():
+            node = index.internalPointer()
+            parentNode = node.parent
+            return QModelIndex() if parentNode is self._treeRoot \
+                    else self.createIndex(parentNode.row(), 0, parentNode)
 
-            if child.isValid():
-                childNode = child.internalPointer()
-                parentNode = childNode.parentNode
-
-                if parentNode is self._rootNode:
-                    value = QModelIndex()
-                else:
-                    value = self.createIndex(parentNode.row(), 0, parentNode)
-
-            return value
-
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole) -> QVariant:
-        value = QVariant()
-
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            value = QVariant(self._header[section])
-
-        return value
-
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = Qt.ItemFlags()
-
-        if index.isValid():
-            value = super().flags(index)
-
-        return value
+        return QModelIndex()
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
-        value = QModelIndex()
-
         if self.hasIndex(row, column, parent):
-            parentNode = parent.internalPointer() if parent.isValid() else self._rootNode
-            childNode = parentNode.children[row]
+            if parent.isValid():
+                parentNode = parent.internalPointer()
+                node = parentNode.children[row]
+            else:
+                node = self._treeRoot.children[row]
 
-            if childNode:
-                value = self.createIndex(row, column, childNode)
+            return self.createIndex(row, column, node)
 
-        return value
+        return QModelIndex()
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
-        value = QVariant()
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if not index.isValid():
+            return None
+
+        parent = index.parent()
+
+        if parent.isValid():
+            item = self._repository[parent.row()]
+
+            if role == Qt.ItemDataRole.DisplayRole and index.column() == 0:
+                return f'Mode {index.row() + 1}'
+            elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
+                probe = item.getProbe()
+
+                try:
+                    relativePower = probe.getModeRelativePower(index.row())
+                except IndexError:
+                    return -1
+
+                if numpy.isfinite(relativePower):
+                    return int(100. * relativePower)
+        else:
+            item = self._repository[index.row()]
+            probe = item.getProbe()
+
+            if role == Qt.ItemDataRole.DisplayRole:
+                if index.column() == 0:
+                    return self._repository.getName(index.row())
+                elif index.column() == 1:
+                    return None
+                elif index.column() == 2:
+                    return item.getBuilder().getName()
+                elif index.column() == 3:
+                    return str(probe.dataType)
+                elif index.column() == 4:
+                    return probe.widthInPixels
+                elif index.column() == 5:
+                    return probe.heightInPixels
+                elif index.column() == 6:
+                    return f'{probe.sizeInBytes / (1024 * 1024):.2f}'
+            elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
+                probe = item.getProbe()
+                coherence = probe.getCoherence()
+                return int(100. * coherence) if numpy.isfinite(coherence) else -1
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        value = super().flags(index)
 
         if index.isValid():
-            node = index.internalPointer()
+            parent = index.parent()
 
-            if role == Qt.DisplayRole:
-                if node.mode < 0:
-                    if index.column() == 0:
-                        value = QVariant(node.getName())
-                    elif index.column() == 2:
-                        value = QVariant(node.getInitializerName())
-                    elif index.column() == 3:
-                        value = QVariant(node.getDataType())
-                    elif index.column() == 4:
-                        value = QVariant(node.getWidthInPixels())
-                    elif index.column() == 5:
-                        value = QVariant(node.getHeightInPixels())
-                    elif index.column() == 6:
-                        value = QVariant(f'{node.getSizeInBytes() / (1024 * 1024):.2f}')
-                elif index.column() == 0:
-                    value = QVariant(f'Mode {node.mode}')
-            elif role == Qt.UserRole and index.column() == 1:
-                value = QVariant(node.getRelativePowerPercent())
+            if not parent.isValid() and index.column() in (0, 2):
+                value |= Qt.ItemFlag.ItemIsEditable
 
         return value
+
+    def setData(self,
+                index: QModelIndex,
+                value: Any,
+                role: int = Qt.ItemDataRole.EditRole) -> bool:
+        if index.isValid() and role == Qt.ItemDataRole.EditRole:
+            parent = index.parent()
+
+            if not parent.isValid():
+                if index.column() == 0:
+                    self._repository.setName(index.row(), str(value))
+                    return True
+                elif index.column() == 2:
+                    self._api.buildProbe(index.row(), str(value))
+                    return True
+
+        return False
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.column() > 0:
             return 0
 
-        node = self._rootNode
-
-        if parent.isValid():
-            node = parent.internalPointer()
-
+        node = parent.internalPointer() if parent.isValid() else self._treeRoot
         return len(node.children)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:

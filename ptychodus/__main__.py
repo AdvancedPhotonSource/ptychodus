@@ -25,10 +25,8 @@ def main() -> int:
     parser.add_argument(
         '-b',
         '--batch',
-        action='store',
-        type=argparse.FileType('w'),
-        metavar='RESULTS_FILE',
-        help='run reconstruction non-interactively',
+        choices=('reconstruct', 'train'),
+        help='run action non-interactively',
     )
     parser.add_argument(
         '-d',
@@ -39,32 +37,33 @@ def main() -> int:
     parser.add_argument(
         '-f',
         '--file-prefix',
-        action='store',
-        dest='prefix',
         help='replace file path prefix in settings',
     )
     parser.add_argument(
-        '-p',
-        '--port',
-        action='store',
-        default=9999,
-        help='remote process communication port number',
-        type=int,
+        '-i',
+        '--input',
+        metavar='INPUT_FILE',
+        help='input data product file (batch mode)',
+        type=argparse.FileType('r'),
     )
     parser.add_argument(
-        '-r',
-        '--restart',
-        action='store',
-        help='use restart data from file',
-        metavar='RESTART_FILE',
+        '-o',
+        '--output',
+        metavar='OUTPUT_FILE',
+        help='output data product file (batch mode)',
+        type=argparse.FileType('w'),
+    )
+    parser.add_argument(
+        '-p',
+        '--patterns',
+        metavar='PATTERNS_FILE',
+        help='use diffraction patterns from file',
         type=argparse.FileType('r'),
     )
     parser.add_argument(
         '-s',
         '--settings',
-        action='store',
         help='use settings from file',
-        metavar='SETTINGS_FILE',
         type=argparse.FileType('r'),
     )
     parser.add_argument(
@@ -76,21 +75,35 @@ def main() -> int:
     parsedArgs, unparsedArgs = parser.parse_known_args()
 
     modelArgs = ModelArgs(
-        restartFilePath=Path(parsedArgs.restart.name) if parsedArgs.restart else None,
-        settingsFilePath=Path(parsedArgs.settings.name) if parsedArgs.settings else None,
-        replacementPathPrefix=parsedArgs.prefix,
-        rpcPort=parsedArgs.port,
-        autoExecuteRPCs=bool(parsedArgs.batch),
-        isDeveloperModeEnabled=parsedArgs.dev,
+        settingsFile=Path(parsedArgs.settings.name) if parsedArgs.settings else None,
+        patternsFile=Path(parsedArgs.patterns.name) if parsedArgs.patterns else None,
+        replacementPathPrefix=parsedArgs.file_prefix,
     )
 
-    with ModelCore(modelArgs) as model:
+    with ModelCore(modelArgs, isDeveloperModeEnabled=parsedArgs.dev) as model:
         if parsedArgs.batch is not None:
-            resultsFilePath = Path(parsedArgs.batch.name)
             verifyAllArgumentsParsed(parser, unparsedArgs)
-            return model.batchModeReconstruct(resultsFilePath)
 
-        from PyQt5.QtWidgets import QApplication
+            if parsedArgs.input is None or parsedArgs.output is None:
+                parser.error('Batch mode requires input and output arguments!')
+                return -1
+
+            inputPath = Path(parsedArgs.input.name)
+            outputPath = Path(parsedArgs.output.name)
+
+            if parsedArgs.batch == 'reconstruct':
+                return model.batchModeReconstruct(inputPath, outputPath)
+            elif parsedArgs.batch == 'train':
+                return model.batchModeTrain(inputPath, outputPath)
+            else:
+                parser.error(f'Unknown batch mode action \"{parsedArgs.batch}\"!')
+                return -1
+
+        try:
+            from PyQt5.QtWidgets import QApplication
+        except ModuleNotFoundError:
+            return 0
+
         # QApplication expects the first argument to be the program name
         app = QApplication(sys.argv[:1] + unparsedArgs)
         verifyAllArgumentsParsed(parser, app.arguments()[1:])
@@ -102,7 +115,7 @@ def main() -> int:
         controller = ControllerCore.createInstance(model, view)
         controller.showMainWindow(versionString())
 
-        return app.exec_()
+        return app.exec()
 
 
 sys.exit(main())

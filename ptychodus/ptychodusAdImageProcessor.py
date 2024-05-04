@@ -18,11 +18,12 @@ import ptychodus.model
 
 class ReconstructionThread(threading.Thread):
 
-    def __init__(self, ptychodus: ptychodus.model.ModelCore, resultsFilePath: Path,
-                 reconstructPV: str) -> None:
+    def __init__(self, ptychodus: ptychodus.model.ModelCore, inputProductPath: Path,
+                 outputProductPath: Path, reconstructPV: str) -> None:
         super().__init__()
         self._ptychodus = ptychodus
-        self._resultsFilePath = resultsFilePath
+        self._inputProductPath = inputProductPath
+        self._outputProductPath = outputProductPath
         self._channel = pvapy.Channel(reconstructPV, pvapy.CA)
         self._reconstructEvent = threading.Event()
         self._stopEvent = threading.Event()
@@ -36,7 +37,8 @@ class ReconstructionThread(threading.Thread):
                 logging.debug('ReconstructionThread: Begin assembling scan positions')
                 self._ptychodus.finalizeStreamingWorkflow()
                 logging.debug('ReconstructionThread: End assembling scan positions')
-                self._ptychodus.batchModeReconstruct(self._resultsFilePath)
+                self._ptychodus.batchModeReconstruct(self._inputProductPath,
+                                                     self._outputProductPath)
                 self._reconstructEvent.clear()
                 # reconstruction done; indicate that results are ready
                 self._channel.put(0)
@@ -62,18 +64,18 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         super().__init__(configDict)
 
         self.logger.debug(f'{ptychodus.__name__.title()} ({ptychodus.__version__})')
-        settingsFilePath = configDict['settingsFilePath']
 
         modelArgs = ptychodus.model.ModelArgs(
-            restartFilePath=None,
-            settingsFilePath=Path(settingsFilePath) if settingsFilePath else None,
+            settingsFile=configDict.get('settingsFile'),
+            patternsFile=None,
             replacementPathPrefix=configDict.get('replacementPathPrefix'),
         )
 
         self._ptychodus = ptychodus.model.ModelCore(modelArgs)
         self._reconstructionThread = ReconstructionThread(
             self._ptychodus,
-            Path(configDict.get('resultsFilePath', 'ptychodus.npz')),
+            Path(configDict.get('inputProductPath', 'input.npz')),
+            Path(configDict.get('outputProductPath', 'output.npz')),
             configDict.get('reconstructPV', 'bdpgp:gp:bit3'),
         )
         self._posXPV = configDict.get('posXPV', 'bluesky:pos_x')
@@ -98,7 +100,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         numberOfPatternsPerArray = configDict.get('nPatternsPerArray', 1)
         patternDataType = configDict.get('PatternDataType', 'uint16')
 
-        metadata = ptychodus.api.data.DiffractionMetadata(
+        metadata = ptychodus.api.patterns.DiffractionMetadata(
             numberOfPatternsPerArray=int(numberOfPatternsPerArray),
             numberOfPatternsTotal=int(numberOfPatternsTotal),
             patternDataType=numpy.dtype(patternDataType),
@@ -117,11 +119,11 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         else:
             self.logger.debug(f'Frame id {frameId} time stamp {frameTimeStamp}')
             image3d = image[numpy.newaxis, :, :].copy()
-            array = ptychodus.api.data.SimpleDiffractionPatternArray(
+            array = ptychodus.api.patterns.SimpleDiffractionPatternArray(
                 label=f'Frame{frameId}',
                 index=frameId,
                 data=image3d,
-                state=ptychodus.api.data.DiffractionPatternState.LOADED,
+                state=ptychodus.api.patterns.DiffractionPatternState.LOADED,
             )
             self._ptychodus.assembleDiffractionPattern(array, frameTimeStamp)
 

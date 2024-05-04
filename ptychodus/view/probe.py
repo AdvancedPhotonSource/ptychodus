@@ -1,183 +1,96 @@
 from __future__ import annotations
-from typing import Generic, Optional, TypeVar
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                             QFormLayout, QGroupBox, QHBoxLayout, QRadioButton, QSpinBox,
+from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
+                             QGroupBox, QHBoxLayout, QLabel, QPushButton, QSlider, QSpinBox,
                              QVBoxLayout, QWidget)
 
-from .widgets import DecimalLineEdit, DecimalSlider, EnergyWidget, LengthWidget, RepositoryTreeView
-
-__all__ = [
-    'ProbeEditorDialog',
-    'ProbeParametersView',
-    'ProbeView',
-]
-
-T = TypeVar('T', bound=QGroupBox)
+from .visualization import VisualizationParametersView, VisualizationWidget
+from .widgets import LengthWidget
 
 
-class ProbeParametersView(QGroupBox):
+class ProbePropagationParametersView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Parameters', parent)
-        self.energyWidget = EnergyWidget.createInstance()
-        self.wavelengthWidget = LengthWidget.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeParametersView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Energy:', view.energyWidget)
-        layout.addRow('Wavelength:', view.wavelengthWidget)
-        view.setLayout(layout)
-
-        return view
-
-
-class DiskProbeView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.diameterWidget = LengthWidget.createInstance()
-        self.testPatternCheckBox = QCheckBox('Test Pattern')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> DiskProbeView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Diameter:', view.diameterWidget)
-        layout.addWidget(view.testPatternCheckBox)
-        view.setLayout(layout)
-
-        return view
-
-
-class SuperGaussianProbeView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.annularRadiusWidget = LengthWidget.createInstance()
-        self.fwhmWidget = LengthWidget.createInstance()
-        self.orderParameterWidget = DecimalLineEdit.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> SuperGaussianProbeView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Annular Radius:', view.annularRadiusWidget)
-        layout.addRow('Full Width at Half Maximum:', view.fwhmWidget)
-        layout.addRow('Order Parameter:', view.orderParameterWidget)
-        view.setLayout(layout)
-
-        return view
-
-
-class FresnelZonePlateProbeView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.presetsComboBox = QComboBox()
-        self.zonePlateDiameterWidget = LengthWidget.createInstance()
-        self.outermostZoneWidthWidget = LengthWidget.createInstance()
-        self.beamstopDiameterWidget = LengthWidget.createInstance()
-        self.defocusDistanceWidget = LengthWidget.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> FresnelZonePlateProbeView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Presets:', view.presetsComboBox)
-        layout.addRow('Zone Plate Diameter:', view.zonePlateDiameterWidget)
-        layout.addRow('Outermost Zone Width:', view.outermostZoneWidthWidget)
-        layout.addRow('Beamstop Diameter:', view.beamstopDiameterWidget)
-        layout.addRow('Defocus Distance:', view.defocusDistanceWidget)
-        view.setLayout(layout)
-
-        return view
-
-
-class ProbeModesView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Additional Modes', parent)
-        self.numberOfModesSpinBox = QSpinBox()
-        self.orthogonalizeModesCheckBox = QCheckBox('Orthogonalize Modes')
-        self.polynomialDecayButton = QRadioButton('Polynomial')
-        self.exponentialDecayButton = QRadioButton('Exponential')
-        self.decayRatioSlider = DecimalSlider.createInstance(Qt.Horizontal)
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeModesView:
-        view = cls(parent)
-
-        decayButtonBox = QHBoxLayout()
-        decayButtonBox.addWidget(view.polynomialDecayButton)
-        decayButtonBox.addWidget(view.exponentialDecayButton)
-
-        layout = QFormLayout()
-        layout.addRow('Number of Modes:', view.numberOfModesSpinBox)
-        layout.addRow(view.orthogonalizeModesCheckBox)
-        layout.addRow('Decay Type:', decayButtonBox)
-        layout.addRow('Decay Ratio:', view.decayRatioSlider)
-        view.setLayout(layout)
-
-        return view
-
-
-class ProbeEditorDialog(Generic[T], QDialog):
-
-    def __init__(self, editorView: T, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.editorView = editorView
-        self.modesView = ProbeModesView.createInstance(parent)
-        self.buttonBox = QDialogButtonBox()
+    def __init__(self, title: str, parent: QWidget | None) -> None:
+        super().__init__(title, parent)
+        self.beginCoordinateWidget = LengthWidget.createInstance(isSigned=True)
+        self.endCoordinateWidget = LengthWidget.createInstance(isSigned=True)
+        self.numberOfStepsSpinBox = QSpinBox()
+        self.visualizationParametersView = VisualizationParametersView.createInstance()
 
     @classmethod
     def createInstance(cls,
                        title: str,
-                       editorView: T,
-                       parent: Optional[QWidget] = None) -> ProbeEditorDialog[T]:
-        view = cls(editorView, parent)
-        view.setWindowTitle(title)
-        editorView.setTitle('Primary Mode')
+                       parent: QWidget | None = None) -> ProbePropagationParametersView:
+        view = cls(title, parent)
+        view.setAlignment(Qt.AlignHCenter)
 
-        view.buttonBox.addButton(QDialogButtonBox.Ok)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+        propagationLayout = QFormLayout()
+        propagationLayout.addRow('Begin Coordinate:', view.beginCoordinateWidget)
+        propagationLayout.addRow('End Coordinate:', view.endCoordinateWidget)
+        propagationLayout.addRow('Number of Steps:', view.numberOfStepsSpinBox)
+
+        propagationGroupBox = QGroupBox('Propagation')
+        propagationGroupBox.setLayout(propagationLayout)
 
         layout = QVBoxLayout()
-        layout.addWidget(editorView)
-        layout.addWidget(view.modesView)
+        layout.addWidget(propagationGroupBox)
+        layout.addWidget(view.visualizationParametersView)
+        layout.addStretch()
+        view.setLayout(layout)
+
+        return view
+
+
+class ProbePropagationDialog(QDialog):
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__(parent)
+        self.xyView = VisualizationWidget.createInstance('XY Plane')
+        self.zxView = VisualizationWidget.createInstance('ZX Plane')
+        self.parametersView = ProbePropagationParametersView.createInstance('Parameters')
+        self.zyView = VisualizationWidget.createInstance('ZY Plane')
+        self.propagateButton = QPushButton('Propagate')
+        self.saveButton = QPushButton('Save')
+        self.coordinateSlider = QSlider(Qt.Orientation.Horizontal)
+        self.coordinateLabel = QLabel()
+        self.buttonBox = QDialogButtonBox()
+
+    @classmethod
+    def createInstance(cls, parent: QWidget | None = None) -> ProbePropagationDialog:
+        view = cls(parent)
+
+        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
+        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+
+        actionLayout = QHBoxLayout()
+        actionLayout.addWidget(view.propagateButton)
+        actionLayout.addWidget(view.saveButton)
+
+        coordinateLayout = QHBoxLayout()
+        coordinateLayout.setContentsMargins(0, 0, 0, 0)
+        coordinateLayout.addWidget(view.coordinateSlider)
+        coordinateLayout.addWidget(view.coordinateLabel)
+
+        contentsLayout = QGridLayout()
+        contentsLayout.addWidget(view.xyView, 0, 0)
+        contentsLayout.addWidget(view.zxView, 0, 1)
+        contentsLayout.addWidget(view.parametersView, 1, 0)
+        contentsLayout.addWidget(view.zyView, 1, 1)
+        contentsLayout.addLayout(actionLayout, 2, 0)
+        contentsLayout.addLayout(coordinateLayout, 2, 1)
+        contentsLayout.setColumnStretch(0, 1)
+        contentsLayout.setColumnStretch(1, 2)
+
+        layout = QVBoxLayout()
+        layout.addLayout(contentsLayout)
         layout.addWidget(view.buttonBox)
         view.setLayout(layout)
 
         return view
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.AcceptRole:
+        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()
-
-
-class ProbeView(QWidget):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__(parent)
-        self.parametersView = ProbeParametersView.createInstance()
-        self.repositoryView = RepositoryTreeView.createInstance('Repository')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> ProbeView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.parametersView)
-        layout.addWidget(view.repositoryView)
-        view.setLayout(layout)
-
-        return view

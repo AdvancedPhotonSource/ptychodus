@@ -4,8 +4,10 @@ from typing import Any
 import logging
 import queue
 
-from ...api.settings import SettingsRegistry
-from ...api.state import StateDataRegistry
+from ptychodus.api.settings import SettingsRegistry
+
+from ..patterns import PatternsAPI
+from ..product import ProductAPI
 from .locator import DataLocator
 from .settings import WorkflowSettings
 
@@ -22,18 +24,27 @@ class WorkflowExecutor:
 
     def __init__(self, settings: WorkflowSettings, inputDataLocator: DataLocator,
                  computeDataLocator: DataLocator, outputDataLocator: DataLocator,
-                 settingsRegistry: SettingsRegistry, stateDataRegistry: StateDataRegistry) -> None:
+                 settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
+                 productAPI: ProductAPI) -> None:
         super().__init__()
         self._settings = settings
         self._inputDataLocator = inputDataLocator
         self._computeDataLocator = computeDataLocator
         self._outputDataLocator = outputDataLocator
+        self._productAPI = productAPI
         self._settingsRegistry = settingsRegistry
-        self._stateDataRegistry = stateDataRegistry
+        self._patternsAPI = patternsAPI
         self.jobQueue: queue.Queue[WorkflowJob] = queue.Queue()
 
-    def runFlow(self, flowLabel: str) -> None:
+    def runFlow(self, inputProductIndex: int) -> None:
         transferSyncLevel = 3  # Copy files if checksums of the source and destination mismatch
+        ptychodusAction = 'reconstruct'  # TODO or 'train'
+
+        try:
+            flowLabel = self._productAPI.getItemName(inputProductIndex)
+        except IndexError:
+            logger.warning(f'Failed access product for flow ({inputProductIndex=})!')
+            return
 
         inputDataPosixPath = self._inputDataLocator.getPosixPath() / flowLabel
         computeDataPosixPath = self._computeDataLocator.getPosixPath() / flowLabel
@@ -42,19 +53,22 @@ class WorkflowExecutor:
         computeDataGlobusPath = f'{self._computeDataLocator.getGlobusPath()}/{flowLabel}'
         outputDataGlobusPath = f'{self._outputDataLocator.getGlobusPath()}/{flowLabel}'
 
-        settingsFileName = 'input.ini'
-        restartFileName = 'input.npz'
-        resultsFileName = 'output.npz'
+        settingsFile = 'settings.ini'
+        patternsFile = 'patterns.npz'
+        inputFile = 'product-in.npz'
+        outputFile = 'product-out.npz'
+        productFileFilter = 'NPZ'
 
         try:
             inputDataPosixPath.mkdir(mode=0o755, parents=True, exist_ok=True)
         except FileExistsError:
-            logger.error('Input data POSIX path must be a directory!')
+            logger.warning('Input data POSIX path must be a directory!')
             return
 
-        self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFileName)
-        self._stateDataRegistry.saveStateData(inputDataPosixPath / restartFileName,
-                                              restartable=True)
+        self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFile)
+        self._patternsAPI.savePatterns(inputDataPosixPath / patternsFile, productFileFilter)
+        self._productAPI.saveProduct(inputProductIndex, inputDataPosixPath / inputFile,
+                                     productFileFilter)
 
         flowInput = {
             'input_data_transfer_source_endpoint_id':
@@ -71,20 +85,24 @@ class WorkflowExecutor:
             transferSyncLevel,
             'compute_endpoint':
             str(self._settings.computeEndpointID.value),
-            'ptychodus_restart_file':
-            str(computeDataPosixPath / restartFileName),
+            'ptychodus_action':
+            ptychodusAction,
             'ptychodus_settings_file':
-            str(computeDataPosixPath / settingsFileName),
-            'ptychodus_results_file':
-            str(computeDataPosixPath / resultsFileName),
+            str(computeDataPosixPath / settingsFile),
+            'ptychodus_patterns_file':
+            str(computeDataPosixPath / patternsFile),
+            'ptychodus_input_file':
+            str(computeDataPosixPath / inputFile),
+            'ptychodus_output_file':
+            str(computeDataPosixPath / outputFile),
             'output_data_transfer_source_endpoint_id':
             str(self._computeDataLocator.getEndpointID()),
             'output_data_transfer_source_path':
-            f'{computeDataGlobusPath}/{resultsFileName}',
+            f'{computeDataGlobusPath}/{outputFile}',
             'output_data_transfer_destination_endpoint_id':
             str(self._outputDataLocator.getEndpointID()),
             'output_data_transfer_destination_path':
-            f'{outputDataGlobusPath}/{resultsFileName}',
+            f'{outputDataGlobusPath}/{outputFile}',
             'output_data_transfer_recursive':
             False
         }

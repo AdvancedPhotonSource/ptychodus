@@ -2,17 +2,17 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import overload, Union
+from typing import overload
 import logging
 
 import h5py
 
-from ptychodus.api.apparatus import PixelGeometry
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, SimpleDiffractionDataset)
-from ptychodus.api.geometry import Array2D
-from ptychodus.api.image import ImageExtent
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.patterns import (CropCenter, DiffractionDataset, DiffractionFileReader,
+                                    DiffractionMetadata, DiffractionPatternArray,
+                                    SimpleDiffractionDataset)
 from ptychodus.api.tree import SimpleTreeNode
+
 from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)
@@ -50,10 +50,8 @@ class DataGroup:
     def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
         ...
 
-    def __getitem__(
-        self,
-        index: Union[int,
-                     slice]) -> Union[DiffractionPatternArray, Sequence[DiffractionPatternArray]]:
+    def __getitem__(self, index: int | slice) -> \
+            DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         return self.arrayList[index]
 
     def __len__(self) -> int:
@@ -201,10 +199,8 @@ class NeXusDiffractionDataset(DiffractionDataset):
     def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
         ...
 
-    def __getitem__(
-        self,
-        index: Union[int,
-                     slice]) -> Union[DiffractionPatternArray, Sequence[DiffractionPatternArray]]:
+    def __getitem__(self, index: int | slice) -> \
+            DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         return self._entry.data[index]
 
     def __len__(self) -> int:
@@ -230,20 +226,20 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                     entry = EntryGroup.read(h5File['entry'])
                     h5Dataset = h5File['/entry/data/data_000001']
                 except KeyError:
-                    logger.info(f'File {filePath} is not a NeXus data file.')
+                    logger.warning(f'File {filePath} is not a NeXus data file.')
                 else:
                     detector = entry.instrument.detector
                     detectorPixelGeometry = PixelGeometry(
                         detector.xPixelSizeInMeters,
                         detector.yPixelSizeInMeters,
                     )
-                    cropCenterInPixels = Array2D[int](
+                    cropCenter = CropCenter(
                         detector.beamCenterXInPixels,
                         detector.beamCenterYInPixels,
                     )
 
                     detectorSpecific = detector.detectorSpecific
-                    detectorExtentInPixels = ImageExtent(
+                    detectorExtent = ImageExtent(
                         detectorSpecific.xPixelsInDetector,
                         detectorSpecific.yPixelsInDetector,
                     )
@@ -254,10 +250,10 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
                         patternDataType=h5Dataset.dtype,
                         detectorDistanceInMeters=detector.detectorDistanceInMeters,
-                        detectorExtentInPixels=detectorExtentInPixels,
+                        detectorExtent=detectorExtent,
                         detectorPixelGeometry=detectorPixelGeometry,
                         detectorBitDepth=detector.bitDepthReadout,
-                        cropCenterInPixels=cropCenterInPixels,
+                        cropCenter=cropCenter,
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
                     )
@@ -267,6 +263,6 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 # vvv TODO This is a hack; remove when able! vvv
                 self.stageRotationInDegrees = entry.sample.goniometer.chiDeg
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return dataset

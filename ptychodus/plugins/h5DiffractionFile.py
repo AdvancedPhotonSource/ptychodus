@@ -2,12 +2,13 @@ from pathlib import Path
 import logging
 
 import h5py
+import numpy
 
-from ptychodus.api.data import (DiffractionPatternArrayType, DiffractionDataset,
-                                DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternArray, DiffractionPatternState,
-                                SimpleDiffractionDataset)
-from ptychodus.api.image import ImageExtent
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.patterns import (DiffractionPatternArrayType, DiffractionDataset,
+                                    DiffractionFileReader, DiffractionFileWriter,
+                                    DiffractionMetadata, DiffractionPatternArray,
+                                    DiffractionPatternState, SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -139,7 +140,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
                 try:
                     data = h5File[self._dataPath]
                 except KeyError:
-                    logger.debug('Unable to find data.')
+                    logger.warning('Unable to find data.')
                 else:
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
@@ -147,7 +148,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
-                        detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
+                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
                         filePath=filePath,
                     )
 
@@ -160,9 +161,21 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
                 dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return dataset
+
+
+class H5DiffractionFileWriter(DiffractionFileWriter):
+
+    def __init__(self, dataPath: str) -> None:
+        self._dataPath = dataPath
+
+    def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
+        data = numpy.concatenate([array.getData() for array in dataset])
+
+        with h5py.File(filePath, 'w') as h5File:
+            h5File.create_dataset(self._dataPath, data=data, compression='gzip')
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
@@ -172,12 +185,17 @@ def registerPlugins(registry: PluginRegistry) -> None:
         displayName='Hierarchical Data Format 5 Files (*.h5 *.hdf5)',
     )
     registry.diffractionFileReaders.registerPlugin(
+        H5DiffractionFileReader(dataPath='/entry/measurement/Eiger/data'),
+        simpleName='NanoMax',
+        displayName='NanoMax Diffraction Files (*.h5 *.hdf5)',
+    )
+    registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/dp'),
         simpleName='PtychoShelves',
         displayName='PtychoShelves Diffraction Files (*.h5 *.hdf5)',
     )
-    registry.diffractionFileReaders.registerPlugin(
-        H5DiffractionFileReader(dataPath='/entry/measurement/Eiger/data'),
-        simpleName='NanoMax',
-        displayName='NanoMax DiffractionEndStation Files (*.h5 *.hdf5)',
+    registry.diffractionFileWriters.registerPlugin(
+        H5DiffractionFileWriter(dataPath='/dp'),
+        simpleName='PtychoShelves',
+        displayName='PtychoShelves Diffraction Files (*.h5 *.hdf5)',
     )

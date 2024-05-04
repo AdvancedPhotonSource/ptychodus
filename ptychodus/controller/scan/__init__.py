@@ -1,4 +1,4 @@
-from .controller import ScanController
+from .core import ScanController
 
 __all__ = [
     'ScanController',
