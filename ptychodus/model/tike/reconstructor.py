@@ -132,8 +132,10 @@ class TikeReconstructor:
             scanInputCoords.append(objectPoint.y + uy)
             scanInputCoords.append(objectPoint.x + ux)
 
-        scanInputArray = numpy.array(scanInputCoords,
-                                     dtype=numpy.float32).reshape(len(scanInput), 2)
+        scanInputArray = numpy.array(
+            scanInputCoords,
+            dtype=numpy.float32,
+        ).reshape(len(scanInput), 2)
         scanMin = scanInputArray.min(axis=0)
         scanMax = scanInputArray.max(axis=0)
         logger.debug(f'Scan range [px]: {scanMin} -> {scanMax}')
@@ -184,18 +186,15 @@ class TikeReconstructor:
 
         logger.debug(f'Result: {pprint.pformat(result)}')
 
-        if self._positionCorrectionSettings.usePositionCorrection.value:
-            scanOutputPoints: list[ScanPoint] = list()
+        scanOutputPoints: list[ScanPoint] = list()
 
-            for uncorrectedPoint, xy in zip(scanInput, result.scan):
-                objectPoint = Point2D(x=xy[1], y=xy[0])
-                point = objectGeometry.mapObjectPointToScanPoint(objectPoint)
-                scanPoint = ScanPoint(uncorrectedPoint.index, point.x, point.y)
-                scanOutputPoints.append(scanPoint)
+        for uncorrectedPoint, xy in zip(scanInput, result.scan):
+            objectPoint = Point2D(x=xy[1] - ux, y=xy[0] - uy)
+            point = objectGeometry.mapObjectPointToScanPoint(objectPoint)
+            scanPoint = ScanPoint(uncorrectedPoint.index, point.x, point.y)
+            scanOutputPoints.append(scanPoint)
 
-            scanOutput = Scan(scanOutputPoints)
-        else:
-            scanOutput = scanInput.copy()
+        scanOutput = Scan(scanOutputPoints)
 
         if self._probeCorrectionSettings.useProbeCorrection.value:
             probeOutput = Probe(
