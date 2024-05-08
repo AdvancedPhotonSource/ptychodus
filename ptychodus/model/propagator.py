@@ -1,6 +1,6 @@
 from typing import Any, Final, TypeAlias
 
-from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
+from scipy.fft import fft2, fftshift, ifft2, ifftshift
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
@@ -13,8 +13,8 @@ class FresnelPropagator:
     EPS: Final[float] = float(numpy.finfo(float).eps)
 
     @staticmethod
-    def _ifftshift_coords(sz: int, pixelSizeInMeters: float) -> RealArrayType:
-        return ifftshift(numpy.arange(-(sz // 2), (sz + 1) // 2)) * pixelSizeInMeters
+    def _create_coordinates(sz: int, pixelSizeInMeters: float) -> RealArrayType:
+        return numpy.arange(-(sz // 2), (sz + 1) // 2) * pixelSizeInMeters
 
     def __init__(self, arrayShape: tuple[int, ...], pixelGeometry: PixelGeometry,
                  propagationDistanceInMeters: float, wavelengthInMeters: float) -> None:
@@ -25,19 +25,19 @@ class FresnelPropagator:
         ik_2z = ik / (2 * propagationDistanceInMeters)
 
         # real space pixel size & coordinate grid
-        x = self._ifftshift_coords(arrayShape[-1], dx)
-        y = self._ifftshift_coords(arrayShape[-2], dy)
+        x = self._create_coordinates(arrayShape[-1], dx)
+        y = self._create_coordinates(arrayShape[-2], dy)
         YY, XX = numpy.meshgrid(y, x)
 
         # reciprocal space pixel size & coordinate grid
-        fx = fftfreq(arrayShape[-1], d=dx / lz)
-        fy = fftfreq(arrayShape[-2], d=dy / lz)
+        fx = self._create_coordinates(arrayShape[-1], lz / (arrayShape[-1] * dx))
+        fy = self._create_coordinates(arrayShape[-2], lz / (arrayShape[-2] * dy))
         FY, FX = numpy.meshgrid(fy, fx)
 
         # propagation quantities
         self._propagationDistanceInMeters = propagationDistanceInMeters
-        self._A = numpy.exp(ik_2z * (XX**2 + YY**2))
-        self._B = numpy.exp(ik_2z * (FX**2 + FY**2))
+        self._A = ifftshift(numpy.exp(ik_2z * (XX**2 + YY**2)))
+        self._B = ifftshift(numpy.exp(ik_2z * (FX**2 + FY**2)))
         self._eikz = numpy.exp(ik * propagationDistanceInMeters)
 
     def propagate(self, inputWavefield: WavefieldArrayType) -> WavefieldArrayType:

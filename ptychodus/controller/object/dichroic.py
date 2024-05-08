@@ -54,13 +54,13 @@ class DichroicViewController:
             return
 
         self._result = result
-        self._differenceVisualizationWidgetController.setArray(result.polarDifference[0, :, :],
-                                                               result.pixelGeometry)
-        self._sumVisualizationWidgetController.setArray(result.polarSum[0, :, :],
-                                                        result.pixelGeometry)
+        self._differenceVisualizationWidgetController.setArray(result.polar_difference[0, :, :],
+                                                               result.pixel_geometry)
+        self._sumVisualizationWidgetController.setArray(result.polar_sum[0, :, :],
+                                                        result.pixel_geometry)
         # TODO support multi-layer objects
-        self._ratioVisualizationWidgetController.setArray(result.polarRatio[0, :, :],
-                                                          result.pixelGeometry)
+        self._ratioVisualizationWidgetController.setArray(result.polar_ratio[0, :, :],
+                                                          result.pixel_geometry)
 
     def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> None:
         self._dialog.parametersView.lcircComboBox.setCurrentIndex(lcircItemIndex)

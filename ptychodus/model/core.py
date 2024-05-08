@@ -21,7 +21,8 @@ from ptychodus.api.patterns import DiffractionMetadata, DiffractionPatternArray
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 
-from .analysis import AnalysisCore, DichroicAnalyzer, FourierRingCorrelator, ProbePropagator
+from .analysis import (AnalysisCore, DichroicAnalyzer, ExposureAnalyzer, FourierRingCorrelator,
+                       ProbePropagator, STXMAnalyzer)
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .memory import MemoryPresenter
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
@@ -261,12 +262,28 @@ class ModelCore:
         return self._reconstructorCore.presenter
 
     @property
+    def stxmAnalyzer(self) -> STXMAnalyzer:
+        return self._analysisCore.stxmAnalyzer
+
+    @property
+    def stxmVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.stxmVisualizationEngine
+
+    @property
     def probePropagator(self) -> ProbePropagator:
         return self._analysisCore.probePropagator
 
     @property
     def probePropagatorVisualizationEngine(self) -> VisualizationEngine:
         return self._analysisCore.probePropagatorVisualizationEngine
+
+    @property
+    def exposureAnalyzer(self) -> ExposureAnalyzer:
+        return self._analysisCore.exposureAnalyzer
+
+    @property
+    def exposureVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.exposureVisualizationEngine
 
     @property
     def fourierRingCorrelator(self) -> FourierRingCorrelator:

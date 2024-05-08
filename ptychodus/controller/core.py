@@ -50,6 +50,9 @@ class ControllerCore:
                                                                    self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepository, model.scanAPI,
                                                              view.scanView, view.scanPlotView,
+                                                             model.stxmAnalyzer,
+                                                             model.stxmVisualizationEngine,
+                                                             view.statusBar(),
                                                              self._fileDialogFactory)
         self._probeImageController = ImageController.createInstance(model.probeVisualizationEngine,
                                                                     view.probeImageView,
@@ -57,7 +60,8 @@ class ControllerCore:
                                                                     self._fileDialogFactory)
         self._probeController = ProbeController.createInstance(
             model.probeRepository, model.probeAPI, self._probeImageController,
-            model.probePropagator, model.probePropagatorVisualizationEngine, view.probeView,
+            model.probePropagator, model.probePropagatorVisualizationEngine,
+            model.exposureAnalyzer, model.exposureVisualizationEngine, view.probeView,
             view.statusBar(), self._fileDialogFactory)
         self._objectImageController = ImageController.createInstance(
             model.objectVisualizationEngine, view.objectImageView, view.statusBar(),

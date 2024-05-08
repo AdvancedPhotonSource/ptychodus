@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
 from ptychodus.api.observer import SequenceObserver
 
+from ...model.analysis import ExposureAnalyzer
 from ...model.analysis import ProbePropagator
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
@@ -15,6 +16,7 @@ from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog, ProgressBarIt
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .editorFactory import ProbeEditorViewControllerFactory
+from .exposure import ExposureViewController
 from .propagator import ProbePropagationViewController
 from .treeModel import ProbeTreeModel
 
@@ -25,7 +27,9 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
     def __init__(self, repository: ProbeRepository, api: ProbeAPI,
                  imageController: ImageController, propagator: ProbePropagator,
-                 propagatorVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
+                 propagatorVisualizationEngine: VisualizationEngine,
+                 exposureAnalyzer: ExposureAnalyzer,
+                 exposureVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
                  statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
                  treeModel: ProbeTreeModel) -> None:
         super().__init__()
@@ -39,17 +43,23 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         self._propagationViewController = ProbePropagationViewController(
             propagator, propagatorVisualizationEngine, statusBar, fileDialogFactory, None)
+        self._exposureViewController = ExposureViewController(exposureAnalyzer,
+                                                              exposureVisualizationEngine,
+                                                              fileDialogFactory, statusBar, None)
 
     @classmethod
     def createInstance(cls, repository: ProbeRepository, api: ProbeAPI,
                        imageController: ImageController, propagator: ProbePropagator,
                        propagatorVisualizationEngine: VisualizationEngine,
-                       view: RepositoryTreeView, statusBar: QStatusBar,
+                       exposureAnalyzer: ExposureAnalyzer,
+                       exposureVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
+                       statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ProbeTreeModel(repository, api)
         controller = cls(repository, api, imageController, propagator,
-                         propagatorVisualizationEngine, view, statusBar, fileDialogFactory,
+                         propagatorVisualizationEngine, exposureAnalyzer,
+                         exposureVisualizationEngine, view, statusBar, fileDialogFactory,
                          treeModel)
         repository.addObserver(controller)
 
@@ -81,6 +91,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         propagateAction = view.buttonBox.analyzeMenu.addAction('Propagate...')
         propagateAction.triggered.connect(controller._propagateProbe)
+        exposureAction = view.buttonBox.analyzeMenu.addAction('Exposure Analysis...')
+        exposureAction.triggered.connect(controller._analyzeExposure)
 
         return controller
 
@@ -168,6 +180,14 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             logger.warning('No current item!')
         else:
             self._propagationViewController.propagate(itemIndex)
+
+    def _analyzeExposure(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            self._exposureViewController.analyze(itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
