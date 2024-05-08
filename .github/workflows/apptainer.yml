@@ -1,4 +1,4 @@
-# This workflow builds an apptainer with tike installed
+# This workflow builds an apptainer with ptychodus installed
 
 name: Publish Apptainer
 
