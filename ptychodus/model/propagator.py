@@ -20,9 +20,12 @@ class FresnelPropagator:
                  propagationDistanceInMeters: float, wavelengthInMeters: float) -> None:
         dx = pixelGeometry.widthInMeters
         dy = pixelGeometry.heightInMeters
-        lz = wavelengthInMeters * numpy.abs(propagationDistanceInMeters)
         ik = 2j * numpy.pi / wavelengthInMeters
-        ik_2z = ik / (2 * propagationDistanceInMeters)
+
+        try:
+            ik_2z = ik / (2 * propagationDistanceInMeters)
+        except ZeroDivisionError:
+            ik_2z = 0
 
         # real space pixel size & coordinate grid
         x = self._create_coordinates(arrayShape[-1], dx)
@@ -30,25 +33,23 @@ class FresnelPropagator:
         YY, XX = numpy.meshgrid(y, x)
 
         # reciprocal space pixel size & coordinate grid
+        lz = numpy.abs(wavelengthInMeters * propagationDistanceInMeters)
         fx = self._create_coordinates(arrayShape[-1], lz / (arrayShape[-1] * dx))
         fy = self._create_coordinates(arrayShape[-2], lz / (arrayShape[-2] * dy))
         FY, FX = numpy.meshgrid(fy, fx)
 
         # propagation quantities
         self._propagationDistanceInMeters = propagationDistanceInMeters
-        self._A = ifftshift(numpy.exp(ik_2z * (XX**2 + YY**2)))
-        self._B = ifftshift(numpy.exp(ik_2z * (FX**2 + FY**2)))
+        self._A = numpy.exp(ik_2z * (XX**2 + YY**2))
+        self._B = numpy.exp(ik_2z * (FX**2 + FY**2))
         self._eikz = numpy.exp(ik * propagationDistanceInMeters)
 
     def propagate(self, inputWavefield: WavefieldArrayType) -> WavefieldArrayType:
-        shiftedWavefield = ifftshift(inputWavefield)
-
-        if self._propagationDistanceInMeters > FresnelPropagator.EPS:
-            Beikz = self._B * self._eikz
-            return fftshift(Beikz * fft2(self._A * shiftedWavefield, norm='ortho'))
-
-        if self._propagationDistanceInMeters < -FresnelPropagator.EPS:
+        if self._propagationDistanceInMeters < 0:
             Aeikz = self._A * self._eikz
-            return fftshift(Aeikz * ifft2(self._B * shiftedWavefield, norm='ortho'))
+            return Aeikz * fftshift(ifft2(ifftshift(self._B * inputWavefield), norm='ortho'))
+        elif self._propagationDistanceInMeters > 0:
+            Beikz = self._B * self._eikz
+            return Beikz * fftshift(fft2(ifftshift(self._A * inputWavefield), norm='ortho'))
 
         return inputWavefield
