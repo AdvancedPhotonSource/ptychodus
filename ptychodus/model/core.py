@@ -116,10 +116,7 @@ class ModelCore:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFile)
 
         if self._modelArgs.patternsFile:
-            patternsFile = self._modelArgs.patternsFile
-            self._patternsCore.patternsAPI.openPatterns(patternsFile,
-                                                        patternsFile.suffix[1:],
-                                                        assemble=True)
+            self._patternsCore.patternsAPI.openPreprocessedPatterns(self._modelArgs.patternsFile)
 
         self._patternsCore.start()
         self._workflowCore.start()

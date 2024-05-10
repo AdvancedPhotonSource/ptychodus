@@ -40,29 +40,33 @@ def main() -> int:
         help='replace file path prefix in settings',
     )
     parser.add_argument(
+        # input data product file (batch mode)
         '-i',
         '--input',
         metavar='INPUT_FILE',
-        help='input data product file (batch mode)',
         type=argparse.FileType('r'),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
+        # output data product file (batch mode)
         '-o',
         '--output',
         metavar='OUTPUT_FILE',
-        help='output data product file (batch mode)',
         type=argparse.FileType('w'),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
+        # preprocessed diffraction patterns file (batch mode)
         '-p',
         '--patterns',
         metavar='PATTERNS_FILE',
-        help='use diffraction patterns from file',
         type=argparse.FileType('r'),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         '-s',
         '--settings',
+        metavar='SETTINGS_FILE',
         help='use settings from file',
         type=argparse.FileType('r'),
     )

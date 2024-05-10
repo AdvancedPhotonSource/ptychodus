@@ -108,8 +108,8 @@ class ScanRepositoryItem(ParameterRepository):
     def _rebuild(self) -> None:
         try:
             scan = self._builder.build()
-        except Exception:
-            logger.exception('Failed to reinitialize scan!')
+        except Exception as exc:
+            logger.error(''.join(exc.args))
         else:
             self._untransformedScan = scan
             self._transformScan()
