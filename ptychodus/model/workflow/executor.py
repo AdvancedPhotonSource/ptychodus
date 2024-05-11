@@ -66,7 +66,7 @@ class WorkflowExecutor:
             return
 
         self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFile)
-        self._patternsAPI.savePatterns(inputDataPosixPath / patternsFile, productFileFilter)
+        self._patternsAPI.savePreprocessedPatterns(inputDataPosixPath / patternsFile)
         self._productAPI.saveProduct(inputProductIndex, inputDataPosixPath / inputFile,
                                      productFileFilter)
 

@@ -52,8 +52,8 @@ class ProbeRepositoryItem(ParameterRepository):
     def _rebuild(self) -> None:
         try:
             probe = self._builder.build(self._geometryProvider)
-        except Exception:
-            logger.exception('Failed to reinitialize probe!')
+        except Exception as exc:
+            logger.error(''.join(exc.args))
             return
 
         self._probe = self._additionalModesBuilder.build(probe)
