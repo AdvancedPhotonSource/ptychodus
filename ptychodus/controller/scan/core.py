@@ -2,19 +2,16 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
+from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ...api.observer import SequenceObserver
-from ...model.analysis import STXMAnalyzer
 from ...model.product import ScanAPI, ScanRepository
 from ...model.product.scan import ScanRepositoryItem
-from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTableView
 from ...view.scan import ScanPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from .editorFactory import ScanEditorViewControllerFactory
-from .stxm import STXMViewController
 from .tableModel import ScanTableModel
 
 logger = logging.getLogger(__name__)
@@ -23,10 +20,8 @@ logger = logging.getLogger(__name__)
 class ScanController(SequenceObserver[ScanRepositoryItem]):
 
     def __init__(self, repository: ScanRepository, api: ScanAPI, view: RepositoryTableView,
-                 plotView: ScanPlotView, stxmAnalyzer: STXMAnalyzer,
-                 stxmVisualizationEngine: VisualizationEngine, statusBar: QStatusBar,
-                 fileDialogFactory: FileDialogFactory, tableModel: ScanTableModel,
-                 proxyModel: QSortFilterProxyModel) -> None:
+                 plotView: ScanPlotView, fileDialogFactory: FileDialogFactory,
+                 tableModel: ScanTableModel, proxyModel: QSortFilterProxyModel) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
@@ -37,19 +32,15 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._proxyModel = proxyModel
         self._editorFactory = ScanEditorViewControllerFactory()
 
-        self._stxmViewController = STXMViewController(stxmAnalyzer, stxmVisualizationEngine,
-                                                      fileDialogFactory, statusBar, None)
-
     @classmethod
     def createInstance(cls, repository: ScanRepository, api: ScanAPI, view: RepositoryTableView,
-                       plotView: ScanPlotView, stxmAnalyzer: STXMAnalyzer,
-                       stxmVisualizationEngine: VisualizationEngine, statusBar: QStatusBar,
+                       plotView: ScanPlotView,
                        fileDialogFactory: FileDialogFactory) -> ScanController:
         tableModel = ScanTableModel(repository, api)
         proxyModel = QSortFilterProxyModel()
         proxyModel.setSourceModel(tableModel)
-        controller = cls(repository, api, view, plotView, stxmAnalyzer, stxmVisualizationEngine,
-                         statusBar, fileDialogFactory, tableModel, proxyModel)
+        controller = cls(repository, api, view, plotView, fileDialogFactory, tableModel,
+                         proxyModel)
         proxyModel.dataChanged.connect(
             lambda topLeft, bottomRight, roles: controller._redrawPlot())
         repository.addObserver(controller)
@@ -81,9 +72,6 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentScan)
         view.buttonBox.saveButton.clicked.connect(controller._saveCurrentScan)
-
-        stxmAction = view.buttonBox.analyzeMenu.addAction('STXM...')
-        stxmAction.triggered.connect(controller._analyzeSTXM)
 
         return controller
 
@@ -183,14 +171,6 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             self._plotView.axes.legend(loc='best')
 
         self._plotView.figureCanvas.draw()
-
-    def _analyzeSTXM(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
-
-        if itemIndex < 0:
-            logger.warning('No current item!')
-        else:
-            self._stxmViewController.analyze(itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

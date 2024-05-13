@@ -50,9 +50,6 @@ class ControllerCore:
                                                                    self._fileDialogFactory)
         self._scanController = ScanController.createInstance(model.scanRepository, model.scanAPI,
                                                              view.scanView, view.scanPlotView,
-                                                             model.stxmAnalyzer,
-                                                             model.stxmVisualizationEngine,
-                                                             view.statusBar(),
                                                              self._fileDialogFactory)
         self._probeImageController = ImageController.createInstance(model.probeVisualizationEngine,
                                                                     view.probeImageView,
@@ -60,16 +57,17 @@ class ControllerCore:
                                                                     self._fileDialogFactory)
         self._probeController = ProbeController.createInstance(
             model.probeRepository, model.probeAPI, self._probeImageController,
-            model.probePropagator, model.probePropagatorVisualizationEngine,
-            model.exposureAnalyzer, model.exposureVisualizationEngine, view.probeView,
+            model.probePropagator, model.probePropagatorVisualizationEngine, view.probeView,
             view.statusBar(), self._fileDialogFactory)
         self._objectImageController = ImageController.createInstance(
             model.objectVisualizationEngine, view.objectImageView, view.statusBar(),
             self._fileDialogFactory)
         self._objectController = ObjectController.createInstance(
             model.objectRepository, model.objectAPI, self._objectImageController,
-            model.fourierRingCorrelator, model.dichroicAnalyzer, model.dichroicVisualizationEngine,
-            view.objectView, view.statusBar(), self._fileDialogFactory)
+            model.fourierRingCorrelator, model.stxmAnalyzer, model.stxmVisualizationEngine,
+            model.exposureAnalyzer, model.exposureVisualizationEngine, model.xmcdAnalyzer,
+            model.xmcdVisualizationEngine, view.objectView, view.statusBar(),
+            self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,

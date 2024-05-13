@@ -2,7 +2,6 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeAlias
 import logging
 
 import numpy
@@ -11,10 +10,9 @@ import numpy.typing
 from ptychodus.api.parametric import ParameterRepository
 from ptychodus.api.probe import (Probe, ProbeFileReader, ProbeGeometry, ProbeGeometryProvider,
                                  WavefieldArrayType)
+from ptychodus.api.typing import RealArrayType
 
 logger = logging.getLogger(__name__)
-
-RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 
 
 @dataclass(frozen=True)

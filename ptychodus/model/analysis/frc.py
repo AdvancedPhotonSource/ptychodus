@@ -1,18 +1,17 @@
 from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, TypeAlias
 import logging
 
 import numpy
 import numpy.typing
 import scipy.fft
 
-from ...api.object import ObjectArrayType
-from ...api.visualization import Plot2D, PlotAxis, PlotSeries
-from ..product import ObjectRepository
+from ptychodus.api.object import ObjectArrayType
+from ptychodus.api.typing import IntegerArrayType
+from ptychodus.api.visualization import Plot2D, PlotAxis, PlotSeries
 
-IntegerArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+from ..product import ObjectRepository
 
 logger = logging.getLogger(__name__)
 

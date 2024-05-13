@@ -1,10 +1,10 @@
 from ..product import ObjectRepository, ProductRepository
 from ..visualization import VisualizationEngine
-from .dichroic import DichroicAnalyzer
 from .exposure import ExposureAnalyzer
 from .frc import FourierRingCorrelator
 from .propagator import ProbePropagator
 from .stxm import STXMAnalyzer
+from .xmcd import XMCDAnalyzer
 
 
 class AnalysisCore:
@@ -18,5 +18,5 @@ class AnalysisCore:
         self.exposureAnalyzer = ExposureAnalyzer(productRepository)
         self.exposureVisualizationEngine = VisualizationEngine(isComplex=False)
         self.fourierRingCorrelator = FourierRingCorrelator(objectRepository)
-        self.dichroicAnalyzer = DichroicAnalyzer(objectRepository)
-        self.dichroicVisualizationEngine = VisualizationEngine(isComplex=False)
+        self.xmcdAnalyzer = XMCDAnalyzer(objectRepository)
+        self.xmcdVisualizationEngine = VisualizationEngine(isComplex=False)

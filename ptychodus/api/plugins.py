@@ -15,6 +15,8 @@ from .patterns import DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from .product import ProductFileReader, ProductFileWriter
 from .scan import ScanFileReader, ScanFileWriter
+from .xrf import (DeconvolutionStrategy, FluorescenceFileReader, FluorescenceFileWriter,
+                  UpscalingStrategy)
 
 __all__ = [
     'PluginChooser',
@@ -111,6 +113,10 @@ class PluginRegistry:
         self.productFileReaders = PluginChooser[ProductFileReader]()
         self.productFileWriters = PluginChooser[ProductFileWriter]()
         self.fileBasedWorkflows = PluginChooser[FileBasedWorkflow]()
+        self.fluorescenceFileReaders = PluginChooser[FluorescenceFileReader]()
+        self.fluorescenceFileWriters = PluginChooser[FluorescenceFileWriter]()
+        self.upscalingStrategies = PluginChooser[UpscalingStrategy]()
+        self.deconvolutionStrategies = PluginChooser[DeconvolutionStrategy]()
 
     @classmethod
     def loadPlugins(cls) -> PluginRegistry:

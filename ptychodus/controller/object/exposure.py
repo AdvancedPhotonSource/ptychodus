@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QStatusBar, QWidget
 
 from ...model.analysis import ExposureAnalyzer, ExposureMap
 from ...model.visualization import VisualizationEngine
-from ...view.probe import ExposureDialog
+from ...view.object import ExposureDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..visualization import VisualizationParametersController, VisualizationWidgetController

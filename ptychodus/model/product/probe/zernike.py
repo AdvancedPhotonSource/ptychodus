@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, TypeAlias
 import logging
 
 import numpy
@@ -8,11 +7,10 @@ import numpy.typing
 import scipy.special
 
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
+from ptychodus.api.typing import RealArrayType
 
 from .builder import ProbeBuilder
 from .settings import ProbeSettings
-
-RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 
 logger = logging.getLogger(__name__)
 

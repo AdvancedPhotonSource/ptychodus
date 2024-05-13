@@ -94,35 +94,3 @@ class ProbePropagationDialog(QDialog):
             self.accept()
         else:
             self.reject()
-
-
-class ExposureDialog(QDialog):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.visualizationWidget = VisualizationWidget.createInstance('Exposure')
-        self.visualizationParametersView = VisualizationParametersView.createInstance()
-        self.saveButton = QPushButton('Save')
-        self.buttonBox = QDialogButtonBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ExposureDialog:
-        view = cls(parent)
-
-        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.visualizationWidget)
-        layout.addWidget(view.visualizationParametersView)
-        layout.addWidget(view.saveButton)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.accept()
-        else:
-            self.reject()

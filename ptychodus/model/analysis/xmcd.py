@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class DichroicResult:
+class XMCDResult:
     pixel_width_m: float
     pixel_height_m: float
     center_x_m: float
@@ -29,14 +29,14 @@ class DichroicResult:
         return PixelGeometry(self.pixel_width_m, self.pixel_height_m)
 
 
-class DichroicAnalyzer:
+class XMCDAnalyzer:
     # TODO feature request: want ability to align/add reconstructed slices
     #      of repeat scans for each polarization separately to improve statistics
 
     def __init__(self, repository: ObjectRepository) -> None:
         self._repository = repository
 
-    def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> DichroicResult:
+    def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> XMCDResult:
         lcircObject = self._repository[lcircItemIndex].getObject()
         rcircObject = self._repository[rcircItemIndex].getObject()
 
@@ -67,7 +67,7 @@ class DichroicAnalyzer:
                                    out=numpy.zeros_like(polar_sum),
                                    where=(polar_sum > 0))
 
-        return DichroicResult(
+        return XMCDResult(
             pixel_width_m=rcircObject.pixelWidthInMeters,
             pixel_height_m=rcircObject.pixelHeightInMeters,
             center_x_m=rcircObject.centerXInMeters,
@@ -83,7 +83,7 @@ class DichroicAnalyzer:
     def getSaveFileFilter(self) -> str:
         return 'NumPy Zipped Archive (*.npz)'
 
-    def saveResult(self, filePath: Path, result: DichroicResult) -> None:
+    def saveResult(self, filePath: Path, result: XMCDResult) -> None:
         numpy.savez(
             filePath,
             'pixel_height_m',

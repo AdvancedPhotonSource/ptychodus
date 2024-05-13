@@ -1,12 +1,11 @@
-from typing import Any, Final, TypeAlias
+from typing import Final
 
 from scipy.fft import fft2, fftshift, ifft2, ifftshift
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import WavefieldArrayType
-
-RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
+from ptychodus.api.typing import RealArrayType
 
 
 class FresnelPropagator:

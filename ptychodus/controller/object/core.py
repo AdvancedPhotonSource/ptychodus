@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
 
 from ptychodus.api.observer import SequenceObserver
 
-from ...model.analysis import DichroicAnalyzer, FourierRingCorrelator
+from ...model.analysis import ExposureAnalyzer, FourierRingCorrelator, STXMAnalyzer, XMCDAnalyzer
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
 from ...model.visualization import VisualizationEngine
@@ -14,20 +14,26 @@ from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
-from .dichroic import DichroicViewController
 from .editorFactory import ObjectEditorViewControllerFactory
+from .exposure import ExposureViewController
 from .frc import FourierRingCorrelationViewController
+from .stxm import STXMViewController
 from .treeModel import ObjectTreeModel
+from .xmcd import XMCDViewController
 
 logger = logging.getLogger(__name__)
+
+# FIXME qstatusbar to individual dialogs
 
 
 class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
     def __init__(self, repository: ObjectRepository, api: ObjectAPI,
                  imageController: ImageController, correlator: FourierRingCorrelator,
-                 dichroicAnalyzer: DichroicAnalyzer,
-                 dichroicVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
+                 stxmAnalyzer: STXMAnalyzer, stxmVisualizationEngine: VisualizationEngine,
+                 exposureAnalyzer: ExposureAnalyzer,
+                 exposureVisualizationEngine: VisualizationEngine, xmcdAnalyzer: XMCDAnalyzer,
+                 xmcdVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
                  statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
                  treeModel: ObjectTreeModel) -> None:
         super().__init__()
@@ -40,22 +46,29 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._editorFactory = ObjectEditorViewControllerFactory()
 
         self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel, None)
-        self._dichroicViewController = DichroicViewController(dichroicAnalyzer,
-                                                              dichroicVisualizationEngine,
-                                                              fileDialogFactory, treeModel,
-                                                              statusBar, None)
+        self._stxmViewController = STXMViewController(stxmAnalyzer, stxmVisualizationEngine,
+                                                      fileDialogFactory, statusBar, None)
+        self._exposureViewController = ExposureViewController(exposureAnalyzer,
+                                                              exposureVisualizationEngine,
+                                                              fileDialogFactory, statusBar, None)
+        self._xmcdViewController = XMCDViewController(xmcdAnalyzer, xmcdVisualizationEngine,
+                                                      fileDialogFactory, treeModel, statusBar,
+                                                      None)
 
     @classmethod
     def createInstance(cls, repository: ObjectRepository, api: ObjectAPI,
                        imageController: ImageController, correlator: FourierRingCorrelator,
-                       dichroicAnalyzer: DichroicAnalyzer,
-                       dichroicVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
-                       statusBar: QStatusBar,
+                       stxmAnalyzer: STXMAnalyzer, stxmVisualizationEngine: VisualizationEngine,
+                       exposureAnalyzer: ExposureAnalyzer,
+                       exposureVisualizationEngine: VisualizationEngine,
+                       xmcdAnalyzer: XMCDAnalyzer, xmcdVisualizationEngine: VisualizationEngine,
+                       view: RepositoryTreeView, statusBar: QStatusBar,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ObjectTreeModel(repository, api)
-        controller = cls(repository, api, imageController, correlator, dichroicAnalyzer,
-                         dichroicVisualizationEngine, view, statusBar, fileDialogFactory,
+        controller = cls(repository, api, imageController, correlator, stxmAnalyzer,
+                         stxmVisualizationEngine, exposureAnalyzer, exposureVisualizationEngine,
+                         xmcdAnalyzer, xmcdVisualizationEngine, view, statusBar, fileDialogFactory,
                          treeModel)
         repository.addObserver(controller)
 
@@ -86,8 +99,14 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         frcAction = view.buttonBox.analyzeMenu.addAction('Fourier Ring Correlation...')
         frcAction.triggered.connect(controller._analyzeFRC)
 
-        dichroicAction = view.buttonBox.analyzeMenu.addAction('Dichroic Analysis...')
-        dichroicAction.triggered.connect(controller._analyzeDichroic)
+        stxmAction = view.buttonBox.analyzeMenu.addAction('STXM...')
+        stxmAction.triggered.connect(controller._analyzeSTXM)
+
+        exposureAction = view.buttonBox.analyzeMenu.addAction('Exposure...')
+        exposureAction.triggered.connect(controller._analyzeExposure)
+
+        xmcdAction = view.buttonBox.analyzeMenu.addAction('XMCD...')
+        xmcdAction.triggered.connect(controller._analyzeXMCD)
 
         return controller
 
@@ -176,13 +195,29 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         else:
             self._frcViewController.analyze(itemIndex, itemIndex)
 
-    def _analyzeDichroic(self) -> None:
+    def _analyzeSTXM(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._dichroicViewController.analyze(itemIndex, itemIndex)
+            self._stxmViewController.analyze(itemIndex)
+
+    def _analyzeExposure(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            self._exposureViewController.analyze(itemIndex)
+
+    def _analyzeXMCD(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            self._xmcdViewController.analyze(itemIndex, itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

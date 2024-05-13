@@ -3,14 +3,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
 import numpy
-import numpy.typing
 
 from .geometry import ImageExtent, PixelGeometry
+from .typing import ComplexArrayType, RealArrayType
 
-WavefieldArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+WavefieldArrayType: TypeAlias = ComplexArrayType
 
 
 @dataclass(frozen=True)
@@ -179,6 +179,9 @@ class Probe:
 
     def getCoherence(self) -> float:
         return numpy.sqrt(numpy.sum(numpy.square(self._modeRelativePower)))
+
+    def getIntensity(self) -> RealArrayType:
+        return numpy.absolute(self._array).sum(axis=-3)
 
 
 class ProbeFileReader(ABC):

@@ -2,7 +2,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
-from typing import TypeAlias
 import logging
 
 import numpy
@@ -15,11 +14,10 @@ from ptychodus.api.object import ObjectArrayType
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
                                          TrainableReconstructor, TrainOutput)
+from ptychodus.api.typing import Float32ArrayType
 
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
-
-FloatArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +25,7 @@ logger = logging.getLogger(__name__)
 class PatternCircularBuffer:
 
     def __init__(self, extent: ImageExtent, maxSize: int) -> None:
-        self._buffer: FloatArrayType = numpy.zeros(
+        self._buffer: Float32ArrayType = numpy.zeros(
             (maxSize, *extent.shape),
             dtype=numpy.float32,
         )
@@ -42,7 +40,7 @@ class PatternCircularBuffer:
     def isZeroSized(self) -> bool:
         return (self._buffer.size == 0)
 
-    def append(self, array: FloatArrayType) -> None:
+    def append(self, array: Float32ArrayType) -> None:
         self._buffer[self._pos, :, :] = array
         self._pos += 1
 
@@ -50,14 +48,14 @@ class PatternCircularBuffer:
             self._pos = 0
             self._full = True
 
-    def getBuffer(self) -> FloatArrayType:
+    def getBuffer(self) -> Float32ArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
 
 
 class ObjectPatchCircularBuffer:
 
     def __init__(self, extent: ImageExtent, channels: int, maxSize: int) -> None:
-        self._buffer: FloatArrayType = numpy.zeros(
+        self._buffer: Float32ArrayType = numpy.zeros(
             (maxSize, channels, *extent.shape),
             dtype=numpy.float32,
         )
@@ -84,7 +82,7 @@ class ObjectPatchCircularBuffer:
             self._pos = 0
             self._full = True
 
-    def getBuffer(self) -> FloatArrayType:
+    def getBuffer(self) -> Float32ArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
 
 

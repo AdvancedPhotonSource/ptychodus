@@ -21,8 +21,8 @@ from ptychodus.api.patterns import DiffractionMetadata, DiffractionPatternArray
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 
-from .analysis import (AnalysisCore, DichroicAnalyzer, ExposureAnalyzer, FourierRingCorrelator,
-                       ProbePropagator, STXMAnalyzer)
+from .analysis import (AnalysisCore, ExposureAnalyzer, FourierRingCorrelator, ProbePropagator,
+                       STXMAnalyzer, XMCDAnalyzer)
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .memory import MemoryPresenter
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
@@ -287,12 +287,12 @@ class ModelCore:
         return self._analysisCore.fourierRingCorrelator
 
     @property
-    def dichroicAnalyzer(self) -> DichroicAnalyzer:
-        return self._analysisCore.dichroicAnalyzer
+    def xmcdAnalyzer(self) -> XMCDAnalyzer:
+        return self._analysisCore.xmcdAnalyzer
 
     @property
-    def dichroicVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.dichroicVisualizationEngine
+    def xmcdVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.xmcdVisualizationEngine
 
     @property
     def areWorkflowsSupported(self) -> bool:

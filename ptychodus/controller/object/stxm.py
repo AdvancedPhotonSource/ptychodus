@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QStatusBar, QWidget
 
 from ...model.analysis import STXMAnalyzer, STXMImage
 from ...model.visualization import VisualizationEngine
-from ...view.scan import STXMDialog
+from ...view.object import STXMDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..visualization import VisualizationParametersController, VisualizationWidgetController
