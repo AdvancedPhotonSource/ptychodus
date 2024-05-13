@@ -59,11 +59,33 @@ class FourierRingCorrelationDialog(QDialog):
             self.reject()
 
 
+class STXMNormalizationView(QGroupBox):
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__('Normalization', parent)
+        self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
+        self.photonFluxLineEdit = DecimalLineEdit.createInstance()
+        self.exposureTimeLineEdit = DecimalLineEdit.createInstance()
+
+    @classmethod
+    def createInstance(cls, parent: QWidget | None = None) -> STXMNormalizationView:
+        view = cls(parent)
+
+        layout = QFormLayout()
+        layout.addRow(view.quantitativeProbeCheckBox)
+        layout.addRow('Photon Flux [ph/s]:', view.photonFluxLineEdit)
+        layout.addRow('Exposure Time [s]:', view.exposureTimeLineEdit)
+        view.setLayout(layout)
+
+        return view
+
+
 class STXMDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.visualizationWidget = VisualizationWidget.createInstance('Transmission')
+        self.normalizationView = STXMNormalizationView.createInstance()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
         self.saveButton = QPushButton('Save')
         self.buttonBox = QDialogButtonBox()
@@ -76,6 +98,7 @@ class STXMDialog(QDialog):
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         parameterLayout = QVBoxLayout()
+        parameterLayout.addWidget(view.normalizationView)
         parameterLayout.addWidget(view.visualizationParametersView)
         parameterLayout.addWidget(view.saveButton)
         parameterLayout.addStretch()
@@ -102,18 +125,22 @@ class ExposureParametersView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Parameters', parent)
+        self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
+        self.photonFluxLineEdit = DecimalLineEdit.createInstance()
+        self.exposureTimeLineEdit = DecimalLineEdit.createInstance()
         self.massAttenuationLabel = QLabel('Mass Attenuation [m\u00B2/kg]:')
         self.massAttenuationLineEdit = DecimalLineEdit.createInstance()
-        self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ExposureParametersView:
         view = cls(parent)
 
         layout = QFormLayout()
+        layout.addRow(view.quantitativeProbeCheckBox)
+        layout.addRow('Photon Flux [ph/s]:', view.photonFluxLineEdit)
+        layout.addRow('Exposure Time [s]:', view.exposureTimeLineEdit)
         layout.addRow(view.massAttenuationLabel)
         layout.addRow(view.massAttenuationLineEdit)
-        layout.addRow(view.quantitativeProbeCheckBox)
         view.setLayout(layout)
 
         return view
