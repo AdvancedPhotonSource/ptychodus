@@ -1,25 +1,30 @@
 from pathlib import Path
-import logging
+from typing import Final
 
 import h5py
 import numpy
 
+from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.typing import RealArrayType
 from ptychodus.api.xrf import (ElementMap, FluorescenceDataset, FluorescenceFileReader,
                                FluorescenceFileWriter)
-from ptychodus.api.typing import RealArrayType
-
-logger = logging.getLogger(__name__)
 
 
-class FluorescenceDatasetReader(FluorescenceFileReader):  # FIXME
+class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
+    SIMPLE_NAME: Final[str] = 'XRF-Maps'
+    DISPLAY_NAME: Final[str] = 'XRF-Maps Fluorescence Dataset (*.h5 *.hdf5)'
 
-    def read(cls, file_path: Path) -> FluorescenceDataset:
-        logger.debug(f'Reading fluorescence data from \"{file_path}\"')
+    @staticmethod
+    def _split_path(data_path: str) -> tuple[str, str]:
+        parts = data_path.split('/')
+        return '/'.join(parts[:-1]), parts[-1]
+
+    def read(cls, filePath: Path) -> FluorescenceDataset:
         element_maps: dict[str, ElementMap] = dict()
         counts_per_second_path = str()
         channel_names_path = str()
 
-        with h5py.File(file_path, 'r') as h5file:
+        with h5py.File(filePath, 'r') as h5file:
             # try to see if v10 layout, Non Negative Lease squares fitting tech was used
             h5_counts_per_second = h5file['/MAPS/XRF_Analyzed/NNLS/Counts_Per_Sec']
             h5_channel_names = h5file['/MAPS/XRF_Analyzed/NNLS/Channel_Names']
@@ -54,15 +59,7 @@ class FluorescenceDatasetReader(FluorescenceFileReader):  # FIXME
             channel_names_path=channel_names_path,
         )
 
-
-class FluorescenceDatasetWriter(FluorescenceFileWriter):  # FIXME
-
-    @staticmethod
-    def _split_path(data_path: str) -> tuple[str, str]:
-        parts = data_path.split('/')
-        return '/'.join(parts[:-1]), parts[-1]
-
-    def write(self, file_path: Path, xrf: FluorescenceDataset) -> None:
+    def write(self, filePath: Path, xrf: FluorescenceDataset) -> None:
         channel_names: list[str] = list()
         counts_per_sec: list[RealArrayType] = list()
 
@@ -73,14 +70,35 @@ class FluorescenceDatasetWriter(FluorescenceFileWriter):  # FIXME
         cps_group_path, cps_dataset_name = self._split_path(xrf.counts_per_second_path)
         ch_group_path, ch_dataset_name = self._split_path(xrf.channel_names_path)
 
-        logger.info(f'Writing element maps to \"{file_path}\"')
-
-        with h5py.File(file_path, 'w') as h5file:
+        with h5py.File(filePath, 'w') as h5file:
             cps_group = h5file.require_group(cps_group_path)
             cps_group.create_dataset(cps_dataset_name, data=numpy.stack(counts_per_sec))
             ch_group = h5file.require_group(ch_group_path)
             ch_group.create_dataset(ch_dataset_name, data=channel_names, dtype='S256')
 
-    def write_npz(self, file_path: Path, xrf: FluorescenceDataset) -> None:
+
+class NPZFluorescenceFileWriter(FluorescenceFileWriter):
+
+    def write(self, filePath: Path, xrf: FluorescenceDataset) -> None:
         element_maps = {name: emap.counts_per_second for name, emap in xrf.element_maps.items()}
-        numpy.savez(file_path, **element_maps)
+        numpy.savez(filePath, **element_maps)
+
+
+def registerPlugins(registry: PluginRegistry) -> None:
+    xrfMapsFileIO = XRFMapsFileIO()
+
+    registry.fluorescenceFileReaders.registerPlugin(
+        xrfMapsFileIO,
+        simpleName=XRFMapsFileIO.SIMPLE_NAME,
+        displayName=XRFMapsFileIO.DISPLAY_NAME,
+    )
+    registry.fluorescenceFileWriters.registerPlugin(
+        xrfMapsFileIO,
+        simpleName=XRFMapsFileIO.SIMPLE_NAME,
+        displayName=XRFMapsFileIO.DISPLAY_NAME,
+    )
+    registry.fluorescenceFileWriters.registerPlugin(
+        NPZFluorescenceFileWriter(),
+        simpleName='NPZ',
+        displayName='NumPy Zipped Archive (*.npz)',
+    )

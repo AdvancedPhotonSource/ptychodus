@@ -1,10 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
-from importlib.metadata import version
 from pathlib import Path
 import logging
-import math
-import sys
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.xrf import (DeconvolutionStrategy, ElementMap, FluorescenceDataset,
