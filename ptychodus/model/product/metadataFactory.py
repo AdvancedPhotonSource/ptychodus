@@ -30,6 +30,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
             detectorDistanceInMeters=float(self._settings.detectorDistanceInMeters.value),
             probeEnergyInElectronVolts=float(self._settings.probeEnergyInElectronVolts.value),
             probePhotonsPerSecond=float(self._settings.probePhotonsPerSecond.value),
+            exposureTimeInSeconds=float(self._settings.exposureTimeInSeconds.value),
         )
         return self.create(metadata)
 

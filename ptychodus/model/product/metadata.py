@@ -29,6 +29,10 @@ class MetadataRepositoryItem(ParameterRepository):
         self.probePhotonsPerSecond = self._registerRealParameter('probe_photons_per_second',
                                                                  metadata.probePhotonsPerSecond,
                                                                  minimum=0.)
+        self.exposureTimeInSeconds = self._registerRealParameter('exposure_time_s',
+                                                                 metadata.exposureTimeInSeconds,
+                                                                 minimum=0.)
+
         self._index = -1
 
     def assign(self, item: MetadataRepositoryItem) -> None:
@@ -37,6 +41,7 @@ class MetadataRepositoryItem(ParameterRepository):
         self.detectorDistanceInMeters.setValue(item.detectorDistanceInMeters.getValue())
         self.probeEnergyInElectronVolts.setValue(item.probeEnergyInElectronVolts.getValue())
         self.probePhotonsPerSecond.setValue(item.probePhotonsPerSecond.getValue())
+        self.exposureTimeInSeconds.setValue(item.exposureTimeInSeconds.getValue())
 
     def getName(self) -> str:
         return self._name.getValue()
@@ -55,4 +60,5 @@ class MetadataRepositoryItem(ParameterRepository):
             detectorDistanceInMeters=self.detectorDistanceInMeters.getValue(),
             probeEnergyInElectronVolts=self.probeEnergyInElectronVolts.getValue(),
             probePhotonsPerSecond=self.probePhotonsPerSecond.getValue(),
+            exposureTimeInSeconds=self.exposureTimeInSeconds.getValue(),
         )

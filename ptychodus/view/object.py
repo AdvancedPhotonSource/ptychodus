@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFormLayout, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
                              QRadioButton, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -102,20 +102,45 @@ class ExposureParametersView(QGroupBox):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Parameters', parent)
-        self.photonsButton = QRadioButton('Photons Per Pixel')
-        self.exposureButton = QRadioButton('Exposure [J/m^2]')
-        self.doseButton = QRadioButton('Dose [Gy]')
+        self.massAttenuationLabel = QLabel('Mass Attenuation [m\u00B2/kg]:')
         self.massAttenuationLineEdit = DecimalLineEdit.createInstance()
+        self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ExposureParametersView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow(view.photonsButton)
-        layout.addRow(view.exposureButton)
-        layout.addRow(view.doseButton)
-        layout.addRow('Mass Attenuation\nCoefficient [m^2/kg]:', view.massAttenuationLineEdit)
+        layout.addRow(view.massAttenuationLabel)
+        layout.addRow(view.massAttenuationLineEdit)
+        layout.addRow(view.quantitativeProbeCheckBox)
+        view.setLayout(layout)
+
+        return view
+
+
+class ExposureQuantityView(QGroupBox):
+
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__('Quantity', parent)
+        self.photonCountButton = QRadioButton('Photon Count')
+        self.photonFluxButton = QRadioButton('Photon Flux [Hz]')
+        self.exposureButton = QRadioButton('Exposure [J/m\u00B2]')
+        self.irradianceButton = QRadioButton('Irradiance [W/m\u00B2]')
+        self.doseButton = QRadioButton('Dose [Gy]')
+        self.doseRateButton = QRadioButton('Dose Rate [Gy/s]')
+
+    @classmethod
+    def createInstance(cls, parent: QWidget | None = None) -> ExposureQuantityView:
+        view = cls(parent)
+
+        layout = QVBoxLayout()
+        layout.addWidget(view.photonCountButton)
+        layout.addWidget(view.photonFluxButton)
+        layout.addWidget(view.exposureButton)
+        layout.addWidget(view.irradianceButton)
+        layout.addWidget(view.doseButton)
+        layout.addWidget(view.doseRateButton)
         view.setLayout(layout)
 
         return view
@@ -125,8 +150,9 @@ class ExposureDialog(QDialog):
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.visualizationWidget = VisualizationWidget.createInstance('Exposure')
+        self.visualizationWidget = VisualizationWidget.createInstance('Visualization')
         self.exposureParametersView = ExposureParametersView.createInstance()
+        self.exposureQuantityView = ExposureQuantityView.createInstance()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
         self.saveButton = QPushButton('Save')
         self.buttonBox = QDialogButtonBox()
@@ -140,6 +166,7 @@ class ExposureDialog(QDialog):
 
         parameterLayout = QVBoxLayout()
         parameterLayout.addWidget(view.exposureParametersView)
+        parameterLayout.addWidget(view.exposureQuantityView)
         parameterLayout.addWidget(view.visualizationParametersView)
         parameterLayout.addWidget(view.saveButton)
         parameterLayout.addStretch()
