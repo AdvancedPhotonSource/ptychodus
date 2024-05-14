@@ -18,7 +18,7 @@ class ReconstructorCore:
                  diffractionDataset: ActiveDiffractionDataset,
                  productRepository: ProductRepository,
                  librarySeq: Sequence[ReconstructorLibrary]) -> None:
-        self.settings = ReconstructorSettings.createInstance(settingsRegistry)
+        self.settings = ReconstructorSettings(settingsRegistry)
         self._pluginChooser = PluginChooser[Reconstructor]()
 
         for library in librarySeq:

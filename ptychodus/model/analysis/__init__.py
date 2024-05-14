@@ -6,11 +6,13 @@ from .objectStitcher import ObjectStitcher
 from .propagator import PropagatedProbe, ProbePropagator
 from .stxm import STXMAnalyzer, STXMImage
 from .xmcd import XMCDAnalyzer, XMCDResult
+from .xrf import FluorescenceEnhancer
 
 __all__ = [
     'AnalysisCore',
     'ExposureAnalyzer',
     'ExposureMap',
+    'FluorescenceEnhancer',
     'FourierRingCorrelator',
     'ObjectLinearInterpolator',
     'ObjectStitcher',

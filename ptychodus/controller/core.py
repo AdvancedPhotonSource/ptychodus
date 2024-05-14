@@ -65,7 +65,8 @@ class ControllerCore:
         self._objectController = ObjectController.createInstance(
             model.objectRepository, model.objectAPI, self._objectImageController,
             model.fourierRingCorrelator, model.stxmAnalyzer, model.stxmVisualizationEngine,
-            model.exposureAnalyzer, model.exposureVisualizationEngine, model.xmcdAnalyzer,
+            model.exposureAnalyzer, model.exposureVisualizationEngine, model.fluorescenceEnhancer,
+            model.fluorescenceVisualizationEngine, model.xmcdAnalyzer,
             model.xmcdVisualizationEngine, view.objectView, view.statusBar(),
             self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(

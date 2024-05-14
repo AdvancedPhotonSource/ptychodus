@@ -1,22 +1,15 @@
-from __future__ import annotations
-
-from ...api.observer import Observable, Observer
-from ...api.settings import SettingsGroup, SettingsRegistry
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry
 
 
 class ReconstructorSettings(Observable, Observer):
 
-    def __init__(self, settingsGroup: SettingsGroup) -> None:
+    def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = settingsGroup
-        self.algorithm = settingsGroup.createStringEntry('Algorithm', 'Tike/lstsq_grad')
+        self._settingsGroup = registry.createGroup('Reconstructor')
+        self._settingsGroup.addObserver(self)
 
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> ReconstructorSettings:
-        settingsGroup = settingsRegistry.createGroup('Reconstructor')
-        settings = cls(settingsGroup)
-        settingsGroup.addObserver(settings)
-        return settings
+        self.algorithm = self._settingsGroup.createStringEntry('Algorithm', 'Tike/lstsq_grad')
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

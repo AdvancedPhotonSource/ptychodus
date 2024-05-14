@@ -21,8 +21,8 @@ from ptychodus.api.patterns import DiffractionMetadata, DiffractionPatternArray
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 
-from .analysis import (AnalysisCore, ExposureAnalyzer, FourierRingCorrelator, ProbePropagator,
-                       STXMAnalyzer, XMCDAnalyzer)
+from .analysis import (AnalysisCore, ExposureAnalyzer, FluorescenceEnhancer, FourierRingCorrelator,
+                       ProbePropagator, STXMAnalyzer, XMCDAnalyzer)
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .memory import MemoryPresenter
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
@@ -104,7 +104,11 @@ class ModelCore:
             ],
         )
         self._analysisCore = AnalysisCore(self._productCore.productRepository,
-                                          self._productCore.objectRepository)
+                                          self._productCore.objectRepository,
+                                          self._pluginRegistry.upscalingStrategies,
+                                          self._pluginRegistry.deconvolutionStrategies,
+                                          self._pluginRegistry.fluorescenceFileReaders,
+                                          self._pluginRegistry.fluorescenceFileWriters)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
                                           self._productCore.productAPI)
         self._automationCore = AutomationCore(
@@ -285,6 +289,14 @@ class ModelCore:
     @property
     def fourierRingCorrelator(self) -> FourierRingCorrelator:
         return self._analysisCore.fourierRingCorrelator
+
+    @property
+    def fluorescenceEnhancer(self) -> FluorescenceEnhancer:
+        return self._analysisCore.fluorescenceEnhancer
+
+    @property
+    def fluorescenceVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.fluorescenceVisualizationEngine
 
     @property
     def xmcdAnalyzer(self) -> XMCDAnalyzer:
