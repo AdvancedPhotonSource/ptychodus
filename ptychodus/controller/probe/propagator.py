@@ -1,8 +1,6 @@
 from decimal import Decimal
 import logging
 
-from PyQt5.QtWidgets import QStatusBar, QWidget
-
 from ...model.analysis import ProbePropagator, PropagatedProbe
 from ...model.visualization import VisualizationEngine
 from ...view.probe import ProbePropagationDialog
@@ -16,28 +14,27 @@ logger = logging.getLogger(__name__)
 class ProbePropagationViewController:
 
     def __init__(self, propagator: ProbePropagator, engine: VisualizationEngine,
-                 statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
-                 parent: QWidget | None) -> None:
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._propagator = propagator
         self._fileDialogFactory = fileDialogFactory
 
-        self._dialog = ProbePropagationDialog.createInstance(parent)
-        self._dialog.parametersView.beginCoordinateWidget.setLengthInMeters(Decimal('-0.01'))
-        self._dialog.parametersView.endCoordinateWidget.setLengthInMeters(Decimal('+0.01'))
+        self._dialog = ProbePropagationDialog()
+        self._dialog.parametersView.beginCoordinateWidget.setLengthInMeters(Decimal('-1e-3'))
+        self._dialog.parametersView.endCoordinateWidget.setLengthInMeters(Decimal('+1e-3'))
         self._dialog.parametersView.numberOfStepsSpinBox.setRange(1, 999)
         self._dialog.propagateButton.clicked.connect(self._repropagate)
         self._dialog.saveButton.clicked.connect(self._saveResult)
         self._dialog.coordinateSlider.valueChanged.connect(self._updateCurrentCoordinate)
 
         self._xyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.xyView, statusBar, fileDialogFactory)
+            engine, self._dialog.xyView, self._dialog.statusBar, fileDialogFactory)
         self._zxVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zxView, statusBar, fileDialogFactory)
+            engine, self._dialog.zxView, self._dialog.statusBar, fileDialogFactory)
         self._visualizationParametersController = VisualizationParametersController.createInstance(
             engine, self._dialog.parametersView.visualizationParametersView)
         self._zyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zyView, statusBar, fileDialogFactory)
+            engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory)
         self._result: PropagatedProbe | None = None
 
     def _updateCurrentCoordinate(self, step: int) -> None:

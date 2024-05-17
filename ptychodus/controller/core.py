@@ -58,7 +58,7 @@ class ControllerCore:
         self._probeController = ProbeController.createInstance(
             model.probeRepository, model.probeAPI, self._probeImageController,
             model.probePropagator, model.probePropagatorVisualizationEngine, view.probeView,
-            view.statusBar(), self._fileDialogFactory)
+            self._fileDialogFactory)
         self._objectImageController = ImageController.createInstance(
             model.objectVisualizationEngine, view.objectImageView, view.statusBar(),
             self._fileDialogFactory)
