@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
+from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
@@ -21,7 +21,7 @@ from .frc import FourierRingCorrelationViewController
 from .stxm import STXMViewController
 from .treeModel import ObjectTreeModel
 from .xmcd import XMCDViewController
-from .xrf import FluorescenceViewController
+from .fluorescence import FluorescenceViewController
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +36,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                  fluorescenceEnhancer: FluorescenceEnhancer,
                  fluorescenceVisualizationEngine: VisualizationEngine, xmcdAnalyzer: XMCDAnalyzer,
                  xmcdVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
-                 statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
-                 treeModel: ObjectTreeModel) -> None:
+                 fileDialogFactory: FileDialogFactory, treeModel: ObjectTreeModel) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
@@ -47,19 +46,16 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._treeModel = treeModel
         self._editorFactory = ObjectEditorViewControllerFactory()
 
-        # TODO qstatusbar to individual dialogs
-        self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel, None)
+        self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel)
         self._stxmViewController = STXMViewController(stxmAnalyzer, stxmVisualizationEngine,
-                                                      fileDialogFactory, statusBar, None)
+                                                      fileDialogFactory)
         self._exposureViewController = ExposureViewController(exposureAnalyzer,
                                                               exposureVisualizationEngine,
-                                                              fileDialogFactory, statusBar, None)
-        self._xrfViewController = FluorescenceViewController(fluorescenceEnhancer,
-                                                             fluorescenceVisualizationEngine,
-                                                             fileDialogFactory, statusBar, None)
+                                                              fileDialogFactory)
+        self._fluorescenceViewController = FluorescenceViewController(
+            fluorescenceEnhancer, fluorescenceVisualizationEngine, fileDialogFactory)
         self._xmcdViewController = XMCDViewController(xmcdAnalyzer, xmcdVisualizationEngine,
-                                                      fileDialogFactory, treeModel, statusBar,
-                                                      None)
+                                                      fileDialogFactory, treeModel)
 
     @classmethod
     def createInstance(cls, repository: ObjectRepository, api: ObjectAPI,
@@ -70,14 +66,14 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                        fluorescenceEnhancer: FluorescenceEnhancer,
                        fluorescenceVisualizationEngine: VisualizationEngine,
                        xmcdAnalyzer: XMCDAnalyzer, xmcdVisualizationEngine: VisualizationEngine,
-                       view: RepositoryTreeView, statusBar: QStatusBar,
+                       view: RepositoryTreeView,
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ObjectTreeModel(repository, api)
         controller = cls(repository, api, imageController, correlator, stxmAnalyzer,
                          stxmVisualizationEngine, exposureAnalyzer, exposureVisualizationEngine,
                          fluorescenceEnhancer, fluorescenceVisualizationEngine, xmcdAnalyzer,
-                         xmcdVisualizationEngine, view, statusBar, fileDialogFactory, treeModel)
+                         xmcdVisualizationEngine, view, fileDialogFactory, treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -113,8 +109,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         exposureAction = view.buttonBox.analyzeMenu.addAction('Exposure...')
         exposureAction.triggered.connect(controller._analyzeExposure)
 
-        xrfAction = view.buttonBox.analyzeMenu.addAction('Enhance XRF...')
-        xrfAction.triggered.connect(controller._enhanceXRF)
+        fluorescenceAction = view.buttonBox.analyzeMenu.addAction('Enhance Fluorescence...')
+        fluorescenceAction.triggered.connect(controller._enhanceFluorescence)
 
         xmcdAction = view.buttonBox.analyzeMenu.addAction('XMCD...')
         xmcdAction.triggered.connect(controller._analyzeXMCD)
@@ -222,13 +218,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         else:
             self._exposureViewController.analyze(itemIndex)
 
-    def _enhanceXRF(self) -> None:
+    def _enhanceFluorescence(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._xrfViewController.enhanceXRF(itemIndex)
+            self._fluorescenceViewController.enhanceFluorescence(itemIndex)
 
     def _analyzeXMCD(self) -> None:
         itemIndex = self._getCurrentItemIndex()

@@ -1,8 +1,8 @@
 import skimage.restoration
 
+from ptychodus.api.fluorescence import DeconvolutionStrategy, ElementMap
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.product import Product
-from ptychodus.api.xrf import DeconvolutionStrategy, ElementMap
 
 
 class IdentityDeconvolution(DeconvolutionStrategy):

@@ -6,8 +6,8 @@ import numpy
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.typing import RealArrayType
-from ptychodus.api.xrf import (ElementMap, FluorescenceDataset, FluorescenceFileReader,
-                               FluorescenceFileWriter)
+from ptychodus.api.fluorescence import (ElementMap, FluorescenceDataset, FluorescenceFileReader,
+                                        FluorescenceFileWriter)
 
 
 class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
@@ -59,16 +59,16 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
             channel_names_path=channel_names_path,
         )
 
-    def write(self, filePath: Path, xrf: FluorescenceDataset) -> None:
+    def write(self, filePath: Path, dataset: FluorescenceDataset) -> None:
         channel_names: list[str] = list()
         counts_per_sec: list[RealArrayType] = list()
 
-        for ch, emap in xrf.element_maps.items():
+        for ch, emap in dataset.element_maps.items():
             channel_names.append(ch)
             counts_per_sec.append(emap.counts_per_second)
 
-        cps_group_path, cps_dataset_name = self._split_path(xrf.counts_per_second_path)
-        ch_group_path, ch_dataset_name = self._split_path(xrf.channel_names_path)
+        cps_group_path, cps_dataset_name = self._split_path(dataset.counts_per_second_path)
+        ch_group_path, ch_dataset_name = self._split_path(dataset.channel_names_path)
 
         with h5py.File(filePath, 'w') as h5file:
             cps_group = h5file.require_group(cps_group_path)
@@ -79,8 +79,11 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
 
 class NPZFluorescenceFileWriter(FluorescenceFileWriter):
 
-    def write(self, filePath: Path, xrf: FluorescenceDataset) -> None:
-        element_maps = {name: emap.counts_per_second for name, emap in xrf.element_maps.items()}
+    def write(self, filePath: Path, dataset: FluorescenceDataset) -> None:
+        element_maps = {
+            name: emap.counts_per_second
+            for name, emap in dataset.element_maps.items()
+        }
         numpy.savez(filePath, **element_maps)
 
 

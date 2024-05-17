@@ -3,9 +3,10 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 import logging
 
+from ptychodus.api.fluorescence import (DeconvolutionStrategy, ElementMap, FluorescenceDataset,
+                                        FluorescenceFileReader, FluorescenceFileWriter,
+                                        UpscalingStrategy)
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.xrf import (DeconvolutionStrategy, ElementMap, FluorescenceDataset,
-                               FluorescenceFileReader, FluorescenceFileWriter, UpscalingStrategy)
 
 from ..product import ProductRepository
 

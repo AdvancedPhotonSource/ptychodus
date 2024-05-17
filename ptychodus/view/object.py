@@ -1,9 +1,6 @@
-from __future__ import annotations
-
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                             QFormLayout, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
-                             QRadioButton, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QGroupBox,
+                             QHBoxLayout, QLabel, QPushButton, QRadioButton, QStatusBar,
+                             QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -15,115 +12,76 @@ from .widgets import DecimalLineEdit
 
 class FourierRingCorrelationDialog(QDialog):
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.name1Label = QLabel('Name 1:')
-        self.name1ComboBox = QComboBox()
-        self.name2Label = QLabel('Name 2:')
-        self.name2ComboBox = QComboBox()
+        self.product1Label = QLabel('Product 1:')
+        self.product1ComboBox = QComboBox()
+        self.product2Label = QLabel('Product 2:')
+        self.product2ComboBox = QComboBox()
         self.figure = Figure()
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
-        self.buttonBox = QDialogButtonBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> FourierRingCorrelationDialog:
-        view = cls(parent)
-        view.setWindowTitle('Fourier Ring Correlation')
-
-        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         parametersLayout = QGridLayout()
-        parametersLayout.addWidget(view.name1Label, 0, 0)
-        parametersLayout.addWidget(view.name1ComboBox, 0, 1)
-        parametersLayout.addWidget(view.name2Label, 0, 2)
-        parametersLayout.addWidget(view.name2ComboBox, 0, 3)
+        parametersLayout.addWidget(self.product1Label, 0, 0)
+        parametersLayout.addWidget(self.product1ComboBox, 0, 1)
+        parametersLayout.addWidget(self.product2Label, 0, 2)
+        parametersLayout.addWidget(self.product2ComboBox, 0, 3)
         parametersLayout.setColumnStretch(1, 1)
         parametersLayout.setColumnStretch(3, 1)
 
         layout = QVBoxLayout()
+        layout.addWidget(self.navigationToolbar)
+        layout.addWidget(self.figureCanvas)
         layout.addLayout(parametersLayout)
-        layout.addWidget(view.navigationToolbar)
-        layout.addWidget(view.figureCanvas)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.accept()
-        else:
-            self.reject()
+        self.setLayout(layout)
 
 
 class STXMNormalizationView(QGroupBox):
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Normalization', parent)
         self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
         self.photonFluxLineEdit = DecimalLineEdit.createInstance()
         self.exposureTimeLineEdit = DecimalLineEdit.createInstance()
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> STXMNormalizationView:
-        view = cls(parent)
-
         layout = QFormLayout()
-        layout.addRow(view.quantitativeProbeCheckBox)
-        layout.addRow('Photon Flux [ph/s]:', view.photonFluxLineEdit)
-        layout.addRow('Exposure Time [s]:', view.exposureTimeLineEdit)
-        view.setLayout(layout)
-
-        return view
+        layout.addRow(self.quantitativeProbeCheckBox)
+        layout.addRow('Photon Flux [ph/s]:', self.photonFluxLineEdit)
+        layout.addRow('Exposure Time [s]:', self.exposureTimeLineEdit)
+        self.setLayout(layout)
 
 
 class STXMDialog(QDialog):
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.visualizationWidget = VisualizationWidget.createInstance('Transmission')
-        self.normalizationView = STXMNormalizationView.createInstance()
+        self.normalizationView = STXMNormalizationView()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
         self.saveButton = QPushButton('Save')
-        self.buttonBox = QDialogButtonBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> STXMDialog:
-        view = cls(parent)
-
-        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+        self.statusBar = QStatusBar()
 
         parameterLayout = QVBoxLayout()
-        parameterLayout.addWidget(view.normalizationView)
-        parameterLayout.addWidget(view.visualizationParametersView)
-        parameterLayout.addWidget(view.saveButton)
+        parameterLayout.addWidget(self.normalizationView)
+        parameterLayout.addWidget(self.visualizationParametersView)
+        parameterLayout.addWidget(self.saveButton)
         parameterLayout.addStretch()
 
         contentsLayout = QHBoxLayout()
-        contentsLayout.addWidget(view.visualizationWidget, 1)
+        contentsLayout.addWidget(self.visualizationWidget, 1)
         contentsLayout.addLayout(parameterLayout)
 
         layout = QVBoxLayout()
         layout.addLayout(contentsLayout)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.accept()
-        else:
-            self.reject()
+        layout.addWidget(self.statusBar)
+        self.setLayout(layout)
 
 
 class ExposureParametersView(QGroupBox):
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
         self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
         self.photonFluxLineEdit = DecimalLineEdit.createInstance()
@@ -131,24 +89,18 @@ class ExposureParametersView(QGroupBox):
         self.massAttenuationLabel = QLabel('Mass Attenuation [m\u00B2/kg]:')
         self.massAttenuationLineEdit = DecimalLineEdit.createInstance()
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ExposureParametersView:
-        view = cls(parent)
-
         layout = QFormLayout()
-        layout.addRow(view.quantitativeProbeCheckBox)
-        layout.addRow('Photon Flux [ph/s]:', view.photonFluxLineEdit)
-        layout.addRow('Exposure Time [s]:', view.exposureTimeLineEdit)
-        layout.addRow(view.massAttenuationLabel)
-        layout.addRow(view.massAttenuationLineEdit)
-        view.setLayout(layout)
-
-        return view
+        layout.addRow(self.quantitativeProbeCheckBox)
+        layout.addRow('Photon Flux [ph/s]:', self.photonFluxLineEdit)
+        layout.addRow('Exposure Time [s]:', self.exposureTimeLineEdit)
+        layout.addRow(self.massAttenuationLabel)
+        layout.addRow(self.massAttenuationLineEdit)
+        self.setLayout(layout)
 
 
 class ExposureQuantityView(QGroupBox):
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Quantity', parent)
         self.photonCountButton = QRadioButton('Photon Count')
         self.photonFluxButton = QRadioButton('Photon Flux [Hz]')
@@ -157,138 +109,96 @@ class ExposureQuantityView(QGroupBox):
         self.doseButton = QRadioButton('Dose [Gy]')
         self.doseRateButton = QRadioButton('Dose Rate [Gy/s]')
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ExposureQuantityView:
-        view = cls(parent)
-
         layout = QVBoxLayout()
-        layout.addWidget(view.photonCountButton)
-        layout.addWidget(view.photonFluxButton)
-        layout.addWidget(view.exposureButton)
-        layout.addWidget(view.irradianceButton)
-        layout.addWidget(view.doseButton)
-        layout.addWidget(view.doseRateButton)
-        view.setLayout(layout)
-
-        return view
+        layout.addWidget(self.photonCountButton)
+        layout.addWidget(self.photonFluxButton)
+        layout.addWidget(self.exposureButton)
+        layout.addWidget(self.irradianceButton)
+        layout.addWidget(self.doseButton)
+        layout.addWidget(self.doseRateButton)
+        self.setLayout(layout)
 
 
 class ExposureDialog(QDialog):
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.visualizationWidget = VisualizationWidget.createInstance('Visualization')
-        self.exposureParametersView = ExposureParametersView.createInstance()
-        self.exposureQuantityView = ExposureQuantityView.createInstance()
+        self.exposureParametersView = ExposureParametersView()
+        self.exposureQuantityView = ExposureQuantityView()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
         self.saveButton = QPushButton('Save')
-        self.buttonBox = QDialogButtonBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ExposureDialog:
-        view = cls(parent)
-
-        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+        self.statusBar = QStatusBar()
 
         parameterLayout = QVBoxLayout()
-        parameterLayout.addWidget(view.exposureParametersView)
-        parameterLayout.addWidget(view.exposureQuantityView)
-        parameterLayout.addWidget(view.visualizationParametersView)
-        parameterLayout.addWidget(view.saveButton)
+        parameterLayout.addWidget(self.exposureParametersView)
+        parameterLayout.addWidget(self.exposureQuantityView)
+        parameterLayout.addWidget(self.visualizationParametersView)
+        parameterLayout.addWidget(self.saveButton)
         parameterLayout.addStretch()
 
         contentsLayout = QHBoxLayout()
-        contentsLayout.addWidget(view.visualizationWidget, 1)
+        contentsLayout.addWidget(self.visualizationWidget, 1)
         contentsLayout.addLayout(parameterLayout)
 
         layout = QVBoxLayout()
         layout.addLayout(contentsLayout)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.accept()
-        else:
-            self.reject()
+        layout.addWidget(self.statusBar)
+        self.setLayout(layout)
 
 
 class FluorescenceParametersView(QGroupBox):
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
         self.channelComboBox = QComboBox()
         self.upscalingStrategyComboBox = QComboBox()
         self.deconvolutionStrategyComboBox = QComboBox()
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> FluorescenceParametersView:
-        view = cls(parent)
-
         layout = QFormLayout()
-        layout.addRow('Channel:', view.channelComboBox)
-        layout.addRow('Upscaling Strategy:', view.upscalingStrategyComboBox)
-        layout.addRow('Deconvolution Strategy:', view.deconvolutionStrategyComboBox)
-        view.setLayout(layout)
-
-        return view
+        layout.addRow('Channel:', self.channelComboBox)
+        layout.addRow('Upscaling Strategy:', self.upscalingStrategyComboBox)
+        layout.addRow('Deconvolution Strategy:', self.deconvolutionStrategyComboBox)
+        self.setLayout(layout)
 
 
 class FluorescenceDialog(QDialog):
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.measuredWidget = VisualizationWidget.createInstance('Measured')
         self.enhancedWidget = VisualizationWidget.createInstance('Enhanced')
-        self.fluorescenceParametersView = FluorescenceParametersView.createInstance()
+        self.fluorescenceParametersView = FluorescenceParametersView()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
         self.openButton = QPushButton('Open')
         self.saveButton = QPushButton('Save')
-        self.buttonBox = QDialogButtonBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> FluorescenceDialog:
-        view = cls(parent)
-
-        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+        self.statusBar = QStatusBar()
 
         buttonsLayout = QHBoxLayout()
-        buttonsLayout.addWidget(view.openButton)
-        buttonsLayout.addWidget(view.saveButton)
+        buttonsLayout.addWidget(self.openButton)
+        buttonsLayout.addWidget(self.saveButton)
 
         parameterLayout = QVBoxLayout()
-        parameterLayout.addWidget(view.fluorescenceParametersView)
-        parameterLayout.addWidget(view.visualizationParametersView)
+        parameterLayout.addWidget(self.fluorescenceParametersView)
+        parameterLayout.addWidget(self.visualizationParametersView)
         parameterLayout.addLayout(buttonsLayout)
         parameterLayout.addStretch()
 
         contentsLayout = QHBoxLayout()
-        contentsLayout.addWidget(view.measuredWidget, 1)
-        contentsLayout.addWidget(view.enhancedWidget, 1)
+        contentsLayout.addWidget(self.measuredWidget, 1)
+        contentsLayout.addWidget(self.enhancedWidget, 1)
         contentsLayout.addLayout(parameterLayout)
 
         layout = QVBoxLayout()
         layout.addLayout(contentsLayout)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.accept()
-        else:
-            self.reject()
+        layout.addWidget(self.statusBar)
+        self.setLayout(layout)
 
 
 class XMCDParametersView(QGroupBox):
 
-    def __init__(self, title: str, parent: QWidget | None) -> None:
-        super().__init__(title, parent)
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Parameters', parent)
 
         self.polarizationGroupBox = QGroupBox('Polarization')
         self.lcircComboBox = QComboBox()
@@ -296,59 +206,36 @@ class XMCDParametersView(QGroupBox):
         self.saveButton = QPushButton('Save')
         self.visualizationParametersView = VisualizationParametersView.createInstance()
 
-    @classmethod
-    def createInstance(cls, title: str, parent: QWidget | None = None) -> XMCDParametersView:
-        view = cls(title, parent)
-        view.setAlignment(Qt.AlignHCenter)
-
         polarizationLayout = QFormLayout()
-        polarizationLayout.addRow('Left Circular:', view.lcircComboBox)
-        polarizationLayout.addRow('Right Circular:', view.rcircComboBox)
-        polarizationLayout.addRow(view.saveButton)
-        view.polarizationGroupBox.setLayout(polarizationLayout)
+        polarizationLayout.addRow('Left Circular:', self.lcircComboBox)
+        polarizationLayout.addRow('Right Circular:', self.rcircComboBox)
+        polarizationLayout.addRow(self.saveButton)
+        self.polarizationGroupBox.setLayout(polarizationLayout)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.polarizationGroupBox)
-        layout.addWidget(view.visualizationParametersView)
+        layout.addWidget(self.polarizationGroupBox)
+        layout.addWidget(self.visualizationParametersView)
         layout.addStretch()
-        view.setLayout(layout)
-
-        return view
+        self.setLayout(layout)
 
 
 class XMCDDialog(QDialog):
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.differenceWidget = VisualizationWidget.createInstance('Difference')
         self.ratioWidget = VisualizationWidget.createInstance('Ratio')
         self.sumWidget = VisualizationWidget.createInstance('Sum')
-        self.parametersView = XMCDParametersView.createInstance('Parameters')
-        self.buttonBox = QDialogButtonBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> XMCDDialog:
-        view = cls(parent)
-        view.setWindowTitle('XMCD Analysis')
-
-        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+        self.parametersView = XMCDParametersView()
+        self.statusBar = QStatusBar()
 
         contentsLayout = QGridLayout()
-        contentsLayout.addWidget(view.differenceWidget, 0, 0)
-        contentsLayout.addWidget(view.ratioWidget, 0, 1)
-        contentsLayout.addWidget(view.sumWidget, 1, 0)
-        contentsLayout.addWidget(view.parametersView, 1, 1)
+        contentsLayout.addWidget(self.differenceWidget, 0, 0)
+        contentsLayout.addWidget(self.ratioWidget, 0, 1)
+        contentsLayout.addWidget(self.sumWidget, 1, 0)
+        contentsLayout.addWidget(self.parametersView, 1, 1)
 
         layout = QVBoxLayout()
         layout.addLayout(contentsLayout)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.accept()
-        else:
-            self.reject()
+        layout.addWidget(self.statusBar)
+        self.setLayout(layout)

@@ -67,8 +67,7 @@ class ControllerCore:
             model.fourierRingCorrelator, model.stxmAnalyzer, model.stxmVisualizationEngine,
             model.exposureAnalyzer, model.exposureVisualizationEngine, model.fluorescenceEnhancer,
             model.fluorescenceVisualizationEngine, model.xmcdAnalyzer,
-            model.xmcdVisualizationEngine, view.objectView, view.statusBar(),
-            self._fileDialogFactory)
+            model.xmcdVisualizationEngine, view.objectView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,

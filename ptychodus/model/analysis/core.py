@@ -1,15 +1,15 @@
+from ptychodus.api.fluorescence import (DeconvolutionStrategy, FluorescenceFileReader,
+                                        FluorescenceFileWriter, UpscalingStrategy)
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.xrf import (DeconvolutionStrategy, FluorescenceFileReader,
-                               FluorescenceFileWriter, UpscalingStrategy)
 
 from ..product import ObjectRepository, ProductRepository
 from ..visualization import VisualizationEngine
 from .exposure import ExposureAnalyzer
+from .fluorescence import FluorescenceEnhancer
 from .frc import FourierRingCorrelator
 from .propagator import ProbePropagator
 from .stxm import STXMAnalyzer
 from .xmcd import XMCDAnalyzer
-from .xrf import FluorescenceEnhancer
 
 
 class AnalysisCore:

@@ -1,7 +1,5 @@
 import logging
 
-from PyQt5.QtWidgets import QStatusBar, QWidget
-
 from ...model.analysis import XMCDAnalyzer, XMCDResult
 from ...model.visualization import VisualizationEngine
 from ...view.object import XMCDDialog
@@ -16,13 +14,13 @@ logger = logging.getLogger(__name__)
 class XMCDViewController:
 
     def __init__(self, analyzer: XMCDAnalyzer, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory, treeModel: ObjectTreeModel,
-                 statusBar: QStatusBar, parent: QWidget | None) -> None:
+                 fileDialogFactory: FileDialogFactory, treeModel: ObjectTreeModel) -> None:
         super().__init__()
         self._analyzer = analyzer
         self._engine = engine
         self._fileDialogFactory = fileDialogFactory
-        self._dialog = XMCDDialog.createInstance(parent)
+        self._dialog = XMCDDialog()
+        self._dialog.setWindowTitle('XMCD Analysis')
         self._dialog.parametersView.lcircComboBox.setModel(treeModel)
         self._dialog.parametersView.lcircComboBox.currentIndexChanged.connect(self._analyze)
         self._dialog.parametersView.rcircComboBox.setModel(treeModel)
@@ -30,11 +28,11 @@ class XMCDViewController:
         self._dialog.parametersView.saveButton.clicked.connect(self._saveResult)
 
         self._differenceVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.differenceWidget, statusBar, fileDialogFactory)
+            engine, self._dialog.differenceWidget, self._dialog.statusBar, fileDialogFactory)
         self._sumVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.sumWidget, statusBar, fileDialogFactory)
+            engine, self._dialog.sumWidget, self._dialog.statusBar, fileDialogFactory)
         self._ratioVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.ratioWidget, statusBar, fileDialogFactory)
+            engine, self._dialog.ratioWidget, self._dialog.statusBar, fileDialogFactory)
         self._visualizationParametersController = VisualizationParametersController.createInstance(
             engine, self._dialog.parametersView.visualizationParametersView)
         self._result: XMCDResult | None = None

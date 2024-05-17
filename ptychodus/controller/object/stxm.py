@@ -1,7 +1,5 @@
 import logging
 
-from PyQt5.QtWidgets import QStatusBar, QWidget
-
 from ...model.analysis import STXMAnalyzer, STXMImage
 from ...model.visualization import VisualizationEngine
 from ...view.object import STXMDialog
@@ -15,17 +13,16 @@ logger = logging.getLogger(__name__)
 class STXMViewController:
 
     def __init__(self, analyzer: STXMAnalyzer, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory, statusBar: QStatusBar,
-                 parent: QWidget | None) -> None:
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._analyzer = analyzer
         self._engine = engine
         self._fileDialogFactory = fileDialogFactory
-        self._dialog = STXMDialog.createInstance(parent)
+        self._dialog = STXMDialog()
         self._dialog.saveButton.clicked.connect(self._saveResult)
 
         self._visualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.visualizationWidget, statusBar, fileDialogFactory)
+            engine, self._dialog.visualizationWidget, self._dialog.statusBar, fileDialogFactory)
         self._visualizationParametersController = VisualizationParametersController.createInstance(
             engine, self._dialog.visualizationParametersView)
         self._result: STXMImage | None = None

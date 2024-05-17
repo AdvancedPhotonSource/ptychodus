@@ -1,12 +1,12 @@
 from scipy.interpolate import griddata, RBFInterpolator
 import numpy
 
+from ptychodus.api.fluorescence import ElementMap, UpscalingStrategy
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.product import Product
 from ptychodus.api.scan import Scan
 from ptychodus.api.typing import RealArrayType
-from ptychodus.api.xrf import ElementMap, UpscalingStrategy
 
 
 def _scan_to_array(scan: Scan) -> RealArrayType:

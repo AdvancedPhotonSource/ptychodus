@@ -1,7 +1,5 @@
 import logging
 
-from PyQt5.QtWidgets import QStatusBar, QWidget
-
 from ...model.analysis import FluorescenceEnhancer
 from ...model.visualization import VisualizationEngine
 from ...view.object import FluorescenceDialog
@@ -14,22 +12,20 @@ logger = logging.getLogger(__name__)
 class FluorescenceViewController:
 
     def __init__(self, enhancer: FluorescenceEnhancer, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory, statusBar: QStatusBar,
-                 parent: QWidget | None) -> None:
+                 fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._enhancer = enhancer
         self._engine = engine
         self._fileDialogFactory = fileDialogFactory
-        self._statusBar = statusBar
-        self._dialog = FluorescenceDialog.createInstance(parent)
+        self._dialog = FluorescenceDialog()
 
         self._measuredWidgetController = VisualizationWidgetController(
-            engine, self._dialog.measuredWidget, statusBar, fileDialogFactory)
+            engine, self._dialog.measuredWidget, self._dialog.statusBar, fileDialogFactory)
         self._enhancedWidgetController = VisualizationWidgetController(
-            engine, self._dialog.enhancedWidget, statusBar, fileDialogFactory)
+            engine, self._dialog.enhancedWidget, self._dialog.statusBar, fileDialogFactory)
         self._visualizationParametersController = VisualizationParametersController.createInstance(
             engine, self._dialog.visualizationParametersView)
 
-    def enhanceXRF(self, itemIndex: int) -> None:
+    def enhanceFluorescence(self, itemIndex: int) -> None:
         print(itemIndex)  # FIXME
         self._dialog.open()

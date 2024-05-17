@@ -9,14 +9,14 @@ import pkgutil
 import re
 
 from .automation import FileBasedWorkflow
+from .fluorescence import (DeconvolutionStrategy, FluorescenceFileReader, FluorescenceFileWriter,
+                           UpscalingStrategy)
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from .product import ProductFileReader, ProductFileWriter
 from .scan import ScanFileReader, ScanFileWriter
-from .xrf import (DeconvolutionStrategy, FluorescenceFileReader, FluorescenceFileWriter,
-                  UpscalingStrategy)
 
 __all__ = [
     'PluginChooser',
