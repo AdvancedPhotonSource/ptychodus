@@ -4,6 +4,7 @@ h5py =3.*
 hdf5plugin
 matplotlib-base =3.*
 numpy =1.*
+mpi =*=openmpi*
 pip
 psutil =5.*
 ptychonn =0.2.*
