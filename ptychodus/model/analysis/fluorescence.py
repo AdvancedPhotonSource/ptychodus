@@ -21,22 +21,25 @@ class FluorescenceEnhancer(Observable, Observer):
                  upscalingStrategyChooser: PluginChooser[UpscalingStrategy],
                  deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
                  fileReaderChooser: PluginChooser[FluorescenceFileReader],
-                 fileWriterChooser: PluginChooser[FluorescenceFileWriter],
-                 reinitObservable: Observable) -> None:
+                 fileWriterChooser: PluginChooser[FluorescenceFileWriter]) -> None:
+        super().__init__()
         self._settings = settings
         self._repository = repository
-        # FIXME vvv get/set & sync to/from settings vvv
         self._upscalingStrategyChooser = upscalingStrategyChooser
         self._deconvolutionStrategyChooser = deconvolutionStrategyChooser
-        # FIXME ^^^^^
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
-        self._reinitObservable = reinitObservable
+
+        self._productIndex: int | None = None
         self._measured: FluorescenceDataset | None = None
         self._enhanced: FluorescenceDataset | None = None
 
-        reinitObservable.addObserver(self)
-        self._syncFromSettings()
+        upscalingStrategyChooser.addObserver(self)
+        upscalingStrategyChooser.setCurrentPluginByName(settings.upscalingStrategy.value)
+        deconvolutionStrategyChooser.addObserver(self)
+        deconvolutionStrategyChooser.setCurrentPluginByName(settings.deconvolutionStrategy.value)
+        fileReaderChooser.setCurrentPluginByName(settings.fileType.value)
+        fileWriterChooser.setCurrentPluginByName(settings.fileType.value)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -58,6 +61,9 @@ class FluorescenceEnhancer(Observable, Observer):
             else:
                 self._measured = measured
                 self._enhanced = None
+
+                self._settings.filePath.value = filePath
+                self._settings.fileType.value = fileType
         else:
             logger.warning(f'Refusing to load dataset from invalid file path \"{filePath}\"')
 
@@ -70,13 +76,32 @@ class FluorescenceEnhancer(Observable, Observer):
 
         return self._measured.element_maps[channelIndex]
 
-    def enhanceFluorescence(self, itemIndex: int) -> None:
+    def getUpscalingStrategyList(self) -> Sequence[str]:
+        return self._upscalingStrategyChooser.getDisplayNameList()
+
+    def getUpscalingStrategy(self) -> str:
+        return self._upscalingStrategyChooser.currentPlugin.displayName
+
+    def setUpscalingStrategy(self, name: str) -> None:
+        self._upscalingStrategyChooser.setCurrentPluginByName(name)
+
+    def getDeconvolutionStrategyList(self) -> Sequence[str]:
+        return self._deconvolutionStrategyChooser.getDisplayNameList()
+
+    def getDeconvolutionStrategy(self) -> str:
+        return self._deconvolutionStrategyChooser.currentPlugin.displayName
+
+    def setDeconvolutionStrategy(self, name: str) -> None:
+        self._deconvolutionStrategyChooser.setCurrentPluginByName(name)
+
+    def enhanceFluorescence(self, productIndex: int) -> str:
+        item = self._repository[productIndex]
+
         if self._measured is None:
-            logger.debug('Fluorescence dataset not loaded!')
-            return
+            raise ValueError('Fluorescence dataset not loaded!')
 
         element_maps: list[ElementMap] = list()
-        product = self._repository[itemIndex].getProduct()
+        product = item.getProduct()
         upscaler = self._upscalingStrategyChooser.currentPlugin.strategy
         deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
 
@@ -86,11 +111,14 @@ class FluorescenceEnhancer(Observable, Observer):
             emap_enhanced = deconvolver(emap_upscaled, product)
             element_maps.append(emap_enhanced)
 
+        self._productIndex = productIndex
         self._enhanced = FluorescenceDataset(
             element_maps=element_maps,
             counts_per_second_path=self._measured.counts_per_second_path,
             channel_names_path=self._measured.channel_names_path,
         )
+
+        return item.getName()
 
     def getEnhancedElementMap(self, channelIndex: int) -> ElementMap:
         if self._enhanced is None:
@@ -105,24 +133,21 @@ class FluorescenceEnhancer(Observable, Observer):
         return self._fileWriterChooser.currentPlugin.displayName
 
     def saveEnhancedDataset(self, filePath: Path, fileFilter: str) -> None:
+        if self._enhanced is None:
+            raise ValueError('Fluorescence dataset not enhanced!')
+
         self._fileWriterChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.currentPlugin.strategy
-
-        if self._enhanced is None:
-            raise ValueError('Fluorescence dataset not enhanced!')
-        else:
-            writer.write(filePath, self._enhanced)
-
-    def _syncFromSettings(self) -> None:
-        self._upscalingStrategyChooser.setCurrentPluginByName(
-            self._settings.upscalingStrategy.value)
-        self._deconvolutionStrategyChooser.setCurrentPluginByName(
-            self._settings.deconvolutionStrategy.value)
-        self._fileReaderChooser.setCurrentPluginByName(self._settings.fileType.value)
-        self._fileWriterChooser.setCurrentPluginByName(self._settings.fileType.value)
+        writer.write(filePath, self._enhanced)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._reinitObservable:
-            self._syncFromSettings()
+        if observable is self._upscalingStrategyChooser:
+            self._settings.upscalingStrategy.value = \
+                    self._upscalingStrategyChooser.currentPlugin.simpleName
+            self.notifyObservers()
+        elif observable is self._deconvolutionStrategyChooser:
+            self._settings.deconvolutionStrategy.value = \
+                    self._deconvolutionStrategyChooser.currentPlugin.simpleName
+            self.notifyObservers()

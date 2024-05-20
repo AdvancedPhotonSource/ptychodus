@@ -94,7 +94,7 @@ class ProbePropagationViewController:  # FIXME like Fluorescence
             logger.debug('No result to show!')
             return
 
-        itemName = self._result.itemName
+        itemName = self._result.itemName  # FIXME = self._propagator.propagate(...)
         self._dialog.setWindowTitle(f'Propagate Probe: {itemName}')
         self._dialog.open()
 

@@ -4,7 +4,7 @@ from .fluorescence import FluorescenceEnhancer
 from .frc import FourierRingCorrelator
 from .objectInterpolator import ObjectLinearInterpolator
 from .objectStitcher import ObjectStitcher
-from .propagator import PropagatedProbe, ProbePropagator
+from .propagator import ProbePropagator
 from .stxm import STXMAnalyzer, STXMImage
 from .xmcd import XMCDAnalyzer, XMCDResult
 
@@ -17,7 +17,6 @@ __all__ = [
     'ObjectLinearInterpolator',
     'ObjectStitcher',
     'ProbePropagator',
-    'PropagatedProbe',
     'STXMAnalyzer',
     'STXMImage',
     'XMCDAnalyzer',
