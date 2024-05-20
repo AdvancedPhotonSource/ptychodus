@@ -20,7 +20,7 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
         return '/'.join(parts[:-1]), parts[-1]
 
     def read(cls, filePath: Path) -> FluorescenceDataset:
-        element_maps: dict[str, ElementMap] = dict()
+        element_maps: list[ElementMap] = list()
         counts_per_second_path = str()
         channel_names_path = str()
 
@@ -48,7 +48,8 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
                 for bname, cps in zip(channel_names, counts_per_second):
                     string_info = h5py.check_string_dtype(bname.dtype)
                     name = bname.decode(string_info.encoding)
-                    element_maps[name] = ElementMap(cps)
+                    emap = ElementMap(name, cps)
+                    element_maps.append(emap)
 
             counts_per_second_path = h5_counts_per_second.name
             channel_names_path = h5_channel_names.name
@@ -63,8 +64,8 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
         channel_names: list[str] = list()
         counts_per_sec: list[RealArrayType] = list()
 
-        for ch, emap in dataset.element_maps.items():
-            channel_names.append(ch)
+        for emap in dataset.element_maps:
+            channel_names.append(emap.name)
             counts_per_sec.append(emap.counts_per_second)
 
         cps_group_path, cps_dataset_name = self._split_path(dataset.counts_per_second_path)
@@ -80,10 +81,7 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
 class NPZFluorescenceFileWriter(FluorescenceFileWriter):
 
     def write(self, filePath: Path, dataset: FluorescenceDataset) -> None:
-        element_maps = {
-            name: emap.counts_per_second
-            for name, emap in dataset.element_maps.items()
-        }
+        element_maps = {emap.name: emap.counts_per_second for emap in dataset.element_maps}
         numpy.savez(filePath, **element_maps)
 
 

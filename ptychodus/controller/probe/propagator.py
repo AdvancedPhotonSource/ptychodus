@@ -11,7 +11,7 @@ from ..visualization import VisualizationParametersController, VisualizationWidg
 logger = logging.getLogger(__name__)
 
 
-class ProbePropagationViewController:
+class ProbePropagationViewController:  # FIXME like Fluorescence
 
     def __init__(self, propagator: ProbePropagator, engine: VisualizationEngine,
                  fileDialogFactory: FileDialogFactory) -> None:

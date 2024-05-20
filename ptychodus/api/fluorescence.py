@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,12 +9,13 @@ from .typing import RealArrayType
 
 @dataclass(frozen=True)
 class ElementMap:
+    name: str
     counts_per_second: RealArrayType
 
 
 @dataclass(frozen=True)
 class FluorescenceDataset:
-    element_maps: Mapping[str, ElementMap]
+    element_maps: Sequence[ElementMap]
     counts_per_second_path: str
     channel_names_path: str
 
@@ -27,7 +28,7 @@ class FluorescenceFileReader(ABC):
 
     @abstractmethod
     def read(self, filePath: Path) -> FluorescenceDataset:
-        '''reads an xrf dataset from file'''
+        '''reads a fluorescence dataset from file'''
         pass
 
 
@@ -35,7 +36,7 @@ class FluorescenceFileWriter(ABC):
 
     @abstractmethod
     def write(self, filePath: Path, dataset: FluorescenceDataset) -> None:
-        '''writes an xrf dataset to file'''
+        '''writes a fluorescence dataset to file'''
         pass
 
 

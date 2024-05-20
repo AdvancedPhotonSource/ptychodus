@@ -53,7 +53,7 @@ class GridDataUpscaling(UpscalingStrategy):
             method=self._method,
             fill_value=0.,
         )
-        return ElementMap(cps.astype(emap.counts_per_second.dtype))
+        return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype))
 
 
 class RadialBasisFunctionUpscaling(UpscalingStrategy):
@@ -80,7 +80,8 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
         )
         grid_y, grid_x = _object_coordinates_yx(product.object_)
         cps = interpolator(numpy.transpose((grid_y.flat, grid_x.flat)))
-        return ElementMap(cps.astype(emap.counts_per_second.dtype).reshape(grid_x.shape))
+        return ElementMap(emap.name,
+                          cps.astype(emap.counts_per_second.dtype).reshape(grid_x.shape))
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

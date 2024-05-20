@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 import logging
 
-from ...api.plugins import PluginChooser
-from ...api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
-from ...api.settings import SettingsRegistry
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
+from ptychodus.api.settings import SettingsRegistry
+
 from ..patterns import ActiveDiffractionDataset
 from ..product import ProductRepository
 from .presenter import ReconstructorPresenter

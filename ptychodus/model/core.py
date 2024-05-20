@@ -103,7 +103,8 @@ class ModelCore:
                 self.ptychonnReconstructorLibrary,
             ],
         )
-        self._analysisCore = AnalysisCore(self._productCore.productRepository,
+        self._analysisCore = AnalysisCore(self.settingsRegistry,
+                                          self._productCore.productRepository,
                                           self._productCore.objectRepository,
                                           self._pluginRegistry.upscalingStrategies,
                                           self._pluginRegistry.deconvolutionStrategies,

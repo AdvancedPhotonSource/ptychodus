@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QPushButton, QRadioButton, QStatusBar,
+                             QHBoxLayout, QLabel, QListView, QPushButton, QRadioButton, QStatusBar,
                              QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -151,14 +151,18 @@ class FluorescenceParametersView(QGroupBox):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
-        self.channelComboBox = QComboBox()
+        self.openButton = QPushButton('Open')
         self.upscalingStrategyComboBox = QComboBox()
         self.deconvolutionStrategyComboBox = QComboBox()
+        self.enhanceButton = QPushButton('Enhance')
+        self.saveButton = QPushButton('Save')
 
         layout = QFormLayout()
-        layout.addRow('Channel:', self.channelComboBox)
+        layout.addRow('Measured Dataset:', self.openButton)
         layout.addRow('Upscaling Strategy:', self.upscalingStrategyComboBox)
         layout.addRow('Deconvolution Strategy:', self.deconvolutionStrategyComboBox)
+        layout.addRow(self.enhanceButton)
+        layout.addRow('Enhanced Dataset:', self.saveButton)
         self.setLayout(layout)
 
 
@@ -169,19 +173,14 @@ class FluorescenceDialog(QDialog):
         self.measuredWidget = VisualizationWidget.createInstance('Measured')
         self.enhancedWidget = VisualizationWidget.createInstance('Enhanced')
         self.fluorescenceParametersView = FluorescenceParametersView()
+        self.fluorescenceChannelListView = QListView()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
-        self.openButton = QPushButton('Open')
-        self.saveButton = QPushButton('Save')
         self.statusBar = QStatusBar()
-
-        buttonsLayout = QHBoxLayout()
-        buttonsLayout.addWidget(self.openButton)
-        buttonsLayout.addWidget(self.saveButton)
 
         parameterLayout = QVBoxLayout()
         parameterLayout.addWidget(self.fluorescenceParametersView)
+        parameterLayout.addWidget(self.fluorescenceChannelListView, 1)
         parameterLayout.addWidget(self.visualizationParametersView)
-        parameterLayout.addLayout(buttonsLayout)
         parameterLayout.addStretch()
 
         contentsLayout = QHBoxLayout()
