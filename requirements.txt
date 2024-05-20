@@ -3,8 +3,8 @@ gladier-tools >=0.5
 h5py =3.*
 hdf5plugin
 matplotlib-base =3.*
-mpi =*=openmpi*
 numpy =1.*
+nompi
 pip
 psutil =5.*
 ptychonn =0.2.*
