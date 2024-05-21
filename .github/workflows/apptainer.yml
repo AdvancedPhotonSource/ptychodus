@@ -20,11 +20,13 @@ jobs:
     strategy:
         matrix:
           cuda-version:
-            - "11.8"
             - "12.0"
           target-arch:
             - "x86_64"
             - "aarch64"
+          include:
+            - target-arch: "x86_64"
+              cuda-version: "11.8"
     steps:
     - uses: actions/checkout@v4
     - name: Set up QEMU
