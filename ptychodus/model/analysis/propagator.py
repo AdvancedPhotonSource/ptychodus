@@ -39,7 +39,6 @@ class ProbePropagator(Observable):
 
     def propagate(self, *, beginCoordinateInMeters: Decimal, endCoordinateInMeters: Decimal,
                   numberOfSteps: int) -> None:
-        # FIXME verify multimodal probes
         item = self._repository[self._productIndex]
         probe = item.getProbe().getProbe()
         wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
@@ -53,7 +52,7 @@ class ProbePropagator(Observable):
         for idx, zInMeters in enumerate(distanceInMeters):
             propagator = FresnelPropagator(probe.array.shape[-2:], probe.getPixelGeometry(),
                                            zInMeters, wavelengthInMeters)
-            wf = propagator.propagate(probe.array[-2:])
+            wf = propagator.propagate(probe.array[0])
             propagatedWavefield[idx, :, :] = wf
 
         self._settings.beginCoordinateInMeters.value = beginCoordinateInMeters
@@ -68,7 +67,6 @@ class ProbePropagator(Observable):
         return self._settings.endCoordinateInMeters.value
 
     def _getProbe(self) -> Probe:
-        # FIXME handle case of bad product index (e.g., empty repository)
         item = self._repository[self._productIndex]
         return item.getProbe().getProbe()
 

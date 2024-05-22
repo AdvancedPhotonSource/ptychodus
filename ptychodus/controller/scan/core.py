@@ -4,7 +4,8 @@ import logging
 from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
-from ...api.observer import SequenceObserver
+from ptychodus.api.observer import SequenceObserver
+
 from ...model.product import ScanAPI, ScanRepository
 from ...model.product.scan import ScanRepositoryItem
 from ...view.repository import RepositoryTableView

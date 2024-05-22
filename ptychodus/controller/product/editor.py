@@ -3,7 +3,8 @@ from typing import Any
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
 from PyQt5.QtWidgets import QWidget
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.product import ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 

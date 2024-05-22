@@ -2,7 +2,8 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import UUID
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.workflow import WorkflowParametersPresenter
 from ...view.workflow import WorkflowOutputDataView
 

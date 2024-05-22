@@ -36,7 +36,6 @@ class ProbePropagationViewController(Observer):
         self._zyVisualizationWidgetController = VisualizationWidgetController(
             engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory)
 
-        self._syncModelToView()
         propagator.addObserver(self)
 
     def _updateCurrentCoordinate(self, step: int) -> None:
@@ -57,13 +56,13 @@ class ProbePropagationViewController(Observer):
         try:
             self._xyVisualizationWidgetController.setArray(self._propagator.getXYProjection(step),
                                                            self._propagator.getPixelGeometry())
-        except ValueError:
+        except IndexError:
             self._xyVisualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Update Current Coordinate', err)
 
-        # FIXME auto-units
+        # TODO auto-units
         self._dialog.coordinateLabel.setText(f'{lerpValue:.4g} m')
 
     def _propagate(self) -> None:
@@ -77,7 +76,7 @@ class ProbePropagationViewController(Observer):
             )
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Propagate', err)
+            ExceptionDialog.showException('Propagate Probe', err)
 
     def launch(self, productIndex: int) -> None:
         self._propagator.setProduct(productIndex)
@@ -113,8 +112,15 @@ class ProbePropagationViewController(Observer):
         view.numberOfStepsSpinBox.setValue(self._propagator.getNumberOfSteps())
 
         numberOfSteps = self._propagator.getNumberOfSteps()
-        self._dialog.coordinateSlider.setRange(0, numberOfSteps - 1)
-        self._dialog.coordinateSlider.setEnabled(numberOfSteps > 1)
+
+        if numberOfSteps > 1:
+            self._dialog.coordinateSlider.setEnabled(True)
+            self._dialog.coordinateSlider.setRange(0, numberOfSteps - 1)
+        else:
+            self._dialog.coordinateSlider.setEnabled(False)
+            self._dialog.coordinateSlider.setRange(0, 1)
+            self._dialog.coordinateSlider.setValue(0)
+
         self._updateCurrentCoordinate(self._dialog.coordinateSlider.value())
 
         try:

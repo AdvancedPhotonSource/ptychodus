@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Any
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.tike import TikeAdaptiveMomentPresenter
 from ...view.tike import TikeAdaptiveMomentView
 

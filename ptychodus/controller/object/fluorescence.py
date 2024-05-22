@@ -1,4 +1,9 @@
+from typing import Any
 import logging
+
+from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QStringListModel
+
+from ptychodus.api.observer import Observable, Observer
 
 from ...model.analysis import FluorescenceEnhancer
 from ...model.visualization import VisualizationEngine
@@ -10,7 +15,23 @@ from ..visualization import VisualizationParametersController, VisualizationWidg
 logger = logging.getLogger(__name__)
 
 
-class FluorescenceViewController:
+class FluorescenceChannelListModel(QAbstractListModel):
+
+    def __init__(self, enhancer: FluorescenceEnhancer, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._enhancer = enhancer
+
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        # TODO make this a table model and show measured/enhanced count statistics
+        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
+            emap = self._enhancer.getMeasuredElementMap(index.row())
+            return emap.name
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return self._enhancer.getNumberOfChannels()
+
+
+class FluorescenceViewController(Observer):
 
     def __init__(self, enhancer: FluorescenceEnhancer, engine: VisualizationEngine,
                  fileDialogFactory: FileDialogFactory) -> None:
@@ -19,17 +40,33 @@ class FluorescenceViewController:
         self._engine = engine
         self._fileDialogFactory = fileDialogFactory
         self._dialog = FluorescenceDialog()
+        self._upscalingModel = QStringListModel()
+        self._upscalingModel.setStringList(self._enhancer.getUpscalingStrategyList())
+        self._deconvolutionModel = QStringListModel()
+        self._deconvolutionModel.setStringList(self._enhancer.getDeconvolutionStrategyList())
+        self._channelListModel = FluorescenceChannelListModel(enhancer)
 
         self._dialog.fluorescenceParametersView.openButton.clicked.connect(
             self._openMeasuredDataset)
-        # FIXME self._dialog.fluorescenceParametersView.upscalingStrategyComboBox: QComboBox
-        # FIXME self._dialog.fluorescenceParametersView.deconvolutionStrategyComboBox: QComboBox
+
+        self._dialog.fluorescenceParametersView.upscalingStrategyComboBox.setModel(
+            self._upscalingModel)
+        self._dialog.fluorescenceParametersView.upscalingStrategyComboBox.textActivated.connect(
+            enhancer.setUpscalingStrategy)
+
+        self._dialog.fluorescenceParametersView.deconvolutionStrategyComboBox.setModel(
+            self._deconvolutionModel)
+        self._dialog.fluorescenceParametersView.deconvolutionStrategyComboBox.textActivated.connect(
+            enhancer.setDeconvolutionStrategy)
+
+        self._dialog.fluorescenceChannelListView.setModel(self._channelListModel)
+        self._dialog.fluorescenceChannelListView.selectionModel().currentChanged.connect(
+            self._updateView)
+
         self._dialog.fluorescenceParametersView.enhanceButton.clicked.connect(
             self._enhanceFluorescence)
         self._dialog.fluorescenceParametersView.saveButton.clicked.connect(
             self._saveEnhancedDataset)
-
-        # FIXME self._dialog.fluorescenceChannelListView: QListView
 
         self._measuredWidgetController = VisualizationWidgetController(
             engine, self._dialog.measuredWidget, self._dialog.statusBar, fileDialogFactory)
@@ -38,13 +75,7 @@ class FluorescenceViewController:
         self._visualizationParametersController = VisualizationParametersController.createInstance(
             engine, self._dialog.visualizationParametersView)
 
-        self._syncModelToView()
-
-    def _updateVisualizations(self) -> None:
-        # FIXME try/except meausred/enhanced separately due to different exception rules
-        # FIXME self._measuredVisualizationWidgetController.setArray(result.measured, result.pixelGeometry)
-        # FIXME self._enhancedVisualizationWidgetController.setArray(result.enhanced), result.pixelGeometry)
-        pass
+        enhancer.addObserver(self)
 
     def _openMeasuredDataset(self) -> None:
         title = 'Open Measured Fluorescence Dataset'
@@ -78,11 +109,7 @@ class FluorescenceViewController:
             ExceptionDialog.showException('Launch', err)
         else:
             self._dialog.setWindowTitle(f'Enhance Fluorescence: {itemName}')
-            self._updateVisualizations()
             self._dialog.open()
-
-    def _syncModelToView(self) -> None:
-        pass  # FIXME
 
     def _saveEnhancedDataset(self) -> None:
         title = 'Save Enhanced Fluorescence Dataset'
@@ -98,3 +125,42 @@ class FluorescenceViewController:
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException(title, err)
+
+    def _syncModelToView(self) -> None:
+        self._dialog.fluorescenceParametersView.upscalingStrategyComboBox.setCurrentText(
+            self._enhancer.getUpscalingStrategy())
+        self._dialog.fluorescenceParametersView.deconvolutionStrategyComboBox.setCurrentText(
+            self._enhancer.getDeconvolutionStrategy())
+
+        self._channelListModel.beginResetModel()
+        self._channelListModel.endResetModel()
+
+    def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
+        if not current.isValid():
+            self._measuredWidgetController.clearArray()
+            self._enhancedWidgetController.clearArray()
+            return
+
+        try:
+            emap_measured = self._enhancer.getMeasuredElementMap(current.row())
+        except Exception as err:
+            logger.exception(err)
+            self._measuredWidgetController.clearArray()
+            ExceptionDialog.showException('Render Measured Element Map', err)
+        else:
+            self._measuredWidgetController.setArray(emap_measured.counts_per_second,
+                                                    self._enhancer.getPixelGeometry())
+
+        try:
+            emap_enhanced = self._enhancer.getEnhancedElementMap(current.row())
+        except Exception as err:
+            logger.exception(err)
+            self._enhancedWidgetController.clearArray()
+            ExceptionDialog.showException('Render Enhanced Element Map', err)
+        else:
+            self._enhancedWidgetController.setArray(emap_enhanced.counts_per_second,
+                                                    self._enhancer.getPixelGeometry())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._enhancer:
+            self._syncModelToView()

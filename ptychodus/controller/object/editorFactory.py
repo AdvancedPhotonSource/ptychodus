@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QDialog, QMessageBox, QSpinBox, QWidget
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.product.object import ObjectRepositoryItem, RandomObjectBuilder
 from ..parametric import ParameterDialogBuilder, ParameterViewController
 

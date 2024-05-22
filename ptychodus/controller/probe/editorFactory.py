@@ -1,8 +1,9 @@
 from PyQt5.QtWidgets import (QButtonGroup, QDialog, QFormLayout, QGroupBox, QHBoxLayout,
                              QMessageBox, QRadioButton, QSpinBox, QTableView, QWidget)
 
-from ...api.observer import Observable, Observer
-from ...api.parametric import StringParameter
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parametric import StringParameter
+
 from ...model.product.probe import (AveragePatternProbeBuilder, DiskProbeBuilder,
                                     FresnelZonePlateProbeBuilder, MultimodalProbeBuilder,
                                     ProbeModeDecayType, ProbeRepositoryItem,

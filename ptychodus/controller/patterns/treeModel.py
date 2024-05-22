@@ -4,7 +4,8 @@ from typing import Any, overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QFont
 
-from ...api.patterns import DiffractionPatternArrayType, DiffractionPatternState
+from ptychodus.api.patterns import DiffractionPatternArrayType, DiffractionPatternState
+
 from ...model.patterns import DiffractionPatternArrayPresenter
 
 

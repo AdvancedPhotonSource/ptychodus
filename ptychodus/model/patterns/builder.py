@@ -5,8 +5,9 @@ import threading
 
 import numpy
 
-from ...api.patterns import (DiffractionDataset, DiffractionPatternArray, DiffractionPatternState,
-                             SimpleDiffractionPatternArray)
+from ptychodus.api.patterns import (DiffractionDataset, DiffractionPatternArray,
+                                    DiffractionPatternState, SimpleDiffractionPatternArray)
+
 from .active import ActiveDiffractionDataset
 from .settings import PatternSettings
 

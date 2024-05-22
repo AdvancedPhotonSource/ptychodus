@@ -2,7 +2,7 @@ from typing import Any, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
-from ...api.tree import SimpleTreeNode
+from ptychodus.api.tree import SimpleTreeNode
 
 
 class SimpleTreeModel(QAbstractItemModel):

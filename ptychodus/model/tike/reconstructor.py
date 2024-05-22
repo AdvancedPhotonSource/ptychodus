@@ -8,12 +8,13 @@ import numpy.typing
 
 import tike.ptycho
 
-from ...api.geometry import Point2D
-from ...api.object import Object
-from ...api.probe import Probe
-from ...api.product import Product
-from ...api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
-from ...api.scan import Scan, ScanPoint
+from ptychodus.api.geometry import Point2D
+from ptychodus.api.object import Object
+from ptychodus.api.probe import Probe
+from ptychodus.api.product import Product
+from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
+from ptychodus.api.scan import Scan, ScanPoint
+
 from .multigrid import TikeMultigridSettings
 from .objectCorrection import TikeObjectCorrectionSettings
 from .positionCorrection import TikePositionCorrectionSettings

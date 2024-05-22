@@ -1,7 +1,8 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from ...api.settings import SettingsGroup, SettingsRegistry
+from ptychodus.api.settings import SettingsGroup, SettingsRegistry
+
 from .adaptiveMoment import TikeAdaptiveMomentPresenter, TikeAdaptiveMomentSettings
 
 

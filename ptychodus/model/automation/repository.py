@@ -3,7 +3,8 @@ from pathlib import Path
 import logging
 import threading
 
-from ...api.observer import Observable
+from ptychodus.api.observer import Observable
+
 from .settings import AutomationSettings
 
 logger = logging.getLogger(__name__)

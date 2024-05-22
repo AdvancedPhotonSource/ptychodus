@@ -6,6 +6,7 @@ import logging
 from ptychodus.api.fluorescence import (DeconvolutionStrategy, ElementMap, FluorescenceDataset,
                                         FluorescenceFileReader, FluorescenceFileWriter,
                                         UpscalingStrategy)
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 
@@ -123,13 +124,17 @@ class FluorescenceEnhancer(Observable, Observer):
             emap_enhanced = deconvolver(emap_upscaled, product)
             element_maps.append(emap_enhanced)
 
-        # FIXME save upscalar/deconvolver to settings
         self._enhanced = FluorescenceDataset(
             element_maps=element_maps,
             counts_per_second_path=self._measured.counts_per_second_path,
             channel_names_path=self._measured.channel_names_path,
         )
         self.notifyObservers()
+
+    def getPixelGeometry(self) -> PixelGeometry:
+        item = self._repository[self._productIndex]
+        object_ = item.getObject().getObject()
+        return object_.getPixelGeometry()
 
     def getEnhancedElementMap(self, channelIndex: int) -> ElementMap:
         if self._enhanced is None:
@@ -155,10 +160,10 @@ class FluorescenceEnhancer(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._upscalingStrategyChooser:
-            self._settings.upscalingStrategy.value = \
-                    self._upscalingStrategyChooser.currentPlugin.simpleName
+            strategy = self._upscalingStrategyChooser.currentPlugin.simpleName
+            self._settings.upscalingStrategy.value = strategy
             self.notifyObservers()
         elif observable is self._deconvolutionStrategyChooser:
-            self._settings.deconvolutionStrategy.value = \
-                    self._deconvolutionStrategyChooser.currentPlugin.simpleName
+            strategy = self._deconvolutionStrategyChooser.currentPlugin.simpleName
+            self._settings.deconvolutionStrategy.value = strategy
             self.notifyObservers()

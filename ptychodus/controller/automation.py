@@ -5,7 +5,8 @@ from typing import Any
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QTimer
 from PyQt5.QtGui import QFont
 
-from ..api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ..model.automation import (AutomationCore, AutomationDatasetState, AutomationPresenter,
                                 AutomationProcessingPresenter)
 from ..view.automation import AutomationView, AutomationProcessingView, AutomationWatchdogView

@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QWidget
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.patterns import DiffractionDatasetPresenter
 from ...view.patterns import PatternsInfoDialog
 from .tree import SimpleTreeModel
