@@ -30,7 +30,7 @@ class FluorescenceEnhancer(Observable, Observer):
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
 
-        self._productIndex: int | None = None
+        self._productIndex = 0
         self._measured: FluorescenceDataset | None = None
         self._enhanced: FluorescenceDataset | None = None
 
@@ -40,6 +40,16 @@ class FluorescenceEnhancer(Observable, Observer):
         deconvolutionStrategyChooser.setCurrentPluginByName(settings.deconvolutionStrategy.value)
         fileReaderChooser.setCurrentPluginByName(settings.fileType.value)
         fileWriterChooser.setCurrentPluginByName(settings.fileType.value)
+
+    def setProduct(self, productIndex: int) -> None:
+        if self._productIndex != productIndex:
+            self._productIndex = productIndex
+            self._enhanced = None
+            self.notifyObservers()
+
+    def getProductName(self) -> str:
+        item = self._repository[self._productIndex]
+        return item.getName()
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -64,6 +74,8 @@ class FluorescenceEnhancer(Observable, Observer):
 
                 self._settings.filePath.value = filePath
                 self._settings.fileType.value = fileType
+
+                self.notifyObservers()
         else:
             logger.warning(f'Refusing to load dataset from invalid file path \"{filePath}\"')
 
@@ -94,14 +106,14 @@ class FluorescenceEnhancer(Observable, Observer):
     def setDeconvolutionStrategy(self, name: str) -> None:
         self._deconvolutionStrategyChooser.setCurrentPluginByName(name)
 
-    def enhanceFluorescence(self, productIndex: int) -> str:
-        item = self._repository[productIndex]
+    def enhanceFluorescence(self) -> None:
+        item = self._repository[self._productIndex]
+        product = item.getProduct()
 
         if self._measured is None:
             raise ValueError('Fluorescence dataset not loaded!')
 
         element_maps: list[ElementMap] = list()
-        product = item.getProduct()
         upscaler = self._upscalingStrategyChooser.currentPlugin.strategy
         deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
 
@@ -111,14 +123,13 @@ class FluorescenceEnhancer(Observable, Observer):
             emap_enhanced = deconvolver(emap_upscaled, product)
             element_maps.append(emap_enhanced)
 
-        self._productIndex = productIndex
+        # FIXME save upscalar/deconvolver to settings
         self._enhanced = FluorescenceDataset(
             element_maps=element_maps,
             counts_per_second_path=self._measured.counts_per_second_path,
             channel_names_path=self._measured.channel_names_path,
         )
-
-        return item.getName()
+        self.notifyObservers()
 
     def getEnhancedElementMap(self, channelIndex: int) -> ElementMap:
         if self._enhanced is None:

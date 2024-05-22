@@ -224,7 +224,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._fluorescenceViewController.enhanceFluorescence(itemIndex)
+            self._fluorescenceViewController.launch(itemIndex)
 
     def _analyzeXMCD(self) -> None:
         itemIndex = self._getCurrentItemIndex()

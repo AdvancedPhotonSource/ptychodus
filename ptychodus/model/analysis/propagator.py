@@ -10,7 +10,7 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe import Probe, WavefieldArrayType
 
-from ..product import ProductRepository, ProductRepositoryItem
+from ..product import ProductRepository
 from ..propagator import FresnelPropagator
 from .settings import ProbePropagationSettings
 
@@ -37,12 +37,6 @@ class ProbePropagator(Observable):
         item = self._repository[self._productIndex]
         return item.getName()
 
-    def getBeginCoordinateInMeters(self) -> Decimal:
-        return self._settings.beginCoordinateInMeters.value
-
-    def getEndCoordinateInMeters(self) -> Decimal:
-        return self._settings.endCoordinateInMeters.value
-
     def propagate(self, *, beginCoordinateInMeters: Decimal, endCoordinateInMeters: Decimal,
                   numberOfSteps: int) -> None:
         # FIXME verify multimodal probes
@@ -67,7 +61,14 @@ class ProbePropagator(Observable):
         self._propagatedWavefield = propagatedWavefield
         self.notifyObservers()
 
+    def getBeginCoordinateInMeters(self) -> Decimal:
+        return self._settings.beginCoordinateInMeters.value
+
+    def getEndCoordinateInMeters(self) -> Decimal:
+        return self._settings.endCoordinateInMeters.value
+
     def _getProbe(self) -> Probe:
+        # FIXME handle case of bad product index (e.g., empty repository)
         item = self._repository[self._productIndex]
         return item.getProbe().getProbe()
 

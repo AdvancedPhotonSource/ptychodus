@@ -22,7 +22,7 @@ class ProbePropagationViewController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
         self._dialog = ProbePropagationDialog()
-        self._dialog.propagateButton.clicked.connect(self._repropagate)
+        self._dialog.propagateButton.clicked.connect(self._propagate)
         self._dialog.saveButton.clicked.connect(self._savePropagatedProbe)
         self._dialog.coordinateSlider.valueChanged.connect(self._updateCurrentCoordinate)
         self._dialog.parametersView.numberOfStepsSpinBox.setRange(1, 999)
@@ -66,7 +66,7 @@ class ProbePropagationViewController(Observer):
         # FIXME auto-units
         self._dialog.coordinateLabel.setText(f'{lerpValue:.4g} m')
 
-    def _repropagate(self) -> None:
+    def _propagate(self) -> None:
         view = self._dialog.parametersView
 
         try:

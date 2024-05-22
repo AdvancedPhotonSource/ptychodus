@@ -38,7 +38,10 @@ class FluorescenceViewController:
         self._visualizationParametersController = VisualizationParametersController.createInstance(
             engine, self._dialog.visualizationParametersView)
 
+        self._syncModelToView()
+
     def _updateVisualizations(self) -> None:
+        # FIXME try/except meausred/enhanced separately due to different exception rules
         # FIXME self._measuredVisualizationWidgetController.setArray(result.measured, result.pixelGeometry)
         # FIXME self._enhancedVisualizationWidgetController.setArray(result.enhanced), result.pixelGeometry)
         pass
@@ -64,13 +67,22 @@ class FluorescenceViewController:
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Enhance Fluorescence', err)
-            return
 
-    def enhanceFluorescence(self, itemIndex: int) -> None:
-        itemName = self._enhancer.enhanceFluorescence(itemIndex)
-        self._dialog.setWindowTitle(f'Enhance Fluorescence: {itemName}')
-        self._updateVisualizations()
-        self._dialog.open()
+    def launch(self, productIndex: int) -> None:
+        self._enhancer.setProduct(productIndex)
+
+        try:
+            itemName = self._enhancer.getProductName()
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.showException('Launch', err)
+        else:
+            self._dialog.setWindowTitle(f'Enhance Fluorescence: {itemName}')
+            self._updateVisualizations()
+            self._dialog.open()
+
+    def _syncModelToView(self) -> None:
+        pass  # FIXME
 
     def _saveEnhancedDataset(self) -> None:
         title = 'Save Enhanced Fluorescence Dataset'
