@@ -24,60 +24,51 @@ class ProbePropagator(Observable):
         self._settings = settings
         self._repository = repository
 
-        self._productIndex: int | None = None
+        self._productIndex = 0
         self._propagatedWavefield: WavefieldArrayType | None = None
 
-    def getBeginCoordinateInMeters(self) -> float:
-        return float(self._settings.beginCoordinateInMeters.value)
+    def setProduct(self, productIndex: int) -> None:
+        if self._productIndex != productIndex:
+            self._productIndex = productIndex
+            self._propagatedWavefield = None
+            self.notifyObservers()
 
-    def getEndCoordinateInMeters(self) -> float:
-        return float(self._settings.endCoordinateInMeters.value)
-
-    def propagate(self,
-                  productIndex: int,
-                  *,
-                  numberOfSteps: int,
-                  beginCoordinateInMeters: float | None = None,
-                  endCoordinateInMeters: float | None = None) -> str:
-        # FIXME verify multimodal probes
-        item = self._repository[productIndex]
-
-        if beginCoordinateInMeters is not None:
-            self._settings.beginCoordinateInMeters.value = Decimal(repr(beginCoordinateInMeters))
-
-        if endCoordinateInMeters is not None:
-            self._settings.endCoordinateInMeters.value = Decimal(repr(endCoordinateInMeters))
-
-        distanceInMeters = numpy.linspace(
-            float(self._settings.beginCoordinateInMeters.value),
-            float(self._settings.endCoordinateInMeters.value),
-            numberOfSteps,
-        )
-        probe = item.getProbe().getProbe()
-        probeArray = probe.array
-        wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
-        propagatedWavefield = numpy.zeros(
-            (numberOfSteps, probeArray.shape[-2], probeArray.shape[-1]), dtype=probeArray.dtype)
-
-        for idx, zInMeters in enumerate(distanceInMeters):
-            propagator = FresnelPropagator(probeArray.shape[-2:], probe.getPixelGeometry(),
-                                           zInMeters, wavelengthInMeters)
-            wf = propagator.propagate(probeArray[-2:])
-            propagatedWavefield[idx, :, :] = wf
-
-        self._productIndex = productIndex
-        self._propagatedWavefield = propagatedWavefield
-
+    def getProductName(self) -> str:
+        item = self._repository[self._productIndex]
         return item.getName()
 
-    def _getProductItem(self) -> ProductRepositoryItem:
-        if self._productIndex is None:
-            raise ValueError('No product index!')
+    def getBeginCoordinateInMeters(self) -> Decimal:
+        return self._settings.beginCoordinateInMeters.value
 
-        return self._repository[self._productIndex]
+    def getEndCoordinateInMeters(self) -> Decimal:
+        return self._settings.endCoordinateInMeters.value
+
+    def propagate(self, *, beginCoordinateInMeters: Decimal, endCoordinateInMeters: Decimal,
+                  numberOfSteps: int) -> None:
+        # FIXME verify multimodal probes
+        item = self._repository[self._productIndex]
+        probe = item.getProbe().getProbe()
+        wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
+        propagatedWavefield = numpy.zeros(
+            (numberOfSteps, probe.array.shape[-2], probe.array.shape[-1]),
+            dtype=probe.array.dtype,
+        )
+        distanceInMeters = numpy.linspace(float(beginCoordinateInMeters),
+                                          float(endCoordinateInMeters), numberOfSteps)
+
+        for idx, zInMeters in enumerate(distanceInMeters):
+            propagator = FresnelPropagator(probe.array.shape[-2:], probe.getPixelGeometry(),
+                                           zInMeters, wavelengthInMeters)
+            wf = propagator.propagate(probe.array[-2:])
+            propagatedWavefield[idx, :, :] = wf
+
+        self._settings.beginCoordinateInMeters.value = beginCoordinateInMeters
+        self._settings.endCoordinateInMeters.value = endCoordinateInMeters
+        self._propagatedWavefield = propagatedWavefield
+        self.notifyObservers()
 
     def _getProbe(self) -> Probe:
-        item = self._getProductItem()
+        item = self._repository[self._productIndex]
         return item.getProbe().getProbe()
 
     def getPixelGeometry(self) -> PixelGeometry:
@@ -93,7 +84,7 @@ class ProbePropagator(Observable):
     def getXYProjection(self, step: int) -> WavefieldArrayType:
         if self._propagatedWavefield is None:
             probe = self._getProbe()
-            return probe.array
+            return probe.array[0]
 
         return self._propagatedWavefield[step]
 
@@ -129,9 +120,9 @@ class ProbePropagator(Observable):
         numpy.savez(
             filePath,
             'begin_coordinate_m',
-            self.getBeginCoordinateInMeters(),
+            float(self.getBeginCoordinateInMeters()),
             'end_coordinate_m',
-            self.getEndCoordinateInMeters(),
+            float(self.getEndCoordinateInMeters()),
             'pixel_height_m',
             pixelGeometry.heightInMeters,
             'pixel_width_m',

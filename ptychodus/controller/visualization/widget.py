@@ -28,3 +28,6 @@ class VisualizationWidgetController:
 
     def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
         self._controller.setArray(array, pixelGeometry)
+
+    def clearArray(self) -> None:
+        self._controller.clearArray()

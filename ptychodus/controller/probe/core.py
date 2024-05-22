@@ -165,7 +165,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._propagationViewController.propagate(itemIndex)
+            self._propagationViewController.launch(itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
