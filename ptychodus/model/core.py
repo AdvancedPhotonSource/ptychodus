@@ -223,6 +223,12 @@ class ModelCore:
     def refreshAutomationDatasets(self) -> None:
         self._automationCore.repository.notifyObserversIfRepositoryChanged()
 
+    def stageReconstructionInputs(self, stagingDir: Path) -> int:
+        self.settingsRegistry.saveSettings(stagingDir / 'settings.ini')
+        self._patternsCore.patternsAPI.savePreprocessedPatterns(stagingDir / 'patterns.npz')
+        self._productCore.productAPI.saveProduct(0, stagingDir / 'product-in.npz', 'NPZ')
+        return 0
+
     def batchModeReconstruct(self, inputFilePath: Path, outputFilePath: Path) -> int:
         inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, 'NPZ')
 

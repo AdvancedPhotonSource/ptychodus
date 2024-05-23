@@ -36,7 +36,7 @@ Standard Installation
        $ conda activate ptychodus
        $ ptychodus -h
 
-       usage: ptychodus [-h] [-b {reconstruct,train}] [-f FILE_PREFIX] [-i INPUT_FILE] [-o OUTPUT_FILE] [-p PATTERNS_FILE] [-s SETTINGS] [-v]
+       usage: ptychodus [-h] [-b {reconstruct,train}] [-f FILE_PREFIX] [-s SETTINGS_FILE] [-v] [-w OUTPUT_DIR]
 
        ptychodus is a ptychography analysis application
 
@@ -46,15 +46,11 @@ Standard Installation
                                run action non-interactively
          -f FILE_PREFIX, --file-prefix FILE_PREFIX
                                replace file path prefix in settings
-         -i INPUT_FILE, --input INPUT_FILE
-                               input data product file (batch mode)
-         -o OUTPUT_FILE, --output OUTPUT_FILE
-                               output data product file (batch mode)
-         -p PATTERNS_FILE, --patterns PATTERNS_FILE
-                               use diffraction patterns from file
-         -s SETTINGS, --settings SETTINGS
+         -s SETTINGS_FILE, --settings SETTINGS_FILE
                                use settings from file
          -v, --version         show program's version number and exit
+         -w OUTPUT_DIR, --write OUTPUT_DIR
+                               stage reconstruction inputs to directory
 
        $ ptychodus
 
