@@ -4,8 +4,9 @@ from typing import Any
 from PyQt5.QtCore import Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject
 from PyQt5.QtWidgets import QTableView
 
-from ..api.observer import Observable, Observer
-from ..api.settings import SettingsGroup, SettingsRegistry
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsGroup, SettingsRegistry
+
 from ..view.settings import SettingsParametersView
 from .data import FileDialogFactory
 

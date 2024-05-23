@@ -1,79 +1,109 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 import logging
 
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.probe import WavefieldArrayType
+from ptychodus.api.observer import Observable
+from ptychodus.api.probe import Probe, WavefieldArrayType
 
 from ..product import ProductRepository
 from ..propagator import FresnelPropagator
+from .settings import ProbePropagationSettings
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class PropagatedProbe:
-    itemIndex: int
-    itemName: str
-    beginCoordinateInMeters: float
-    endCoordinateInMeters: float
-    pixelGeometry: PixelGeometry
-    wavefield: WavefieldArrayType
+class ProbePropagator(Observable):
+
+    def __init__(self, settings: ProbePropagationSettings, repository: ProductRepository) -> None:
+        super().__init__()
+        self._settings = settings
+        self._repository = repository
+
+        self._productIndex = 0
+        self._propagatedWavefield: WavefieldArrayType | None = None
+
+    def setProduct(self, productIndex: int) -> None:
+        if self._productIndex != productIndex:
+            self._productIndex = productIndex
+            self._propagatedWavefield = None
+            self.notifyObservers()
+
+    def getProductName(self) -> str:
+        item = self._repository[self._productIndex]
+        return item.getName()
+
+    def propagate(self, *, beginCoordinateInMeters: Decimal, endCoordinateInMeters: Decimal,
+                  numberOfSteps: int) -> None:
+        item = self._repository[self._productIndex]
+        probe = item.getProbe().getProbe()
+        wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
+        propagatedWavefield = numpy.zeros(
+            (numberOfSteps, probe.array.shape[-2], probe.array.shape[-1]),
+            dtype=probe.array.dtype,
+        )
+        distanceInMeters = numpy.linspace(float(beginCoordinateInMeters),
+                                          float(endCoordinateInMeters), numberOfSteps)
+
+        for idx, zInMeters in enumerate(distanceInMeters):
+            propagator = FresnelPropagator(probe.array.shape[-2:], probe.getPixelGeometry(),
+                                           zInMeters, wavelengthInMeters)
+            wf = propagator.propagate(probe.array[0])
+            propagatedWavefield[idx, :, :] = wf
+
+        self._settings.beginCoordinateInMeters.value = beginCoordinateInMeters
+        self._settings.endCoordinateInMeters.value = endCoordinateInMeters
+        self._propagatedWavefield = propagatedWavefield
+        self.notifyObservers()
+
+    def getBeginCoordinateInMeters(self) -> Decimal:
+        return self._settings.beginCoordinateInMeters.value
+
+    def getEndCoordinateInMeters(self) -> Decimal:
+        return self._settings.endCoordinateInMeters.value
+
+    def _getProbe(self) -> Probe:
+        item = self._repository[self._productIndex]
+        return item.getProbe().getProbe()
+
+    def getPixelGeometry(self) -> PixelGeometry:
+        probe = self._getProbe()
+        return probe.getPixelGeometry()
 
     def getNumberOfSteps(self) -> int:
-        return self.wavefield.shape[0]
+        if self._propagatedWavefield is None:
+            return 1
+
+        return self._propagatedWavefield.shape[-3]
 
     def getXYProjection(self, step: int) -> WavefieldArrayType:
-        return self.wavefield[step]
+        if self._propagatedWavefield is None:
+            probe = self._getProbe()
+            return probe.array[0]
+
+        return self._propagatedWavefield[step]
 
     def getZXProjection(self) -> WavefieldArrayType:
-        sz = self.wavefield.shape[-2]
-        arrayL = self.wavefield[:, (sz - 1) // 2, :]
-        arrayR = self.wavefield[:, sz // 2, :]
+        if self._propagatedWavefield is None:
+            raise ValueError('No propagated wavefield!')
+
+        sz = self._propagatedWavefield.shape[-2]
+        arrayL = self._propagatedWavefield[:, (sz - 1) // 2, :]
+        arrayR = self._propagatedWavefield[:, sz // 2, :]
         return numpy.transpose(arrayL + arrayR) / 2  # type: ignore
 
     def getZYProjection(self) -> WavefieldArrayType:
-        sz = self.wavefield.shape[-1]
-        arrayL = self.wavefield[:, :, (sz - 1) // 2]
-        arrayR = self.wavefield[:, :, sz // 2]
+        if self._propagatedWavefield is None:
+            raise ValueError('No propagated wavefield!')
+
+        sz = self._propagatedWavefield.shape[-1]
+        arrayL = self._propagatedWavefield[:, :, (sz - 1) // 2]
+        arrayR = self._propagatedWavefield[:, :, sz // 2]
         return numpy.transpose(arrayL + arrayR) / 2  # type: ignore
-
-
-class ProbePropagator:
-
-    def __init__(self, repository: ProductRepository) -> None:
-        self._repository = repository
-
-    def propagate(self, itemIndex: int, beginCoordinateInMeters: float,
-                  endCoordinateInMeters: float, numberOfSteps: int) -> PropagatedProbe:
-        item = self._repository[itemIndex]
-        distanceInMeters = numpy.linspace(beginCoordinateInMeters, endCoordinateInMeters,
-                                          numberOfSteps)
-        probe = item.getProbe().getProbe()
-        probeArray = probe.array
-        pixelGeometry = probe.getPixelGeometry()
-        wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
-        wavefield = numpy.zeros((numberOfSteps, probeArray.shape[-2], probeArray.shape[-1]),
-                                dtype=probeArray.dtype)
-
-        for idx, zInMeters in enumerate(distanceInMeters):
-            propagator = FresnelPropagator(probeArray.shape[-2:], pixelGeometry, zInMeters,
-                                           wavelengthInMeters)
-            wf = propagator.propagate(probeArray[-2:])
-            wavefield[idx, :, :] = wf
-
-        return PropagatedProbe(
-            itemIndex=itemIndex,
-            itemName=item.getName(),
-            beginCoordinateInMeters=beginCoordinateInMeters,
-            endCoordinateInMeters=endCoordinateInMeters,
-            pixelGeometry=probe.getPixelGeometry(),
-            wavefield=wavefield,
-        )
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return [self.getSaveFileFilter()]
@@ -81,17 +111,21 @@ class ProbePropagator:
     def getSaveFileFilter(self) -> str:
         return 'NumPy Zipped Archive (*.npz)'
 
-    def savePropagatedProbe(self, filePath: Path, result: PropagatedProbe) -> None:
+    def savePropagatedProbe(self, filePath: Path) -> None:
+        if self._propagatedWavefield is None:
+            raise ValueError('No propagated wavefield!')
+
+        pixelGeometry = self.getPixelGeometry()
         numpy.savez(
             filePath,
             'begin_coordinate_m',
-            result.beginCoordinateInMeters,
+            float(self.getBeginCoordinateInMeters()),
             'end_coordinate_m',
-            result.endCoordinateInMeters,
+            float(self.getEndCoordinateInMeters()),
             'pixel_height_m',
-            result.pixelGeometry.heightInMeters,
+            pixelGeometry.heightInMeters,
             'pixel_width_m',
-            result.pixelGeometry.widthInMeters,
+            pixelGeometry.widthInMeters,
             'wavefield',
-            result.wavefield,
+            self._propagatedWavefield,
         )

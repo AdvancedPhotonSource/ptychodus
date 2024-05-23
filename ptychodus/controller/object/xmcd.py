@@ -1,10 +1,8 @@
 import logging
 
-from PyQt5.QtWidgets import QStatusBar, QWidget
-
-from ...model.analysis import DichroicAnalyzer, DichroicResult
+from ...model.analysis import XMCDAnalyzer, XMCDResult
 from ...model.visualization import VisualizationEngine
-from ...view.object import DichroicDialog
+from ...view.object import XMCDDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..visualization import VisualizationParametersController, VisualizationWidgetController
@@ -13,16 +11,16 @@ from .treeModel import ObjectTreeModel
 logger = logging.getLogger(__name__)
 
 
-class DichroicViewController:
+class XMCDViewController:
 
-    def __init__(self, analyzer: DichroicAnalyzer, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory, treeModel: ObjectTreeModel,
-                 statusBar: QStatusBar, parent: QWidget | None) -> None:
+    def __init__(self, analyzer: XMCDAnalyzer, engine: VisualizationEngine,
+                 fileDialogFactory: FileDialogFactory, treeModel: ObjectTreeModel) -> None:
         super().__init__()
         self._analyzer = analyzer
         self._engine = engine
         self._fileDialogFactory = fileDialogFactory
-        self._dialog = DichroicDialog.createInstance(parent)
+        self._dialog = XMCDDialog()
+        self._dialog.setWindowTitle('XMCD Analysis')
         self._dialog.parametersView.lcircComboBox.setModel(treeModel)
         self._dialog.parametersView.lcircComboBox.currentIndexChanged.connect(self._analyze)
         self._dialog.parametersView.rcircComboBox.setModel(treeModel)
@@ -30,14 +28,14 @@ class DichroicViewController:
         self._dialog.parametersView.saveButton.clicked.connect(self._saveResult)
 
         self._differenceVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.differenceWidget, statusBar, fileDialogFactory)
+            engine, self._dialog.differenceWidget, self._dialog.statusBar, fileDialogFactory)
         self._sumVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.sumWidget, statusBar, fileDialogFactory)
+            engine, self._dialog.sumWidget, self._dialog.statusBar, fileDialogFactory)
         self._ratioVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.ratioWidget, statusBar, fileDialogFactory)
+            engine, self._dialog.ratioWidget, self._dialog.statusBar, fileDialogFactory)
         self._visualizationParametersController = VisualizationParametersController.createInstance(
             engine, self._dialog.parametersView.visualizationParametersView)
-        self._result: DichroicResult | None = None
+        self._result: XMCDResult | None = None
 
     def _analyze(self) -> None:
         lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()
@@ -50,17 +48,17 @@ class DichroicViewController:
             result = self._analyzer.analyze(lcircItemIndex, rcircItemIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Dichroic Analysis', err)
+            ExceptionDialog.showException('XMCD Analysis', err)
             return
 
         self._result = result
-        self._differenceVisualizationWidgetController.setArray(result.polarDifference[0, :, :],
-                                                               result.pixelGeometry)
-        self._sumVisualizationWidgetController.setArray(result.polarSum[0, :, :],
-                                                        result.pixelGeometry)
+        self._differenceVisualizationWidgetController.setArray(result.polar_difference[0, :, :],
+                                                               result.pixel_geometry)
+        self._sumVisualizationWidgetController.setArray(result.polar_sum[0, :, :],
+                                                        result.pixel_geometry)
         # TODO support multi-layer objects
-        self._ratioVisualizationWidgetController.setArray(result.polarRatio[0, :, :],
-                                                          result.pixelGeometry)
+        self._ratioVisualizationWidgetController.setArray(result.polar_ratio[0, :, :],
+                                                          result.pixel_geometry)
 
     def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> None:
         self._dialog.parametersView.lcircComboBox.setCurrentIndex(lcircItemIndex)

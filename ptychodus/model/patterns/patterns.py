@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import Final
 
-from ...api.geometry import Interval
-from ...api.observer import Observable, Observer
+from ptychodus.api.geometry import Interval
+from ptychodus.api.observer import Observable, Observer
+
 from .settings import PatternSettings
 from .sizer import PatternSizer
 

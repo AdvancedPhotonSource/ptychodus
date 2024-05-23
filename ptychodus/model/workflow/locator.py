@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from uuid import UUID
 
-from ...api.settings import SettingsGroup
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsGroup
 
 
 class DataLocator(ABC, Observable):

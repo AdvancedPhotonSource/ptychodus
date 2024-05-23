@@ -17,6 +17,17 @@ def verifyAllArgumentsParsed(parser: argparse.ArgumentParser, argv: list[str]) -
         parser.error('unrecognized arguments: %s' % ' '.join(argv))
 
 
+class DirectoryType:
+
+    def __call__(self, string: str) -> Path:
+        path = Path(string)
+
+        if not path.is_dir():
+            raise argparse.ArgumentTypeError(f'\"{string}\" is not a directory!')
+
+        return path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog=ptychodus.__name__.lower(),
@@ -40,29 +51,33 @@ def main() -> int:
         help='replace file path prefix in settings',
     )
     parser.add_argument(
+        # input data product file (batch mode)
         '-i',
         '--input',
         metavar='INPUT_FILE',
-        help='input data product file (batch mode)',
         type=argparse.FileType('r'),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
+        # output data product file (batch mode)
         '-o',
         '--output',
         metavar='OUTPUT_FILE',
-        help='output data product file (batch mode)',
         type=argparse.FileType('w'),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
+        # preprocessed diffraction patterns file (batch mode)
         '-p',
         '--patterns',
         metavar='PATTERNS_FILE',
-        help='use diffraction patterns from file',
         type=argparse.FileType('r'),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         '-s',
         '--settings',
+        metavar='SETTINGS_FILE',
         help='use settings from file',
         type=argparse.FileType('r'),
     )
@@ -72,6 +87,14 @@ def main() -> int:
         action='version',
         version=versionString(),
     )
+    parser.add_argument(
+        '-w',
+        '--write',
+        metavar='OUTPUT_DIR',
+        type=DirectoryType(),
+        help='stage reconstruction inputs to directory',
+    )
+
     parsedArgs, unparsedArgs = parser.parse_known_args()
 
     modelArgs = ModelArgs(
@@ -81,6 +104,9 @@ def main() -> int:
     )
 
     with ModelCore(modelArgs, isDeveloperModeEnabled=parsedArgs.dev) as model:
+        if parsedArgs.write is not None:
+            return model.stageReconstructionInputs(parsedArgs.write)
+
         if parsedArgs.batch is not None:
             verifyAllArgumentsParsed(parser, unparsedArgs)
 

@@ -1,6 +1,9 @@
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 import logging
+
+import numpy
 
 from ptychodus.api.patterns import (DiffractionFileReader, DiffractionFileWriter,
                                     DiffractionMetadata, DiffractionPatternArray,
@@ -64,7 +67,7 @@ class PatternsAPI:
             else:
                 self._builder.switchTo(dataset)
         else:
-            logger.debug(f'Refusing to read invalid file path {filePath}')
+            logger.warning(f'Refusing to read invalid file path {filePath}')
             return None
 
         if assemble:
@@ -85,3 +88,26 @@ class PatternsAPI:
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, self._dataset)
+
+    def openPreprocessedPatterns(self, filePath: Path) -> None:
+        if filePath.is_file():
+            logger.debug(f'Reading preprocessed patterns from \"{filePath}\"')
+
+            try:
+                contents = numpy.load(filePath)
+            except Exception as exc:
+                raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
+
+            self._builder.stop(finishAssembling=False)
+            self._dataset.setAssembledData(contents['patterns'], contents['indexes'])
+            self._builder.start()
+            self._builder.stop(finishAssembling=True)
+        else:
+            logger.warning(f'Refusing to read invalid file path {filePath}')
+
+    def savePreprocessedPatterns(self, filePath: Path) -> None:
+        contents: dict[str, Any] = {
+            'indexes': numpy.array(self._dataset.getAssembledIndexes()),
+            'patterns': numpy.array(self._dataset.getAssembledData()),
+        }
+        numpy.savez(filePath, **contents)

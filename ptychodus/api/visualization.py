@@ -1,17 +1,13 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Final, TypeAlias
+from typing import Final
 
 from scipy.stats import gaussian_kde
 import numpy
-import numpy.typing
 
 from .geometry import Box2D, Interval, Line2D, PixelGeometry
-
-RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
-NumberTypes: TypeAlias = numpy.integer[Any] | numpy.floating[Any] | numpy.complexfloating[Any, Any]
-NumberArrayType: TypeAlias = numpy.typing.NDArray[NumberTypes]
+from .typing import NumberArrayType, RealArrayType
 
 
 @dataclass(frozen=True)

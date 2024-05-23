@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog, QStatusBar
+from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
@@ -26,8 +26,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
     def __init__(self, repository: ProbeRepository, api: ProbeAPI,
                  imageController: ImageController, propagator: ProbePropagator,
                  propagatorVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
-                 statusBar: QStatusBar, fileDialogFactory: FileDialogFactory,
-                 treeModel: ProbeTreeModel) -> None:
+                 fileDialogFactory: FileDialogFactory, treeModel: ProbeTreeModel) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
@@ -38,19 +37,18 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._editorFactory = ProbeEditorViewControllerFactory()
 
         self._propagationViewController = ProbePropagationViewController(
-            propagator, propagatorVisualizationEngine, statusBar, fileDialogFactory, None)
+            propagator, propagatorVisualizationEngine, fileDialogFactory)
 
     @classmethod
     def createInstance(cls, repository: ProbeRepository, api: ProbeAPI,
                        imageController: ImageController, propagator: ProbePropagator,
                        propagatorVisualizationEngine: VisualizationEngine,
-                       view: RepositoryTreeView, statusBar: QStatusBar,
+                       view: RepositoryTreeView,
                        fileDialogFactory: FileDialogFactory) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ProbeTreeModel(repository, api)
         controller = cls(repository, api, imageController, propagator,
-                         propagatorVisualizationEngine, view, statusBar, fileDialogFactory,
-                         treeModel)
+                         propagatorVisualizationEngine, view, fileDialogFactory, treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -167,7 +165,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._propagationViewController.propagate(itemIndex)
+            self._propagationViewController.launch(itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

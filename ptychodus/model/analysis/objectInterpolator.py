@@ -16,7 +16,7 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         ixBeginF, xi = divmod(patchMinimumXInMeters - geometry.minimumXInMeters,
                               geometry.pixelWidthInMeters)
         ixBegin = int(ixBeginF)
-        ixEnd = ixBegin + patchWidth + 1
+        ixEnd = ixBegin + patchWidth
         ixSlice0 = slice(ixBegin, ixEnd)
         ixSlice1 = slice(ixBegin + 1, ixEnd + 1)
 
@@ -26,7 +26,7 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         iyBeginF, eta = divmod(patchMinimumYInMeters - geometry.minimumYInMeters,
                                geometry.pixelHeightInMeters)
         iyBegin = int(iyBeginF)
-        iyEnd = iyBegin + patchHeight + 1
+        iyEnd = iyBegin + patchHeight
         iySlice0 = slice(iyBegin, iyEnd)
         iySlice1 = slice(iyBegin + 1, iyEnd + 1)
 

@@ -9,6 +9,8 @@ import pkgutil
 import re
 
 from .automation import FileBasedWorkflow
+from .fluorescence import (DeconvolutionStrategy, FluorescenceFileReader, FluorescenceFileWriter,
+                           UpscalingStrategy)
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
@@ -111,6 +113,10 @@ class PluginRegistry:
         self.productFileReaders = PluginChooser[ProductFileReader]()
         self.productFileWriters = PluginChooser[ProductFileWriter]()
         self.fileBasedWorkflows = PluginChooser[FileBasedWorkflow]()
+        self.fluorescenceFileReaders = PluginChooser[FluorescenceFileReader]()
+        self.fluorescenceFileWriters = PluginChooser[FluorescenceFileWriter]()
+        self.upscalingStrategies = PluginChooser[UpscalingStrategy]()
+        self.deconvolutionStrategies = PluginChooser[DeconvolutionStrategy]()
 
     @classmethod
     def loadPlugins(cls) -> PluginRegistry:

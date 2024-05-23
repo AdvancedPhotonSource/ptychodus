@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.patterns import DetectorPresenter
 from ...view.patterns import DetectorView
 

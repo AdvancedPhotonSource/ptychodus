@@ -16,6 +16,7 @@ class ProductMetadata:
     detectorDistanceInMeters: float
     probeEnergyInElectronVolts: float
     probePhotonsPerSecond: float
+    exposureTimeInSeconds: float
 
     @property
     def sizeInBytes(self) -> int:
@@ -24,6 +25,7 @@ class ProductMetadata:
         sz += getsizeof(self.detectorDistanceInMeters)
         sz += getsizeof(self.probeEnergyInElectronVolts)
         sz += getsizeof(self.probePhotonsPerSecond)
+        sz += getsizeof(self.exposureTimeInSeconds)
         return sz
 
 

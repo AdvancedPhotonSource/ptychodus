@@ -6,12 +6,13 @@ import time
 
 import numpy
 
-from ...api.observer import Observable, Observer
-from ...api.plugins import PluginChooser
-from ...api.product import Product
-from ...api.reconstructor import (ReconstructInput, Reconstructor, TrainableReconstructor,
-                                  TrainOutput)
-from ...api.scan import Scan, ScanPoint
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.product import Product
+from ptychodus.api.reconstructor import (ReconstructInput, Reconstructor, TrainableReconstructor,
+                                         TrainOutput)
+from ptychodus.api.scan import Scan, ScanPoint
+
 from ..patterns import ActiveDiffractionDataset
 from ..product import ProductRepository
 from .indexFilter import ScanIndexFilter

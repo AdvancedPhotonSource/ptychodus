@@ -76,8 +76,8 @@ class ObjectRepositoryItem(ParameterRepository):
 
         try:
             object_ = self._builder.build(self._geometryProvider, layerDistanceInMeters)
-        except Exception:
-            logger.exception('Failed to reinitialize object!')
+        except Exception as exc:
+            logger.error(''.join(exc.args))
             return
 
         self._object = object_

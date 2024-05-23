@@ -6,7 +6,7 @@ import numpy
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QHBoxLayout, QLabel, QSlider, QWidget
 
-from ...api.geometry import Interval
+from ptychodus.api.geometry import Interval
 
 
 class DecimalSlider(QWidget):

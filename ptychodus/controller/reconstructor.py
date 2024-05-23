@@ -6,7 +6,8 @@ import logging
 from PyQt5.QtCore import Qt, QAbstractItemModel
 from PyQt5.QtWidgets import QLabel, QWidget
 
-from ..api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ..model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
 from ..model.product.metadata import MetadataRepositoryItem
 from ..model.product.object import ObjectRepositoryItem

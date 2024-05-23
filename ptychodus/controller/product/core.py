@@ -30,6 +30,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             'Detector-Object\nDistance [m]',
             'Probe Energy\n[keV]',
             'Probe Photon\nFlux [ph/s]',
+            'Exposure\nTime [s]',
             'Pixel Width\n[nm]',
             'Pixel Height\n[nm]',
             'Size\n[MB]',
@@ -38,7 +39,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.column() < 4:
+        if index.isValid() and index.column() < 5:
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -71,10 +72,12 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 elif index.column() == 3:
                     return f'{metadata.probePhotonsPerSecond.getValue():.4g}'
                 elif index.column() == 4:
-                    return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
+                    return f'{metadata.exposureTimeInSeconds.getValue():.4g}'
                 elif index.column() == 5:
-                    return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                    return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
                 elif index.column() == 6:
+                    return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                elif index.column() == 7:
                     product = item.getProduct()
                     return f'{product.sizeInBytes / (1024 * 1024):.2f}'
 
@@ -117,6 +120,14 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     return False
 
                 metadata.probePhotonsPerSecond.setValue(photonsPerSecond)
+                return True
+            elif index.column() == 4:
+                try:
+                    exposureTimeInSeconds = float(value)
+                except ValueError:
+                    return False
+
+                metadata.exposureTimeInSeconds.setValue(exposureTimeInSeconds)
                 return True
 
         return False

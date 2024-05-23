@@ -6,7 +6,8 @@ import re
 from PyQt5.QtCore import Qt, QDir, QFileInfo, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import QAbstractItemView, QFileSystemModel, QWizard
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.patterns import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
                                DiffractionMetadataPresenter, DiffractionPatternPresenter)
 from ...view.patterns import (OpenDatasetWizard, OpenDatasetWizardFilesPage,

@@ -53,6 +53,8 @@ class ProductSettings(Observable, Observer):
             'ProbeEnergyInElectronVolts', '10000')
         self.probePhotonsPerSecond = self._settingsGroup.createRealEntry(
             'ProbePhotonsPerSecond', '0')
+        self.exposureTimeInSeconds = self._settingsGroup.createRealEntry(
+            'ExposureTimeInSeconds', '0')
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

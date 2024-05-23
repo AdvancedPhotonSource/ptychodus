@@ -1,37 +1,40 @@
-from typing import Any, Final, TypeAlias
+from typing import Final
 
-from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
+from scipy.fft import fft2, fftshift, ifft2, ifftshift
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import WavefieldArrayType
-
-RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
+from ptychodus.api.typing import RealArrayType
 
 
 class FresnelPropagator:
     EPS: Final[float] = float(numpy.finfo(float).eps)
 
     @staticmethod
-    def _ifftshift_coords(sz: int, pixelSizeInMeters: float) -> RealArrayType:
-        return ifftshift(numpy.arange(-(sz // 2), (sz + 1) // 2)) * pixelSizeInMeters
+    def _create_coordinates(sz: int, pixelSizeInMeters: float) -> RealArrayType:
+        return numpy.arange(-(sz // 2), (sz + 1) // 2) * pixelSizeInMeters
 
     def __init__(self, arrayShape: tuple[int, ...], pixelGeometry: PixelGeometry,
                  propagationDistanceInMeters: float, wavelengthInMeters: float) -> None:
         dx = pixelGeometry.widthInMeters
         dy = pixelGeometry.heightInMeters
-        lz = wavelengthInMeters * numpy.abs(propagationDistanceInMeters)
         ik = 2j * numpy.pi / wavelengthInMeters
-        ik_2z = ik / (2 * propagationDistanceInMeters)
+
+        try:
+            ik_2z = ik / (2 * propagationDistanceInMeters)
+        except ZeroDivisionError:
+            ik_2z = 0
 
         # real space pixel size & coordinate grid
-        x = self._ifftshift_coords(arrayShape[-1], dx)
-        y = self._ifftshift_coords(arrayShape[-2], dy)
+        x = self._create_coordinates(arrayShape[-1], dx)
+        y = self._create_coordinates(arrayShape[-2], dy)
         YY, XX = numpy.meshgrid(y, x)
 
         # reciprocal space pixel size & coordinate grid
-        fx = fftfreq(arrayShape[-1], d=dx / lz)
-        fy = fftfreq(arrayShape[-2], d=dy / lz)
+        lz = numpy.abs(wavelengthInMeters * propagationDistanceInMeters)
+        fx = self._create_coordinates(arrayShape[-1], lz / (arrayShape[-1] * dx))
+        fy = self._create_coordinates(arrayShape[-2], lz / (arrayShape[-2] * dy))
         FY, FX = numpy.meshgrid(fy, fx)
 
         # propagation quantities
@@ -41,14 +44,11 @@ class FresnelPropagator:
         self._eikz = numpy.exp(ik * propagationDistanceInMeters)
 
     def propagate(self, inputWavefield: WavefieldArrayType) -> WavefieldArrayType:
-        shiftedWavefield = ifftshift(inputWavefield)
-
-        if self._propagationDistanceInMeters > FresnelPropagator.EPS:
-            Beikz = self._B * self._eikz
-            return fftshift(Beikz * fft2(self._A * shiftedWavefield, norm='ortho'))
-
-        if self._propagationDistanceInMeters < -FresnelPropagator.EPS:
+        if self._propagationDistanceInMeters < 0:
             Aeikz = self._A * self._eikz
-            return fftshift(Aeikz * ifft2(self._B * shiftedWavefield, norm='ortho'))
+            return Aeikz * fftshift(ifft2(ifftshift(self._B * inputWavefield), norm='ortho'))
+        elif self._propagationDistanceInMeters > 0:
+            Beikz = self._B * self._eikz
+            return Beikz * fftshift(fft2(ifftshift(self._A * inputWavefield), norm='ortho'))
 
         return inputWavefield

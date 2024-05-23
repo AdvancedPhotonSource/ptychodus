@@ -21,7 +21,8 @@ from ptychodus.api.patterns import DiffractionMetadata, DiffractionPatternArray
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 
-from .analysis import AnalysisCore, DichroicAnalyzer, FourierRingCorrelator, ProbePropagator
+from .analysis import (AnalysisCore, ExposureAnalyzer, FluorescenceEnhancer, FourierRingCorrelator,
+                       ProbePropagator, STXMAnalyzer, XMCDAnalyzer)
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .memory import MemoryPresenter
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
@@ -102,8 +103,13 @@ class ModelCore:
                 self.ptychonnReconstructorLibrary,
             ],
         )
-        self._analysisCore = AnalysisCore(self._productCore.productRepository,
-                                          self._productCore.objectRepository)
+        self._analysisCore = AnalysisCore(self.settingsRegistry,
+                                          self._productCore.productRepository,
+                                          self._productCore.objectRepository,
+                                          self._pluginRegistry.upscalingStrategies,
+                                          self._pluginRegistry.deconvolutionStrategies,
+                                          self._pluginRegistry.fluorescenceFileReaders,
+                                          self._pluginRegistry.fluorescenceFileWriters)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
                                           self._productCore.productAPI)
         self._automationCore = AutomationCore(
@@ -116,10 +122,7 @@ class ModelCore:
             self.settingsRegistry.openSettings(self._modelArgs.settingsFile)
 
         if self._modelArgs.patternsFile:
-            patternsFile = self._modelArgs.patternsFile
-            self._patternsCore.patternsAPI.openPatterns(patternsFile,
-                                                        patternsFile.suffix[1:],
-                                                        assemble=True)
+            self._patternsCore.patternsAPI.openPreprocessedPatterns(self._modelArgs.patternsFile)
 
         self._patternsCore.start()
         self._workflowCore.start()
@@ -220,6 +223,12 @@ class ModelCore:
     def refreshAutomationDatasets(self) -> None:
         self._automationCore.repository.notifyObserversIfRepositoryChanged()
 
+    def stageReconstructionInputs(self, stagingDir: Path) -> int:
+        self.settingsRegistry.saveSettings(stagingDir / 'settings.ini')
+        self._patternsCore.patternsAPI.savePreprocessedPatterns(stagingDir / 'patterns.npz')
+        self._productCore.productAPI.saveProduct(0, stagingDir / 'product-in.npz', 'NPZ')
+        return 0
+
     def batchModeReconstruct(self, inputFilePath: Path, outputFilePath: Path) -> int:
         inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, 'NPZ')
 
@@ -261,6 +270,14 @@ class ModelCore:
         return self._reconstructorCore.presenter
 
     @property
+    def stxmAnalyzer(self) -> STXMAnalyzer:
+        return self._analysisCore.stxmAnalyzer
+
+    @property
+    def stxmVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.stxmVisualizationEngine
+
+    @property
     def probePropagator(self) -> ProbePropagator:
         return self._analysisCore.probePropagator
 
@@ -269,16 +286,32 @@ class ModelCore:
         return self._analysisCore.probePropagatorVisualizationEngine
 
     @property
+    def exposureAnalyzer(self) -> ExposureAnalyzer:
+        return self._analysisCore.exposureAnalyzer
+
+    @property
+    def exposureVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.exposureVisualizationEngine
+
+    @property
     def fourierRingCorrelator(self) -> FourierRingCorrelator:
         return self._analysisCore.fourierRingCorrelator
 
     @property
-    def dichroicAnalyzer(self) -> DichroicAnalyzer:
-        return self._analysisCore.dichroicAnalyzer
+    def fluorescenceEnhancer(self) -> FluorescenceEnhancer:
+        return self._analysisCore.fluorescenceEnhancer
 
     @property
-    def dichroicVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.dichroicVisualizationEngine
+    def fluorescenceVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.fluorescenceVisualizationEngine
+
+    @property
+    def xmcdAnalyzer(self) -> XMCDAnalyzer:
+        return self._analysisCore.xmcdAnalyzer
+
+    @property
+    def xmcdVisualizationEngine(self) -> VisualizationEngine:
+        return self._analysisCore.xmcdVisualizationEngine
 
     @property
     def areWorkflowsSupported(self) -> bool:
