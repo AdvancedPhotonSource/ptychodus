@@ -1,7 +1,5 @@
-from .controller import ProbeController
-from .image import ProbeImageController
+from .core import ProbeController
 
 __all__ = [
     'ProbeController',
-    'ProbeImageController',
 ]

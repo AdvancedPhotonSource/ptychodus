@@ -42,7 +42,7 @@ class WorkflowAuthorizationController:
         self._dialog.open()
 
     def _finishAuthorization(self, result: int) -> None:
-        if result != QDialog.Accepted:
+        if result != QDialog.DialogCode.Accepted:
             return
 
         authCode = self._dialog.lineEdit.text()

@@ -31,7 +31,7 @@ class WorkflowStatusController:
         controller._proxyModel.setSourceModel(controller._tableModel)
         tableView.setModel(controller._proxyModel)
         tableView.setSortingEnabled(True)
-        tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        tableView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         tableView.clicked.connect(controller._handleTableViewClick)
 
         controller._timer.timeout.connect(presenter.refreshStatus)
@@ -45,7 +45,7 @@ class WorkflowStatusController:
 
     def _handleTableViewClick(self, index: QModelIndex) -> None:
         if index.column() == 5:
-            url = index.data(Qt.UserRole)
+            url = index.data(Qt.ItemDataRole.UserRole)
             logger.debug(f'Opening URL: \"{url.toString()}\"')
             QDesktopServices.openUrl(url)
 

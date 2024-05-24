@@ -1,7 +1,8 @@
 from __future__ import annotations
 from pathlib import Path
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.ptychonn import PtychoNNModelPresenter
 from ...view.ptychonn import PtychoNNModelParametersView
 from ..data import FileDialogFactory

@@ -1,6 +1,5 @@
 from __future__ import annotations
 from decimal import Decimal
-from typing import Optional
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QComboBox, QHBoxLayout, QWidget
@@ -12,14 +11,14 @@ from .decimalLineEdit import DecimalLineEdit
 class AngleWidget(QWidget):
     angleChanged = pyqtSignal(Decimal)
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.angleInTurns = Decimal()
         self.angleLineEdit = DecimalLineEdit.createInstance(isSigned=False)
         self.unitsComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> AngleWidget:
+    def createInstance(cls, parent: QWidget | None = None) -> AngleWidget:
         widget = cls(parent)
 
         widget.angleLineEdit.valueChanged.connect(widget._setAngleInTurnsFromWidgets)

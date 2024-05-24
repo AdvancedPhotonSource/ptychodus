@@ -16,7 +16,7 @@ class NPYProbeFileReader(ProbeFileReader):
 class NPYProbeFileWriter(ProbeFileWriter):
 
     def write(self, filePath: Path, probe: Probe) -> None:
-        array = probe.getArray()
+        array = probe.array
         numpy.save(filePath, array)
 
 

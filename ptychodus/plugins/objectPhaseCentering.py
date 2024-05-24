@@ -28,9 +28,9 @@ class CenterBoxMeanPhaseCenteringStrategy(ObjectPhaseCenteringStrategy):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.objectPhaseCenteringStrategies.registerPlugin(
         IdentityPhaseCenteringStrategy(),
-        simpleName='Identity',
+        displayName='Identity',
     )
     registry.objectPhaseCenteringStrategies.registerPlugin(
         CenterBoxMeanPhaseCenteringStrategy(),
-        simpleName='CenterBoxMean',
+        displayName='Center Box Mean',
     )

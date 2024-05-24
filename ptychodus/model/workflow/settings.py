@@ -1,8 +1,8 @@
 from __future__ import annotations
 from uuid import UUID
 
-from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry, SettingsGroup
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry, SettingsGroup
 
 
 class WorkflowSettings(Observable, Observer):

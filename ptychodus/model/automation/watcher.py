@@ -6,25 +6,29 @@ import watchdog.events
 from watchdog.observers.polling import PollingObserver
 import watchdog.observers
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.automation import FileBasedWorkflow
+from ptychodus.api.observer import Observable, Observer
+
 from .buffer import AutomationDatasetBuffer
 from .settings import AutomationSettings
+from .workflow import CurrentFileBasedWorkflow
 
 logger = logging.getLogger(__name__)
 
 
 class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
 
-    def __init__(self, datasetBuffer: AutomationDatasetBuffer) -> None:
+    def __init__(self, workflow: FileBasedWorkflow,
+                 datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
+        self._workflow = workflow
         self._datasetBuffer = datasetBuffer
 
     def on_created_or_modified(self, event: watchdog.events.FileSystemEvent) -> None:
         if not event.is_directory:
             srcPath = Path(event.src_path)
 
-            # TODO generalize
-            if srcPath.suffix.casefold() == '.mda':
+            if srcPath.match(self._workflow.getFilePattern()):
                 self._datasetBuffer.put(srcPath)
 
     def on_created(self, event: watchdog.events.FileSystemEvent) -> None:
@@ -36,19 +40,16 @@ class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
 
 class DataDirectoryWatcher(Observable, Observer):
 
-    def __init__(self, settings: AutomationSettings,
+    def __init__(self, settings: AutomationSettings, workflow: CurrentFileBasedWorkflow,
                  datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
         self._settings = settings
+        self._workflow = workflow
         self._datasetBuffer = datasetBuffer
         self._observer: watchdog.observers.api.BaseObserver = watchdog.observers.Observer()
 
-    @classmethod
-    def createInstance(cls, settings: AutomationSettings,
-                       datasetBuffer: AutomationDatasetBuffer) -> DataDirectoryWatcher:
-        watcher = cls(settings, datasetBuffer)
-        settings.addObserver(watcher)
-        return watcher
+        settings.addObserver(self)
+        workflow.addObserver(self)
 
     @property
     def isAlive(self) -> bool:
@@ -56,12 +57,17 @@ class DataDirectoryWatcher(Observable, Observer):
 
     def _updateWatch(self) -> None:
         self._observer.unschedule_all()
-        observedWatch = self._observer.schedule(
-            event_handler=DataDirectoryEventHandler(self._datasetBuffer),
-            path=self._settings.dataDirectory.value,
-            recursive=False,  # TODO generalize
-        )
-        logger.debug(observedWatch)
+        dataDirectory = self._settings.dataDirectory.value
+
+        if dataDirectory.exists():
+            observedWatch = self._observer.schedule(
+                event_handler=DataDirectoryEventHandler(self._workflow, self._datasetBuffer),
+                path=dataDirectory,
+                recursive=False,  # TODO generalize
+            )
+            logger.debug(observedWatch)
+        else:
+            logger.warning(f'Data directory \"{dataDirectory}\" does not exist!')
 
     def start(self) -> None:
         if self.isAlive:
@@ -83,4 +89,6 @@ class DataDirectoryWatcher(Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
+            self._updateWatch()
+        elif observable is self._workflow:
             self._updateWatch()

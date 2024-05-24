@@ -1,30 +1,27 @@
 Ptychodus
 =========
 
-`ptychodus`_ is a ptychography analysis application that supports multiple reconstruction libraries. Current reconstructor status:
+`ptychodus`_ is a ptychography analysis application that supports multiple reconstruction libraries.
 
-* `tike`_ is working
-* `PtychoNN`_ is working
-* `ptychopy`_ is under development
 
 Standard Installation
 ---------------------
 
-1. Install `miniforge <https://github.com/conda-forge/miniforge>`_, the conda disribution that uses faster default settings than the Anaconda installer.
+1. Install `miniforge <https://github.com/conda-forge/miniforge>`_.
 
 2. Install ptychodus.
-
-   * To install `ptychodus` with the GUI and no optional packages:
-
-     .. code-block:: shell
-
-           $ conda create -c conda-forge -n ptychodus ptychodus
 
    * To install `ptychodus` with the GUI and all optional packages:
 
      .. code-block:: shell
 
            $ conda create -c conda-forge -n ptychodus ptychodus-all
+
+   * To install `ptychodus` with the GUI and no optional packages:
+
+     .. code-block:: shell
+
+           $ conda create -c conda-forge -n ptychodus ptychodus
 
    * To install `ptychodus` without the GUI or optional packages:
 
@@ -35,24 +32,26 @@ Standard Installation
 3. Activate the `ptychodus` conda environment to run ptychodus.
 
    .. code-block:: shell
+
        $ conda activate ptychodus
        $ ptychodus -h
-       usage: ptychodus [-h] [-b RESULTS_FILE] [-f PREFIX] [-p PORT] [-r RESTART_FILE] [-s SETTINGS_FILE] [-v]
+
+       usage: ptychodus [-h] [-b {reconstruct,train}] [-f FILE_PREFIX] [-s SETTINGS_FILE] [-v] [-w OUTPUT_DIR]
 
        ptychodus is a ptychography analysis application
 
        options:
          -h, --help            show this help message and exit
-         -b RESULTS_FILE, --batch RESULTS_FILE
-                               run reconstruction non-interactively
-         -f PREFIX, --file-prefix PREFIX
-                               replace file path prefix
-         -p PORT, --port PORT  remote process communication port number
-         -r RESTART_FILE, --restart RESTART_FILE
-                               use restart data from file
+         -b {reconstruct,train}, --batch {reconstruct,train}
+                               run action non-interactively
+         -f FILE_PREFIX, --file-prefix FILE_PREFIX
+                               replace file path prefix in settings
          -s SETTINGS_FILE, --settings SETTINGS_FILE
                                use settings from file
          -v, --version         show program's version number and exit
+         -w OUTPUT_DIR, --write OUTPUT_DIR
+                               stage reconstruction inputs to directory
+
        $ ptychodus
 
 
@@ -68,46 +67,32 @@ Developer Installation
    $ conda activate ptychodus
    $ pip install -e ./ptychodus
 
-* To install the `tike` backend:
+* To install the `tike`_ backend:
 
 .. code-block:: shell
 
    $ conda install -n ptychodus -c conda-forge tike
 
-* To install the `PtychoNN` backend:
+* To install the `PtychoNN`_ backend:
 
 .. code-block:: shell
 
    $ conda install -n ptychodus -c conda-forge ptychonn pytorch-gpu
 
-* To launch the `ptychodus` GUI (with the "ptychodus" conda environment activated):
+* Launch `ptychodus`:
 
 .. code-block:: shell
 
+   $ conda activate ptychodus
    $ ptychodus
 
-Tips
-----
 
-* This project is experimenting with `type hints <https://docs.python.org/3/library/typing.html>`_ which can be checked using `mypy <http://mypy-lang.org>`_.
-
-.. code-block:: shell
-
-  $ mypy ptychodus
-
-* Stubs to support PyQt5 type hinting can be installed within the conda environment.
-
-.. code-block:: shell
-
-   $ pip install PyQt5-stubs
-
-Reporting bugs
--------------
+Reporting Bugs
+--------------
 
 Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
 
 .. _`ptychodus`: https://github.com/AdvancedPhotonSource/ptychodus
 .. _`tike`: https://github.com/tomography/tike
-.. _`ptychopy`: https://github.com/AdvancedPhotonSource/ptychopy
 .. _`PtychoNN`: https://github.com/mcherukara/PtychoNN
 .. _`PvaPy`: https://github.com/epics-base/pvaPy

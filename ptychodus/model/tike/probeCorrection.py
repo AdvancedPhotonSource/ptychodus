@@ -1,8 +1,9 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from ...api.geometry import Interval
-from ...api.settings import SettingsGroup, SettingsRegistry
+from ptychodus.api.geometry import Interval
+from ptychodus.api.settings import SettingsGroup, SettingsRegistry
+
 from .adaptiveMoment import TikeAdaptiveMomentPresenter, TikeAdaptiveMomentSettings
 
 

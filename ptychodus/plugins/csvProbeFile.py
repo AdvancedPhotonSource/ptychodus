@@ -24,7 +24,7 @@ class CSVProbeFileReader(ProbeFileReader):
 class CSVProbeFileWriter(ProbeFileWriter):
 
     def write(self, filePath: Path, probe: Probe) -> None:
-        array = probe.getArray()
+        array = probe.array
         arrayFlat = array.reshape(-1, array.shape[-1])
         numpy.savetxt(filePath, arrayFlat, delimiter=',')
 

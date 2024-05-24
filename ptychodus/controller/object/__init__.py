@@ -1,7 +1,5 @@
-from .controller import ObjectController
-from .image import ObjectImageController
+from .core import ObjectController
 
 __all__ = [
     'ObjectController',
-    'ObjectImageController',
 ]

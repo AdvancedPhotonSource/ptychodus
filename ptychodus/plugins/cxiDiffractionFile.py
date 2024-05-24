@@ -3,11 +3,12 @@ import logging
 
 import h5py
 
-from ptychodus.api.apparatus import PixelGeometry
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                SimpleDiffractionDataset)
-from ptychodus.api.image import ImageExtent
+from ptychodus.api.constants import ELECTRON_VOLT_J
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                    SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
+
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)
@@ -29,11 +30,11 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                 try:
                     data = h5File[self._dataPath]
                 except KeyError:
-                    logger.debug('Unable to load data.')
+                    logger.warning('Unable to load data.')
                 else:
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
-                    detectorExtentInPixels = ImageExtent(detectorWidth, detectorHeight)
+                    detectorExtent = ImageExtent(detectorWidth, detectorHeight)
                     detectorDistanceInMeters = float(
                         h5File['/entry_1/instrument_1/detector_1/distance'][()])
                     detectorPixelGeometry = PixelGeometry(
@@ -42,15 +43,14 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                     )
                     probeEnergyInJoules = float(
                         h5File['/entry_1/instrument_1/source_1/energy'][()])
-                    oneJouleInElectronVolts = 6.241509074e18
-                    probeEnergyInElectronVolts = probeEnergyInJoules * oneJouleInElectronVolts
+                    probeEnergyInElectronVolts = probeEnergyInJoules / ELECTRON_VOLT_J
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
                         detectorDistanceInMeters=detectorDistanceInMeters,
-                        detectorExtentInPixels=detectorExtentInPixels,
+                        detectorExtent=detectorExtent,
                         detectorPixelGeometry=detectorPixelGeometry,
                         probeEnergyInElectronVolts=probeEnergyInElectronVolts,
                         filePath=filePath,
@@ -65,7 +65,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
 
                     dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return dataset
 

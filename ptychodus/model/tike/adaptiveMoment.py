@@ -1,9 +1,9 @@
 from decimal import Decimal
 from typing import Generic, TypeVar
 
-from ...api.geometry import Interval
-from ...api.observer import Observable, Observer
-from ...api.settings import SettingsGroup
+from ptychodus.api.geometry import Interval
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsGroup
 
 
 class TikeAdaptiveMomentSettings(Observable, Observer):

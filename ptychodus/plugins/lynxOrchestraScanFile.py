@@ -1,11 +1,10 @@
-from collections import defaultdict
 from pathlib import Path
 from typing import Final
 import csv
 import logging
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError, TabularScan
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
     ]
 
     def read(self, filePath: Path) -> Scan:
-        pointSeqMap: dict[int, list[ScanPoint]] = defaultdict(list[ScanPoint])
+        pointList: list[ScanPoint] = list()
         scanName = self.SIMPLE_NAME
 
         with filePath.open(newline='') as csvFile:
@@ -70,14 +69,14 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
                 if len(row) != len(columnHeaderRow):
                     raise ScanPointParseError('Bad number of columns!')
 
-                data_point = int(row[self.DATA_POINT_COLUMN])
                 point = ScanPoint(
-                    x=-float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
-                    y=-float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
+                    int(row[self.DATA_POINT_COLUMN]),
+                    -float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
+                    -float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
                 )
-                pointSeqMap[data_point].append(point)
+                pointList.append(point)
 
-        return TabularScan.createFromMappedPointIterable(pointSeqMap)
+        return Scan(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

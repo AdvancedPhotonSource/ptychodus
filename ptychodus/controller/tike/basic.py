@@ -3,7 +3,8 @@ from __future__ import annotations
 from PyQt5.QtCore import QRegularExpression
 from PyQt5.QtGui import QRegularExpressionValidator
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.tike import TikePresenter
 from ...view.tike import TikeBasicParametersView
 

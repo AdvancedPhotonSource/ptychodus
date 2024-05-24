@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 
 from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QListView,
                              QPushButton, QVBoxLayout, QWidget)
@@ -7,12 +6,12 @@ from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QLi
 
 class SettingsView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Parameters', parent)
         self.replacementPathPrefixLineEdit = QLineEdit()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsView:
+    def createInstance(cls, parent: QWidget | None = None) -> SettingsView:
         view = cls(parent)
 
         view.replacementPathPrefixLineEdit.setToolTip(
@@ -27,13 +26,13 @@ class SettingsView(QGroupBox):
 
 class SettingsButtonBox(QWidget):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.openButton = QPushButton('Open')
         self.saveButton = QPushButton('Save')
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsButtonBox:
+    def createInstance(cls, parent: QWidget | None = None) -> SettingsButtonBox:
         view = cls(parent)
 
         layout = QHBoxLayout()
@@ -47,13 +46,13 @@ class SettingsButtonBox(QWidget):
 
 class SettingsGroupView(QGroupBox):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Groups', parent)
         self.listView = QListView()
         self.buttonBox = SettingsButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsGroupView:
+    def createInstance(cls, parent: QWidget | None = None) -> SettingsGroupView:
         view = cls(parent)
 
         layout = QVBoxLayout()
@@ -66,13 +65,13 @@ class SettingsGroupView(QGroupBox):
 
 class SettingsParametersView(QWidget):
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.settingsView = SettingsView.createInstance()
         self.groupView = SettingsGroupView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> SettingsParametersView:
+    def createInstance(cls, parent: QWidget | None = None) -> SettingsParametersView:
         view = cls(parent)
 
         layout = QVBoxLayout()

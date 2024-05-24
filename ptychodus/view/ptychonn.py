@@ -72,7 +72,8 @@ class PtychoNNTrainingParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Training Parameters', parent)
-        self.validationSetFractionalSizeSlider = DecimalSlider.createInstance(Qt.Horizontal)
+        self.validationSetFractionalSizeSlider = DecimalSlider.createInstance(
+            Qt.Orientation.Horizontal)
         self.optimizationEpochsPerHalfCycleSpinBox = QSpinBox()
         self.maximumLearningRateLineEdit = DecimalLineEdit.createInstance()
         self.minimumLearningRateLineEdit = DecimalLineEdit.createInstance()

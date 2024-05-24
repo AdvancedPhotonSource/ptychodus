@@ -4,59 +4,20 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from .data import DiffractionPatternArrayType
-from .image import ImageExtent
-from .object import ObjectArrayType, ObjectInterpolator
-from .plot import Plot2D, PlotUncertain2D
-from .probe import ProbeArrayType
-from .scan import Scan
+from .product import Product
+from .patterns import DiffractionPatternArrayType
 
 
 @dataclass(frozen=True)
 class ReconstructInput:
-    diffractionPatternArray: DiffractionPatternArrayType
-    scan: Scan
-    probeArray: ProbeArrayType
-    objectInterpolator: ObjectInterpolator
-
-    @property
-    def diffractionPatternExtent(self) -> ImageExtent:
-        return ImageExtent(
-            width=self.diffractionPatternArray.shape[-1],
-            height=self.diffractionPatternArray.shape[-2],
-        )
-
-    @property
-    def probeExtent(self) -> ImageExtent:
-        return ImageExtent(
-            width=self.probeArray.shape[-1],
-            height=self.probeArray.shape[-2],
-        )
-
-    @property
-    def objectArray(self) -> ObjectArrayType:
-        return self.objectInterpolator.getArray()
-
-    @property
-    def objectExtent(self) -> ImageExtent:
-        return ImageExtent(
-            width=self.objectArray.shape[-1],
-            height=self.objectArray.shape[-2],
-        )
+    patterns: DiffractionPatternArrayType
+    product: Product
 
 
 @dataclass(frozen=True)
 class ReconstructOutput:
-    scan: Scan | None
-    probeArray: ProbeArrayType | None
-    objectArray: ObjectArrayType | None
-    objective: Sequence[Sequence[float]]
-    plot2D: Plot2D | PlotUncertain2D
+    product: Product
     result: int
-
-    @classmethod
-    def createNull(cls) -> ReconstructOutput:
-        return cls(None, None, None, [[]], Plot2D.createNull(), 0)
 
 
 class Reconstructor(ABC):
@@ -71,6 +32,13 @@ class Reconstructor(ABC):
         pass
 
 
+@dataclass(frozen=True)
+class TrainOutput:
+    trainingLoss: Sequence[float]
+    validationLoss: Sequence[float]
+    result: int
+
+
 class TrainableReconstructor(Reconstructor):
 
     @abstractmethod
@@ -78,11 +46,11 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def getSaveFileFilterList(self) -> Sequence[str]:
+    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         pass
 
     @abstractmethod
-    def getSaveFileFilter(self) -> str:
+    def getSaveTrainingDataFileFilter(self) -> str:
         pass
 
     @abstractmethod
@@ -90,11 +58,23 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def train(self) -> Plot2D:
+    def train(self) -> TrainOutput:
         pass
 
     @abstractmethod
     def clearTrainingData(self) -> None:
+        pass
+
+    @abstractmethod
+    def getSaveModelFileFilterList(self) -> Sequence[str]:
+        pass
+
+    @abstractmethod
+    def getSaveModelFileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def saveModel(self, filePath: Path) -> None:
         pass
 
 
@@ -108,31 +88,33 @@ class NullReconstructor(TrainableReconstructor):
         return self._name
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        return ReconstructOutput(
-            scan=parameters.scan,
-            probeArray=parameters.probeArray,
-            objectArray=parameters.objectInterpolator.getArray(),
-            objective=[[]],
-            plot2D=Plot2D.createNull(),
-            result=0,
-        )
+        return ReconstructOutput(parameters.product, 0)
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         pass
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
+    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         return list()
 
-    def getSaveFileFilter(self) -> str:
+    def getSaveTrainingDataFileFilter(self) -> str:
         return str()
 
     def saveTrainingData(self, filePath: Path) -> None:
         pass
 
-    def train(self) -> Plot2D:
-        return Plot2D.createNull()
+    def train(self) -> TrainOutput:
+        return TrainOutput([], [], 0)
 
     def clearTrainingData(self) -> None:
+        pass
+
+    def getSaveModelFileFilterList(self) -> Sequence[str]:
+        return list()
+
+    def getSaveModelFileFilter(self) -> str:
+        return str()
+
+    def saveModel(self, filePath: Path) -> None:
         pass
 
 

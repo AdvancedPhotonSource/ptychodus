@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Union, overload
+from typing import overload
 import threading
 
 
@@ -33,8 +33,7 @@ class WorkflowStatusRepository(Sequence[WorkflowStatus]):
     def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]:
         ...
 
-    def __getitem__(self, index: Union[int, slice]) -> \
-            Union[WorkflowStatus, Sequence[WorkflowStatus]]:
+    def __getitem__(self, index: int | slice) -> WorkflowStatus | Sequence[WorkflowStatus]:
         with self._statusLock:
             return self._statusList[index]
 

@@ -1,11 +1,12 @@
 from __future__ import annotations
+from typing import Any
 
-from PyQt5.QtCore import (Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject,
-                          QVariant)
+from PyQt5.QtCore import Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QObject
 from PyQt5.QtWidgets import QTableView
 
-from ..api.observer import Observable, Observer
-from ..api.settings import SettingsGroup, SettingsRegistry
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsGroup, SettingsRegistry
+
 from ..view.settings import SettingsParametersView
 from .data import FileDialogFactory
 
@@ -20,14 +21,10 @@ class SettingsGroupListModel(QAbstractListModel):
         self.beginResetModel()
         self.endResetModel()
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
-        value = QVariant()
-
-        if index.isValid() and role == Qt.DisplayRole:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             settingsGroup = self._settingsRegistry[index.row()]
-            value = QVariant(settingsGroup.name)
-
-        return value
+            return settingsGroup.name
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._settingsRegistry)
@@ -42,32 +39,24 @@ class SettingsEntryTableModel(QAbstractTableModel):
     def headerData(self,
                    section: int,
                    orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole) -> QVariant:
-        value = QVariant()
-
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             if section == 0:
-                value = QVariant('Name')
+                return 'Name'
             elif section == 1:
-                value = QVariant('Value')
+                return 'Value'
 
-        return value
-
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> QVariant:
-        value = QVariant()
-
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if self._settingsGroup is None:
-            return value
+            return None
 
-        if index.isValid() and role == Qt.DisplayRole:
+        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             settingsEntry = self._settingsGroup[index.row()]
 
             if index.column() == 0:
-                value = QVariant(settingsEntry.name)
+                return settingsEntry.name
             elif index.column() == 1:
-                value = QVariant(str(settingsEntry.value))
-
-        return value
+                return str(settingsEntry.value)
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._settingsGroup) if self._settingsGroup else 0

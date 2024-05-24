@@ -3,7 +3,8 @@ from pathlib import Path
 import logging
 import threading
 
-from ...api.observer import Observable
+from ptychodus.api.observer import Observable
+
 from .settings import AutomationSettings
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,14 @@ class AutomationDatasetRepository(Observable):
                 logger.debug(f'{filePath}: {priorState} -> {state}')
                 self._fileState[filePath] = state
 
-        self._changedEvent.set()
+            self._changedEvent.set()
+
+    def clear(self) -> None:
+        with self._lock:
+            self._fileList.clear()
+            self._fileState.clear()
+
+            self._changedEvent.set()
 
     def getLabel(self, index: int) -> str:
         with self._lock:

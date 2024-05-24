@@ -3,11 +3,11 @@ import logging
 
 import h5py
 
-from ptychodus.api.apparatus import PixelGeometry
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                SimpleDiffractionDataset)
-from ptychodus.api.image import ImageExtent
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                    SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
+
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
                     data = h5File[self._dataPath]
                     pixelSize = float(data.attrs['Pixel_size'].item())
                 except KeyError:
-                    logger.debug('Unable to load data.')
+                    logger.warning('Unable to load data.')
                 else:
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
@@ -38,7 +38,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
-                        detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
+                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
                         detectorPixelGeometry=PixelGeometry(pixelSize, pixelSize),
                         filePath=filePath,
                     )
@@ -52,7 +52,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
                     dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file \"{filePath}\".')
 
         return dataset
 

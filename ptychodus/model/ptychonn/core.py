@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Final
 import logging
 
-from ...api.geometry import Interval
-from ...api.observer import Observable, Observer
-from ...api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
-                                  TrainableReconstructor)
-from ...api.settings import SettingsRegistry
-from ..object import ObjectAPI
+from ptychodus.api.geometry import Interval
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
+                                         TrainableReconstructor)
+from ptychodus.api.settings import SettingsRegistry
+
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 logger = logging.getLogger(__name__)
@@ -182,7 +182,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry, objectAPI: ObjectAPI,
+    def createInstance(cls, settingsRegistry: SettingsRegistry,
                        isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
         modelSettings = PtychoNNModelSettings.createInstance(settingsRegistry)
         trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
@@ -201,11 +201,9 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         else:
             phaseOnlyReconstructor = PtychoNNTrainableReconstructor(modelSettings,
                                                                     trainingSettings,
-                                                                    objectAPI,
                                                                     enableAmplitude=False)
             amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(modelSettings,
                                                                          trainingSettings,
-                                                                         objectAPI,
                                                                          enableAmplitude=True)
             reconstructors.append(phaseOnlyReconstructor)
             reconstructors.append(amplitudePhaseReconstructor)

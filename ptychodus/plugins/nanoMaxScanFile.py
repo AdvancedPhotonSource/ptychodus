@@ -5,7 +5,7 @@ import logging
 import h5py
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError
 
 logger = logging.getLogger(__name__)
 
@@ -14,23 +14,25 @@ class NanoMaxScanFileReader(ScanFileReader):
     MICRONS_TO_METERS: Final[float] = 1.e-6
 
     def read(self, filePath: Path) -> Scan:
-        pointList = list()
+        pointList: list[ScanPoint] = list()
 
         with h5py.File(filePath, 'r') as h5File:
             try:
-                xArray = h5File['/entry/measurement/pseudo/x'][()]
-                yArray = h5File['/entry/measurement/pseudo/y'][()]
+                positionX = h5File['/entry/measurement/pseudo/x'][()]
+                positionY = h5File['/entry/measurement/pseudo/y'][()]
             except KeyError:
                 logger.exception('Unable to load scan.')
             else:
-                for x, y in zip(xArray, yArray):
-                    point = ScanPoint(
-                        x=x * self.MICRONS_TO_METERS,
-                        y=y * self.MICRONS_TO_METERS,
-                    )
+                if positionX.shape == positionY.shape:
+                    logger.debug(f'Coordinate arrays have shape {positionX.shape}.')
+                else:
+                    raise ScanPointParseError('Coordinate array shape mismatch!')
+
+                for idx, (x, y) in enumerate(zip(positionX, positionY)):
+                    point = ScanPoint(idx, x, y)
                     pointList.append(point)
 
-        return TabularScan.createFromPointIterable(pointList)
+        return Scan(pointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

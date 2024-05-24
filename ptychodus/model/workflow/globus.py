@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from importlib.metadata import version
 from pprint import pformat
-from typing import Final, Optional, Union
+from typing import Final, TypeAlias
 import json
 import logging
 import os
@@ -22,34 +22,48 @@ from .status import WorkflowStatus, WorkflowStatusRepository
 
 logger = logging.getLogger(__name__)
 
-AuthorizerTypes = Union[globus_sdk.AccessTokenAuthorizer, globus_sdk.RefreshTokenAuthorizer]
-ScopeAuthorizerMapping = Mapping[str, AuthorizerTypes]
+AuthorizerTypes: TypeAlias = globus_sdk.AccessTokenAuthorizer | globus_sdk.RefreshTokenAuthorizer
+ScopeAuthorizerMapping: TypeAlias = Mapping[str, AuthorizerTypes]
 
 PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
+# TODO add review consents fix
+
 
 def ptychodus_reconstruct(**data: str) -> None:
+    import sys
+
     from pathlib import Path
     from ptychodus.model import ModelArgs, ModelCore
 
+    action = data['ptychodus_action']
+    inputFile = Path(data['ptychodus_input_file'])
+    outputFile = Path(data['ptychodus_output_file'])
+
     modelArgs = ModelArgs(
-        restartFilePath=Path(data['ptychodus_restart_file']),
-        settingsFilePath=Path(data['ptychodus_settings_file']),
+        settingsFile=Path(data['ptychodus_settings_file']),
+        patternsFile=Path(data['ptychodus_patterns_file']),
+        replacementPathPrefix=data.get('ptychodus_path_prefix'),
     )
 
-    resultsFilePath = Path(data['ptychodus_results_file'])
-
     with ModelCore(modelArgs) as model:
-        model.batchModeReconstruct(resultsFilePath)
+        if action.lower() == 'reconstruct':
+            model.batchModeReconstruct(inputFile, outputFile)
+        elif action.lower() == 'train':
+            model.batchModeTrain(inputFile, outputFile)
+        else:
+            print(f'Unknown batch mode action \"{action}\"!', file=sys.stderr)
 
 
 @gladier.generate_flow_definition
 class PtychodusReconstruct(gladier.GladierBaseTool):
     compute_functions = [ptychodus_reconstruct]
     required_input = [
-        'ptychodus_restart_file',
+        'ptychodus_action',
+        'ptychodus_input_file',
+        'ptychodus_output_file',
+        'ptychodus_patterns_file',
         'ptychodus_settings_file',
-        'ptychodus_results_file',
     ]
 
 
@@ -125,7 +139,7 @@ class NativePtychodusClientBuilder(PtychodusClientBuilder):
 
 class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
 
-    def __init__(self, clientID: str, clientSecret: str, flowID: Optional[str]) -> None:
+    def __init__(self, clientID: str, clientSecret: str, flowID: str | None) -> None:
         super().__init__()
         self._authClient = globus_sdk.ConfidentialAppAuthClient(
             client_id=clientID,
@@ -167,7 +181,7 @@ class GlobusWorkflowThread(threading.Thread):
         logger.info('\tFair Research Login ' + version('fair-research-login'))
         logger.info('\tGladier ' + version('gladier'))
 
-        self.__gladierClient: Optional[gladier.GladierBaseClient] = None
+        self.__gladierClient: gladier.GladierBaseClient | None = None
 
     @classmethod
     def createInstance(cls, authorizer: WorkflowAuthorizer,

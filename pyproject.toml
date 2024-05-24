@@ -8,6 +8,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 
+[tool.mypy]
+plugins = "numpy.typing.mypy_plugin"
+
 [[tool.mypy.overrides]]
 module = [
     "fair_research_login",
@@ -15,17 +18,13 @@ module = [
     "gladier.*",
     "h5py",
     "hdf5plugin",
-    "matplotlib.*",
     "parsl.*",
     "ptychonn.*",
-    "ptychopy",
     "pvaccess",
     "pvapy.*",
     "scipy.*",
-    "skimage.*",
     "tifffile",
     "tike.*",
-    "watchdog.*",
 ]
 ignore_missing_imports = true
 

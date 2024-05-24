@@ -1,6 +1,5 @@
 from __future__ import annotations
 from decimal import Decimal
-from typing import Optional
 import logging
 
 from PyQt5.QtCore import pyqtSignal
@@ -13,19 +12,19 @@ logger = logging.getLogger(__name__)
 class DecimalLineEdit(QWidget):
     valueChanged = pyqtSignal(Decimal)
 
-    def __init__(self, parent: Optional[QWidget]) -> None:
+    def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self._validator = QDoubleValidator()
         self._lineEdit = QLineEdit()
         self._value = Decimal()
-        self._minimum: Optional[Decimal] = None
-        self._maximum: Optional[Decimal] = None
+        self._minimum: Decimal | None = None
+        self._maximum: Decimal | None = None
 
     @classmethod
     def createInstance(cls,
                        *,
                        isSigned: bool = False,
-                       parent: Optional[QWidget] = None) -> DecimalLineEdit:
+                       parent: QWidget | None = None) -> DecimalLineEdit:
         widget = cls(parent)
 
         widget._lineEdit.setValidator(widget._validator)
@@ -62,7 +61,7 @@ class DecimalLineEdit(QWidget):
             self._value = value
             self._setValueToLineEditAndEmitValueChanged()
 
-    def getMinimum(self) -> Optional[Decimal]:
+    def getMinimum(self) -> Decimal | None:
         return self._minimum
 
     def setMinimum(self, value: Decimal) -> None:
@@ -73,7 +72,7 @@ class DecimalLineEdit(QWidget):
         if valueBefore != valueAfter:
             self._setValueToLineEditAndEmitValueChanged()
 
-    def getMaximum(self) -> Optional[Decimal]:
+    def getMaximum(self) -> Decimal | None:
         return self._maximum
 
     def setMaximum(self, value: Decimal) -> None:

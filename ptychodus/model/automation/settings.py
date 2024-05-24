@@ -1,29 +1,26 @@
 from __future__ import annotations
 from pathlib import Path
 
-from ...api.observer import Observable, Observer
-from ...api.settings import SettingsRegistry, SettingsGroup
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry
 
 
 class AutomationSettings(Observable, Observer):
 
-    def __init__(self, settingsGroup: SettingsGroup) -> None:
+    def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = settingsGroup
-        self.strategy = settingsGroup.createStringEntry('Strategy', 'LYNX Catalyst Particle')
-        self.dataDirectory = settingsGroup.createPathEntry('DataDirectory', Path('/path/to/data'))
-        self.processingIntervalInSeconds = settingsGroup.createIntegerEntry(
-            'ProcessingIntervalInSeconds', 0)
-        self.useWatchdogPollingObserver = settingsGroup.createBooleanEntry(
-            'UseWatchdogPollingObserver', False)
-        self.watchdogDelayInSeconds = settingsGroup.createIntegerEntry(
-            'WatchdogDelayInSeconds', 15)
+        self._settingsGroup = registry.createGroup('Automation')
+        self._settingsGroup.addObserver(self)
 
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> AutomationSettings:
-        settings = cls(settingsRegistry.createGroup('Automation'))
-        settings._settingsGroup.addObserver(settings)
-        return settings
+        self.strategy = self._settingsGroup.createStringEntry('Strategy', 'APS2ID')
+        self.dataDirectory = self._settingsGroup.createPathEntry('DataDirectory',
+                                                                 Path('/path/to/data'))
+        self.processingIntervalInSeconds = self._settingsGroup.createIntegerEntry(
+            'ProcessingIntervalInSeconds', 0)
+        self.useWatchdogPollingObserver = self._settingsGroup.createBooleanEntry(
+            'UseWatchdogPollingObserver', False)
+        self.watchdogDelayInSeconds = self._settingsGroup.createIntegerEntry(
+            'WatchdogDelayInSeconds', 15)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

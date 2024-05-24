@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QAbstractItemModel, QTimer
 from PyQt5.QtWidgets import QTableView
 
 from ...model.workflow import (WorkflowAuthorizationPresenter, WorkflowExecutionPresenter,
@@ -17,7 +17,8 @@ class WorkflowController:
                  authorizationPresenter: WorkflowAuthorizationPresenter,
                  statusPresenter: WorkflowStatusPresenter,
                  executionPresenter: WorkflowExecutionPresenter,
-                 parametersView: WorkflowParametersView, tableView: QTableView) -> None:
+                 parametersView: WorkflowParametersView, tableView: QTableView,
+                 productItemModel: QAbstractItemModel) -> None:
         self._parametersPresenter = parametersPresenter
         self._authorizationPresenter = authorizationPresenter
         self._executionPresenter = executionPresenter
@@ -27,7 +28,8 @@ class WorkflowController:
         self._statusController = WorkflowStatusController.createInstance(
             statusPresenter, parametersView.statusView, tableView)
         self._executionController = WorkflowExecutionController.createInstance(
-            parametersPresenter, executionPresenter, parametersView.executionView)
+            parametersPresenter, executionPresenter, parametersView.executionView,
+            productItemModel)
         self._timer = QTimer()
 
     @classmethod
@@ -35,10 +37,10 @@ class WorkflowController:
                        authorizationPresenter: WorkflowAuthorizationPresenter,
                        statusPresenter: WorkflowStatusPresenter,
                        executionPresenter: WorkflowExecutionPresenter,
-                       parametersView: WorkflowParametersView,
-                       tableView: QTableView) -> WorkflowController:
+                       parametersView: WorkflowParametersView, tableView: QTableView,
+                       productItemModel: QAbstractItemModel) -> WorkflowController:
         controller = cls(parametersPresenter, authorizationPresenter, statusPresenter,
-                         executionPresenter, parametersView, tableView)
+                         executionPresenter, parametersView, tableView, productItemModel)
 
         controller._timer.timeout.connect(controller._processEvents)
         controller._timer.start(1000)  # TODO customize

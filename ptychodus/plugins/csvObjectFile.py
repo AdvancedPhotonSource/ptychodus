@@ -16,7 +16,7 @@ class CSVObjectFileReader(ObjectFileReader):
 class CSVObjectFileWriter(ObjectFileWriter):
 
     def write(self, filePath: Path, object_: Object) -> None:
-        array = object_.getArray()
+        array = object_.array
         numpy.savetxt(filePath, array, delimiter=',')
 
 

@@ -3,7 +3,8 @@ from decimal import Decimal
 from pathlib import Path
 import logging
 
-from ...api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer
+
 from ...model.ptychonn import PtychoNNTrainingPresenter
 from ...view.ptychonn import PtychoNNOutputParametersView, PtychoNNTrainingParametersView
 from ..data import FileDialogFactory

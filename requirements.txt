@@ -1,0 +1,21 @@
+gladier >=0.9
+gladier-tools >=0.5
+h5py =3.*
+hdf5plugin
+matplotlib-base =3.*
+numpy =1.*
+pip
+psutil =5.*
+ptychonn =0.2.*
+pyqt =5.*
+python >=3.10
+pytorch=*=cuda*
+scikit-image =0.*
+scipy >=1.6,<2.0
+setuptools >=46.4.0
+setuptools_scm >=7
+setuptools_scm_git_archive
+tifffile =2023.*
+tike >=0.25.3,<0.26
+watchdog =3.*
+wheel

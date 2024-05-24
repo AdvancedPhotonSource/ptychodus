@@ -1,7 +1,8 @@
 from __future__ import annotations
 from decimal import Decimal
 
-from ...api.settings import SettingsGroup, SettingsRegistry
+from ptychodus.api.settings import SettingsGroup, SettingsRegistry
+
 from .adaptiveMoment import TikeAdaptiveMomentPresenter, TikeAdaptiveMomentSettings
 
 
@@ -13,7 +14,7 @@ class TikePositionCorrectionSettings(TikeAdaptiveMomentSettings):
             'UsePositionCorrection', False)
         self.usePositionRegularization = settingsGroup.createBooleanEntry(
             'UsePositionRegularization', False)
-        self.updateMagnitudeLimit = settingsGroup.createRealEntry('Update Magnitude Limit', '0.0')
+        self.updateMagnitudeLimit = settingsGroup.createRealEntry('UpdateMagnitudeLimit', '0.0')
         # TODO transform: Global transform of positions.
         # TODO origin: The rotation center of the transformation.
 
