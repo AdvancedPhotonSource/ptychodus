@@ -5,11 +5,11 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                SimpleDiffractionDataset)
-from ptychodus.api.image import ImageExtent
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                    SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
 
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
@@ -41,7 +41,7 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
-                        detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
+                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
                         filePath=filePath,
                     )
 
@@ -69,7 +69,7 @@ class LCLSScanFileReader(ScanFileReader):
         self._ipm2HighThreshold = ipm2HighThreshold
 
     def read(self, filePath: Path) -> Scan:
-        pointMap: dict[int, ScanPoint] = dict()
+        scanPointList: list[ScanPoint] = list()
 
         with h5py.File(filePath, 'r') as h5File:
             try:
@@ -92,14 +92,15 @@ class LCLSScanFileReader(ScanFileReader):
                 sinAngle = numpy.sin(tomographyAngleInRadians)
                 xcoords = (cosAngle * pi_x + sinAngle * pi_y) * self.MICRONS_TO_METERS
 
-                for index, (ipm, x, y) in enumerate(zip(ipm2, xcoords, ycoords)):
+                for index, (ipm, x_m, y_m) in enumerate(zip(ipm2, xcoords, ycoords)):
                     if self._ipm2LowThreshold <= ipm and ipm < self._ipm2HighThreshold:
-                        if numpy.isfinite(x) and numpy.isfinite(y):
-                            pointMap[index] = ScanPoint(x, y)
+                        if numpy.isfinite(x_m) and numpy.isfinite(y_m):
+                            point = ScanPoint(index, x_m, y_m)
+                            scanPointList.append(point)
                     else:
                         logger.debug(f'Filtered scan point {index=} {ipm=}.')
 
-        return TabularScan(pointMap)
+        return Scan(scanPointList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

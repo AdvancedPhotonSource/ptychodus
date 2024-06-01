@@ -4,14 +4,14 @@ import logging
 
 import numpy
 
-from ptychodus.api.data import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                DiffractionPatternState, SimpleDiffractionDataset,
-                                SimpleDiffractionPatternArray)
-from ptychodus.api.image import ImageExtent
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import Object, ObjectFileReader
+from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
+                                    DiffractionPatternState, SimpleDiffractionDataset,
+                                    SimpleDiffractionPatternArray)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileReader
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, TabularScan
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class SLAC_NPZDiffractionFileReader(DiffractionFileReader):
             numberOfPatternsPerArray=numberOfPatterns,
             numberOfPatternsTotal=numberOfPatterns,
             patternDataType=patterns.dtype,
-            detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
+            detectorExtent=ImageExtent(detectorWidth, detectorHeight),
             filePath=filePath,
         )
 
@@ -62,25 +62,17 @@ class SLAC_NPZDiffractionFileReader(DiffractionFileReader):
 class SLAC_NPZScanFileReader(ScanFileReader):
 
     def read(self, filePath: Path) -> Scan:
-        pointMap: dict[int, ScanPoint] = dict()
+        with numpy.load(filePath) as npzFile:
+            scanXInMeters = npzFile['xcoords_start']
+            scanYInMeters = npzFile['ycoords_start']
 
-        try:
-            npz = numpy.load(filePath)
-        except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
-            return TabularScan(pointMap)
+        scanPointList: list[ScanPoint] = list()
 
-        try:
-            positionXInMeters = npz['xcoords_start']
-            positionYInMeters = npz['ycoords_start']
-        except KeyError:
-            logger.warning(f'No scan positions in \"{filePath}\"!')
-            return TabularScan(pointMap)
+        for idx, (x_m, y_m) in enumerate(zip(scanXInMeters, scanYInMeters)):
+            point = ScanPoint(idx, x_m, y_m)
+            scanPointList.append(point)
 
-        for index, (x, y) in enumerate(zip(positionXInMeters, positionYInMeters)):
-            pointMap[index] = ScanPoint(x, y)
-
-        return TabularScan(pointMap)
+        return Scan(scanPointList)
 
 
 class SLAC_NPZProbeFileReader(ProbeFileReader):

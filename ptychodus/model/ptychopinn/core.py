@@ -11,7 +11,6 @@ from ...api.reconstructor import (NullReconstructor, Reconstructor, Reconstructo
                                   TrainableReconstructor)
 from ...api.settings import SettingsRegistry
 from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
-from ptychodus.model.object.api import ObjectAPI
 
 logger = logging.getLogger(__name__)
 
@@ -80,12 +79,6 @@ class PtychoPINNModelPresenter(Observable, Observer):
 
     def setNFiltersScale(self, value: int) -> None:
         self._settings.nFiltersScale.value = value
-
-    def getNPhotons(self) -> Decimal:
-        return self._settings.nphotons.value
-
-    def setNPhotons(self, value: Decimal) -> None:
-        self._settings.nphotons.value = value
 
     def isProbeTrainable(self) -> bool:
         return self._settings.probeTrainable.value
@@ -268,10 +261,10 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry, objectAPI: ObjectAPI,
+    def createInstance(cls, settingsRegistry: SettingsRegistry,
                        isDeveloperModeEnabled: bool) -> PtychoPINNReconstructorLibrary:
-        modelSettings = PtychoPINNModelSettings.createInstance(settingsRegistry)
-        trainingSettings = PtychoPINNTrainingSettings.createInstance(settingsRegistry)
+        modelSettings = PtychoPINNModelSettings(settingsRegistry)
+        trainingSettings = PtychoPINNTrainingSettings(settingsRegistry)
         ptychoPINNReconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
         reconstructors: list[TrainableReconstructor] = list()
 
@@ -284,30 +277,10 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
                 reconstructors.append(ptychoPINNReconstructor)
         else:
             ptychoPINNReconstructor = PtychoPINNTrainableReconstructor(
-                modelSettings, trainingSettings, objectAPI)
+                modelSettings, trainingSettings)
             reconstructors.append(ptychoPINNReconstructor)
 
         return cls(modelSettings, trainingSettings, reconstructors)
-
-    def load_model(self, path: str):
-        # TODO: Define the method to load the model from a given path. This method should
-        # support loading the model architecture and weights from the file specified by `path`.
-        # Consider using TensorFlow's `load_model` function or an equivalent in other libraries.
-        pass
-
-    def reconstruct(self, input_data):
-        # TODO: Implement the reconstruction logic using the loaded model. This method should
-        # take input data, preprocess it as required by the model, perform inference to
-        # reconstruct the image or pattern, and then postprocess the output as needed.
-        # Ensure the input data is correctly shaped and scaled for the model.
-        pass
-
-    def save_results(self, results, output_path: str):
-        # TODO: Implement the logic to save the reconstruction results to a file. This method
-        # should take the results of the reconstruction and save them to `output_path`.
-        # Consider the format in which the results should be saved (e.g., images, numpy arrays)
-        # and use appropriate libraries (e.g., PIL for images, numpy for arrays) to save the data.
-        pass
 
     @property
     def name(self) -> str:

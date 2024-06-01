@@ -96,7 +96,7 @@ class ModelCore:
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, isDeveloperModeEnabled)
         self.ptychopinnReconstructorLibrary = PtychoPINNReconstructorLibrary.createInstance(
-            self.settingsRegistry, self._objectCore.objectAPI, modelArgs.isDeveloperModeEnabled)
+            self.settingsRegistry, isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             self._patternsCore.dataset,

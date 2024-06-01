@@ -2,310 +2,221 @@ from __future__ import annotations
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any
 import logging
 
 import numpy
-np = numpy
 import numpy.typing
 
+from ptycho import params as ptycho_params, train_pinn
 from ptycho.loader import PtychoDataContainer
 
-from ...api.image import ImageExtent
-from ...api.object import ObjectArrayType, ObjectPatchAxis
-from ...api.plot import Plot2D, PlotAxis, PlotSeries
-from ...api.reconstructor import ReconstructInput, ReconstructOutput, TrainableReconstructor
-from ..object import ObjectAPI
+from ptychodus.api.geometry import Point2D
+from ptychodus.api.product import Product
+from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput, TrainableReconstructor, TrainOutput)
+
+from ..analysis import ObjectStitcher
 from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
 
-FloatArrayType = numpy.typing.NDArray[numpy.float32]
+__all__ = [
+    'PtychoPINNTrainableReconstructor',
+]
+
 logger = logging.getLogger(__name__)
 
 
-class PatternCircularBuffer:
+def createPtychoDataContainer(parameters: ReconstructInput) -> PtychoDataContainer:
+    diff3d = parameters.patterns
+    probeGuess = parameters.product.probe.array[0, :, :]
+    objectGuess = parameters.product.object_.array[0, :, :]
 
-    def __init__(self, extent: ImageExtent, maxSize: int) -> None:
-        self._buffer: FloatArrayType = numpy.zeros(
-            (maxSize, *extent.shape),
-            dtype=numpy.float32,
-        )
-        self._pos = 0
-        self._full = False
+    logger.debug("createPtychoDataContainer pre-condition sizes:")
+    logger.debug(f"diffractionPatterns: {diff3d.shape}")
+    logger.debug(f"probeGuess: {probeGuess.shape}")
+    logger.debug(f"objectGuess: {objectGuess.shape}")
+    logger.debug(f"scanCoordinates: {len(parameters.product.scan)}")
 
-    @classmethod
-    def createZeroSized(cls) -> PatternCircularBuffer:
-        return cls(ImageExtent(0, 0), 0)
+    if objectGuess is not None:
+        objectGuess = objectGuess[0, :, :]
 
-    @property
-    def isZeroSized(self) -> bool:
-        return (self._buffer.size == 0)
-
-    def append(self, array: FloatArrayType) -> None:
-        self._buffer[self._pos, :, :] = array
-        self._pos += 1
-
-        if self._pos == self._buffer.shape[0]:
-            self._pos = 0
-            self._full = True
-
-    def getBuffer(self) -> FloatArrayType:
-        return self._buffer if self._full else self._buffer[:self._pos]
-
-
-class ObjectPatchCircularBuffer:
-
-    def __init__(self, extent: ImageExtent, channels: int, maxSize: int) -> None:
-        self._buffer: FloatArrayType = numpy.zeros(
-            (maxSize, channels, *extent.shape),
-            dtype=numpy.float32,
-        )
-        self._pos = 0
-        self._full = False
-
-    @classmethod
-    def createZeroSized(cls) -> ObjectPatchCircularBuffer:
-        return cls(ImageExtent(0, 0), 0, 0)
-
-    @property
-    def isZeroSized(self) -> bool:
-        return (self._buffer.size == 0)
-
-    def append(self, array: ObjectArrayType) -> None:
-        self._buffer[self._pos, 0, :, :] = numpy.angle(array).astype(numpy.float32)
-
-        if self._buffer.shape[1] > 1:
-            self._buffer[self._pos, 1, :, :] = numpy.absolute(array).astype(numpy.float32)
-
-        self._pos += 1
-
-        if self._pos == self._buffer.shape[0]:
-            self._pos = 0
-            self._full = True
-
-    def getBuffer(self) -> FloatArrayType:
-        return self._buffer if self._full else self._buffer[:self._pos]
+    return PtychoDataContainer.from_raw_data_without_pc(
+        xcoords=numpy.array([p.positionXInMeters for p in parameters.product.scan]),
+        ycoords=numpy.array([p.positionYInMeters for p in parameters.product.scan]),
+        diff3d=diff3d,
+        probeGuess=probeGuess,
+        # Assuming all patches are from the same object
+        scan_index=numpy.zeros(len(diff3d)),  # FIXME
+        objectGuess=objectGuess)
 
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def __init__(self, modelSettings: PtychoPINNModelSettings,
-                 trainingSettings: PtychoPINNTrainingSettings, objectAPI: ObjectAPI) -> None:
+                 trainingSettings: PtychoPINNTrainingSettings) -> None:
+        super().__init__()
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
-        self._objectAPI = objectAPI
-        self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
-        self._patternBuffer = PatternCircularBuffer.createZeroSized()
-        self._ptychoDataContainer: PtychoDataContainer | None = None
-        self._fileFilterList: list[str] = ['NumPy Arrays (*.npy)', 'NumPy Zipped Archive (*.npz)']
+        self._trainingDataFileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
+        self._modelFileFilterList: list[str] = list()  # TODO
+
+        self._trainingData: ReconstructInput | None = None
+        self._modelInstance = modelInstance  # FIXME
+        self._history = history  # FIXME
 
         ptychopinnVersion = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinnVersion}')
 
-        self._initialize_ptycho()
-
-    def appendPatterns(self, patterns: FloatArrayType) -> None:
-        if self._patternBuffer.isZeroSized:
-            extent = ImageExtent(patterns.shape[-2], patterns.shape[-1])
-            self._patternBuffer = PatternCircularBuffer(extent, patterns.shape[0])
-
-        for pattern in patterns:
-            self._patternBuffer.append(pattern)
+        self._syncSettingsToPtycho(nphotons=-1)
 
     @property
     def name(self) -> str:
-        return 'AmplitudePhase'
-
-    # Placeholder for the reconstruct method remains as implementing the actual logic requires details about the PtychoPINN model.
-
-#probe.set_probe_guess(None, probeGuess)
-    #def _set_probe(self, self, parameters: ReconstructInput) -> None:
-    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        # TODO assert this wasn't already called
-        self.appendPatterns(parameters.diffractionPatternArray)
-        scanCoordinates = numpy.array(list(parameters.scan.values()))
-        probeGuess = parameters.probeArray
-        objectGuess = parameters.objectInterpolator.getArray()
-        self._ptychoDataContainer = create_ptycho_data_container(self._patternBuffer.getBuffer(), probeGuess,
-                                                                 objectGuess, scanCoordinates)
-
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
-
-    def getSaveFileFilter(self) -> str:
-        return self._fileFilterList[0]  # Default to the first option
-
-    def saveTrainingData(self, filePath: Path) -> None:
-        logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
-        trainingData = {
-            'diffractionPatterns': self._patternBuffer.getBuffer(),
-            'objectPatches': self._objectPatchBuffer.getBuffer(),
-        }
-        numpy.savez(filePath, **trainingData)
-
-    def _initialize_ptycho(self) -> None:
-        from .params import update_cfg_from_settings, cfg
-        from ptycho import params as ptycho_params
-        # Update the configuration for ptycho based on the current settings in ptychodus
-        update_cfg_from_settings(self._modelSettings, self._trainingSettings)
-        # Apply the updated configuration to ptycho's configuration
-        ptycho_params.cfg.update(cfg)
-
-    def train(self) -> Plot2D:
-        self._initialize_ptycho()
-        from ptycho import train_pinn
-        intensity_scale = train_pinn.calculate_intensity_scale(self._ptychoDataContainer)
-        model_instance, history = train_pinn.train(self._ptychoDataContainer, intensity_scale)
-        self._model_instance = model_instance
-        self._history = history
-
-        trainingLoss = history.history['loss']
-        validationLoss = history.history['val_loss']  # Replace with actual validation loss values
-        validationLossSeries = PlotSeries(label='Validation Loss', values=validationLoss)
-        trainingLossSeries = PlotSeries(label='Training Loss', values=trainingLoss)
-        seriesX = PlotSeries(label='Epoch', values=[*range(len(trainingLoss))])
-
-        return Plot2D(
-            axisX=PlotAxis(label='Epoch', series=[seriesX]),
-            axisY=PlotAxis(label='Loss', series=[trainingLossSeries, validationLossSeries]),
-        )
-
-    def clearTrainingData(self) -> None:
-        logger.debug('Clearing training data...')
-        self._patternBuffer = PatternCircularBuffer.createZeroSized()
-        self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
+        return 'PtychoPINN'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        from scipy.ndimage import map_coordinates
-        from ptycho import train_pinn, probe
-        assert self._model_instance  # FIXME fail nicely
+        if self._history is None:
+            raise ValueError('No history!')
 
-        # TODO data size/shape requirements to GUI
-        data = parameters.diffractionPatternArray
-        dataSize = data.shape[-1]
+        if self._modelInstance is None:
+            raise ValueError('No model instance!')
 
-        if dataSize != data.shape[-2]:
-            raise ValueError('PtychoPINN expects square diffraction data!')
-
-        isDataSizePow2 = (dataSize & (dataSize - 1) == 0 and dataSize > 0)
-
-        if not isDataSizePow2:
-            msg = 'PtychoPINN expects that the diffraction data size is a power of two!'
-            raise ValueError(msg)
-
-        scanCoordinates = numpy.array(list(parameters.scan.values()))
-        probeGuess = parameters.probeArray
-        objectGuess = parameters.objectInterpolator.getArray()
-
-        test_data = create_ptycho_data_container(data, probeGuess, objectGuess, scanCoordinates)
-        eval_results = train_pinn.eval(test_data, self._history, self._model_instance)
-        objectPatches = eval_results['reconstructed_obj'][:, :, :, 0]
-        self._eval_output = eval_results
-
-        # TODO save the test data
+        testData = createPtychoDataContainer(parameters)
+        evalResults = train_pinn.eval(testData, self._history, self._modelInstance)
+        objectPatches = evalResults['reconstructed_obj'][:, :, :, 0]
 
         logger.debug('Stitching...')
-        objectInterpolator = parameters.objectInterpolator
-        objectGrid = objectInterpolator.getGrid()
-        objectArray = objectInterpolator.getArray()
+        stitcher = ObjectStitcher(parameters.product.object_.getGeometry())
 
-        print("Shape of objectArray:", objectArray.shape)
-        print("objectInterpolator:", objectInterpolator)
+        for scanPoint, patchArray in zip(parameters.product.scan, objectPatches):
+            patchCenter = Point2D(
+                x=scanPoint.positionXInMeters,
+                y=scanPoint.positionYInMeters,
+            )
+            stitcher.addPatch(patchCenter, patchArray)
 
-        objectArrayUpper = numpy.zeros_like(objectArray, dtype=complex)
-        objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
-
-        patchExtent = ImageExtent(
-            width=objectPatches.shape[-1],
-            height=objectPatches.shape[-2],
+        product = Product(
+            metadata=parameters.product.metadata,
+            scan=parameters.product.scan,
+            probe=parameters.product.probe,
+            object_=stitcher.build(),
+            costs=list(),  # TODO put something here?
         )
 
-        for scanPoint, objectPatch in zip(parameters.scan.values(), objectPatches):
-            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
-            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
+        return ReconstructOutput(product, 0)
 
-            pixelCentersX = patchAxisX.getObjectPixelCenters()
-            pixelCentersY = patchAxisY.getObjectPixelCenters()
+    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
+        self._trainingData = parameters
 
-            print("pixelCentersY.objectSlice:", pixelCentersY.objectSlice)
-            print("pixelCentersX.objectSlice:", pixelCentersX.objectSlice)
+    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
+        return self._trainingDataFileFilterList
 
-            xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
-            patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
+    def getSaveTrainingDataFileFilter(self) -> str:
+        return self._trainingDataFileFilterList[0]
 
-            print("Shape of patchValues:", patchValues.shape)
+    def saveTrainingData(self, filePath: Path) -> None:
+        raise NotImplementedError(f'Save training data to \"{filePath}\"')  # FIXME
 
-            # TODO consider inverse distance weighting
-            objectArrayUpper[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += patchValues
-            objectArrayCount[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += 1
+    def train(self) -> TrainOutput:
+        parameters = self._trainingData
 
-        objectArrayLower = numpy.maximum(objectArrayCount, 1)
-        objectArray = objectArrayUpper / objectArrayLower
+        if parameters is None:
+            raise ValueError('No training dataset!')
 
-        return ReconstructOutput(
-            scan=None,
-            probeArray=None,
-            objectArray=objectArray,
-            objective=[[]],
-            plot2D=Plot2D.createNull(),  # TODO show something here?
+        ptychoDataContainer = createPtychoDataContainer(parameters)
+        self._syncSettingsToPtycho(nphotons=int(parameters.product.metadata.probePhotons))
+        intensity_scale = train_pinn.calculate_intensity_scale(ptychoDataContainer)
+        modelInstance, history = train_pinn.train(ptychoDataContainer, intensity_scale)
+        self._modelInstance = modelInstance  # FIXME
+        self._history = history  # FIXME
+
+        return TrainOutput(
+            trainingLoss=history.history['loss'],
+            validationLoss=history.history['val_loss'],  # TODO replace with actual values
             result=0,
         )
 
-#        logger.debug('Stitching...')
-#        objectInterpolator = parameters.objectInterpolator
-#        objectGrid = objectInterpolator.getGrid()
-#        objectArray = objectInterpolator.getArray()
-#        objectArrayUpper = numpy.zeros_like(objectArray, dtype=complex)
-#        objectArrayCount = numpy.zeros_like(objectArray, dtype=float)
-#
-#        patchExtent = ImageExtent(
-#            width=objectPatches.shape[-1],
-#            height=objectPatches.shape[-2],
-#        )
-#
-#        for scanPoint, objectPatch in zip(parameters.scan.values(), objectPatches):
-#
-#            patchAxisX = ObjectPatchAxis(objectGrid.axisX, scanPoint.x, patchExtent.width)
-#            patchAxisY = ObjectPatchAxis(objectGrid.axisY, scanPoint.y, patchExtent.height)
-#
-#            pixelCentersX = patchAxisX.getObjectPixelCenters()
-#            pixelCentersY = patchAxisY.getObjectPixelCenters()
-#
-#            xx, yy = numpy.meshgrid(pixelCentersX.patchCoordinates, pixelCentersY.patchCoordinates)
-#            patchValues = map_coordinates(objectPatch, (yy, xx), order=1)
-#
-#            # TODO consider inverse distance weighting
-#            objectArrayUpper[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += patchValues
-#            objectArrayCount[pixelCentersY.objectSlice, pixelCentersX.objectSlice] += 1
-#
-#        objectArrayLower = numpy.maximum(objectArrayCount, 1)
-#        objectArray = objectArrayUpper / objectArrayLower
-#
-#        return ReconstructOutput(
-#            scan=None,
-#            probeArray=None,
-#            objectArray=objectArray,
-#            objective=[[]],
-#            plot2D=Plot2D.createNull(),  # TODO show something here?
-#            result=0,
-#        )
+    def clearTrainingData(self) -> None:
+        self._trainingData = None
 
+    def getSaveModelFileFilterList(self) -> Sequence[str]:
+        return self._modelFileFilterList
 
-def create_ptycho_data_container(diffractionPatterns, probeGuess, objectGuess: ObjectArrayType,
-                                 scanCoordinates: numpy.ndarray) -> PtychoDataContainer:
-    print("create_ptycho_data_container pre-condition sizes:")
-    print(f"diffractionPatterns: {diffractionPatterns.shape}")
-    print(f"probeGuess: {probeGuess.shape}")
-    print(f"objectGuess: {objectGuess.shape}")
-    print(f"scanCoordinates: {scanCoordinates.shape}")
+    def getSaveModelFileFilter(self) -> str:
+        return self._modelFileFilterList[0]
 
-    xcoords = np.array([p.x for p in scanCoordinates])
-    ycoords = np.array([p.y for p in scanCoordinates])
-    if objectGuess is not None:
-        objectGuess = objectGuess[0, :, :]
-    return PtychoDataContainer.from_raw_data_without_pc(
-        xcoords=xcoords,
-        ycoords=ycoords,
-        diff3d=diffractionPatterns,
-        probeGuess=probeGuess[0, :, :],
-        # Assuming all patches are from the same object
-        scan_index=numpy.zeros(len(diffractionPatterns)),
-        objectGuess=objectGuess)
+    def saveModel(self, filePath: Path) -> None:
+        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # FIXME
+
+    def _syncSettingsToPtycho(self, *, nphotons: int) -> None:
+        N = self._modelSettings.N.value
+        gridsize = self._modelSettings.gridsize.value
+        offset = self._modelSettings.offset.value
+        bigN = N + (gridsize - 1) * offset
+        max_position_jitter = 10
+        buffer = max_position_jitter
+
+        # TODO naming convention for different types of parameters
+        # TODO what default value and initialization for the probe scale?
+        cfg: dict[str, Any] = {
+            'learning_rate': float(self._modelSettings.learningRate.value),
+            'N': N,
+            'offset': offset,
+            'gridsize': gridsize,
+            'outer_offset_train': None,
+            'outer_offset_test': None,
+            'batch_size': self._modelSettings.batchSize.value,
+            'nepochs': 60,
+            'n_filters_scale': self._modelSettings.nFiltersScale.value,
+            'output_path': self._trainingSettings.outputPath.value,
+            'output_prefix': 'outputs',
+            'output_suffix': self._trainingSettings.outputSuffix.value,
+            'big_gridsize': 10,
+            'max_position_jitter': max_position_jitter,
+            'sim_jitter_scale': 0.,
+            'default_probe_scale': 0.7,
+            'mae_weight': float(self._trainingSettings.maeWeight.value),
+            'nll_weight': float(self._trainingSettings.nllWeight.value),
+            'tv_weight': float(self._trainingSettings.tvWeight.value),
+            'realspace_mae_weight': float(self._trainingSettings.realspaceMAEWeight.value),
+            'realspace_weight': float(self._trainingSettings.realspaceWeight.value),
+            'nimgs_train': 9,
+            'nimgs_test': 3,
+            'data_source': 'generic',
+            'probe.trainable': self._modelSettings.probeTrainable.value,
+            'intensity_scale.trainable': self._modelSettings.intensityScaleTrainable.value,
+            'positions.provided': False,
+            'object.big': self._modelSettings.objectBig.value,
+            'probe.big': self._modelSettings.probeBig.
+            value,  # if True, increase the real space solution from 32x32 to 64x64
+            'probe_scale': float(self._modelSettings.probeScale.value),
+            'set_phi': False,
+            'probe.mask': self._modelSettings.probeMask.value,
+            'model_type': self._modelSettings.modelType.value,
+            'label': '',
+            'size': self._modelSettings.size.value,
+            'amp_activation': self._modelSettings.ampActivation.value,
+            # derived values
+            'bigN': bigN,
+            'padded_size': bigN + buffer,
+            'padding_size': (gridsize - 1) * offset + buffer,
+        }
+
+        if nphotons > 0:
+            cfg['nphotons'] = nphotons
+
+        # sync current settings to ptycho's configuration
+        ptycho_params.cfg.update(cfg)
+
+    def validate(self) -> bool:  # FIXME
+        valid_data_sources = [
+            'lines', 'grf', 'experimental', 'points', 'testimg', 'diagonals', 'xpp', 'V', 'generic'
+        ]
+        # FIXME asserts
+        assert cfg['data_source'] in valid_data_sources, \
+            f"Invalid data source: {cfg['data_source']}. Must be one of {valid_data_sources}."
+
+        if cfg['realspace_mae_weight'] > 0.:
+            assert cfg['realspace_weight'] > 0
+
+        assert cfg['bigoffset'] % 4 == 0  # TODO
+
+        return True

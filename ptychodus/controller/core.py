@@ -78,7 +78,11 @@ class ControllerCore:
             view.reconstructorPlotView,
             self._fileDialogFactory,
             self._productController.tableModel,
-            [self._ptychonnViewControllerFactory, self._tikeViewControllerFactory, self._ptychopinnViewControllerFactory,],
+            [
+                self._ptychonnViewControllerFactory,
+                self._tikeViewControllerFactory,
+                self._ptychopinnViewControllerFactory,
+            ],
         )
         self._workflowController = WorkflowController.createInstance(
             model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
