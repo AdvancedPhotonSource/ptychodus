@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
 from types import TracebackType
@@ -17,6 +16,7 @@ except ModuleNotFoundError:
 import h5py
 import numpy
 
+from ptychodus.api.automation import WorkflowAPI
 from ptychodus.api.patterns import DiffractionMetadata, DiffractionPatternArray
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
@@ -56,23 +56,22 @@ def configureLogger() -> None:
     logger.info(f'HDF5 {h5py.version.hdf5_version}')
 
 
-@dataclass(frozen=True)
-class ModelArgs:
-    settingsFile: Path | None
-    patternsFile: Path | None
-    replacementPathPrefix: str | None
-
-
 class ModelCore:
 
-    def __init__(self, modelArgs: ModelArgs, *, isDeveloperModeEnabled: bool = False) -> None:
+    def __init__(self,
+                 settingsFile: Path | None = None,
+                 *,
+                 isDeveloperModeEnabled: bool = False) -> None:
         configureLogger()
-        self._modelArgs = modelArgs
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
         self.memoryPresenter = MemoryPresenter()
-        self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
+        self.settingsRegistry = SettingsRegistry()
+
+        if settingsFile:
+            self.settingsRegistry.openSettings(settingsFile)
+
         self._patternsCore = PatternsCore(self.settingsRegistry,
                                           self._pluginRegistry.diffractionFileReaders,
                                           self._pluginRegistry.diffractionFileWriters)
@@ -118,16 +117,9 @@ class ModelCore:
             self._workflowCore, self._pluginRegistry.fileBasedWorkflows)
 
     def __enter__(self) -> ModelCore:
-        if self._modelArgs.settingsFile:
-            self.settingsRegistry.openSettings(self._modelArgs.settingsFile)
-
-        if self._modelArgs.patternsFile:
-            self._patternsCore.patternsAPI.openPreprocessedPatterns(self._modelArgs.patternsFile)
-
         self._patternsCore.start()
         self._workflowCore.start()
         self._automationCore.start()
-
         return self
 
     @overload
@@ -222,12 +214,6 @@ class ModelCore:
 
     def refreshAutomationDatasets(self) -> None:
         self._automationCore.repository.notifyObserversIfRepositoryChanged()
-
-    def stageReconstructionInputs(self, stagingDir: Path) -> int:
-        self.settingsRegistry.saveSettings(stagingDir / 'settings.ini')
-        self._patternsCore.patternsAPI.savePreprocessedPatterns(stagingDir / 'patterns.npz')
-        self._productCore.productAPI.saveProduct(0, stagingDir / 'product-in.npz', 'NPZ')
-        return 0
 
     def batchModeReconstruct(self, inputFilePath: Path, outputFilePath: Path) -> int:
         inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, 'NPZ')
@@ -332,6 +318,10 @@ class ModelCore:
     @property
     def workflowParametersPresenter(self) -> WorkflowParametersPresenter:
         return self._workflowCore.parametersPresenter
+
+    @property
+    def workflowAPI(self) -> WorkflowAPI:
+        return self._automationCore.workflowAPI
 
     @property
     def automationPresenter(self) -> AutomationPresenter:

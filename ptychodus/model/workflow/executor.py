@@ -65,8 +65,9 @@ class WorkflowExecutor:
             logger.warning('Input data POSIX path must be a directory!')
             return
 
+        # FIXME use workflow API
         self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFile)
-        self._patternsAPI.savePreprocessedPatterns(inputDataPosixPath / patternsFile)
+        self._patternsAPI.exportPreprocessedPatterns(inputDataPosixPath / patternsFile)
         self._productAPI.saveProduct(inputProductIndex, inputDataPosixPath / inputFile,
                                      productFileFilter)
 

@@ -33,8 +33,8 @@ class ControllerCore:
             model.ptychonnReconstructorLibrary, self._fileDialogFactory)
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
         self._settingsController = SettingsController.createInstance(model.settingsRegistry,
-                                                                     view.settingsParametersView,
-                                                                     view.settingsEntryView,
+                                                                     view.settingsView,
+                                                                     view.settingsTableView,
                                                                      self._fileDialogFactory)
         self._patternsImageController = ImageController.createInstance(
             model.patternVisualizationEngine, view.patternsImageView, view.statusBar(),

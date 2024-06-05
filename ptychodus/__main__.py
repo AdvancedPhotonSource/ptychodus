@@ -4,7 +4,7 @@ from pathlib import Path
 import argparse
 import sys
 
-from ptychodus.model import ModelArgs, ModelCore
+from ptychodus.model import ModelCore
 import ptychodus
 
 
@@ -15,17 +15,6 @@ def versionString() -> str:
 def verifyAllArgumentsParsed(parser: argparse.ArgumentParser, argv: list[str]) -> None:
     if argv:
         parser.error('unrecognized arguments: %s' % ' '.join(argv))
-
-
-class DirectoryType:
-
-    def __call__(self, string: str) -> Path:
-        path = Path(string)
-
-        if not path.is_dir():
-            raise argparse.ArgumentTypeError(f'\"{string}\" is not a directory!')
-
-        return path
 
 
 def main() -> int:
@@ -44,11 +33,6 @@ def main() -> int:
         '--dev',
         action='store_true',
         help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
-        '-f',
-        '--file-prefix',
-        help='replace file path prefix in settings',
     )
     parser.add_argument(
         # input data product file (batch mode)
@@ -87,26 +71,11 @@ def main() -> int:
         action='version',
         version=versionString(),
     )
-    parser.add_argument(
-        '-w',
-        '--write',
-        metavar='OUTPUT_DIR',
-        type=DirectoryType(),
-        help='stage reconstruction inputs to directory',
-    )
 
     parsedArgs, unparsedArgs = parser.parse_known_args()
+    settingsFile = Path(parsedArgs.settings.name) if parsedArgs.settings else None
 
-    modelArgs = ModelArgs(
-        settingsFile=Path(parsedArgs.settings.name) if parsedArgs.settings else None,
-        patternsFile=Path(parsedArgs.patterns.name) if parsedArgs.patterns else None,
-        replacementPathPrefix=parsedArgs.file_prefix,
-    )
-
-    with ModelCore(modelArgs, isDeveloperModeEnabled=parsedArgs.dev) as model:
-        if parsedArgs.write is not None:
-            return model.stageReconstructionInputs(parsedArgs.write)
-
+    with ModelCore(settingsFile, isDeveloperModeEnabled=parsedArgs.dev) as model:
         if parsedArgs.batch is not None:
             verifyAllArgumentsParsed(parser, unparsedArgs)
 

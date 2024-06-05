@@ -3,11 +3,14 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.patterns import CropCenter
+
 
 class WorkflowProductAPI(ABC):
 
     @abstractmethod
-    def openScan(self, filePath: Path, fileType: str) -> None:
+    def openScan(self, filePath: Path, *, fileType: str | None = None) -> None:
         pass
 
     @abstractmethod
@@ -15,7 +18,7 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def openProbe(self, filePath: Path, fileType: str) -> None:
+    def openProbe(self, filePath: Path, *, fileType: str | None = None) -> None:
         pass
 
     @abstractmethod
@@ -23,7 +26,7 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def openObject(self, filePath: Path, fileType: str) -> None:
+    def openObject(self, filePath: Path, *, fileType: str | None = None) -> None:
         pass
 
     @abstractmethod
@@ -35,19 +38,40 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def saveProduct(self, filePath: Path, fileType: str) -> None:
+    def saveProduct(self, filePath: Path, *, fileType: str | None = None) -> None:
         pass
 
 
 class WorkflowAPI(ABC):
 
     @abstractmethod
-    def openPatterns(self, filePath: Path, fileType: str) -> None:
+    def openPatterns(
+        self,
+        filePath: Path,
+        *,
+        fileType: str | None = None,
+        cropCenter: CropCenter | None = None,
+        cropExtent: ImageExtent | None = None,
+    ) -> None:
         '''loads diffraction patterns from file'''
         pass
 
     @abstractmethod
-    def createProduct(self, name: str) -> WorkflowProductAPI:
+    def openProduct(self, filePath: Path, *, fileType: str | None = None) -> WorkflowProductAPI:
+        '''opens product from file'''
+        pass
+
+    @abstractmethod
+    def createProduct(
+        self,
+        name: str,
+        *,
+        comments: str = '',
+        detectorDistanceInMeters: float | None = None,
+        probeEnergyInElectronVolts: float | None = None,
+        probePhotonsPerSecond: float | None = None,
+        exposureTimeInSeconds: float | None = None,
+    ) -> WorkflowProductAPI:
         '''creates a new product'''
         pass
 

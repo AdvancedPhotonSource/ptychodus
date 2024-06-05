@@ -1,27 +1,6 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QListView,
-                             QPushButton, QVBoxLayout, QWidget)
-
-
-class SettingsView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Parameters', parent)
-        self.replacementPathPrefixLineEdit = QLineEdit()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> SettingsView:
-        view = cls(parent)
-
-        view.replacementPathPrefixLineEdit.setToolTip(
-            'Path prefix replacement text used when opening or saving settings files.')
-
-        layout = QFormLayout()
-        layout.addRow('Replacement Path Prefix:', view.replacementPathPrefixLineEdit)
-        view.setLayout(layout)
-
-        return view
+from PyQt5.QtWidgets import QHBoxLayout, QListView, QPushButton, QVBoxLayout, QWidget
 
 
 class SettingsButtonBox(QWidget):
@@ -44,39 +23,20 @@ class SettingsButtonBox(QWidget):
         return view
 
 
-class SettingsGroupView(QGroupBox):
+class SettingsView(QWidget):
 
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Groups', parent)
+        super().__init__(parent)
         self.listView = QListView()
         self.buttonBox = SettingsButtonBox.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> SettingsGroupView:
+    def createInstance(cls, parent: QWidget | None = None) -> SettingsView:
         view = cls(parent)
 
         layout = QVBoxLayout()
         layout.addWidget(view.listView)
         layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
-
-
-class SettingsParametersView(QWidget):
-
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.settingsView = SettingsView.createInstance()
-        self.groupView = SettingsGroupView.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> SettingsParametersView:
-        view = cls(parent)
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.settingsView)
-        layout.addWidget(view.groupView)
         view.setLayout(layout)
 
         return view

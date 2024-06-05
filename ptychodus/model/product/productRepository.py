@@ -90,7 +90,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         return self._insertProduct(item)
 
     def insertProductFromSettings(self) -> int:
-        # TODO add mechanism to sync product state to settings
+        # FIXME add mechanism to sync product state to settings
         metadataItem = self._metadataRepositoryItemFactory.createDefault('FromSettings')
         scanItem = self._scanRepositoryItemFactory.createFromSettings()
         geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)

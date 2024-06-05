@@ -155,11 +155,11 @@ class AutomationCore:
         self._settings = AutomationSettings(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
         self._workflow = CurrentFileBasedWorkflow(self._settings, workflowChooser)
-        self._workflowAPI = ConcreteWorkflowAPI(patternsAPI, productAPI, scanAPI, probeAPI,
-                                                objectAPI, workflowCore)
+        self.workflowAPI = ConcreteWorkflowAPI(patternsAPI, productAPI, scanAPI, probeAPI,
+                                               objectAPI, workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
-                                                     self._workflow, self._workflowAPI,
+                                                     self._workflow, self.workflowAPI,
                                                      self._processingQueue)
         self._datasetBuffer = AutomationDatasetBuffer(self._settings, self.repository,
                                                       self._processor)

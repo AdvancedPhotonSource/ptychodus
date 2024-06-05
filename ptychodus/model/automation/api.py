@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Any
 
 from ptychodus.api.automation import WorkflowAPI, WorkflowProductAPI
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.patterns import CropCenter
 
 from ..patterns import PatternsAPI
 from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
@@ -60,13 +62,29 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         return ConcreteWorkflowProductAPI(self._productAPI, self._scanAPI, self._probeAPI,
                                           self._objectAPI, self._workflowCore, productIndex)
 
-    def openPatterns(self, filePath: Path, fileType: str) -> None:
-        self._patternsAPI.openPatterns(filePath, fileType)
+    def openPatterns(
+        self,
+        filePath: Path,
+        fileType: str,
+        *,
+        cropCenter: CropCenter | None = None,
+        cropExtent: ImageExtent | None = None,
+    ) -> None:
+        self._patternsAPI.openPatterns(filePath, fileType)  # FIXME
 
     def openProduct(self, filePath: Path, fileType: str) -> WorkflowProductAPI:
         productIndex = self._productAPI.openProduct(filePath, fileType)
-        return self._createProductAPI(productIndex)
+        return self._createProductAPI(productIndex)  # FIXME
 
-    def createProduct(self, name: str) -> WorkflowProductAPI:
+    def createProduct(
+        self,
+        name: str,
+        *,
+        comments: str = '',
+        detectorDistanceInMeters: float | None = None,
+        probeEnergyInElectronVolts: float | None = None,
+        probePhotonsPerSecond: float | None = None,
+        exposureTimeInSeconds: float | None = None,
+    ) -> WorkflowProductAPI:
         productIndex = self._productAPI.insertNewProduct(name)
         return self._createProductAPI(productIndex)

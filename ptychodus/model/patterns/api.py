@@ -105,7 +105,7 @@ class PatternsAPI:
         else:
             logger.warning(f'Refusing to read invalid file path {filePath}')
 
-    def savePreprocessedPatterns(self, filePath: Path) -> None:
+    def exportPreprocessedPatterns(self, filePath: Path) -> None:
         contents: dict[str, Any] = {
             'indexes': numpy.array(self._dataset.getAssembledIndexes()),
             'patterns': numpy.array(self._dataset.getAssembledData()),
