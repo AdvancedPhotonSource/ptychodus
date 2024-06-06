@@ -236,15 +236,18 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             model=model,
             batch_size=self._modelSettings.batchSize.value,
             out_dir=None,
-            X_train_full=self._patternBuffer.getBuffer(),
-            Y_ph_train_full=self._objectPatchBuffer.getBuffer(),
+            X_train=self._patternBuffer.getBuffer(),
+            Y_train=self._objectPatchBuffer.getBuffer(),
             epochs=self._trainingSettings.trainingEpochs.value,
-            training_fraction=float(self._trainingSettings.validationSetFractionalSize.value),
+            training_fraction=(
+                1.0 - float(self._trainingSettings.validationSetFractionalSize.value)
+            ),
+            log_frequency=self._trainingSettings.statusIntervalInEpochs.value,
         )
         if self._trainingSettings.saveTrainingArtifacts.value:
             ptychonn.create_model_checkpoint(
                 trainer,
-                self._trainingSettings.outputPath.value,
+                self._trainingSettings.outputPath.value / self._trainingSettings.outputSuffix.value,
             )
 
         def not_none(x):
