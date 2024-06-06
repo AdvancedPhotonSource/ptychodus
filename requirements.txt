@@ -6,7 +6,7 @@ matplotlib-base =3.*
 numpy =1.*
 pip
 psutil =5.*
-ptychonn =0.3.*,>=0.3.5
+ptychonn =0.3.*,>=0.3.6
 pyqt =5.*
 python >=3.10
 pytorch=*=cuda*
