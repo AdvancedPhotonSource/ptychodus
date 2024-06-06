@@ -89,9 +89,9 @@ class PatternsAPI:
         writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, self._dataset)
 
-    def openPreprocessedPatterns(self, filePath: Path) -> None:
+    def importProcessedPatterns(self, filePath: Path) -> None:
         if filePath.is_file():
-            logger.debug(f'Reading preprocessed patterns from \"{filePath}\"')
+            logger.debug(f'Reading processed patterns from \"{filePath}\"')
 
             try:
                 contents = numpy.load(filePath)
@@ -105,7 +105,7 @@ class PatternsAPI:
         else:
             logger.warning(f'Refusing to read invalid file path {filePath}')
 
-    def exportPreprocessedPatterns(self, filePath: Path) -> None:
+    def exportProcessedPatterns(self, filePath: Path) -> None:
         contents: dict[str, Any] = {
             'indexes': numpy.array(self._dataset.getAssembledIndexes()),
             'patterns': numpy.array(self._dataset.getAssembledData()),

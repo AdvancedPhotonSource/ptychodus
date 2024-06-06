@@ -1,8 +1,8 @@
 from pathlib import Path
 import re
 
-from ptychodus.api.automation import FileBasedWorkflow, WorkflowAPI
 from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):

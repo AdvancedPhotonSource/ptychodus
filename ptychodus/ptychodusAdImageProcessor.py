@@ -37,8 +37,8 @@ class ReconstructionThread(threading.Thread):
                 logging.debug('ReconstructionThread: Begin assembling scan positions')
                 self._ptychodus.finalizeStreamingWorkflow()
                 logging.debug('ReconstructionThread: End assembling scan positions')
-                self._ptychodus.batchModeReconstruct(self._inputProductPath,
-                                                     self._outputProductPath)
+                self._ptychodus.batchModeExecute('reconstruct', self._inputProductPath,
+                                                 self._outputProductPath)
                 self._reconstructEvent.clear()
                 # reconstruction done; indicate that results are ready
                 self._channel.put(0)

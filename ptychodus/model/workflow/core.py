@@ -12,7 +12,8 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import PatternsAPI
-from ..product import ProductAPI
+from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
+from .api import ConcreteWorkflowAPI
 from .authorizer import WorkflowAuthorizer
 from .executor import WorkflowExecutor
 from .locator import DataLocator, OutputDataLocator, SimpleDataLocator
@@ -186,8 +187,9 @@ class WorkflowExecutionPresenter:
 class WorkflowCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
-                 productAPI: ProductAPI) -> None:
-        self._settings = WorkflowSettings.createInstance(settingsRegistry)
+                 productAPI: ProductAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
+                 objectAPI: ObjectAPI) -> None:
+        self._settings = WorkflowSettings(settingsRegistry)
         self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Input')
         self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group,
                                                                     'Compute')
@@ -198,6 +200,8 @@ class WorkflowCore:
         self._executor = WorkflowExecutor(self._settings, self._inputDataLocator,
                                           self._computeDataLocator, self._outputDataLocator,
                                           settingsRegistry, patternsAPI, productAPI)
+        self.workflowAPI = ConcreteWorkflowAPI(settingsRegistry, patternsAPI, productAPI, scanAPI,
+                                               probeAPI, objectAPI, self._executor)
         self._thread: threading.Thread | None = None
 
         try:
@@ -215,10 +219,6 @@ class WorkflowCore:
         self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
         self.statusPresenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
         self.executionPresenter = WorkflowExecutionPresenter(self._executor)
-
-    def executeWorkflow(self, inputProductIndex: int) -> None:
-        logger.debug(f'Execute Workflow: index={inputProductIndex}')
-        self._executor.runFlow(inputProductIndex)
 
     @property
     def areWorkflowsSupported(self) -> bool:

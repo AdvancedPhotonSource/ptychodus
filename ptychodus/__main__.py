@@ -83,16 +83,12 @@ def main() -> int:
                 parser.error('Batch mode requires input and output arguments!')
                 return -1
 
-            inputPath = Path(parsedArgs.input.name)
-            outputPath = Path(parsedArgs.output.name)
-
-            if parsedArgs.batch == 'reconstruct':
-                return model.batchModeReconstruct(inputPath, outputPath)
-            elif parsedArgs.batch == 'train':
-                return model.batchModeTrain(inputPath, outputPath)
-            else:
-                parser.error(f'Unknown batch mode action \"{parsedArgs.batch}\"!')
-                return -1
+            action = parsedArgs.batch
+            inputFilePath = Path(parsedArgs.input.name)
+            outputFilePath = Path(parsedArgs.output.name)
+            patternsFilePath = Path(parsedArgs.patterns.name)
+            model.workflowAPI.importProcessedPatterns(patternsFilePath)
+            return model.batchModeExecute(action, inputFilePath, outputFilePath)
 
         try:
             from PyQt5.QtWidgets import QApplication

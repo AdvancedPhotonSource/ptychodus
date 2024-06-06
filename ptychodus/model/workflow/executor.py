@@ -67,7 +67,7 @@ class WorkflowExecutor:
 
         # FIXME use workflow API
         self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFile)
-        self._patternsAPI.exportPreprocessedPatterns(inputDataPosixPath / patternsFile)
+        self._patternsAPI.exportProcessedPatterns(inputDataPosixPath / patternsFile)
         self._productAPI.saveProduct(inputProductIndex, inputDataPosixPath / inputFile,
                                      productFileFilter)
 

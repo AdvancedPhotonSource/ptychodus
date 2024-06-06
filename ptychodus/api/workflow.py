@@ -5,6 +5,7 @@ from typing import Any
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import CropCenter
+from ptychodus.api.settings import PathPrefixChange
 
 
 class WorkflowProductAPI(ABC):
@@ -53,7 +54,17 @@ class WorkflowAPI(ABC):
         cropCenter: CropCenter | None = None,
         cropExtent: ImageExtent | None = None,
     ) -> None:
-        '''loads diffraction patterns from file'''
+        '''opens diffraction patterns from file'''
+        pass
+
+    @abstractmethod
+    def importProcessedPatterns(self, filePath: Path) -> None:
+        '''import processed patterns'''
+        pass
+
+    @abstractmethod
+    def exportProcessedPatterns(self, filePath: Path) -> None:
+        '''export processed patterns'''
         pass
 
     @abstractmethod
@@ -73,6 +84,12 @@ class WorkflowAPI(ABC):
         exposureTimeInSeconds: float | None = None,
     ) -> WorkflowProductAPI:
         '''creates a new product'''
+        pass
+
+    @abstractmethod
+    def saveSettings(self,
+                     filePath: Path,
+                     changePathPrefix: PathPrefixChange | None = None) -> None:
         pass
 
 
