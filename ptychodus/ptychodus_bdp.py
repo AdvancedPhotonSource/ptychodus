@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import argparse
+import logging
 import sys
 
 from ptychodus.api.geometry import ImageExtent
@@ -9,6 +10,8 @@ from ptychodus.api.patterns import CropCenter
 from ptychodus.api.settings import PathPrefixChange
 from ptychodus.model import ModelCore
 import ptychodus
+
+logger = logging.getLogger(__name__)
 
 
 def versionString() -> str:
@@ -106,10 +109,10 @@ def main() -> int:
         required=True,
     )
     parser.add_argument(
-        '--number_of_gpus',
-        metavar='INTEGER',
-        help='number of GPUs to use in reconstruction',
-        type=int,
+        '--defocus_distance_m',
+        metavar='DISTANCE',
+        help='defocus distance in meters',
+        type=float,
     )
     parser.add_argument(
         '--probe_energy_eV',
@@ -134,6 +137,12 @@ def main() -> int:
         metavar='DISTANCE',
         help='detector distance in meters',
         type=float,
+    )
+    parser.add_argument(
+        '--number_of_gpus',
+        metavar='INTEGER',
+        help='number of GPUs to use in reconstruction',
+        type=int,
     )
     parser.add_argument(
         '--local_path_prefix',
@@ -161,29 +170,42 @@ def main() -> int:
 
     print(args)  # FIXME
 
-    if bool(args.local_path_prefix) ^ bool(args.remote_path_prefix):
-        parser.error('--local_path_prefix and --remote_path_prefix'
-                     'must be given together.')
-    else:
+    if args.local_path_prefix is not None and args.remote_path_prefix is not None:
         changePathPrefix = PathPrefixChange(
             findPathPrefix=args.local_path_prefix,
             replacementPathPrefix=args.remote_path_prefix,
         )
+    elif bool(args.local_path_prefix) ^ bool(args.remote_path_prefix):
+        parser.error('--local_path_prefix and --remote_path_prefix'
+                     'must be given together.')
 
-    if bool(args.crop_center_x_px) ^ bool(args.crop_center_y_px):
+    if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
+        cropCenter = CropCenter(
+            positionXInPixels=args.crop_center_x_px,
+            positionYInPixels=args.crop_center_y_px,
+        )
+    elif bool(args.crop_center_x_px) ^ bool(args.crop_center_y_px):
         parser.error('--crop_center_x_px and --crop_center_y_px must be given together.')
-    # FIXME args.crop_center_x_px
-    # FIXME args.crop_center_y_px
 
-    if bool(args.crop_width_px) ^ bool(args.crop_height_px):
+    if args.crop_width_px is not None and args.crop_height_px is not None:
+        cropExtent = ImageExtent(
+            widthInPixels=args.crop_width_px,
+            heightInPixels=args.crop_height_px,
+        )
+    elif bool(args.crop_width_px) ^ bool(args.crop_height_px):
         parser.error('--crop_width_px and --crop_height_px must be given together.')
-    # FIXME args.crop_width_px
-    # FIXME args.crop_height_px
+
+    if args.defocus_distance_m is not None:
+        logger.warning('Defocus distance is not implemented yet!')  # TODO
+
+    if args.number_of_gpus is not None:
+        logger.warning('Number of GPUs is not implemented yet!')  # TODO
 
     with ModelCore(Path(args.settings), isDeveloperModeEnabled=args.dev) as model:
         model.workflowAPI.openPatterns(args.patterns_file_path,
                                        cropCenter=cropCenter,
                                        cropExtent=cropExtent)
+
         workflowProductAPI = model.workflowAPI.createProduct(
             name=args.name,
             comments=args.comments,
@@ -193,14 +215,11 @@ def main() -> int:
             exposureTimeInSeconds=args.exposure_time_s,
         )
         workflowProductAPI.openScan(args.scan_file_path)
-        workflowProductAPI.syncProductToSettings()
-
-        # FIXME args.number_of_gpus
 
         stagingDir = args.output_directory
         stagingDir.mkdir(parents=True, exist_ok=True)
-        # FIXME settingsRegistry.saveSettings(stagingDir / 'settings.ini', changePathPrefix)
-        # FIXME patternsAPI.exportPreprocessedPatterns(stagingDir / 'patterns.npz')
+        model.workflowAPI.saveSettings(stagingDir / 'settings.ini', changePathPrefix)
+        model.workflowAPI.exportProcessedPatterns(stagingDir / 'patterns.npz')
         workflowProductAPI.saveProduct(stagingDir / 'product-in.npz', fileType='NPZ')
 
     return 0

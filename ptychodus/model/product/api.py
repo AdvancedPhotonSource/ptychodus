@@ -6,12 +6,16 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
 
+from ..patterns import ProductSettings
 from .object.builderFactory import ObjectBuilderFactory
+from .object.settings import ObjectSettings
 from .objectRepository import ObjectRepository
 from .probe.builderFactory import ProbeBuilderFactory
+from .probe.settings import ProbeSettings
 from .probeRepository import ProbeRepository
 from .productRepository import ProductRepository
 from .scan.builderFactory import ScanBuilderFactory
+from .scan.settings import ScanSettings
 from .scanRepository import ScanRepository
 
 logger = logging.getLogger(__name__)
@@ -19,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 class ScanAPI:
 
-    def __init__(self, repository: ScanRepository, builderFactory: ScanBuilderFactory) -> None:
+    def __init__(self, settings: ScanSettings, repository: ScanRepository,
+                 builderFactory: ScanBuilderFactory) -> None:
+        self._settings = settings
         self._repository = repository
         self._builderFactory = builderFactory
 
@@ -59,8 +65,9 @@ class ScanAPI:
     def getOpenFileFilter(self) -> str:
         return self._builderFactory.getOpenFileFilter()
 
-    def openScan(self, index: int, filePath: Path, fileFilter: str) -> None:
-        builder = self._builderFactory.createScanFromFile(filePath, fileFilter)
+    def openScan(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
+        builder = self._builderFactory.createScanFromFile(
+            filePath, self._settings.fileType.value if fileType is None else fileType)
 
         try:
             item = self._repository[index]
@@ -92,18 +99,20 @@ class ScanAPI:
     def getSaveFileFilter(self) -> str:
         return self._builderFactory.getSaveFileFilter()
 
-    def saveScan(self, index: int, filePath: Path, fileFilter: str) -> None:
+    def saveScan(self, index: int, filePath: Path, fileType: str) -> None:
         try:
             item = self._repository[index]
         except IndexError:
             logger.warning(f'Failed to save scan {index}!')
         else:
-            self._builderFactory.saveScan(filePath, fileFilter, item.getScan())
+            self._builderFactory.saveScan(filePath, fileType, item.getScan())
 
 
 class ProbeAPI:
 
-    def __init__(self, repository: ProbeRepository, builderFactory: ProbeBuilderFactory) -> None:
+    def __init__(self, settings: ProbeSettings, repository: ProbeRepository,
+                 builderFactory: ProbeBuilderFactory) -> None:
+        self._settings = settings
         self._repository = repository
         self._builderFactory = builderFactory
 
@@ -143,8 +152,9 @@ class ProbeAPI:
     def getOpenFileFilter(self) -> str:
         return self._builderFactory.getOpenFileFilter()
 
-    def openProbe(self, index: int, filePath: Path, fileFilter: str) -> None:
-        builder = self._builderFactory.createProbeFromFile(filePath, fileFilter)
+    def openProbe(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
+        builder = self._builderFactory.createProbeFromFile(
+            filePath, self._settings.fileType.value if fileType is None else fileType)
 
         try:
             item = self._repository[index]
@@ -176,18 +186,20 @@ class ProbeAPI:
     def getSaveFileFilter(self) -> str:
         return self._builderFactory.getSaveFileFilter()
 
-    def saveProbe(self, index: int, filePath: Path, fileFilter: str) -> None:
+    def saveProbe(self, index: int, filePath: Path, fileType: str) -> None:
         try:
             item = self._repository[index]
         except IndexError:
             logger.warning(f'Failed to save probe {index}!')
         else:
-            self._builderFactory.saveProbe(filePath, fileFilter, item.getProbe())
+            self._builderFactory.saveProbe(filePath, fileType, item.getProbe())
 
 
 class ObjectAPI:
 
-    def __init__(self, repository: ObjectRepository, builderFactory: ObjectBuilderFactory) -> None:
+    def __init__(self, settings: ObjectSettings, repository: ObjectRepository,
+                 builderFactory: ObjectBuilderFactory) -> None:
+        self._settings = settings
         self._repository = repository
         self._builderFactory = builderFactory
 
@@ -227,8 +239,9 @@ class ObjectAPI:
     def getOpenFileFilter(self) -> str:
         return self._builderFactory.getOpenFileFilter()
 
-    def openObject(self, index: int, filePath: Path, fileFilter: str) -> None:
-        builder = self._builderFactory.createObjectFromFile(filePath, fileFilter)
+    def openObject(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
+        builder = self._builderFactory.createObjectFromFile(
+            filePath, self._settings.fileType.value if fileType is None else fileType)
 
         try:
             item = self._repository[index]
@@ -260,20 +273,21 @@ class ObjectAPI:
     def getSaveFileFilter(self) -> str:
         return self._builderFactory.getSaveFileFilter()
 
-    def saveObject(self, index: int, filePath: Path, fileFilter: str) -> None:
+    def saveObject(self, index: int, filePath: Path, fileType: str) -> None:
         try:
             item = self._repository[index]
         except IndexError:
             logger.warning(f'Failed to save object {index}!')
         else:
-            self._builderFactory.saveObject(filePath, fileFilter, item.getObject())
+            self._builderFactory.saveObject(filePath, fileType, item.getObject())
 
 
 class ProductAPI:
 
-    def __init__(self, repository: ProductRepository,
+    def __init__(self, settings: ProductSettings, repository: ProductRepository,
                  fileReaderChooser: PluginChooser[ProductFileReader],
                  fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
+        self._settings = settings
         self._repository = repository
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
@@ -291,9 +305,10 @@ class ProductAPI:
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.currentPlugin.displayName
 
-    def openProduct(self, filePath: Path, fileFilter: str) -> int:
+    def openProduct(self, filePath: Path, *, fileType: str | None = None) -> int:
         if filePath.is_file():
-            self._fileReaderChooser.setCurrentPluginByName(fileFilter)
+            self._fileReaderChooser.setCurrentPluginByName(
+                self._settings.fileType.value if fileType is None else fileType)
             fileType = self._fileReaderChooser.currentPlugin.simpleName
             logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
             fileReader = self._fileReaderChooser.currentPlugin.strategy
@@ -315,14 +330,15 @@ class ProductAPI:
     def getSaveFileFilter(self) -> str:
         return self._fileWriterChooser.currentPlugin.displayName
 
-    def saveProduct(self, index: int, filePath: Path, fileFilter: str) -> None:
+    def saveProduct(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         try:
             item = self._repository[index]
         except IndexError:
             logger.warning(f'Failed to save product {index}!')
             return
 
-        self._fileWriterChooser.setCurrentPluginByName(fileFilter)
+        self._fileWriterChooser.setCurrentPluginByName(self._settings.fileType.value if fileType is
+                                                       None else fileType)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.currentPlugin.strategy

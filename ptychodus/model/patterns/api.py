@@ -5,7 +5,8 @@ import logging
 
 import numpy
 
-from ptychodus.api.patterns import (DiffractionFileReader, DiffractionFileWriter,
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.patterns import (CropCenter, DiffractionFileReader, DiffractionFileWriter,
                                     DiffractionMetadata, DiffractionPatternArray,
                                     SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginChooser
@@ -13,16 +14,19 @@ from ptychodus.api.tree import SimpleTreeNode
 
 from .active import ActiveDiffractionDataset
 from .builder import ActiveDiffractionDatasetBuilder
+from .settings import PatternSettings
 
 logger = logging.getLogger(__name__)
 
 
 class PatternsAPI:
 
-    def __init__(self, builder: ActiveDiffractionDatasetBuilder, dataset: ActiveDiffractionDataset,
+    def __init__(self, settings: PatternSettings, builder: ActiveDiffractionDatasetBuilder,
+                 dataset: ActiveDiffractionDataset,
                  fileReaderChooser: PluginChooser[DiffractionFileReader],
                  fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
         super().__init__()
+        self._settings = settings
         self._builder = builder
         self._dataset = dataset
         self._fileReaderChooser = fileReaderChooser
@@ -52,8 +56,23 @@ class PatternsAPI:
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.currentPlugin.displayName
 
-    def openPatterns(self, filePath: Path, fileType: str, *, assemble: bool = True) -> str | None:
-        self._fileReaderChooser.setCurrentPluginByName(fileType)
+    def openPatterns(self,
+                     filePath: Path,
+                     *,
+                     fileType: str | None = None,
+                     cropCenter: CropCenter | None = None,
+                     cropExtent: ImageExtent | None = None,
+                     assemble: bool = True) -> str | None:
+        if cropCenter is not None:
+            self._settings.cropCenterXInPixels.value = cropCenter.positionXInPixels
+            self._settings.cropCenterYInPixels.value = cropCenter.positionYInPixels
+
+        if cropExtent is not None:
+            self._settings.cropWidthInPixels.value = cropExtent.widthInPixels
+            self._settings.cropHeightInPixels.value = cropExtent.heightInPixels
+
+        self._fileReaderChooser.setCurrentPluginByName(self._settings.fileType.value if fileType is
+                                                       None else fileType)
 
         if filePath.is_file():
             fileReader = self._fileReaderChooser.currentPlugin.strategy

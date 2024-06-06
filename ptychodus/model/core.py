@@ -216,8 +216,8 @@ class ModelCore:
         self._automationCore.repository.notifyObserversIfRepositoryChanged()
 
     def batchModeExecute(self, action: str, inputFilePath: Path, outputFilePath: Path) -> int:
-        # FIXME use workflow API
-        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, 'NPZ')
+        # TODO add enum for actions; implement using workflow API
+        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, fileType='NPZ')
 
         if inputProductIndex < 0:
             logger.error(f'Failed to open product \"{inputFilePath}\"')
@@ -232,7 +232,9 @@ class ModelCore:
                 logger.error(f'Failed to reconstruct product index=\"{inputProductIndex}\"')
                 return -1
 
-            self._productCore.productAPI.saveProduct(outputProductIndex, outputFilePath, 'NPZ')
+            self._productCore.productAPI.saveProduct(outputProductIndex,
+                                                     outputFilePath,
+                                                     fileType='NPZ')
         elif action.lower() == 'train':
             self._reconstructorCore.presenter.ingestTrainingData(inputProductIndex)
             _ = self._reconstructorCore.presenter.train()

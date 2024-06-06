@@ -27,19 +27,19 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._productIndex = productIndex
 
     def openScan(self, filePath: Path, *, fileType: str | None = None) -> None:
-        self._scanAPI.openScan(self._productIndex, filePath, fileType)
+        self._scanAPI.openScan(self._productIndex, filePath, fileType=fileType)
 
     def buildScan(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
         self._scanAPI.buildScan(self._productIndex, builderName, builderParameters)
 
     def openProbe(self, filePath: Path, *, fileType: str | None = None) -> None:
-        self._probeAPI.openProbe(self._productIndex, filePath, fileType)
+        self._probeAPI.openProbe(self._productIndex, filePath, fileType=fileType)
 
     def buildProbe(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
         self._probeAPI.buildProbe(self._productIndex, builderName, builderParameters)
 
     def openObject(self, filePath: Path, *, fileType: str | None = None) -> None:
-        self._objectAPI.openObject(self._productIndex, filePath, fileType)
+        self._objectAPI.openObject(self._productIndex, filePath, fileType=fileType)
 
     def buildObject(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
         self._objectAPI.buildObject(self._productIndex, builderName, builderParameters)
@@ -49,7 +49,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._executor.runFlow(self._productIndex)
 
     def saveProduct(self, filePath: Path, *, fileType: str | None = None) -> None:
-        self._productAPI.saveProduct(self._productIndex, filePath, fileType)
+        self._productAPI.saveProduct(self._productIndex, filePath, fileType=fileType)
 
 
 class ConcreteWorkflowAPI(WorkflowAPI):
@@ -66,6 +66,9 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self._executor = executor
 
     def _createProductAPI(self, productIndex: int) -> WorkflowProductAPI:
+        if productIndex < 0:
+            raise ValueError(f'Bad product index ({productIndex=})!')
+
         return ConcreteWorkflowProductAPI(self._productAPI, self._scanAPI, self._probeAPI,
                                           self._objectAPI, self._executor, productIndex)
 
@@ -77,17 +80,20 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         cropCenter: CropCenter | None = None,
         cropExtent: ImageExtent | None = None,
     ) -> None:
-        self._patternsAPI.openPatterns(filePath, fileType)  # FIXME
+        self._patternsAPI.openPatterns(filePath,
+                                       fileType=fileType,
+                                       cropCenter=cropCenter,
+                                       cropExtent=cropExtent)
 
-    def importProcessedPatterns(self, filePath: Path) -> None:  # FIXME use
+    def importProcessedPatterns(self, filePath: Path) -> None:
         self._patternsAPI.importProcessedPatterns(filePath)
 
-    def exportProcessedPatterns(self, filePath: Path) -> None:  # FIXME use
+    def exportProcessedPatterns(self, filePath: Path) -> None:
         self._patternsAPI.exportProcessedPatterns(filePath)
 
     def openProduct(self, filePath: Path, *, fileType: str | None = None) -> WorkflowProductAPI:
-        productIndex = self._productAPI.openProduct(filePath, fileType)
-        return self._createProductAPI(productIndex)  # FIXME
+        productIndex = self._productAPI.openProduct(filePath, fileType=fileType)
+        return self._createProductAPI(productIndex)
 
     def createProduct(
         self,
@@ -99,6 +105,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         probePhotonsPerSecond: float | None = None,
         exposureTimeInSeconds: float | None = None,
     ) -> WorkflowProductAPI:
+        # FIXME use metadata; fall back to settings for defaults
         productIndex = self._productAPI.insertNewProduct(name)
         return self._createProductAPI(productIndex)
 
