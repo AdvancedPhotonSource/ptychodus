@@ -6,8 +6,7 @@ import logging
 
 import numpy
 import numpy.typing
-
-from ptychonn import ReconSmallModel, Tester, Trainer
+import ptychonn
 
 from ptychodus.api.geometry import ImageExtent, Point2D
 from ptychodus.api.object import ObjectArrayType
@@ -105,12 +104,24 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return 'AmplitudePhase' if self._enableAmplitude else 'PhaseOnly'
 
-    def _createModel(self) -> ReconSmallModel:
+    def _createModel(self) -> ptychonn.LitReconSmallModel:
         logger.debug('Building model...')
-        return ReconSmallModel(
-            nconv=self._modelSettings.numberOfConvolutionKernels.value,
-            use_batch_norm=self._modelSettings.useBatchNormalization.value,
-            enable_amplitude=self._enableAmplitude,
+        if self._modelSettings.stateFilePath.value.exists():
+            path = self._modelSettings.stateFilePath.value
+            parameters = None
+        else:
+            path = None
+            parameters = dict(
+                nconv=self._modelSettings.numberOfConvolutionKernels.value,
+                use_batch_norm=self._modelSettings.useBatchNormalization.value,
+                enable_amplitude=self._enableAmplitude,
+                max_lr=float(self._trainingSettings.maximumLearningRate.value),
+                min_lr=float(self._trainingSettings.minimumLearningRate.value),
+            )
+        return ptychonn.init_or_load_model(
+            model_type=ptychonn.LitReconSmallModel,
+            model_checkpoint_path=path,
+            model_init_params=parameters,
         )
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
@@ -142,16 +153,14 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                                                          binSize * j:binSize * (j + 1)])
 
         logger.debug('Loading model state...')
-        tester = Tester(
-            model=self._createModel(),
-            model_params_path=self._modelSettings.stateFilePath.value,
-        )
+        model = self._createModel()
 
         logger.debug('Inferring...')
-        tester.setTestData(binnedData.astype(numpy.float32),
-                           batch_size=self._modelSettings.batchSize.value)
-        npzSavePath = None  # TODO self._trainingSettings.outputPath.value / 'preds.npz'
-        objectPatches = tester.predictTestData(npz_save_path=npzSavePath)
+        objectPatches = ptychonn.infer(
+            data=binnedData.astype(numpy.float32),
+            model=model,
+        )
+        assert objectPatches.ndim == 4, objectPatches.shape
 
         logger.debug('Stitching...')
         stitcher = ObjectStitcher(parameters.product.object_.getGeometry())
@@ -219,39 +228,36 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         numpy.savez(filePath, **trainingData)
 
     def train(self) -> TrainOutput:
-        outputPath = self._trainingSettings.outputPath.value \
-                if self._trainingSettings.saveTrainingArtifacts.value else None
+        logger.debug("Loading model state...")
+        model = self._createModel()
 
-        trainer = Trainer(
-            model=self._createModel(),
+        logger.debug("Training...")
+        trainer, trainer_log = ptychonn.train(
+            model=model,
             batch_size=self._modelSettings.batchSize.value,
-            output_path=outputPath,
-            output_suffix=self._trainingSettings.outputSuffix.value,
-        )
-
-        trainer.setTrainingData(
+            out_dir=None,
             X_train_full=self._patternBuffer.getBuffer(),
             Y_ph_train_full=self._objectPatchBuffer.getBuffer(),
-            valid_data_ratio=float(self._trainingSettings.validationSetFractionalSize.value),
-        )
-        trainer.setOptimizationParams(
-            epochs_per_half_cycle=self._trainingSettings.optimizationEpochsPerHalfCycle.value,
-            max_lr=float(self._trainingSettings.maximumLearningRate.value),
-            min_lr=float(self._trainingSettings.minimumLearningRate.value),
-        )
-
-        logger.debug('Loading model state...')
-        trainer.initModel()
-
-        logger.debug('Training...')
-        trainer.run(
             epochs=self._trainingSettings.trainingEpochs.value,
-            output_frequency=self._trainingSettings.statusIntervalInEpochs.value,
+            training_fraction=float(self._trainingSettings.validationSetFractionalSize.value),
         )
+        if self._trainingSettings.saveTrainingArtifacts.value:
+            ptychonn.create_model_checkpoint(
+                trainer,
+                self._trainingSettings.outputPath.value,
+            )
+
+        def not_none(x):
+            """Return True if x is not None"""
+            return x is not None
 
         return TrainOutput(
-            trainingLoss=[losses[0] for losses in trainer.metrics['losses']],
-            validationLoss=[losses[0] for losses in trainer.metrics['val_losses']],
+            trainingLoss=[
+                filter(not_none, (entry.get("training_loss") for entry in trainer_log.logs))
+            ],
+            validationLoss=[
+                filter(not_none, (entry.get("validation_loss") for entry in trainer_log.logs))
+            ],
             result=0,
         )
 
