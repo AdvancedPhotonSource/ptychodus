@@ -292,8 +292,23 @@ class ProductAPI:
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
 
-    def insertNewProduct(self, name: str = 'Unnamed', *, likeIndex: int = -1) -> int:
-        return self._repository.insertNewProduct(name, likeIndex=likeIndex)
+    def insertNewProduct(self,
+                         name: str = 'Unnamed',
+                         *,
+                         comments: str = '',
+                         detectorDistanceInMeters: float | None = None,
+                         probeEnergyInElectronVolts: float | None = None,
+                         probePhotonsPerSecond: float | None = None,
+                         exposureTimeInSeconds: float | None = None,
+                         likeIndex: int = -1) -> int:
+        return self._repository.insertNewProduct(
+            name,
+            comments=comments,
+            detectorDistanceInMeters=detectorDistanceInMeters,
+            probeEnergyInElectronVolts=probeEnergyInElectronVolts,
+            probePhotonsPerSecond=probePhotonsPerSecond,
+            exposureTimeInSeconds=exposureTimeInSeconds,
+            likeIndex=likeIndex)
 
     def getItemName(self, productIndex: int) -> str:
         item = self._repository[productIndex]

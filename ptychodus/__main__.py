@@ -35,20 +35,18 @@ def main() -> int:
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        # input data product file (batch mode)
         '-i',
         '--input',
         metavar='INPUT_FILE',
         type=argparse.FileType('r'),
-        help=argparse.SUPPRESS,
+        help='input file (batch mode)',
     )
     parser.add_argument(
-        # output data product file (batch mode)
         '-o',
         '--output',
         metavar='OUTPUT_FILE',
         type=argparse.FileType('w'),
-        help=argparse.SUPPRESS,
+        help='output file (batch mode)',
     )
     parser.add_argument(
         # preprocessed diffraction patterns file (batch mode)
@@ -76,6 +74,10 @@ def main() -> int:
     settingsFile = Path(parsedArgs.settings.name) if parsedArgs.settings else None
 
     with ModelCore(settingsFile, isDeveloperModeEnabled=parsedArgs.dev) as model:
+        if parsedArgs.patterns is not None:
+            patternsFilePath = Path(parsedArgs.patterns.name)
+            model.workflowAPI.importProcessedPatterns(patternsFilePath)
+
         if parsedArgs.batch is not None:
             verifyAllArgumentsParsed(parser, unparsedArgs)
 
@@ -86,8 +88,6 @@ def main() -> int:
             action = parsedArgs.batch
             inputFilePath = Path(parsedArgs.input.name)
             outputFilePath = Path(parsedArgs.output.name)
-            patternsFilePath = Path(parsedArgs.patterns.name)
-            model.workflowAPI.importProcessedPatterns(patternsFilePath)
             return model.batchModeExecute(action, inputFilePath, outputFilePath)
 
         try:

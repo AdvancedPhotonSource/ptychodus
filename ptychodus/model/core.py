@@ -69,9 +69,6 @@ class ModelCore:
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry()
 
-        if settingsFile:
-            self.settingsRegistry.openSettings(settingsFile)
-
         self._patternsCore = PatternsCore(self.settingsRegistry,
                                           self._pluginRegistry.diffractionFileReaders,
                                           self._pluginRegistry.diffractionFileWriters)
@@ -115,6 +112,9 @@ class ModelCore:
         self._automationCore = AutomationCore(self.settingsRegistry,
                                               self._workflowCore.workflowAPI,
                                               self._pluginRegistry.fileBasedWorkflows)
+
+        if settingsFile:
+            self.settingsRegistry.openSettings(settingsFile)
 
     def __enter__(self) -> ModelCore:
         self._patternsCore.start()

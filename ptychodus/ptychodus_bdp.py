@@ -33,6 +33,10 @@ class DirectoryType:
 
 
 def main() -> int:
+    changePathPrefix: PathPrefixChange | None = None
+    cropCenter: CropCenter | None = None
+    cropExtent: ImageExtent | None = None
+
     prog = Path(__file__).stem.lower()
     parser = argparse.ArgumentParser(
         prog=prog,
@@ -164,11 +168,6 @@ def main() -> int:
     )
 
     args = parser.parse_args()
-    changePathPrefix: PathPrefixChange | None = None
-    cropCenter: CropCenter | None = None
-    cropExtent: ImageExtent | None = None
-
-    print(args)  # FIXME
 
     if args.local_path_prefix is not None and args.remote_path_prefix is not None:
         changePathPrefix = PathPrefixChange(
@@ -201,20 +200,20 @@ def main() -> int:
     if args.number_of_gpus is not None:
         logger.warning('Number of GPUs is not implemented yet!')  # TODO
 
-    with ModelCore(Path(args.settings), isDeveloperModeEnabled=args.dev) as model:
-        model.workflowAPI.openPatterns(args.patterns_file_path,
+    with ModelCore(Path(args.settings.name), isDeveloperModeEnabled=args.dev) as model:
+        model.workflowAPI.openPatterns(Path(args.patterns_file_path.name),
                                        cropCenter=cropCenter,
                                        cropExtent=cropExtent)
 
         workflowProductAPI = model.workflowAPI.createProduct(
             name=args.name,
-            comments=args.comments,
+            comments=args.comment,
             detectorDistanceInMeters=args.detector_distance_m,
             probeEnergyInElectronVolts=args.probe_energy_eV,
             probePhotonsPerSecond=args.probe_photon_flux_Hz,
             exposureTimeInSeconds=args.exposure_time_s,
         )
-        workflowProductAPI.openScan(args.scan_file_path)
+        workflowProductAPI.openScan(Path(args.scan_file_path.name))
 
         stagingDir = args.output_directory
         stagingDir.mkdir(parents=True, exist_ok=True)

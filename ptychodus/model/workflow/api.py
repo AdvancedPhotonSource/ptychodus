@@ -105,8 +105,13 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         probePhotonsPerSecond: float | None = None,
         exposureTimeInSeconds: float | None = None,
     ) -> WorkflowProductAPI:
-        # FIXME use metadata; fall back to settings for defaults
-        productIndex = self._productAPI.insertNewProduct(name)
+        productIndex = self._productAPI.insertNewProduct(
+            name,
+            comments=comments,
+            detectorDistanceInMeters=detectorDistanceInMeters,
+            probeEnergyInElectronVolts=probeEnergyInElectronVolts,
+            probePhotonsPerSecond=probePhotonsPerSecond,
+            exposureTimeInSeconds=exposureTimeInSeconds)
         return self._createProductAPI(productIndex)
 
     def saveSettings(self,

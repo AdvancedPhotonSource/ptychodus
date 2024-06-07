@@ -71,8 +71,8 @@ class PatternsAPI:
             self._settings.cropWidthInPixels.value = cropExtent.widthInPixels
             self._settings.cropHeightInPixels.value = cropExtent.heightInPixels
 
-        self._fileReaderChooser.setCurrentPluginByName(self._settings.fileType.value if fileType is
-                                                       None else fileType)
+        fileType_ = self._settings.fileType.value if fileType is None else fileType
+        self._fileReaderChooser.setCurrentPluginByName(fileType_)
 
         if filePath.is_file():
             fileReader = self._fileReaderChooser.currentPlugin.strategy
@@ -129,4 +129,5 @@ class PatternsAPI:
             'indexes': numpy.array(self._dataset.getAssembledIndexes()),
             'patterns': numpy.array(self._dataset.getAssembledData()),
         }
+        logger.debug(f'Writing processed patterns to \"{filePath}\"')
         numpy.savez(filePath, **contents)
