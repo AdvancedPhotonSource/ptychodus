@@ -1,6 +1,5 @@
-from .core import ModelArgs, ModelCore
+from .core import ModelCore
 
 __all__ = [
-    'ModelArgs',
     'ModelCore',
 ]

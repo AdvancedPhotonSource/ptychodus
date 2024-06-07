@@ -57,7 +57,6 @@ class WorkflowExecutor:
         patternsFile = 'patterns.npz'
         inputFile = 'product-in.npz'
         outputFile = 'product-out.npz'
-        productFileFilter = 'NPZ'
 
         try:
             inputDataPosixPath.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -65,10 +64,12 @@ class WorkflowExecutor:
             logger.warning('Input data POSIX path must be a directory!')
             return
 
+        # TODO use workflow API
         self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFile)
-        self._patternsAPI.savePreprocessedPatterns(inputDataPosixPath / patternsFile)
-        self._productAPI.saveProduct(inputProductIndex, inputDataPosixPath / inputFile,
-                                     productFileFilter)
+        self._patternsAPI.exportProcessedPatterns(inputDataPosixPath / patternsFile)
+        self._productAPI.saveProduct(inputProductIndex,
+                                     inputDataPosixPath / inputFile,
+                                     fileType='NPZ')
 
         flowInput = {
             'input_data_transfer_source_endpoint_id':

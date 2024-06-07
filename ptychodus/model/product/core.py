@@ -66,14 +66,16 @@ class ProductCore(Observer):
                                                    self._scanRepositoryItemFactory,
                                                    self._probeRepositoryItemFactory,
                                                    self._objectRepositoryItemFactory)
-        self.productAPI = ProductAPI(self.productRepository, productFileReaderChooser,
+        self.productAPI = ProductAPI(settings, self.productRepository, productFileReaderChooser,
                                      productFileWriterChooser)
         self.scanRepository = ScanRepository(self.productRepository)
-        self.scanAPI = ScanAPI(self.scanRepository, self._scanBuilderFactory)
+        self.scanAPI = ScanAPI(self._scanSettings, self.scanRepository, self._scanBuilderFactory)
         self.probeRepository = ProbeRepository(self.productRepository)
-        self.probeAPI = ProbeAPI(self.probeRepository, self._probeBuilderFactory)
+        self.probeAPI = ProbeAPI(self._probeSettings, self.probeRepository,
+                                 self._probeBuilderFactory)
         self.objectRepository = ObjectRepository(self.productRepository)
-        self.objectAPI = ObjectAPI(self.objectRepository, self._objectBuilderFactory)
+        self.objectAPI = ObjectAPI(self._objectSettings, self.objectRepository,
+                                   self._objectBuilderFactory)
 
         # TODO vvv refactor vvv
         productFileReaderChooser.setCurrentPluginByName(settings.fileType.value)

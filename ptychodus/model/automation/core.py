@@ -3,16 +3,12 @@ from collections.abc import Generator, Sequence
 from pathlib import Path
 import queue
 
-from ptychodus.api.automation import FileBasedWorkflow
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 
-from ..patterns import PatternsAPI
-from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
-from ..workflow import WorkflowCore
-from .api import ConcreteWorkflowAPI
 from .buffer import AutomationDatasetBuffer
 from .processor import AutomationDatasetProcessor
 from .repository import AutomationDatasetRepository, AutomationDatasetState
@@ -148,18 +144,14 @@ class AutomationProcessingPresenter(Observable, Observer):
 
 class AutomationCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
-                 productAPI: ProductAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
-                 objectAPI: ObjectAPI, workflowCore: WorkflowCore,
+    def __init__(self, settingsRegistry: SettingsRegistry, workflowAPI: WorkflowAPI,
                  workflowChooser: PluginChooser[FileBasedWorkflow]) -> None:
         self._settings = AutomationSettings(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
         self._workflow = CurrentFileBasedWorkflow(self._settings, workflowChooser)
-        self._workflowAPI = ConcreteWorkflowAPI(patternsAPI, productAPI, scanAPI, probeAPI,
-                                                objectAPI, workflowCore)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(self._settings, self.repository,
-                                                     self._workflow, self._workflowAPI,
+                                                     self._workflow, workflowAPI,
                                                      self._processingQueue)
         self._datasetBuffer = AutomationDatasetBuffer(self._settings, self.repository,
                                                       self._processor)

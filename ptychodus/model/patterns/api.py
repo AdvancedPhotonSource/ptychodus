@@ -5,7 +5,8 @@ import logging
 
 import numpy
 
-from ptychodus.api.patterns import (DiffractionFileReader, DiffractionFileWriter,
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.patterns import (CropCenter, DiffractionFileReader, DiffractionFileWriter,
                                     DiffractionMetadata, DiffractionPatternArray,
                                     SimpleDiffractionDataset)
 from ptychodus.api.plugins import PluginChooser
@@ -13,16 +14,19 @@ from ptychodus.api.tree import SimpleTreeNode
 
 from .active import ActiveDiffractionDataset
 from .builder import ActiveDiffractionDatasetBuilder
+from .settings import PatternSettings
 
 logger = logging.getLogger(__name__)
 
 
 class PatternsAPI:
 
-    def __init__(self, builder: ActiveDiffractionDatasetBuilder, dataset: ActiveDiffractionDataset,
+    def __init__(self, settings: PatternSettings, builder: ActiveDiffractionDatasetBuilder,
+                 dataset: ActiveDiffractionDataset,
                  fileReaderChooser: PluginChooser[DiffractionFileReader],
                  fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
         super().__init__()
+        self._settings = settings
         self._builder = builder
         self._dataset = dataset
         self._fileReaderChooser = fileReaderChooser
@@ -52,8 +56,23 @@ class PatternsAPI:
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.currentPlugin.displayName
 
-    def openPatterns(self, filePath: Path, fileType: str, *, assemble: bool = True) -> str | None:
-        self._fileReaderChooser.setCurrentPluginByName(fileType)
+    def openPatterns(self,
+                     filePath: Path,
+                     *,
+                     fileType: str | None = None,
+                     cropCenter: CropCenter | None = None,
+                     cropExtent: ImageExtent | None = None,
+                     assemble: bool = True) -> str | None:
+        if cropCenter is not None:
+            self._settings.cropCenterXInPixels.value = cropCenter.positionXInPixels
+            self._settings.cropCenterYInPixels.value = cropCenter.positionYInPixels
+
+        if cropExtent is not None:
+            self._settings.cropWidthInPixels.value = cropExtent.widthInPixels
+            self._settings.cropHeightInPixels.value = cropExtent.heightInPixels
+
+        fileType_ = self._settings.fileType.value if fileType is None else fileType
+        self._fileReaderChooser.setCurrentPluginByName(fileType_)
 
         if filePath.is_file():
             fileReader = self._fileReaderChooser.currentPlugin.strategy
@@ -89,9 +108,9 @@ class PatternsAPI:
         writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, self._dataset)
 
-    def openPreprocessedPatterns(self, filePath: Path) -> None:
+    def importProcessedPatterns(self, filePath: Path) -> None:
         if filePath.is_file():
-            logger.debug(f'Reading preprocessed patterns from \"{filePath}\"')
+            logger.debug(f'Reading processed patterns from \"{filePath}\"')
 
             try:
                 contents = numpy.load(filePath)
@@ -105,9 +124,10 @@ class PatternsAPI:
         else:
             logger.warning(f'Refusing to read invalid file path {filePath}')
 
-    def savePreprocessedPatterns(self, filePath: Path) -> None:
+    def exportProcessedPatterns(self, filePath: Path) -> None:
         contents: dict[str, Any] = {
             'indexes': numpy.array(self._dataset.getAssembledIndexes()),
             'patterns': numpy.array(self._dataset.getAssembledData()),
         }
+        logger.debug(f'Writing processed patterns to \"{filePath}\"')
         numpy.savez(filePath, **contents)

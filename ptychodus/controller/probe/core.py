@@ -111,7 +111,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         if filePath:
             try:
-                self._api.openProbe(itemIndex, filePath, nameFilter)
+                self._api.openProbe(itemIndex, filePath, fileType=nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)

@@ -170,7 +170,7 @@ class ActiveDiffractionDataset(DiffractionDataset):
             # TODO use arrayIndexes
             self._arrayList = [
                 SimpleDiffractionPatternArray(
-                    label='Restart',
+                    label='Processed',
                     index=0,
                     data=arrayData[...],
                     state=DiffractionPatternState.LOADED,

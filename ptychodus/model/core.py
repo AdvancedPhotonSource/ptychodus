@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
 from types import TracebackType
@@ -20,6 +19,7 @@ import numpy
 from ptychodus.api.patterns import DiffractionMetadata, DiffractionPatternArray
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.workflow import WorkflowAPI
 
 from .analysis import (AnalysisCore, ExposureAnalyzer, FluorescenceEnhancer, FourierRingCorrelator,
                        ProbePropagator, STXMAnalyzer, XMCDAnalyzer)
@@ -56,23 +56,19 @@ def configureLogger() -> None:
     logger.info(f'HDF5 {h5py.version.hdf5_version}')
 
 
-@dataclass(frozen=True)
-class ModelArgs:
-    settingsFile: Path | None
-    patternsFile: Path | None
-    replacementPathPrefix: str | None
-
-
 class ModelCore:
 
-    def __init__(self, modelArgs: ModelArgs, *, isDeveloperModeEnabled: bool = False) -> None:
+    def __init__(self,
+                 settingsFile: Path | None = None,
+                 *,
+                 isDeveloperModeEnabled: bool = False) -> None:
         configureLogger()
-        self._modelArgs = modelArgs
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
         self.memoryPresenter = MemoryPresenter()
-        self.settingsRegistry = SettingsRegistry(modelArgs.replacementPathPrefix)
+        self.settingsRegistry = SettingsRegistry()
+
         self._patternsCore = PatternsCore(self.settingsRegistry,
                                           self._pluginRegistry.diffractionFileReaders,
                                           self._pluginRegistry.diffractionFileWriters)
@@ -111,23 +107,19 @@ class ModelCore:
                                           self._pluginRegistry.fluorescenceFileReaders,
                                           self._pluginRegistry.fluorescenceFileWriters)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
-                                          self._productCore.productAPI)
-        self._automationCore = AutomationCore(
-            self.settingsRegistry, self._patternsCore.patternsAPI, self._productCore.productAPI,
-            self._productCore.scanAPI, self._productCore.probeAPI, self._productCore.objectAPI,
-            self._workflowCore, self._pluginRegistry.fileBasedWorkflows)
+                                          self._productCore.productAPI, self._productCore.scanAPI,
+                                          self._productCore.probeAPI, self._productCore.objectAPI)
+        self._automationCore = AutomationCore(self.settingsRegistry,
+                                              self._workflowCore.workflowAPI,
+                                              self._pluginRegistry.fileBasedWorkflows)
+
+        if settingsFile:
+            self.settingsRegistry.openSettings(settingsFile)
 
     def __enter__(self) -> ModelCore:
-        if self._modelArgs.settingsFile:
-            self.settingsRegistry.openSettings(self._modelArgs.settingsFile)
-
-        if self._modelArgs.patternsFile:
-            self._patternsCore.patternsAPI.openPreprocessedPatterns(self._modelArgs.patternsFile)
-
         self._patternsCore.start()
         self._workflowCore.start()
         self._automationCore.start()
-
         return self
 
     @overload
@@ -223,41 +215,33 @@ class ModelCore:
     def refreshAutomationDatasets(self) -> None:
         self._automationCore.repository.notifyObserversIfRepositoryChanged()
 
-    def stageReconstructionInputs(self, stagingDir: Path) -> int:
-        self.settingsRegistry.saveSettings(stagingDir / 'settings.ini')
-        self._patternsCore.patternsAPI.savePreprocessedPatterns(stagingDir / 'patterns.npz')
-        self._productCore.productAPI.saveProduct(0, stagingDir / 'product-in.npz', 'NPZ')
-        return 0
-
-    def batchModeReconstruct(self, inputFilePath: Path, outputFilePath: Path) -> int:
-        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, 'NPZ')
+    def batchModeExecute(self, action: str, inputFilePath: Path, outputFilePath: Path) -> int:
+        # TODO add enum for actions; implement using workflow API
+        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, fileType='NPZ')
 
         if inputProductIndex < 0:
             logger.error(f'Failed to open product \"{inputFilePath}\"')
             return -1
 
-        outputProductName = self._productCore.productAPI.getItemName(inputProductIndex)
-        outputProductIndex = self._reconstructorCore.presenter.reconstruct(
-            inputProductIndex, outputProductName)
+        if action.lower() == 'reconstruct':
+            outputProductName = self._productCore.productAPI.getItemName(inputProductIndex)
+            outputProductIndex = self._reconstructorCore.presenter.reconstruct(
+                inputProductIndex, outputProductName)
 
-        if outputProductIndex < 0:
-            logger.error(f'Failed to reconstruct product index=\"{inputProductIndex}\"')
+            if outputProductIndex < 0:
+                logger.error(f'Failed to reconstruct product index=\"{inputProductIndex}\"')
+                return -1
+
+            self._productCore.productAPI.saveProduct(outputProductIndex,
+                                                     outputFilePath,
+                                                     fileType='NPZ')
+        elif action.lower() == 'train':
+            self._reconstructorCore.presenter.ingestTrainingData(inputProductIndex)
+            _ = self._reconstructorCore.presenter.train()
+            self._reconstructorCore.presenter.saveModel(outputFilePath)
+        else:
+            logger.error(f'Unknown batch mode action \"{action}\"!')
             return -1
-
-        self._productCore.productAPI.saveProduct(outputProductIndex, outputFilePath, 'NPZ')
-
-        return 0
-
-    def batchModeTrain(self, inputFilePath: Path, outputFilePath: Path) -> int:
-        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, 'NPZ')
-
-        if inputProductIndex < 0:
-            logger.error(f'Failed to open product \"{inputFilePath}\"')
-            return -1
-
-        self._reconstructorCore.presenter.ingestTrainingData(inputProductIndex)
-        _ = self._reconstructorCore.presenter.train()
-        self._reconstructorCore.presenter.saveModel(outputFilePath)
 
         return 0
 
@@ -332,6 +316,10 @@ class ModelCore:
     @property
     def workflowParametersPresenter(self) -> WorkflowParametersPresenter:
         return self._workflowCore.parametersPresenter
+
+    @property
+    def workflowAPI(self) -> WorkflowAPI:
+        return self._workflowCore.workflowAPI
 
     @property
     def automationPresenter(self) -> AutomationPresenter:
