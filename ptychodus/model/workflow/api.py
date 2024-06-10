@@ -38,11 +38,17 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def buildProbe(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
         self._probeAPI.buildProbe(self._productIndex, builderName, builderParameters)
 
+    def buildProbeFromSettings(self) -> None:
+        self._probeAPI.buildProbeFromSettings(self._productIndex)
+
     def openObject(self, filePath: Path, *, fileType: str | None = None) -> None:
         self._objectAPI.openObject(self._productIndex, filePath, fileType=fileType)
 
     def buildObject(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
         self._objectAPI.buildObject(self._productIndex, builderName, builderParameters)
+
+    def buildObjectFromSettings(self) -> None:
+        self._objectAPI.buildObjectFromSettings(self._productIndex)
 
     def reconstruct(self) -> None:
         logger.debug(f'Execute Workflow: index={self._productIndex}')

@@ -45,6 +45,7 @@ def main() -> int:
     parser.add_argument(
         '-c',
         '--comment',
+        default='',
         help='data product comment',
     )
     parser.add_argument(
@@ -200,6 +201,8 @@ def main() -> int:
     if args.number_of_gpus is not None:
         logger.warning('Number of GPUs is not implemented yet!')  # TODO
 
+    print(args)
+
     with ModelCore(Path(args.settings.name), isDeveloperModeEnabled=args.dev) as model:
         model.workflowAPI.openPatterns(Path(args.patterns_file_path.name),
                                        cropCenter=cropCenter,
@@ -214,6 +217,8 @@ def main() -> int:
             exposureTimeInSeconds=args.exposure_time_s,
         )
         workflowProductAPI.openScan(Path(args.scan_file_path.name))
+        workflowProductAPI.buildProbeFromSettings()
+        workflowProductAPI.buildObjectFromSettings()
 
         stagingDir = args.output_directory
         stagingDir.mkdir(parents=True, exist_ok=True)
