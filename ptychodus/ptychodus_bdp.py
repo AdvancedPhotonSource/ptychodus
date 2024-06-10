@@ -45,6 +45,7 @@ def main() -> int:
     parser.add_argument(
         '-c',
         '--comment',
+        default='',
         help='data product comment',
     )
     parser.add_argument(
@@ -214,6 +215,8 @@ def main() -> int:
             exposureTimeInSeconds=args.exposure_time_s,
         )
         workflowProductAPI.openScan(Path(args.scan_file_path.name))
+        workflowProductAPI.buildProbeFromSettings()
+        workflowProductAPI.buildObjectFromSettings()
 
         stagingDir = args.output_directory
         stagingDir.mkdir(parents=True, exist_ok=True)

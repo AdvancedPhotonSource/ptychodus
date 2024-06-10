@@ -146,6 +146,21 @@ class ProbeAPI:
 
         item.setBuilder(builder)
 
+    def buildProbeFromSettings(self, index: int) -> None:
+        try:
+            item = self._repository[index]
+        except IndexError:
+            logger.warning(f'Failed to access item {index}!')
+            return
+
+        try:
+            builder = self._builderFactory.createFromSettings()
+        except KeyError:
+            logger.warning('Failed to create builder from settings!')
+            return
+
+        item.setBuilder(builder)
+
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._builderFactory.getOpenFileFilterList()
 
@@ -230,6 +245,21 @@ class ObjectAPI:
                                f' parameter \"{parameterName}\"!')
             else:
                 parameter.setValue(parameterValue)
+
+        item.setBuilder(builder)
+
+    def buildObjectFromSettings(self, index: int) -> None:
+        try:
+            item = self._repository[index]
+        except IndexError:
+            logger.warning(f'Failed to access item {index}!')
+            return
+
+        try:
+            builder = self._builderFactory.createFromSettings()
+        except KeyError:
+            logger.warning('Failed to create builder from settings!')
+            return
 
         item.setBuilder(builder)
 
