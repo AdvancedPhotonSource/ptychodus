@@ -201,8 +201,6 @@ def main() -> int:
     if args.number_of_gpus is not None:
         logger.warning('Number of GPUs is not implemented yet!')  # TODO
 
-    print(args)
-
     with ModelCore(Path(args.settings.name), isDeveloperModeEnabled=args.dev) as model:
         model.workflowAPI.openPatterns(Path(args.patterns_file_path.name),
                                        cropCenter=cropCenter,
