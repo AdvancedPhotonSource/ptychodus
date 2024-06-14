@@ -1,11 +1,31 @@
 from typing import Final
 
-from scipy.fft import fft2, fftshift, ifft2, ifftshift
+from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import WavefieldArrayType
 from ptychodus.api.typing import RealArrayType
+
+
+class AngularSpectrumPropagator:
+
+    def __init__(self, arrayShape: tuple[int, ...], pixelGeometry: PixelGeometry,
+                 propagationDistanceInMeters: float, wavelengthInMeters: float) -> None:
+        z = propagationDistanceInMeters / wavelengthInMeters
+        i2piz = 2j * numpy.pi * z
+        fx = fftfreq(arrayShape[-1])
+        fy = fftfreq(arrayShape[-2])
+        Fy, Fx = numpy.meshgrid(fy, fx)
+        F_sq = numpy.square(Fx) + numpy.square(pixelGeometry.aspectRatio * Fy)
+        dx_sq = numpy.square(pixelGeometry.widthInMeters / wavelengthInMeters)
+
+        # transfer function
+        self._z = z
+        self._TF = numpy.exp(i2piz * numpy.sqrt(1 - F_sq / dx_sq))
+
+    def propagate(self, inputWavefield: WavefieldArrayType) -> WavefieldArrayType:
+        return fftshift(ifft2(self._TF * fft2(ifftshift(inputWavefield))))
 
 
 class FresnelPropagator:

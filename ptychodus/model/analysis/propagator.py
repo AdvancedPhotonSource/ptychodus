@@ -11,7 +11,7 @@ from ptychodus.api.observer import Observable
 from ptychodus.api.probe import Probe, WavefieldArrayType
 
 from ..product import ProductRepository
-from ..propagator import FresnelPropagator
+from ..propagator import AngularSpectrumPropagator
 from .settings import ProbePropagationSettings
 
 logger = logging.getLogger(__name__)
@@ -50,8 +50,9 @@ class ProbePropagator(Observable):
                                           float(endCoordinateInMeters), numberOfSteps)
 
         for idx, zInMeters in enumerate(distanceInMeters):
-            propagator = FresnelPropagator(probe.array.shape[-2:], probe.getPixelGeometry(),
-                                           zInMeters, wavelengthInMeters)
+            propagator = AngularSpectrumPropagator(probe.array.shape[-2:],
+                                                   probe.getPixelGeometry(), zInMeters,
+                                                   wavelengthInMeters)
             wf = propagator.propagate(probe.array[0])
             propagatedWavefield[idx, :, :] = wf
 
