@@ -1,4 +1,3 @@
-from __future__ import annotations
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
@@ -15,6 +14,7 @@ from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
 
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
 from .buffers import ObjectPatchCircularBuffer, PatternCircularBuffer
+from .common import MODEL_FILE_FILTER, TRAINING_DATA_FILE_FILTER
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 logger = logging.getLogger(__name__)
@@ -29,8 +29,6 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
         self._enableAmplitude = enableAmplitude
-        self._trainingDataFileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
-        self._modelFileFilterList: list[str] = list()  # FIXME
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -40,10 +38,11 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         return 'AmplitudePhase' if self._enableAmplitude else 'PhaseOnly'
 
     def _createModel(self) -> ptychonn.LitReconSmallModel:
+        # TODO keep model in memory
         logger.debug('Building model...')
 
-        if self._modelSettings.stateFilePath.value.exists():
-            path = self._modelSettings.stateFilePath.value
+        if self._modelSettings.modelFilePath.value.exists():
+            path = self._modelSettings.modelFilePath.value
             parameters = None
         else:
             path = None
@@ -144,10 +143,10 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             self._patternBuffer.append(pattern)
 
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
-        return self._trainingDataFileFilterList
+        return [self.getSaveTrainingDataFileFilter()]
 
     def getSaveTrainingDataFileFilter(self) -> str:
-        return self._trainingDataFileFilterList[0]
+        return TRAINING_DATA_FILE_FILTER
 
     def saveTrainingData(self, filePath: Path) -> None:
         logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
@@ -177,8 +176,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         if self._trainingSettings.saveTrainingArtifacts.value:
             ptychonn.create_model_checkpoint(
                 trainer,
-                self._trainingSettings.outputPath.value /
-                self._trainingSettings.outputSuffix.value,
+                self._trainingSettings.trainingArtifactsDirectory.value /
+                self._trainingSettings.trainingArtifactsSuffix.value,
             )
 
         trainingLoss: list[float] = list()
@@ -205,10 +204,10 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
 
     def getSaveModelFileFilterList(self) -> Sequence[str]:
-        return self._modelFileFilterList
+        return [self.getSaveModelFileFilter()]
 
     def getSaveModelFileFilter(self) -> str:
-        return self._modelFileFilterList[0]
+        return MODEL_FILE_FILTER
 
     def saveModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # FIXME
+        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # TODO

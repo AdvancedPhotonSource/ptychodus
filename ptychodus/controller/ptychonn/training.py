@@ -6,15 +6,15 @@ import logging
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.ptychonn import PtychoNNTrainingPresenter
-from ...view.ptychonn import PtychoNNOutputParametersView, PtychoNNTrainingParametersView
+from ...view.ptychonn import PtychoNNTrainingArtifactsView, PtychoNNTrainingParametersView
 from ..data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
 
 
-class PtychoNNOutputParametersController(Observer):
+class PtychoNNTrainingArtifactsController(Observer):
 
-    def __init__(self, presenter: PtychoNNTrainingPresenter, view: PtychoNNOutputParametersView,
+    def __init__(self, presenter: PtychoNNTrainingPresenter, view: PtychoNNTrainingArtifactsView,
                  fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._presenter = presenter
@@ -22,46 +22,47 @@ class PtychoNNOutputParametersController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, presenter: PtychoNNTrainingPresenter,
-                       view: PtychoNNOutputParametersView,
-                       fileDialogFactory: FileDialogFactory) -> PtychoNNOutputParametersController:
+    def createInstance(
+            cls, presenter: PtychoNNTrainingPresenter, view: PtychoNNTrainingArtifactsView,
+            fileDialogFactory: FileDialogFactory) -> PtychoNNTrainingArtifactsController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
         view.setCheckable(True)
         view.toggled.connect(presenter.setSaveTrainingArtifactsEnabled)
 
-        view.pathLineEdit.editingFinished.connect(controller._syncOutputPathToModel)
-        view.pathBrowseButton.clicked.connect(controller._browseOutputPath)
-        view.suffixLineEdit.editingFinished.connect(controller._syncOutputSuffixToModel)
+        view.directoryLineEdit.editingFinished.connect(
+            controller._syncTrainingArtifactsDirectoryToModel)
+        view.directoryBrowseButton.clicked.connect(controller._browseTrainingArtifactsDirectory)
+        view.suffixLineEdit.editingFinished.connect(controller._syncTrainingArtifactsSuffixToModel)
 
         controller._syncModelToView()
 
         return controller
 
-    def _syncOutputPathToModel(self) -> None:
-        self._presenter.setOutputPath(Path(self._view.pathLineEdit.text()))
+    def _syncTrainingArtifactsDirectoryToModel(self) -> None:
+        self._presenter.setTrainingArtifactsDirectory(Path(self._view.directoryLineEdit.text()))
 
-    def _browseOutputPath(self) -> None:
+    def _browseTrainingArtifactsDirectory(self) -> None:
         dirPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, 'Choose Training Output Data Directory')
+            self._view, 'Choose Training Artifacts Directory')
 
         if dirPath:
-            self._presenter.setOutputPath(dirPath)
+            self._presenter.setTrainingArtifactsDirectory(dirPath)
 
-    def _syncOutputSuffixToModel(self) -> None:
-        self._presenter.setOutputSuffix(self._view.suffixLineEdit.text())
+    def _syncTrainingArtifactsSuffixToModel(self) -> None:
+        self._presenter.setTrainingArtifactsSuffix(self._view.suffixLineEdit.text())
 
     def _syncModelToView(self) -> None:
         self._view.setChecked(self._presenter.isSaveTrainingArtifactsEnabled())
-        outputPath = self._presenter.getOutputPath()
+        outputPath = self._presenter.getTrainingArtifactsDirectory()
 
         if outputPath:
-            self._view.pathLineEdit.setText(str(outputPath))
+            self._view.directoryLineEdit.setText(str(outputPath))
         else:
-            self._view.pathLineEdit.clear()
+            self._view.directoryLineEdit.clear()
 
-        outputSuffix = self._presenter.getOutputSuffix()
+        outputSuffix = self._presenter.getTrainingArtifactsSuffix()
 
         if outputSuffix:
             self._view.suffixLineEdit.setText(str(outputSuffix))
@@ -80,8 +81,8 @@ class PtychoNNTrainingParametersController(Observer):
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._outputParametersController = PtychoNNOutputParametersController.createInstance(
-            presenter, view.outputParametersView, fileDialogFactory)
+        self._trainingArtifactsController = PtychoNNTrainingArtifactsController.createInstance(
+            presenter, view.trainingArtifactsView, fileDialogFactory)
 
     @classmethod
     def createInstance(

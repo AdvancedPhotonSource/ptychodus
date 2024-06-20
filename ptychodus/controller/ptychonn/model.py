@@ -35,20 +35,20 @@ class PtychoNNModelParametersController(Observer):
         return controller
 
     def _syncModelStateFilePathToModel(self) -> None:
-        self._presenter.setStateFilePath(Path(self._view.modelStateLineEdit.text()))
+        self._presenter.setModelFilePath(Path(self._view.modelStateLineEdit.text()))
 
     def _openModelState(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Model State',
-            nameFilters=self._presenter.getStateFileFilterList(),
-            selectedNameFilter=self._presenter.getStateFileFilter())
+            nameFilters=self._presenter.getSaveModelFileFilterList(),
+            selectedNameFilter=self._presenter.getSaveModelFileFilter())
 
         if filePath:
-            self._presenter.setStateFilePath(filePath)
+            self._presenter.setModelFilePath(filePath)
 
     def _syncModelToView(self) -> None:
-        modelStateFilePath = self._presenter.getStateFilePath()
+        modelStateFilePath = self._presenter.getModelFilePath()
 
         if modelStateFilePath:
             self._view.modelStateLineEdit.setText(str(modelStateFilePath))
