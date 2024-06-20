@@ -4,7 +4,7 @@ from pathlib import Path
 import argparse
 import sys
 
-from ptychodus.model import ModelArgs, ModelCore
+from ptychodus.model import ModelCore
 import ptychodus
 
 
@@ -15,17 +15,6 @@ def versionString() -> str:
 def verifyAllArgumentsParsed(parser: argparse.ArgumentParser, argv: list[str]) -> None:
     if argv:
         parser.error('unrecognized arguments: %s' % ' '.join(argv))
-
-
-class DirectoryType:
-
-    def __call__(self, string: str) -> Path:
-        path = Path(string)
-
-        if not path.is_dir():
-            raise argparse.ArgumentTypeError(f'\"{string}\" is not a directory!')
-
-        return path
 
 
 def main() -> int:
@@ -46,25 +35,18 @@ def main() -> int:
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        '-f',
-        '--file-prefix',
-        help='replace file path prefix in settings',
-    )
-    parser.add_argument(
-        # input data product file (batch mode)
         '-i',
         '--input',
         metavar='INPUT_FILE',
         type=argparse.FileType('r'),
-        help=argparse.SUPPRESS,
+        help='input file (batch mode)',
     )
     parser.add_argument(
-        # output data product file (batch mode)
         '-o',
         '--output',
         metavar='OUTPUT_FILE',
         type=argparse.FileType('w'),
-        help=argparse.SUPPRESS,
+        help='output file (batch mode)',
     )
     parser.add_argument(
         # preprocessed diffraction patterns file (batch mode)
@@ -87,25 +69,14 @@ def main() -> int:
         action='version',
         version=versionString(),
     )
-    parser.add_argument(
-        '-w',
-        '--write',
-        metavar='OUTPUT_DIR',
-        type=DirectoryType(),
-        help='stage reconstruction inputs to directory',
-    )
 
     parsedArgs, unparsedArgs = parser.parse_known_args()
+    settingsFile = Path(parsedArgs.settings.name) if parsedArgs.settings else None
 
-    modelArgs = ModelArgs(
-        settingsFile=Path(parsedArgs.settings.name) if parsedArgs.settings else None,
-        patternsFile=Path(parsedArgs.patterns.name) if parsedArgs.patterns else None,
-        replacementPathPrefix=parsedArgs.file_prefix,
-    )
-
-    with ModelCore(modelArgs, isDeveloperModeEnabled=parsedArgs.dev) as model:
-        if parsedArgs.write is not None:
-            return model.stageReconstructionInputs(parsedArgs.write)
+    with ModelCore(settingsFile, isDeveloperModeEnabled=parsedArgs.dev) as model:
+        if parsedArgs.patterns is not None:
+            patternsFilePath = Path(parsedArgs.patterns.name)
+            model.workflowAPI.importProcessedPatterns(patternsFilePath)
 
         if parsedArgs.batch is not None:
             verifyAllArgumentsParsed(parser, unparsedArgs)
@@ -114,16 +85,10 @@ def main() -> int:
                 parser.error('Batch mode requires input and output arguments!')
                 return -1
 
-            inputPath = Path(parsedArgs.input.name)
-            outputPath = Path(parsedArgs.output.name)
-
-            if parsedArgs.batch == 'reconstruct':
-                return model.batchModeReconstruct(inputPath, outputPath)
-            elif parsedArgs.batch == 'train':
-                return model.batchModeTrain(inputPath, outputPath)
-            else:
-                parser.error(f'Unknown batch mode action \"{parsedArgs.batch}\"!')
-                return -1
+            action = parsedArgs.batch
+            inputFilePath = Path(parsedArgs.input.name)
+            outputFilePath = Path(parsedArgs.output.name)
+            return model.batchModeExecute(action, inputFilePath, outputFilePath)
 
         try:
             from PyQt5.QtWidgets import QApplication

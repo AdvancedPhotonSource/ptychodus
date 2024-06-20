@@ -23,14 +23,30 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
     def create(self, metadata: ProductMetadata) -> MetadataRepositoryItem:
         return MetadataRepositoryItem(self, metadata)
 
-    def createDefault(self, name: str, comments: str = '') -> MetadataRepositoryItem:
+    def createDefault(self,
+                      name: str,
+                      *,
+                      comments: str = '',
+                      detectorDistanceInMeters: float | None = None,
+                      probeEnergyInElectronVolts: float | None = None,
+                      probePhotonsPerSecond: float | None = None,
+                      exposureTimeInSeconds: float | None = None) -> MetadataRepositoryItem:
+        detectorDistanceInMeters_ = float(self._settings.detectorDistanceInMeters.value) \
+                if detectorDistanceInMeters is None else detectorDistanceInMeters
+        probeEnergyInElectronVolts_ = float(self._settings.probeEnergyInElectronVolts.value) \
+                if probeEnergyInElectronVolts is None else probeEnergyInElectronVolts
+        probePhotonsPerSecond_ = float(self._settings.probePhotonsPerSecond.value) \
+                if probePhotonsPerSecond is None else probePhotonsPerSecond
+        exposureTimeInSeconds_ = float(self._settings.exposureTimeInSeconds.value) \
+                if exposureTimeInSeconds is None else exposureTimeInSeconds
+
         metadata = ProductMetadata(
             name=name,
             comments=comments,
-            detectorDistanceInMeters=float(self._settings.detectorDistanceInMeters.value),
-            probeEnergyInElectronVolts=float(self._settings.probeEnergyInElectronVolts.value),
-            probePhotonsPerSecond=float(self._settings.probePhotonsPerSecond.value),
-            exposureTimeInSeconds=float(self._settings.exposureTimeInSeconds.value),
+            detectorDistanceInMeters=detectorDistanceInMeters_,
+            probeEnergyInElectronVolts=probeEnergyInElectronVolts_,
+            probePhotonsPerSecond=probePhotonsPerSecond_,
+            exposureTimeInSeconds=exposureTimeInSeconds_,
         )
         return self.create(metadata)
 

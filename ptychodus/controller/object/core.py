@@ -146,7 +146,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
         if filePath:
             try:
-                self._api.openObject(itemIndex, filePath, nameFilter)
+                self._api.openObject(itemIndex, filePath, fileType=nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)

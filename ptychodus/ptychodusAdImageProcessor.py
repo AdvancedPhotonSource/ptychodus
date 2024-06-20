@@ -12,14 +12,14 @@ from pvapy.utility.timeUtility import TimeUtility
 import pvaccess
 import pvapy
 
+from ptychodus.model import ModelCore
 import ptychodus
-import ptychodus.model
 
 
 class ReconstructionThread(threading.Thread):
 
-    def __init__(self, ptychodus: ptychodus.model.ModelCore, inputProductPath: Path,
-                 outputProductPath: Path, reconstructPV: str) -> None:
+    def __init__(self, ptychodus: ModelCore, inputProductPath: Path, outputProductPath: Path,
+                 reconstructPV: str) -> None:
         super().__init__()
         self._ptychodus = ptychodus
         self._inputProductPath = inputProductPath
@@ -37,8 +37,8 @@ class ReconstructionThread(threading.Thread):
                 logging.debug('ReconstructionThread: Begin assembling scan positions')
                 self._ptychodus.finalizeStreamingWorkflow()
                 logging.debug('ReconstructionThread: End assembling scan positions')
-                self._ptychodus.batchModeReconstruct(self._inputProductPath,
-                                                     self._outputProductPath)
+                self._ptychodus.batchModeExecute('reconstruct', self._inputProductPath,
+                                                 self._outputProductPath)
                 self._reconstructEvent.clear()
                 # reconstruction done; indicate that results are ready
                 self._channel.put(0)
@@ -65,13 +65,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
 
         self.logger.debug(f'{ptychodus.__name__.title()} ({ptychodus.__version__})')
 
-        modelArgs = ptychodus.model.ModelArgs(
-            settingsFile=configDict.get('settingsFile'),
-            patternsFile=None,
-            replacementPathPrefix=configDict.get('replacementPathPrefix'),
-        )
-
-        self._ptychodus = ptychodus.model.ModelCore(modelArgs)
+        settingsFile = configDict.get('settingsFile')
+        self._ptychodus = ModelCore(settingsFile)
         self._reconstructionThread = ReconstructionThread(
             self._ptychodus,
             Path(configDict.get('inputProductPath', 'input.npz')),
