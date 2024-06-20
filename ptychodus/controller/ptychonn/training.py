@@ -92,8 +92,6 @@ class PtychoNNTrainingParametersController(Observer):
 
         view.validationSetFractionalSizeSlider.valueChanged.connect(
             presenter.setValidationSetFractionalSize)
-        view.optimizationEpochsPerHalfCycleSpinBox.valueChanged.connect(
-            presenter.setOptimizationEpochsPerHalfCycle)
         view.maximumLearningRateLineEdit.valueChanged.connect(presenter.setMaximumLearningRate)
         view.minimumLearningRateLineEdit.valueChanged.connect(presenter.setMinimumLearningRate)
         view.trainingEpochsSpinBox.valueChanged.connect(presenter.setTrainingEpochs)
@@ -108,14 +106,6 @@ class PtychoNNTrainingParametersController(Observer):
             self._presenter.getValidationSetFractionalSize(),
             self._presenter.getValidationSetFractionalSizeLimits(),
             blockValueChangedSignal=True)
-
-        self._view.optimizationEpochsPerHalfCycleSpinBox.blockSignals(True)
-        self._view.optimizationEpochsPerHalfCycleSpinBox.setRange(
-            self._presenter.getOptimizationEpochsPerHalfCycleLimits().lower,
-            self._presenter.getOptimizationEpochsPerHalfCycleLimits().upper)
-        self._view.optimizationEpochsPerHalfCycleSpinBox.setValue(
-            self._presenter.getOptimizationEpochsPerHalfCycle())
-        self._view.optimizationEpochsPerHalfCycleSpinBox.blockSignals(False)
 
         self._view.maximumLearningRateLineEdit.setMinimum(Decimal())
         self._view.maximumLearningRateLineEdit.setValue(self._presenter.getMaximumLearningRate())

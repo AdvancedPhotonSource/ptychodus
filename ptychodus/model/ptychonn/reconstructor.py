@@ -8,81 +8,16 @@ import numpy
 import numpy.typing
 import ptychonn
 
-from ptychodus.api.geometry import ImageExtent, Point2D
-from ptychodus.api.object import ObjectArrayType
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
                                          TrainableReconstructor, TrainOutput)
-from ptychodus.api.typing import Float32ArrayType
 
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
+from .buffers import ObjectPatchCircularBuffer, PatternCircularBuffer
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 logger = logging.getLogger(__name__)
-
-
-class PatternCircularBuffer:
-
-    def __init__(self, extent: ImageExtent, maxSize: int) -> None:
-        self._buffer: Float32ArrayType = numpy.zeros(
-            (maxSize, *extent.shape),
-            dtype=numpy.float32,
-        )
-        self._pos = 0
-        self._full = False
-
-    @classmethod
-    def createZeroSized(cls) -> PatternCircularBuffer:
-        return cls(ImageExtent(0, 0), 0)
-
-    @property
-    def isZeroSized(self) -> bool:
-        return (self._buffer.size == 0)
-
-    def append(self, array: Float32ArrayType) -> None:
-        self._buffer[self._pos, :, :] = array
-        self._pos += 1
-
-        if self._pos == self._buffer.shape[0]:
-            self._pos = 0
-            self._full = True
-
-    def getBuffer(self) -> Float32ArrayType:
-        return self._buffer if self._full else self._buffer[:self._pos]
-
-
-class ObjectPatchCircularBuffer:
-
-    def __init__(self, extent: ImageExtent, channels: int, maxSize: int) -> None:
-        self._buffer: Float32ArrayType = numpy.zeros(
-            (maxSize, channels, *extent.shape),
-            dtype=numpy.float32,
-        )
-        self._pos = 0
-        self._full = False
-
-    @classmethod
-    def createZeroSized(cls) -> ObjectPatchCircularBuffer:
-        return cls(ImageExtent(0, 0), 0, 0)
-
-    @property
-    def isZeroSized(self) -> bool:
-        return (self._buffer.size == 0)
-
-    def append(self, array: ObjectArrayType) -> None:
-        self._buffer[self._pos, 0, :, :] = numpy.angle(array).astype(numpy.float32)
-
-        if self._buffer.shape[1] > 1:
-            self._buffer[self._pos, 1, :, :] = numpy.absolute(array).astype(numpy.float32)
-
-        self._pos += 1
-
-        if self._pos == self._buffer.shape[0]:
-            self._pos = 0
-            self._full = True
-
-    def getBuffer(self) -> Float32ArrayType:
-        return self._buffer if self._full else self._buffer[:self._pos]
 
 
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
@@ -95,7 +30,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
         self._enableAmplitude = enableAmplitude
         self._trainingDataFileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
-        self._modelFileFilterList: list[str] = list()  # TODO
+        self._modelFileFilterList: list[str] = list()  # FIXME
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -106,6 +41,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def _createModel(self) -> ptychonn.LitReconSmallModel:
         logger.debug('Building model...')
+
         if self._modelSettings.stateFilePath.value.exists():
             path = self._modelSettings.stateFilePath.value
             parameters = None
@@ -118,6 +54,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                 max_lr=float(self._trainingSettings.maximumLearningRate.value),
                 min_lr=float(self._trainingSettings.minimumLearningRate.value),
             )
+
         return ptychonn.init_or_load_model(
             model_type=ptychonn.LitReconSmallModel,
             model_checkpoint_path=path,
@@ -160,16 +97,11 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             data=binnedData.astype(numpy.float32),
             model=model,
         )
-        assert objectPatches.ndim == 4, objectPatches.shape
 
         logger.debug('Stitching...')
         stitcher = ObjectStitcher(parameters.product.object_.getGeometry())
 
         for scanPoint, objectPatchChannels in zip(parameters.product.scan, objectPatches):
-            patchCenter = Point2D(
-                x=scanPoint.positionXInMeters,
-                y=scanPoint.positionYInMeters,
-            )
             patchArray = numpy.exp(1j * objectPatchChannels[0])
 
             if objectPatchChannels.shape[0] == 2:
@@ -177,7 +109,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             else:
                 patchArray *= 0.5
 
-            stitcher.addPatch(patchCenter, patchArray)
+            stitcher.addPatch(scanPoint, patchArray)
 
         product = Product(
             metadata=parameters.product.metadata,
@@ -194,8 +126,10 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         probeExtent = parameters.product.probe.getExtent()
 
         if self._patternBuffer.isZeroSized:
-            patternExtent = ImageExtent(widthInPixels=parameters.patterns.shape[-1],
-                                        heightInPixels=parameters.patterns.shape[-2])
+            patternExtent = ImageExtent(
+                widthInPixels=parameters.patterns.shape[-1],
+                heightInPixels=parameters.patterns.shape[-2],
+            )
             maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
             channels = 2 if self._enableAmplitude else 1
             self._patternBuffer = PatternCircularBuffer(patternExtent, maximumSize)
@@ -203,11 +137,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                                                                 maximumSize)
 
         for scanPoint in parameters.product.scan:
-            patchCenter = Point2D(
-                x=scanPoint.positionXInMeters,
-                y=scanPoint.positionYInMeters,
-            )
-            objectPatch = interpolator.getPatch(patchCenter, probeExtent)
+            objectPatch = interpolator.getPatch(scanPoint, probeExtent)
             self._objectPatchBuffer.append(objectPatch.array)
 
         for pattern in parameters.patterns.astype(numpy.float32):
@@ -232,35 +162,41 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         model = self._createModel()
 
         logger.debug("Training...")
-        trainer, trainer_log = ptychonn.train(
+        trainingSetFractionalSize = 1 - self._trainingSettings.validationSetFractionalSize.value
+        trainer, trainerLog = ptychonn.train(
             model=model,
             batch_size=self._modelSettings.batchSize.value,
             out_dir=None,
             X_train=self._patternBuffer.getBuffer(),
             Y_train=self._objectPatchBuffer.getBuffer(),
             epochs=self._trainingSettings.trainingEpochs.value,
-            training_fraction=(
-                1.0 - float(self._trainingSettings.validationSetFractionalSize.value)
-            ),
+            training_fraction=float(trainingSetFractionalSize),
             log_frequency=self._trainingSettings.statusIntervalInEpochs.value,
         )
+
         if self._trainingSettings.saveTrainingArtifacts.value:
             ptychonn.create_model_checkpoint(
                 trainer,
-                self._trainingSettings.outputPath.value / self._trainingSettings.outputSuffix.value,
+                self._trainingSettings.outputPath.value /
+                self._trainingSettings.outputSuffix.value,
             )
 
-        def not_none(x):
-            """Return True if x is not None"""
-            return x is not None
+        trainingLoss: list[float] = list()
+        validationLoss: list[float] = list()
+
+        for entry in trainerLog.logs:
+            try:
+                tloss = entry['training_loss']
+                vloss = entry['validation_loss']
+            except KeyError:
+                pass
+            else:
+                trainingLoss.append(tloss)
+                validationLoss.append(vloss)
 
         return TrainOutput(
-            trainingLoss=[
-                filter(not_none, (entry.get("training_loss") for entry in trainer_log.logs))
-            ],
-            validationLoss=[
-                filter(not_none, (entry.get("validation_loss") for entry in trainer_log.logs))
-            ],
+            trainingLoss=trainingLoss,
+            validationLoss=validationLoss,
             result=0,
         )
 
@@ -275,4 +211,4 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         return self._modelFileFilterList[0]
 
     def saveModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # TODO
+        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # FIXME

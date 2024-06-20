@@ -96,16 +96,6 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def setValidationSetFractionalSize(self, value: Decimal) -> None:
         self._settings.validationSetFractionalSize.value = value
 
-    def getOptimizationEpochsPerHalfCycleLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getOptimizationEpochsPerHalfCycle(self) -> int:
-        limits = self.getOptimizationEpochsPerHalfCycleLimits()
-        return limits.clamp(self._settings.optimizationEpochsPerHalfCycle.value)
-
-    def setOptimizationEpochsPerHalfCycle(self, value: int) -> None:
-        self._settings.optimizationEpochsPerHalfCycle.value = value
-
     def getMaximumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 

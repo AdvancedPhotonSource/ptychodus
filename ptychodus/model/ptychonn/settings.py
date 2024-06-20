@@ -39,8 +39,6 @@ class PtychoNNTrainingSettings(Observable, Observer):
             'MaximumTrainingDatasetSize', 100000)
         self.validationSetFractionalSize = settingsGroup.createRealEntry(
             'ValidationSetFractionalSize', '0.1')
-        self.optimizationEpochsPerHalfCycle = settingsGroup.createIntegerEntry(
-            'OptimizationEpochsPerHalfCycle', 6)
         self.maximumLearningRate = settingsGroup.createRealEntry('MaximumLearningRate', '1e-3')
         self.minimumLearningRate = settingsGroup.createRealEntry('MinimumLearningRate', '1e-4')
         self.trainingEpochs = settingsGroup.createIntegerEntry('TrainingEpochs', 50)
