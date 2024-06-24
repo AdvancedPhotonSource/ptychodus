@@ -4,6 +4,7 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
 from ..product import ObjectRepository, ProductRepository
+from ..reconstructor import DiffractionPatternPositionMatcher
 from ..visualization import VisualizationEngine
 from .exposure import ExposureAnalyzer
 from .fluorescence import FluorescenceEnhancer
@@ -16,13 +17,14 @@ from .xmcd import XMCDAnalyzer
 
 class AnalysisCore:
 
-    def __init__(self, settingsRegistry: SettingsRegistry, productRepository: ProductRepository,
-                 objectRepository: ObjectRepository,
+    def __init__(self, settingsRegistry: SettingsRegistry,
+                 dataMatcher: DiffractionPatternPositionMatcher,
+                 productRepository: ProductRepository, objectRepository: ObjectRepository,
                  upscalingStrategyChooser: PluginChooser[UpscalingStrategy],
                  deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
                  fluorescenceFileReaderChooser: PluginChooser[FluorescenceFileReader],
                  fluorescenceFileWriterChooser: PluginChooser[FluorescenceFileWriter]) -> None:
-        self.stxmAnalyzer = STXMAnalyzer(productRepository)
+        self.stxmAnalyzer = STXMAnalyzer(dataMatcher)
         self.stxmVisualizationEngine = VisualizationEngine(isComplex=False)
 
         self._probePropagationSettings = ProbePropagationSettings(settingsRegistry)

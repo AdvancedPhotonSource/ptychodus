@@ -99,13 +99,12 @@ class ModelCore:
                 self.ptychonnReconstructorLibrary,
             ],
         )
-        self._analysisCore = AnalysisCore(self.settingsRegistry,
-                                          self._productCore.productRepository,
-                                          self._productCore.objectRepository,
-                                          self._pluginRegistry.upscalingStrategies,
-                                          self._pluginRegistry.deconvolutionStrategies,
-                                          self._pluginRegistry.fluorescenceFileReaders,
-                                          self._pluginRegistry.fluorescenceFileWriters)
+        self._analysisCore = AnalysisCore(
+            self.settingsRegistry, self._reconstructorCore.dataMatcher,
+            self._productCore.productRepository, self._productCore.objectRepository,
+            self._pluginRegistry.upscalingStrategies, self._pluginRegistry.deconvolutionStrategies,
+            self._pluginRegistry.fluorescenceFileReaders,
+            self._pluginRegistry.fluorescenceFileWriters)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
                                           self._productCore.productAPI, self._productCore.scanAPI,
                                           self._productCore.probeAPI, self._productCore.objectAPI)
