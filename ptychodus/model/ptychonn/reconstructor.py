@@ -142,6 +142,15 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         for pattern in parameters.patterns.astype(numpy.float32):
             self._patternBuffer.append(pattern)
 
+    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
+        return [self.getOpenTrainingDataFileFilter()]
+
+    def getOpenTrainingDataFileFilter(self) -> str:
+        return TRAINING_DATA_FILE_FILTER
+
+    def openTrainingData(self, filePath: Path) -> None:
+        raise NotImplementedError(f'Open training data from \"{filePath}\"')  # FIXME
+
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         return [self.getSaveTrainingDataFileFilter()]
 
@@ -203,6 +212,15 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
 
+    def getOpenModelFileFilterList(self) -> Sequence[str]:
+        return [self.getOpenModelFileFilter()]
+
+    def getOpenModelFileFilter(self) -> str:
+        return MODEL_FILE_FILTER
+
+    def openModel(self, filePath: Path) -> None:
+        raise NotImplementedError(f'Open trained model from \"{filePath}\"')  # FIXME
+
     def getSaveModelFileFilterList(self) -> Sequence[str]:
         return [self.getSaveModelFileFilter()]
 
@@ -210,4 +228,4 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         return MODEL_FILE_FILTER
 
     def saveModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # TODO
+        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # FIXME
