@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 from ptychodus.api.observer import SequenceObserver
 
 from ...model.analysis import (ExposureAnalyzer, FluorescenceEnhancer, FourierRingCorrelator,
-                               STXMAnalyzer, XMCDAnalyzer)
+                               STXMSimulator, XMCDAnalyzer)
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
 from ...model.visualization import VisualizationEngine
@@ -30,7 +30,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
     def __init__(self, repository: ObjectRepository, api: ObjectAPI,
                  imageController: ImageController, correlator: FourierRingCorrelator,
-                 stxmAnalyzer: STXMAnalyzer, stxmVisualizationEngine: VisualizationEngine,
+                 stxmSimulator: STXMSimulator, stxmVisualizationEngine: VisualizationEngine,
                  exposureAnalyzer: ExposureAnalyzer,
                  exposureVisualizationEngine: VisualizationEngine,
                  fluorescenceEnhancer: FluorescenceEnhancer,
@@ -47,7 +47,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._editorFactory = ObjectEditorViewControllerFactory()
 
         self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel)
-        self._stxmViewController = STXMViewController(stxmAnalyzer, stxmVisualizationEngine,
+        self._stxmViewController = STXMViewController(stxmSimulator, stxmVisualizationEngine,
                                                       fileDialogFactory)
         self._exposureViewController = ExposureViewController(exposureAnalyzer,
                                                               exposureVisualizationEngine,
@@ -60,7 +60,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
     @classmethod
     def createInstance(cls, repository: ObjectRepository, api: ObjectAPI,
                        imageController: ImageController, correlator: FourierRingCorrelator,
-                       stxmAnalyzer: STXMAnalyzer, stxmVisualizationEngine: VisualizationEngine,
+                       stxmSimulator: STXMSimulator, stxmVisualizationEngine: VisualizationEngine,
                        exposureAnalyzer: ExposureAnalyzer,
                        exposureVisualizationEngine: VisualizationEngine,
                        fluorescenceEnhancer: FluorescenceEnhancer,
@@ -70,7 +70,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                        fileDialogFactory: FileDialogFactory) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ObjectTreeModel(repository, api)
-        controller = cls(repository, api, imageController, correlator, stxmAnalyzer,
+        controller = cls(repository, api, imageController, correlator, stxmSimulator,
                          stxmVisualizationEngine, exposureAnalyzer, exposureVisualizationEngine,
                          fluorescenceEnhancer, fluorescenceVisualizationEngine, xmcdAnalyzer,
                          xmcdVisualizationEngine, view, fileDialogFactory, treeModel)
@@ -103,8 +103,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         frcAction = view.buttonBox.analyzeMenu.addAction('Fourier Ring Correlation...')
         frcAction.triggered.connect(controller._analyzeFRC)
 
-        stxmAction = view.buttonBox.analyzeMenu.addAction('STXM...')
-        stxmAction.triggered.connect(controller._analyzeSTXM)
+        stxmAction = view.buttonBox.analyzeMenu.addAction('Simulate STXM...')
+        stxmAction.triggered.connect(controller._simulateSTXM)
 
         exposureAction = view.buttonBox.analyzeMenu.addAction('Exposure...')
         exposureAction.triggered.connect(controller._analyzeExposure)
@@ -202,13 +202,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         else:
             self._frcViewController.analyze(itemIndex, itemIndex)
 
-    def _analyzeSTXM(self) -> None:
+    def _simulateSTXM(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._stxmViewController.analyze(itemIndex)
+            self._stxmViewController.launch(itemIndex)
 
     def _analyzeExposure(self) -> None:
         itemIndex = self._getCurrentItemIndex()

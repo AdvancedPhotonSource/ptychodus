@@ -22,7 +22,7 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
 
 from .analysis import (AnalysisCore, ExposureAnalyzer, FluorescenceEnhancer, FourierRingCorrelator,
-                       ProbePropagator, STXMAnalyzer, XMCDAnalyzer)
+                       ProbePropagator, STXMSimulator, XMCDAnalyzer)
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .memory import MemoryPresenter
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
@@ -253,8 +253,8 @@ class ModelCore:
         return self._reconstructorCore.presenter
 
     @property
-    def stxmAnalyzer(self) -> STXMAnalyzer:
-        return self._analysisCore.stxmAnalyzer
+    def stxmSimulator(self) -> STXMSimulator:
+        return self._analysisCore.stxmSimulator
 
     @property
     def stxmVisualizationEngine(self) -> VisualizationEngine:

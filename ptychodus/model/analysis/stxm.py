@@ -8,10 +8,15 @@ import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import ObjectGeometry
+from ptychodus.api.observer import Observable
 from ptychodus.api.scan import ScanPoint
 from ptychodus.api.visualization import RealArrayType
 
 from ..reconstructor import DiffractionPatternPositionMatcher
+
+__all__ = [
+    'STXMSimulator',
+]
 
 logger = logging.getLogger(__name__)
 
@@ -88,24 +93,46 @@ class STXMStitcher:
         )
 
 
-class STXMAnalyzer:
+class STXMSimulator(Observable):
 
     def __init__(self, dataMatcher: DiffractionPatternPositionMatcher) -> None:
+        super().__init__()
         self._dataMatcher = dataMatcher
 
-    def analyze(self, itemIndex: int) -> STXMImage:
-        parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(itemIndex)
-        product = parameters.product
+        self._productIndex = 0
+        self._productName = ''
+        self._image: STXMImage | None = None
+
+    def setProduct(self, productIndex: int) -> None:
+        if self._productIndex != productIndex:
+            self._productIndex = productIndex
+            self._productName = 'FIXME'  # FIXME
+            self._image = None
+            self.notifyObservers()
+
+    def getProductName(self) -> str:
+        return self._productName
+
+    def simulate(self) -> None:
+        reconstructInput = self._dataMatcher.matchDiffractionPatternsWithPositions(
+            self._productIndex)
+        product = reconstructInput.product
         stitcher = STXMStitcher(product.object_.getGeometry())
 
         probeIntensity = product.probe.getIntensity()
         probeProfile = probeIntensity / numpy.sqrt(numpy.sum(numpy.abs(probeIntensity)**2))
 
-        for pattern, scanPoint in zip(parameters.patterns, product.scan):
+        for pattern, scanPoint in zip(reconstructInput.patterns, product.scan):
             patternIntensity = pattern.sum()
             stitcher.addMeasurement(scanPoint, patternIntensity, probeProfile)
 
-        return stitcher.build()
+        self._image = stitcher.build()
+
+    def getImage(self) -> STXMImage:
+        if self._image is None:
+            raise ValueError('No simulated image!')
+
+        return self._image
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return [self.getSaveFileFilter()]
@@ -113,17 +140,20 @@ class STXMAnalyzer:
     def getSaveFileFilter(self) -> str:
         return 'NumPy Zipped Archive (*.npz)'
 
-    def saveResult(self, filePath: Path, result: STXMImage) -> None:
+    def saveImage(self, filePath: Path) -> None:
+        if self._image is None:
+            raise ValueError('No simulated image!')
+
         numpy.savez(
             filePath,
             'pixel_height_m',
-            result.pixel_height_m,
+            self._image.pixel_height_m,
             'pixel_width_m',
-            result.pixel_width_m,
+            self._image.pixel_width_m,
             'center_x_m',
-            result.center_x_m,
+            self._image.center_x_m,
             'center_y_m',
-            result.center_y_m,
+            self._image.center_y_m,
             'intensity',
-            result.intensity,
+            self._image.intensity,
         )

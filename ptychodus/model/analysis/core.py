@@ -11,7 +11,7 @@ from .fluorescence import FluorescenceEnhancer
 from .frc import FourierRingCorrelator
 from .propagator import ProbePropagator
 from .settings import FluorescenceSettings, ProbePropagationSettings
-from .stxm import STXMAnalyzer
+from .stxm import STXMSimulator
 from .xmcd import XMCDAnalyzer
 
 
@@ -24,7 +24,7 @@ class AnalysisCore:
                  deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
                  fluorescenceFileReaderChooser: PluginChooser[FluorescenceFileReader],
                  fluorescenceFileWriterChooser: PluginChooser[FluorescenceFileWriter]) -> None:
-        self.stxmAnalyzer = STXMAnalyzer(dataMatcher)
+        self.stxmSimulator = STXMSimulator(dataMatcher)
         self.stxmVisualizationEngine = VisualizationEngine(isComplex=False)
 
         self._probePropagationSettings = ProbePropagationSettings(settingsRegistry)
