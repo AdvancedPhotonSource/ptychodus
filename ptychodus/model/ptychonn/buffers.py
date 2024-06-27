@@ -40,6 +40,11 @@ class PatternCircularBuffer:
     def getBuffer(self) -> Float32ArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
 
+    def setBuffer(self, array: Float32ArrayType) -> None:
+        self._buffer = array
+        self._pos = 0
+        self._full = True
+
 
 class ObjectPatchCircularBuffer:
 
@@ -73,3 +78,8 @@ class ObjectPatchCircularBuffer:
 
     def getBuffer(self) -> Float32ArrayType:
         return self._buffer if self._full else self._buffer[:self._pos]
+
+    def setBuffer(self, array: Float32ArrayType) -> None:
+        self._buffer = array
+        self._pos = 0
+        self._full = True

@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
+from typing import Final
 import logging
 
 import numpy
@@ -14,51 +15,33 @@ from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
 
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
 from .buffers import ObjectPatchCircularBuffer, PatternCircularBuffer
-from .common import MODEL_FILE_FILTER, TRAINING_DATA_FILE_FILTER
+from .model import PtychoNNModelProvider
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 logger = logging.getLogger(__name__)
 
 
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
+    MODEL_FILE_FILTER: Final[str] = 'PyTorch Lightning Checkpoint Files (*.ckpt)'
+    TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
+    PATCHES_KW: Final[str] = 'real'
+    PATTERNS_KW: Final[str] = 'reciprocal'
 
     def __init__(self, modelSettings: PtychoNNModelSettings,
-                 trainingSettings: PtychoNNTrainingSettings, *, enableAmplitude: bool) -> None:
+                 trainingSettings: PtychoNNTrainingSettings,
+                 modelProvider: PtychoNNModelProvider) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
+        self._modelProvider = modelProvider
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
-        self._enableAmplitude = enableAmplitude
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
 
     @property
     def name(self) -> str:
-        return 'AmplitudePhase' if self._enableAmplitude else 'PhaseOnly'
-
-    def _createModel(self) -> ptychonn.LitReconSmallModel:
-        # TODO keep model in memory
-        logger.debug('Building model...')
-
-        if self._modelSettings.modelFilePath.value.exists():
-            path = self._modelSettings.modelFilePath.value
-            parameters = None
-        else:
-            path = None
-            parameters = dict(
-                nconv=self._modelSettings.numberOfConvolutionKernels.value,
-                use_batch_norm=self._modelSettings.useBatchNormalization.value,
-                enable_amplitude=self._enableAmplitude,
-                max_lr=float(self._trainingSettings.maximumLearningRate.value),
-                min_lr=float(self._trainingSettings.minimumLearningRate.value),
-            )
-
-        return ptychonn.init_or_load_model(
-            model_type=ptychonn.LitReconSmallModel,
-            model_checkpoint_path=path,
-            model_init_params=parameters,
-        )
+        return self._modelProvider.getModelName()
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         # TODO data size/shape requirements to GUI
@@ -88,8 +71,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                     binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
                                                          binSize * j:binSize * (j + 1)])
 
-        logger.debug('Loading model state...')
-        model = self._createModel()
+        model = self._modelProvider.getModel()
 
         logger.debug('Inferring...')
         objectPatches = ptychonn.infer(
@@ -130,10 +112,9 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                 heightInPixels=parameters.patterns.shape[-2],
             )
             maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
-            channels = 2 if self._enableAmplitude else 1
             self._patternBuffer = PatternCircularBuffer(patternExtent, maximumSize)
-            self._objectPatchBuffer = ObjectPatchCircularBuffer(patternExtent, channels,
-                                                                maximumSize)
+            self._objectPatchBuffer = ObjectPatchCircularBuffer(
+                patternExtent, self._modelProvider.getNumberOfChannels(), maximumSize)
 
         for scanPoint in parameters.product.scan:
             objectPatch = interpolator.getPatch(scanPoint, probeExtent)
@@ -146,30 +127,31 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         return [self.getOpenTrainingDataFileFilter()]
 
     def getOpenTrainingDataFileFilter(self) -> str:
-        return TRAINING_DATA_FILE_FILTER
+        return self.TRAINING_DATA_FILE_FILTER
 
     def openTrainingData(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Open training data from \"{filePath}\"')  # FIXME
+        logger.debug(f'Reading \"{filePath}\" as \"NPZ\"')
+        trainingData = numpy.load(filePath)
+        self._patternBuffer.setBuffer(trainingData[self.PATTERNS_KW])
+        self._objectPatchBuffer.setBuffer(trainingData[self.PATCHES_KW])
 
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         return [self.getSaveTrainingDataFileFilter()]
 
     def getSaveTrainingDataFileFilter(self) -> str:
-        return TRAINING_DATA_FILE_FILTER
+        return self.TRAINING_DATA_FILE_FILTER
 
     def saveTrainingData(self, filePath: Path) -> None:
         logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
         trainingData = {
-            'diffractionPatterns': self._patternBuffer.getBuffer(),
-            'objectPatches': self._objectPatchBuffer.getBuffer(),
+            self.PATTERNS_KW: self._patternBuffer.getBuffer(),
+            self.PATCHES_KW: self._objectPatchBuffer.getBuffer(),
         }
-        numpy.savez(filePath, **trainingData)
+        numpy.savez_compressed(filePath, **trainingData)
 
     def train(self) -> TrainOutput:
-        logger.debug("Loading model state...")
-        model = self._createModel()
-
-        logger.debug("Training...")
+        model = self._modelProvider.getModel()
+        logger.debug('Training...')
         trainingSetFractionalSize = 1 - self._trainingSettings.validationSetFractionalSize.value
         trainer, trainerLog = ptychonn.train(
             model=model,
@@ -180,14 +162,9 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             epochs=self._trainingSettings.trainingEpochs.value,
             training_fraction=float(trainingSetFractionalSize),
             log_frequency=self._trainingSettings.statusIntervalInEpochs.value,
+            strategy='ddp',
         )
-
-        if self._trainingSettings.saveTrainingArtifacts.value:
-            ptychonn.create_model_checkpoint(
-                trainer,
-                self._trainingSettings.trainingArtifactsDirectory.value /
-                self._trainingSettings.trainingArtifactsSuffix.value,
-            )
+        self._modelProvider.setTrainer(trainer)
 
         trainingLoss: list[float] = list()
         validationLoss: list[float] = list()
@@ -216,16 +193,16 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         return [self.getOpenModelFileFilter()]
 
     def getOpenModelFileFilter(self) -> str:
-        return MODEL_FILE_FILTER
+        return self.MODEL_FILE_FILTER
 
     def openModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Open trained model from \"{filePath}\"')  # FIXME
+        self._modelProvider.openModel(filePath)
 
     def getSaveModelFileFilterList(self) -> Sequence[str]:
         return [self.getSaveModelFileFilter()]
 
     def getSaveModelFileFilter(self) -> str:
-        return MODEL_FILE_FILTER
+        return self.MODEL_FILE_FILTER
 
     def saveModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # FIXME
+        self._modelProvider.saveModel(filePath)
