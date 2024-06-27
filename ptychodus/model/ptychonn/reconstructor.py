@@ -162,7 +162,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             epochs=self._trainingSettings.trainingEpochs.value,
             training_fraction=float(trainingSetFractionalSize),
             log_frequency=self._trainingSettings.statusIntervalInEpochs.value,
-            strategy='ddp',
+            strategy='ddp_notebook',
         )
         self._modelProvider.setTrainer(trainer)
 
