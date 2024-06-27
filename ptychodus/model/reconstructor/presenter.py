@@ -99,6 +99,38 @@ class ReconstructorPresenter(Observable, Observer):
         else:
             logger.warning('Reconstructor is not trainable!')
 
+    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.getOpenTrainingDataFileFilterList()
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+        return list()
+
+    def getOpenTrainingDataFileFilter(self) -> str:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.getOpenTrainingDataFileFilter()
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+        return str()
+
+    def openTrainingData(self, filePath: Path) -> None:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            logger.info('Opening training data...')
+            tic = time.perf_counter()
+            reconstructor.openTrainingData(filePath)
+            toc = time.perf_counter()
+            logger.info(f'Open time {toc - tic:.4f} seconds.')
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
@@ -157,6 +189,58 @@ class ReconstructorPresenter(Observable, Observer):
             logger.info(f'Reset time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Reconstructor is not trainable!')
+
+    def getOpenModelFileFilterList(self) -> Sequence[str]:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.getOpenModelFileFilterList()
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+        return list()
+
+    def getOpenModelFileFilter(self) -> str:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.getOpenModelFileFilter()
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+        return str()
+
+    def openModel(self, filePath: Path) -> None:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            logger.info('Opening model...')
+            tic = time.perf_counter()
+            reconstructor.openModel(filePath)
+            toc = time.perf_counter()
+            logger.info(f'Open time {toc - tic:.4f} seconds.')
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+    def getSaveModelFileFilterList(self) -> Sequence[str]:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.getSaveModelFileFilterList()
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+        return list()
+
+    def getSaveModelFileFilter(self) -> str:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.getSaveModelFileFilter()
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+        return str()
 
     def saveModel(self, filePath: Path) -> None:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy

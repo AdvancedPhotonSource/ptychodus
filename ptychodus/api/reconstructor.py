@@ -46,6 +46,18 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
+    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
+        pass
+
+    @abstractmethod
+    def getOpenTrainingDataFileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def openTrainingData(self, filePath: Path) -> None:
+        pass
+
+    @abstractmethod
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         pass
 
@@ -63,6 +75,18 @@ class TrainableReconstructor(Reconstructor):
 
     @abstractmethod
     def clearTrainingData(self) -> None:
+        pass
+
+    @abstractmethod
+    def getOpenModelFileFilterList(self) -> Sequence[str]:
+        pass
+
+    @abstractmethod
+    def getOpenModelFileFilter(self) -> str:
+        pass
+
+    @abstractmethod
+    def openModel(self, filePath: Path) -> None:
         pass
 
     @abstractmethod
@@ -93,6 +117,15 @@ class NullReconstructor(TrainableReconstructor):
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         pass
 
+    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
+        return list()
+
+    def getOpenTrainingDataFileFilter(self) -> str:
+        return str()
+
+    def openTrainingData(self, filePath: Path) -> None:
+        pass
+
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         return list()
 
@@ -106,6 +139,15 @@ class NullReconstructor(TrainableReconstructor):
         return TrainOutput([], [], 0)
 
     def clearTrainingData(self) -> None:
+        pass
+
+    def getOpenModelFileFilterList(self) -> Sequence[str]:
+        return list()
+
+    def getOpenModelFileFilter(self) -> str:
+        return str()
+
+    def openModel(self, filePath: Path) -> None:
         pass
 
     def getSaveModelFileFilterList(self) -> Sequence[str]:
