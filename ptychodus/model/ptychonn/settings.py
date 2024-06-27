@@ -11,8 +11,6 @@ class PtychoNNModelSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('PtychoNN')
         self._settingsGroup.addObserver(self)
 
-        self.modelFilePath = self._settingsGroup.createPathEntry('ModelFilePath',
-                                                                 Path('/path/to/best_model.ckpt'))
         self.numberOfConvolutionKernels = self._settingsGroup.createIntegerEntry(
             'NumberOfConvolutionKernels', 16)
         self.batchSize = self._settingsGroup.createIntegerEntry('BatchSize', 64)
