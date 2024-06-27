@@ -6,10 +6,9 @@ matplotlib-base =3.*
 numpy =1.*
 pip
 psutil =5.*
-ptychonn =0.3.*,>=0.3.6
+ptychonn =0.3.*,>=0.3.7
 pyqt =5.*
 python >=3.10
-pytorch=*=cuda*
 scikit-image =0.*
 scipy >=1.6,<2.0
 setuptools >=46.4.0
