@@ -35,8 +35,7 @@ class AnalysisCore:
         self.fourierRingCorrelator = FourierRingCorrelator(objectRepository)
 
         self._fluorescenceSettings = FluorescenceSettings(settingsRegistry)
-        self.fluorescenceEnhancer = FluorescenceEnhancer(self._fluorescenceSettings,
-                                                         productRepository,
+        self.fluorescenceEnhancer = FluorescenceEnhancer(self._fluorescenceSettings, dataMatcher,
                                                          upscalingStrategyChooser,
                                                          deconvolutionStrategyChooser,
                                                          fluorescenceFileReaderChooser,

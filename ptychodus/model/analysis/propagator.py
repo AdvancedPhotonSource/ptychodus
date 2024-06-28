@@ -24,7 +24,7 @@ class ProbePropagator(Observable):
         self._settings = settings
         self._repository = repository
 
-        self._productIndex = 0
+        self._productIndex = -1
         self._propagatedWavefield: WavefieldArrayType | None = None
 
     def setProduct(self, productIndex: int) -> None:

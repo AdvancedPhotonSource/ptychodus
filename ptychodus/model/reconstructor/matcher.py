@@ -3,6 +3,7 @@ import logging
 
 import numpy
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import Scan, ScanPoint
@@ -39,6 +40,11 @@ class DiffractionPatternPositionMatcher:
     def getProductName(self, inputProductIndex: int) -> str:
         inputProductItem = self._productRepository[inputProductIndex]
         return inputProductItem.getName()
+
+    def getObjectPlanePixelGeometry(self, inputProductIndex: int) -> PixelGeometry:
+        inputProductItem = self._productRepository[inputProductIndex]
+        objectGeometry = inputProductItem.getGeometry().getObjectGeometry()
+        return objectGeometry.getPixelGeometry()
 
     def matchDiffractionPatternsWithPositions(
             self,
