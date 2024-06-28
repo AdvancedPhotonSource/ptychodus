@@ -99,19 +99,17 @@ class STXMSimulator(Observable):
         super().__init__()
         self._dataMatcher = dataMatcher
 
-        self._productIndex = 0
-        self._productName = ''
+        self._productIndex = -1
         self._image: STXMImage | None = None
 
     def setProduct(self, productIndex: int) -> None:
         if self._productIndex != productIndex:
             self._productIndex = productIndex
-            self._productName = 'FIXME'  # FIXME
             self._image = None
             self.notifyObservers()
 
     def getProductName(self) -> str:
-        return self._productName
+        return self._dataMatcher.getProductName(self._productIndex)
 
     def simulate(self) -> None:
         reconstructInput = self._dataMatcher.matchDiffractionPatternsWithPositions(
@@ -127,6 +125,7 @@ class STXMSimulator(Observable):
             stitcher.addMeasurement(scanPoint, patternIntensity, probeProfile)
 
         self._image = stitcher.build()
+        self.notifyObservers()
 
     def getImage(self) -> STXMImage:
         if self._image is None:

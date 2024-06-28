@@ -36,6 +36,10 @@ class DiffractionPatternPositionMatcher:
         self._diffractionDataset = diffractionDataset
         self._productRepository = productRepository
 
+    def getProductName(self, inputProductIndex: int) -> str:
+        inputProductItem = self._productRepository[inputProductIndex]
+        return inputProductItem.getName()
+
     def matchDiffractionPatternsWithPositions(
             self,
             inputProductIndex: int,

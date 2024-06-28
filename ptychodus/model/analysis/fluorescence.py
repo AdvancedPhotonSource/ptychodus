@@ -31,7 +31,7 @@ class FluorescenceEnhancer(Observable, Observer):
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
 
-        self._productIndex = 0
+        self._productIndex = -1
         self._measured: FluorescenceDataset | None = None
         self._enhanced: FluorescenceDataset | None = None
 

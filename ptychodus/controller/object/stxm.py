@@ -60,15 +60,15 @@ class STXMViewController(Observer):
                 ExceptionDialog.showException(title, err)
 
     def _syncModelToView(self) -> None:
-        image = self._simulator.getImage()
-
         try:
-            self._visualizationWidgetController.setArray(image.intensity, image.pixel_geometry)
+            image = self._simulator.getImage()
         except ValueError:
             self._visualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Update Views', err)
+        else:
+            self._visualizationWidgetController.setArray(image.intensity, image.pixel_geometry)
 
     def update(self, observable: Observable) -> None:
         if observable is self._simulator:
