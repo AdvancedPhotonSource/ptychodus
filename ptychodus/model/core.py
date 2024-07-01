@@ -40,11 +40,13 @@ from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExe
 logger = logging.getLogger(__name__)
 
 
-def configureLogger() -> None:
-    logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-                        stream=sys.stdout,
-                        encoding='utf-8',
-                        level=logging.DEBUG)
+def configureLogger(isDeveloperModeEnabled: bool) -> None:
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        stream=sys.stdout,
+        encoding="utf-8",
+        level=logging.DEBUG if isDeveloperModeEnabled else logging.INFO,
+    )
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
     logging.getLogger('tike').setLevel(logging.WARNING)
 
@@ -62,7 +64,7 @@ class ModelCore:
                  settingsFile: Path | None = None,
                  *,
                  isDeveloperModeEnabled: bool = False) -> None:
-        configureLogger()
+        configureLogger(isDeveloperModeEnabled)
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
 
