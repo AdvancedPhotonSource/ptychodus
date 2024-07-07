@@ -3,14 +3,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeAlias
 
 import numpy
 
 from .geometry import ImageExtent, PixelGeometry
-from .typing import ComplexArrayType, RealArrayType
-
-WavefieldArrayType: TypeAlias = ComplexArrayType
+from .propagator import WavefieldArrayType
+from .typing import RealArrayType
 
 
 @dataclass(frozen=True)
@@ -181,7 +179,8 @@ class Probe:
         return numpy.sqrt(numpy.sum(numpy.square(self._modeRelativePower)))
 
     def getIntensity(self) -> RealArrayType:
-        return numpy.absolute(self._array).sum(axis=-3)
+        intensity = numpy.real(self._array * numpy.conjugate(self._array))
+        return intensity.sum(axis=-3)
 
 
 class ProbeFileReader(ABC):

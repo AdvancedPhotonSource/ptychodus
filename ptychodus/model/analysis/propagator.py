@@ -9,9 +9,9 @@ import numpy
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe import Probe, WavefieldArrayType
+from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
 
 from ..product import ProductRepository
-from ..propagator import AngularSpectrumPropagator
 from .settings import ProbePropagationSettings
 
 logger = logging.getLogger(__name__)
@@ -48,11 +48,19 @@ class ProbePropagator(Observable):
         )
         distanceInMeters = numpy.linspace(float(beginCoordinateInMeters),
                                           float(endCoordinateInMeters), numberOfSteps)
+        pixelGeometry = probe.getPixelGeometry()
 
         for idx, zInMeters in enumerate(distanceInMeters):
-            propagator = AngularSpectrumPropagator(probe.array.shape[-2:],
-                                                   probe.getPixelGeometry(), zInMeters,
-                                                   wavelengthInMeters)
+            propagatorParameters = PropagatorParameters(
+                wavelength_m=wavelengthInMeters,
+                width_px=probe.array.shape[-1],
+                height_px=probe.array.shape[-2],
+                pixel_width_m=pixelGeometry.widthInMeters,
+                pixel_height_m=pixelGeometry.heightInMeters,
+                propagation_distance_m=zInMeters,
+            )
+            propagator = AngularSpectrumPropagator(propagatorParameters)
+            # FIXME Each mode is propagated independently and the total intensity is the sum of the absolute square of their individual intensities. The focus was located by identifying the maximum intensity position which agreed with the focal spot position found by the edge scans.
             wf = propagator.propagate(probe.array[0])
             propagatedWavefield[idx, :, :] = wf
 

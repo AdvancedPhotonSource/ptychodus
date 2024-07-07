@@ -11,10 +11,6 @@ class PixelGeometry:
     widthInMeters: float
     heightInMeters: float
 
-    @property
-    def aspectRatio(self) -> float:
-        return self.widthInMeters / self.heightInMeters
-
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})'
 
