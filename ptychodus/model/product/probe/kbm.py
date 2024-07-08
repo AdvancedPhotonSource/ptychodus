@@ -13,7 +13,7 @@ from .builder import ProbeBuilder
 from .settings import ProbeSettings
 
 
-class KirkpatrickBaezMirrorProbeBuilder(ProbeBuilder): # FIXME
+class KirkpatrickBaezMirrorProbeBuilder(ProbeBuilder):  # FIXME
 
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__('kirkpatrick_baez_mirror')

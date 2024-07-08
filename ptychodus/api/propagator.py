@@ -109,16 +109,16 @@ class FresnelTransformPropagator(Propagator):
         Fr = parameters.fresnel_number
         ar = parameters.pixel_aspect_ratio
 
-        i2pi = 2j * numpy.pi
-        ipiFr = 1j * numpy.pi * Fr
+        i2piz = 2j * numpy.pi * parameters.z
+        ipi = 1j * numpy.pi
         iar = 1j * ar
 
         YY, XX = parameters.get_spatial_coordinates()
         FY, FX = parameters.get_frequency_coordinates()
         F2 = numpy.square(FX) + numpy.square(ar * FY)
 
-        self._A = numpy.exp(-i2pi * (parameters.z - 0.5 * F2 / Fr)) * Fr / iar
-        self._B = numpy.exp(-ipiFr * (numpy.square(XX) + numpy.square(YY) / numpy.square(ar)))
+        self._A = numpy.exp(F2 * ipi / Fr) * numpy.exp(-i2piz) * Fr / iar
+        self._B = numpy.exp(ipi * Fr * (numpy.square(XX) + numpy.square(YY) / numpy.square(ar)))
 
     def propagate(self, wavefield: WavefieldArrayType) -> WavefieldArrayType:
         return self._A * fftshift(fft2(ifftshift(wavefield * self._B)))
@@ -130,13 +130,14 @@ class FraunhoferPropagator(Propagator):
         Fr = parameters.fresnel_number
         ar = parameters.pixel_aspect_ratio
 
-        i2pi = 2j * numpy.pi
+        i2piz = 2j * numpy.pi * parameters.z
+        ipi = 1j * numpy.pi
         iar = 1j * ar
 
         FY, FX = parameters.get_frequency_coordinates()
         F2 = numpy.square(FX) + numpy.square(ar * FY)
 
-        self._A = numpy.exp(-i2pi * (parameters.z - 0.5 * F2 / Fr)) * Fr / iar
+        self._A = numpy.exp(F2 * ipi / Fr) * numpy.exp(-i2piz) * Fr / iar
 
     def propagate(self, wavefield: WavefieldArrayType) -> WavefieldArrayType:
         return self._A * fftshift(fft2(ifftshift(wavefield)))
