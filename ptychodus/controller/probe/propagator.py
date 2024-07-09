@@ -37,6 +37,7 @@ class ProbePropagationViewController(Observer):
             engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory)
 
         propagator.addObserver(self)
+        self._syncModelToView()
 
     def _updateCurrentCoordinate(self, step: int) -> None:
         lerpValue = Decimal()

@@ -47,6 +47,12 @@ class ObjectGeometry:
     def _radiusY(self) -> float:
         return self.heightInPixels / 2
 
+    def getPixelGeometry(self) -> PixelGeometry:
+        return PixelGeometry(
+            widthInMeters=self.pixelWidthInMeters,
+            heightInMeters=self.pixelHeightInMeters,
+        )
+
     def mapObjectPointToScanPoint(self, objectPoint: Point2D) -> Point2D:
         x = self.centerXInMeters + self.pixelWidthInMeters * (objectPoint.x - self._radiusX)
         y = self.centerYInMeters + self.pixelHeightInMeters * (objectPoint.y - self._radiusY)

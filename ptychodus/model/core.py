@@ -22,7 +22,7 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
 
 from .analysis import (AnalysisCore, ExposureAnalyzer, FluorescenceEnhancer, FourierRingCorrelator,
-                       ProbePropagator, STXMAnalyzer, XMCDAnalyzer)
+                       ProbePropagator, STXMSimulator, XMCDAnalyzer)
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .memory import MemoryPresenter
 from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
@@ -101,13 +101,12 @@ class ModelCore:
                 self.ptychonnReconstructorLibrary,
             ],
         )
-        self._analysisCore = AnalysisCore(self.settingsRegistry,
-                                          self._productCore.productRepository,
-                                          self._productCore.objectRepository,
-                                          self._pluginRegistry.upscalingStrategies,
-                                          self._pluginRegistry.deconvolutionStrategies,
-                                          self._pluginRegistry.fluorescenceFileReaders,
-                                          self._pluginRegistry.fluorescenceFileWriters)
+        self._analysisCore = AnalysisCore(
+            self.settingsRegistry, self._reconstructorCore.dataMatcher,
+            self._productCore.productRepository, self._productCore.objectRepository,
+            self._pluginRegistry.upscalingStrategies, self._pluginRegistry.deconvolutionStrategies,
+            self._pluginRegistry.fluorescenceFileReaders,
+            self._pluginRegistry.fluorescenceFileWriters)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
                                           self._productCore.productAPI, self._productCore.scanAPI,
                                           self._productCore.probeAPI, self._productCore.objectAPI)
@@ -256,8 +255,8 @@ class ModelCore:
         return self._reconstructorCore.presenter
 
     @property
-    def stxmAnalyzer(self) -> STXMAnalyzer:
-        return self._analysisCore.stxmAnalyzer
+    def stxmSimulator(self) -> STXMSimulator:
+        return self._analysisCore.stxmSimulator
 
     @property
     def stxmVisualizationEngine(self) -> VisualizationEngine:
