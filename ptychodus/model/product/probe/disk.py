@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
+from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
 
 from .builder import ProbeBuilder
 from .settings import ProbeSettings
@@ -19,10 +20,15 @@ class DiskProbeBuilder(ProbeBuilder):
             float(settings.diskDiameterInMeters.value),
             minimum=0.,
         )
+        self.defocusDistanceInMeters = self._registerRealParameter(
+            'defocus_distance_m',
+            float(settings.defocusDistanceInMeters.value),
+        )  # from sample to the focal plane
 
     def copy(self) -> DiskProbeBuilder:
         builder = DiskProbeBuilder(self._settings)
         builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
+        builder.defocusDistanceInMeters.setValue(self.defocusDistanceInMeters.getValue())
         return builder
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
@@ -31,9 +37,21 @@ class DiskProbeBuilder(ProbeBuilder):
 
         R_m = coords.positionRInMeters
         r_m = self.diameterInMeters.getValue() / 2.
+        disk = numpy.where(R_m < r_m, 1 + 0j, 0j)
+
+        propagatorParameters = PropagatorParameters(
+            wavelength_m=geometryProvider.probeWavelengthInMeters,
+            width_px=disk.shape[-1],
+            height_px=disk.shape[-2],
+            pixel_width_m=geometry.pixelWidthInMeters,
+            pixel_height_m=geometry.pixelHeightInMeters,
+            propagation_distance_m=self.defocusDistanceInMeters.getValue(),
+        )
+        propagator = AngularSpectrumPropagator(propagatorParameters)
+        array = propagator.propagate(disk)
 
         return Probe(
-            array=self.normalize(numpy.where(R_m < r_m, 1 + 0j, 0j)),
+            array=self.normalize(array),
             pixelWidthInMeters=geometry.pixelWidthInMeters,
             pixelHeightInMeters=geometry.pixelHeightInMeters,
         )

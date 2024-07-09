@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
-from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParameters
+from ptychodus.api.propagator import FresnelTransformLegacyPropagator, PropagatorParameters
 
 from ...patterns import ActiveDiffractionDataset, Detector
 from .builder import ProbeBuilder
@@ -32,7 +32,7 @@ class AveragePatternProbeBuilder(ProbeBuilder):
             pixel_height_m=pixelGeometry.heightInMeters,
             propagation_distance_m=-geometryProvider.detectorDistanceInMeters,
         )
-        propagator = FresnelTransformPropagator(propagatorParameters)
+        propagator = FresnelTransformLegacyPropagator(propagatorParameters)
         array = propagator.propagate(numpy.sqrt(detectorIntensity).astype(complex))
 
         return Probe(
