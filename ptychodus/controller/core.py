@@ -57,17 +57,17 @@ class ControllerCore:
                                                                     self._fileDialogFactory)
         self._probeController = ProbeController.createInstance(
             model.probeRepository, model.probeAPI, self._probeImageController,
-            model.probePropagator, model.probePropagatorVisualizationEngine, view.probeView,
-            self._fileDialogFactory)
+            model.probePropagator, model.probePropagatorVisualizationEngine, model.stxmSimulator,
+            model.stxmVisualizationEngine, model.exposureAnalyzer,
+            model.exposureVisualizationEngine, model.fluorescenceEnhancer,
+            model.fluorescenceVisualizationEngine, view.probeView, self._fileDialogFactory)
         self._objectImageController = ImageController.createInstance(
             model.objectVisualizationEngine, view.objectImageView, view.statusBar(),
             self._fileDialogFactory)
         self._objectController = ObjectController.createInstance(
             model.objectRepository, model.objectAPI, self._objectImageController,
-            model.fourierRingCorrelator, model.stxmSimulator, model.stxmVisualizationEngine,
-            model.exposureAnalyzer, model.exposureVisualizationEngine, model.fluorescenceEnhancer,
-            model.fluorescenceVisualizationEngine, model.xmcdAnalyzer,
-            model.xmcdVisualizationEngine, view.objectView, self._fileDialogFactory)
+            model.fourierRingCorrelator, model.xmcdAnalyzer, model.xmcdVisualizationEngine,
+            view.objectView, self._fileDialogFactory)
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,

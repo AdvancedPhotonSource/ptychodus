@@ -6,7 +6,8 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
-from ...model.analysis import ProbePropagator
+from ...model.analysis import (ExposureAnalyzer, FluorescenceEnhancer, ProbePropagator,
+                               STXMSimulator)
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
@@ -15,7 +16,10 @@ from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog, ProgressBarIt
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .editorFactory import ProbeEditorViewControllerFactory
+from .exposure import ExposureViewController
+from .fluorescence import FluorescenceViewController
 from .propagator import ProbePropagationViewController
+from .stxm import STXMViewController
 from .treeModel import ProbeTreeModel
 
 logger = logging.getLogger(__name__)
@@ -25,7 +29,11 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
     def __init__(self, repository: ProbeRepository, api: ProbeAPI,
                  imageController: ImageController, propagator: ProbePropagator,
-                 propagatorVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
+                 propagatorVisualizationEngine: VisualizationEngine, stxmSimulator: STXMSimulator,
+                 stxmVisualizationEngine: VisualizationEngine, exposureAnalyzer: ExposureAnalyzer,
+                 exposureVisualizationEngine: VisualizationEngine,
+                 fluorescenceEnhancer: FluorescenceEnhancer,
+                 fluorescenceVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
                  fileDialogFactory: FileDialogFactory, treeModel: ProbeTreeModel) -> None:
         super().__init__()
         self._repository = repository
@@ -38,17 +46,31 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         self._propagationViewController = ProbePropagationViewController(
             propagator, propagatorVisualizationEngine, fileDialogFactory)
+        self._stxmViewController = STXMViewController(stxmSimulator, stxmVisualizationEngine,
+                                                      fileDialogFactory)
+        self._exposureViewController = ExposureViewController(exposureAnalyzer,
+                                                              exposureVisualizationEngine,
+                                                              fileDialogFactory)
+        self._fluorescenceViewController = FluorescenceViewController(
+            fluorescenceEnhancer, fluorescenceVisualizationEngine, fileDialogFactory)
 
     @classmethod
     def createInstance(cls, repository: ProbeRepository, api: ProbeAPI,
                        imageController: ImageController, propagator: ProbePropagator,
                        propagatorVisualizationEngine: VisualizationEngine,
+                       stxmSimulator: STXMSimulator, stxmVisualizationEngine: VisualizationEngine,
+                       exposureAnalyzer: ExposureAnalyzer,
+                       exposureVisualizationEngine: VisualizationEngine,
+                       fluorescenceEnhancer: FluorescenceEnhancer,
+                       fluorescenceVisualizationEngine: VisualizationEngine,
                        view: RepositoryTreeView,
                        fileDialogFactory: FileDialogFactory) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ProbeTreeModel(repository, api)
         controller = cls(repository, api, imageController, propagator,
-                         propagatorVisualizationEngine, view, fileDialogFactory, treeModel)
+                         propagatorVisualizationEngine, stxmSimulator, stxmVisualizationEngine,
+                         exposureAnalyzer, exposureVisualizationEngine, fluorescenceEnhancer,
+                         fluorescenceVisualizationEngine, view, fileDialogFactory, treeModel)
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -79,6 +101,15 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         propagateAction = view.buttonBox.analyzeMenu.addAction('Propagate...')
         propagateAction.triggered.connect(controller._propagateProbe)
+
+        stxmAction = view.buttonBox.analyzeMenu.addAction('Simulate STXM...')
+        stxmAction.triggered.connect(controller._simulateSTXM)
+
+        exposureAction = view.buttonBox.analyzeMenu.addAction('Exposure...')
+        exposureAction.triggered.connect(controller._analyzeExposure)
+
+        fluorescenceAction = view.buttonBox.analyzeMenu.addAction('Enhance Fluorescence...')
+        fluorescenceAction.triggered.connect(controller._enhanceFluorescence)
 
         return controller
 
@@ -166,6 +197,30 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             logger.warning('No current item!')
         else:
             self._propagationViewController.launch(itemIndex)
+
+    def _simulateSTXM(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            self._stxmViewController.launch(itemIndex)
+
+    def _analyzeExposure(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            self._exposureViewController.analyze(itemIndex)
+
+    def _enhanceFluorescence(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            self._fluorescenceViewController.launch(itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
