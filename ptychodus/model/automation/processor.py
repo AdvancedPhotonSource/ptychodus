@@ -4,7 +4,7 @@ import logging
 import queue
 import threading
 
-from ptychodus.api.automation import FileBasedWorkflow, WorkflowAPI
+from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 
 from .repository import AutomationDatasetRepository, AutomationDatasetState
 from .settings import AutomationSettings

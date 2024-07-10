@@ -1,9 +1,9 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from ptychodus.api.automation import FileBasedWorkflow, WorkflowAPI
-from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 
 from .settings import AutomationSettings
 

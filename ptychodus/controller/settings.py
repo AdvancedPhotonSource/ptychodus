@@ -7,19 +7,15 @@ from PyQt5.QtWidgets import QTableView
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsGroup, SettingsRegistry
 
-from ..view.settings import SettingsParametersView
+from ..view.settings import SettingsView
 from .data import FileDialogFactory
 
 
-class SettingsGroupListModel(QAbstractListModel):
+class SettingsListModel(QAbstractListModel):
 
     def __init__(self, settingsRegistry: SettingsRegistry, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._settingsRegistry = settingsRegistry
-
-    def refresh(self) -> None:
-        self.beginResetModel()
-        self.endResetModel()
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
@@ -30,7 +26,7 @@ class SettingsGroupListModel(QAbstractListModel):
         return len(self._settingsRegistry)
 
 
-class SettingsEntryTableModel(QAbstractTableModel):
+class SettingsTableModel(QAbstractTableModel):
 
     def __init__(self, settingsGroup: SettingsGroup | None, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -67,43 +63,35 @@ class SettingsEntryTableModel(QAbstractTableModel):
 
 class SettingsController(Observer):
 
-    def __init__(self, settingsRegistry: SettingsRegistry, parametersView: SettingsParametersView,
-                 entryTableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, view: SettingsView,
+                 tableView: QTableView, fileDialogFactory: FileDialogFactory) -> None:
         super().__init__()
         self._settingsRegistry = settingsRegistry
-        self._groupListModel = SettingsGroupListModel(settingsRegistry)
-        self._parametersView = parametersView
-        self._entryTableView = entryTableView
+        self._listModel = SettingsListModel(settingsRegistry)
+        self._view = view
+        self._tableView = tableView
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry,
-                       parametersView: SettingsParametersView, entryTableView: QTableView,
+    def createInstance(cls, settingsRegistry: SettingsRegistry, view: SettingsView,
+                       tableView: QTableView,
                        fileDialogFactory: FileDialogFactory) -> SettingsController:
-        controller = cls(settingsRegistry, parametersView, entryTableView, fileDialogFactory)
+        controller = cls(settingsRegistry, view, tableView, fileDialogFactory)
         settingsRegistry.addObserver(controller)
 
-        parametersView.settingsView.replacementPathPrefixLineEdit.editingFinished.connect(
-            controller._syncReplacementPathPrefixToModel)
+        view.listView.setModel(controller._listModel)
+        view.listView.selectionModel().currentChanged.connect(controller._updateView)
 
-        groupListView = parametersView.groupView.listView
-        groupListView.setModel(controller._groupListModel)
-        groupListView.selectionModel().currentChanged.connect(controller._updateEntryTable)
-
-        parametersView.groupView.buttonBox.openButton.clicked.connect(controller._openSettings)
-        parametersView.groupView.buttonBox.saveButton.clicked.connect(controller._saveSettings)
+        view.buttonBox.openButton.clicked.connect(controller._openSettings)
+        view.buttonBox.saveButton.clicked.connect(controller._saveSettings)
 
         controller._syncModelToView()
 
         return controller
 
-    def _syncReplacementPathPrefixToModel(self) -> None:
-        self._settingsRegistry.setReplacementPathPrefix(
-            self._parametersView.settingsView.replacementPathPrefixLineEdit.text())
-
     def _openSettings(self) -> None:
         filePath, _ = self._fileDialogFactory.getOpenFilePath(
-            self._parametersView,
+            self._view,
             'Open Settings',
             nameFilters=self._settingsRegistry.getOpenFileFilterList(),
             selectedNameFilter=self._settingsRegistry.getOpenFileFilter())
@@ -113,7 +101,7 @@ class SettingsController(Observer):
 
     def _saveSettings(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._parametersView,
+            self._view,
             'Save Settings',
             nameFilters=self._settingsRegistry.getSaveFileFilterList(),
             selectedNameFilter=self._settingsRegistry.getSaveFileFilter())
@@ -121,23 +109,17 @@ class SettingsController(Observer):
         if filePath:
             self._settingsRegistry.saveSettings(filePath)
 
-    def _updateEntryTable(self, current: QModelIndex, previous: QModelIndex) -> None:
+    def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         settingsGroup = self._settingsRegistry[current.row()] if current.isValid() else None
-        entryTableModel = SettingsEntryTableModel(settingsGroup)
-        self._entryTableView.setModel(entryTableModel)
+        tableModel = SettingsTableModel(settingsGroup)
+        self._tableView.setModel(tableModel)
 
     def _syncModelToView(self) -> None:
-        replacementPathPrefix = self._settingsRegistry.getReplacementPathPrefix()
+        self._listModel.beginResetModel()
+        self._listModel.endResetModel()
 
-        if replacementPathPrefix:
-            self._parametersView.settingsView.replacementPathPrefixLineEdit.setText(
-                replacementPathPrefix)
-        else:
-            self._parametersView.settingsView.replacementPathPrefixLineEdit.clear()
-
-        self._groupListModel.refresh()
-        current = self._parametersView.groupView.listView.currentIndex()
-        self._updateEntryTable(current, QModelIndex())
+        current = self._view.listView.currentIndex()
+        self._updateView(current, QModelIndex())
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:

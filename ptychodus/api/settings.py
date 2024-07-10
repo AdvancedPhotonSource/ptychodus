@@ -1,8 +1,9 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, Final, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 from uuid import UUID
 import configparser
 import logging
@@ -12,6 +13,12 @@ from .observer import Observable, Observer
 T = TypeVar('T')
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PathPrefixChange:
+    findPathPrefix: Path
+    replacementPathPrefix: Path
 
 
 class SettingsEntry(Generic[T], Observable):
@@ -115,11 +122,9 @@ class SettingsGroup(Observable, Observer):
 
 
 class SettingsRegistry(Observable):
-    PREFIX_PLACEHOLDER_TEXT: Final[str] = 'PREFIX'
 
-    def __init__(self, replacementPathPrefix: str | None) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._replacementPathPrefix = replacementPathPrefix
         self._groupList: list[SettingsGroup] = list()
         self._fileFilterList: list[str] = ['Initialization Files (*.ini)']
 
@@ -142,12 +147,6 @@ class SettingsRegistry(Observable):
     def __len__(self) -> int:
         return len(self._groupList)
 
-    def getReplacementPathPrefix(self) -> str | None:
-        return self._replacementPathPrefix
-
-    def setReplacementPathPrefix(self, replacementPathPrefix: str) -> None:
-        self._replacementPathPrefix = replacementPathPrefix
-
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileFilterList
 
@@ -166,13 +165,6 @@ class SettingsRegistry(Observable):
             for settingsEntry in settingsGroup:
                 if config.has_option(settingsGroup.name, settingsEntry.name):
                     valueString = config.get(settingsGroup.name, settingsEntry.name)
-
-                    if self._replacementPathPrefix is not None \
-                            and isinstance(settingsEntry.value, Path):
-                        if valueString.startswith(SettingsRegistry.PREFIX_PLACEHOLDER_TEXT):
-                            valueString = self._replacementPathPrefix \
-                                    + valueString[len(SettingsRegistry.PREFIX_PLACEHOLDER_TEXT):]
-
                     settingsEntry.setValueFromString(valueString)
 
         self.notifyObservers()
@@ -183,7 +175,9 @@ class SettingsRegistry(Observable):
     def getSaveFileFilter(self) -> str:
         return self._fileFilterList[0]
 
-    def saveSettings(self, filePath: Path) -> None:
+    def saveSettings(self,
+                     filePath: Path,
+                     changePathPrefix: PathPrefixChange | None = None) -> None:
         config = configparser.ConfigParser(interpolation=None)
         setattr(config, 'optionxform', lambda option: option)
 
@@ -193,10 +187,16 @@ class SettingsRegistry(Observable):
             for settingsEntry in settingsGroup:
                 valueString = str(settingsEntry.value)
 
-                if self._replacementPathPrefix and isinstance(settingsEntry.value, Path):
-                    if valueString.startswith(self._replacementPathPrefix):
-                        valueString = SettingsRegistry.PREFIX_PLACEHOLDER_TEXT \
-                                + valueString[len(self._replacementPathPrefix):]
+                if changePathPrefix and isinstance(settingsEntry.value, Path):
+                    try:
+                        relativePath = settingsEntry.value.relative_to(
+                            changePathPrefix.findPathPrefix)
+                    except ValueError:
+                        pass
+                    else:
+                        modifiedPath = changePathPrefix.replacementPathPrefix / relativePath
+                        valueString = str(modifiedPath)
+
                 config.set(settingsGroup.name, settingsEntry.name, valueString)
 
         logger.debug(f'Writing settings to \"{filePath}\"')

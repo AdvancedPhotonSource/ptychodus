@@ -12,9 +12,9 @@ from ptychodus.api.geometry import Interval
 class DecimalSlider(QWidget):
     valueChanged = pyqtSignal(Decimal)
 
-    def __init__(self, orientation: Qt.Orientation, parent: QWidget | None) -> None:
+    def __init__(self, slider: QSlider, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self._slider = QSlider(orientation)
+        self._slider = slider
         self._label = QLabel()
         self._value = Decimal()
         self._minimum = Decimal()
@@ -23,13 +23,16 @@ class DecimalSlider(QWidget):
     @classmethod
     def createInstance(cls,
                        orientation: Qt.Orientation,
-                       parent: QWidget | None = None) -> DecimalSlider:
-        widget = cls(orientation, parent)
+                       parent: QWidget | None = None,
+                       *,
+                       numberOfTicks: int = 1000) -> DecimalSlider:
+        slider = QSlider(orientation)
+        slider.setRange(0, numberOfTicks)
+        slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        slider.setTickInterval(100)
 
-        widget._slider.setRange(0, 1000)
-        widget._slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        widget._slider.setTickInterval(100)
-        widget._slider.valueChanged.connect(lambda value: widget._setValueFromSlider())
+        widget = cls(slider, parent)
+        slider.valueChanged.connect(lambda value: widget._setValueFromSlider())
         widget.setValueAndRange(Decimal(1) / 2, Interval[Decimal](Decimal(0), Decimal(1)))
 
         layout = QHBoxLayout()

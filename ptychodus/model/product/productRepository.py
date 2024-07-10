@@ -62,8 +62,22 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         return index
 
-    def insertNewProduct(self, name: str, *, likeIndex: int) -> int:
-        metadataItem = self._metadataRepositoryItemFactory.createDefault(name)
+    def insertNewProduct(self,
+                         name: str,
+                         *,
+                         comments: str = '',
+                         detectorDistanceInMeters: float | None = None,
+                         probeEnergyInElectronVolts: float | None = None,
+                         probePhotonsPerSecond: float | None = None,
+                         exposureTimeInSeconds: float | None = None,
+                         likeIndex: int) -> int:
+        metadataItem = self._metadataRepositoryItemFactory.createDefault(
+            name,
+            comments=comments,
+            detectorDistanceInMeters=detectorDistanceInMeters,
+            probeEnergyInElectronVolts=probeEnergyInElectronVolts,
+            probePhotonsPerSecond=probePhotonsPerSecond,
+            exposureTimeInSeconds=exposureTimeInSeconds)
         scanItem = self._scanRepositoryItemFactory.create()
         geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.create(geometry)

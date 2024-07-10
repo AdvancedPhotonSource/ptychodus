@@ -10,7 +10,7 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 
-from ..product import ProductRepository
+from ..reconstructor import DiffractionPatternPositionMatcher
 from .settings import FluorescenceSettings
 
 logger = logging.getLogger(__name__)
@@ -18,20 +18,21 @@ logger = logging.getLogger(__name__)
 
 class FluorescenceEnhancer(Observable, Observer):
 
-    def __init__(self, settings: FluorescenceSettings, repository: ProductRepository,
+    def __init__(self, settings: FluorescenceSettings,
+                 dataMatcher: DiffractionPatternPositionMatcher,
                  upscalingStrategyChooser: PluginChooser[UpscalingStrategy],
                  deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
                  fileReaderChooser: PluginChooser[FluorescenceFileReader],
                  fileWriterChooser: PluginChooser[FluorescenceFileWriter]) -> None:
         super().__init__()
         self._settings = settings
-        self._repository = repository
+        self._dataMatcher = dataMatcher
         self._upscalingStrategyChooser = upscalingStrategyChooser
         self._deconvolutionStrategyChooser = deconvolutionStrategyChooser
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
 
-        self._productIndex = 0
+        self._productIndex = -1
         self._measured: FluorescenceDataset | None = None
         self._enhanced: FluorescenceDataset | None = None
 
@@ -49,8 +50,7 @@ class FluorescenceEnhancer(Observable, Observer):
             self.notifyObservers()
 
     def getProductName(self) -> str:
-        item = self._repository[self._productIndex]
-        return item.getName()
+        return self._dataMatcher.getProductName(self._productIndex)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -108,20 +108,19 @@ class FluorescenceEnhancer(Observable, Observer):
         self._deconvolutionStrategyChooser.setCurrentPluginByName(name)
 
     def enhanceFluorescence(self) -> None:
-        item = self._repository[self._productIndex]
-        product = item.getProduct()
-
         if self._measured is None:
             raise ValueError('Fluorescence dataset not loaded!')
 
+        reconstructInput = self._dataMatcher.matchDiffractionPatternsWithPositions(
+            self._productIndex)
         element_maps: list[ElementMap] = list()
         upscaler = self._upscalingStrategyChooser.currentPlugin.strategy
         deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
 
         for emap in self._measured.element_maps:
             logger.debug(f'Processing \"{emap.name}\"')
-            emap_upscaled = upscaler(emap, product)
-            emap_enhanced = deconvolver(emap_upscaled, product)
+            emap_upscaled = upscaler(emap, reconstructInput.product)
+            emap_enhanced = deconvolver(emap_upscaled, reconstructInput.product)
             element_maps.append(emap_enhanced)
 
         self._enhanced = FluorescenceDataset(
@@ -132,9 +131,7 @@ class FluorescenceEnhancer(Observable, Observer):
         self.notifyObservers()
 
     def getPixelGeometry(self) -> PixelGeometry:
-        item = self._repository[self._productIndex]
-        object_ = item.getObject().getObject()
-        return object_.getPixelGeometry()
+        return self._dataMatcher.getObjectPlanePixelGeometry(self._productIndex)
 
     def getEnhancedElementMap(self, channelIndex: int) -> ElementMap:
         if self._enhanced is None:

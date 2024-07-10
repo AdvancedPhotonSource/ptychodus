@@ -1,6 +1,5 @@
 import numpy
 
-from ptychodus.api.geometry import Point2D
 from ptychodus.api.scan import ScanBoundingBox, ScanPoint
 
 
@@ -24,12 +23,6 @@ class ScanBoundingBoxBuilder:
 
         if self._maximumYInMeters < point.positionYInMeters:
             self._maximumYInMeters = point.positionYInMeters
-
-    def getMidpointInMeters(self) -> Point2D:
-        return Point2D(
-            x=0.5 * (self._minimumXInMeters + self._maximumXInMeters),
-            y=0.5 * (self._minimumYInMeters + self._maximumYInMeters),
-        )
 
     def getBoundingBox(self) -> ScanBoundingBox | None:
         isEmptyX = (self._maximumXInMeters < self._minimumXInMeters)

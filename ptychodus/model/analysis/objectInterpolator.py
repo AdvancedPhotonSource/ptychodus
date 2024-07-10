@@ -1,5 +1,6 @@
-from ptychodus.api.geometry import ImageExtent, Point2D
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import Object, ObjectInterpolator
+from ptychodus.api.scan import ScanPoint
 
 
 class ObjectLinearInterpolator(ObjectInterpolator):
@@ -7,12 +8,12 @@ class ObjectLinearInterpolator(ObjectInterpolator):
     def __init__(self, object_: Object) -> None:
         self._object = object_
 
-    def getPatch(self, patchCenter: Point2D, patchExtent: ImageExtent) -> Object:
+    def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> Object:
         geometry = self._object.getGeometry()
 
         patchWidth = patchExtent.widthInPixels
         patchRadiusXInMeters = geometry.pixelWidthInMeters * patchWidth / 2
-        patchMinimumXInMeters = patchCenter.x - patchRadiusXInMeters
+        patchMinimumXInMeters = patchCenter.positionXInMeters - patchRadiusXInMeters
         ixBeginF, xi = divmod(patchMinimumXInMeters - geometry.minimumXInMeters,
                               geometry.pixelWidthInMeters)
         ixBegin = int(ixBeginF)
@@ -22,7 +23,7 @@ class ObjectLinearInterpolator(ObjectInterpolator):
 
         patchHeight = patchExtent.heightInPixels
         patchRadiusYInMeters = geometry.pixelHeightInMeters * patchHeight / 2
-        patchMinimumYInMeters = patchCenter.y - patchRadiusYInMeters
+        patchMinimumYInMeters = patchCenter.positionYInMeters - patchRadiusYInMeters
         iyBeginF, eta = divmod(patchMinimumYInMeters - geometry.minimumYInMeters,
                                geometry.pixelHeightInMeters)
         iyBegin = int(iyBeginF)

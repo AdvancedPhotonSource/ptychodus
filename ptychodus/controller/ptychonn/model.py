@@ -1,5 +1,4 @@
 from __future__ import annotations
-from pathlib import Path
 
 from ptychodus.api.observer import Observable, Observer
 
@@ -23,8 +22,6 @@ class PtychoNNModelParametersController(Observer):
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
-        view.modelStateLineEdit.editingFinished.connect(controller._syncModelStateFilePathToModel)
-        view.modelStateBrowseButton.clicked.connect(controller._openModelState)
         view.numberOfConvolutionKernelsSpinBox.valueChanged.connect(
             presenter.setNumberOfConvolutionKernels)
         view.batchSizeSpinBox.valueChanged.connect(presenter.setBatchSize)
@@ -34,27 +31,7 @@ class PtychoNNModelParametersController(Observer):
 
         return controller
 
-    def _syncModelStateFilePathToModel(self) -> None:
-        self._presenter.setStateFilePath(Path(self._view.modelStateLineEdit.text()))
-
-    def _openModelState(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Model State',
-            nameFilters=self._presenter.getStateFileFilterList(),
-            selectedNameFilter=self._presenter.getStateFileFilter())
-
-        if filePath:
-            self._presenter.setStateFilePath(filePath)
-
     def _syncModelToView(self) -> None:
-        modelStateFilePath = self._presenter.getStateFilePath()
-
-        if modelStateFilePath:
-            self._view.modelStateLineEdit.setText(str(modelStateFilePath))
-        else:
-            self._view.modelStateLineEdit.clear()
-
         self._view.numberOfConvolutionKernelsSpinBox.blockSignals(True)
         self._view.numberOfConvolutionKernelsSpinBox.setRange(
             self._presenter.getNumberOfConvolutionKernelsLimits().lower,

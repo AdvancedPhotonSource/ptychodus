@@ -38,36 +38,19 @@ class FourierRingCorrelationDialog(QDialog):
         self.setLayout(layout)
 
 
-class STXMNormalizationView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Normalization', parent)
-        self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
-        self.photonFluxLineEdit = DecimalLineEdit.createInstance()
-        self.exposureTimeLineEdit = DecimalLineEdit.createInstance()
-
-        layout = QFormLayout()
-        layout.addRow(self.quantitativeProbeCheckBox)
-        layout.addRow('Photon Flux [ph/s]:', self.photonFluxLineEdit)
-        layout.addRow('Exposure Time [s]:', self.exposureTimeLineEdit)
-        self.setLayout(layout)
-
-
 class STXMDialog(QDialog):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.visualizationWidget = VisualizationWidget.createInstance('Transmission')
-        self.normalizationView = STXMNormalizationView()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
         self.saveButton = QPushButton('Save')
         self.statusBar = QStatusBar()
 
         parameterLayout = QVBoxLayout()
-        parameterLayout.addWidget(self.normalizationView)
         parameterLayout.addWidget(self.visualizationParametersView)
-        parameterLayout.addWidget(self.saveButton)
         parameterLayout.addStretch()
+        parameterLayout.addWidget(self.saveButton)
 
         contentsLayout = QHBoxLayout()
         contentsLayout.addWidget(self.visualizationWidget, 1)

@@ -5,7 +5,7 @@ from .frc import FourierRingCorrelator
 from .objectInterpolator import ObjectLinearInterpolator
 from .objectStitcher import ObjectStitcher
 from .propagator import ProbePropagator
-from .stxm import STXMAnalyzer, STXMImage
+from .stxm import STXMSimulator
 from .xmcd import XMCDAnalyzer, XMCDResult
 
 __all__ = [
@@ -17,8 +17,7 @@ __all__ = [
     'ObjectLinearInterpolator',
     'ObjectStitcher',
     'ProbePropagator',
-    'STXMAnalyzer',
-    'STXMImage',
+    'STXMSimulator',
     'XMCDAnalyzer',
     'XMCDResult',
 ]

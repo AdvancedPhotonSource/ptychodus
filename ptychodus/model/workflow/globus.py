@@ -31,28 +31,18 @@ PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 
 
 def ptychodus_reconstruct(**data: str) -> None:
-    import sys
-
     from pathlib import Path
-    from ptychodus.model import ModelArgs, ModelCore
+    from ptychodus.model import ModelCore
 
     action = data['ptychodus_action']
     inputFile = Path(data['ptychodus_input_file'])
     outputFile = Path(data['ptychodus_output_file'])
+    settingsFile = Path(data['ptychodus_settings_file'])
+    patternsFile = Path(data['ptychodus_patterns_file'])
 
-    modelArgs = ModelArgs(
-        settingsFile=Path(data['ptychodus_settings_file']),
-        patternsFile=Path(data['ptychodus_patterns_file']),
-        replacementPathPrefix=data.get('ptychodus_path_prefix'),
-    )
-
-    with ModelCore(modelArgs) as model:
-        if action.lower() == 'reconstruct':
-            model.batchModeReconstruct(inputFile, outputFile)
-        elif action.lower() == 'train':
-            model.batchModeTrain(inputFile, outputFile)
-        else:
-            print(f'Unknown batch mode action \"{action}\"!', file=sys.stderr)
+    with ModelCore(settingsFile) as model:
+        model.workflowAPI.importProcessedPatterns(patternsFile)
+        model.batchModeExecute(action, inputFile, outputFile)
 
 
 @gladier.generate_flow_definition

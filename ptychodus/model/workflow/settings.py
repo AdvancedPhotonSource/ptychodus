@@ -2,23 +2,18 @@ from __future__ import annotations
 from uuid import UUID
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry, SettingsGroup
+from ptychodus.api.settings import SettingsRegistry
 
 
 class WorkflowSettings(Observable, Observer):
 
-    def __init__(self, group: SettingsGroup) -> None:
+    def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self.group = group
-        self.computeEndpointID = group.createUUIDEntry('ComputeEndpointID', UUID(int=0))
-        self.statusRefreshIntervalInSeconds = group.createIntegerEntry(
+        self.group = registry.createGroup('Workflow')
+        self.group.addObserver(self)
+        self.computeEndpointID = self.group.createUUIDEntry('ComputeEndpointID', UUID(int=0))
+        self.statusRefreshIntervalInSeconds = self.group.createIntegerEntry(
             'StatusRefreshIntervalInSeconds', 10)
-
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> WorkflowSettings:
-        settings = cls(settingsRegistry.createGroup('Workflow'))
-        settings.group.addObserver(settings)
-        return settings
 
     def update(self, observable: Observable) -> None:
         if observable is self.group:

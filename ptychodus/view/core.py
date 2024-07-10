@@ -14,7 +14,7 @@ from .product import ProductView
 from .reconstructor import ReconstructorParametersView, ReconstructorPlotView
 from .repository import RepositoryTableView, RepositoryTreeView
 from .scan import ScanPlotView
-from .settings import SettingsParametersView
+from .settings import SettingsView
 from .workflow import WorkflowParametersView
 
 logger = logging.getLogger(__name__)
@@ -35,8 +35,8 @@ class ViewCore(QMainWindow):
 
         self.settingsAction = self.navigationToolBar.addAction(QIcon(':/icons/settings'),
                                                                'Settings')
-        self.settingsParametersView = SettingsParametersView.createInstance()
-        self.settingsEntryView = QTableView()
+        self.settingsView = SettingsView.createInstance()
+        self.settingsTableView = QTableView()
 
         self.patternsAction = self.navigationToolBar.addAction(QIcon(':/icons/patterns'),
                                                                'Patterns')
@@ -98,7 +98,7 @@ class ViewCore(QMainWindow):
         view.settingsAction.setChecked(True)
 
         # maintain same order as navigationToolBar buttons
-        view.parametersWidget.addWidget(view.settingsParametersView)
+        view.parametersWidget.addWidget(view.settingsView)
         view.parametersWidget.addWidget(view.patternsView)
         view.parametersWidget.addWidget(view.productView)
         view.parametersWidget.addWidget(view.scanView)
@@ -111,7 +111,7 @@ class ViewCore(QMainWindow):
         view.splitter.addWidget(view.parametersWidget)
 
         # maintain same order as navigationToolBar buttons
-        view.contentsWidget.addWidget(view.settingsEntryView)
+        view.contentsWidget.addWidget(view.settingsTableView)
         view.contentsWidget.addWidget(view.patternsImageView)
         view.contentsWidget.addWidget(view.productDiagramView)
         view.contentsWidget.addWidget(view.scanPlotView)

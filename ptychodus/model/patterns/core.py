@@ -156,8 +156,8 @@ class PatternsCore:
 
         self.dataset = ActiveDiffractionDataset(self.patternSettings, self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self.patternSettings, self.dataset)
-        self.patternsAPI = PatternsAPI(self._builder, self.dataset, fileReaderChooser,
-                                       fileWriterChooser)
+        self.patternsAPI = PatternsAPI(self.patternSettings, self._builder, self.dataset,
+                                       fileReaderChooser, fileWriterChooser)
 
         self.metadataPresenter = DiffractionMetadataPresenter(self.dataset, self.detector,
                                                               self.patternSettings,

@@ -6,8 +6,8 @@ import watchdog.events
 from watchdog.observers.polling import PollingObserver
 import watchdog.observers
 
-from ptychodus.api.automation import FileBasedWorkflow
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.workflow import FileBasedWorkflow
 
 from .buffer import AutomationDatasetBuffer
 from .settings import AutomationSettings
