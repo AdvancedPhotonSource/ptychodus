@@ -10,6 +10,10 @@ from .typing import ComplexArrayType, RealArrayType
 WavefieldArrayType: TypeAlias = ComplexArrayType
 
 
+def intensity(wavefield: WavefieldArrayType) -> RealArrayType:
+    return numpy.real(numpy.multiply(wavefield, numpy.conjugate(wavefield)))
+
+
 @dataclass(frozen=True)
 class PropagatorParameters:
     wavelength_m: float
@@ -74,7 +78,7 @@ class AngularSpectrumPropagator(Propagator):
         FY, FX = parameters.get_frequency_coordinates()
         F2 = numpy.square(FX) + numpy.square(ar * FY)
         ratio = F2 / numpy.square(parameters.dx)
-        tf = numpy.exp(i2piz * numpy.sqrt(1 - ratio)),
+        tf = numpy.exp(i2piz * numpy.sqrt(1 - ratio))
 
         self._transfer_function = numpy.where(ratio < 1, tf, 0)
 

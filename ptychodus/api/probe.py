@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy
 
 from .geometry import ImageExtent, PixelGeometry
-from .propagator import WavefieldArrayType
+from .propagator import WavefieldArrayType, intensity
 from .typing import RealArrayType
 
 
@@ -74,8 +74,8 @@ class Probe:
 
     @staticmethod
     def _calculateModeRelativePower(array: WavefieldArrayType) -> Sequence[float]:
-        power = numpy.sum((array * array.conj()).real, axis=(-2, -1))
-        powersum = power.sum()
+        power = numpy.sum(intensity(array), axis=(-2, -1))
+        powersum = numpy.sum(power)
 
         if powersum > 0.:
             power /= powersum
@@ -179,8 +179,7 @@ class Probe:
         return numpy.sqrt(numpy.sum(numpy.square(self._modeRelativePower)))
 
     def getIntensity(self) -> RealArrayType:
-        intensity = numpy.real(self._array * numpy.conjugate(self._array))
-        return intensity.sum(axis=-3)
+        return numpy.sum(intensity(self._array), axis=-3)
 
 
 class ProbeFileReader(ABC):
