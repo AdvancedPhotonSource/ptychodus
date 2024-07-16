@@ -93,7 +93,7 @@ class ProbePropagator(Observable):
 
     def getNumberOfSteps(self) -> int:
         if self._propagatedIntensity is None:
-            return 0
+            return self._settings.numberOfSteps.value
 
         return self._propagatedIntensity.shape[0]
 
