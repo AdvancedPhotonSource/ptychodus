@@ -8,8 +8,10 @@ import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable
-from ptychodus.api.probe import Probe, WavefieldArrayType
-from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
+from ptychodus.api.probe import Probe
+from ptychodus.api.propagator import (AngularSpectrumPropagator, PropagatorParameters,
+                                      WavefieldArrayType, intensity)
+from ptychodus.api.typing import RealArrayType
 
 from ..product import ProductRepository
 from .settings import ProbePropagationSettings
@@ -26,11 +28,13 @@ class ProbePropagator(Observable):
 
         self._productIndex = -1
         self._propagatedWavefield: WavefieldArrayType | None = None
+        self._propagatedIntensity: RealArrayType | None = None
 
     def setProduct(self, productIndex: int) -> None:
         if self._productIndex != productIndex:
             self._productIndex = productIndex
             self._propagatedWavefield = None
+            self._propagatedIntensity = None
             self.notifyObservers()
 
     def getProductName(self) -> str:
@@ -43,9 +47,10 @@ class ProbePropagator(Observable):
         probe = item.getProbe().getProbe()
         wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
         propagatedWavefield = numpy.zeros(
-            (numberOfSteps, probe.array.shape[-2], probe.array.shape[-1]),
+            (numberOfSteps, *probe.array.shape),
             dtype=probe.array.dtype,
         )
+        propagatedIntensity = numpy.zeros((numberOfSteps, *probe.array.shape[-2:]))
         distanceInMeters = numpy.linspace(float(beginCoordinateInMeters),
                                           float(endCoordinateInMeters), numberOfSteps)
         pixelGeometry = probe.getPixelGeometry()
@@ -60,13 +65,16 @@ class ProbePropagator(Observable):
                 propagation_distance_m=zInMeters,
             )
             propagator = AngularSpectrumPropagator(propagatorParameters)
-            # FIXME Each mode is propagated independently and the total intensity is the sum of the absolute square of their individual intensities. The focus was located by identifying the maximum intensity position which agreed with the focal spot position found by the edge scans.
-            wf = propagator.propagate(probe.array[0])
-            propagatedWavefield[idx, :, :] = wf
+
+            for mode in range(probe.array.shape[-3]):
+                wf = propagator.propagate(probe.array[mode])
+                propagatedWavefield[idx, mode, :, :] = wf
+                propagatedIntensity[idx, :, :] += intensity(wf)
 
         self._settings.beginCoordinateInMeters.value = beginCoordinateInMeters
         self._settings.endCoordinateInMeters.value = endCoordinateInMeters
         self._propagatedWavefield = propagatedWavefield
+        self._propagatedIntensity = propagatedIntensity
         self.notifyObservers()
 
     def getBeginCoordinateInMeters(self) -> Decimal:
@@ -84,35 +92,34 @@ class ProbePropagator(Observable):
         return probe.getPixelGeometry()
 
     def getNumberOfSteps(self) -> int:
-        if self._propagatedWavefield is None:
-            return 1
+        if self._propagatedIntensity is None:
+            return self._settings.numberOfSteps.value
 
-        return self._propagatedWavefield.shape[-3]
+        return self._propagatedIntensity.shape[0]
 
-    def getXYProjection(self, step: int) -> WavefieldArrayType:
-        if self._propagatedWavefield is None:
-            probe = self._getProbe()
-            return probe.array[0]
-
-        return self._propagatedWavefield[step]
-
-    def getZXProjection(self) -> WavefieldArrayType:
-        if self._propagatedWavefield is None:
+    def getXYProjection(self, step: int) -> RealArrayType:
+        if self._propagatedIntensity is None:
             raise ValueError('No propagated wavefield!')
 
-        sz = self._propagatedWavefield.shape[-2]
-        arrayL = self._propagatedWavefield[:, (sz - 1) // 2, :]
-        arrayR = self._propagatedWavefield[:, sz // 2, :]
-        return numpy.transpose(arrayL + arrayR) / 2  # type: ignore
+        return self._propagatedIntensity[step]
 
-    def getZYProjection(self) -> WavefieldArrayType:
-        if self._propagatedWavefield is None:
+    def getZXProjection(self) -> RealArrayType:
+        if self._propagatedIntensity is None:
             raise ValueError('No propagated wavefield!')
 
-        sz = self._propagatedWavefield.shape[-1]
-        arrayL = self._propagatedWavefield[:, :, (sz - 1) // 2]
-        arrayR = self._propagatedWavefield[:, :, sz // 2]
-        return numpy.transpose(arrayL + arrayR) / 2  # type: ignore
+        sz = self._propagatedIntensity.shape[-2]
+        cutPlaneL = self._propagatedIntensity[:, (sz - 1) // 2, :]
+        cutPlaneR = self._propagatedIntensity[:, sz // 2, :]
+        return numpy.transpose(numpy.add(cutPlaneL, cutPlaneR) / 2)
+
+    def getZYProjection(self) -> RealArrayType:
+        if self._propagatedIntensity is None:
+            raise ValueError('No propagated wavefield!')
+
+        sz = self._propagatedIntensity.shape[-1]
+        cutPlaneL = self._propagatedIntensity[:, :, (sz - 1) // 2]
+        cutPlaneR = self._propagatedIntensity[:, :, sz // 2]
+        return numpy.transpose(numpy.add(cutPlaneL, cutPlaneR) / 2)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return [self.getSaveFileFilter()]
@@ -121,7 +128,7 @@ class ProbePropagator(Observable):
         return 'NumPy Zipped Archive (*.npz)'
 
     def savePropagatedProbe(self, filePath: Path) -> None:
-        if self._propagatedWavefield is None:
+        if self._propagatedWavefield is None or self._propagatedIntensity is None:
             raise ValueError('No propagated wavefield!')
 
         pixelGeometry = self.getPixelGeometry()
@@ -137,4 +144,6 @@ class ProbePropagator(Observable):
             pixelGeometry.widthInMeters,
             'wavefield',
             self._propagatedWavefield,
+            'intensity',
+            self._propagatedIntensity,
         )

@@ -15,6 +15,7 @@ class ProbePropagationSettings(Observable, Observer):
             'BeginCoordinateInMeters', '-1e-3')
         self.endCoordinateInMeters = self._settingsGroup.createRealEntry(
             'EndCoordinateInMeters', '+1e-3')
+        self.numberOfSteps = self._settingsGroup.createIntegerEntry('NumberOfSteps', 100)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

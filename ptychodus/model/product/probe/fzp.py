@@ -7,7 +7,7 @@ import numpy.typing
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
-from ptychodus.api.propagator import FresnelTransformLegacyPropagator, PropagatorParameters
+from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParameters
 
 from .builder import ProbeBuilder
 from .settings import ProbeSettings
@@ -100,7 +100,7 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
             pixel_height_m=fzpPixelGeometry.heightInMeters,
             propagation_distance_m=distanceInMeters,
         )
-        propagator = FresnelTransformLegacyPropagator(propagatorParameters)
+        propagator = FresnelTransformPropagator(propagatorParameters)
         array = propagator.propagate(fzpTransmissionFunction)
 
         return Probe(

@@ -55,16 +55,19 @@ class ProbePropagationViewController(Observer):
             logger.error('Bad slider range!')
 
         try:
-            self._xyVisualizationWidgetController.setArray(self._propagator.getXYProjection(step),
-                                                           self._propagator.getPixelGeometry())
-        except IndexError:
+            xyProjection = self._propagator.getXYProjection(step)
+        except (IndexError, ValueError):
             self._xyVisualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Update Current Coordinate', err)
+        else:
+            self._xyVisualizationWidgetController.setArray(xyProjection,
+                                                           self._propagator.getPixelGeometry())
 
         # TODO auto-units
-        self._dialog.coordinateLabel.setText(f'{lerpValue:.4g} m')
+        lerpValue *= Decimal('1e6')
+        self._dialog.coordinateLabel.setText(f'{lerpValue:.1f} \u00B5m')
 
     def _propagate(self) -> None:
         view = self._dialog.parametersView
