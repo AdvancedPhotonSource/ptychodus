@@ -7,7 +7,7 @@ from ptychodus.api.observer import Observable, Observer
 
 from ...model.analysis import FluorescenceEnhancer
 from ...model.visualization import VisualizationEngine
-from ...view.object import FluorescenceDialog
+from ...view.probe import FluorescenceDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..visualization import VisualizationParametersController, VisualizationWidgetController

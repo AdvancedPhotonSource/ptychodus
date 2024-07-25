@@ -15,6 +15,13 @@ ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any
 
 
 @dataclass(frozen=True)
+class ObjectPoint:
+    index: int
+    positionXInPixels: float
+    positionYInPixels: float
+
+
+@dataclass(frozen=True)
 class ObjectGeometry:
     widthInPixels: int
     heightInPixels: int
@@ -39,29 +46,33 @@ class ObjectGeometry:
     def minimumYInMeters(self) -> float:
         return self.centerYInMeters - self.heightInMeters / 2.
 
-    @property
-    def _radiusX(self) -> float:
-        return self.widthInPixels / 2
-
-    @property
-    def _radiusY(self) -> float:
-        return self.heightInPixels / 2
-
     def getPixelGeometry(self) -> PixelGeometry:
         return PixelGeometry(
             widthInMeters=self.pixelWidthInMeters,
             heightInMeters=self.pixelHeightInMeters,
         )
 
-    def mapObjectPointToScanPoint(self, objectPoint: Point2D) -> Point2D:
-        x = self.centerXInMeters + self.pixelWidthInMeters * (objectPoint.x - self._radiusX)
-        y = self.centerYInMeters + self.pixelHeightInMeters * (objectPoint.y - self._radiusY)
-        return Point2D(x, y)
+    def mapObjectPointToScanPoint(self, point: ObjectPoint) -> ScanPoint:
+        rx_px = self.widthInPixels / 2
+        ry_px = self.heightInPixels / 2
+        dx_m = self.pixelWidthInMeters
+        dy_m = self.pixelHeightInMeters
 
-    def mapScanPointToObjectPoint(self, scanPoint: Point2D) -> Point2D:
-        x = (scanPoint.x - self.centerXInMeters) / self.pixelWidthInMeters + self._radiusX
-        y = (scanPoint.y - self.centerYInMeters) / self.pixelHeightInMeters + self._radiusY
-        return Point2D(x, y)
+        x_m = self.centerXInMeters + dx_m * (point.positionXInPixels - rx_px)
+        y_m = self.centerYInMeters + dy_m * (point.positionYInPixels - ry_px)
+
+        return ScanPoint(point.index, x_m, y_m)
+
+    def mapScanPointToObjectPoint(self, point: ScanPoint) -> ObjectPoint:
+        rx_px = self.widthInPixels / 2
+        ry_px = self.heightInPixels / 2
+        dx_m = self.pixelWidthInMeters
+        dy_m = self.pixelHeightInMeters
+
+        x_px = (point.positionXInMeters - self.centerXInMeters) / dx_m + rx_px
+        y_px = (point.positionYInMeters - self.centerYInMeters) / dy_m + ry_px
+
+        return ObjectPoint(point.index, x_px, y_px)
 
     def contains(self, geometry: ObjectGeometry) -> bool:
         dx = self.centerXInMeters - geometry.centerXInMeters

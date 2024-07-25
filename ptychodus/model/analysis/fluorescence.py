@@ -23,7 +23,8 @@ class FluorescenceEnhancer(Observable, Observer):
                  upscalingStrategyChooser: PluginChooser[UpscalingStrategy],
                  deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
                  fileReaderChooser: PluginChooser[FluorescenceFileReader],
-                 fileWriterChooser: PluginChooser[FluorescenceFileWriter]) -> None:
+                 fileWriterChooser: PluginChooser[FluorescenceFileWriter],
+                 reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
         self._dataMatcher = dataMatcher
@@ -31,6 +32,7 @@ class FluorescenceEnhancer(Observable, Observer):
         self._deconvolutionStrategyChooser = deconvolutionStrategyChooser
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
+        self._reinitObservable = reinitObservable
 
         self._productIndex = -1
         self._measured: FluorescenceDataset | None = None
@@ -42,6 +44,7 @@ class FluorescenceEnhancer(Observable, Observer):
         deconvolutionStrategyChooser.setCurrentPluginByName(settings.deconvolutionStrategy.value)
         fileReaderChooser.setCurrentPluginByName(settings.fileType.value)
         fileWriterChooser.setCurrentPluginByName(settings.fileType.value)
+        reinitObservable.addObserver(self)
 
     def setProduct(self, productIndex: int) -> None:
         if self._productIndex != productIndex:
@@ -118,7 +121,7 @@ class FluorescenceEnhancer(Observable, Observer):
         deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
 
         for emap in self._measured.element_maps:
-            logger.debug(f'Processing \"{emap.name}\"')
+            logger.info(f'Enhancing \"{emap.name}\"')
             emap_upscaled = upscaler(emap, reconstructInput.product)
             emap_enhanced = deconvolver(emap_upscaled, reconstructInput.product)
             element_maps.append(emap_enhanced)
@@ -155,8 +158,13 @@ class FluorescenceEnhancer(Observable, Observer):
         writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, self._enhanced)
 
+    def _openFluorescenceFileFromSettings(self) -> None:
+        self.openMeasuredDataset(self._settings.filePath.value, self._settings.fileType.value)
+
     def update(self, observable: Observable) -> None:
-        if observable is self._upscalingStrategyChooser:
+        if observable is self._reinitObservable:
+            self._openFluorescenceFileFromSettings()
+        elif observable is self._upscalingStrategyChooser:
             strategy = self._upscalingStrategyChooser.currentPlugin.simpleName
             self._settings.upscalingStrategy.value = strategy
             self.notifyObservers()

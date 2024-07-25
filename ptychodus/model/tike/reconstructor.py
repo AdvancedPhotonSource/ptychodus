@@ -9,7 +9,7 @@ import numpy.typing
 import tike.ptycho
 
 from ptychodus.api.geometry import Point2D
-from ptychodus.api.object import Object
+from ptychodus.api.object import Object, ObjectPoint
 from ptychodus.api.probe import Probe
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
@@ -128,10 +128,9 @@ class TikeReconstructor:
         uy = -probeInputArray.shape[-2] / 2
 
         for scanPoint in scanInput:
-            point = Point2D(scanPoint.positionXInMeters, scanPoint.positionYInMeters)
-            objectPoint = objectGeometry.mapScanPointToObjectPoint(point)
-            scanInputCoords.append(objectPoint.y + uy)
-            scanInputCoords.append(objectPoint.x + ux)
+            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
+            scanInputCoords.append(objectPoint.positionYInPixels + uy)
+            scanInputCoords.append(objectPoint.positionXInPixels + ux)
 
         scanInputArray = numpy.array(
             scanInputCoords,
@@ -190,9 +189,8 @@ class TikeReconstructor:
         scanOutputPoints: list[ScanPoint] = list()
 
         for uncorrectedPoint, xy in zip(scanInput, result.scan):
-            objectPoint = Point2D(x=xy[1] - ux, y=xy[0] - uy)
-            point = objectGeometry.mapObjectPointToScanPoint(objectPoint)
-            scanPoint = ScanPoint(uncorrectedPoint.index, point.x, point.y)
+            objectPoint = ObjectPoint(uncorrectedPoint.index, xy[1] - ux, xy[0] - uy)
+            scanPoint = objectGeometry.mapObjectPointToScanPoint(objectPoint)
             scanOutputPoints.append(scanPoint)
 
         scanOutput = Scan(scanOutputPoints)

@@ -9,23 +9,23 @@ from ptychodus.api.scan import Scan
 from ptychodus.api.typing import RealArrayType
 
 
-def _scan_to_array(scan: Scan) -> RealArrayType:
+def _scan_to_array(scan: Scan) -> RealArrayType:  # FIXME REMOVE
     coords: list[float] = list()
 
     for point in scan:
-        coords.append(point.positionXInMeters)
         coords.append(point.positionYInMeters)
+        coords.append(point.positionXInMeters)
 
     return numpy.reshape(coords, (-1, 2))
 
 
 def _object_coordinates(numberOfPixels: int, pixelSizeInMeters: float,
-                        centerInMeters: float) -> RealArrayType:
+                        centerInMeters: float) -> RealArrayType:  # FIXME REMOVE
     positionInPixels = numpy.arange(numberOfPixels) - numberOfPixels / 2
     return centerInMeters + positionInPixels * pixelSizeInMeters
 
 
-def _object_coordinates_yx(object_: Object) -> tuple[RealArrayType, RealArrayType]:
+def _object_coordinates_yx(object_: Object) -> tuple[RealArrayType, RealArrayType]:  # FIXME REMOVE
     axisXInMeters = _object_coordinates(object_.widthInPixels, object_.pixelWidthInMeters,
                                         object_.centerXInMeters)
     axisYInMeters = _object_coordinates(object_.heightInPixels, object_.pixelHeightInMeters,
@@ -46,13 +46,21 @@ class GridDataUpscaling(UpscalingStrategy):
         self._method = method
 
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        cps = griddata(
-            _scan_to_array(product.scan),
-            emap.counts_per_second.flat,
-            _object_coordinates_yx(product.object_),
-            method=self._method,
-            fill_value=0.,
-        )
+        objectGeometry = product.object_.getGeometry()
+        scanCoordinatesInPixels: list[float] = list()
+
+        for scanPoint in product.scan:
+            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
+            scanCoordinatesInPixels.append(objectPoint.positionYInPixels)
+            scanCoordinatesInPixels.append(objectPoint.positionXInPixels)
+
+        points = numpy.reshape(scanCoordinatesInPixels, (-1, 2))
+        values = emap.counts_per_second.flat
+        YY, XX = numpy.mgrid[:objectGeometry.heightInPixels, :objectGeometry.widthInPixels]
+        query_points = numpy.transpose((YY.flat, XX.flat))
+
+        cps = griddata(points, values, query_points, method=self._method, fill_value=0.).reshape(XX.shape)
+
         return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype))
 
 

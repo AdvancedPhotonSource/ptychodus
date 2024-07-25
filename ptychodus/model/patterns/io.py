@@ -22,13 +22,7 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         self._patternsAPI = patternsAPI
         self._reinitObservable = reinitObservable
 
-    @classmethod
-    def createInstance(cls, settings: PatternSettings, dataset: ActiveDiffractionDataset,
-                       patternsAPI: PatternsAPI,
-                       reinitObservable: Observable) -> DiffractionDatasetInputOutputPresenter:
-        presenter = cls(settings, dataset, patternsAPI, reinitObservable)
-        reinitObservable.addObserver(presenter)
-        return presenter
+        reinitObservable.addObserver(self)
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._patternsAPI.getOpenFileFilterList()
