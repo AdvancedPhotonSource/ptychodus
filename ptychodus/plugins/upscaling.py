@@ -59,7 +59,8 @@ class GridDataUpscaling(UpscalingStrategy):
         YY, XX = numpy.mgrid[:objectGeometry.heightInPixels, :objectGeometry.widthInPixels]
         query_points = numpy.transpose((YY.flat, XX.flat))
 
-        cps = griddata(points, values, query_points, method=self._method, fill_value=0.).reshape(XX.shape)
+        cps = griddata(points, values, query_points, method=self._method,
+                       fill_value=0.).reshape(XX.shape)
 
         return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype))
 

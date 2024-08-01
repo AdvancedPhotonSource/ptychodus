@@ -32,6 +32,7 @@ class FluorescenceSettings(Observable, Observer):
         self.filePath = self._settingsGroup.createPathEntry('FilePath',
                                                             Path('/path/to/dataset.h5'))
         self.fileType = self._settingsGroup.createStringEntry('FileType', 'XRF-Maps')
+        self.useVSPI = self._settingsGroup.createBooleanEntry('UseVSPI', True)
         self.upscalingStrategy = self._settingsGroup.createStringEntry(
             'UpscalingStrategy', 'Linear')
         self.deconvolutionStrategy = self._settingsGroup.createStringEntry(

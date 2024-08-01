@@ -167,7 +167,7 @@ class FluorescenceParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
         self.openButton = QPushButton('Open')
-        self.virtualSinglePixelImagingCheckBox = QCheckBox('Virtual Single Pixel Imaging')
+        self.enhancementStrategyComboBox = QComboBox()
         self.upscalingStrategyComboBox = QComboBox()
         self.deconvolutionStrategyComboBox = QComboBox()
         self.enhanceButton = QPushButton('Enhance')
@@ -175,7 +175,8 @@ class FluorescenceParametersView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Measured Dataset:', self.openButton)
-        layout.addRow(self.virtualSinglePixelImagingCheckBox)  # FIXME to controller
+        layout.addRow('Enhancement Strategy:',
+                      self.enhancementStrategyComboBox)  # FIXME to controller
         layout.addRow('Upscaling Strategy:', self.upscalingStrategyComboBox)
         layout.addRow('Deconvolution Strategy:', self.deconvolutionStrategyComboBox)
         layout.addRow(self.enhanceButton)

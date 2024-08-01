@@ -8,7 +8,7 @@ from typing import Any, TypeAlias
 import numpy
 import numpy.typing
 
-from .geometry import ImageExtent, PixelGeometry, Point2D
+from .geometry import ImageExtent, PixelGeometry
 from .scan import ScanPoint
 
 ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]

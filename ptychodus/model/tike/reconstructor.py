@@ -8,7 +8,6 @@ import numpy.typing
 
 import tike.ptycho
 
-from ptychodus.api.geometry import Point2D
 from ptychodus.api.object import Object, ObjectPoint
 from ptychodus.api.probe import Probe
 from ptychodus.api.product import Product
