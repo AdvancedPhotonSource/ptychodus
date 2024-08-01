@@ -103,8 +103,14 @@ class WorkflowAPI(ABC):
 
 class FileBasedWorkflow(ABC):
 
+    @property
     @abstractmethod
-    def getFilePattern(self) -> str:
+    def isWatchRecursive(self) -> bool:
+        '''indicates whether the data directory must be watched recursively'''
+        pass
+
+    @abstractmethod
+    def getWatchFilePattern(self) -> str:
         '''UNIX-style filename pattern. For rules see fnmatch from Python standard library.'''
         pass
 
