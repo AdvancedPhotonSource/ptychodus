@@ -12,6 +12,7 @@ from ptychodus.api.reconstructor import (NullReconstructor, Reconstructor, Recon
 from ptychodus.api.settings import SettingsRegistry
 
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings, PtychoNNPositionPredictionSettings
+from ...model.ptychonn.position import PositionPredictionWorker
 
 logger = logging.getLogger(__name__)
 
@@ -171,9 +172,11 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 class PtychoNNPositionPredictionPresenter(Observable, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, settings: Pty) -> None:
+    def __init__(self, settings: PtychoNNPositionPredictionSettings) -> None:
         super().__init__()
         self._settings = settings
+        self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
+        self._worker = PositionPredictionWorker()
 
     @classmethod
     def createInstance(cls, settings: PtychoNNPositionPredictionSettings) -> PtychoNNPositionPredictionPresenter:
@@ -181,88 +184,34 @@ class PtychoNNPositionPredictionPresenter(Observable, Observer):
         settings.addObserver(presenter)
         return presenter
 
-    def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))
+    def getReconstructorImageFileFilterList(self) -> Sequence[str]:
+        return self._fileFilterList
 
-    def getValidationSetFractionalSize(self) -> Decimal:
-        limits = self.getValidationSetFractionalSizeLimits()
-        return limits.clamp(self._settings.validationSetFractionalSize.value)
+    def getReconstructorImageFileFilter(self) -> str:
+        return self._fileFilterList[0]
+    
+    def getReconstructorImageFilePath(self) -> Path:
+        return self._settings.reconstructorImagePath.value
+    
+    def setReconstructorImageFilePath(self, directory: Path) -> None:
+        self._settings.reconstructorImagePath.value = directory
 
-    def setValidationSetFractionalSize(self, value: Decimal) -> None:
-        self._settings.validationSetFractionalSize.value = value
-
-    def getOptimizationEpochsPerHalfCycleLimits(self) -> Interval[int]:
+    def getNumberNeighborsCollectiveLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
-    def getOptimizationEpochsPerHalfCycle(self) -> int:
-        limits = self.getOptimizationEpochsPerHalfCycleLimits()
-        return limits.clamp(self._settings.optimizationEpochsPerHalfCycle.value)
+    def getNumberNeighborsCollective(self) -> int:
+        limits = self.getNumberNeighborsCollectiveLimits()
+        return limits.clamp(self._settings.numberNeighborsCollective.value)
 
-    def setOptimizationEpochsPerHalfCycle(self, value: int) -> None:
-        self._settings.optimizationEpochsPerHalfCycle.value = value
-
-    def getMaximumLearningRateLimits(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))
-
-    def getMaximumLearningRate(self) -> Decimal:
-        limits = self.getMaximumLearningRateLimits()
-        return limits.clamp(self._settings.maximumLearningRate.value)
-
-    def setMaximumLearningRate(self, value: Decimal) -> None:
-        self._settings.maximumLearningRate.value = value
-
-    def getMinimumLearningRateLimits(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))
-
-    def getMinimumLearningRate(self) -> Decimal:
-        limits = self.getMinimumLearningRateLimits()
-        return limits.clamp(self._settings.minimumLearningRate.value)
-
-    def setMinimumLearningRate(self, value: Decimal) -> None:
-        self._settings.minimumLearningRate.value = value
-
-    def getTrainingEpochsLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getTrainingEpochs(self) -> int:
-        limits = self.getTrainingEpochsLimits()
-        return limits.clamp(self._settings.trainingEpochs.value)
-
-    def setTrainingEpochs(self, value: int) -> None:
-        self._settings.trainingEpochs.value = value
-
-    def isSaveTrainingArtifactsEnabled(self) -> bool:
-        return self._settings.saveTrainingArtifacts.value
-
-    def setSaveTrainingArtifactsEnabled(self, enabled: bool) -> None:
-        self._settings.saveTrainingArtifacts.value = enabled
-
-    def getOutputPath(self) -> Path:
-        return self._settings.outputPath.value
-
-    def setOutputPath(self, directory: Path) -> None:
-        self._settings.outputPath.value = directory
-
-    def getOutputSuffix(self) -> str:
-        return self._settings.outputSuffix.value
-
-    def setOutputSuffix(self, suffix: str) -> None:
-        self._settings.outputSuffix.value = suffix
-
-    def getStatusIntervalInEpochsLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getStatusIntervalInEpochs(self) -> int:
-        limits = self.getStatusIntervalInEpochsLimits()
-        return limits.clamp(self._settings.statusIntervalInEpochs.value)
-
-    def setStatusIntervalInEpochs(self, value: int) -> None:
-        self._settings.statusIntervalInEpochs.value = value
+    def setNumberNeighborsCollective(self, value: int) -> None:
+        self._settings.numberNeighborsCollective.value = value
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
 
+    def runPositionPrediction(self):
+        self._worker.run()
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
@@ -300,9 +249,11 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         else:
             phaseOnlyReconstructor = PtychoNNTrainableReconstructor(modelSettings,
                                                                     trainingSettings,
+                                                                    positionPredictionSettings,
                                                                     enableAmplitude=False)
             amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(modelSettings,
                                                                          trainingSettings,
+                                                                         positionPredictionSettings,
                                                                          enableAmplitude=True)
             reconstructors.append(phaseOnlyReconstructor)
             reconstructors.append(amplitudePhaseReconstructor)

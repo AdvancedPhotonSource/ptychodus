@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGroupBox, QLineEdit, QSpinBox,
-                             QVBoxLayout, QWidget, QLabel, QPushButton)
+from PyQt5.QtWidgets import (QCheckBox, QFormLayout, QGridLayout, QGroupBox, QLabel, QLineEdit,
+                             QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, DecimalSlider
 
@@ -11,243 +11,108 @@ from .widgets import DecimalLineEdit, DecimalSlider
 class PositionPredictionParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Position Parameters', parent)
+        super().__init__('Model Parameters', parent)
         self.modelStateLabel = QLabel('Model State:')
         self.modelStateLineEdit = QLineEdit()
         self.modelStateBrowseButton = QPushButton('Browse')
-        self.numGpusLineEdit = QLineEdit()
-        self.noiseModelComboBox = QComboBox()
-        self.numBatchSpinBox = QSpinBox()
-        self.batchMethodComboBox = QComboBox()
-        self.numIterSpinBox = QSpinBox()
-        self.convergenceWindowSpinBox = QSpinBox()
-        self.alphaSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.stepLengthSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.logLevelComboBox = QComboBox()
+        self.numberOfConvolutionKernelsLabel = QLabel('Convolution Kernels:')
+        self.numberOfConvolutionKernelsSpinBox = QSpinBox()
+        self.batchSizeLabel = QLabel('Batch Size:')
+        self.batchSizeSpinBox = QSpinBox()
+        self.useBatchNormalizationCheckBox = QCheckBox('Use Batch Normalization')
 
     @classmethod
-    def createInstance(cls,
-                       showAlpha: bool,
-                       showStepLength: bool,
-                       parent: Optional[QWidget] = None) -> PositionPredictionParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNModelParametersView:
         view = cls(parent)
 
-        view.numGpusLineEdit.setToolTip(
-            'The number of GPUs to use. If the number of GPUs is less than the requested number, '
-            'only workers for the available GPUs are allocated.')
-        view.noiseModelComboBox.setToolTip('The noise model to use for the cost function.')
-        view.numBatchSpinBox.setToolTip('The dataset is divided into this number of groups '
-                                        'where each group is processed sequentially.')
-        view.batchMethodComboBox.setToolTip('The name of the batch selection method.')
-        view.numIterSpinBox.setToolTip('The number of epochs to process before returning.')
-        view.convergenceWindowSpinBox.setToolTip(
-            'The number of epochs to consider for convergence monitoring. '
-            'Set to any value less than 2 to disable.')
-        view.alphaSlider.setToolTip('RPIE becomes EPIE when this parameter is 1.')
-        view.stepLengthSlider.setToolTip(
-            'Scales the inital search directions before the line search.')
-
-        layout = QFormLayout()
-        layout.addRow('Number of GPUs:', view.numGpusLineEdit)
-        layout.addRow('Noise Model:', view.noiseModelComboBox)
-        layout.addRow('Number of Batches:', view.numBatchSpinBox)
-        layout.addRow('Batch Method:', view.batchMethodComboBox)
-        layout.addRow('Number of Iterations:', view.numIterSpinBox)
-        layout.addRow('Convergence Window:', view.convergenceWindowSpinBox)
-
-        if showAlpha:
-            layout.addRow('Alpha:', view.alphaSlider)
-
-        if showStepLength:
-            layout.addRow('Step Length:', view.stepLengthSlider)
-
-        layout.addRow('Log Level:', view.logLevelComboBox)
-
+        layout = QGridLayout()
+        layout.addWidget(view.modelStateLabel, 0, 0)
+        layout.addWidget(view.modelStateLineEdit, 0, 1)
+        layout.addWidget(view.modelStateBrowseButton, 0, 2)
+        layout.addWidget(view.numberOfConvolutionKernelsLabel, 1, 0)
+        layout.addWidget(view.numberOfConvolutionKernelsSpinBox, 1, 1, 1, 2)
+        layout.addWidget(view.batchSizeLabel, 2, 0)
+        layout.addWidget(view.batchSizeSpinBox, 2, 1, 1, 2)
+        layout.addWidget(view.useBatchNormalizationCheckBox, 3, 0, 1, 3)
+        layout.setColumnStretch(1, 1)
         view.setLayout(layout)
 
         return view
 
 
-class TikeAdaptiveMomentView(QGroupBox):
+class PtychoNNOutputParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Adaptive Moment', parent)
-        self.mdecaySlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.vdecaySlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        super().__init__('Save Training Artifacts', parent)
+        self.pathLabel = QLabel('Path:')
+        self.pathLineEdit = QLineEdit()
+        self.pathBrowseButton = QPushButton('Browse')
+
+        self.suffixLabel = QLabel('Suffix:')
+        self.suffixLineEdit = QLineEdit()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeAdaptiveMomentView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> \
+            PtychoNNOutputParametersView:
         view = cls(parent)
 
-        view.mdecaySlider.setToolTip('The proportion of the first moment '
-                                     'that is previous first moments.')
-        view.vdecaySlider.setToolTip('The proportion of the second moment '
-                                     'that is previous second moments.')
-
-        layout = QFormLayout()
-        layout.addRow('M Decay:', view.mdecaySlider)
-        layout.addRow('V Decay:', view.vdecaySlider)
+        layout = QGridLayout()
+        layout.addWidget(view.pathLabel, 0, 0)
+        layout.addWidget(view.pathLineEdit, 0, 1)
+        layout.addWidget(view.pathBrowseButton, 0, 2)
+        layout.addWidget(view.suffixLabel, 1, 0)
+        layout.addWidget(view.suffixLineEdit, 1, 1, 1, 2)
+        layout.setColumnStretch(1, 1)
         view.setLayout(layout)
 
         return view
 
 
-class TikeMultigridView(QGroupBox):
+class PtychoNNTrainingParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Multigrid', parent)
-        self.numLevelsSpinBox = QSpinBox()
+        super().__init__('Training Parameters', parent)
+        self.validationSetFractionalSizeSlider = DecimalSlider.createInstance(
+            Qt.Orientation.Horizontal)
+        self.optimizationEpochsPerHalfCycleSpinBox = QSpinBox()
+        self.maximumLearningRateLineEdit = DecimalLineEdit.createInstance()
+        self.minimumLearningRateLineEdit = DecimalLineEdit.createInstance()
+        self.trainingEpochsSpinBox = QSpinBox()
+        self.statusIntervalSpinBox = QSpinBox()
+        self.outputParametersView = PtychoNNOutputParametersView.createInstance()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeMultigridView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNTrainingParametersView:
         view = cls(parent)
 
-        view.numLevelsSpinBox.setToolTip(
-            'The number of times to reduce the problem by a factor of two.')
-
         layout = QFormLayout()
-        layout.addRow('Number of Levels:', view.numLevelsSpinBox)
+        layout.addRow('Validation Set Fractional Size:', view.validationSetFractionalSizeSlider)
+        layout.addRow('Optimization Epochs Per Half Cycle:',
+                      view.optimizationEpochsPerHalfCycleSpinBox)
+        layout.addRow('Maximum Learning Rate:', view.maximumLearningRateLineEdit)
+        layout.addRow('Minimum Learning Rate:', view.minimumLearningRateLineEdit)
+        layout.addRow('Training Epochs:', view.trainingEpochsSpinBox)
+        layout.addRow('Status Interval:', view.statusIntervalSpinBox)
+        layout.addRow(view.outputParametersView)
         view.setLayout(layout)
 
         return view
 
 
-class TikePositionCorrectionView(QGroupBox):
+class PtychoNNParametersView(QWidget):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Position Correction', parent)
-        self.positionRegularizationCheckBox = QCheckBox('Use Regularization')
-        self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
-        self.updateMagnitudeLimitLineEdit = DecimalLineEdit.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> TikePositionCorrectionView:
-        view = cls(parent)
-
-        view.positionRegularizationCheckBox.setToolTip(
-            'Whether the positions are constrained to fit a random error plus affine error model.')
-        view.updateMagnitudeLimitLineEdit.setToolTip(
-            'When set to a positive number, x and y update magnitudes are clipped (limited) '
-            'to this value.')
-
-        layout = QFormLayout()
-        layout.addRow(view.positionRegularizationCheckBox)
-        layout.addRow(view.adaptiveMomentView)
-        layout.addRow('Update Magnitude Limit:', view.updateMagnitudeLimitLineEdit)
-        view.setLayout(layout)
-
-        return view
-
-
-class TikeProbeSupportView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Finite Probe Support', parent)
-        self.weightLineEdit = DecimalLineEdit.createInstance()
-        self.radiusSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.degreeLineEdit = DecimalLineEdit.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeProbeSupportView:
-        view = cls(parent)
-
-        view.weightLineEdit.setToolTip('Weight of the finite probe constraint.')
-        view.radiusSlider.setToolTip('Radius of probe support as fraction of probe grid.')
-        view.degreeLineEdit.setToolTip('Degree of the supergaussian defining the probe support.')
-
-        layout = QFormLayout()
-        layout.addRow('Weight:', view.weightLineEdit)
-        layout.addRow('Radius:', view.radiusSlider)
-        layout.addRow('Degree:', view.degreeLineEdit)
-        view.setLayout(layout)
-
-        return view
-
-
-class TikeProbeCorrectionView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Probe Correction', parent)
-        self.forceSparsitySlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.forceOrthogonalityCheckBox = QCheckBox('Force Orthogonality')
-        self.forceCenteredIntensityCheckBox = QCheckBox('Force Centered Intensity')
-        self.probeSupportView = TikeProbeSupportView.createInstance()
-        self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
-        self.additionalProbePenaltyLineEdit = DecimalLineEdit.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeProbeCorrectionView:
-        view = cls(parent)
-
-        view.forceSparsitySlider.setToolTip('Forces this proportion of zero elements.')
-        view.forceOrthogonalityCheckBox.setToolTip(
-            'Forces probes to be orthogonal each iteration.')
-        view.forceCenteredIntensityCheckBox.setToolTip(
-            'Forces the probe intensity to be centered.')
-        view.additionalProbePenaltyLineEdit.setToolTip(
-            'Penalty applied to the last probe for existing.')
-
-        layout = QFormLayout()
-        layout.addRow('Force Sparsity:', view.forceSparsitySlider)
-        layout.addRow(view.forceOrthogonalityCheckBox)
-        layout.addRow(view.forceCenteredIntensityCheckBox)
-        layout.addRow(view.probeSupportView)
-        layout.addRow(view.adaptiveMomentView)
-        layout.addRow('Additional Probe Penalty:', view.additionalProbePenaltyLineEdit)
-        view.setLayout(layout)
-
-        return view
-
-
-class TikeObjectCorrectionView(QGroupBox):
-
-    def __init__(self, parent: Optional[QWidget]) -> None:
-        super().__init__('Object Correction', parent)
-        self.positivityConstraintSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.smoothnessConstraintSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.adaptiveMomentView = TikeAdaptiveMomentView.createInstance()
-        self.useMagnitudeClippingCheckBox = QCheckBox('Magnitude Clipping')
-
-    @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> TikeObjectCorrectionView:
-        view = cls(parent)
-
-        view.useMagnitudeClippingCheckBox.setToolTip('Forces the object magnitude to be <= 1.')
-
-        layout = QFormLayout()
-        layout.addRow('Positivity Constraint:', view.positivityConstraintSlider)
-        layout.addRow('Smoothness Constraint:', view.smoothnessConstraintSlider)
-        layout.addRow(view.adaptiveMomentView)
-        layout.addRow(view.useMagnitudeClippingCheckBox)
-        view.setLayout(layout)
-
-        return view
-
-
-class TikeParametersView(QWidget):
-
-    def __init__(self, showAlpha: bool, showStepLength: bool, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
-        self.basicParametersView = TikeBasicParametersView.createInstance(
-            showAlpha, showStepLength)
-        self.multigridView = TikeMultigridView.createInstance()
-        self.positionCorrectionView = TikePositionCorrectionView.createInstance()
-        self.probeCorrectionView = TikeProbeCorrectionView.createInstance()
-        self.objectCorrectionView = TikeObjectCorrectionView.createInstance()
+        self.modelParametersView = PtychoNNModelParametersView.createInstance()
+        self.trainingParametersView = PtychoNNTrainingParametersView.createInstance()
 
     @classmethod
-    def createInstance(cls,
-                       showAlpha: bool,
-                       showStepLength: bool,
-                       parent: Optional[QWidget] = None) -> TikeParametersView:
-        view = cls(showAlpha, showStepLength, parent)
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNParametersView:
+        view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.basicParametersView)
-        layout.addWidget(view.multigridView)
-        layout.addWidget(view.positionCorrectionView)
-        layout.addWidget(view.probeCorrectionView)
-        layout.addWidget(view.objectCorrectionView)
+        layout.addWidget(view.modelParametersView)
+        layout.addWidget(view.trainingParametersView)
         layout.addStretch()
         view.setLayout(layout)
 

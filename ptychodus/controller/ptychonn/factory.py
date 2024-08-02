@@ -26,6 +26,7 @@ class PtychoNNViewControllerFactory(ReconstructorViewControllerFactory):
 
         controller = PtychoNNParametersController.createInstance(self._model.modelPresenter,
                                                                  self._model.trainingPresenter,
+                                                                 self._model.positionPredictionPresenter,
                                                                  view, self._fileDialogFactory)
         self._controllerList.append(controller)
 

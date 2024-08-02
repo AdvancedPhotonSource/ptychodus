@@ -17,8 +17,8 @@ from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
 from ptychodus.api.typing import Float32ArrayType
 
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
-from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
-
+from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings, PtychoNNPositionPredictionSettings
+ 
 logger = logging.getLogger(__name__)
 
 
@@ -89,9 +89,11 @@ class ObjectPatchCircularBuffer:
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def __init__(self, modelSettings: PtychoNNModelSettings,
-                 trainingSettings: PtychoNNTrainingSettings, *, enableAmplitude: bool) -> None:
+                 trainingSettings: PtychoNNTrainingSettings, 
+                 positionPredictionSettings: PtychoNNPositionPredictionSettings, *, enableAmplitude: bool) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
+        self._positionPredictionSettings = positionPredictionSettings
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
         self._enableAmplitude = enableAmplitude
@@ -267,3 +269,5 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def saveModel(self, filePath: Path) -> None:
         raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # TODO
+    
+    
