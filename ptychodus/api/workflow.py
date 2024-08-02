@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from pathlib import Path
@@ -43,7 +44,11 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def reconstruct(self) -> None:
+    def reconstructLocal(self) -> WorkflowProductAPI:
+        pass
+
+    @abstractmethod
+    def reconstructRemote(self) -> None:
         pass
 
     @abstractmethod

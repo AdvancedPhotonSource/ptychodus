@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -50,7 +51,10 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def buildObjectFromSettings(self) -> None:
         self._objectAPI.buildObjectFromSettings(self._productIndex)
 
-    def reconstruct(self) -> None:
+    def reconstructLocal(self) -> WorkflowProductAPI:
+        logger.error('Reconstruct local!')  # FIXME
+
+    def reconstructRemote(self) -> None:
         logger.debug(f'Execute Workflow: index={self._productIndex}')
         self._executor.runFlow(self._productIndex)
 

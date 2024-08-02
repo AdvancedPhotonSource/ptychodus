@@ -61,9 +61,9 @@ class AutomationPresenter(Observable, Observer):
         dataDirectory = self.getDataDirectory()
         pattern = '**/' if self._workflow.isWatchRecursive else ''
         pattern += self._workflow.getWatchFilePattern()
-        scanFileGlob: Generator[Path, None, None] = dataDirectory.glob(pattern)
+        scanFileList = sorted(scanFile for scanFile in dataDirectory.glob(pattern))
 
-        for scanFile in scanFileGlob:
+        for scanFile in scanFileList:
             self._datasetBuffer.put(scanFile)
 
     def clearDatasetRepository(self) -> None:
