@@ -2,36 +2,8 @@ from scipy.interpolate import griddata, RBFInterpolator
 import numpy
 
 from ptychodus.api.fluorescence import ElementMap, UpscalingStrategy
-from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.product import Product
-from ptychodus.api.scan import Scan
-from ptychodus.api.typing import RealArrayType
-
-
-def _scan_to_array(scan: Scan) -> RealArrayType:  # FIXME REMOVE
-    coords: list[float] = list()
-
-    for point in scan:
-        coords.append(point.positionYInMeters)
-        coords.append(point.positionXInMeters)
-
-    return numpy.reshape(coords, (-1, 2))
-
-
-def _object_coordinates(numberOfPixels: int, pixelSizeInMeters: float,
-                        centerInMeters: float) -> RealArrayType:  # FIXME REMOVE
-    positionInPixels = numpy.arange(numberOfPixels) - numberOfPixels / 2
-    return centerInMeters + positionInPixels * pixelSizeInMeters
-
-
-def _object_coordinates_yx(object_: Object) -> tuple[RealArrayType, RealArrayType]:  # FIXME REMOVE
-    axisXInMeters = _object_coordinates(object_.widthInPixels, object_.pixelWidthInMeters,
-                                        object_.centerXInMeters)
-    axisYInMeters = _object_coordinates(object_.heightInPixels, object_.pixelHeightInMeters,
-                                        object_.centerYInMeters)
-    gridYInMeters, gridXInMeters = numpy.meshgrid(axisYInMeters, axisXInMeters)
-    return gridYInMeters, gridXInMeters
 
 
 class IdentityUpscaling(UpscalingStrategy):
@@ -79,18 +51,25 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
         self._degree = degree
 
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
+        objectGeometry = product.object_.getGeometry()
+        scanCoordinatesInPixels: list[float] = list()
+
+        for scanPoint in product.scan:
+            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
+            scanCoordinatesInPixels.append(objectPoint.positionYInPixels)
+            scanCoordinatesInPixels.append(objectPoint.positionXInPixels)
+
         interpolator = RBFInterpolator(
-            _scan_to_array(product.scan),
+            numpy.reshape(scanCoordinatesInPixels, (-1, 2)),
             emap.counts_per_second.flat,
             kernel=self._kernel,
             neighbors=self._neighbors,
             epsilon=self._epsilon,
             degree=self._degree,
         )
-        grid_y, grid_x = _object_coordinates_yx(product.object_)
-        cps = interpolator(numpy.transpose((grid_y.flat, grid_x.flat)))
-        return ElementMap(emap.name,
-                          cps.astype(emap.counts_per_second.dtype).reshape(grid_x.shape))
+        YY, XX = numpy.mgrid[:objectGeometry.heightInPixels, :objectGeometry.widthInPixels]
+        cps = interpolator(numpy.transpose((YY.flat, XX.flat)))
+        return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype).reshape(XX.shape))
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

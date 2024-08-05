@@ -175,8 +175,7 @@ class FluorescenceParametersView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow('Measured Dataset:', self.openButton)
-        layout.addRow('Enhancement Strategy:',
-                      self.enhancementStrategyComboBox)  # FIXME to controller
+        layout.addRow('Enhancement Strategy:', self.enhancementStrategyComboBox)
         layout.addRow('Upscaling Strategy:', self.upscalingStrategyComboBox)
         layout.addRow('Deconvolution Strategy:', self.deconvolutionStrategyComboBox)
         layout.addRow(self.enhanceButton)

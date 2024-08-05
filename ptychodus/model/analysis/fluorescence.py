@@ -23,38 +23,26 @@ from .settings import FluorescenceSettings
 logger = logging.getLogger(__name__)
 
 
-def get_axis_weights_and_indexes(xmin_o: float, dx_o: float, xmin_p: float,
-                                 dx_p: float) -> tuple[Sequence[float], Sequence[int]]:
+def get_axis_weights_and_indexes(xmin_o: float, dx_o: float, xmin_p: float, dx_p: float,
+                                 n_p: int) -> tuple[Sequence[float], Sequence[int]]:
     pos: list[float] = []
     idx: list[int] = []
 
-    # TODO n_p is probe.widthInPixels or probe.heightInPixels
-    # TODO frac, whole = numpy.modf(i)
-    # TODO foo.ravel()
+    i_o = int((xmin_p - xmin_o) / dx_o)
+    x_o = xmin_o + i_o + dx_o
 
-    x_o = xmin_o
-    x_p = xmin_p
+    for i_p in range(n_p):  # FIXME
+        x_p = xmin_p + i_p * dx_p
 
-    i_o = 0  # FIXME calculate
+        while x_o < x_p:
+            pos.append(x_o)
+            idx.append(i_o)
 
-    while True:  # FIXME exit?
+            i_o += 1
+            x_o = xmin_o + i_o + dx_o
+
+        pos.append(x_p)
         idx.append(i_o)
-
-        if x_p < x_o:
-            pos.append(x_p)
-
-            x_p += dx_p
-        elif x_p > x_o:
-            pos.append(x_o)
-
-            i_o += 1
-            x_o += dx_o
-        else:  # x_p == x_o
-            pos.append(x_o)
-
-            i_o += 1
-            x_o += dx_o
-            x_p += dx_p
 
     return numpy.diff(pos), idx
 
@@ -72,31 +60,37 @@ class VSPILinearOperator(LinearOperator):
         super().__init__(float, (len(product.scan), xrf_nchannels))
         self._product = product
 
-    def matmat(self, x: ArrayLike) -> RealArrayType:
+    def matmat(self, X: ArrayLike) -> RealArrayType:
         AX = numpy.zeros(self.shape, dtype=self.dtype)
 
         probeGeometry = self._product.probe.getGeometry()
-        dx_p = probeGeometry.pixelWidthInMeters
-        dy_p = probeGeometry.pixelHeightInMeters
+        dx_p_m = probeGeometry.pixelWidthInMeters
+        dy_p_m = probeGeometry.pixelHeightInMeters
 
         objectGeometry = self._product.object_.getGeometry()
-        xmin_o = objectGeometry.minimumXInMeters
-        ymin_o = objectGeometry.minimumYInMeters
-        dx_o = objectGeometry.pixelWidthInMeters
-        dy_o = objectGeometry.pixelHeightInMeters
+        objectShape = objectGeometry.heightInPixels, objectGeometry.widthInPixels
+        xmin_o_m = objectGeometry.minimumXInMeters
+        ymin_o_m = objectGeometry.minimumYInMeters
+        dx_o_m = objectGeometry.pixelWidthInMeters
+        dy_o_m = objectGeometry.pixelHeightInMeters
 
         for index, point in enumerate(self._product.scan):
-            xmin_p = point.positionXInMeters - probeGeometry.widthInMeters / 2
-            ymin_p = point.positionYInMeters - probeGeometry.heightInMeters / 2
+            xmin_p_m = point.positionXInMeters - probeGeometry.widthInMeters / 2
+            ymin_p_m = point.positionYInMeters - probeGeometry.heightInMeters / 2
 
-            wx, ix = get_axis_weights_and_indexes(xmin_o, dx_o, xmin_p, dx_p)
-            wy, iy = get_axis_weights_and_indexes(ymin_o, dy_o, ymin_p, dy_p)
+            wx_m, ix = get_axis_weights_and_indexes(xmin_o_m, dx_o_m, xmin_p_m, dx_p_m,
+                                                    probeGeometry.widthInPixels)
+            wy_m, iy = get_axis_weights_and_indexes(ymin_o_m, dy_o_m, ymin_p_m, dy_p_m,
+                                                    probeGeometry.heightInPixels)
 
-            i_nz = numpy.meshgrid(iy, ix)  # FIXME
+            # FIXME BEGIN
+            IY, IX = numpy.meshgrid(iy, ix)
+            objectMultiIndex = list(zip(IY.flat, IX.flat))
 
-            w_nz = numpy.outer(wy, wx) / (dx_p * dy_p)
-            i_nz = numpy.ravel_multi_index(multi_index, dims)  # FIXME
+            w_nz = numpy.outer(wy_m, wx_m) / (dy_p_m * dx_p_m)
+            i_nz = numpy.ravel_multi_index(objectMultiIndex, objectShape)
             X_nz = X.take(i_nz, axis=0)
+            # FIXME END
 
             AX[index, :] = numpy.dot(w_nz.ravel(), X_nz)
 
@@ -219,15 +213,18 @@ class FluorescenceEnhancer(Observable, Observer):
         element_maps: list[ElementMap] = list()
 
         if self._settings.useVSPI.value:
-            emaps = self._measured.element_maps
-            A = VSPILinearOperator(reconstructInput.product, len(emaps))
-            B = numpy.stack([b.counts_per_second.flatten() for b in emaps]).T
-            X, exitCode = gmres(A, B, atol=1e-5)
+            measured_emaps = self._measured.element_maps
+            A = VSPILinearOperator(reconstructInput.product, len(measured_emaps))
+            B = numpy.stack([b.counts_per_second.flatten() for b in measured_emaps]).T
+            X, info = gmres(A, B, atol=1e-5)  # TODO expose atol
 
-            if exitCode != 0:
-                raise RuntimeError() # FIXME print(exitCode) # 0 indicates successful convergence
+            if info != 0:
+                logger.warning(f'Convergence to tolerance not achieved! {info=}')
 
-            # FIXME element_maps.append(emap_enhanced)
+            for m_emap, e_cps in zip(measured_emaps, X.T):
+                e_emap = ElementMap(m_emap.name, e_cps.reshape(m_emap.counts_per_second.shape))
+                element_maps.append(e_emap)
+
         else:
             upscaler = self._upscalingStrategyChooser.currentPlugin.strategy
             deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
