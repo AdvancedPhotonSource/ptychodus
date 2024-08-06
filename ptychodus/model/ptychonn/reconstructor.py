@@ -29,11 +29,9 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def __init__(self, modelSettings: PtychoNNModelSettings,
                  trainingSettings: PtychoNNTrainingSettings,
-                 positionPredictionSettings: PtychoNNPositionPredictionSettings,
                  modelProvider: PtychoNNModelProvider) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
-        self._positionPredictionSettings = positionPredictionSettings
         self._modelProvider = modelProvider
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()

@@ -3,9 +3,6 @@ from pathlib import Path
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
-# from ptychonn.position.configs import InferenceConfig
-from ptychodus.model.ptychonn.config_temp import InferenceConfig
-
 
 class PtychoNNModelSettings(Observable, Observer):
 
@@ -50,60 +47,48 @@ class PtychoNNTrainingSettings(Observable, Observer):
 
 class PtychoNNPositionPredictionSettings(Observable, Observer):
 
-    def __init__(self, settingsGroup: SettingsGroup) -> None:
+    def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = settingsGroup
+        self._settingsGroup = registry.createGroup('PtychoNNPositionPrediction')
+        self._settingsGroup.addObserver(self)
 
-        # configs = InferenceConfig()
-        # for field in dataclasses.fields(configs):
-            # print(field)
-            # settingsGroup.createIntegerEntry(field.name, 100000)
-
-        self.reconstructorImagePath = settingsGroup.createPathEntry(
+        self.reconstructorImagePath = self._settingsGroup.createPathEntry(
             'Reconstructor Image Path', Path('/path/to/output'))
-        self.probePositionListPath = settingsGroup.createPathEntry(
+        self.probePositionListPath = self._settingsGroup.createPathEntry(
             'Probe Position List Path', Path('/path/to/output'))
-        self.probePositionDataUnit = settingsGroup.createStringEntry(
+        self.probePositionDataUnit = self._settingsGroup.createStringEntry(
             'Probe Position Data Unit', 'nm')
-        self.pixelSizeNM = settingsGroup.createRealEntry(
+        self.pixelSizeNM = self._settingsGroup.createRealEntry(
             'Pixel Size NM', 1)
-        self.baselinePositionList = settingsGroup.createPathEntry(
+        self.baselinePositionList = self._settingsGroup.createPathEntry(
             'Baseline Position List', Path('/path/to/output'))
-        self.centralCrop = settingsGroup.createStringEntry(
+        self.centralCrop = self._settingsGroup.createStringEntry(
             'Central Crop', '1, 2')
-        self.method = settingsGroup.createStringEntry(
+        self.method = self._settingsGroup.createStringEntry(
             'Method', 'serial')
-        self.numberNeighborsCollective = settingsGroup.createIntegerEntry(
+        self.numberNeighborsCollective = self._settingsGroup.createIntegerEntry(
             'Number of Neighbors Collective', 4)
-        self.offsetEstimatorOrder = settingsGroup.createIntegerEntry(
+        self.offsetEstimatorOrder = self._settingsGroup.createIntegerEntry(
             'Offset Estimator Order', 1)
-        self.offsetEstimatorBeta = settingsGroup.createRealEntry(
+        self.offsetEstimatorBeta = self._settingsGroup.createRealEntry(
             'Offset Estimator Beta', 0.5)
-        self.smoothConstraintWeight = settingsGroup.createRealEntry(
+        self.smoothConstraintWeight = self._settingsGroup.createRealEntry(
             'Smooth Contraint Weight', 1e-2)
-        self.rectangularGrid = settingsGroup.createBooleanEntry(
+        self.rectangularGrid = self._settingsGroup.createBooleanEntry(
             'Rectangular Grid', False)
-        self.randomSeed = settingsGroup.createIntegerEntry(
+        self.randomSeed = self._settingsGroup.createIntegerEntry(
             'Random Seed', 123)
-        self.debug = settingsGroup.createBooleanEntry(
+        self.debug = self._settingsGroup.createBooleanEntry(
             'Debug', False)
-        self.registrationMethod = settingsGroup.createStringEntry(    
+        self.registrationMethod = self._settingsGroup.createStringEntry(    
             'RegisrationMethod', 'hybrid')
-        self.hybridRegistrationAlgs = settingsGroup.createStringEntry(    
+        self.hybridRegistrationAlgs = self._settingsGroup.createStringEntry(    
             'Hybrid Registration Algs', 'error_map_expandable')
-        self.hybridRegistrationTols = settingsGroup.createIntegerEntry(
+        self.hybridRegistrationTols = self._settingsGroup.createIntegerEntry(
             'Nonhybrid Registration Tols', 1)
-        self.maxShift = settingsGroup.createIntegerEntry(
+        self.maxShift = self._settingsGroup.createIntegerEntry(
             'Max Shift', 40)
-
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry) -> PtychoNNPositionPredictionSettings:
-        settingsGroup = settingsRegistry.createGroup('PtychoNNPositionPrediction')
-        settings = cls(settingsGroup)
-        settingsGroup.addObserver(settings)
-        return settings
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
             self.notifyObservers()
-

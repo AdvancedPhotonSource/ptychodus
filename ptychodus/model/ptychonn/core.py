@@ -126,13 +126,8 @@ class PtychoNNPositionPredictionPresenter(Observable, Observer):
         super().__init__()
         self._settings = settings
         self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
-        self._worker = PositionPredictionWorker()
-
-    @classmethod
-    def createInstance(cls, settings: PtychoNNPositionPredictionSettings) -> PtychoNNPositionPredictionPresenter:
-        presenter = cls(settings)
-        settings.addObserver(presenter)
-        return presenter
+        self._worker = PositionPredictionWorker(settings)
+        settings.addObserver(self)
 
     def getReconstructorImageFileFilterList(self) -> Sequence[str]:
         return self._fileFilterList
@@ -173,17 +168,17 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._positionPredictionSettings = positionPredictionSettings
-        self.modelPresenter = PtychoNNModelPresenter.createInstance(modelSettings)
-        self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(trainingSettings)
-        self.positionPredictionPresenter = PtychoNNPositionPredictionPresenter.createInstance(positionPredictionSettings)
+        self.modelPresenter = PtychoNNModelPresenter(modelSettings)
+        self.trainingPresenter = PtychoNNTrainingPresenter(trainingSettings)
+        self.positionPredictionPresenter = PtychoNNPositionPredictionPresenter(positionPredictionSettings)
         self._reconstructors = reconstructors
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry,
                        isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
-        modelSettings = PtychoNNModelSettings.createInstance(settingsRegistry)
-        trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
-        positionPredictionSettings = PtychoNNPositionPredictionSettings.createInstance(settingsRegistry)
+        modelSettings = PtychoNNModelSettings(settingsRegistry)
+        trainingSettings = PtychoNNTrainingSettings(settingsRegistry)
+        positionPredictionSettings = PtychoNNPositionPredictionSettings(settingsRegistry)
         phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
         amplitudePhaseReconstructor: TrainableReconstructor = NullReconstructor('AmplitudePhase')
         reconstructors: list[TrainableReconstructor] = list()
