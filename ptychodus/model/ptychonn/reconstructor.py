@@ -16,8 +16,8 @@ from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
 from .buffers import ObjectPatchCircularBuffer, PatternCircularBuffer
 from .model import PtychoNNModelProvider
-from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
-
+from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings, PtychoNNPositionPredictionSettings
+ 
 logger = logging.getLogger(__name__)
 
 
@@ -29,9 +29,11 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def __init__(self, modelSettings: PtychoNNModelSettings,
                  trainingSettings: PtychoNNTrainingSettings,
+                 positionPredictionSettings: PtychoNNPositionPredictionSettings,
                  modelProvider: PtychoNNModelProvider) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
+        self._positionPredictionSettings = positionPredictionSettings
         self._modelProvider = modelProvider
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()

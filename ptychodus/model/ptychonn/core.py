@@ -10,7 +10,8 @@ from ptychodus.api.reconstructor import (NullReconstructor, Reconstructor, Recon
                                          TrainableReconstructor)
 from ptychodus.api.settings import SettingsRegistry
 
-from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
+from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings, PtychoNNPositionPredictionSettings
+from ...model.ptychonn.position import PositionPredictionWorker
 
 logger = logging.getLogger(__name__)
 
@@ -118,24 +119,71 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         if observable is self._settings:
             self.notifyObservers()
 
+class PtychoNNPositionPredictionPresenter(Observable, Observer):
+    MAX_INT: Final[int] = 0x7FFFFFFF
+
+    def __init__(self, settings: PtychoNNPositionPredictionSettings) -> None:
+        super().__init__()
+        self._settings = settings
+        self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
+        self._worker = PositionPredictionWorker()
+
+    @classmethod
+    def createInstance(cls, settings: PtychoNNPositionPredictionSettings) -> PtychoNNPositionPredictionPresenter:
+        presenter = cls(settings)
+        settings.addObserver(presenter)
+        return presenter
+
+    def getReconstructorImageFileFilterList(self) -> Sequence[str]:
+        return self._fileFilterList
+
+    def getReconstructorImageFileFilter(self) -> str:
+        return self._fileFilterList[0]
+    
+    def getReconstructorImageFilePath(self) -> Path:
+        return self._settings.reconstructorImagePath.value
+    
+    def setReconstructorImageFilePath(self, directory: Path) -> None:
+        self._settings.reconstructorImagePath.value = directory
+
+    def getNumberNeighborsCollectiveLimits(self) -> Interval[int]:
+        return Interval[int](1, self.MAX_INT)
+
+    def getNumberNeighborsCollective(self) -> int:
+        limits = self.getNumberNeighborsCollectiveLimits()
+        return limits.clamp(self._settings.numberNeighborsCollective.value)
+
+    def setNumberNeighborsCollective(self, value: int) -> None:
+        self._settings.numberNeighborsCollective.value = value
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self.notifyObservers()
+
+    def runPositionPrediction(self):
+        self._worker.run()
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
     def __init__(self, modelSettings: PtychoNNModelSettings,
                  trainingSettings: PtychoNNTrainingSettings,
+                 positionPredictionSettings: PtychoNNPositionPredictionSettings,
                  reconstructors: Sequence[Reconstructor]) -> None:
         super().__init__()
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
-        self.modelPresenter = PtychoNNModelPresenter(modelSettings)
-        self.trainingPresenter = PtychoNNTrainingPresenter(trainingSettings)
+        self._positionPredictionSettings = positionPredictionSettings
+        self.modelPresenter = PtychoNNModelPresenter.createInstance(modelSettings)
+        self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(trainingSettings)
+        self.positionPredictionPresenter = PtychoNNPositionPredictionPresenter.createInstance(positionPredictionSettings)
         self._reconstructors = reconstructors
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry,
                        isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
-        modelSettings = PtychoNNModelSettings(settingsRegistry)
-        trainingSettings = PtychoNNTrainingSettings(settingsRegistry)
+        modelSettings = PtychoNNModelSettings.createInstance(settingsRegistry)
+        trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
+        positionPredictionSettings = PtychoNNPositionPredictionSettings.createInstance(settingsRegistry)
         phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
         amplitudePhaseReconstructor: TrainableReconstructor = NullReconstructor('AmplitudePhase')
         reconstructors: list[TrainableReconstructor] = list()
@@ -164,7 +212,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
             reconstructors.append(phaseOnlyReconstructor)
             reconstructors.append(amplitudePhaseReconstructor)
 
-        return cls(modelSettings, trainingSettings, reconstructors)
+        return cls(modelSettings, trainingSettings, positionPredictionSettings, reconstructors)
 
     @property
     def name(self) -> str:
