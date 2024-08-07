@@ -9,6 +9,7 @@ import numpy
 import numpy.typing
 
 from .geometry import ImageExtent, PixelGeometry, Point2D
+from .scan import ScanPoint
 
 ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
 
@@ -45,6 +46,12 @@ class ObjectGeometry:
     @property
     def _radiusY(self) -> float:
         return self.heightInPixels / 2
+
+    def getPixelGeometry(self) -> PixelGeometry:
+        return PixelGeometry(
+            widthInMeters=self.pixelWidthInMeters,
+            heightInMeters=self.pixelHeightInMeters,
+        )
 
     def mapObjectPointToScanPoint(self, objectPoint: Point2D) -> Point2D:
         x = self.centerXInMeters + self.pixelWidthInMeters * (objectPoint.x - self._radiusX)
@@ -196,7 +203,7 @@ class Object:
 class ObjectInterpolator(ABC):
 
     @abstractmethod
-    def getPatch(self, patchCenter: Point2D, patchExtent: ImageExtent) -> Object:
+    def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> Object:
         '''returns an interpolated patch from the object array'''
         pass
 

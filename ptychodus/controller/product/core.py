@@ -201,7 +201,7 @@ class ProductController(ProductRepositoryObserver):
 
         if filePath:
             try:
-                self._api.openProduct(filePath, nameFilter)
+                self._api.openProduct(filePath, fileType=nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)
@@ -221,7 +221,7 @@ class ProductController(ProductRepositoryObserver):
 
             if filePath:
                 try:
-                    self._api.saveProduct(current.row(), filePath, nameFilter)
+                    self._api.saveProduct(current.row(), filePath, fileType=nameFilter)
                 except Exception as err:
                     logger.exception(err)
                     ExceptionDialog.showException('File Writer', err)

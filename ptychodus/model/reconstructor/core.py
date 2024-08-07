@@ -7,6 +7,7 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import ActiveDiffractionDataset
 from ..product import ProductRepository
+from .matcher import DiffractionPatternPositionMatcher
 from .presenter import ReconstructorPresenter
 from .settings import ReconstructorSettings
 
@@ -32,7 +33,6 @@ class ReconstructorCore:
         if not self._pluginChooser:
             self._pluginChooser.registerPlugin(NullReconstructor('None'), displayName='None/None')
 
-        self.presenter = ReconstructorPresenter.createInstance(self.settings, diffractionDataset,
-                                                               productRepository,
-                                                               self._pluginChooser,
-                                                               settingsRegistry)
+        self.dataMatcher = DiffractionPatternPositionMatcher(diffractionDataset, productRepository)
+        self.presenter = ReconstructorPresenter(self.settings, self.dataMatcher, productRepository,
+                                                self._pluginChooser, settingsRegistry)

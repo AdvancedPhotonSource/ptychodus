@@ -185,6 +185,11 @@ class ProbeEditorViewControllerFactory:
                 'Diameter:',
                 primaryModeGroup,
             )
+            dialogBuilder.addLengthWidget(
+                probeBuilder.defocusDistanceInMeters,
+                'Defocus Distance:',
+                primaryModeGroup,
+            )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
             return dialogBuilder.build(title, parent)
         elif isinstance(probeBuilder, FresnelZonePlateProbeBuilder):
@@ -203,6 +208,11 @@ class ProbeEditorViewControllerFactory:
             dialogBuilder.addLengthWidget(
                 probeBuilder.heightInMeters,
                 'Height:',
+                primaryModeGroup,
+            )
+            dialogBuilder.addLengthWidget(
+                probeBuilder.defocusDistanceInMeters,
+                'Defocus Distance:',
                 primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)

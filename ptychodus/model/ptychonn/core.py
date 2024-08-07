@@ -1,7 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from decimal import Decimal
-from pathlib import Path
 from typing import Final
 import logging
 
@@ -22,25 +21,8 @@ class PtychoNNModelPresenter(Observable, Observer):
     def __init__(self, settings: PtychoNNModelSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
 
-    @classmethod
-    def createInstance(cls, settings: PtychoNNModelSettings) -> PtychoNNModelPresenter:
-        presenter = cls(settings)
-        settings.addObserver(presenter)
-        return presenter
-
-    def getStateFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
-
-    def getStateFileFilter(self) -> str:
-        return self._fileFilterList[0]
-
-    def getStateFilePath(self) -> Path:
-        return self._settings.stateFilePath.value
-
-    def setStateFilePath(self, directory: Path) -> None:
-        self._settings.stateFilePath.value = directory
+        settings.addObserver(self)
 
     def getNumberOfConvolutionKernelsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
@@ -80,11 +62,7 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         super().__init__()
         self._settings = settings
 
-    @classmethod
-    def createInstance(cls, settings: PtychoNNTrainingSettings) -> PtychoNNTrainingPresenter:
-        presenter = cls(settings)
-        settings.addObserver(presenter)
-        return presenter
+        settings.addObserver(self)
 
     def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
@@ -95,16 +73,6 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
     def setValidationSetFractionalSize(self, value: Decimal) -> None:
         self._settings.validationSetFractionalSize.value = value
-
-    def getOptimizationEpochsPerHalfCycleLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getOptimizationEpochsPerHalfCycle(self) -> int:
-        limits = self.getOptimizationEpochsPerHalfCycleLimits()
-        return limits.clamp(self._settings.optimizationEpochsPerHalfCycle.value)
-
-    def setOptimizationEpochsPerHalfCycle(self, value: int) -> None:
-        self._settings.optimizationEpochsPerHalfCycle.value = value
 
     def getMaximumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
@@ -136,24 +104,6 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def setTrainingEpochs(self, value: int) -> None:
         self._settings.trainingEpochs.value = value
 
-    def isSaveTrainingArtifactsEnabled(self) -> bool:
-        return self._settings.saveTrainingArtifacts.value
-
-    def setSaveTrainingArtifactsEnabled(self, enabled: bool) -> None:
-        self._settings.saveTrainingArtifacts.value = enabled
-
-    def getOutputPath(self) -> Path:
-        return self._settings.outputPath.value
-
-    def setOutputPath(self, directory: Path) -> None:
-        self._settings.outputPath.value = directory
-
-    def getOutputSuffix(self) -> str:
-        return self._settings.outputSuffix.value
-
-    def setOutputSuffix(self, suffix: str) -> None:
-        self._settings.outputSuffix.value = suffix
-
     def getStatusIntervalInEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
@@ -177,20 +127,21 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         super().__init__()
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
-        self.modelPresenter = PtychoNNModelPresenter.createInstance(modelSettings)
-        self.trainingPresenter = PtychoNNTrainingPresenter.createInstance(trainingSettings)
+        self.modelPresenter = PtychoNNModelPresenter(modelSettings)
+        self.trainingPresenter = PtychoNNTrainingPresenter(trainingSettings)
         self._reconstructors = reconstructors
 
     @classmethod
     def createInstance(cls, settingsRegistry: SettingsRegistry,
                        isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
-        modelSettings = PtychoNNModelSettings.createInstance(settingsRegistry)
-        trainingSettings = PtychoNNTrainingSettings.createInstance(settingsRegistry)
+        modelSettings = PtychoNNModelSettings(settingsRegistry)
+        trainingSettings = PtychoNNTrainingSettings(settingsRegistry)
         phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
         amplitudePhaseReconstructor: TrainableReconstructor = NullReconstructor('AmplitudePhase')
         reconstructors: list[TrainableReconstructor] = list()
 
         try:
+            from .model import PtychoNNModelProvider
             from .reconstructor import PtychoNNTrainableReconstructor
         except ModuleNotFoundError:
             logger.info('PtychoNN not found.')
@@ -199,12 +150,17 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
                 reconstructors.append(phaseOnlyReconstructor)
                 reconstructors.append(amplitudePhaseReconstructor)
         else:
+            phaseOnlyModelProvider = PtychoNNModelProvider(modelSettings,
+                                                           trainingSettings,
+                                                           enableAmplitude=False)
             phaseOnlyReconstructor = PtychoNNTrainableReconstructor(modelSettings,
                                                                     trainingSettings,
-                                                                    enableAmplitude=False)
-            amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(modelSettings,
-                                                                         trainingSettings,
-                                                                         enableAmplitude=True)
+                                                                    phaseOnlyModelProvider)
+            amplitudePhaseModelProvider = PtychoNNModelProvider(modelSettings,
+                                                                trainingSettings,
+                                                                enableAmplitude=True)
+            amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(
+                modelSettings, trainingSettings, amplitudePhaseModelProvider)
             reconstructors.append(phaseOnlyReconstructor)
             reconstructors.append(amplitudePhaseReconstructor)
 

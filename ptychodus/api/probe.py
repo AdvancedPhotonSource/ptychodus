@@ -3,14 +3,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeAlias
 
 import numpy
 
 from .geometry import ImageExtent, PixelGeometry
-from .typing import ComplexArrayType, RealArrayType
-
-WavefieldArrayType: TypeAlias = ComplexArrayType
+from .propagator import WavefieldArrayType, intensity
+from .typing import RealArrayType
 
 
 @dataclass(frozen=True)
@@ -76,8 +74,8 @@ class Probe:
 
     @staticmethod
     def _calculateModeRelativePower(array: WavefieldArrayType) -> Sequence[float]:
-        power = numpy.sum((array * array.conj()).real, axis=(-2, -1))
-        powersum = power.sum()
+        power = numpy.sum(intensity(array), axis=(-2, -1))
+        powersum = numpy.sum(power)
 
         if powersum > 0.:
             power /= powersum
@@ -181,7 +179,7 @@ class Probe:
         return numpy.sqrt(numpy.sum(numpy.square(self._modeRelativePower)))
 
     def getIntensity(self) -> RealArrayType:
-        return numpy.absolute(self._array).sum(axis=-3)
+        return numpy.sum(intensity(self._array), axis=-3)
 
 
 class ProbeFileReader(ABC):

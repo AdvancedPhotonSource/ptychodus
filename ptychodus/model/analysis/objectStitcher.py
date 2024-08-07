@@ -1,7 +1,7 @@
 import numpy
 
-from ptychodus.api.geometry import Point2D
 from ptychodus.api.object import Object, ObjectArrayType, ObjectGeometry
+from ptychodus.api.scan import ScanPoint
 
 
 class ObjectStitcher:
@@ -17,12 +17,12 @@ class ObjectStitcher:
         self._weights[idx] += weight
         self._array[idx] += (patchArray - self._array[idx]) * weight / self._weights[idx]
 
-    def addPatch(self, patchCenter: Point2D, patchArray: ObjectArrayType) -> None:
+    def addPatch(self, patchCenter: ScanPoint, patchArray: ObjectArrayType) -> None:
         geometry = self._geometry
 
         patchWidth = patchArray.shape[-1]
         patchRadiusXInMeters = geometry.pixelWidthInMeters * patchWidth / 2
-        patchMinimumXInMeters = patchCenter.x - patchRadiusXInMeters
+        patchMinimumXInMeters = patchCenter.positionXInMeters - patchRadiusXInMeters
         ixBeginF, xi = divmod(patchMinimumXInMeters - geometry.minimumXInMeters,
                               geometry.pixelWidthInMeters)
         ixBegin = int(ixBeginF)
@@ -32,7 +32,7 @@ class ObjectStitcher:
 
         patchHeight = patchArray.shape[-2]
         patchRadiusYInMeters = geometry.pixelHeightInMeters * patchHeight / 2
-        patchMinimumYInMeters = patchCenter.y - patchRadiusYInMeters
+        patchMinimumYInMeters = patchCenter.positionYInMeters - patchRadiusYInMeters
         iyBeginF, eta = divmod(patchMinimumYInMeters - geometry.minimumYInMeters,
                                geometry.pixelHeightInMeters)
         iyBegin = int(iyBeginF)
