@@ -125,21 +125,61 @@ class PtychoNNPositionPredictionPresenter(Observable, Observer):
     def __init__(self, settings: PtychoNNPositionPredictionSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
+        self._reconImageFileFilterList: list[str] = ['TIFF images (*.tif *.tiff)']
+        self._probePositionFileFilterList: list[str] = ['Probe position files (*.csv)']
         self._worker = PositionPredictionWorker(settings)
         settings.addObserver(self)
 
-    def getReconstructorImageFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
+    def getReconstructedImageFileFilterList(self) -> Sequence[str]:
+        return self._reconImageFileFilterList
 
     def getReconstructorImageFileFilter(self) -> str:
-        return self._fileFilterList[0]
+        return self._reconImageFileFilterList[0]
+    
+    def getProbePositionFileFilterList(self) -> Sequence[str]:
+        return self._probePositionFileFilterList
     
     def getReconstructorImageFilePath(self) -> Path:
         return self._settings.reconstructorImagePath.value
     
-    def setReconstructorImageFilePath(self, directory: Path) -> None:
+    def setReconstructedImageFilePath(self, directory: Path) -> None:
         self._settings.reconstructorImagePath.value = directory
+
+    def getProbePositionListFilePath(self) -> str:
+        return self._settings.probePositionListPath.value
+    
+    def setProbePositionListFilePath(self, directory: Path) -> str:
+        self._settings.probePositionListPath.value = directory
+        
+    def getProbePositionDataUnit(self) -> str:
+        return self._settings.probePositionDataUnit.value
+    
+    def setProbePositionDataUnit(self, unit: str) -> None:
+        self._settings.probePositionDataUnit.value = unit
+        
+    def getPixelSizeNM(self) -> Decimal:
+        return self._settings.pixelSizeNM.value
+    
+    def setPixelSizeNM(self, value: Decimal) -> None:
+        self._settings.pixelSizeNM.value = value
+        
+    def getBaselinePositionListFilePath(self) -> str:
+        return self._settings.baselinePositionList.value
+    
+    def setBaselinePositionListFilePath(self, directory: Path) -> str:
+        self._settings.baselinePositionList.value = directory
+        
+    def getCentralCrop(self) -> str:
+        return self._settings.centralCrop.value
+    
+    def setCentralCrop(self, value: str) -> None:
+        self._settings.centralCrop.value = value
+        
+    def getMethod(self) -> str:
+        return self._settings.method.value
+    
+    def setMethod(self, value: str) -> None:
+        self._settings.method.value = value
 
     def getNumberNeighborsCollectiveLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
@@ -150,6 +190,66 @@ class PtychoNNPositionPredictionPresenter(Observable, Observer):
 
     def setNumberNeighborsCollective(self, value: int) -> None:
         self._settings.numberNeighborsCollective.value = value
+        
+    def getOffsetEstimatorOrder(self) -> int:
+        return self._settings.offsetEstimatorOrder.value
+    
+    def setOffsetEstimatorOrder(self, value: int) -> None:
+        self._settings.offsetEstimatorOrder.value = value
+        
+    def getOffsetEstimatorBeta(self) -> Decimal:
+        return self._settings.offsetEstimatorBeta.value
+    
+    def setOffsetEstimatorBeta(self, value: Decimal) -> None:
+        self._settings.offsetEstimatorBeta.value = value
+        
+    def getSmoothConstraintWeight(self) -> Decimal:
+        return self._settings.smoothConstraintWeight.value
+    
+    def setSmoothConstraintWeight(self, value: Decimal) -> None:
+        self._settings.smoothConstraintWeight.value = value
+        
+    def getRectangularGrid(self) -> bool:
+        return self._settings.rectangularGrid.value
+    
+    def setRectangularGrid(self, value: bool) -> None:
+        self._settings.rectangularGrid.value = value
+        
+    def getRandomSeed(self) -> int:
+        return self._settings.randomSeed.value
+    
+    def setRandomSeed(self, value: int) -> None:
+        self._settings.randomSeed.value = value
+        
+    def getDebug(self) -> bool:
+        return self._settings.debug.value
+    
+    def setDebug(self, value: bool) -> None:
+        self._settings.debug.value = value
+        
+    def getRegistrationMethod(self) -> str:
+        return self._settings.registrationMethod.value
+    
+    def setRegistrationMethod(self, value: str) -> None:
+        self._settings.registrationMethod.value = value
+        
+    def getHybridRegistrationTols(self) -> str:
+        return self._settings.hybridRegistrationTols.value
+    
+    def setHybridRegistrationTols(self, value: str) -> None:
+        self._settings.hybridRegistrationTols.value = value
+        
+    def getNonHybridRegistrationTol(self) -> Decimal:
+        return self._settings.nonHybridRegistrationTol.value
+    
+    def setNonHybridRegistrationTol(self, value: Decimal) -> None:
+        self._settings.nonHybridRegistrationTol.value = value
+        
+    def getMaxShift(self) -> int:
+        return self._settings.maxShift.value
+    
+    def setMaxShift(self, value: int) -> None:
+        self._settings.maxShift.value = value
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

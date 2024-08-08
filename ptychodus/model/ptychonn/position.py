@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class PositionPredictionWorker:
 
     def __init__(self, positionPredictionSettings: PtychoNNPositionPredictionSettings) -> None:
-        self._positionPredictionSettings = positionPredictionSettings
+        self._settings = positionPredictionSettings
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -19,5 +19,4 @@ class PositionPredictionWorker:
         return 'PositionPOredictor'
 
     def run(self):
-        print("Hello from PositionPredictionWorker.run")
         return None

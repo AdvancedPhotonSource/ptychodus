@@ -53,17 +53,17 @@ class PtychoNNPositionPredictionSettings(Observable, Observer):
         self._settingsGroup.addObserver(self)
 
         self.reconstructorImagePath = self._settingsGroup.createPathEntry(
-            'Reconstructor Image Path', Path('/path/to/output'))
+            'Reconstructor Image Path', Path(''))
         self.probePositionListPath = self._settingsGroup.createPathEntry(
-            'Probe Position List Path', Path('/path/to/output'))
+            'Probe Position List Path', Path(''))
         self.probePositionDataUnit = self._settingsGroup.createStringEntry(
             'Probe Position Data Unit', 'nm')
         self.pixelSizeNM = self._settingsGroup.createRealEntry(
-            'Pixel Size NM', 1)
+            'Pixel Size NM', '1.0')
         self.baselinePositionList = self._settingsGroup.createPathEntry(
-            'Baseline Position List', Path('/path/to/output'))
-        self.centralCrop = self._settingsGroup.createStringEntry(
-            'Central Crop', '1, 2')
+            'Baseline Position List', Path(''))
+        self.centralCrop = self._settingsGroup.createIntegerEntry(
+            'Central Crop', 0)
         self.method = self._settingsGroup.createStringEntry(
             'Method', 'serial')
         self.numberNeighborsCollective = self._settingsGroup.createIntegerEntry(
@@ -71,9 +71,9 @@ class PtychoNNPositionPredictionSettings(Observable, Observer):
         self.offsetEstimatorOrder = self._settingsGroup.createIntegerEntry(
             'Offset Estimator Order', 1)
         self.offsetEstimatorBeta = self._settingsGroup.createRealEntry(
-            'Offset Estimator Beta', 0.5)
+            'Offset Estimator Beta', '0.5')
         self.smoothConstraintWeight = self._settingsGroup.createRealEntry(
-            'Smooth Contraint Weight', 1e-2)
+            'Smooth Contraint Weight', '1e-2')
         self.rectangularGrid = self._settingsGroup.createBooleanEntry(
             'Rectangular Grid', False)
         self.randomSeed = self._settingsGroup.createIntegerEntry(
@@ -82,10 +82,10 @@ class PtychoNNPositionPredictionSettings(Observable, Observer):
             'Debug', False)
         self.registrationMethod = self._settingsGroup.createStringEntry(    
             'RegisrationMethod', 'hybrid')
-        self.hybridRegistrationAlgs = self._settingsGroup.createStringEntry(    
-            'Hybrid Registration Algs', 'error_map_expandable')
-        self.hybridRegistrationTols = self._settingsGroup.createIntegerEntry(
-            'Nonhybrid Registration Tols', 1)
+        self.hybridRegistrationTols = self._settingsGroup.createStringEntry(
+            'Hybrid Registration Tols (comma separated)', '0.3, 0.15')
+        self.nonHybridRegistrationTol = self._settingsGroup.createRealEntry(
+            'Non-hybrid Registration Tol', 0.15)
         self.maxShift = self._settingsGroup.createIntegerEntry(
             'Max Shift', 40)
 
