@@ -13,6 +13,7 @@ class PositionPredictionWorker:
         self._settings = positionPredictionSettings
         self._configs = None
         self._corrector = None
+        self.predicted_positions_px = None
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -65,11 +66,14 @@ class PositionPredictionWorker:
         logger.info("Position prediction configs:")
         logger.info(self._configs)
         
+    def get_predicted_positions(self):
+        return self.predicted_positions_px
+        
     def run(self):
         self.createConfigs()
         self._corrector = ptychonn.position.core.PtychoNNProbePositionCorrector(self._configs)
         self._corrector.build()
         self._corrector.run()
         
-        self._corrector.new_probe_positions.plot()
-        return None
+        self.predicted_positions_px = self._corrector.new_probe_positions.array
+        return
