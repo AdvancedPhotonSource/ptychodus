@@ -60,7 +60,7 @@ class PtychoNNPositionPredictionSettings(Observable, Observer):
             'Probe Position Data Unit', 'nm')
         self.pixelSizeNM = self._settingsGroup.createRealEntry(
             'Pixel Size NM', '1.0')
-        self.baselinePositionList = self._settingsGroup.createPathEntry(
+        self.baselinePositionListPath = self._settingsGroup.createPathEntry(
             'Baseline Position List', Path(''))
         self.centralCrop = self._settingsGroup.createIntegerEntry(
             'Central Crop', 0)

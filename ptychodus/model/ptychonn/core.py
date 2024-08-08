@@ -164,10 +164,10 @@ class PtychoNNPositionPredictionPresenter(Observable, Observer):
         self._settings.pixelSizeNM.value = value
         
     def getBaselinePositionListFilePath(self) -> str:
-        return self._settings.baselinePositionList.value
+        return self._settings.baselinePositionListPath.value
     
     def setBaselinePositionListFilePath(self, directory: Path) -> str:
-        self._settings.baselinePositionList.value = directory
+        self._settings.baselinePositionListPath.value = directory
         
     def getCentralCrop(self) -> str:
         return self._settings.centralCrop.value
