@@ -149,7 +149,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
                         patternDataType=data.dtype,
-                        detectorExtentInPixels=ImageExtent(detectorWidth, detectorHeight),
+                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
                         filePath=filePath,
                     )
 

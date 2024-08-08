@@ -69,7 +69,7 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
                     )
 
             dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
-            logger.debug(f'loaded dataset')
+            logger.debug('loaded dataset')
         except OSError:
             logger.debug(f'Unable to read file \"{filePath}\".')
 
