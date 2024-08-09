@@ -110,13 +110,8 @@ class AutomationProcessingPresenter(Observable, Observer):
         self._repository = repository
         self._processor = processor
 
-    @classmethod
-    def createInstance(cls, settings: AutomationSettings, repository: AutomationDatasetRepository,
-                       processor: AutomationDatasetProcessor) -> AutomationProcessingPresenter:
-        presenter = cls(settings, repository, processor)
-        settings.addObserver(presenter)
-        repository.addObserver(presenter)
-        return presenter
+        settings.addObserver(self)
+        repository.addObserver(self)
 
     def getDatasetLabel(self, index: int) -> str:
         return self._repository.getLabel(index)
@@ -159,11 +154,14 @@ class AutomationCore:
         self._watcher = DataDirectoryWatcher(self._settings, self._workflow, self._datasetBuffer)
         self.presenter = AutomationPresenter(self._settings, self._workflow, self._watcher,
                                              self._datasetBuffer, self.repository)
-        self.processingPresenter = AutomationProcessingPresenter.createInstance(
-            self._settings, self.repository, self._processor)
+        self.processingPresenter = AutomationProcessingPresenter(self._settings, self.repository,
+                                                                 self._processor)
 
     def start(self) -> None:
         self._datasetBuffer.start()
+
+    def refreshDatasetRepository(self) -> None:
+        self.repository.notifyObserversIfRepositoryChanged()
 
     def executeWaitingTasks(self) -> None:
         self._processor.runOnce()

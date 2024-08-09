@@ -214,9 +214,6 @@ class ModelCore:
     def refreshActiveDataset(self) -> None:
         self._patternsCore.dataset.notifyObserversIfDatasetChanged()
 
-    def refreshAutomationDatasets(self) -> None:
-        self._automationCore.repository.notifyObserversIfRepositoryChanged()
-
     def batchModeExecute(self, action: str, inputFilePath: Path, outputFilePath: Path) -> int:
         # TODO add enum for actions; implement using workflow API
         inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, fileType='NPZ')
