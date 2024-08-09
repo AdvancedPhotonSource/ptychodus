@@ -51,11 +51,11 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.fileBasedWorkflows.registerPlugin(
         APS2IDFileBasedWorkflow(),
-        simpleName='APS2ID',
+        simpleName='APS_2ID',
         displayName='LYNX Catalyst Particle',
     )
     registry.fileBasedWorkflows.registerPlugin(
         APS26IDFileBasedWorkflow(),
-        simpleName='APS26ID',
+        simpleName='APS_26ID',
         displayName='CNM/APS Hard X-Ray Nanoprobe',
     )
