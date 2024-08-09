@@ -16,7 +16,9 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildScan(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildScan(self,
+                  builderName: str | None = None,
+                  builderParameters: Mapping[str, Any] = {}) -> None:
         pass
 
     @abstractmethod
@@ -24,11 +26,9 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildProbe(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
-        pass
-
-    @abstractmethod
-    def buildProbeFromSettings(self) -> None:
+    def buildProbe(self,
+                   builderName: str | None = None,
+                   builderParameters: Mapping[str, Any] = {}) -> None:
         pass
 
     @abstractmethod
@@ -36,15 +36,13 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildObject(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildObject(self,
+                    builderName: str | None = None,
+                    builderParameters: Mapping[str, Any] = {}) -> None:
         pass
 
     @abstractmethod
-    def buildObjectFromSettings(self) -> None:
-        pass
-
-    @abstractmethod
-    def reconstructLocal(self) -> WorkflowProductAPI:
+    def reconstructLocal(self, outputProductName: str) -> WorkflowProductAPI:
         pass
 
     @abstractmethod

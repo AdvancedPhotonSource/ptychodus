@@ -29,8 +29,8 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
         workflowAPI.openPatterns(diffractionFilePath, fileType='NeXus')
         productAPI = workflowAPI.createProduct(f'scan{scanID}')
         productAPI.openScan(filePath, fileType='CSV')
-        productAPI.buildProbe('Disk')
-        productAPI.buildObject('Random')
+        productAPI.buildProbe()
+        productAPI.buildObject()
         productAPI.reconstructRemote()
 
 
@@ -58,8 +58,8 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
         workflowAPI.openPatterns(diffractionFilePath, fileType='HDF5')
         productAPI = workflowAPI.createProduct(f'scan_{scanID}')
         productAPI.openScan(filePath, fileType='MDA')
-        productAPI.buildProbe('Disk')
-        productAPI.buildObject('Random')
+        productAPI.buildProbe()
+        productAPI.buildObject()
         productAPI.reconstructRemote()
 
 
@@ -74,14 +74,13 @@ class APS31IDEMetadata:
     label: str
 
     def __str__(self) -> str:
-        return f'''
-        {self.scan_no=}
-        {self.golden_angle=}
-        {self.encoder_angle=}
-        {self.measurement_id=}
-        {self.subtomo_no=}
-        {self.detector_position=}
-        {self.label=}
+        return f'''scan_no={self.scan_no}
+        golden_angle={self.golden_angle}
+        encoder_angle={self.encoder_angle}
+        measurement_id={self.measurement_id}
+        subtomo_no={self.subtomo_no}
+        detector_position={self.detector_position}
+        label={self.label}
         '''
 
 
@@ -139,13 +138,12 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             workflowAPI.openPatterns(filePath, fileType='LYNX')
             inputProductAPI = workflowAPI.createProduct(productName, comments=str(metadata))
             inputProductAPI.openScan(scanFile, fileType='LYNXOrchestra')
-            inputProductAPI.buildProbe('fresnel_zone_plate')
-            inputProductAPI.buildObject('random')
+            inputProductAPI.buildProbe()
+            inputProductAPI.buildObject()
             # TODO would prefer to write instructions and submit to queue
-            #outputProductAPI = inputProductAPI.reconstructLocal()
-            # TODO also save scan number and scan angle
-            #outputProductAPI.saveProduct(expermentDir / 'ptychodus' / f'{productName}.h5', fileType='HDF5')
-            print(f'Reconstruct {productName}!')
+            outputProductAPI = inputProductAPI.reconstructLocal(f'{productName}_out')
+            outputProductAPI.saveProduct(experimentDir / 'ptychodus' / f'{productName}.h5',
+                                         fileType='HDF5')
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

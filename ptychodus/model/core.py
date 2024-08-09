@@ -109,7 +109,8 @@ class ModelCore:
             self._pluginRegistry.fluorescenceFileWriters)
         self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
                                           self._productCore.productAPI, self._productCore.scanAPI,
-                                          self._productCore.probeAPI, self._productCore.objectAPI)
+                                          self._productCore.probeAPI, self._productCore.objectAPI,
+                                          self._reconstructorCore.reconstructorAPI)
         self._automationCore = AutomationCore(self.settingsRegistry,
                                               self._workflowCore.workflowAPI,
                                               self._pluginRegistry.fileBasedWorkflows)
@@ -226,7 +227,7 @@ class ModelCore:
 
         if action.lower() == 'reconstruct':
             outputProductName = self._productCore.productAPI.getItemName(inputProductIndex)
-            outputProductIndex = self._reconstructorCore.presenter.reconstruct(
+            outputProductIndex = self._reconstructorCore.reconstructorAPI.reconstruct(
                 inputProductIndex, outputProductName)
 
             if outputProductIndex < 0:
@@ -237,9 +238,9 @@ class ModelCore:
                                                      outputFilePath,
                                                      fileType='NPZ')
         elif action.lower() == 'train':
-            self._reconstructorCore.presenter.ingestTrainingData(inputProductIndex)
-            _ = self._reconstructorCore.presenter.train()
-            self._reconstructorCore.presenter.saveModel(outputFilePath)
+            self._reconstructorCore.reconstructorAPI.ingestTrainingData(inputProductIndex)
+            _ = self._reconstructorCore.reconstructorAPI.train()
+            self._reconstructorCore.reconstructorAPI.saveModel(outputFilePath)
         else:
             logger.error(f'Unknown batch mode action \"{action}\"!')
             return -1
