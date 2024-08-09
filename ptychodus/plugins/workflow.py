@@ -151,16 +151,16 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.fileBasedWorkflows.registerPlugin(
         APS2IDFileBasedWorkflow(),
-        simpleName='APS2ID',
+        simpleName='APS_2ID',
         displayName='APS 2-ID',
     )
     registry.fileBasedWorkflows.registerPlugin(
         APS26IDFileBasedWorkflow(),
-        simpleName='APS26ID',
+        simpleName='APS_26ID',
         displayName='APS 26-ID',
     )
     registry.fileBasedWorkflows.registerPlugin(
         APS31IDEFileBasedWorkflow(),
-        simpleName='APS31IDE',
+        simpleName='APS_31IDE',
         displayName='APS 31-ID-E',
     )

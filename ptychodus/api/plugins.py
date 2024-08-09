@@ -130,8 +130,13 @@ class PluginRegistry:
         # import_module to work without having to do additional modification to
         # the name.
         for moduleInfo in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + '.'):
-            logger.info(f'Importing {moduleInfo.name}')
-            module = importlib.import_module(moduleInfo.name)
-            module.registerPlugins(registry)
+            try:
+                module = importlib.import_module(moduleInfo.name)
+            except ModuleNotFoundError as exc:
+                logger.info(f'Skipping {moduleInfo.name}')
+                logger.warning(exc)
+            else:
+                logger.info(f'Registering {moduleInfo.name}')
+                module.registerPlugins(registry)
 
         return registry

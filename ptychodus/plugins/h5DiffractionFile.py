@@ -61,6 +61,8 @@ class H5DiffractionFileTreeBuilder:
         for name, value in attributeManager.items():
             if isinstance(value, str):
                 itemDetails = f'STRING = "{value}"'
+            elif isinstance(value, h5py.Empty):
+                logger.debug(f'Skipping empty attribute {name}.')
             else:
                 stringInfo = h5py.check_string_dtype(value.dtype)
                 itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"' if stringInfo \
