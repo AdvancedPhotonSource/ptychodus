@@ -489,12 +489,12 @@ def registerPlugins(registry: PluginRegistry) -> None:
     )
     registry.scanFileReaders.registerPlugin(
         MDAScanFileReader(),
-        simpleName='2ID',
+        simpleName='APS_2ID',
         displayName='APS 2-ID MDA Files (*.mda)',
     )
     registry.scanFileReaders.registerPlugin(
         HXNScanFileReader(),
-        simpleName='HXN',
+        simpleName='APS_HXN',
         displayName='CNM/APS HXN Scan Files (*.mda)',
     )
 
