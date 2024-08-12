@@ -57,7 +57,7 @@ class PtychoNNPositionPredictionParametersView(QGroupBox):
 
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Position Prediction Parameters', parent)
-        self.reconstructorImagePathLabel = QLabel('Reconstructor Image Path:')
+        self.reconstructedImagePathLabel = QLabel('Reconstructed Image Path:')
         self.reconstructedImagePathLineEdit = QLineEdit()
         self.reconstructedImagePathBrowseButton = QPushButton('Browse')
         self.probePositionListPathLabel = QLabel('Probe Position List Path:')
@@ -106,7 +106,7 @@ class PtychoNNPositionPredictionParametersView(QGroupBox):
         view = cls(parent)
 
         layout = QGridLayout()
-        layout.addWidget(view.reconstructorImagePathLabel, 0, 0)
+        layout.addWidget(view.reconstructedImagePathLabel, 0, 0)
         layout.addWidget(view.reconstructedImagePathLineEdit, 0, 1)
         layout.addWidget(view.reconstructedImagePathBrowseButton, 0, 2)
         layout.addWidget(view.probePositionListPathLabel, 1, 0)

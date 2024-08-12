@@ -35,7 +35,7 @@ def test_position_prediction(generate_gold: bool = False, debug: bool = False) -
     worker = PositionPredictionWorker(settings)
     worker.run()
     
-    predicted_pos = worker.get_predicted_positions()
+    predicted_pos = worker.getPredictedPositions()
     
     if debug:
         worker._corrector.new_probe_positions.plot()

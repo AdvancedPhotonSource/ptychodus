@@ -66,7 +66,7 @@ class PositionPredictionWorker:
         logger.info("Position prediction configs:")
         logger.info(self._configs)
         
-    def get_predicted_positions(self):
+    def getPredictedPositions(self):
         return self.predicted_positions_px
         
     def run(self):
