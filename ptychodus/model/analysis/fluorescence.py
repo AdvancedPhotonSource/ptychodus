@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Final
 import logging
 
-from numpy.typing import ArrayLike
 from scipy.sparse.linalg import gmres, LinearOperator
+import math
 import numpy
 
 from ptychodus.api.fluorescence import (DeconvolutionStrategy, ElementMap, FluorescenceDataset,
@@ -24,27 +24,36 @@ logger = logging.getLogger(__name__)
 
 
 def get_axis_weights_and_indexes(xmin_o: float, dx_o: float, xmin_p: float, dx_p: float,
-                                 n_p: int) -> tuple[Sequence[float], Sequence[int]]:
-    pos: list[float] = []
-    idx: list[int] = []
+                                 N_p: int) -> tuple[Sequence[float], Sequence[int]]:
+    weight: list[float] = []
+    index: list[int] = []
 
-    i_o = int((xmin_p - xmin_o) / dx_o)
-    x_o = xmin_o + i_o + dx_o
+    x_l = xmin_p
+    n_o = math.ceil((x_l - xmin_o) / dx_o)
 
-    for i_p in range(n_p):  # FIXME
-        x_p = xmin_p + i_p * dx_p
+    for n_p in range(N_p):
+        x_p = xmin_p + (n_p + 1) * dx_p
 
-        while x_o < x_p:
-            pos.append(x_o)
-            idx.append(i_o)
+        while True:
+            x_o = xmin_o + n_o + dx_o
 
-            i_o += 1
-            x_o = xmin_o + i_o + dx_o
+            if x_o >= x_p:
+                break
 
-        pos.append(x_p)
-        idx.append(i_o)
+            weight.append((x_o - x_l) / dx_p)
+            index.append(n_o)
 
-    return numpy.diff(pos), idx
+            n_o += 1
+            x_l = x_o
+
+        weight.append((x_p - x_l) / dx_p)
+        index.append(n_o)
+        x_l = x_p
+
+        if x_o == x_p:
+            n_o += 1
+
+    return weight, index
 
 
 class VSPILinearOperator(LinearOperator):
@@ -60,7 +69,7 @@ class VSPILinearOperator(LinearOperator):
         super().__init__(float, (len(product.scan), xrf_nchannels))
         self._product = product
 
-    def matmat(self, X: ArrayLike) -> RealArrayType:
+    def matmat(self, X: RealArrayType) -> RealArrayType:
         AX = numpy.zeros(self.shape, dtype=self.dtype)
 
         probeGeometry = self._product.probe.getGeometry()
@@ -78,21 +87,16 @@ class VSPILinearOperator(LinearOperator):
             xmin_p_m = point.positionXInMeters - probeGeometry.widthInMeters / 2
             ymin_p_m = point.positionYInMeters - probeGeometry.heightInMeters / 2
 
-            wx_m, ix = get_axis_weights_and_indexes(xmin_o_m, dx_o_m, xmin_p_m, dx_p_m,
-                                                    probeGeometry.widthInPixels)
-            wy_m, iy = get_axis_weights_and_indexes(ymin_o_m, dy_o_m, ymin_p_m, dy_p_m,
-                                                    probeGeometry.heightInPixels)
+            wx, ix = get_axis_weights_and_indexes(xmin_o_m, dx_o_m, xmin_p_m, dx_p_m,
+                                                  probeGeometry.widthInPixels)
+            wy, iy = get_axis_weights_and_indexes(ymin_o_m, dy_o_m, ymin_p_m, dy_p_m,
+                                                  probeGeometry.heightInPixels)
 
-            # FIXME BEGIN
             IY, IX = numpy.meshgrid(iy, ix)
-            objectMultiIndex = list(zip(IY.flat, IX.flat))
-
-            w_nz = numpy.outer(wy_m, wx_m) / (dy_p_m * dx_p_m)
-            i_nz = numpy.ravel_multi_index(objectMultiIndex, objectShape)
+            i_nz = numpy.ravel_multi_index(list(zip(IY.flat, IX.flat)), objectShape)
             X_nz = X.take(i_nz, axis=0)
-            # FIXME END
 
-            AX[index, :] = numpy.dot(w_nz.ravel(), X_nz)
+            AX[index, :] = numpy.matmul(numpy.outer(wy, wx).ravel(), X_nz)
 
         return AX
 
