@@ -42,7 +42,7 @@ class ProbeSettings(Observable, Observer):
         self.centralBeamstopDiameterInMeters = self._settingsGroup.createRealEntry(
             'CentralBeamstopDiameterInMeters', '60e-6')
         self.defocusDistanceInMeters = self._settingsGroup.createRealEntry(
-            'DefocusDistanceInMeters', '800e-6')
+            'DefocusDistanceInMeters', '0')
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

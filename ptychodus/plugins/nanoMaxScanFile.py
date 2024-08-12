@@ -29,7 +29,11 @@ class NanoMaxScanFileReader(ScanFileReader):
                     raise ScanPointParseError('Coordinate array shape mismatch!')
 
                 for idx, (x, y) in enumerate(zip(positionX, positionY)):
-                    point = ScanPoint(idx, x, y)
+                    point = ScanPoint(
+                        idx,
+                        x * self.MICRONS_TO_METERS,
+                        y * self.MICRONS_TO_METERS,
+                    )
                     pointList.append(point)
 
         return Scan(pointList)

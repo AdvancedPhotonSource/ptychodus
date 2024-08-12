@@ -33,8 +33,8 @@ class ProbeBuilderFactory(Iterable[str]):
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[], ProbeBuilder]] = {
-            'average_pattern': self._createAveragePatternBuilder,
             'disk': lambda: DiskProbeBuilder(settings),
+            'average_pattern': self._createAveragePatternBuilder,
             'fresnel_zone_plate': self._createFresnelZonePlateBuilder,
             'rectangular': lambda: RectangularProbeBuilder(settings),
             'super_gaussian': lambda: SuperGaussianProbeBuilder(settings),

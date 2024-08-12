@@ -29,7 +29,7 @@ class AnalysisCore:
 
         self._probePropagationSettings = ProbePropagationSettings(settingsRegistry)
         self.probePropagator = ProbePropagator(self._probePropagationSettings, productRepository)
-        self.probePropagatorVisualizationEngine = VisualizationEngine(isComplex=True)
+        self.probePropagatorVisualizationEngine = VisualizationEngine(isComplex=False)
         self.exposureAnalyzer = ExposureAnalyzer(productRepository)
         self.exposureVisualizationEngine = VisualizationEngine(isComplex=False)
         self.fourierRingCorrelator = FourierRingCorrelator(objectRepository)
