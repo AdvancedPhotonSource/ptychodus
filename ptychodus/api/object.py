@@ -120,7 +120,7 @@ class Object:
         expectedLayers = self.numberOfLayers
         actualLayers = len(self._layerDistanceInMeters)
 
-        if actualLayers != expectedLayers:
+        if actualLayers < expectedLayers:
             raise ValueError(f'Expected {expectedLayers} layer distances; got {actualLayers}!')
 
         self._pixelWidthInMeters = pixelWidthInMeters
