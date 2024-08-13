@@ -4,7 +4,7 @@ from ptychodus.api.observer import Observable, Observer
 
 from ...model.analysis import STXMSimulator
 from ...model.visualization import VisualizationEngine
-from ...view.object import STXMDialog
+from ...view.probe import STXMDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..visualization import VisualizationParametersController, VisualizationWidgetController

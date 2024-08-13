@@ -81,6 +81,7 @@ class ObjectRepositoryItem(ParameterRepository):
             return
 
         self._object = object_
+        self.layerDistanceInMeters.setValue(object_.layerDistanceInMeters)
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:

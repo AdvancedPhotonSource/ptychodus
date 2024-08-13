@@ -7,7 +7,7 @@ from ptychodus.api.observer import Observable, Observer
 
 from ...model.analysis import FluorescenceEnhancer
 from ...model.visualization import VisualizationEngine
-from ...view.object import FluorescenceDialog
+from ...view.probe import FluorescenceDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..visualization import VisualizationParametersController, VisualizationWidgetController
@@ -40,6 +40,8 @@ class FluorescenceViewController(Observer):
         self._engine = engine
         self._fileDialogFactory = fileDialogFactory
         self._dialog = FluorescenceDialog()
+        self._enhancementModel = QStringListModel()
+        self._enhancementModel.setStringList(self._enhancer.getEnhancementStrategyList())
         self._upscalingModel = QStringListModel()
         self._upscalingModel.setStringList(self._enhancer.getUpscalingStrategyList())
         self._deconvolutionModel = QStringListModel()
@@ -48,6 +50,11 @@ class FluorescenceViewController(Observer):
 
         self._dialog.fluorescenceParametersView.openButton.clicked.connect(
             self._openMeasuredDataset)
+
+        self._dialog.fluorescenceParametersView.enhancementStrategyComboBox.setModel(
+            self._enhancementModel)
+        self._dialog.fluorescenceParametersView.enhancementStrategyComboBox.textActivated.connect(
+            enhancer.setEnhancementStrategy)
 
         self._dialog.fluorescenceParametersView.upscalingStrategyComboBox.setModel(
             self._upscalingModel)
@@ -127,6 +134,8 @@ class FluorescenceViewController(Observer):
                 ExceptionDialog.showException(title, err)
 
     def _syncModelToView(self) -> None:
+        self._dialog.fluorescenceParametersView.enhancementStrategyComboBox.setCurrentText(
+            self._enhancer.getEnhancementStrategy())
         self._dialog.fluorescenceParametersView.upscalingStrategyComboBox.setCurrentText(
             self._enhancer.getUpscalingStrategy())
         self._dialog.fluorescenceParametersView.deconvolutionStrategyComboBox.setCurrentText(
