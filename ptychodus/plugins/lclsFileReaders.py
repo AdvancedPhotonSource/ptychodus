@@ -66,6 +66,7 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
 
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        metadata = DiffractionMetadata.createNullInstance(filePath)
 
         try:
             with tables.open_file(filePath, mode='r') as h5File:
@@ -83,16 +84,6 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
                         filePath=filePath,
                         dataPath=self._dataPath,
                     )
-
-            with h5py.File(filePath, 'r') as h5File:
-                metadata = DiffractionMetadata.createNullInstance(filePath)
-                contentsTree = self._treeBuilder.build(h5File)
-
-                try:
-                    data = h5File.get_node(self._dataPath)
-                except KeyError:
-                    logger.debug('Unable to find data.')
-                else:
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
@@ -100,6 +91,9 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
                         detectorExtent=ImageExtent(detectorWidth, detectorHeight),
                         filePath=filePath,
                     )
+
+            with h5py.File(filePath, 'r') as h5File:
+                contentsTree = self._treeBuilder.build(h5File)
 
             dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
