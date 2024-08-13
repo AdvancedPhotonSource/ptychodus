@@ -80,8 +80,12 @@ class MATProductFileReader(ProductFileReader):
         except KeyError:
             pass
         else:
-            layer_distance_m = multi_slice_param['z_distance']
-            print(layer_distance_m)  # FIXME
+            try:
+                z_distance = multi_slice_param['z_distance']
+            except KeyError:
+                pass
+            else:
+                layer_distance_m = z_distance.tolist()
 
         object_ = Object(
             self._load_object_array(matDict['object']),
