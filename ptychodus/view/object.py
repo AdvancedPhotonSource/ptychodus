@@ -1,13 +1,11 @@
-from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QListView, QPushButton, QRadioButton, QStatusBar,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QComboBox, QDialog, QFormLayout, QGridLayout, QGroupBox, QLabel,
+                             QPushButton, QStatusBar, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 from .visualization import VisualizationParametersView, VisualizationWidget
-from .widgets import DecimalLineEdit
 
 
 class FourierRingCorrelationDialog(QDialog):
@@ -35,145 +33,6 @@ class FourierRingCorrelationDialog(QDialog):
         layout.addWidget(self.navigationToolbar)
         layout.addWidget(self.figureCanvas)
         layout.addLayout(parametersLayout)
-        self.setLayout(layout)
-
-
-class STXMDialog(QDialog):
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.visualizationWidget = VisualizationWidget.createInstance('Transmission')
-        self.visualizationParametersView = VisualizationParametersView.createInstance()
-        self.saveButton = QPushButton('Save')
-        self.statusBar = QStatusBar()
-
-        parameterLayout = QVBoxLayout()
-        parameterLayout.addWidget(self.visualizationParametersView)
-        parameterLayout.addStretch()
-        parameterLayout.addWidget(self.saveButton)
-
-        contentsLayout = QHBoxLayout()
-        contentsLayout.addWidget(self.visualizationWidget, 1)
-        contentsLayout.addLayout(parameterLayout)
-
-        layout = QVBoxLayout()
-        layout.addLayout(contentsLayout)
-        layout.addWidget(self.statusBar)
-        self.setLayout(layout)
-
-
-class ExposureParametersView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Parameters', parent)
-        self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
-        self.photonFluxLineEdit = DecimalLineEdit.createInstance()
-        self.exposureTimeLineEdit = DecimalLineEdit.createInstance()
-        self.massAttenuationLabel = QLabel('Mass Attenuation [m\u00B2/kg]:')
-        self.massAttenuationLineEdit = DecimalLineEdit.createInstance()
-
-        layout = QFormLayout()
-        layout.addRow(self.quantitativeProbeCheckBox)
-        layout.addRow('Photon Flux [ph/s]:', self.photonFluxLineEdit)
-        layout.addRow('Exposure Time [s]:', self.exposureTimeLineEdit)
-        layout.addRow(self.massAttenuationLabel)
-        layout.addRow(self.massAttenuationLineEdit)
-        self.setLayout(layout)
-
-
-class ExposureQuantityView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Quantity', parent)
-        self.photonCountButton = QRadioButton('Photon Count')
-        self.photonFluxButton = QRadioButton('Photon Flux [Hz]')
-        self.exposureButton = QRadioButton('Exposure [J/m\u00B2]')
-        self.irradianceButton = QRadioButton('Irradiance [W/m\u00B2]')
-        self.doseButton = QRadioButton('Dose [Gy]')
-        self.doseRateButton = QRadioButton('Dose Rate [Gy/s]')
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.photonCountButton)
-        layout.addWidget(self.photonFluxButton)
-        layout.addWidget(self.exposureButton)
-        layout.addWidget(self.irradianceButton)
-        layout.addWidget(self.doseButton)
-        layout.addWidget(self.doseRateButton)
-        self.setLayout(layout)
-
-
-class ExposureDialog(QDialog):
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.visualizationWidget = VisualizationWidget.createInstance('Visualization')
-        self.exposureParametersView = ExposureParametersView()
-        self.exposureQuantityView = ExposureQuantityView()
-        self.visualizationParametersView = VisualizationParametersView.createInstance()
-        self.saveButton = QPushButton('Save')
-        self.statusBar = QStatusBar()
-
-        parameterLayout = QVBoxLayout()
-        parameterLayout.addWidget(self.exposureParametersView)
-        parameterLayout.addWidget(self.exposureQuantityView)
-        parameterLayout.addWidget(self.visualizationParametersView)
-        parameterLayout.addWidget(self.saveButton)
-        parameterLayout.addStretch()
-
-        contentsLayout = QHBoxLayout()
-        contentsLayout.addWidget(self.visualizationWidget, 1)
-        contentsLayout.addLayout(parameterLayout)
-
-        layout = QVBoxLayout()
-        layout.addLayout(contentsLayout)
-        layout.addWidget(self.statusBar)
-        self.setLayout(layout)
-
-
-class FluorescenceParametersView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Parameters', parent)
-        self.openButton = QPushButton('Open')
-        self.upscalingStrategyComboBox = QComboBox()
-        self.deconvolutionStrategyComboBox = QComboBox()
-        self.enhanceButton = QPushButton('Enhance')
-        self.saveButton = QPushButton('Save')
-
-        layout = QFormLayout()
-        layout.addRow('Measured Dataset:', self.openButton)
-        layout.addRow('Upscaling Strategy:', self.upscalingStrategyComboBox)
-        layout.addRow('Deconvolution Strategy:', self.deconvolutionStrategyComboBox)
-        layout.addRow(self.enhanceButton)
-        layout.addRow('Enhanced Dataset:', self.saveButton)
-        self.setLayout(layout)
-
-
-class FluorescenceDialog(QDialog):
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.measuredWidget = VisualizationWidget.createInstance('Measured')
-        self.enhancedWidget = VisualizationWidget.createInstance('Enhanced')
-        self.fluorescenceParametersView = FluorescenceParametersView()
-        self.fluorescenceChannelListView = QListView()
-        self.visualizationParametersView = VisualizationParametersView.createInstance()
-        self.statusBar = QStatusBar()
-
-        parameterLayout = QVBoxLayout()
-        parameterLayout.addWidget(self.fluorescenceParametersView)
-        parameterLayout.addWidget(self.fluorescenceChannelListView, 1)
-        parameterLayout.addWidget(self.visualizationParametersView)
-        parameterLayout.addStretch()
-
-        contentsLayout = QHBoxLayout()
-        contentsLayout.addWidget(self.measuredWidget, 1)
-        contentsLayout.addWidget(self.enhancedWidget, 1)
-        contentsLayout.addLayout(parameterLayout)
-
-        layout = QVBoxLayout()
-        layout.addLayout(contentsLayout)
-        layout.addWidget(self.statusBar)
         self.setLayout(layout)
 
 
