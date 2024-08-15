@@ -262,10 +262,29 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(err)
             ExceptionDialog.showException('PositionPrediction', err)
             return
+        
+        # TODO: get the latest PtychoNN reconstruction product from self._productRepository,
+        # and pass it to posPredController._presenter.runPositionPrediction(). 
+        # reconProduct = self._productRepository[self._view.reconstructorView.productComboBox.currentIndex()]
+        
         # There are 2 PtychoNNParametersController objects in the list. Which one to use?
         ptychoNNController = self._viewControllerFactoryDict['PtychoNN']._controllerList[0]
         posPredController = ptychoNNController._positionPredictionParamtersController
         posPredController._presenter.runPositionPrediction()
+        self._redrawPositionPlot()
+        
+    def _redrawPositionPlot(self) -> None:
+        ptychoNNController = self._viewControllerFactoryDict['PtychoNN']._controllerList[0]
+        posPredController = ptychoNNController._positionPredictionParamtersController
+        pos = posPredController._presenter._worker.getPredictedPositions()
+
+        ax = self._plotView.axes
+        ax.clear()
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.grid(False)
+        ax.plot(pos[:, 1], pos[:, 0], '.-', label='Cost', linewidth=1)
+        self._plotView.figureCanvas.draw()
         
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
         pass

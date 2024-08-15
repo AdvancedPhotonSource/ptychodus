@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from decimal import Decimal
-from typing import Final
+from typing import Final, Optional
 import logging
 
 from ptychodus.api.geometry import Interval
@@ -9,6 +9,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
                                          TrainableReconstructor)
 from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.product.item import ProductRepositoryItem
 
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings, PtychoNNPositionPredictionSettings
 from ...model.ptychonn.position import PositionPredictionWorker
@@ -255,7 +256,8 @@ class PtychoNNPositionPredictionPresenter(Observable, Observer):
         if observable is self._settings:
             self.notifyObservers()
 
-    def runPositionPrediction(self):
+    def runPositionPrediction(self, product: Optional[ProductRepositoryItem] = None) -> None:
+        self._worker.build(product)
         self._worker.run()
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
