@@ -96,6 +96,8 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         reconstructSplitAction.triggered.connect(controller._reconstructSplit)
         reconstructAction = view.reconstructorView.reconstructorMenu.addAction('Reconstruct')
         reconstructAction.triggered.connect(controller._reconstruct)
+        posPredAction = view.reconstructorView.reconstructorMenu.addAction('Calculate positions')
+        posPredAction.triggered.connect(controller._predictPositions)
 
         controller._syncAlgorithmToView()
 
@@ -253,7 +255,18 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._view.reconstructorView.trainerButton.setVisible(isTrainable)
 
         self._redrawPlot()
-
+        
+    def _predictPositions(self) -> None:
+        if self._presenter.getReconstructor().split('/')[0] != 'PtychoNN':
+            err = NotImplementedError('Position Prediction is only available with PtychoNN backend.')
+            logger.exception(err)
+            ExceptionDialog.showException('PositionPrediction', err)
+            return
+        # There are 2 PtychoNNParametersController objects in the list. Which one to use?
+        ptychoNNController = self._viewControllerFactoryDict['PtychoNN']._controllerList[0]
+        posPredController = ptychoNNController._positionPredictionParamtersController
+        posPredController._presenter.runPositionPrediction()
+        
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 

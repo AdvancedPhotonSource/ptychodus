@@ -53,8 +53,6 @@ class PtychoNNPositionPredictionParametersController(Observer):
         )
         view.registrationParametersView.maxShiftLineEdit.textChanged.connect(presenter.setMaxShift)
         
-        view.runButton.clicked.connect(presenter.runPositionPrediction)
-
         controller._syncModelToView()
 
         return controller

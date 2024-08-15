@@ -99,8 +99,6 @@ class PtychoNNPositionPredictionParametersView(QGroupBox):
         self.debugCheckBox = QCheckBox()
         self.registrationParametersView = PtychoNNRegistrationParametersView.createInstance()
         
-        self.runButton = QPushButton('Run')
-
     @classmethod
     def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoNNPositionPredictionParametersView:
         view = cls(parent)
@@ -138,7 +136,6 @@ class PtychoNNPositionPredictionParametersView(QGroupBox):
         layout.addWidget(view.debugLabel, 13, 0)
         layout.addWidget(view.debugCheckBox, 13, 1, 1, 2)
         layout.addWidget(view.registrationParametersView, 14, 0, 1, 3)
-        layout.addWidget(view.runButton, 15, 0)
 
         layout.setColumnStretch(1, 1)
         view.setLayout(layout)
