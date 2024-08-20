@@ -256,9 +256,6 @@ class PtychoNNPositionPredictionPresenter(Observable, Observer):
         if observable is self._settings:
             self.notifyObservers()
 
-    def runPositionPrediction(self, product: Optional[ProductRepositoryItem] = None) -> None:
-        self._worker.build(product)
-        self._worker.run()
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
@@ -300,12 +297,13 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
                                                            enableAmplitude=False)
             phaseOnlyReconstructor = PtychoNNTrainableReconstructor(modelSettings,
                                                                     trainingSettings,
+                                                                    positionPredictionSettings,
                                                                     phaseOnlyModelProvider)
             amplitudePhaseModelProvider = PtychoNNModelProvider(modelSettings,
                                                                 trainingSettings,
                                                                 enableAmplitude=True)
             amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(
-                modelSettings, trainingSettings, amplitudePhaseModelProvider)
+                modelSettings, trainingSettings, positionPredictionSettings, amplitudePhaseModelProvider)
             reconstructors.append(phaseOnlyReconstructor)
             reconstructors.append(amplitudePhaseReconstructor)
 

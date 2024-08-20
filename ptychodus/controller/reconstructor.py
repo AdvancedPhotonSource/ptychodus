@@ -257,33 +257,39 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._redrawPlot()
         
     def _predictPositions(self) -> None:
-        if self._presenter.getReconstructor().split('/')[0] != 'PtychoNN':
-            err = NotImplementedError('Position Prediction is only available with PtychoNN backend.')
+        outputProductName = self._presenter.getReconstructor()
+        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
+
+        # TODO: Ignoring this for now to test position prediction without loading product
+        # if inputProductIndex < 0:
+        #     return
+
+        try:
+            self._presenter.predictPositions(inputProductIndex, outputProductName)
+        except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('PositionPrediction', err)
-            return
-        
-        # TODO: get the latest PtychoNN reconstruction product from self._productRepository,
-        # and pass it to posPredController._presenter.runPositionPrediction(). 
-        # reconProduct = self._productRepository[self._view.reconstructorView.productComboBox.currentIndex()]
-        
-        # There are 2 PtychoNNParametersController objects in the list. Which one to use?
-        ptychoNNController = self._viewControllerFactoryDict['PtychoNN']._controllerList[0]
-        posPredController = ptychoNNController._positionPredictionParamtersController
-        posPredController._presenter.runPositionPrediction()
-        self._redrawPositionPlot()
+            ExceptionDialog.showException('PositionPredictor', err)
         
     def _redrawPositionPlot(self) -> None:
-        ptychoNNController = self._viewControllerFactoryDict['PtychoNN']._controllerList[0]
-        posPredController = ptychoNNController._positionPredictionParamtersController
-        pos = posPredController._presenter._worker.getPredictedPositions()
+        productIndex = self._view.reconstructorView.productComboBox.currentIndex()
+
+        if productIndex < 0:
+            self._plotView.axes.clear()
+            return
+
+        try:
+            item = self._productRepository[productIndex]
+        except IndexError as err:
+            logger.exception(err)
+            return
 
         ax = self._plotView.axes
         ax.clear()
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.grid(False)
-        ax.plot(pos[:, 1], pos[:, 0], '.-', label='Cost', linewidth=1)
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel('Cost')
+        ax.grid(True)
+        # TODO: make this work
+        ax.plot(item.getScan().getPositions(), '.-', label='Cost', linewidth=1.5)
         self._plotView.figureCanvas.draw()
         
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
