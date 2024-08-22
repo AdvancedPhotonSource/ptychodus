@@ -9,7 +9,7 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return 'rPIE'
+        return 'PIE'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         scan_input = parameters.product.scan
@@ -17,7 +17,10 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
         object_input = parameters.product.object_
         object_geometry = object_input.getGeometry()
 
-        detector_data = DetectorData.create_simple(torch.tensor(parameters.patterns))
+        # FIXME rescale probe
+
+        detector_data = DetectorData.create_simple(
+            torch.tensor(parameters.patterns.astype(numpy.int32)))
         positions_px: list[float] = list()
 
         for scan_point in scan_input:
@@ -39,5 +42,5 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
         algorithm = PtychographicIterativeEngine(detector_data, product)
         data_error = algorithm.iterate(plan)
         product = algorithm.get_product()
-        # FIXME ptychopack product -> ptychodus product
+        print(product)  # FIXME ptychopack product -> ptychodus product
         return ReconstructOutput(parameters.product, 0)

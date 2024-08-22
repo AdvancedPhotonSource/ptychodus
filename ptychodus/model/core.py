@@ -31,6 +31,7 @@ from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter
 from .product import (ObjectAPI, ObjectRepository, ProbeAPI, ProbeRepository, ProductAPI,
                       ProductCore, ProductRepository, ScanAPI, ScanRepository)
 from .ptychonn import PtychoNNReconstructorLibrary
+from .ptychopack import PtychoPackReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .tike import TikeReconstructorLibrary
 from .visualization import VisualizationEngine
@@ -88,6 +89,8 @@ class ModelCore:
         self.probeVisualizationEngine = VisualizationEngine(isComplex=True)
         self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
 
+        self.ptychoPackReconstructorLibrary = PtychoPackReconstructorLibrary.createInstance(
+            self.settingsRegistry, isDeveloperModeEnabled)
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
@@ -97,6 +100,7 @@ class ModelCore:
             self._patternsCore.dataset,
             self._productCore.productRepository,
             [
+                self.ptychoPackReconstructorLibrary,
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
             ],

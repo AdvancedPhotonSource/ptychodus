@@ -37,7 +37,7 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
         core = cls(settingsRegistry)
 
         try:
-            from .rpie import PtychographicIterativeEngineReconstructor
+            from .pie import PtychographicIterativeEngineReconstructor
         except ModuleNotFoundError:
             logger.info('PtychoPack not found.')
 
