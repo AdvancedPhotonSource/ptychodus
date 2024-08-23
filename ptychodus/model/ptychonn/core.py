@@ -12,7 +12,6 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.product.item import ProductRepositoryItem
 
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings, PtychoNNPositionPredictionSettings
-from ...model.ptychonn.position import PositionPredictionWorker
 
 logger = logging.getLogger(__name__)
 
@@ -128,47 +127,7 @@ class PtychoNNPositionPredictionPresenter(Observable, Observer):
         self._settings = settings
         self._reconImageFileFilterList: list[str] = ['TIFF images (*.tif *.tiff)']
         self._probePositionFileFilterList: list[str] = ['Probe position files (*.csv)']
-        self._worker = PositionPredictionWorker(settings)
         settings.addObserver(self)
-
-    def getReconstructedImageFileFilterList(self) -> Sequence[str]:
-        return self._reconImageFileFilterList
-
-    def getReconstructorImageFileFilter(self) -> str:
-        return self._reconImageFileFilterList[0]
-    
-    def getProbePositionFileFilterList(self) -> Sequence[str]:
-        return self._probePositionFileFilterList
-    
-    def getReconstructorImageFilePath(self) -> Path:
-        return self._settings.reconstructorImagePath.value
-    
-    def setReconstructedImageFilePath(self, directory: Path) -> None:
-        self._settings.reconstructorImagePath.value = directory
-
-    def getProbePositionListFilePath(self) -> str:
-        return self._settings.probePositionListPath.value
-    
-    def setProbePositionListFilePath(self, directory: Path) -> str:
-        self._settings.probePositionListPath.value = directory
-        
-    def getProbePositionDataUnit(self) -> str:
-        return self._settings.probePositionDataUnit.value
-    
-    def setProbePositionDataUnit(self, unit: str) -> None:
-        self._settings.probePositionDataUnit.value = unit
-        
-    def getPixelSizeNM(self) -> Decimal:
-        return self._settings.pixelSizeNM.value
-    
-    def setPixelSizeNM(self, value: Decimal) -> None:
-        self._settings.pixelSizeNM.value = value
-        
-    def getBaselinePositionListFilePath(self) -> str:
-        return self._settings.baselinePositionListPath.value
-    
-    def setBaselinePositionListFilePath(self, directory: Path) -> str:
-        self._settings.baselinePositionListPath.value = directory
         
     def getCentralCrop(self) -> str:
         return self._settings.centralCrop.value

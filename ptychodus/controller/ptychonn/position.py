@@ -4,7 +4,6 @@ from pathlib import Path
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.ptychonn import PtychoNNPositionPredictionPresenter
-from ...model.ptychonn.position import PositionPredictionWorker
 from ...view.ptychonn import PtychoNNPositionPredictionParametersView
 from ..data import FileDialogFactory
 
@@ -24,14 +23,6 @@ class PtychoNNPositionPredictionParametersController(Observer):
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
         
-        view.reconstructedImagePathLineEdit.editingFinished.connect(controller._syncReconstructedImagePathToModel)
-        view.reconstructedImagePathBrowseButton.clicked.connect(controller._openReconstructedImagePath)
-        view.probePositionListPathLineEdit.editingFinished.connect(controller._syncProbePositionPathToModel)
-        view.probePositionListPathBrowseButton.clicked.connect(controller._openProbePositionPath)
-        view.probePositionDataUnitDropDown.currentTextChanged.connect(presenter.setProbePositionDataUnit)
-        view.pixelSizeNMLineEdit.valueChanged.connect(presenter.setPixelSizeNM)
-        view.baselinePositionListPathLineEdit.editingFinished.connect(controller._syncBaselinePositionPathToModel)
-        view.baselinePositionListBrowseButton.clicked.connect(controller._openBaselinePositionPath)
         view.centralCropLineEdit.textChanged.connect(presenter.setCentralCrop)
         view.methodDropDown.currentTextChanged.connect(presenter.setMethod)
         view.numberNeighborsCollectiveSpinbox.valueChanged.connect(
@@ -57,68 +48,7 @@ class PtychoNNPositionPredictionParametersController(Observer):
 
         return controller
 
-    def _syncReconstructedImagePathToModel(self) -> None:
-        self._presenter.setReconstructedImageFilePath(Path(self._view.reconstructedImagePathLineEdit.text()))
-
-    def _openReconstructedImagePath(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Reconstructed Image',
-            nameFilters=self._presenter.getReconstructedImageFileFilterList(),
-            selectedNameFilter=self._presenter.getReconstructedImageFileFilterList()[0])
-
-        if filePath:
-            self._presenter.setReconstructedImageFilePath(filePath)
-            
-    def _syncProbePositionPathToModel(self) -> None:
-        self._presenter.setProbePositionListFilePath(Path(self._view.probePositionListPathLineEdit.text()))
-            
-    def _openProbePositionPath(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Probe Position File',
-            nameFilters=self._presenter.getProbePositionFileFilterList(),
-            selectedNameFilter=self._presenter.getProbePositionFileFilterList()[0])
-
-        if filePath:
-            self._presenter.setProbePositionListFilePath(filePath)
-            
-    def _syncBaselinePositionPathToModel(self) -> None:
-        self._presenter.setBaselinePositionListFilePath(Path(self._view.baselinePositionListPathLineEdit.text()))
-            
-    def _openBaselinePositionPath(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Probe Position File',
-            nameFilters=self._presenter.getProbePositionFileFilterList(),
-            selectedNameFilter=self._presenter.getProbePositionFileFilterList()[0])
-
-        if filePath:
-            self._presenter.setBaselinePositionListFilePath(filePath)
-
     def _syncModelToView(self) -> None:
-        reconImagePath = self._presenter.getReconstructorImageFilePath()
-        if reconImagePath:
-            self._view.reconstructedImagePathLineEdit.setText(str(reconImagePath))
-        else:
-            self._view.reconstructedImagePathLineEdit.clear()
-
-        probePosPath = self._presenter.getProbePositionListFilePath()
-        if probePosPath:
-            self._view.probePositionListPathLineEdit.setText(str(probePosPath))
-        else:
-            self._view.probePositionListPathLineEdit.clear()
-        
-        self._view.probePositionDataUnitDropDown.setCurrentText(str(self._presenter.getProbePositionDataUnit()))
-        
-        self._view.pixelSizeNMLineEdit.setValue(self._presenter.getPixelSizeNM())
-        
-        baselinePosPath = self._presenter.getBaselinePositionListFilePath()
-        if baselinePosPath:
-            self._view.baselinePositionListPathLineEdit.setText(str(baselinePosPath))
-        else:
-            self._view.baselinePositionListPathLineEdit.clear()
-        
         self._view.centralCropLineEdit.setText(str(self._presenter.getCentralCrop()))
         self._view.methodDropDown.setCurrentText(str(self._presenter.getMethod()))
         

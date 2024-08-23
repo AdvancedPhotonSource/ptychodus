@@ -39,6 +39,7 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         w10 = xiC * eta
         w11 = xi * eta
 
+        # TODO: handle out-of-range slices
         patch = w00 * self._object.array[:, iySlice0, ixSlice0]
         patch += w01 * self._object.array[:, iySlice0, ixSlice1]
         patch += w10 * self._object.array[:, iySlice1, ixSlice0]

@@ -1,11 +1,15 @@
 from importlib.metadata import version
 import logging
-from typing import Optional
+from typing import Optional, Literal
 import copy
 
 from ptychodus.model.product.item import ProductRepositoryItem
 from ptychodus.api.scan import Scan
 from ptychodus.api.object import Object
+from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.geometry import ImageExtent
+from ..analysis import ObjectLinearInterpolator
+from .buffers import ObjectPatchCircularBuffer, PatternCircularBuffer
 from .settings import PtychoNNPositionPredictionSettings
 
 import ptychonn.position
@@ -15,11 +19,16 @@ logger = logging.getLogger(__name__)
 
 class PositionPredictionWorker:
 
-    def __init__(self, positionPredictionSettings: PtychoNNPositionPredictionSettings) -> None:
+    def __init__(self, 
+                 positionPredictionSettings: PtychoNNPositionPredictionSettings, 
+                 reconInput: ReconstructInput,
+                 ) -> None:
         self._settings = positionPredictionSettings
+        self._reconInput = reconInput
         self._configs = None
         self._corrector = None
-        self.predicted_positions_px = None
+        self._objPatches = None
+        self.predictedPositionsPx = None
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -28,20 +37,35 @@ class PositionPredictionWorker:
     def name(self) -> str:
         return 'PositionPredictor'
     
+    def getPixelSizeInMetersFromReconstructInput(self):
+        obj = self._reconInput.product.object_
+        return (obj.pixelHeightInMeters + obj.pixelWidthInMeters) / 2.0
+    
+    def getProbePositionsFromReconstructInput(self):
+        scanObj = self._reconInput.product.scan
+        psizeM = self.getPixelSizeInMetersFromReconstructInput()
+        scanArr = np.array([[scanObj[i].positionYInMeters, scanObj[i].positionXInMeters] for i in range(len(scanObj))])
+        scanArr = scanArr / psizeM
+        probePos = ptychonn.position.ProbePositionList(position_list=scanArr, unit='pixel')
+        return probePos
+    
+    def generateObjectPatches(self) -> None:
+        interpolator = ObjectLinearInterpolator(self._reconInput.product.object_)
+
+        patternExtent = self._reconInput.product.probe.getExtent()
+        maximumSize = max(1, len(self._reconInput.product.scan))
+        objectPatchBuffer = np.zeros([maximumSize, patternExtent.heightInPixels, patternExtent.widthInPixels])
+
+        for i, scanPoint in enumerate(self._reconInput.product.scan):
+            objectPatch = interpolator.getPatch(scanPoint, patternExtent)
+            # For now we take phase only
+            objectPatchArr = np.angle(objectPatch.array[0])
+            objectPatchBuffer[i] = objectPatchArr
+        self._objPatches = objectPatchBuffer
+    
     def createConfigs(self):
-        if str(self._settings.probePositionListPath.value) != '.':
-            probePositions = ptychonn.position.ProbePositionList(file_path=self._settings.probePositionListPath.value,
-                                                                 unit=self._settings.probePositionDataUnit.value,
-                                                                 psize_nm=float(self._settings.pixelSizeNM.value))
-        else:
-            probePositions = None
-        
-        if str(self._settings.baselinePositionListPath.value) != '.':
-            baselinePositions = ptychonn.position.ProbePositionList(file_path=self._settings.baselinePositionListPath.value,
-                                                                    unit=self._settings.probePositionDataUnit.value,
-                                                                    psize_nm=float(self._settings.pixelSizeNM.value))
-        else:
-            baselinePositions = None
+        initialProbePositions = self.getProbePositionsFromReconstructInput()
+        baselineProbePositions = self.getProbePositionsFromReconstructInput()
         
         if int(self._settings.centralCrop.value) == 0:
             centralCrop = None
@@ -56,11 +80,10 @@ class PositionPredictionWorker:
         )
             
         self._configs = ptychonn.position.InferenceConfig(
-            reconstruction_image_path=self._settings.reconstructorImagePath.value,
-            probe_position_list=probePositions,
-            probe_position_data_unit=self._settings.probePositionDataUnit.value,
-            pixel_size_nm=float(self._settings.pixelSizeNM.value),
-            baseline_position_list=baselinePositions,
+            reconstruction_images=self._objPatches,
+            probe_position_list=initialProbePositions,
+            pixel_size_nm=self.getPixelSizeInMetersFromReconstructInput() * 1e9,
+            baseline_position_list=baselineProbePositions,
             central_crop=centralCrop,
             method=self._settings.method.value,
             num_neighbors_collective=int(self._settings.numberNeighborsCollective.value),
@@ -76,45 +99,34 @@ class PositionPredictionWorker:
         logger.info("Position prediction configs:")
         logger.info(self._configs)
         
-    def getPredictedPositions(self):
-        return self.predicted_positions_px
+    def getPredictedPositions(self, unit: Literal['pixel', 'm', 'nm'] = 'pixels') -> np.ndarray:
+        """Get the predicted positions as a Numpy array. Returns a 2D array of shape (N, 2),
+        each row of which is the (y, x) position in the unit specified. Note that the
+        y position comes first, which follows the row-major order.
+
+        :param unit: str. The unit in which the positions should be returned.
+        :return: ndarray
+        """
+        if unit == 'pixel':
+            return self.predictedPositionsPx
+        else:
+            conversionFactorDict = {'m': 1e-9, 'nm': 1.0}
+            assert unit in conversionFactorDict.keys()
+            return self.predictedPositionsPx * self._configs.pixel_size_nm * conversionFactorDict[unit]
     
     def scanObjToArray(self, scan: Scan):
         arr = [[scan._pointSeq[i].positionYInMeters, scan._pointSeq[i].positionXInMeters] 
                for i in range(len(scan))]
         return np.array(arr)
     
-    def updateConfigsWithReconstructionProduct(self, product: ProductRepositoryItem) -> None:
-        # TODO: update reconstructed images and initial probe positions using data in product
-        
-        psizeNM = product.getObject().getObject().getPixelGeometry().widthInMeters * 1e9
-        self._configs.pixel_size_nm = psizeNM
-        
-        probePositions = ptychonn.position.ProbePositionList(
-            position_list=self.scanObjToArray(product.getScan().getScan()),
-            unit='m',
-            psize_nm=psizeNM
-        )
-        self._configs.probe_position_list = probePositions
-        self._configs.baseline_position_list = copy.deepcopy(probePositions)
-        self._configs.probe_position_data_unit = 'm'
-        
-        # Update values in settings object
-        self._settings.pixelSizeNM.value = str(psizeNM)
-        self._settings.probePositionDataUnit.value = 'm'
-        self._settings.reconstructorImagePath.value = 'readFromProduct'
-        self._settings.probePositionListPath.value = 'readFromProduct'
-        self._settings.baselinePositionListPath.value = 'readFromProduct'
-    
-    def build(self, product: Optional[ProductRepositoryItem] = None) -> None:
+    def build(self) -> None:
+        self.generateObjectPatches()
         self.createConfigs()
-        if product is not None:
-            self.updateConfigsWithReconstructionProduct(product)
         
     def run(self) -> None:
         self._corrector = ptychonn.position.core.PtychoNNProbePositionCorrector(self._configs)
         self._corrector.build()
         self._corrector.run()
         
-        self.predicted_positions_px = self._corrector.new_probe_positions.array
+        self.predictedPositionsPx = self._corrector.new_probe_positions.array
         return

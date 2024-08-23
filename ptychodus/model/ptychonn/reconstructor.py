@@ -10,6 +10,7 @@ import ptychonn
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.product import Product
+from ptychodus.api.scan import Scan, ScanPoint
 from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
                                          TrainableReconstructor, TrainOutput)
 
@@ -211,7 +212,19 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         self._modelProvider.saveModel(filePath)
         
     def predictPositions(self, parameters: ReconstructInput) -> ReconstructOutput:
-        worker = PositionPredictionWorker(self._positionPredictionSettings)
-        # worker.build(parameters)
+        worker = PositionPredictionWorker(self._positionPredictionSettings, parameters)
         worker.build()
         worker.run()
+        
+        newPos = worker.getPredictedPositions(unit='m')
+        newPos = [ScanPoint(index=i, positionXInMeters=x, positionYInMeters=y) for i, (y, x) in enumerate(newPos)]
+        newPos = Scan(newPos)
+        
+        product = Product(
+            metadata=parameters.product.metadata,
+            scan=newPos,
+            probe=parameters.product.probe,
+            object_=parameters.product.object_,
+            costs=list(),
+        )
+        return ReconstructOutput(product, 0)

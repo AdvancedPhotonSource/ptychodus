@@ -79,10 +79,8 @@ class ReconstructorPresenter(Observable, Observer):
                               outputProductName: str,
                               indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> int:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
-        # TODO: Skipping this for now to test position prediction without loading product
-        parameters = None
-        # parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-        #     inputProductIndex, indexFilter)
+        parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
+            inputProductIndex, indexFilter)
         
         if not isinstance(reconstructor, TrainableReconstructor):
             logger.warning(f'Reconstructor {reconstructor.name} does not support position prediction.')

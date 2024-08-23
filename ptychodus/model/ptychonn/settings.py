@@ -52,20 +52,10 @@ class PtychoNNPositionPredictionSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('PtychoNNPositionPrediction')
         self._settingsGroup.addObserver(self)
 
-        self.reconstructorImagePath = self._settingsGroup.createPathEntry(
-            'Reconstructor Image Path', Path(''))
-        self.probePositionListPath = self._settingsGroup.createPathEntry(
-            'Probe Position List Path', Path(''))
-        self.probePositionDataUnit = self._settingsGroup.createStringEntry(
-            'Probe Position Data Unit', 'nm')
-        self.pixelSizeNM = self._settingsGroup.createRealEntry(
-            'Pixel Size NM', '1.0')
-        self.baselinePositionListPath = self._settingsGroup.createPathEntry(
-            'Baseline Position List', Path(''))
         self.centralCrop = self._settingsGroup.createIntegerEntry(
             'Central Crop', 0)
         self.method = self._settingsGroup.createStringEntry(
-            'Method', 'serial')
+            'Method', 'collective')
         self.numberNeighborsCollective = self._settingsGroup.createIntegerEntry(
             'Number of Neighbors Collective', 4)
         self.offsetEstimatorOrder = self._settingsGroup.createIntegerEntry(

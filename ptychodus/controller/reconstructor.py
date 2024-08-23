@@ -270,28 +270,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(err)
             ExceptionDialog.showException('PositionPredictor', err)
         
-    def _redrawPositionPlot(self) -> None:
-        productIndex = self._view.reconstructorView.productComboBox.currentIndex()
-
-        if productIndex < 0:
-            self._plotView.axes.clear()
-            return
-
-        try:
-            item = self._productRepository[productIndex]
-        except IndexError as err:
-            logger.exception(err)
-            return
-
-        ax = self._plotView.axes
-        ax.clear()
-        ax.set_xlabel('Iteration')
-        ax.set_ylabel('Cost')
-        ax.grid(True)
-        # TODO: make this work
-        ax.plot(item.getScan().getPositions(), '.-', label='Cost', linewidth=1.5)
-        self._plotView.figureCanvas.draw()
-        
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
