@@ -26,7 +26,7 @@ class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
 
     def on_created_or_modified(self, event: watchdog.events.FileSystemEvent) -> None:
         if not event.is_directory:
-            srcPath = Path(event.src_path)
+            srcPath = Path(str(event.src_path))
 
             if srcPath.match(self._workflow.getWatchFilePattern()):
                 self._datasetBuffer.put(srcPath)
@@ -62,7 +62,7 @@ class DataDirectoryWatcher(Observable, Observer):
         if dataDirectory.exists():
             observedWatch = self._observer.schedule(
                 event_handler=DataDirectoryEventHandler(self._workflow, self._datasetBuffer),
-                path=dataDirectory,
+                path=str(dataDirectory),
                 recursive=self._workflow.isWatchRecursive,
             )
             logger.debug(observedWatch)
