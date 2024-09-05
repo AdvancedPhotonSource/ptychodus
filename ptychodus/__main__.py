@@ -103,7 +103,7 @@ def main() -> int:
         view = ViewCore.createInstance(parsedArgs.dev)
 
         from ptychodus.controller import ControllerCore
-        controller = ControllerCore.createInstance(model, view)
+        controller = ControllerCore(model, view)
         controller.showMainWindow(versionString())
 
         return app.exec()

@@ -48,7 +48,7 @@ class ActiveDiffractionDatasetBuilder:
                 logger.exception('Error while assembling array!')
 
     def _assemble(self, array: DiffractionPatternArray) -> None:
-        logger.debug(f'Assembling {array.getLabel()}...')
+        logger.info(f'Assembling {array.getLabel()}...')
 
         try:
             data = array.getData()

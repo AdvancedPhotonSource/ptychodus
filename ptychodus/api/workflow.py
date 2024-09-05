@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from pathlib import Path
@@ -15,7 +16,9 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildScan(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildScan(self,
+                  builderName: str | None = None,
+                  builderParameters: Mapping[str, Any] = {}) -> None:
         pass
 
     @abstractmethod
@@ -23,11 +26,9 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildProbe(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
-        pass
-
-    @abstractmethod
-    def buildProbeFromSettings(self) -> None:
+    def buildProbe(self,
+                   builderName: str | None = None,
+                   builderParameters: Mapping[str, Any] = {}) -> None:
         pass
 
     @abstractmethod
@@ -35,15 +36,17 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildObject(self, builderName: str, builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildObject(self,
+                    builderName: str | None = None,
+                    builderParameters: Mapping[str, Any] = {}) -> None:
         pass
 
     @abstractmethod
-    def buildObjectFromSettings(self) -> None:
+    def reconstructLocal(self, outputProductName: str) -> WorkflowProductAPI:
         pass
 
     @abstractmethod
-    def reconstruct(self) -> None:
+    def reconstructRemote(self) -> None:
         pass
 
     @abstractmethod
@@ -103,8 +106,14 @@ class WorkflowAPI(ABC):
 
 class FileBasedWorkflow(ABC):
 
+    @property
     @abstractmethod
-    def getFilePattern(self) -> str:
+    def isWatchRecursive(self) -> bool:
+        '''indicates whether the data directory must be watched recursively'''
+        pass
+
+    @abstractmethod
+    def getWatchFilePattern(self) -> str:
         '''UNIX-style filename pattern. For rules see fnmatch from Python standard library.'''
         pass
 

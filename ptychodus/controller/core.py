@@ -26,8 +26,7 @@ class ControllerCore:
     def __init__(self, model: ModelCore, view: ViewCore) -> None:
         self.view = view
 
-        self._memoryController = MemoryController.createInstance(model.memoryPresenter,
-                                                                 view.memoryProgressBar)
+        self._memoryController = MemoryController(model.memoryPresenter, view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
             model.ptychonnReconstructorLibrary, self._fileDialogFactory)
@@ -85,26 +84,14 @@ class ControllerCore:
         self._automationController = AutomationController.createInstance(
             model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
             view.automationView, self._fileDialogFactory)
-        self._refreshDataTimer = QTimer()
-        self._automationTimer = QTimer()
-        self._processMessagesTimer = QTimer()
 
-    @classmethod
-    def createInstance(cls, model: ModelCore, view: ViewCore) -> ControllerCore:
-        controller = cls(model, view)
+        self._refreshDataTimer = QTimer()
+        self._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
+        self._refreshDataTimer.start(1000)  # TODO make configurable
 
         view.navigationActionGroup.triggered.connect(
-            lambda action: controller.swapCentralWidgets(action))
-
+            lambda action: self.swapCentralWidgets(action))
         view.workflowAction.setVisible(model.areWorkflowsSupported)
-
-        controller._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
-        controller._refreshDataTimer.start(1000)  # TODO make configurable
-
-        controller._automationTimer.timeout.connect(model.refreshAutomationDatasets)
-        controller._automationTimer.start(1000)  # TODO make configurable
-
-        return controller
 
     def showMainWindow(self, windowTitle: str) -> None:
         self.view.setWindowTitle(windowTitle)
