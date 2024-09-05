@@ -155,7 +155,8 @@ class AutomationController(Observer):
         self._processingPresenter = processingPresenter
         self._listModel = AutomationProcessingListModel(processingPresenter)
         self._view = view
-        self._timer = QTimer()
+        self._executeWaitingTasksTimer = QTimer()
+        self._automationTimer = QTimer()
 
     @classmethod
     def createInstance(cls, core: AutomationCore, presenter: AutomationPresenter,
@@ -174,8 +175,12 @@ class AutomationController(Observer):
         view.clearButton.clicked.connect(presenter.clearDatasetRepository)
 
         controller._syncModelToView()
-        controller._timer.timeout.connect(core.executeWaitingTasks)
-        controller._timer.start(60 * 1000)  # TODO customize (in milliseconds)
+
+        controller._executeWaitingTasksTimer.timeout.connect(core.executeWaitingTasks)
+        controller._executeWaitingTasksTimer.start(60 * 1000)  # TODO customize (in milliseconds)
+
+        controller._automationTimer.timeout.connect(core.refreshDatasetRepository)
+        controller._automationTimer.start(10 * 1000)  # TODO customize (in milliseconds)
 
         return controller
 

@@ -46,13 +46,8 @@ class DiffractionDatasetPresenter(Observable, Observer):
         self._settings = settings
         self._dataset = dataset
 
-    @classmethod
-    def createInstance(cls, settings: PatternSettings,
-                       dataset: ActiveDiffractionDataset) -> DiffractionDatasetPresenter:
-        presenter = cls(settings, dataset)
-        settings.addObserver(presenter)
-        dataset.addObserver(presenter)
-        return presenter
+        settings.addObserver(self)
+        dataset.addObserver(self)
 
     def __iter__(self) -> Iterator[DiffractionPatternArrayPresenter]:
         for array in self._dataset:
@@ -162,9 +157,8 @@ class PatternsCore:
         self.metadataPresenter = DiffractionMetadataPresenter(self.dataset, self.detector,
                                                               self.patternSettings,
                                                               self.productSettings)
-        self.datasetPresenter = DiffractionDatasetPresenter.createInstance(
-            self.patternSettings, self.dataset)
-        self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter.createInstance(
+        self.datasetPresenter = DiffractionDatasetPresenter(self.patternSettings, self.dataset)
+        self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter(
             self.patternSettings, self.dataset, self.patternsAPI, settingsRegistry)
 
     def start(self) -> None:

@@ -1,14 +1,13 @@
 from collections.abc import Sequence
 from pathlib import Path
 import logging
-import time
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.reconstructor import Reconstructor, TrainableReconstructor, TrainOutput
 
-from ..product import ProductRepository
-from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
+from .api import ReconstructorAPI
+from .matcher import ScanIndexFilter
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
@@ -17,17 +16,15 @@ logger = logging.getLogger(__name__)
 class ReconstructorPresenter(Observable, Observer):
 
     def __init__(self, settings: ReconstructorSettings,
-                 dataMatcher: DiffractionPatternPositionMatcher,
-                 productRepository: ProductRepository,
                  reconstructorChooser: PluginChooser[Reconstructor],
-                 reinitObservable: Observable) -> None:
+                 reconstructorAPI: ReconstructorAPI, reinitObservable: Observable) -> None:
         super().__init__()
         self._settings = settings
-        self._dataMatcher = dataMatcher
-        self._productRepository = productRepository
         self._reconstructorChooser = reconstructorChooser
+        self._reconstructorAPI = reconstructorAPI
         self._reinitObservable = reinitObservable
 
+        reconstructorChooser.addObserver(self)
         reinitObservable.addObserver(self)
         self._syncFromSettings()
 
@@ -39,41 +36,22 @@ class ReconstructorPresenter(Observable, Observer):
 
     def setReconstructor(self, name: str) -> None:
         self._reconstructorChooser.setCurrentPluginByName(name)
-        self._settings.algorithm.value = self._reconstructorChooser.currentPlugin.simpleName
-        self.notifyObservers()
 
     def _syncFromSettings(self) -> None:
         self.setReconstructor(self._settings.algorithm.value)
+
+    def _syncToSettings(self) -> None:
+        self._settings.algorithm.value = self._reconstructorChooser.currentPlugin.simpleName
 
     def reconstruct(self,
                     inputProductIndex: int,
                     outputProductName: str,
                     indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> int:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-        parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            inputProductIndex, indexFilter)
-
-        tic = time.perf_counter()
-        result = reconstructor.reconstruct(parameters)
-        toc = time.perf_counter()
-        logger.info(f'Reconstruction time {toc - tic:.4f} seconds. (code={result.result})')
-
-        outputProductIndex = self._productRepository.insertProduct(result.product)
-        return outputProductIndex
+        return self._reconstructorAPI.reconstruct(inputProductIndex, outputProductName,
+                                                  indexFilter)
 
     def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
-        outputProductIndexOdd = self.reconstruct(
-            inputProductIndex,
-            f'{outputProductName} - Odd',
-            ScanIndexFilter.ODD,
-        )
-        outputProductIndexEven = self.reconstruct(
-            inputProductIndex,
-            f'{outputProductName} - Even',
-            ScanIndexFilter.EVEN,
-        )
-
-        return outputProductIndexOdd, outputProductIndexEven
+        return self._reconstructorAPI.reconstructSplit(inputProductIndex, outputProductName)
 
     @property
     def isTrainable(self) -> bool:
@@ -81,23 +59,7 @@ class ReconstructorPresenter(Observable, Observer):
         return isinstance(reconstructor, TrainableReconstructor)
 
     def ingestTrainingData(self, inputProductIndex: int) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Preparing input data...')
-            tic = time.perf_counter()
-            parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-                inputProductIndex, ScanIndexFilter.ALL)
-            toc = time.perf_counter()
-            logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
-
-            logger.info('Ingesting...')
-            tic = time.perf_counter()
-            reconstructor.ingestTrainingData(parameters)
-            toc = time.perf_counter()
-            logger.info(f'Ingest time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')
+        return self._reconstructorAPI.ingestTrainingData(inputProductIndex)
 
     def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
@@ -120,16 +82,7 @@ class ReconstructorPresenter(Observable, Observer):
         return str()
 
     def openTrainingData(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Opening training data...')
-            tic = time.perf_counter()
-            reconstructor.openTrainingData(filePath)
-            toc = time.perf_counter()
-            logger.info(f'Open time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')
+        return self._reconstructorAPI.openTrainingData(filePath)
 
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
@@ -152,43 +105,13 @@ class ReconstructorPresenter(Observable, Observer):
         return str()
 
     def saveTrainingData(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Saving training data...')
-            tic = time.perf_counter()
-            reconstructor.saveTrainingData(filePath)
-            toc = time.perf_counter()
-            logger.info(f'Save time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')
+        return self._reconstructorAPI.saveTrainingData(filePath)
 
     def train(self) -> TrainOutput:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-        result = TrainOutput([], [], -1)
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Training...')
-            tic = time.perf_counter()
-            result = reconstructor.train()
-            toc = time.perf_counter()
-            logger.info(f'Training time {toc - tic:.4f} seconds. (code={result.result})')
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return result
+        return self._reconstructorAPI.train()
 
     def clearTrainingData(self) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Resetting...')
-            tic = time.perf_counter()
-            reconstructor.clearTrainingData()
-            toc = time.perf_counter()
-            logger.info(f'Reset time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')
+        self._reconstructorAPI.clearTrainingData()
 
     def getOpenModelFileFilterList(self) -> Sequence[str]:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
@@ -211,16 +134,7 @@ class ReconstructorPresenter(Observable, Observer):
         return str()
 
     def openModel(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Opening model...')
-            tic = time.perf_counter()
-            reconstructor.openModel(filePath)
-            toc = time.perf_counter()
-            logger.info(f'Open time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')
+        return self._reconstructorAPI.openModel(filePath)
 
     def getSaveModelFileFilterList(self) -> Sequence[str]:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
@@ -243,17 +157,11 @@ class ReconstructorPresenter(Observable, Observer):
         return str()
 
     def saveModel(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Saving model...')
-            tic = time.perf_counter()
-            reconstructor.saveModel(filePath)
-            toc = time.perf_counter()
-            logger.info(f'Save time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')
+        return self._reconstructorAPI.saveModel(filePath)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._reinitObservable:
+        if observable is self._reconstructorChooser:
+            self._syncToSettings()
+            self.notifyObservers()
+        elif observable is self._reinitObservable:
             self._syncFromSettings()

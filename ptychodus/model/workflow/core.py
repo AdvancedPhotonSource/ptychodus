@@ -13,6 +13,7 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import PatternsAPI
 from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
+from ..reconstructor import ReconstructorAPI
 from .api import ConcreteWorkflowAPI
 from .authorizer import WorkflowAuthorizer
 from .executor import WorkflowExecutor
@@ -188,7 +189,7 @@ class WorkflowCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry, patternsAPI: PatternsAPI,
                  productAPI: ProductAPI, scanAPI: ScanAPI, probeAPI: ProbeAPI,
-                 objectAPI: ObjectAPI) -> None:
+                 objectAPI: ObjectAPI, reconstructorAPI: ReconstructorAPI) -> None:
         self._settings = WorkflowSettings(settingsRegistry)
         self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Input')
         self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group,
@@ -201,7 +202,8 @@ class WorkflowCore:
                                           self._computeDataLocator, self._outputDataLocator,
                                           settingsRegistry, patternsAPI, productAPI)
         self.workflowAPI = ConcreteWorkflowAPI(settingsRegistry, patternsAPI, productAPI, scanAPI,
-                                               probeAPI, objectAPI, self._executor)
+                                               probeAPI, objectAPI, reconstructorAPI,
+                                               self._executor)
         self._thread: threading.Thread | None = None
 
         try:

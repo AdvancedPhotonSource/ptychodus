@@ -29,9 +29,14 @@ class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
         self._workflowChooser.setCurrentPluginByName(name)
         self._settings.strategy.value = self._workflowChooser.currentPlugin.simpleName
 
-    def getFilePattern(self) -> str:
+    @property
+    def isWatchRecursive(self) -> bool:
         workflow = self._workflowChooser.currentPlugin.strategy
-        return workflow.getFilePattern()
+        return workflow.isWatchRecursive
+
+    def getWatchFilePattern(self) -> str:
+        workflow = self._workflowChooser.currentPlugin.strategy
+        return workflow.getWatchFilePattern()
 
     def execute(self, api: WorkflowAPI, filePath: Path) -> None:
         workflow = self._workflowChooser.currentPlugin.strategy

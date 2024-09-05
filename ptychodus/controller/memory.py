@@ -8,23 +8,14 @@ from ..model.memory import MemoryPresenter
 
 class MemoryController:
 
-    def __init__(self, presenter: MemoryPresenter, progressBar: QProgressBar,
-                 timer: QTimer) -> None:
+    def __init__(self, presenter: MemoryPresenter, progressBar: QProgressBar) -> None:
         self._presenter = presenter
         self._progressBar = progressBar
-        self._timer = timer
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._updateProgressBar)
 
-    @classmethod
-    def createInstance(cls, presenter: MemoryPresenter,
-                       progressBar: QProgressBar) -> MemoryController:
-        timer = QTimer()
-        controller = cls(presenter, progressBar, timer)
-        controller._updateProgressBar()
-
-        timer.timeout.connect(controller._updateProgressBar)
-        timer.start(10 * 1000)  # TODO customize (in milliseconds)
-
-        return controller
+        self._updateProgressBar()
+        self._timer.start(10 * 1000)  # TODO customize (in milliseconds)
 
     def _updateProgressBar(self) -> None:
         stats = self._presenter.getStatistics()

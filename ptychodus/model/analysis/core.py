@@ -39,7 +39,8 @@ class AnalysisCore:
                                                          upscalingStrategyChooser,
                                                          deconvolutionStrategyChooser,
                                                          fluorescenceFileReaderChooser,
-                                                         fluorescenceFileWriterChooser)
+                                                         fluorescenceFileWriterChooser,
+                                                         settingsRegistry)
         self.fluorescenceVisualizationEngine = VisualizationEngine(isComplex=False)
         self.xmcdAnalyzer = XMCDAnalyzer(objectRepository)
         self.xmcdVisualizationEngine = VisualizationEngine(isComplex=False)
