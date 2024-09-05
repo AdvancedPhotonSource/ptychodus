@@ -13,7 +13,8 @@ from ptycho.loader import PtychoDataContainer
 
 from ptychodus.api.geometry import Point2D
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput, TrainableReconstructor, TrainOutput)
+from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
+                                         TrainableReconstructor, TrainOutput)
 
 from ..analysis import ObjectStitcher
 from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
@@ -87,11 +88,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         stitcher = ObjectStitcher(parameters.product.object_.getGeometry())
 
         for scanPoint, patchArray in zip(parameters.product.scan, objectPatches):
-            patchCenter = Point2D(
-                x=scanPoint.positionXInMeters,
-                y=scanPoint.positionYInMeters,
-            )
-            stitcher.addPatch(patchCenter, patchArray)
+            stitcher.addPatch(scanPoint, patchArray)
 
         product = Product(
             metadata=parameters.product.metadata,
@@ -105,6 +102,15 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         self._trainingData = parameters
+
+    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
+        return self._trainingDataFileFilterList
+
+    def getOpenTrainingDataFileFilter(self) -> str:
+        return self._trainingDataFileFilterList[0]
+
+    def openTrainingData(self, filePath: Path) -> None:
+        raise NotImplementedError(f'Open training data from \"{filePath}\"')  # FIXME
 
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         return self._trainingDataFileFilterList
@@ -136,6 +142,15 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def clearTrainingData(self) -> None:
         self._trainingData = None
+
+    def getOpenModelFileFilterList(self) -> Sequence[str]:
+        return self._modelFileFilterList
+
+    def getOpenModelFileFilter(self) -> str:
+        return self._modelFileFilterList[0]
+
+    def openModel(self, filePath: Path) -> None:
+        raise NotImplementedError(f'Open model to \"{filePath}\"')  # FIXME
 
     def getSaveModelFileFilterList(self) -> Sequence[str]:
         return self._modelFileFilterList
