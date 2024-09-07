@@ -18,17 +18,12 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         scan_input = parameters.product.scan
         probe_input = parameters.product.probe
-        probe_counts = numpy.sum(probe_input.getIntensity())
         object_input = parameters.product.object_
         object_geometry = object_input.getGeometry()
 
-        target_pattern_counts = numpy.mean(numpy.sum(parameters.patterns, axis=(-2, -1)))
-        probe_rescale = numpy.sqrt(target_pattern_counts / probe_counts)
-        print(f'rescaling probe {probe_counts} -> {probe_rescale * probe_counts}')
-        probe = probe_input.array * probe_rescale  # FIXME remove when able
-
         detector_data = DetectorData.create_simple(
             torch.from_numpy(parameters.patterns.astype(numpy.int32)))
+        probe_power = numpy.max(numpy.sum(parameters.patterns, axis=(-2, -1)))
         positions_px: list[float] = list()
 
         for scan_point in scan_input:
@@ -37,20 +32,23 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
             positions_px.append(object_point.positionXInPixels)
 
         product = DataProduct.create_simple(
-            positions_px=torch.reshape(torch.tensor(positions_px), (len(scan_input), 2)),
-            probe=torch.tensor(numpy.expand_dims(probe, axis=0)),
-            object_=torch.tensor(parameters.product.object_.array),
+            positions_px=torch.tensor(positions_px).reshape(len(scan_input), 2),
+            probe=torch.tensor(numpy.expand_dims(probe_input.array, axis=0)),
+            object_=torch.tensor(object_input.array),
         )
         num_iterations = 10
         plan = CorrectionPlan.create_simple(
             num_iterations,
             correct_object=True,
-            correct_probe=False,
+            correct_probe=True,
+            correct_probe_power=True,
             correct_positions=False,
         )
 
         device = 'cpu'  # TODO
         algorithm = PtychographicIterativeEngine(device, detector_data, product)
+        algorithm.set_object_relaxation(0.25)  # FIXME
+        algorithm.set_probe_power(probe_power)
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()
         scan_output_points: list[ScanPoint] = list()
