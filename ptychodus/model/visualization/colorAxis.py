@@ -29,8 +29,8 @@ class ColorAxis(ParameterRepository):
 
     def setToDataRange(self, array: RealArrayType) -> None:
         if array.size > 0:
-            lower = array.min()
-            upper = array.max()
+            lower = array.min().item()
+            upper = array.max().item()
 
             if numpy.isfinite(lower) and numpy.isfinite(upper):
                 if lower == upper:

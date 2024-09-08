@@ -1,45 +1,55 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QFormLayout, QGroupBox, QSpinBox, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QSpinBox,
+                             QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, DecimalSlider
 
 
-class PtychoPackPositionCorrectionView(QGroupBox):
+class PtychoPackParametersView(QGroupBox):
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Position Correction', parent)
-        self.start_spinbox = QSpinBox()
-        self.stop_spinbox = QSpinBox()
-        self.stride_spinbox = QSpinBox()
-        self.probe_threshold_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.feedback_line_edit = DecimalLineEdit.createInstance()
+        super().__init__('PtychoPack', parent)
+        self.device_combobox = QComboBox()
+        self.iterations_label = QLabel('Planned Iterations: 999')  # FIXME to controller
+
+        self.device_combobox.setToolTip("Device to use for reconstruction.")
+        self.iterations_label.setToolTip("Number of iterations needed to execute correction plan.")
 
         layout = QFormLayout()
-        layout.addRow('Start Iteration:', self.start_spinbox)
-        layout.addRow('Stop Iteration:', self.stop_spinbox)
-        layout.addRow('Iteration Stride:', self.stride_spinbox)
-        layout.addRow('Probe Threshold:', self.probe_threshold_slider)
-        layout.addRow('Feedback:', self.feedback_line_edit)
+        layout.addRow('Device:', self.device_combobox)
+        layout.addRow(self.iterations_label)
         self.setLayout(layout)
 
 
-class PtychoPackProbeCorrectionView(QGroupBox):
+class PtychoPackCorrectionPlanWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Probe Correction', parent)
+        super().__init__(parent)
         self.start_spinbox = QSpinBox()
         self.stop_spinbox = QSpinBox()
         self.stride_spinbox = QSpinBox()
-        self.beta_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+
+        self.start_spinbox.setToolTip("Iteration to start correcting.")
+        self.stop_spinbox.setToolTip("Iteration to stop correcting.")
+        self.stride_spinbox.setToolTip("Iteration stride between corrections.")
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.start_spinbox)
+        layout.addWidget(self.stop_spinbox)
+        layout.addWidget(self.stride_spinbox)
+        self.setLayout(layout)
+
+
+class PtychoPackExitWaveCorrectionView(QGroupBox):
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Exit Wave Correction', parent)
         self.relaxation_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
 
         layout = QFormLayout()
-        layout.addRow('Start Iteration:', self.start_spinbox)
-        layout.addRow('Stop Iteration:', self.stop_spinbox)
-        layout.addRow('Iteration Stride:', self.stride_spinbox)
-        layout.addRow('Beta:', self.beta_slider)
         layout.addRow('Relaxation:', self.relaxation_slider)
         self.setLayout(layout)
 
@@ -48,32 +58,64 @@ class PtychoPackObjectCorrectionView(QGroupBox):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Object Correction', parent)
-        self.start_spinbox = QSpinBox()
-        self.stop_spinbox = QSpinBox()
-        self.stride_spinbox = QSpinBox()
+        self.plan_widget = PtychoPackCorrectionPlanWidget()
         self.alpha_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
         self.relaxation_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
 
         layout = QFormLayout()
-        layout.addRow('Start Iteration:', self.start_spinbox)
-        layout.addRow('Stop Iteration:', self.stop_spinbox)
-        layout.addRow('Iteration Stride:', self.stride_spinbox)
+        layout.addRow('Correction Plan:', self.plan_widget)
         layout.addRow('Alpha:', self.alpha_slider)
         layout.addRow('Relaxation:', self.relaxation_slider)
         self.setLayout(layout)
 
 
-class PtychoPackParametersView(QWidget):
+class PtychoPackProbeCorrectionView(QGroupBox):
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Probe Correction', parent)
+        self.plan_widget = PtychoPackCorrectionPlanWidget()
+        self.power_plan_widget = PtychoPackCorrectionPlanWidget()
+        self.beta_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self.relaxation_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+
+        layout = QFormLayout()
+        layout.addRow('Correction Plan:', self.plan_widget)
+        layout.addRow('Power Correction Plan:', self.power_plan_widget)
+        layout.addRow('Beta:', self.beta_slider)
+        layout.addRow('Relaxation:', self.relaxation_slider)
+        self.setLayout(layout)
+
+
+class PtychoPackPositionCorrectionView(QGroupBox):
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Position Correction', parent)
+        self.plan_widget = PtychoPackCorrectionPlanWidget()
+        self.probe_threshold_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self.feedback_line_edit = DecimalLineEdit.createInstance()
+
+        layout = QFormLayout()
+        layout.addRow('Correction Plan:', self.plan_widget)
+        layout.addRow('Probe Threshold:', self.probe_threshold_slider)
+        layout.addRow('Feedback:', self.feedback_line_edit)
+        self.setLayout(layout)
+
+
+class PtychoPackView(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.position_correction_view = PtychoPackPositionCorrectionView()
-        self.probe_correction_view = PtychoPackProbeCorrectionView()
-        self.object_correction_view = PtychoPackObjectCorrectionView()
+        self.parameters_view = PtychoPackParametersView()
+        self.exit_wave_view = PtychoPackExitWaveCorrectionView()
+        self.object_view = PtychoPackObjectCorrectionView()
+        self.probe_view = PtychoPackProbeCorrectionView()
+        self.position_view = PtychoPackPositionCorrectionView()
 
         layout = QVBoxLayout()
-        layout.addWidget(self.position_correction_view)
-        layout.addWidget(self.probe_correction_view)
-        layout.addWidget(self.object_correction_view)
+        layout.addWidget(self.parameters_view)
+        layout.addWidget(self.exit_wave_view)
+        layout.addWidget(self.object_view)
+        layout.addWidget(self.probe_view)
+        layout.addWidget(self.position_view)
         layout.addStretch()
         self.setLayout(layout)

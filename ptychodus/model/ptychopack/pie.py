@@ -1,6 +1,7 @@
 import numpy
 import torch
-from ptychopack import CorrectionPlan, DataProduct, DetectorData, PtychographicIterativeEngine
+from ptychopack import (CorrectionPlan, DataProduct, DetectorData, Device,
+                        PtychographicIterativeEngine)
 
 from ptychodus.api.object import Object, ObjectPoint
 from ptychodus.api.probe import Probe
@@ -45,7 +46,7 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
             correct_positions=False,
         )
 
-        device = 'cpu'  # TODO
+        device = Device('CPU', 0, 'CPU:0')  # TODO
         algorithm = PtychographicIterativeEngine(device, detector_data, product)
         algorithm.set_object_relaxation(0.25)  # FIXME
         algorithm.set_probe_power(probe_power)
