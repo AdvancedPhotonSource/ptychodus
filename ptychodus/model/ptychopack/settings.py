@@ -6,20 +6,44 @@ class PtychoPackSettings(Observable, Observer):
 
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup('PtychoPack')
-        self._settingsGroup.addObserver(self)
+        self._settings_group = registry.createGroup('PtychoPack')
+        self._settings_group.addObserver(self)
 
-        self.objectTuningParameter = self._settingsGroup.createRealEntry(
-            'ObjectTuningParameter', '1.')
-        self.objectAlpha = self._settingsGroup.createRealEntry('ObjectAlpha', '0.05')
-        self.probeTuningParameter = self._settingsGroup.createRealEntry(
-            'ProbeTuningParameter', '1.')
-        self.probeAlpha = self._settingsGroup.createRealEntry('ProbeAlpha', '0.8')
-        self.positionCorrectionProbeThreshold = self._settingsGroup.createRealEntry(
-            'PositionCorrectionProbeThreshold', '0.1')
-        self.positionCorrectionFeedbackParameter = self._settingsGroup.createRealEntry(
-            'PositionCorrectionFeedbackParameter', '0.')
+        self.object_correction_plan_start = self._settings_group.createIntegerEntry(
+            'object_correction_plan_start', 0)
+        self.object_correction_plan_stop = self._settings_group.createIntegerEntry(
+            'object_correction_plan_stop', 100)
+        self.object_correction_plan_stride = self._settings_group.createIntegerEntry(
+            'object_correction_plan_stride', 1)
+        self.alpha = self._settings_group.createRealEntry('alpha', '1')
+        self.object_relaxation = self._settings_group.createRealEntry('object_relaxation', '1')
+
+        self.probe_correction_plan_start = self._settings_group.createIntegerEntry(
+            'probe_correction_plan_start', 10)
+        self.probe_correction_plan_stop = self._settings_group.createIntegerEntry(
+            'probe_correction_plan_stop', 100)
+        self.probe_correction_plan_stride = self._settings_group.createIntegerEntry(
+            'probe_correction_plan_stride', 1)
+        self.probe_power_correction_plan_start = self._settings_group.createIntegerEntry(
+            'probe_power_correction_plan_start', 0)
+        self.probe_power_correction_plan_stop = self._settings_group.createIntegerEntry(
+            'probe_power_correction_plan_stop', 1)
+        self.probe_power_correction_plan_stride = self._settings_group.createIntegerEntry(
+            'probe_power_correction_plan_stride', 10)
+        self.beta = self._settings_group.createRealEntry('beta', '1')
+        self.probe_relaxation = self._settings_group.createRealEntry('probe_relaxation', '1')
+
+        self.position_correction_plan_start = self._settings_group.createIntegerEntry(
+            'position_correction_plan_start', 0)
+        self.position_correction_plan_stop = self._settings_group.createIntegerEntry(
+            'position_correction_plan_stop', 0)
+        self.position_correction_plan_stride = self._settings_group.createIntegerEntry(
+            'position_correction_plan_stride', 1)
+        self.position_correction_probe_threshold = self._settings_group.createRealEntry(
+            'position_correction_probe_threshold', '0.1')
+        self.position_correction_feedback = self._settings_group.createRealEntry(
+            'position_correction_feedback', '50')
 
     def update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
+        if observable is self._settings_group:
             self.notifyObservers()

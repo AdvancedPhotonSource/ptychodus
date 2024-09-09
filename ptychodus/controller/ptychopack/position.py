@@ -35,7 +35,7 @@ class PtychoPackPositionCorrectionController(Observer):
         except ValueError:
             logger.warning(f'Failed to convert \"{text}\" to int!')
         else:
-            self._presenter.set_object_correction_plan_start(value)
+            self._presenter.set_position_correction_plan_start(value)
 
     def _sync_plan_stop_to_model(self) -> None:
         text = self._view.plan_widget.stop_lineedit.text()
@@ -45,7 +45,7 @@ class PtychoPackPositionCorrectionController(Observer):
         except ValueError:
             logger.warning(f'Failed to convert \"{text}\" to int!')
         else:
-            self._presenter.set_object_correction_plan_stop(value)
+            self._presenter.set_position_correction_plan_stop(value)
 
     def _sync_plan_stride_to_model(self) -> None:
         text = self._view.plan_widget.stride_lineedit.text()
@@ -55,15 +55,15 @@ class PtychoPackPositionCorrectionController(Observer):
         except ValueError:
             logger.warning(f'Failed to convert \"{text}\" to int!')
         else:
-            self._presenter.set_object_correction_plan_stride(value)
+            self._presenter.set_position_correction_plan_stride(value)
 
     def _sync_model_to_view(self) -> None:
         self._view.plan_widget.start_lineedit.setText(
-            str(self._presenter.get_object_correction_plan_start()))
+            str(self._presenter.get_position_correction_plan_start()))
         self._view.plan_widget.stop_lineedit.setText(
-            str(self._presenter.get_object_correction_plan_stop()))
+            str(self._presenter.get_position_correction_plan_stop()))
         self._view.plan_widget.stride_lineedit.setText(
-            str(self._presenter.get_object_correction_plan_stride()))
+            str(self._presenter.get_position_correction_plan_stride()))
 
         self._view.probe_threshold_slider.setValueAndRange(
             self._presenter.get_position_correction_probe_threshold(),
