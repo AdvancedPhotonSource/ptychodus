@@ -89,7 +89,7 @@ class ModelCore:
         self.probeVisualizationEngine = VisualizationEngine(isComplex=True)
         self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
 
-        self.ptychoPackReconstructorLibrary = PtychoPackReconstructorLibrary.createInstance(
+        self.ptychoPackReconstructorLibrary = PtychoPackReconstructorLibrary(
             self.settingsRegistry, isDeveloperModeEnabled)
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, isDeveloperModeEnabled)

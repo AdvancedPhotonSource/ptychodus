@@ -58,7 +58,7 @@ class PhaseInRadiansArrayComponent(DataArrayComponent):
         super().__init__('phase', isCyclic=True)
 
     def calculate(self, array: NumberArrayType) -> RealArrayType:
-        return numpy.angle(array).astype(numpy.single)
+        return numpy.angle(array).astype(numpy.single)  # type: ignore
 
 
 class UnwrappedPhaseInRadiansArrayComponent(DataArrayComponent):
@@ -67,5 +67,5 @@ class UnwrappedPhaseInRadiansArrayComponent(DataArrayComponent):
         super().__init__('unwrapped_phase', isCyclic=False)
 
     def calculate(self, array: NumberArrayType) -> RealArrayType:
-        phaseInRadians = numpy.angle(array).astype(numpy.single)
+        phaseInRadians = numpy.angle(array).astype(numpy.single)  # type: ignore
         return unwrap_phase(phaseInRadians)

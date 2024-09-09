@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QWidget
 from ...model.ptychopack import PtychoPackReconstructorLibrary
 from ...view.ptychopack import PtychoPackView
 from ..reconstructor import ReconstructorViewControllerFactory
-from .controller import PtychoPackController
+from .core import PtychoPackController
 
 
 class PtychoPackViewControllerFactory(ReconstructorViewControllerFactory):

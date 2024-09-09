@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QSpinBox,
+from PyQt5.QtGui import QIntValidator
+from PyQt5.QtWidgets import (QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
                              QVBoxLayout, QWidget)
 
 from .widgets import DecimalLineEdit, DecimalSlider
@@ -12,14 +13,14 @@ class PtychoPackParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('PtychoPack', parent)
         self.device_combobox = QComboBox()
-        self.iterations_label = QLabel('Planned Iterations: 999')  # FIXME to controller
+        self.plan_label = QLabel()
 
-        self.device_combobox.setToolTip("Device to use for reconstruction.")
-        self.iterations_label.setToolTip("Number of iterations needed to execute correction plan.")
+        self.device_combobox.setToolTip('Device to use for reconstruction.')
+        self.plan_label.setToolTip('Correction plan information.')
 
         layout = QFormLayout()
         layout.addRow('Device:', self.device_combobox)
-        layout.addRow(self.iterations_label)
+        layout.addRow(self.plan_label)
         self.setLayout(layout)
 
 
@@ -27,30 +28,23 @@ class PtychoPackCorrectionPlanWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.start_spinbox = QSpinBox()
-        self.stop_spinbox = QSpinBox()
-        self.stride_spinbox = QSpinBox()
+        self.start_lineedit = QLineEdit()
+        self.stop_lineedit = QLineEdit()
+        self.stride_lineedit = QLineEdit()
 
-        self.start_spinbox.setToolTip("Iteration to start correcting.")
-        self.stop_spinbox.setToolTip("Iteration to stop correcting.")
-        self.stride_spinbox.setToolTip("Iteration stride between corrections.")
+        self.start_lineedit.setValidator(QIntValidator())
+        self.stop_lineedit.setValidator(QIntValidator())
+        self.stride_lineedit.setValidator(QIntValidator())
+
+        self.start_lineedit.setToolTip('Iteration to start correcting.')
+        self.stop_lineedit.setToolTip('Iteration to stop correcting.')
+        self.stride_lineedit.setToolTip('Iteration stride between corrections.')
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.start_spinbox)
-        layout.addWidget(self.stop_spinbox)
-        layout.addWidget(self.stride_spinbox)
-        self.setLayout(layout)
-
-
-class PtychoPackExitWaveCorrectionView(QGroupBox):
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Exit Wave Correction', parent)
-        self.relaxation_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-
-        layout = QFormLayout()
-        layout.addRow('Relaxation:', self.relaxation_slider)
+        layout.addWidget(self.start_lineedit)
+        layout.addWidget(self.stop_lineedit)
+        layout.addWidget(self.stride_lineedit)
         self.setLayout(layout)
 
 
@@ -106,14 +100,12 @@ class PtychoPackView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.parameters_view = PtychoPackParametersView()
-        self.exit_wave_view = PtychoPackExitWaveCorrectionView()
         self.object_view = PtychoPackObjectCorrectionView()
         self.probe_view = PtychoPackProbeCorrectionView()
         self.position_view = PtychoPackPositionCorrectionView()
 
         layout = QVBoxLayout()
         layout.addWidget(self.parameters_view)
-        layout.addWidget(self.exit_wave_view)
         layout.addWidget(self.object_view)
         layout.addWidget(self.probe_view)
         layout.addWidget(self.position_view)

@@ -18,6 +18,18 @@ class PtychoPackPresenter(Observable, Observer):
         self._settings = settings
         settings.addObserver(self)
 
+    def get_available_devices(self) -> Iterator[str]:
+        return iter([])  # FIXME
+
+    def set_device(self, device: str) -> None:
+        pass  # FIXME
+
+    def get_device(self) -> str:
+        return ''  # FIXME
+
+    def get_plan(self) -> str:
+        return 'Planned Iterations: 999'  # FIXME
+
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
@@ -25,16 +37,11 @@ class PtychoPackPresenter(Observable, Observer):
 
 class PtychoPackReconstructorLibrary(ReconstructorLibrary):
 
-    def __init__(self, settingsRegistry: SettingsRegistry) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool) -> None:
         super().__init__()
         self._settings = PtychoPackSettings(settingsRegistry)
         self.presenter = PtychoPackPresenter(self._settings)
-        self.reconstructorList: list[Reconstructor] = list()
-
-    @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry,
-                       isDeveloperModeEnabled: bool) -> PtychoPackReconstructorLibrary:
-        core = cls(settingsRegistry)
+        self.reconstructor_list: list[Reconstructor] = list()
 
         try:
             from .pie import PtychographicIterativeEngineReconstructor
@@ -42,15 +49,13 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
             logger.info('PtychoPack not found.')
 
             if isDeveloperModeEnabled:
-                core.reconstructorList.append(NullReconstructor('rPIE'))
+                self.reconstructor_list.append(NullReconstructor('PIE'))
         else:
-            core.reconstructorList.append(PtychographicIterativeEngineReconstructor())
-
-        return core
+            self.reconstructor_list.append(PtychographicIterativeEngineReconstructor())
 
     @property
     def name(self) -> str:
         return 'PtychoPack'
 
     def __iter__(self) -> Iterator[Reconstructor]:
-        return iter(self.reconstructorList)
+        return iter(self.reconstructor_list)
