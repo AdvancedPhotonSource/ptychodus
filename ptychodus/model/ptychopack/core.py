@@ -174,14 +174,20 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
         self.reconstructor_list: list[Reconstructor] = list()
 
         try:
+            from .dm import DifferenceMapReconstructor
             from .pie import PtychographicIterativeEngineReconstructor
+            from .raar import RelaxedAveragedAlternatingReflectionsReconstructor
         except ModuleNotFoundError:
             logger.info('PtychoPack not found.')
 
             if isDeveloperModeEnabled:
                 self.reconstructor_list.append(NullReconstructor('PIE'))
+                self.reconstructor_list.append(NullReconstructor('DM'))
+                self.reconstructor_list.append(NullReconstructor('RAAR'))
         else:
             self.reconstructor_list.append(PtychographicIterativeEngineReconstructor())
+            self.reconstructor_list.append(DifferenceMapReconstructor())
+            self.reconstructor_list.append(RelaxedAveragedAlternatingReflectionsReconstructor())
 
     @property
     def name(self) -> str:

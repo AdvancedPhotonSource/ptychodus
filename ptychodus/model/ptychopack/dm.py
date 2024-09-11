@@ -1,7 +1,6 @@
 import numpy
 import torch
-from ptychopack import (CorrectionPlan, DataProduct, DetectorData, Device,
-                        PtychographicIterativeEngine)
+from ptychopack import (CorrectionPlan, DataProduct, DetectorData, Device, DifferenceMap)
 
 from ptychodus.api.object import Object, ObjectPoint
 from ptychodus.api.probe import Probe
@@ -10,11 +9,11 @@ from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, Reconst
 from ptychodus.api.scan import Scan, ScanPoint
 
 
-class PtychographicIterativeEngineReconstructor(Reconstructor):
+class DifferenceMapReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return 'PIE'
+        return 'DM'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         scan_input = parameters.product.scan
@@ -46,8 +45,7 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
         )
 
         device = Device('CPU', 0, 'CPU:0')  # TODO
-        algorithm = PtychographicIterativeEngine(device, detector_data, product)
-        algorithm.set_object_relaxation(0.25)  # FIXME
+        algorithm = DifferenceMap(device, detector_data, product)
         algorithm.set_probe_power(probe_power)
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()
