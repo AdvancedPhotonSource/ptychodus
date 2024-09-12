@@ -187,9 +187,11 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
                 self.reconstructor_list.append(NullReconstructor('DM'))
                 self.reconstructor_list.append(NullReconstructor('RAAR'))
         else:
-            self.reconstructor_list.append(PtychographicIterativeEngineReconstructor())
-            self.reconstructor_list.append(DifferenceMapReconstructor())
-            self.reconstructor_list.append(RelaxedAveragedAlternatingReflectionsReconstructor())
+            self.reconstructor_list.append(
+                PtychographicIterativeEngineReconstructor(self._settings))
+            self.reconstructor_list.append(DifferenceMapReconstructor(self._settings))
+            self.reconstructor_list.append(
+                RelaxedAveragedAlternatingReflectionsReconstructor(self._settings))
 
     @property
     def name(self) -> str:

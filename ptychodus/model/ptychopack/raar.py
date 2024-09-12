@@ -1,6 +1,6 @@
 import numpy
 import torch
-from ptychopack import (CorrectionPlan, DataProduct, DetectorData, Device,
+from ptychopack import (CorrectionPlan, CorrectionPlanElement, DataProduct, DetectorData, Device,
                         RelaxedAveragedAlternatingReflections)
 
 from ptychodus.api.object import Object, ObjectPoint
@@ -9,8 +9,13 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ptychodus.api.scan import Scan, ScanPoint
 
+from .settings import PtychoPackSettings
+
 
 class RelaxedAveragedAlternatingReflectionsReconstructor(Reconstructor):
+
+    def __init__(self, settings: PtychoPackSettings) -> None:
+        self._settings = settings
 
     @property
     def name(self) -> str:
@@ -37,16 +42,27 @@ class RelaxedAveragedAlternatingReflectionsReconstructor(Reconstructor):
             probe=torch.tensor(numpy.expand_dims(probe_input.array, axis=0)),
             object_=torch.tensor(object_input.array),
         )
-        num_iterations = 10
-        plan = CorrectionPlan.create_simple(
-            num_iterations,
-            correct_object=True,
-            correct_probe=True,
-            correct_positions=False,
+        plan = CorrectionPlan(
+            object_correction=CorrectionPlanElement(
+                start=self._settings.object_correction_plan_start.value,
+                stop=self._settings.object_correction_plan_stop.value,
+                stride=self._settings.object_correction_plan_stride.value,
+            ),
+            probe_correction=CorrectionPlanElement(
+                start=self._settings.probe_correction_plan_start.value,
+                stop=self._settings.probe_correction_plan_stop.value,
+                stride=self._settings.probe_correction_plan_stride.value,
+            ),
+            position_correction=CorrectionPlanElement(
+                start=self._settings.position_correction_plan_start.value,
+                stop=self._settings.position_correction_plan_stop.value,
+                stride=self._settings.position_correction_plan_stride.value,
+            ),
         )
 
         device = Device('cuda', 0, 'cuda:0')  # TODO
         algorithm = RelaxedAveragedAlternatingReflections(device, detector_data, product)
+        # FIXME parameters
         algorithm.set_probe_power(probe_power)
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()

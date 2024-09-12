@@ -1,6 +1,6 @@
 import numpy
 import torch
-from ptychopack import (CorrectionPlan, DataProduct, DetectorData, Device,
+from ptychopack import (CorrectionPlan, CorrectionPlanElement, DataProduct, DetectorData, Device,
                         PtychographicIterativeEngine)
 
 from ptychodus.api.object import Object, ObjectPoint
@@ -9,8 +9,13 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ptychodus.api.scan import Scan, ScanPoint
 
+from .settings import PtychoPackSettings
+
 
 class PtychographicIterativeEngineReconstructor(Reconstructor):
+
+    def __init__(self, settings: PtychoPackSettings) -> None:
+        self._settings = settings
 
     @property
     def name(self) -> str:
@@ -37,18 +42,35 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
             probe=torch.tensor(numpy.expand_dims(probe_input.array, axis=0)),
             object_=torch.tensor(object_input.array),
         )
-        num_iterations = 10
-        plan = CorrectionPlan.create_simple(
-            num_iterations,
-            correct_object=True,
-            correct_probe=True,
-            correct_positions=False,
+        plan = CorrectionPlan(
+            object_correction=CorrectionPlanElement(
+                start=self._settings.object_correction_plan_start.value,
+                stop=self._settings.object_correction_plan_stop.value,
+                stride=self._settings.object_correction_plan_stride.value,
+            ),
+            probe_correction=CorrectionPlanElement(
+                start=self._settings.probe_correction_plan_start.value,
+                stop=self._settings.probe_correction_plan_stop.value,
+                stride=self._settings.probe_correction_plan_stride.value,
+            ),
+            position_correction=CorrectionPlanElement(
+                start=self._settings.position_correction_plan_start.value,
+                stop=self._settings.position_correction_plan_stop.value,
+                stride=self._settings.position_correction_plan_stride.value,
+            ),
         )
 
         device = Device('cuda', 0, 'cuda:0')  # TODO
         algorithm = PtychographicIterativeEngine(device, detector_data, product)
-        algorithm.set_object_relaxation(0.25)  # FIXME
+        algorithm.set_object_relaxation(float(self._settings.pie_object_relaxation.value))
+        algorithm.set_alpha(float(self._settings.pie_alpha.value))
         algorithm.set_probe_power(probe_power)
+        algorithm.set_probe_relaxation(float(self._settings.pie_probe_relaxation.value))
+        algorithm.set_beta(float(self._settings.pie_beta.value))
+        algorithm.set_pc_probe_threshold(
+            float(self._settings.position_correction_probe_threshold.value))
+        algorithm.set_pc_feedback(float(self._settings.position_correction_feedback.value))
+
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()
         scan_output_points: list[ScanPoint] = list()
