@@ -44,7 +44,7 @@ class DifferenceMapReconstructor(Reconstructor):
             correct_positions=False,
         )
 
-        device = Device('CPU', 0, 'CPU:0')  # TODO
+        device = Device('cuda', 0, 'cuda:0')  # TODO
         algorithm = DifferenceMap(device, detector_data, product)
         algorithm.set_probe_power(probe_power)
         data_error = algorithm.iterate(plan)

@@ -20,8 +20,8 @@ class PtychoPackObjectCorrectionController(Observer):
         view.plan_widget.start_lineedit.editingFinished.connect(self._sync_plan_start_to_model)
         view.plan_widget.stop_lineedit.editingFinished.connect(self._sync_plan_stop_to_model)
         view.plan_widget.stride_lineedit.editingFinished.connect(self._sync_plan_stride_to_model)
-        view.alpha_slider.valueChanged.connect(presenter.set_alpha)
-        view.relaxation_slider.valueChanged.connect(presenter.set_object_relaxation)
+        view.pie_alpha_slider.valueChanged.connect(presenter.set_pie_alpha)
+        view.pie_relaxation_slider.valueChanged.connect(presenter.set_pie_object_relaxation)
 
         self._sync_model_to_view()
         presenter.addObserver(self)
@@ -64,12 +64,12 @@ class PtychoPackObjectCorrectionController(Observer):
         self._view.plan_widget.stride_lineedit.setText(
             str(self._presenter.get_object_correction_plan_stride()))
 
-        self._view.alpha_slider.setValueAndRange(self._presenter.get_alpha(),
-                                                 self._presenter.get_alpha_limits(),
-                                                 blockValueChangedSignal=True)
-        self._view.relaxation_slider.setValueAndRange(
-            self._presenter.get_object_relaxation(),
-            self._presenter.get_object_relaxation_limits(),
+        self._view.pie_alpha_slider.setValueAndRange(self._presenter.get_pie_alpha(),
+                                                     self._presenter.get_pie_alpha_limits(),
+                                                     blockValueChangedSignal=True)
+        self._view.pie_relaxation_slider.setValueAndRange(
+            self._presenter.get_pie_object_relaxation(),
+            self._presenter.get_pie_object_relaxation_limits(),
             blockValueChangedSignal=True)
 
     def update(self, observable: Observable) -> None:

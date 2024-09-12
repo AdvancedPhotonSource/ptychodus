@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget
 
 from ...model.ptychopack import PtychoPackReconstructorLibrary
-from ...view.ptychopack import PtychoPackView
+from ...view.ptychopack import PtychoPackAlgorithm, PtychoPackView
 from ..reconstructor import ReconstructorViewControllerFactory
 from .core import PtychoPackController
 
@@ -18,7 +18,13 @@ class PtychoPackViewControllerFactory(ReconstructorViewControllerFactory):
         return 'PtychoPack'
 
     def createViewController(self, reconstructorName: str) -> QWidget:
-        view = PtychoPackView()
+        if reconstructorName.casefold() == 'dm':
+            view = PtychoPackView(PtychoPackAlgorithm.DM)
+        elif reconstructorName.casefold() == 'raar':
+            view = PtychoPackView(PtychoPackAlgorithm.RAAR)
+        else:
+            view = PtychoPackView(PtychoPackAlgorithm.PIE)
+
         controller = PtychoPackController(self._model, view)
         self._controllerList.append(controller)
         return view

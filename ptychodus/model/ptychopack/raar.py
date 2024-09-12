@@ -1,6 +1,7 @@
 import numpy
 import torch
-from ptychopack import (CorrectionPlan, DataProduct, DetectorData, Device, RelaxedAveragedAlternatingReflections)
+from ptychopack import (CorrectionPlan, DataProduct, DetectorData, Device,
+                        RelaxedAveragedAlternatingReflections)
 
 from ptychodus.api.object import Object, ObjectPoint
 from ptychodus.api.probe import Probe
@@ -44,7 +45,7 @@ class RelaxedAveragedAlternatingReflectionsReconstructor(Reconstructor):
             correct_positions=False,
         )
 
-        device = Device('CPU', 0, 'CPU:0')  # TODO
+        device = Device('cuda', 0, 'cuda:0')  # TODO
         algorithm = RelaxedAveragedAlternatingReflections(device, detector_data, product)
         algorithm.set_probe_power(probe_power)
         data_error = algorithm.iterate(plan)

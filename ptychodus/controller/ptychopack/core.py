@@ -5,6 +5,7 @@ from ptychodus.api.observer import Observable, Observer
 
 from ...model.ptychopack import PtychoPackPresenter, PtychoPackReconstructorLibrary
 from ...view.ptychopack import PtychoPackParametersView, PtychoPackView
+from .exit_wave import PtychoPackExitWaveCorrectionController
 from .object import PtychoPackObjectCorrectionController
 from .position import PtychoPackPositionCorrectionController
 from .probe import PtychoPackProbeCorrectionController
@@ -41,6 +42,8 @@ class PtychoPackController:
     def __init__(self, model: PtychoPackReconstructorLibrary, view: PtychoPackView) -> None:
         self.parameters_controller = PtychoPackParametersController(model.presenter,
                                                                     view.parameters_view)
+        self.exit_wave_controller = PtychoPackExitWaveCorrectionController(
+            model.presenter, view.exit_wave_view)
         self.object_controller = PtychoPackObjectCorrectionController(
             model.presenter, view.object_view)
         self.probe_controller = PtychoPackProbeCorrectionController(model.presenter,

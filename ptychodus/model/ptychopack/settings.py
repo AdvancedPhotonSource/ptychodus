@@ -9,14 +9,20 @@ class PtychoPackSettings(Observable, Observer):
         self._settings_group = registry.createGroup('PtychoPack')
         self._settings_group.addObserver(self)
 
+        self.dm_exit_wave_relaxation = self._settings_group.createRealEntry(
+            'dm_exit_wave_relaxation', '0.8')
+        self.raar_exit_wave_relaxation = self._settings_group.createRealEntry(
+            'raar_exit_wave_relaxation', '0.75')
+
         self.object_correction_plan_start = self._settings_group.createIntegerEntry(
             'object_correction_plan_start', 0)
         self.object_correction_plan_stop = self._settings_group.createIntegerEntry(
             'object_correction_plan_stop', 100)
         self.object_correction_plan_stride = self._settings_group.createIntegerEntry(
             'object_correction_plan_stride', 1)
-        self.alpha = self._settings_group.createRealEntry('alpha', '1')
-        self.object_relaxation = self._settings_group.createRealEntry('object_relaxation', '1')
+        self.pie_alpha = self._settings_group.createRealEntry('pie_alpha', '1')
+        self.pie_object_relaxation = self._settings_group.createRealEntry(
+            'pie_object_relaxation', '1')
 
         self.probe_correction_plan_start = self._settings_group.createIntegerEntry(
             'probe_correction_plan_start', 10)
@@ -24,14 +30,9 @@ class PtychoPackSettings(Observable, Observer):
             'probe_correction_plan_stop', 100)
         self.probe_correction_plan_stride = self._settings_group.createIntegerEntry(
             'probe_correction_plan_stride', 1)
-        self.probe_power_correction_plan_start = self._settings_group.createIntegerEntry(
-            'probe_power_correction_plan_start', 0)
-        self.probe_power_correction_plan_stop = self._settings_group.createIntegerEntry(
-            'probe_power_correction_plan_stop', 1)
-        self.probe_power_correction_plan_stride = self._settings_group.createIntegerEntry(
-            'probe_power_correction_plan_stride', 10)
-        self.beta = self._settings_group.createRealEntry('beta', '1')
-        self.probe_relaxation = self._settings_group.createRealEntry('probe_relaxation', '1')
+        self.pie_beta = self._settings_group.createRealEntry('pie_beta', '1')
+        self.pie_probe_relaxation = self._settings_group.createRealEntry(
+            'pie_probe_relaxation', '1')
 
         self.position_correction_plan_start = self._settings_group.createIntegerEntry(
             'position_correction_plan_start', 0)

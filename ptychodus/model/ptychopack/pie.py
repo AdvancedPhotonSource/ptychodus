@@ -45,7 +45,7 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
             correct_positions=False,
         )
 
-        device = Device('CPU', 0, 'CPU:0')  # TODO
+        device = Device('cuda', 0, 'cuda:0')  # TODO
         algorithm = PtychographicIterativeEngine(device, detector_data, product)
         algorithm.set_object_relaxation(0.25)  # FIXME
         algorithm.set_probe_power(probe_power)
