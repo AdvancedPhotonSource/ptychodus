@@ -9,13 +9,15 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ptychodus.api.scan import Scan, ScanPoint
 
+from .device import PtychoPackDevice
 from .settings import PtychoPackSettings
 
 
 class PtychographicIterativeEngineReconstructor(Reconstructor):
 
-    def __init__(self, settings: PtychoPackSettings) -> None:
+    def __init__(self, settings: PtychoPackSettings, device: PtychoPackDevice) -> None:
         self._settings = settings
+        self._device = device
 
     @property
     def name(self) -> str:
@@ -60,8 +62,7 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
             ),
         )
 
-        device = Device('cuda', 0, 'cuda:0')  # TODO
-        algorithm = PtychographicIterativeEngine(device, detector_data, product)
+        algorithm = PtychographicIterativeEngine(self._device._device, detector_data, product)
         algorithm.set_object_relaxation(float(self._settings.pie_object_relaxation.value))
         algorithm.set_alpha(float(self._settings.pie_alpha.value))
         algorithm.set_probe_power(probe_power)

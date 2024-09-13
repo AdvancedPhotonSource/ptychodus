@@ -9,13 +9,15 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ptychodus.api.scan import Scan, ScanPoint
 
+from .device import PtychoPackDevice
 from .settings import PtychoPackSettings
 
 
 class DifferenceMapReconstructor(Reconstructor):
 
-    def __init__(self, settings: PtychoPackSettings) -> None:
+    def __init__(self, settings: PtychoPackSettings, device: PtychoPackDevice) -> None:
         self._settings = settings
+        self._device = device
 
     @property
     def name(self) -> str:
@@ -60,9 +62,8 @@ class DifferenceMapReconstructor(Reconstructor):
             ),
         )
 
-        device = Device('cuda', 0, 'cuda:0')  # TODO
-        algorithm = DifferenceMap(device, detector_data, product)
-        # FIXME parameters
+        algorithm = DifferenceMap(self._device._device, detector_data, product)
+        algorithm.set_relaxation(float(self._settings.dm_exit_wave_relaxation.value))
         algorithm.set_probe_power(probe_power)
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()

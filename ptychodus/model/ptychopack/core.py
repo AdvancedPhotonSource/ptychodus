@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from decimal import Decimal
 import logging
 
@@ -8,6 +8,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
 from ptychodus.api.settings import SettingsRegistry
 
+from .device import NullPtychoPackDevice, PtychoPackDevice
 from .settings import PtychoPackSettings
 
 logger = logging.getLogger(__name__)
@@ -15,22 +16,27 @@ logger = logging.getLogger(__name__)
 
 class PtychoPackPresenter(Observable, Observer):
 
-    def __init__(self, settings: PtychoPackSettings) -> None:
+    def __init__(self, settings: PtychoPackSettings, device: PtychoPackDevice) -> None:
         super().__init__()
         self._settings = settings
+        self._device = device
         settings.addObserver(self)
+        # FIXME device.addObserver(self)
 
-    def get_available_devices(self) -> Iterator[str]:
-        return iter([])  # FIXME
+    def get_available_devices(self) -> Sequence[str]:
+        return [device.torch_device for device in self._device.get_available_devices()]
 
     def get_device(self) -> str:
-        return ''  # FIXME
+        return self._device.get_device()
 
     def set_device(self, device: str) -> None:
-        pass  # FIXME
+        self._device.set_device(device)
 
     def get_plan(self) -> str:
-        return 'Planned Iterations: 999'  # FIXME
+        iterations = self._settings.object_correction_plan_stop.value
+        iterations = max(iterations, self._settings.probe_correction_plan_stop.value)
+        iterations = max(iterations, self._settings.position_correction_plan_stop.value)
+        return f'Planned Iterations: {iterations}'
 
     def get_dm_exit_wave_relaxation_limits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
@@ -165,6 +171,8 @@ class PtychoPackPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
+        # FIXME elif observable is self._device:
+        # FIXME     self.notifyObservers()
 
 
 class PtychoPackReconstructorLibrary(ReconstructorLibrary):
@@ -172,13 +180,14 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
     def __init__(self, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool) -> None:
         super().__init__()
         self._settings = PtychoPackSettings(settingsRegistry)
-        self.presenter = PtychoPackPresenter(self._settings)
+        self._device: PtychoPackDevice = NullPtychoPackDevice()
         self.reconstructor_list: list[Reconstructor] = list()
 
         try:
             from .dm import DifferenceMapReconstructor
             from .pie import PtychographicIterativeEngineReconstructor
             from .raar import RelaxedAveragedAlternatingReflectionsReconstructor
+            from .real_device import RealPtychoPackDevice
         except ModuleNotFoundError:
             logger.info('PtychoPack not found.')
 
@@ -187,11 +196,15 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
                 self.reconstructor_list.append(NullReconstructor('DM'))
                 self.reconstructor_list.append(NullReconstructor('RAAR'))
         else:
+            self._device = RealPtychoPackDevice()
             self.reconstructor_list.append(
-                PtychographicIterativeEngineReconstructor(self._settings))
-            self.reconstructor_list.append(DifferenceMapReconstructor(self._settings))
+                PtychographicIterativeEngineReconstructor(self._settings, self._device))
+            self.reconstructor_list.append(DifferenceMapReconstructor(
+                self._settings, self._device))
             self.reconstructor_list.append(
-                RelaxedAveragedAlternatingReflectionsReconstructor(self._settings))
+                RelaxedAveragedAlternatingReflectionsReconstructor(self._settings, self._device))
+
+        self.presenter = PtychoPackPresenter(self._settings, self._device)
 
     @property
     def name(self) -> str:
