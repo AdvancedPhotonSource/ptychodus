@@ -29,8 +29,7 @@ class DifferenceMapReconstructor(Reconstructor):
         object_input = parameters.product.object_
         object_geometry = object_input.getGeometry()
 
-        detector_data = DetectorData.create_simple(
-            torch.from_numpy(parameters.patterns.astype(numpy.int32)))
+        detector_data = DetectorData.from_numpy(parameters.patterns)
         probe_power = numpy.max(numpy.sum(parameters.patterns, axis=(-2, -1)))
         positions_px: list[float] = list()
 
@@ -39,10 +38,10 @@ class DifferenceMapReconstructor(Reconstructor):
             positions_px.append(object_point.positionYInPixels)
             positions_px.append(object_point.positionXInPixels)
 
-        product = DataProduct.create_simple(
-            positions_px=torch.tensor(positions_px).reshape(len(scan_input), 2),
-            probe=torch.tensor(numpy.expand_dims(probe_input.array, axis=0)),
-            object_=torch.tensor(object_input.array),
+        product = DataProduct.from_numpy(
+            positions_px=numpy.reshape(positions_px, (len(scan_input), 2)),
+            probe=numpy.expand_dims(probe_input.array, axis=0),
+            object_=object_input.array,
         )
         plan = CorrectionPlan(
             object_correction=CorrectionPlanElement(

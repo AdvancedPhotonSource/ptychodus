@@ -15,7 +15,7 @@ class RealPtychoPackDevice(PtychoPackDevice):
         self._device = self._available_devices[0]
 
     def get_available_devices(self) -> Iterator[str]:
-        return iter(self._available_devices) # FIXME typing
+        return iter(self._available_devices)  # FIXME typing
 
     def get_device(self) -> str:
         return self._device.name
