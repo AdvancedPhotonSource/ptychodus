@@ -9,7 +9,18 @@ from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 
 logger = logging.getLogger(__name__)
 
-# FIXME plugin for loading products from file
+
+class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
+
+    @property
+    def isWatchRecursive(self) -> bool:
+        return True
+
+    def getWatchFilePattern(self) -> str:
+        return 'product-out.npz'
+
+    def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
+        workflowAPI.openProduct(filePath, 'NPZ')
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):
@@ -147,6 +158,11 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
+    registry.fileBasedWorkflows.registerPlugin(
+        PtychodusAutoloadProductFileBasedWorkflow(),
+        simpleName='Autoload_Product',
+        displayName='Autoload Product',
+    )
     registry.fileBasedWorkflows.registerPlugin(
         APS2IDFileBasedWorkflow(),
         simpleName='APS_2ID',
