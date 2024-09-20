@@ -20,7 +20,7 @@ class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
         return 'product-out.npz'
 
     def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
-        workflowAPI.openProduct(filePath, 'NPZ')
+        workflowAPI.openProduct(filePath, fileType='NPZ')
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):

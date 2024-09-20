@@ -1,3 +1,6 @@
+from pathlib import Path
+import logging
+
 from ptychodus.api.fluorescence import (DeconvolutionStrategy, FluorescenceFileReader,
                                         FluorescenceFileWriter, UpscalingStrategy)
 from ptychodus.api.plugins import PluginChooser
@@ -14,6 +17,7 @@ from .settings import FluorescenceSettings, ProbePropagationSettings
 from .stxm import STXMSimulator
 from .xmcd import XMCDAnalyzer
 
+logger = logging.getLogger(__name__)
 
 class AnalysisCore:
 
@@ -44,3 +48,18 @@ class AnalysisCore:
         self.fluorescenceVisualizationEngine = VisualizationEngine(isComplex=False)
         self.xmcdAnalyzer = XMCDAnalyzer(objectRepository)
         self.xmcdVisualizationEngine = VisualizationEngine(isComplex=False)
+
+    def enhanceFluorescence(self, productIndex: int, inputFilePath: Path,
+                            outputFilePath: Path) -> int:
+        fileType = 'XRF-Maps'
+
+        try:
+            self.fluorescenceEnhancer.setProduct(productIndex)
+            self.fluorescenceEnhancer.openMeasuredDataset(inputFilePath, fileType)
+            self.fluorescenceEnhancer.enhanceFluorescence()
+            self.fluorescenceEnhancer.saveEnhancedDataset(outputFilePath, fileType)
+        except Exception as exc:
+            logger.exception(exc)
+            return -1
+
+        return 0

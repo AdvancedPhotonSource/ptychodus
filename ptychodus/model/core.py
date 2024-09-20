@@ -218,7 +218,13 @@ class ModelCore:
     def refreshActiveDataset(self) -> None:
         self._patternsCore.dataset.notifyObserversIfDatasetChanged()
 
-    def batchModeExecute(self, action: str, inputFilePath: Path, outputFilePath: Path) -> int:
+    def batchModeExecute(self,
+                         action: str,
+                         inputFilePath: Path,
+                         outputFilePath: Path,
+                         *,
+                         fluorescenceInputFilePath: Path | None = None,
+                         fluorescenceOutputFilePath: Path | None = None) -> int:
         # TODO add enum for actions; implement using workflow API
         inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, fileType='NPZ')
 
@@ -238,6 +244,12 @@ class ModelCore:
             self._productCore.productAPI.saveProduct(outputProductIndex,
                                                      outputFilePath,
                                                      fileType='NPZ')
+
+            if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
+                self._analysisCore.enhanceFluorescence(outputProductIndex,
+                                                       fluorescenceInputFilePath,
+                                                       fluorescenceOutputFilePath)
+
         elif action.lower() == 'train':
             self._reconstructorCore.reconstructorAPI.ingestTrainingData(inputProductIndex)
             _ = self._reconstructorCore.reconstructorAPI.train()
