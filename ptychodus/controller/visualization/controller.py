@@ -107,6 +107,10 @@ class VisualizationController(Observer):
         self._lineCutDialog.open()
 
     def _analyzeRegion(self, rect: QRectF) -> None:
+        if rect.isEmpty():
+            logger.debug('QRectF is empty!')
+            return
+
         box = Box2D(
             x=rect.x(),
             y=rect.y(),
