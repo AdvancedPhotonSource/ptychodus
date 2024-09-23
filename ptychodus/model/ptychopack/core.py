@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from decimal import Decimal
 import logging
 
@@ -23,8 +23,8 @@ class PtychoPackPresenter(Observable, Observer):
         settings.addObserver(self)
         # FIXME device.addObserver(self)
 
-    def get_available_devices(self) -> Sequence[str]:
-        return [device.torch_device for device in self._device.get_available_devices()]
+    def get_available_devices(self) -> Iterator[str]:
+        return self._device.get_available_devices()
 
     def get_device(self) -> str:
         return self._device.get_device()

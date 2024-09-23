@@ -3,12 +3,14 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 from uuid import UUID
 import configparser
 import logging
 
 from .observer import Observable, Observer
+from .parametric import (BooleanParameter, DecimalParameter, IntegerParameter, Parameter,
+                         PathParameter, StringParameter, UUIDParameter)
 
 T = TypeVar('T')
 
@@ -21,13 +23,13 @@ class PathPrefixChange:
     replacementPathPrefix: Path
 
 
-class SettingsEntry(Generic[T], Observable):
+class SettingsEntry(Generic[T], Observable, Observer):
 
-    def __init__(self, name: str, defaultValue: T, stringConverter: Callable[[str], T]) -> None:
+    def __init__(self, name: str, parameter: Parameter[Any]) -> None:
         super().__init__()
         self._name = name
-        self._value = defaultValue
-        self._stringConverter = stringConverter
+        self._parameter = parameter
+        self._parameter.addObserver(self)
 
     @property
     def name(self) -> str:
@@ -35,18 +37,18 @@ class SettingsEntry(Generic[T], Observable):
 
     @property
     def value(self) -> T:
-        return self._value
+        return self._parameter.getValue()
 
     @value.setter
     def value(self, value: T) -> None:
-        candidate_value = value
-
-        if self._value != candidate_value:
-            self._value = candidate_value
-            self.notifyObservers()
+        self._parameter.setValue(value)
 
     def setValueFromString(self, valueString: str) -> None:
-        self.value = self._stringConverter(valueString)
+        self._parameter.setValueFromString(valueString)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self.notifyObservers()
 
 
 class SettingsGroup(Observable, Observer):
@@ -61,35 +63,33 @@ class SettingsGroup(Observable, Observer):
         return self._name
 
     def createStringEntry(self, name: str, defaultValue: str) -> SettingsEntry[str]:
-        candidateEntry = SettingsEntry[str](name, defaultValue,
-                                            lambda valueString: str(valueString))
+        parameter = StringParameter(defaultValue)
+        candidateEntry = SettingsEntry[str](name, parameter)
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createPathEntry(self, name: str, defaultValue: Path) -> SettingsEntry[Path]:
-        candidateEntry = SettingsEntry[Path](name, defaultValue,
-                                             lambda valueString: Path(valueString))
+        parameter = PathParameter(defaultValue)
+        candidateEntry = SettingsEntry[Path](name, parameter)
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createUUIDEntry(self, name: str, defaultValue: UUID) -> SettingsEntry[UUID]:
-        candidateEntry = SettingsEntry[UUID](name, defaultValue,
-                                             lambda valueString: UUID(valueString))
+        parameter = UUIDParameter(defaultValue)
+        candidateEntry = SettingsEntry[UUID](name, parameter)
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createBooleanEntry(self, name: str, defaultValue: bool) -> SettingsEntry[bool]:
-        trueStringList = ['1', 'true', 't', 'yes', 'y']
-        candidateEntry = SettingsEntry[bool](name, defaultValue, \
-                lambda valueString: valueString.lower() in trueStringList)
+        parameter = BooleanParameter(defaultValue)
+        candidateEntry = SettingsEntry[bool](name, parameter)
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createIntegerEntry(self, name: str, defaultValue: int) -> SettingsEntry[int]:
-        candidateEntry = SettingsEntry[int](name, defaultValue,
-                                            lambda valueString: int(valueString))
+        parameter = IntegerParameter(defaultValue, minimum=None, maximum=None)
+        candidateEntry = SettingsEntry[int](name, parameter)
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def createRealEntry(self, name: str, defaultValue: str | Decimal) -> SettingsEntry[Decimal]:
-        defaultDecimal = Decimal(defaultValue) if isinstance(defaultValue, str) else defaultValue
-        candidateEntry = SettingsEntry[Decimal](name, defaultDecimal,
-                                                lambda valueString: Decimal(valueString))
+        parameter = DecimalParameter(defaultValue)
+        candidateEntry = SettingsEntry[Decimal](name, parameter)
         return self._registerEntryIfNonexistent(candidateEntry)
 
     def _registerEntryIfNonexistent(self,

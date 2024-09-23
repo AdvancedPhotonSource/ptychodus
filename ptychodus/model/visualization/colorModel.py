@@ -101,6 +101,9 @@ class CylindricalColorModelParameter(Parameter[str], Observer):
         self._chooser.setCurrentPluginByName(value)
         super().setValue(self._chooser.currentPlugin.displayName, notify=notify)
 
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(value)
+
     def getPlugin(self) -> CylindricalColorModel:
         return self._chooser.currentPlugin.strategy
 

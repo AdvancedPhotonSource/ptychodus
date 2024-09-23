@@ -19,6 +19,7 @@ from .xmcd import XMCDAnalyzer
 
 logger = logging.getLogger(__name__)
 
+
 class AnalysisCore:
 
     def __init__(self, settingsRegistry: SettingsRegistry,

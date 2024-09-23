@@ -1,13 +1,28 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, MutableSequence, Sequence
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Final, Generic, TypeVar
+from uuid import UUID
+import json
 import logging
 
 from .observer import Observable, Observer
 
 __all__ = [
+    'BooleanParameter',
+    'ComplexArrayParameter',
+    'DecimalParameter',
+    'IntegerParameter',
+    'Parameter',
     'ParameterRepository',
+    'ParameterRepositoryBuilder',
+    'PathParameter',
+    'RealArrayParameter',
+    'RealParameter',
+    'StringParameter',
+    'UUIDParameter',
 ]
 
 logger = logging.getLogger(__name__)
@@ -15,7 +30,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar('T')
 
 
-class Parameter(Generic[T], Observable):
+class Parameter(ABC, Generic[T], Observable):
 
     def __init__(self, value: T) -> None:
         super().__init__()
@@ -31,11 +46,18 @@ class Parameter(Generic[T], Observable):
             if notify:
                 self.notifyObservers()
 
+    @abstractmethod
+    def setValueFromString(self, value: str) -> None:
+        pass
+
 
 class StringParameter(Parameter[str]):
 
     def __init__(self, value: str) -> None:
         super().__init__(value)
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(str(value))
 
 
 class PathParameter(Parameter[Path]):
@@ -43,11 +65,36 @@ class PathParameter(Parameter[Path]):
     def __init__(self, value: Path) -> None:
         super().__init__(value)
 
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(Path(value))
+
+
+class DecimalParameter(Parameter[Decimal]):
+
+    def __init__(self, value: Decimal | str) -> None:
+        super().__init__(Decimal(value) if isinstance(value, str) else value)
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(Decimal(value))
+
+
+class UUIDParameter(Parameter[UUID]):
+
+    def __init__(self, value: UUID) -> None:
+        super().__init__(value)
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(UUID(value))
+
 
 class BooleanParameter(Parameter[bool]):
+    TRUE_VALUES: Final = ('1', 'true', 't', 'yes', 'y')
 
     def __init__(self, value: bool) -> None:
         super().__init__(value)
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(value.lower() in BooleanParameter.TRUE_VALUES)
 
 
 class IntegerParameter(Parameter[int]):
@@ -74,6 +121,9 @@ class IntegerParameter(Parameter[int]):
 
         return value
 
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(int(value))
+
 
 class RealParameter(Parameter[float]):
 
@@ -98,6 +148,9 @@ class RealParameter(Parameter[float]):
             value = min(value, self._maximum)
 
         return value
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(float(value))
 
 
 class RealArrayParameter(Parameter[MutableSequence[float]]):
@@ -134,6 +187,9 @@ class RealArrayParameter(Parameter[MutableSequence[float]]):
             if notify:
                 self.notifyObservers()
 
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(json.loads(value))  # FIXME
+
 
 class ComplexArrayParameter(Parameter[MutableSequence[complex]]):
 
@@ -169,16 +225,24 @@ class ComplexArrayParameter(Parameter[MutableSequence[complex]]):
             if notify:
                 self.notifyObservers()
 
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(json.loads(value))  # FIXME
+
 
 class ParameterRepository(Mapping[str, Any], Observable, Observer):
 
-    def __init__(self, name: str, parent: ParameterRepository | None = None) -> None:
+    def __init__(self, repositoryName: str, parent: ParameterRepository | None = None) -> None:
         super().__init__()
-        self._parameterDict: dict[str, Parameter[Any]] = dict()
+        self._repositoryName = repositoryName
+        self._contents: dict[str, Parameter[Any]] = dict()
         self._repositoryList: list[ParameterRepository] = list()
 
         if parent is not None:
             parent._addParameterRepository(self)
+
+    @property
+    def repositoryName(self) -> str:
+        return self._repositoryName
 
     def _addParameterRepository(self,
                                 repository: ParameterRepository,
@@ -199,7 +263,7 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
             repository.removeObserver(self)
 
     def _registerParameter(self, name: str, parameter: Parameter[Any]) -> None:
-        if self._parameterDict.setdefault(name, parameter) == parameter:
+        if self._contents.setdefault(name, parameter) == parameter:
             parameter.addObserver(self)
         else:
             raise ValueError('Name already exists!')
@@ -251,18 +315,18 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
         return parameter
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._parameterDict)
+        return iter(self._contents)
 
     def __getitem__(self, name: str) -> Any:
-        return self._parameterDict[name]
+        return self._contents[name]
 
     def __len__(self) -> int:
-        return len(self._parameterDict)
+        return len(self._contents)
 
     def setParameters(self, parameterMap: Mapping[str, Any]) -> None:
         for key, value in parameterMap.items():
             try:
-                parameter = self._parameterDict[key]
+                parameter = self._contents[key]
             except KeyError:
                 logger.debug(f'Parameter \"{key}\" not found!')
             else:
@@ -278,7 +342,7 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
         self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
-        if observable in self._parameterDict.values():
+        if observable in self._contents.values():
             self.notifyObservers()
         elif observable in self._repositoryList:
             self.notifyObservers()

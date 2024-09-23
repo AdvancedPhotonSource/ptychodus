@@ -1,6 +1,5 @@
 import numpy
-import torch
-from ptychopack import (CorrectionPlan, CorrectionPlanElement, DataProduct, DetectorData, Device,
+from ptychopack import (CorrectionPlan, CorrectionPlanElement, DataProduct, DetectorData,
                         RelaxedAveragedAlternatingReflections)
 
 from ptychodus.api.object import Object, ObjectPoint
@@ -9,13 +8,13 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ptychodus.api.scan import Scan, ScanPoint
 
-from .device import PtychoPackDevice
+from .real_device import RealPtychoPackDevice
 from .settings import PtychoPackSettings
 
 
 class RelaxedAveragedAlternatingReflectionsReconstructor(Reconstructor):
 
-    def __init__(self, settings: PtychoPackSettings, device: PtychoPackDevice) -> None:
+    def __init__(self, settings: PtychoPackSettings, device: RealPtychoPackDevice) -> None:
         self._settings = settings
         self._device = device
 
@@ -61,8 +60,8 @@ class RelaxedAveragedAlternatingReflectionsReconstructor(Reconstructor):
             ),
         )
 
-        algorithm = RelaxedAveragedAlternatingReflections(self._device._device, detector_data,
-                                                          product)
+        algorithm = RelaxedAveragedAlternatingReflections(self._device.get_ptychopack_device(),
+                                                          detector_data, product)
         algorithm.set_relaxation(float(self._settings.raar_exit_wave_relaxation.value))
         algorithm.set_probe_power(probe_power)
         data_error = algorithm.iterate(plan)

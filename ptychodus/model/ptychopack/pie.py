@@ -1,6 +1,5 @@
 import numpy
-import torch
-from ptychopack import (CorrectionPlan, CorrectionPlanElement, DataProduct, DetectorData, Device,
+from ptychopack import (CorrectionPlan, CorrectionPlanElement, DataProduct, DetectorData,
                         PtychographicIterativeEngine)
 
 from ptychodus.api.object import Object, ObjectPoint
@@ -9,13 +8,13 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ptychodus.api.scan import Scan, ScanPoint
 
-from .device import PtychoPackDevice
+from .real_device import RealPtychoPackDevice
 from .settings import PtychoPackSettings
 
 
 class PtychographicIterativeEngineReconstructor(Reconstructor):
 
-    def __init__(self, settings: PtychoPackSettings, device: PtychoPackDevice) -> None:
+    def __init__(self, settings: PtychoPackSettings, device: RealPtychoPackDevice) -> None:
         self._settings = settings
         self._device = device
 
@@ -61,7 +60,8 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
             ),
         )
 
-        algorithm = PtychographicIterativeEngine(self._device._device, detector_data, product)
+        algorithm = PtychographicIterativeEngine(self._device.get_ptychopack_device(),
+                                                 detector_data, product)
         algorithm.set_object_relaxation(float(self._settings.pie_object_relaxation.value))
         algorithm.set_alpha(float(self._settings.pie_alpha.value))
         algorithm.set_probe_power(probe_power)
