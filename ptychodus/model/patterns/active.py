@@ -88,8 +88,8 @@ class ActiveDiffractionDataset(DiffractionDataset):
         with self._arrayListLock:
             self._arrayList.clear()
 
-            if self._settings.memmapEnabled.value:
-                scratchDirectory = self._settings.scratchDirectory.value
+            if self._settings.memmapEnabled.getValue():
+                scratchDirectory = self._settings.scratchDirectory.getValue()
                 scratchDirectory.mkdir(mode=0o755, parents=True, exist_ok=True)
                 npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
                 logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
@@ -107,19 +107,19 @@ class ActiveDiffractionDataset(DiffractionDataset):
         if array.getState() == DiffractionPatternState.LOADED:
             data = self._diffractionPatternSizer(array.getData())
 
-            if self._settings.valueUpperBoundEnabled.value:
-                valueLowerBound = self._settings.valueLowerBound.value
-                valueUpperBound = self._settings.valueUpperBound.value
+            if self._settings.valueUpperBoundEnabled.getValue():
+                valueLowerBound = self._settings.valueLowerBound.getValue()
+                valueUpperBound = self._settings.valueUpperBound.getValue()
                 data[data >= valueUpperBound] = 0
 
-            if self._settings.valueLowerBoundEnabled.value:
-                valueLowerBound = self._settings.valueLowerBound.value
+            if self._settings.valueLowerBoundEnabled.getValue():
+                valueLowerBound = self._settings.valueLowerBound.getValue()
                 data[data < valueLowerBound] = 0
 
-            if self._settings.flipXEnabled.value:
+            if self._settings.flipXEnabled.getValue():
                 data = numpy.flip(data, axis=-1)
 
-            if self._settings.flipYEnabled.value:
+            if self._settings.flipYEnabled.getValue():
                 data = numpy.flip(data, axis=-2)
 
             offset = self._metadata.numberOfPatternsPerArray * array.getIndex()

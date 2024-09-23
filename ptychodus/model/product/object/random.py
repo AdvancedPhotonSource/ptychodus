@@ -17,27 +17,27 @@ class RandomObjectBuilder(ObjectBuilder):
         self._settings = settings
 
         self.extraPaddingX = self._registerIntegerParameter('extra_padding_x',
-                                                            settings.extraPaddingX.value,
+                                                            settings.extraPaddingX.getValue(),
                                                             minimum=0)
         self.extraPaddingY = self._registerIntegerParameter('extra_padding_y',
-                                                            settings.extraPaddingY.value,
+                                                            settings.extraPaddingY.getValue(),
                                                             minimum=0)
 
         self.amplitudeMean = self._registerRealParameter(
             'amplitude_mean',
-            float(settings.amplitudeMean.value),
+            float(settings.amplitudeMean.getValue()),
             minimum=0.,
             maximum=1.,
         )
         self.amplitudeDeviation = self._registerRealParameter(
             'amplitude_deviation',
-            float(settings.amplitudeDeviation.value),
+            float(settings.amplitudeDeviation.getValue()),
             minimum=0.,
             maximum=1.,
         )
         self.phaseDeviation = self._registerRealParameter(
             'phase_deviation',
-            float(settings.phaseDeviation.value),
+            float(settings.phaseDeviation.getValue()),
             minimum=0.,
             maximum=numpy.pi,
         )

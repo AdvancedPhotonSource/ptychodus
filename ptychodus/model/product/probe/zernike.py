@@ -78,7 +78,7 @@ class ZernikeProbeBuilder(ProbeBuilder):
 
         self.diameterInMeters = self._registerRealParameter(
             'diameter_m',
-            float(settings.diskDiameterInMeters.value),
+            float(settings.diskDiameterInMeters.getValue()),
             minimum=0.,
         )
         # TODO init zernike coefficients from settings

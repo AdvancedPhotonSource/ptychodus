@@ -29,26 +29,26 @@ class PtychoNNModelPresenter(Observable, Observer):
 
     def getNumberOfConvolutionKernels(self) -> int:
         limits = self.getNumberOfConvolutionKernelsLimits()
-        return limits.clamp(self._settings.numberOfConvolutionKernels.value)
+        return limits.clamp(self._settings.numberOfConvolutionKernels.getValue())
 
     def setNumberOfConvolutionKernels(self, value: int) -> None:
-        self._settings.numberOfConvolutionKernels.value = value
+        self._settings.numberOfConvolutionKernels.setValue(value)
 
     def getBatchSizeLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getBatchSize(self) -> int:
         limits = self.getBatchSizeLimits()
-        return limits.clamp(self._settings.batchSize.value)
+        return limits.clamp(self._settings.batchSize.getValue())
 
     def setBatchSize(self, value: int) -> None:
-        self._settings.batchSize.value = value
+        self._settings.batchSize.setValue(value)
 
     def isBatchNormalizationEnabled(self) -> bool:
-        return self._settings.useBatchNormalization.value
+        return self._settings.useBatchNormalization.getValue()
 
     def setBatchNormalizationEnabled(self, enabled: bool) -> None:
-        self._settings.useBatchNormalization.value = enabled
+        self._settings.useBatchNormalization.setValue(enabled)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
@@ -69,50 +69,50 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
     def getValidationSetFractionalSize(self) -> Decimal:
         limits = self.getValidationSetFractionalSizeLimits()
-        return limits.clamp(self._settings.validationSetFractionalSize.value)
+        return limits.clamp(self._settings.validationSetFractionalSize.getValue())
 
     def setValidationSetFractionalSize(self, value: Decimal) -> None:
-        self._settings.validationSetFractionalSize.value = value
+        self._settings.validationSetFractionalSize.setValue(value)
 
     def getMaximumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMaximumLearningRate(self) -> Decimal:
         limits = self.getMaximumLearningRateLimits()
-        return limits.clamp(self._settings.maximumLearningRate.value)
+        return limits.clamp(self._settings.maximumLearningRate.getValue())
 
     def setMaximumLearningRate(self, value: Decimal) -> None:
-        self._settings.maximumLearningRate.value = value
+        self._settings.maximumLearningRate.setValue(value)
 
     def getMinimumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMinimumLearningRate(self) -> Decimal:
         limits = self.getMinimumLearningRateLimits()
-        return limits.clamp(self._settings.minimumLearningRate.value)
+        return limits.clamp(self._settings.minimumLearningRate.getValue())
 
     def setMinimumLearningRate(self, value: Decimal) -> None:
-        self._settings.minimumLearningRate.value = value
+        self._settings.minimumLearningRate.setValue(value)
 
     def getTrainingEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getTrainingEpochs(self) -> int:
         limits = self.getTrainingEpochsLimits()
-        return limits.clamp(self._settings.trainingEpochs.value)
+        return limits.clamp(self._settings.trainingEpochs.getValue())
 
     def setTrainingEpochs(self, value: int) -> None:
-        self._settings.trainingEpochs.value = value
+        self._settings.trainingEpochs.setValue(value)
 
     def getStatusIntervalInEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getStatusIntervalInEpochs(self) -> int:
         limits = self.getStatusIntervalInEpochsLimits()
-        return limits.clamp(self._settings.statusIntervalInEpochs.value)
+        return limits.clamp(self._settings.statusIntervalInEpochs.getValue())
 
     def setStatusIntervalInEpochs(self, value: int) -> None:
-        self._settings.statusIntervalInEpochs.value = value
+        self._settings.statusIntervalInEpochs.setValue(value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

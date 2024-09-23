@@ -17,12 +17,12 @@ class DiskProbeBuilder(ProbeBuilder):
 
         self.diameterInMeters = self._registerRealParameter(
             'diameter_m',
-            float(settings.diskDiameterInMeters.value),
+            float(settings.diskDiameterInMeters.getValue()),
             minimum=0.,
         )
         self.defocusDistanceInMeters = self._registerRealParameter(
             'defocus_distance_m',
-            float(settings.defocusDistanceInMeters.value),
+            float(settings.defocusDistanceInMeters.getValue()),
         )  # from sample to the focal plane
 
     def copy(self) -> DiskProbeBuilder:

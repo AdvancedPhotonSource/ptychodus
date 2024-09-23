@@ -78,14 +78,14 @@ class ProductCore(Observer):
                                    self._objectBuilderFactory)
 
         # TODO vvv refactor vvv
-        productFileReaderChooser.setCurrentPluginByName(settings.fileType.value)
-        productFileWriterChooser.setCurrentPluginByName(settings.fileType.value)
-        scanFileReaderChooser.setCurrentPluginByName(self._scanSettings.fileType.value)
-        scanFileWriterChooser.setCurrentPluginByName(self._scanSettings.fileType.value)
-        probeFileReaderChooser.setCurrentPluginByName(self._probeSettings.fileType.value)
-        probeFileWriterChooser.setCurrentPluginByName(self._probeSettings.fileType.value)
-        objectFileReaderChooser.setCurrentPluginByName(self._objectSettings.fileType.value)
-        objectFileWriterChooser.setCurrentPluginByName(self._objectSettings.fileType.value)
+        productFileReaderChooser.setCurrentPluginByName(settings.fileType.getValue())
+        productFileWriterChooser.setCurrentPluginByName(settings.fileType.getValue())
+        scanFileReaderChooser.setCurrentPluginByName(self._scanSettings.fileType.getValue())
+        scanFileWriterChooser.setCurrentPluginByName(self._scanSettings.fileType.getValue())
+        probeFileReaderChooser.setCurrentPluginByName(self._probeSettings.fileType.getValue())
+        probeFileWriterChooser.setCurrentPluginByName(self._probeSettings.fileType.getValue())
+        objectFileReaderChooser.setCurrentPluginByName(self._objectSettings.fileType.getValue())
+        objectFileWriterChooser.setCurrentPluginByName(self._objectSettings.fileType.getValue())
         # TODO ^^^^^^^^^^^^^^^^
 
         self._reinitObservable = reinitObservable

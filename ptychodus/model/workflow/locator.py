@@ -53,22 +53,22 @@ class SimpleDataLocator(DataLocator, Observer):
         return locator
 
     def setEndpointID(self, endpointID: UUID) -> None:
-        self._endpointID.value = endpointID
+        self._endpointID.setValue(endpointID)
 
     def getEndpointID(self) -> UUID:
-        return self._endpointID.value
+        return self._endpointID.getValue()
 
     def setGlobusPath(self, globusPath: str) -> None:
-        self._globusPath.value = globusPath
+        self._globusPath.setValue(globusPath)
 
     def getGlobusPath(self) -> str:
-        return self._globusPath.value
+        return self._globusPath.getValue()
 
     def setPosixPath(self, posixPath: Path) -> None:
-        self._posixPath.value = posixPath
+        self._posixPath.setValue(posixPath)
 
     def getPosixPath(self) -> Path:
-        return self._posixPath.value
+        return self._posixPath.getValue()
 
     def update(self, observable: Observable) -> None:
         if observable is self._endpointID:
@@ -98,30 +98,30 @@ class OutputDataLocator(DataLocator, Observer):
         return locator
 
     def setRoundTripEnabled(self, enable: bool) -> None:
-        self._useRoundTrip.value = enable
+        self._useRoundTrip.setValue(enable)
 
     def isRoundTripEnabled(self) -> bool:
-        return self._useRoundTrip.value
+        return self._useRoundTrip.getValue()
 
     def setEndpointID(self, endpointID: UUID) -> None:
         self._outputDataLocator.setEndpointID(endpointID)
 
     def getEndpointID(self) -> UUID:
-        return self._inputDataLocator.getEndpointID() if self._useRoundTrip.value \
+        return self._inputDataLocator.getEndpointID() if self._useRoundTrip.getValue() \
                 else self._outputDataLocator.getEndpointID()
 
     def setGlobusPath(self, globusPath: str) -> None:
         self._outputDataLocator.setGlobusPath(globusPath)
 
     def getGlobusPath(self) -> str:
-        return self._inputDataLocator.getGlobusPath() if self._useRoundTrip.value \
+        return self._inputDataLocator.getGlobusPath() if self._useRoundTrip.getValue() \
                 else self._outputDataLocator.getGlobusPath()
 
     def setPosixPath(self, posixPath: Path) -> None:
         self._outputDataLocator.setPosixPath(posixPath)
 
     def getPosixPath(self) -> Path:
-        return self._inputDataLocator.getPosixPath() if self._useRoundTrip.value \
+        return self._inputDataLocator.getPosixPath() if self._useRoundTrip.getValue() \
                 else self._outputDataLocator.getPosixPath()
 
     def update(self, observable: Observable) -> None:

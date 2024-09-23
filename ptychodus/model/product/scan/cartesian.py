@@ -41,22 +41,22 @@ class CartesianScanBuilder(ScanBuilder):
 
         self.numberOfPointsX = self._registerIntegerParameter(
             'number_of_points_x',
-            settings.numberOfPointsX.value,
+            settings.numberOfPointsX.getValue(),
             minimum=0,
         )
         self.numberOfPointsY = self._registerIntegerParameter(
             'number_of_points_y',
-            settings.numberOfPointsY.value,
+            settings.numberOfPointsY.getValue(),
             minimum=0,
         )
         self.stepSizeXInMeters = self._registerRealParameter(
             'step_size_x_m',
-            float(settings.stepSizeXInMeters.value),
+            float(settings.stepSizeXInMeters.getValue()),
             minimum=0.,
         )
         self.stepSizeYInMeters = self._registerRealParameter(
             'step_size_y_m',
-            float(settings.stepSizeYInMeters.value),
+            float(settings.stepSizeYInMeters.getValue()),
             minimum=0.,
         )
 

@@ -39,20 +39,20 @@ class TikeMultigridPresenter(Observable, Observer):
         return presenter
 
     def isMultigridEnabled(self) -> bool:
-        return self._settings.useMultigrid.value
+        return self._settings.useMultigrid.getValue()
 
     def setMultigridEnabled(self, enabled: bool) -> None:
-        self._settings.useMultigrid.value = enabled
+        self._settings.useMultigrid.setValue(enabled)
 
     def getNumLevelsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getNumLevels(self) -> int:
         limits = self.getNumLevelsLimits()
-        return limits.clamp(self._settings.numLevels.value)
+        return limits.clamp(self._settings.numLevels.getValue())
 
     def setNumLevels(self, value: int) -> None:
-        self._settings.numLevels.value = value
+        self._settings.numLevels.setValue(value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

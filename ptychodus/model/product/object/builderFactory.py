@@ -41,13 +41,13 @@ class ObjectBuilderFactory(Iterable[str]):
         return next(iter(self._builders.values()))()
 
     def createFromSettings(self) -> ObjectBuilder:
-        name = self._settings.builder.value
+        name = self._settings.builder.getValue()
         nameRepaired = name.casefold()
 
         if nameRepaired == 'from_file':
             return self.createObjectFromFile(
-                self._settings.filePath.value,
-                self._settings.fileType.value,
+                self._settings.filePath.getValue(),
+                self._settings.fileType.getValue(),
             )
 
         return self.create(nameRepaired)

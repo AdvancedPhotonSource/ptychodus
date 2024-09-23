@@ -33,78 +33,78 @@ class TikePresenter(Observable, Observer):
         return presenter
 
     def getNumGpus(self) -> str:
-        return self._settings.numGpus.value
+        return self._settings.numGpus.getValue()
 
     def setNumGpus(self, value: str) -> None:
-        self._settings.numGpus.value = value
+        self._settings.numGpus.setValue(value)
 
     def getNoiseModelList(self) -> Sequence[str]:
         return ['poisson', 'gaussian']
 
     def getNoiseModel(self) -> str:
-        return self._settings.noiseModel.value
+        return self._settings.noiseModel.getValue()
 
     def setNoiseModel(self, name: str) -> None:
-        self._settings.noiseModel.value = name
+        self._settings.noiseModel.setValue(name)
 
     def getNumBatchLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getNumBatch(self) -> int:
         limits = self.getNumBatchLimits()
-        return limits.clamp(self._settings.numBatch.value)
+        return limits.clamp(self._settings.numBatch.getValue())
 
     def setNumBatch(self, value: int) -> None:
-        self._settings.numBatch.value = value
+        self._settings.numBatch.setValue(value)
 
     def getBatchMethodList(self) -> Sequence[str]:
         return ['wobbly_center', 'wobbly_center_random_bootstrap', 'compact']
 
     def getBatchMethod(self) -> str:
-        return self._settings.batchMethod.value
+        return self._settings.batchMethod.getValue()
 
     def setBatchMethod(self, name: str) -> None:
-        self._settings.batchMethod.value = name
+        self._settings.batchMethod.setValue(name)
 
     def getNumIterLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getNumIter(self) -> int:
         limits = self.getNumIterLimits()
-        return limits.clamp(self._settings.numIter.value)
+        return limits.clamp(self._settings.numIter.getValue())
 
     def setNumIter(self, value: int) -> None:
-        self._settings.numIter.value = value
+        self._settings.numIter.setValue(value)
 
     def getConvergenceWindowLimits(self) -> Interval[int]:
         return Interval[int](0, self.MAX_INT)
 
     def getConvergenceWindow(self) -> int:
         limits = self.getConvergenceWindowLimits()
-        return limits.clamp(self._settings.convergenceWindow.value)
+        return limits.clamp(self._settings.convergenceWindow.getValue())
 
     def setConvergenceWindow(self, value: int) -> None:
-        self._settings.convergenceWindow.value = value
+        self._settings.convergenceWindow.setValue(value)
 
     def getAlphaLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getAlpha(self) -> Decimal:
         limits = self.getAlphaLimits()
-        return limits.clamp(self._settings.alpha.value)
+        return limits.clamp(self._settings.alpha.getValue())
 
     def setAlpha(self, value: Decimal) -> None:
-        self._settings.alpha.value = value
+        self._settings.alpha.setValue(value)
 
     def getStepLengthLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getStepLength(self) -> Decimal:
         limits = self.getStepLengthLimits()
-        return limits.clamp(self._settings.stepLength.value)
+        return limits.clamp(self._settings.stepLength.getValue())
 
     def setStepLength(self, value: Decimal) -> None:
-        self._settings.stepLength.value = value
+        self._settings.stepLength.setValue(value)
 
     def getLogLevelList(self) -> Sequence[str]:
         return ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG']

@@ -85,7 +85,7 @@ class WorkflowExecutor:
             'input_data_transfer_sync_level':
             transferSyncLevel,
             'compute_endpoint':
-            str(self._settings.computeEndpointID.value),
+            str(self._settings.computeEndpointID.getValue()),
             'ptychodus_action':
             ptychodusAction,
             'ptychodus_settings_file':

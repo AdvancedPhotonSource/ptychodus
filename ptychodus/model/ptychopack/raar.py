@@ -44,25 +44,25 @@ class RelaxedAveragedAlternatingReflectionsReconstructor(Reconstructor):
         )
         plan = CorrectionPlan(
             object_correction=CorrectionPlanElement(
-                start=self._settings.object_correction_plan_start.value,
-                stop=self._settings.object_correction_plan_stop.value,
-                stride=self._settings.object_correction_plan_stride.value,
+                start=self._settings.object_correction_plan_start.getValue(),
+                stop=self._settings.object_correction_plan_stop.getValue(),
+                stride=self._settings.object_correction_plan_stride.getValue(),
             ),
             probe_correction=CorrectionPlanElement(
-                start=self._settings.probe_correction_plan_start.value,
-                stop=self._settings.probe_correction_plan_stop.value,
-                stride=self._settings.probe_correction_plan_stride.value,
+                start=self._settings.probe_correction_plan_start.getValue(),
+                stop=self._settings.probe_correction_plan_stop.getValue(),
+                stride=self._settings.probe_correction_plan_stride.getValue(),
             ),
             position_correction=CorrectionPlanElement(
-                start=self._settings.position_correction_plan_start.value,
-                stop=self._settings.position_correction_plan_stop.value,
-                stride=self._settings.position_correction_plan_stride.value,
+                start=self._settings.position_correction_plan_start.getValue(),
+                stop=self._settings.position_correction_plan_stop.getValue(),
+                stride=self._settings.position_correction_plan_stride.getValue(),
             ),
         )
 
         algorithm = RelaxedAveragedAlternatingReflections(self._device.get_ptychopack_device(),
                                                           detector_data, product)
-        algorithm.set_relaxation(float(self._settings.raar_exit_wave_relaxation.value))
+        algorithm.set_relaxation(float(self._settings.raar_exit_wave_relaxation.getValue()))
         algorithm.set_probe_power(probe_power)
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()

@@ -69,7 +69,7 @@ class AutomationDatasetProcessor:
                 logger.exception('Error while processing dataset!')
             finally:
                 self._processingQueue.task_done()
-                self._nextJobTime = self._settings.processingIntervalInSeconds.value + time()
+                self._nextJobTime = self._settings.processingIntervalInSeconds.getValue() + time()
 
     def start(self) -> None:
         self.stop()

@@ -71,17 +71,17 @@ class ProbePropagator(Observable):
                 propagatedWavefield[idx, mode, :, :] = wf
                 propagatedIntensity[idx, :, :] += intensity(wf)
 
-        self._settings.beginCoordinateInMeters.value = beginCoordinateInMeters
-        self._settings.endCoordinateInMeters.value = endCoordinateInMeters
+        self._settings.beginCoordinateInMeters.setValue(beginCoordinateInMeters)
+        self._settings.endCoordinateInMeters.setValue(endCoordinateInMeters)
         self._propagatedWavefield = propagatedWavefield
         self._propagatedIntensity = propagatedIntensity
         self.notifyObservers()
 
     def getBeginCoordinateInMeters(self) -> Decimal:
-        return self._settings.beginCoordinateInMeters.value
+        return self._settings.beginCoordinateInMeters.getValue()
 
     def getEndCoordinateInMeters(self) -> Decimal:
-        return self._settings.endCoordinateInMeters.value
+        return self._settings.endCoordinateInMeters.getValue()
 
     def _getProbe(self) -> Probe:
         item = self._repository[self._productIndex]
@@ -93,7 +93,7 @@ class ProbePropagator(Observable):
 
     def getNumberOfSteps(self) -> int:
         if self._propagatedIntensity is None:
-            return self._settings.numberOfSteps.value
+            return self._settings.numberOfSteps.getValue()
 
         return self._propagatedIntensity.shape[0]
 

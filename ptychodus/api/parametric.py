@@ -17,7 +17,6 @@ __all__ = [
     'IntegerParameter',
     'Parameter',
     'ParameterRepository',
-    'ParameterRepositoryBuilder',
     'PathParameter',
     'RealArrayParameter',
     'RealParameter',
@@ -50,6 +49,9 @@ class Parameter(ABC, Generic[T], Observable):
     def setValueFromString(self, value: str) -> None:
         pass
 
+    def __str__(self) -> str:
+        return str(self._value)
+
 
 class StringParameter(Parameter[str]):
 
@@ -67,6 +69,18 @@ class PathParameter(Parameter[Path]):
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(Path(value))
+
+    def changePathPrefix(self, find_path_prefix: Path, replacement_path_prefix: Path) -> Path:
+        value = self.getValue()
+
+        try:
+            relative_path = value.resolve().relative_to(find_path_prefix)
+        except ValueError:
+            pass
+        else:
+            return replacement_path_prefix / relative_path
+
+        return value
 
 
 class DecimalParameter(Parameter[Decimal]):
@@ -229,7 +243,7 @@ class ComplexArrayParameter(Parameter[MutableSequence[complex]]):
         self.setValue(json.loads(value))  # FIXME
 
 
-class ParameterRepository(Mapping[str, Any], Observable, Observer):
+class ParameterRepository(Mapping[str, Parameter[Any]], Observable, Observer):
 
     def __init__(self, repositoryName: str, parent: ParameterRepository | None = None) -> None:
         super().__init__()
@@ -273,8 +287,13 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
         self._registerParameter(name, parameter)
         return parameter
 
-    def _registerPathParameter(self, name: str, value: Path) -> Parameter[Path]:
+    def _registerPathParameter(self, name: str, value: Path) -> PathParameter:
         parameter = PathParameter(value)
+        self._registerParameter(name, parameter)
+        return parameter
+
+    def _registerUUIDParameter(self, name: str, value: UUID) -> UUIDParameter:
+        parameter = UUIDParameter(value)
         self._registerParameter(name, parameter)
         return parameter
 
@@ -317,13 +336,13 @@ class ParameterRepository(Mapping[str, Any], Observable, Observer):
     def __iter__(self) -> Iterator[str]:
         return iter(self._contents)
 
-    def __getitem__(self, name: str) -> Any:
+    def __getitem__(self, name: str) -> Parameter[Any]:
         return self._contents[name]
 
     def __len__(self) -> int:
         return len(self._contents)
 
-    def setParameters(self, parameterMap: Mapping[str, Any]) -> None:
+    def setParameters(self, parameterMap: Mapping[str, Parameter[Any]]) -> None:
         for key, value in parameterMap.items():
             try:
                 parameter = self._contents[key]

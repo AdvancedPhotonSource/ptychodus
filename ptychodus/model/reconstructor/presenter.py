@@ -38,10 +38,10 @@ class ReconstructorPresenter(Observable, Observer):
         self._reconstructorChooser.setCurrentPluginByName(name)
 
     def _syncFromSettings(self) -> None:
-        self.setReconstructor(self._settings.algorithm.value)
+        self.setReconstructor(self._settings.algorithm.getValue())
 
     def _syncToSettings(self) -> None:
-        self._settings.algorithm.value = self._reconstructorChooser.currentPlugin.simpleName
+        self._settings.algorithm.setValue(self._reconstructorChooser.currentPlugin.simpleName)
 
     def reconstruct(self,
                     inputProductIndex: int,

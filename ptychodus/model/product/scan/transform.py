@@ -17,22 +17,22 @@ class ScanPointTransform(ParameterRepository):
         self._settings = settings
 
         self.affineAX = self._registerRealParameter('affine_ax',
-                                                    float(settings.affineTransformAX.value))
+                                                    float(settings.affineTransformAX.getValue()))
         self.affineAY = self._registerRealParameter('affine_ay',
-                                                    float(settings.affineTransformAY.value))
+                                                    float(settings.affineTransformAY.getValue()))
         self.affineATInMeters = self._registerRealParameter(
-            'affine_at_m', float(settings.affineTransformATInMeters.value))
+            'affine_at_m', float(settings.affineTransformATInMeters.getValue()))
 
         self.affineBX = self._registerRealParameter('affine_bx',
-                                                    float(settings.affineTransformBX.value))
+                                                    float(settings.affineTransformBX.getValue()))
         self.affineBY = self._registerRealParameter('affine_by',
-                                                    float(settings.affineTransformBY.value))
+                                                    float(settings.affineTransformBY.getValue()))
         self.affineBTInMeters = self._registerRealParameter(
-            'affine_bt_m', float(settings.affineTransformBTInMeters.value))
+            'affine_bt_m', float(settings.affineTransformBTInMeters.getValue()))
 
         self.jitterRadiusInMeters = self._registerRealParameter(
             'jitter_radius_m',
-            float(settings.jitterRadiusInMeters.value),
+            float(settings.jitterRadiusInMeters.getValue()),
             minimum=0.,
         )
 

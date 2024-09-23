@@ -47,12 +47,13 @@ class SettingsTableModel(QAbstractTableModel):
             return None
 
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            settingsEntry = self._settingsGroup[index.row()]
+            nameList = list(self._settingsGroup.keys())
+            name = nameList[index.row()]
 
             if index.column() == 0:
-                return settingsEntry.name
+                return name
             elif index.column() == 1:
-                return str(settingsEntry.value)
+                return str(self._settingsGroup[name])
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._settingsGroup) if self._settingsGroup else 0

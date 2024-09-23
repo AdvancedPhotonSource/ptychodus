@@ -28,22 +28,22 @@ class MultimodalProbeBuilder(ParameterRepository):
 
         self.numberOfModes = self._registerIntegerParameter(
             'number_of_modes',
-            settings.numberOfModes.value,
+            settings.numberOfModes.getValue(),
             minimum=1,
         )
         self.modeDecayType = self._registerStringParameter(
             'mode_decay_type',
-            settings.modeDecayType.value,
+            settings.modeDecayType.getValue(),
         )
         self.modeDecayRatio = self._registerRealParameter(
             'mode_decay_ratio',
-            float(settings.modeDecayRatio.value),
+            float(settings.modeDecayRatio.getValue()),
             minimum=0.,
             maximum=1.,
         )
         self.isOrthogonalizeModesEnabled = self._registerBooleanParameter(
             'orthogonalize_modes',
-            settings.orthogonalizeModesEnabled.value,
+            settings.orthogonalizeModesEnabled.getValue(),
         )
 
     def copy(self) -> MultimodalProbeBuilder:

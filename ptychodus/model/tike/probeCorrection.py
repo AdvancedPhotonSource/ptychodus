@@ -39,73 +39,75 @@ class TikeProbeCorrectionPresenter(TikeAdaptiveMomentPresenter[TikeProbeCorrecti
         return presenter
 
     def isProbeCorrectionEnabled(self) -> bool:
-        return self._settings.useProbeCorrection.value
+        return self._settings.useProbeCorrection.getValue()
 
     def setProbeCorrectionEnabled(self, enabled: bool) -> None:
-        self._settings.useProbeCorrection.value = enabled
+        self._settings.useProbeCorrection.setValue(enabled)
 
     def isForceOrthogonalityEnabled(self) -> bool:
-        return self._settings.forceOrthogonality.value
+        return self._settings.forceOrthogonality.getValue()
 
     def setForceOrthogonalityEnabled(self, enabled: bool) -> None:
-        self._settings.forceOrthogonality.value = enabled
+        self._settings.forceOrthogonality.setValue(enabled)
 
     def isForceCenteredIntensityEnabled(self) -> bool:
-        return self._settings.forceCenteredIntensity.value
+        return self._settings.forceCenteredIntensity.getValue()
 
     def setForceCenteredIntensityEnabled(self, enabled: bool) -> None:
-        self._settings.forceCenteredIntensity.value = enabled
+        self._settings.forceCenteredIntensity.setValue(enabled)
 
     def getForceSparsityLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getForceSparsity(self) -> Decimal:
         limits = self.getForceSparsityLimits()
-        return limits.clamp(self._settings.forceSparsity.value)
+        return limits.clamp(self._settings.forceSparsity.getValue())
 
     def setForceSparsity(self, value: Decimal) -> None:
-        self._settings.forceSparsity.value = value
+        self._settings.forceSparsity.setValue(value)
 
     def isFiniteProbeSupportEnabled(self) -> bool:
-        return self._settings.useFiniteProbeSupport.value
+        return self._settings.useFiniteProbeSupport.getValue()
 
     def setFiniteProbeSupportEnabled(self, enabled: bool) -> None:
-        self._settings.useFiniteProbeSupport.value = enabled
+        self._settings.useFiniteProbeSupport.setValue(enabled)
 
     def getProbeSupportWeightMinimum(self) -> Decimal:
         return Decimal()
 
     def getProbeSupportWeight(self) -> Decimal:
-        return max(self._settings.probeSupportWeight.value, self.getProbeSupportWeightMinimum())
+        return max(self._settings.probeSupportWeight.getValue(),
+                   self.getProbeSupportWeightMinimum())
 
     def setProbeSupportWeight(self, value: Decimal) -> None:
-        self._settings.probeSupportWeight.value = value
+        self._settings.probeSupportWeight.setValue(value)
 
     def getProbeSupportRadiusLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1) / 2)
 
     def getProbeSupportRadius(self) -> Decimal:
         limits = self.getProbeSupportRadiusLimits()
-        return limits.clamp(self._settings.probeSupportRadius.value)
+        return limits.clamp(self._settings.probeSupportRadius.getValue())
 
     def setProbeSupportRadius(self, value: Decimal) -> None:
-        self._settings.probeSupportRadius.value = value
+        self._settings.probeSupportRadius.setValue(value)
 
     def getProbeSupportDegreeMinimum(self) -> Decimal:
         return Decimal()
 
     def getProbeSupportDegree(self) -> Decimal:
-        return max(self._settings.probeSupportDegree.value, self.getProbeSupportDegreeMinimum())
+        return max(self._settings.probeSupportDegree.getValue(),
+                   self.getProbeSupportDegreeMinimum())
 
     def setProbeSupportDegree(self, value: Decimal) -> None:
-        self._settings.probeSupportDegree.value = value
+        self._settings.probeSupportDegree.setValue(value)
 
     def getAdditionalProbePenaltyMinimum(self) -> Decimal:
         return Decimal()
 
     def getAdditionalProbePenalty(self) -> Decimal:
-        return max(self._settings.additionalProbePenalty.value,
+        return max(self._settings.additionalProbePenalty.getValue(),
                    self.getAdditionalProbePenaltyMinimum())
 
     def setAdditionalProbePenalty(self, value: Decimal) -> None:
-        self._settings.additionalProbePenalty.value = value
+        self._settings.additionalProbePenalty.setValue(value)

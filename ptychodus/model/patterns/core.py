@@ -64,26 +64,26 @@ class DiffractionDatasetPresenter(Observable, Observer):
         return self._dataset.getInfoText()
 
     def isMemmapEnabled(self) -> bool:
-        return self._settings.memmapEnabled.value
+        return self._settings.memmapEnabled.getValue()
 
     def setMemmapEnabled(self, value: bool) -> None:
-        self._settings.memmapEnabled.value = value
+        self._settings.memmapEnabled.setValue(value)
 
     def getScratchDirectory(self) -> Path:
-        return self._settings.scratchDirectory.value
+        return self._settings.scratchDirectory.getValue()
 
     def setScratchDirectory(self, directory: Path) -> None:
-        self._settings.scratchDirectory.value = directory
+        self._settings.scratchDirectory.setValue(directory)
 
     def getNumberOfDataThreadsLimits(self) -> Interval[int]:
         return Interval[int](1, 64)
 
     def getNumberOfDataThreads(self) -> int:
         limits = self.getNumberOfDataThreadsLimits()
-        return limits.clamp(self._settings.numberOfDataThreads.value)
+        return limits.clamp(self._settings.numberOfDataThreads.getValue())
 
     def setNumberOfDataThreads(self, number: int) -> None:
-        self._settings.numberOfDataThreads.value = number
+        self._settings.numberOfDataThreads.setValue(number)
 
     @property
     def isAssembled(self) -> bool:
@@ -141,8 +141,8 @@ class PatternsCore:
         self.productSettings = ProductSettings(settingsRegistry)
 
         # TODO vvv refactor vvv
-        fileReaderChooser.setCurrentPluginByName(self.patternSettings.fileType.value)
-        fileWriterChooser.setCurrentPluginByName(self.patternSettings.fileType.value)
+        fileReaderChooser.setCurrentPluginByName(self.patternSettings.fileType.getValue())
+        fileWriterChooser.setCurrentPluginByName(self.patternSettings.fileType.getValue())
         # TODO ^^^^^^^^^^^^^^^^
 
         self.patternSizer = PatternSizer.createInstance(self.patternSettings, self.detector)

@@ -21,7 +21,7 @@ class SpiralScanBuilder(ScanBuilder):
         )
         self.radiusScalarInMeters = self._registerRealParameter(
             'radius_scalar_m',
-            float(settings.radiusScalarInMeters.value),
+            float(settings.radiusScalarInMeters.getValue()),
             minimum=0.,
         )
 

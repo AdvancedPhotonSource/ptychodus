@@ -33,9 +33,9 @@ class PtychoPackPresenter(Observable, Observer):
         self._device.set_device(device)
 
     def get_plan(self) -> str:
-        iterations = self._settings.object_correction_plan_stop.value
-        iterations = max(iterations, self._settings.probe_correction_plan_stop.value)
-        iterations = max(iterations, self._settings.position_correction_plan_stop.value)
+        iterations = self._settings.object_correction_plan_stop.getValue()
+        iterations = max(iterations, self._settings.probe_correction_plan_stop.getValue())
+        iterations = max(iterations, self._settings.position_correction_plan_stop.getValue())
         return f'Planned Iterations: {iterations}'
 
     def get_dm_exit_wave_relaxation_limits(self) -> Interval[Decimal]:
@@ -43,130 +43,130 @@ class PtychoPackPresenter(Observable, Observer):
 
     def get_dm_exit_wave_relaxation(self) -> Decimal:
         limits = self.get_dm_exit_wave_relaxation_limits()
-        return limits.clamp(self._settings.dm_exit_wave_relaxation.value)
+        return limits.clamp(self._settings.dm_exit_wave_relaxation.getValue())
 
     def set_dm_exit_wave_relaxation(self, value: Decimal) -> None:
-        self._settings.dm_exit_wave_relaxation.value = value
+        self._settings.dm_exit_wave_relaxation.setValue(value)
 
     def get_raar_exit_wave_relaxation_limits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def get_raar_exit_wave_relaxation(self) -> Decimal:
         limits = self.get_raar_exit_wave_relaxation_limits()
-        return limits.clamp(self._settings.raar_exit_wave_relaxation.value)
+        return limits.clamp(self._settings.raar_exit_wave_relaxation.getValue())
 
     def set_raar_exit_wave_relaxation(self, value: Decimal) -> None:
-        self._settings.raar_exit_wave_relaxation.value = value
+        self._settings.raar_exit_wave_relaxation.setValue(value)
 
     def get_object_correction_plan_start(self) -> int:
-        return self._settings.object_correction_plan_start.value
+        return self._settings.object_correction_plan_start.getValue()
 
     def set_object_correction_plan_start(self, value: int) -> None:
-        self._settings.object_correction_plan_start.value = value
+        self._settings.object_correction_plan_start.setValue(value)
 
     def get_object_correction_plan_stop(self) -> int:
-        return self._settings.object_correction_plan_stop.value
+        return self._settings.object_correction_plan_stop.getValue()
 
     def set_object_correction_plan_stop(self, value: int) -> None:
-        self._settings.object_correction_plan_stop.value = value
+        self._settings.object_correction_plan_stop.setValue(value)
 
     def get_object_correction_plan_stride(self) -> int:
-        return self._settings.object_correction_plan_stride.value
+        return self._settings.object_correction_plan_stride.getValue()
 
     def set_object_correction_plan_stride(self, value: int) -> None:
-        self._settings.object_correction_plan_stride.value = value
+        self._settings.object_correction_plan_stride.setValue(value)
 
     def get_pie_alpha_limits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def get_pie_alpha(self) -> Decimal:
         limits = self.get_pie_alpha_limits()
-        return limits.clamp(self._settings.pie_alpha.value)
+        return limits.clamp(self._settings.pie_alpha.getValue())
 
     def set_pie_alpha(self, value: Decimal) -> None:
-        self._settings.pie_alpha.value = value
+        self._settings.pie_alpha.setValue(value)
 
     def get_pie_object_relaxation_limits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def get_pie_object_relaxation(self) -> Decimal:
         limits = self.get_pie_object_relaxation_limits()
-        return limits.clamp(self._settings.pie_object_relaxation.value)
+        return limits.clamp(self._settings.pie_object_relaxation.getValue())
 
     def set_pie_object_relaxation(self, value: Decimal) -> None:
-        self._settings.pie_object_relaxation.value = value
+        self._settings.pie_object_relaxation.setValue(value)
 
     def get_probe_correction_plan_start(self) -> int:
-        return self._settings.probe_correction_plan_start.value
+        return self._settings.probe_correction_plan_start.getValue()
 
     def set_probe_correction_plan_start(self, value: int) -> None:
-        self._settings.probe_correction_plan_start.value = value
+        self._settings.probe_correction_plan_start.setValue(value)
 
     def get_probe_correction_plan_stop(self) -> int:
-        return self._settings.probe_correction_plan_stop.value
+        return self._settings.probe_correction_plan_stop.getValue()
 
     def set_probe_correction_plan_stop(self, value: int) -> None:
-        self._settings.probe_correction_plan_stop.value = value
+        self._settings.probe_correction_plan_stop.setValue(value)
 
     def get_probe_correction_plan_stride(self) -> int:
-        return self._settings.probe_correction_plan_stride.value
+        return self._settings.probe_correction_plan_stride.getValue()
 
     def set_probe_correction_plan_stride(self, value: int) -> None:
-        self._settings.probe_correction_plan_stride.value = value
+        self._settings.probe_correction_plan_stride.setValue(value)
 
     def get_pie_beta_limits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def get_pie_beta(self) -> Decimal:
         limits = self.get_pie_beta_limits()
-        return limits.clamp(self._settings.pie_beta.value)
+        return limits.clamp(self._settings.pie_beta.getValue())
 
     def set_pie_beta(self, value: Decimal) -> None:
-        self._settings.pie_beta.value = value
+        self._settings.pie_beta.setValue(value)
 
     def get_pie_probe_relaxation_limits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def get_pie_probe_relaxation(self) -> Decimal:
         limits = self.get_pie_probe_relaxation_limits()
-        return limits.clamp(self._settings.pie_probe_relaxation.value)
+        return limits.clamp(self._settings.pie_probe_relaxation.getValue())
 
     def set_pie_probe_relaxation(self, value: Decimal) -> None:
-        self._settings.pie_probe_relaxation.value = value
+        self._settings.pie_probe_relaxation.setValue(value)
 
     def get_position_correction_plan_start(self) -> int:
-        return self._settings.position_correction_plan_start.value
+        return self._settings.position_correction_plan_start.getValue()
 
     def set_position_correction_plan_start(self, value: int) -> None:
-        self._settings.position_correction_plan_start.value = value
+        self._settings.position_correction_plan_start.setValue(value)
 
     def get_position_correction_plan_stop(self) -> int:
-        return self._settings.position_correction_plan_stop.value
+        return self._settings.position_correction_plan_stop.getValue()
 
     def set_position_correction_plan_stop(self, value: int) -> None:
-        self._settings.position_correction_plan_stop.value = value
+        self._settings.position_correction_plan_stop.setValue(value)
 
     def get_position_correction_plan_stride(self) -> int:
-        return self._settings.position_correction_plan_stride.value
+        return self._settings.position_correction_plan_stride.getValue()
 
     def set_position_correction_plan_stride(self, value: int) -> None:
-        self._settings.position_correction_plan_stride.value = value
+        self._settings.position_correction_plan_stride.setValue(value)
 
     def get_position_correction_probe_threshold_limits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def get_position_correction_probe_threshold(self) -> Decimal:
         limits = self.get_position_correction_probe_threshold_limits()
-        return limits.clamp(self._settings.position_correction_probe_threshold.value)
+        return limits.clamp(self._settings.position_correction_probe_threshold.getValue())
 
     def set_position_correction_probe_threshold(self, value: Decimal) -> None:
-        self._settings.position_correction_probe_threshold.value = value
+        self._settings.position_correction_probe_threshold.setValue(value)
 
     def get_position_correction_feedback(self) -> Decimal:
-        return self._settings.position_correction_feedback.value
+        return self._settings.position_correction_feedback.getValue()
 
     def set_position_correction_feedback(self, value: Decimal) -> None:
-        self._settings.position_correction_feedback.value = value
+        self._settings.position_correction_feedback.setValue(value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

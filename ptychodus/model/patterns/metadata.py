@@ -63,17 +63,17 @@ class DiffractionMetadataPresenter(Observable, Observer):
             cropCenter = self._metadata.cropCenter
 
             if cropCenter:
-                self._patternSettings.cropCenterXInPixels.value = cropCenter.positionXInPixels
-                self._patternSettings.cropCenterYInPixels.value = cropCenter.positionYInPixels
+                self._patternSettings.cropCenterXInPixels.setValue(cropCenter.positionXInPixels)
+                self._patternSettings.cropCenterYInPixels.setValue(cropCenter.positionYInPixels)
             elif self._metadata.detectorExtent:
-                self._patternSettings.cropCenterXInPixels.value = \
-                        int(self._metadata.detectorExtent.widthInPixels) // 2
-                self._patternSettings.cropCenterYInPixels.value = \
-                        int(self._metadata.detectorExtent.heightInPixels) // 2
+                self._patternSettings.cropCenterXInPixels.setValue(
+                    int(self._metadata.detectorExtent.widthInPixels) // 2)
+                self._patternSettings.cropCenterYInPixels.setValue(
+                    int(self._metadata.detectorExtent.heightInPixels) // 2)
 
         if syncExtent and self._metadata.detectorExtent:
-            centerX = self._patternSettings.cropCenterXInPixels.value
-            centerY = self._patternSettings.cropCenterYInPixels.value
+            centerX = self._patternSettings.cropCenterXInPixels.getValue()
+            centerY = self._patternSettings.cropCenterYInPixels.getValue()
 
             extentX = int(self._metadata.detectorExtent.widthInPixels)
             extentY = int(self._metadata.detectorExtent.heightInPixels)
@@ -86,8 +86,8 @@ class DiffractionMetadataPresenter(Observable, Observer):
             while cropDiameterInPixels < maxRadius:
                 cropDiameterInPixels <<= 1
 
-            self._patternSettings.cropWidthInPixels.value = cropDiameterInPixels
-            self._patternSettings.cropHeightInPixels.value = cropDiameterInPixels
+            self._patternSettings.cropWidthInPixels.setValue(cropDiameterInPixels)
+            self._patternSettings.cropHeightInPixels.setValue(cropDiameterInPixels)
 
     def canSyncProbeEnergy(self) -> bool:
         return (self._metadata.probeEnergyInElectronVolts is not None)
@@ -96,8 +96,8 @@ class DiffractionMetadataPresenter(Observable, Observer):
         energyInElectronVolts = self._metadata.probeEnergyInElectronVolts
 
         if energyInElectronVolts:
-            self._productSettings.probeEnergyInElectronVolts.value = \
-                    Decimal.from_float(energyInElectronVolts)
+            self._productSettings.probeEnergyInElectronVolts.setValue(
+                Decimal.from_float(energyInElectronVolts))
 
     def canSyncDetectorDistance(self) -> bool:
         return (self._metadata.detectorDistanceInMeters is not None)
@@ -106,8 +106,8 @@ class DiffractionMetadataPresenter(Observable, Observer):
         distanceInMeters = self._metadata.detectorDistanceInMeters
 
         if distanceInMeters:
-            self._productSettings.detectorDistanceInMeters.value = \
-                    Decimal.from_float(distanceInMeters)
+            self._productSettings.detectorDistanceInMeters.setValue(
+                Decimal.from_float(distanceInMeters))
 
     def update(self, observable: Observable) -> None:
         if observable is self._diffractionDataset:

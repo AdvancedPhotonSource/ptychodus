@@ -16,17 +16,17 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
 
         self.annularRadiusInMeters = self._registerRealParameter(
             'annular_radius_m',
-            float(settings.superGaussianAnnularRadiusInMeters.value),
+            float(settings.superGaussianAnnularRadiusInMeters.getValue()),
             minimum=0.,
         )
         self.fwhmInMeters = self._registerRealParameter(
             'full_width_at_half_maximum_m',
-            float(settings.superGaussianWidthInMeters.value),
+            float(settings.superGaussianWidthInMeters.getValue()),
             minimum=0.,
         )
         self.orderParameter = self._registerRealParameter(
             'order_parameter',
-            float(settings.superGaussianOrderParameter.value),
+            float(settings.superGaussianOrderParameter.getValue()),
             minimum=1.,
         )
 

@@ -32,16 +32,16 @@ class ScanRepositoryItem(ParameterRepository):
         self._addParameterRepository(builder, observe=True)
         self._addParameterRepository(transform, observe=True)
 
-        self.expandBoundingBox = self._registerBooleanParameter('expand_bbox',
-                                                                settings.expandBoundingBox.value)
+        self.expandBoundingBox = self._registerBooleanParameter(
+            'expand_bbox', settings.expandBoundingBox.getValue())
         self.expandedBoundingBoxMinimumXInMeters = self._registerRealParameter(
-            'expanded_bbox_xmin_m', float(settings.expandedBoundingBoxMinimumXInMeters.value))
+            'expanded_bbox_xmin_m', float(settings.expandedBoundingBoxMinimumXInMeters.getValue()))
         self.expandedBoundingBoxMaximumXInMeters = self._registerRealParameter(
-            'expanded_bbox_xmax_m', float(settings.expandedBoundingBoxMaximumXInMeters.value))
+            'expanded_bbox_xmax_m', float(settings.expandedBoundingBoxMaximumXInMeters.getValue()))
         self.expandedBoundingBoxMinimumYInMeters = self._registerRealParameter(
-            'expanded_bbox_ymin_m', float(settings.expandedBoundingBoxMinimumYInMeters.value))
+            'expanded_bbox_ymin_m', float(settings.expandedBoundingBoxMinimumYInMeters.getValue()))
         self.expandedBoundingBoxMaximumYInMeters = self._registerRealParameter(
-            'expanded_bbox_ymax_m', float(settings.expandedBoundingBoxMaximumYInMeters.value))
+            'expanded_bbox_ymax_m', float(settings.expandedBoundingBoxMaximumYInMeters.getValue()))
 
         self._rebuild()
 

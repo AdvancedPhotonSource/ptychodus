@@ -31,13 +31,13 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
                       probeEnergyInElectronVolts: float | None = None,
                       probePhotonsPerSecond: float | None = None,
                       exposureTimeInSeconds: float | None = None) -> MetadataRepositoryItem:
-        detectorDistanceInMeters_ = float(self._settings.detectorDistanceInMeters.value) \
+        detectorDistanceInMeters_ = float(self._settings.detectorDistanceInMeters.getValue()) \
                 if detectorDistanceInMeters is None else detectorDistanceInMeters
-        probeEnergyInElectronVolts_ = float(self._settings.probeEnergyInElectronVolts.value) \
+        probeEnergyInElectronVolts_ = float(self._settings.probeEnergyInElectronVolts.getValue()) \
                 if probeEnergyInElectronVolts is None else probeEnergyInElectronVolts
-        probePhotonsPerSecond_ = float(self._settings.probePhotonsPerSecond.value) \
+        probePhotonsPerSecond_ = float(self._settings.probePhotonsPerSecond.getValue()) \
                 if probePhotonsPerSecond is None else probePhotonsPerSecond
-        exposureTimeInSeconds_ = float(self._settings.exposureTimeInSeconds.value) \
+        exposureTimeInSeconds_ = float(self._settings.exposureTimeInSeconds.getValue()) \
                 if exposureTimeInSeconds is None else exposureTimeInSeconds
 
         metadata = ProductMetadata(

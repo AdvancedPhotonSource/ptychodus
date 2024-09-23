@@ -21,25 +21,25 @@ class LissajousScanBuilder(ScanBuilder):
         )
         self.amplitudeXInMeters = self._registerRealParameter(
             'amplitude_x_m',
-            float(settings.amplitudeXInMeters.value),
+            float(settings.amplitudeXInMeters.getValue()),
             minimum=0.,
         )
         self.amplitudeYInMeters = self._registerRealParameter(
             'amplitude_y_m',
-            float(settings.amplitudeYInMeters.value),
+            float(settings.amplitudeYInMeters.getValue()),
             minimum=0.,
         )
         self.angularStepXInTurns = self._registerRealParameter(
             'angular_step_x_tr',
-            float(settings.angularStepXInTurns.value),
+            float(settings.angularStepXInTurns.getValue()),
         )
         self.angularStepYInTurns = self._registerRealParameter(
             'angular_step_y_tr',
-            float(settings.angularStepYInTurns.value),
+            float(settings.angularStepYInTurns.getValue()),
         )
         self.angularShiftInTurns = self._registerRealParameter(
             'angular_shift_tr',
-            float(settings.angularShiftInTurns.value),
+            float(settings.angularShiftInTurns.getValue()),
         )
 
     def copy(self) -> LissajousScanBuilder:

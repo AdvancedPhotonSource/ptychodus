@@ -92,7 +92,7 @@ class ActiveDiffractionDatasetBuilder:
         logger.info('Starting data assembler...')
         self._stopWorkEvent.clear()
 
-        for idx in range(self._settings.numberOfDataThreads.value):
+        for idx in range(self._settings.numberOfDataThreads.getValue()):
             thread = threading.Thread(target=self._getArrayAndAssemble)
             thread.start()
             self._workers.append(thread)

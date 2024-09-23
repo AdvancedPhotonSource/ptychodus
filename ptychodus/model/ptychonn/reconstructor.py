@@ -111,7 +111,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                 widthInPixels=parameters.patterns.shape[-1],
                 heightInPixels=parameters.patterns.shape[-2],
             )
-            maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
+            maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.getValue())
             self._patternBuffer = PatternCircularBuffer(patternExtent, maximumSize)
             self._objectPatchBuffer = ObjectPatchCircularBuffer(
                 patternExtent, self._modelProvider.getNumberOfChannels(), maximumSize)
@@ -152,16 +152,17 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
     def train(self) -> TrainOutput:
         model = self._modelProvider.getModel()
         logger.debug('Training...')
-        trainingSetFractionalSize = 1 - self._trainingSettings.validationSetFractionalSize.value
+        trainingSetFractionalSize = 1 - self._trainingSettings.validationSetFractionalSize.getValue(
+        )
         trainer, trainerLog = ptychonn.train(
             model=model,
-            batch_size=self._modelSettings.batchSize.value,
+            batch_size=self._modelSettings.batchSize.getValue(),
             out_dir=None,
             X_train=self._patternBuffer.getBuffer(),
             Y_train=self._objectPatchBuffer.getBuffer(),
-            epochs=self._trainingSettings.trainingEpochs.value,
+            epochs=self._trainingSettings.trainingEpochs.getValue(),
             training_fraction=float(trainingSetFractionalSize),
-            log_frequency=self._trainingSettings.statusIntervalInEpochs.value,
+            log_frequency=self._trainingSettings.statusIntervalInEpochs.getValue(),
             strategy='ddp_notebook',
         )
         self._modelProvider.setTrainer(trainer)

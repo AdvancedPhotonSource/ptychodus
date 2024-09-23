@@ -35,19 +35,19 @@ class TikePositionCorrectionPresenter(TikeAdaptiveMomentPresenter[TikePositionCo
         return presenter
 
     def isPositionCorrectionEnabled(self) -> bool:
-        return self._settings.usePositionCorrection.value
+        return self._settings.usePositionCorrection.getValue()
 
     def setPositionCorrectionEnabled(self, enabled: bool) -> None:
-        self._settings.usePositionCorrection.value = enabled
+        self._settings.usePositionCorrection.setValue(enabled)
 
     def isPositionRegularizationEnabled(self) -> bool:
-        return self._settings.usePositionRegularization.value
+        return self._settings.usePositionRegularization.getValue()
 
     def setPositionRegularizationEnabled(self, enabled: bool) -> None:
-        self._settings.usePositionRegularization.value = enabled
+        self._settings.usePositionRegularization.setValue(enabled)
 
     def getUpdateMagnitudeLimit(self) -> Decimal:
-        return self._settings.updateMagnitudeLimit.value
+        return self._settings.updateMagnitudeLimit.getValue()
 
     def setUpdateMagnitudeLimit(self, value: Decimal) -> None:
-        self._settings.updateMagnitudeLimit.value = value
+        self._settings.updateMagnitudeLimit.setValue(value)

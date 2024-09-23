@@ -32,30 +32,30 @@ class TikeAdaptiveMomentPresenter(Generic[T], Observable, Observer):
         settings.addObserver(self)
 
     def isAdaptiveMomentEnabled(self) -> bool:
-        return self._settings.useAdaptiveMoment.value
+        return self._settings.useAdaptiveMoment.getValue()
 
     def setAdaptiveMomentEnabled(self, enabled: bool) -> None:
-        self._settings.useAdaptiveMoment.value = enabled
+        self._settings.useAdaptiveMoment.setValue(enabled)
 
     def getMDecayLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMDecay(self) -> Decimal:
         limits = self.getMDecayLimits()
-        return limits.clamp(self._settings.mdecay.value)
+        return limits.clamp(self._settings.mdecay.getValue())
 
     def setMDecay(self, value: Decimal) -> None:
-        self._settings.mdecay.value = value
+        self._settings.mdecay.setValue(value)
 
     def getVDecayLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getVDecay(self) -> Decimal:
         limits = self.getVDecayLimits()
-        return limits.clamp(self._settings.vdecay.value)
+        return limits.clamp(self._settings.vdecay.getValue())
 
     def setVDecay(self, value: Decimal) -> None:
-        self._settings.vdecay.value = value
+        self._settings.vdecay.setValue(value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

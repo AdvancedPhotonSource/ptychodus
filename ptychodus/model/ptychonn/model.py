@@ -31,11 +31,11 @@ class PtychoNNModelProvider:
         else:
             logger.debug('Initializing model from settings')
             self._model = ptychonn.LitReconSmallModel(
-                nconv=self._modelSettings.numberOfConvolutionKernels.value,
-                use_batch_norm=self._modelSettings.useBatchNormalization.value,
+                nconv=self._modelSettings.numberOfConvolutionKernels.getValue(),
+                use_batch_norm=self._modelSettings.useBatchNormalization.getValue(),
                 enable_amplitude=self._enableAmplitude,
-                max_lr=float(self._trainingSettings.maximumLearningRate.value),
-                min_lr=float(self._trainingSettings.minimumLearningRate.value),
+                max_lr=float(self._trainingSettings.maximumLearningRate.getValue()),
+                min_lr=float(self._trainingSettings.minimumLearningRate.getValue()),
             )
 
         return self._model

@@ -42,20 +42,20 @@ class AutomationPresenter(Observable, Observer):
         self._workflow.setWorkflow(strategy)
 
     def getDataDirectory(self) -> Path:
-        return self._settings.dataDirectory.value
+        return self._settings.dataDirectory.getValue()
 
     def setDataDirectory(self, directory: Path) -> None:
-        self._settings.dataDirectory.value = directory
+        self._settings.dataDirectory.setValue(directory)
 
     def getProcessingIntervalLimitsInSeconds(self) -> Interval[int]:
         return Interval[int](0, 600)
 
     def getProcessingIntervalInSeconds(self) -> int:
         limits = self.getProcessingIntervalLimitsInSeconds()
-        return limits.clamp(self._settings.processingIntervalInSeconds.value)
+        return limits.clamp(self._settings.processingIntervalInSeconds.getValue())
 
     def setProcessingIntervalInSeconds(self, value: int) -> None:
-        self._settings.processingIntervalInSeconds.value = value
+        self._settings.processingIntervalInSeconds.setValue(value)
 
     def loadExistingDatasetsToRepository(self) -> None:
         dataDirectory = self.getDataDirectory()
@@ -83,16 +83,16 @@ class AutomationPresenter(Observable, Observer):
 
     def getWatchdogDelayInSeconds(self) -> int:
         limits = self.getWatchdogDelayLimitsInSeconds()
-        return limits.clamp(self._settings.watchdogDelayInSeconds.value)
+        return limits.clamp(self._settings.watchdogDelayInSeconds.getValue())
 
     def setWatchdogDelayInSeconds(self, value: int) -> None:
-        self._settings.watchdogDelayInSeconds.value = value
+        self._settings.watchdogDelayInSeconds.setValue(value)
 
     def setWatchdogPollingObserverEnabled(self, enable: bool) -> None:
-        self._settings.useWatchdogPollingObserver.value = enable
+        self._settings.useWatchdogPollingObserver.setValue(enable)
 
     def isWatchdogPollingObserverEnabled(self) -> bool:
-        return self._settings.useWatchdogPollingObserver.value
+        return self._settings.useWatchdogPollingObserver.getValue()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:

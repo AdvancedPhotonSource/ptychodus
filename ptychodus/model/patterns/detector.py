@@ -23,16 +23,16 @@ class Detector(Observable, Observer):
         self._bitDepth = self._settingsGroup.createIntegerEntry('BitDepth', 8)
 
     def getWidthInPixels(self) -> int:
-        return max(0, self._widthInPixels.value)
+        return max(0, self._widthInPixels.getValue())
 
     def setWidthInPixels(self, widthInPixels: int) -> None:
-        self._widthInPixels.value = widthInPixels
+        self._widthInPixels.setValue(widthInPixels)
 
     def getHeightInPixels(self) -> int:
-        return max(0, self._heightInPixels.value)
+        return max(0, self._heightInPixels.getValue())
 
     def setHeightInPixels(self, heightInPixels: int) -> None:
-        self._heightInPixels.value = heightInPixels
+        self._heightInPixels.setValue(heightInPixels)
 
     def getImageExtent(self) -> ImageExtent:
         return ImageExtent(
@@ -45,16 +45,16 @@ class Detector(Observable, Observer):
         self.setHeightInPixels(imageExtent.heightInPixels)
 
     def getPixelWidthInMeters(self) -> Decimal:
-        return max(Decimal(), self._pixelWidthInMeters.value)
+        return max(Decimal(), self._pixelWidthInMeters.getValue())
 
     def setPixelWidthInMeters(self, pixelWidthInMeters: Decimal) -> None:
-        self._pixelWidthInMeters.value = pixelWidthInMeters
+        self._pixelWidthInMeters.setValue(pixelWidthInMeters)
 
     def getPixelHeightInMeters(self) -> Decimal:
-        return max(Decimal(), self._pixelHeightInMeters.value)
+        return max(Decimal(), self._pixelHeightInMeters.getValue())
 
     def setPixelHeightInMeters(self, pixelHeightInMeters: Decimal) -> None:
-        self._pixelHeightInMeters.value = pixelHeightInMeters
+        self._pixelHeightInMeters.setValue(pixelHeightInMeters)
 
     def getPixelGeometry(self) -> PixelGeometry:
         return PixelGeometry(
@@ -67,10 +67,10 @@ class Detector(Observable, Observer):
         self.setPixelHeightInMeters(Decimal(repr(pixelGeometry.heightInMeters)))
 
     def getBitDepth(self) -> int:
-        return max(1, self._bitDepth.value)
+        return max(1, self._bitDepth.getValue())
 
     def setBitDepth(self, bitDepth: int) -> None:
-        self._bitDepth.value = bitDepth
+        self._bitDepth.setValue(bitDepth)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

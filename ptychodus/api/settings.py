@@ -1,16 +1,16 @@
 from __future__ import annotations
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 from uuid import UUID
 import configparser
 import logging
 
 from .observer import Observable, Observer
 from .parametric import (BooleanParameter, DecimalParameter, IntegerParameter, Parameter,
-                         PathParameter, StringParameter, UUIDParameter)
+                         ParameterRepository, PathParameter, StringParameter, UUIDParameter)
 
 T = TypeVar('T')
 
@@ -23,101 +23,48 @@ class PathPrefixChange:
     replacementPathPrefix: Path
 
 
-class SettingsEntry(Generic[T], Observable, Observer):
-
-    def __init__(self, name: str, parameter: Parameter[Any]) -> None:
-        super().__init__()
-        self._name = name
-        self._parameter = parameter
-        self._parameter.addObserver(self)
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def value(self) -> T:
-        return self._parameter.getValue()
-
-    @value.setter
-    def value(self, value: T) -> None:
-        self._parameter.setValue(value)
-
-    def setValueFromString(self, valueString: str) -> None:
-        self._parameter.setValueFromString(valueString)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._parameter:
-            self.notifyObservers()
-
-
-class SettingsGroup(Observable, Observer):
+class SettingsGroup(Mapping[str, Parameter[Any]], Observable, Observer):
 
     def __init__(self, name: str) -> None:
         super().__init__()
-        self._name = name
-        self._entryList: list[SettingsEntry[Any]] = list()
+        self._repository = ParameterRepository(name)
+        self._repository.addObserver(self)
 
     @property
     def name(self) -> str:
-        return self._name
+        return self._repository.repositoryName
 
-    def createStringEntry(self, name: str, defaultValue: str) -> SettingsEntry[str]:
-        parameter = StringParameter(defaultValue)
-        candidateEntry = SettingsEntry[str](name, parameter)
-        return self._registerEntryIfNonexistent(candidateEntry)
+    def createStringEntry(self, name: str, defaultValue: str) -> StringParameter:
+        return self._repository._registerStringParameter(name, defaultValue)
 
-    def createPathEntry(self, name: str, defaultValue: Path) -> SettingsEntry[Path]:
-        parameter = PathParameter(defaultValue)
-        candidateEntry = SettingsEntry[Path](name, parameter)
-        return self._registerEntryIfNonexistent(candidateEntry)
+    def createPathEntry(self, name: str, defaultValue: Path) -> PathParameter:
+        return self._repository._registerPathParameter(name, defaultValue)
 
-    def createUUIDEntry(self, name: str, defaultValue: UUID) -> SettingsEntry[UUID]:
-        parameter = UUIDParameter(defaultValue)
-        candidateEntry = SettingsEntry[UUID](name, parameter)
-        return self._registerEntryIfNonexistent(candidateEntry)
+    def createUUIDEntry(self, name: str, defaultValue: UUID) -> UUIDParameter:
+        return self._repository._registerUUIDParameter(name, defaultValue)
 
-    def createBooleanEntry(self, name: str, defaultValue: bool) -> SettingsEntry[bool]:
-        parameter = BooleanParameter(defaultValue)
-        candidateEntry = SettingsEntry[bool](name, parameter)
-        return self._registerEntryIfNonexistent(candidateEntry)
+    def createBooleanEntry(self, name: str, defaultValue: bool) -> BooleanParameter:
+        return self._repository._registerBooleanParameter(name, defaultValue)
 
-    def createIntegerEntry(self, name: str, defaultValue: int) -> SettingsEntry[int]:
-        parameter = IntegerParameter(defaultValue, minimum=None, maximum=None)
-        candidateEntry = SettingsEntry[int](name, parameter)
-        return self._registerEntryIfNonexistent(candidateEntry)
+    def createIntegerEntry(self, name: str, defaultValue: int) -> IntegerParameter:
+        return self._repository._registerIntegerParameter(name, defaultValue)
 
-    def createRealEntry(self, name: str, defaultValue: str | Decimal) -> SettingsEntry[Decimal]:
+    def createRealEntry(self, name: str, defaultValue: str | Decimal) -> DecimalParameter:
         parameter = DecimalParameter(defaultValue)
-        candidateEntry = SettingsEntry[Decimal](name, parameter)
-        return self._registerEntryIfNonexistent(candidateEntry)
+        self._repository._registerParameter(name, parameter)
+        return parameter
 
-    def _registerEntryIfNonexistent(self,
-                                    candidateEntry: SettingsEntry[Any]) -> SettingsEntry[Any]:
-        for existingEntry in self._entryList:
-            if existingEntry.name.casefold() == candidateEntry.name.casefold():
-                if not isinstance(candidateEntry, existingEntry.value.__class__):
-                    raise TypeError('Attempted to duplicate settings entry with conflicting type.')
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._repository)
 
-                return existingEntry
-
-        candidateEntry.addObserver(self)
-        self._entryList.append(candidateEntry)
-        self.notifyObservers()
-
-        return candidateEntry
-
-    def __iter__(self) -> Iterator[SettingsEntry[Any]]:
-        return iter(self._entryList)
-
-    def __getitem__(self, index: int) -> SettingsEntry[Any]:
-        return self._entryList[index]
+    def __getitem__(self, name: str) -> Parameter[Any]:
+        return self._repository[name]
 
     def __len__(self) -> int:
-        return len(self._entryList)
+        return len(self._repository)
 
     def update(self, observable: Observable) -> None:
-        if observable in self._entryList:
+        if observable is self._repository:
             self.notifyObservers()
 
 
@@ -162,10 +109,10 @@ class SettingsRegistry(Observable):
             if not config.has_section(settingsGroup.name):
                 continue
 
-            for settingsEntry in settingsGroup:
-                if config.has_option(settingsGroup.name, settingsEntry.name):
-                    valueString = config.get(settingsGroup.name, settingsEntry.name)
-                    settingsEntry.setValueFromString(valueString)
+            for name, parameter in settingsGroup.items():
+                if config.has_option(settingsGroup.name, name):
+                    valueString = config.get(settingsGroup.name, name)
+                    parameter.setValueFromString(valueString)
 
         self.notifyObservers()
 
@@ -184,20 +131,15 @@ class SettingsRegistry(Observable):
         for settingsGroup in self._groupList:
             config.add_section(settingsGroup.name)
 
-            for settingsEntry in settingsGroup:
-                valueString = str(settingsEntry.value)
+            for name, parameter in settingsGroup.items():
+                valueString = str(parameter)
 
-                if changePathPrefix and isinstance(settingsEntry.value, Path):
-                    try:
-                        relativePath = settingsEntry.value.relative_to(
-                            changePathPrefix.findPathPrefix)
-                    except ValueError:
-                        pass
-                    else:
-                        modifiedPath = changePathPrefix.replacementPathPrefix / relativePath
-                        valueString = str(modifiedPath)
+                if changePathPrefix and isinstance(parameter, PathParameter):
+                    modifiedPath = parameter.changePathPrefix(
+                        changePathPrefix.findPathPrefix, changePathPrefix.replacementPathPrefix)
+                    valueString = str(modifiedPath)
 
-                config.set(settingsGroup.name, settingsEntry.name, valueString)
+                config.set(settingsGroup.name, name, valueString)
 
         logger.debug(f'Writing settings to \"{filePath}\"')
 

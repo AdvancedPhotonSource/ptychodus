@@ -33,33 +33,33 @@ class TikeObjectCorrectionPresenter(TikeAdaptiveMomentPresenter[TikeObjectCorrec
         return presenter
 
     def isObjectCorrectionEnabled(self) -> bool:
-        return self._settings.useObjectCorrection.value
+        return self._settings.useObjectCorrection.getValue()
 
     def setObjectCorrectionEnabled(self, enabled: bool) -> None:
-        self._settings.useObjectCorrection.value = enabled
+        self._settings.useObjectCorrection.setValue(enabled)
 
     def getPositivityConstraintLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getPositivityConstraint(self) -> Decimal:
         limits = self.getPositivityConstraintLimits()
-        return limits.clamp(self._settings.positivityConstraint.value)
+        return limits.clamp(self._settings.positivityConstraint.getValue())
 
     def setPositivityConstraint(self, value: Decimal) -> None:
-        self._settings.positivityConstraint.value = value
+        self._settings.positivityConstraint.setValue(value)
 
     def getSmoothnessConstraintLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1) / 8)
 
     def getSmoothnessConstraint(self) -> Decimal:
         limits = self.getSmoothnessConstraintLimits()
-        return limits.clamp(self._settings.smoothnessConstraint.value)
+        return limits.clamp(self._settings.smoothnessConstraint.getValue())
 
     def setSmoothnessConstraint(self, value: Decimal) -> None:
-        self._settings.smoothnessConstraint.value = value
+        self._settings.smoothnessConstraint.setValue(value)
 
     def isMagnitudeClippingEnabled(self) -> bool:
-        return self._settings.useMagnitudeClipping.value
+        return self._settings.useMagnitudeClipping.getValue()
 
     def setMagnitudeClippingEnabled(self, enabled: bool) -> None:
-        self._settings.useMagnitudeClipping.value = enabled
+        self._settings.useMagnitudeClipping.setValue(enabled)

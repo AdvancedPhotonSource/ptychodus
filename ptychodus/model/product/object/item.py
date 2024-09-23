@@ -40,7 +40,7 @@ class ObjectRepositoryItem(ParameterRepository):
         numRequested = max(1, number)
         distanceInMeters = list(self.layerDistanceInMeters.getValue())
         numExisting = len(distanceInMeters)
-        defaultDistanceInMeters = float(self._settings.objectLayerDistanceInMeters.value)
+        defaultDistanceInMeters = float(self._settings.objectLayerDistanceInMeters.getValue())
 
         if numExisting < 2:
             distanceInMeters = [defaultDistanceInMeters] * numRequested

@@ -36,7 +36,7 @@ class DiffractionPatternPresenter(Observable, Observer):
         return self._sizer.getCenterXInPixels()
 
     def setCropCenterXInPixels(self, value: int) -> None:
-        self._settings.cropCenterXInPixels.value = value
+        self._settings.cropCenterXInPixels.setValue(value)
 
     def getCropCenterYLimitsInPixels(self) -> Interval[int]:
         return self._sizer.getCenterYLimitsInPixels()
@@ -45,7 +45,7 @@ class DiffractionPatternPresenter(Observable, Observer):
         return self._sizer.getCenterYInPixels()
 
     def setCropCenterYInPixels(self, value: int) -> None:
-        self._settings.cropCenterYInPixels.value = value
+        self._settings.cropCenterYInPixels.setValue(value)
 
     def getCropWidthLimitsInPixels(self) -> Interval[int]:
         return self._sizer.getWidthLimitsInPixels()
@@ -54,7 +54,7 @@ class DiffractionPatternPresenter(Observable, Observer):
         return self._sizer.getWidthInPixels()
 
     def setCropWidthInPixels(self, value: int) -> None:
-        self._settings.cropWidthInPixels.value = value
+        self._settings.cropWidthInPixels.setValue(value)
 
     def getCropHeightLimitsInPixels(self) -> Interval[int]:
         return self._sizer.getHeightLimitsInPixels()
@@ -63,49 +63,49 @@ class DiffractionPatternPresenter(Observable, Observer):
         return self._sizer.getHeightInPixels()
 
     def setCropHeightInPixels(self, value: int) -> None:
-        self._settings.cropHeightInPixels.value = value
+        self._settings.cropHeightInPixels.setValue(value)
 
     def isFlipXEnabled(self) -> bool:
-        return self._settings.flipXEnabled.value
+        return self._settings.flipXEnabled.getValue()
 
     def setFlipXEnabled(self, value: bool) -> None:
-        self._settings.flipXEnabled.value = value
+        self._settings.flipXEnabled.setValue(value)
 
     def isFlipYEnabled(self) -> bool:
-        return self._settings.flipYEnabled.value
+        return self._settings.flipYEnabled.getValue()
 
     def setFlipYEnabled(self, value: bool) -> None:
-        self._settings.flipYEnabled.value = value
+        self._settings.flipYEnabled.setValue(value)
 
     def isValueLowerBoundEnabled(self) -> bool:
-        return self._settings.valueLowerBoundEnabled.value
+        return self._settings.valueLowerBoundEnabled.getValue()
 
     def setValueLowerBoundEnabled(self, value: bool) -> None:
-        self._settings.valueLowerBoundEnabled.value = value
+        self._settings.valueLowerBoundEnabled.setValue(value)
 
     def getValueLowerBoundLimits(self) -> Interval[int]:
         return Interval[int](0, self.MAX_INT)
 
     def getValueLowerBound(self) -> int:
-        return self._settings.valueLowerBound.value
+        return self._settings.valueLowerBound.getValue()
 
     def setValueLowerBound(self, value: int) -> None:
-        self._settings.valueLowerBound.value = value
+        self._settings.valueLowerBound.setValue(value)
 
     def isValueUpperBoundEnabled(self) -> bool:
-        return self._settings.valueUpperBoundEnabled.value
+        return self._settings.valueUpperBoundEnabled.getValue()
 
     def setValueUpperBoundEnabled(self, value: bool) -> None:
-        self._settings.valueUpperBoundEnabled.value = value
+        self._settings.valueUpperBoundEnabled.setValue(value)
 
     def getValueUpperBoundLimits(self) -> Interval[int]:
         return Interval[int](0, self.MAX_INT)
 
     def getValueUpperBound(self) -> int:
-        return self._settings.valueUpperBound.value
+        return self._settings.valueUpperBound.getValue()
 
     def setValueUpperBound(self, value: int) -> None:
-        self._settings.valueUpperBound.value = value
+        self._settings.valueUpperBound.setValue(value)
 
     def update(self, observable: Observable) -> None:
         if observable is self._sizer:

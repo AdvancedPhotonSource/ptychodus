@@ -57,7 +57,7 @@ class DataDirectoryWatcher(Observable, Observer):
 
     def _updateWatch(self) -> None:
         self._observer.unschedule_all()
-        dataDirectory = self._settings.dataDirectory.value
+        dataDirectory = self._settings.dataDirectory.getValue()
 
         if dataDirectory.exists():
             observedWatch = self._observer.schedule(
@@ -74,7 +74,7 @@ class DataDirectoryWatcher(Observable, Observer):
             logger.error('Automation watchdog thread already started!')
         else:
             logger.info('Starting automation watchdog thread...')
-            self._observer = PollingObserver() if self._settings.useWatchdogPollingObserver.value \
+            self._observer = PollingObserver() if self._settings.useWatchdogPollingObserver.getValue() \
                     else watchdog.observers.Observer()
             self._observer.start()
             self._updateWatch()

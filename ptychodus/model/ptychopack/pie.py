@@ -44,32 +44,32 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
         )
         plan = CorrectionPlan(
             object_correction=CorrectionPlanElement(
-                start=self._settings.object_correction_plan_start.value,
-                stop=self._settings.object_correction_plan_stop.value,
-                stride=self._settings.object_correction_plan_stride.value,
+                start=self._settings.object_correction_plan_start.getValue(),
+                stop=self._settings.object_correction_plan_stop.getValue(),
+                stride=self._settings.object_correction_plan_stride.getValue(),
             ),
             probe_correction=CorrectionPlanElement(
-                start=self._settings.probe_correction_plan_start.value,
-                stop=self._settings.probe_correction_plan_stop.value,
-                stride=self._settings.probe_correction_plan_stride.value,
+                start=self._settings.probe_correction_plan_start.getValue(),
+                stop=self._settings.probe_correction_plan_stop.getValue(),
+                stride=self._settings.probe_correction_plan_stride.getValue(),
             ),
             position_correction=CorrectionPlanElement(
-                start=self._settings.position_correction_plan_start.value,
-                stop=self._settings.position_correction_plan_stop.value,
-                stride=self._settings.position_correction_plan_stride.value,
+                start=self._settings.position_correction_plan_start.getValue(),
+                stop=self._settings.position_correction_plan_stop.getValue(),
+                stride=self._settings.position_correction_plan_stride.getValue(),
             ),
         )
 
         algorithm = PtychographicIterativeEngine(self._device.get_ptychopack_device(),
                                                  detector_data, product)
-        algorithm.set_object_relaxation(float(self._settings.pie_object_relaxation.value))
-        algorithm.set_alpha(float(self._settings.pie_alpha.value))
+        algorithm.set_object_relaxation(float(self._settings.pie_object_relaxation.getValue()))
+        algorithm.set_alpha(float(self._settings.pie_alpha.getValue()))
         algorithm.set_probe_power(probe_power)
-        algorithm.set_probe_relaxation(float(self._settings.pie_probe_relaxation.value))
-        algorithm.set_beta(float(self._settings.pie_beta.value))
+        algorithm.set_probe_relaxation(float(self._settings.pie_probe_relaxation.getValue()))
+        algorithm.set_beta(float(self._settings.pie_beta.getValue()))
         algorithm.set_pc_probe_threshold(
-            float(self._settings.position_correction_probe_threshold.value))
-        algorithm.set_pc_feedback(float(self._settings.position_correction_feedback.value))
+            float(self._settings.position_correction_probe_threshold.getValue()))
+        algorithm.set_pc_feedback(float(self._settings.position_correction_feedback.getValue()))
 
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()

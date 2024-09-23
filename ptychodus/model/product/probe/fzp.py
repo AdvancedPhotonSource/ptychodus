@@ -23,22 +23,22 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
 
         self.zonePlateDiameterInMeters = self._registerRealParameter(
             'zone_plate_diameter_m',
-            float(settings.zonePlateDiameterInMeters.value),
+            float(settings.zonePlateDiameterInMeters.getValue()),
             minimum=0.,
         )
         self.outermostZoneWidthInMeters = self._registerRealParameter(
             'outermost_zone_width_m',
-            float(settings.outermostZoneWidthInMeters.value),
+            float(settings.outermostZoneWidthInMeters.getValue()),
             minimum=0.,
         )
         self.centralBeamstopDiameterInMeters = self._registerRealParameter(
             'central_beamstop_diameter_m',
-            float(settings.centralBeamstopDiameterInMeters.value),
+            float(settings.centralBeamstopDiameterInMeters.getValue()),
             minimum=0.,
         )
         self.defocusDistanceInMeters = self._registerRealParameter(
             'defocus_distance_m',
-            float(settings.defocusDistanceInMeters.value),
+            float(settings.defocusDistanceInMeters.getValue()),
         )  # from sample to the focal plane
 
     def copy(self) -> FresnelZonePlateProbeBuilder:

@@ -17,17 +17,17 @@ class RectangularProbeBuilder(ProbeBuilder):
 
         self.widthInMeters = self._registerRealParameter(
             'width_m',
-            float(settings.rectangleWidthInMeters.value),
+            float(settings.rectangleWidthInMeters.getValue()),
             minimum=0.,
         )
         self.heightInMeters = self._registerRealParameter(
             'height_m',
-            float(settings.rectangleHeightInMeters.value),
+            float(settings.rectangleHeightInMeters.getValue()),
             minimum=0.,
         )
         self.defocusDistanceInMeters = self._registerRealParameter(
             'defocus_distance_m',
-            float(settings.defocusDistanceInMeters.value),
+            float(settings.defocusDistanceInMeters.getValue()),
         )  # from sample to the focal plane
 
     def copy(self) -> RectangularProbeBuilder:

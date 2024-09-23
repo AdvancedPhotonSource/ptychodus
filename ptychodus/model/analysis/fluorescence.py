@@ -128,11 +128,12 @@ class FluorescenceEnhancer(Observable, Observer):
         self._enhanced: FluorescenceDataset | None = None
 
         upscalingStrategyChooser.addObserver(self)
-        upscalingStrategyChooser.setCurrentPluginByName(settings.upscalingStrategy.value)
+        upscalingStrategyChooser.setCurrentPluginByName(settings.upscalingStrategy.getValue())
         deconvolutionStrategyChooser.addObserver(self)
-        deconvolutionStrategyChooser.setCurrentPluginByName(settings.deconvolutionStrategy.value)
-        fileReaderChooser.setCurrentPluginByName(settings.fileType.value)
-        fileWriterChooser.setCurrentPluginByName(settings.fileType.value)
+        deconvolutionStrategyChooser.setCurrentPluginByName(
+            settings.deconvolutionStrategy.getValue())
+        fileReaderChooser.setCurrentPluginByName(settings.fileType.getValue())
+        fileWriterChooser.setCurrentPluginByName(settings.fileType.getValue())
         reinitObservable.addObserver(self)
 
     def setProduct(self, productIndex: int) -> None:
@@ -165,8 +166,8 @@ class FluorescenceEnhancer(Observable, Observer):
                 self._measured = measured
                 self._enhanced = None
 
-                self._settings.filePath.value = filePath
-                self._settings.fileType.value = fileType
+                self._settings.filePath.setValue(filePath)
+                self._settings.fileType.setValue(fileType)
 
                 self.notifyObservers()
         else:
@@ -185,10 +186,10 @@ class FluorescenceEnhancer(Observable, Observer):
         return [self.VSPI, self.TWO_STEP]
 
     def getEnhancementStrategy(self) -> str:
-        return self.VSPI if self._settings.useVSPI.value else self.TWO_STEP
+        return self.VSPI if self._settings.useVSPI.getValue() else self.TWO_STEP
 
     def setEnhancementStrategy(self, name: str) -> None:
-        self._settings.useVSPI.value = (name.casefold() == self.VSPI.casefold())
+        self._settings.useVSPI.setValue(name.casefold() == self.VSPI.casefold())
 
     def getUpscalingStrategyList(self) -> Sequence[str]:
         return self._upscalingStrategyChooser.getDisplayNameList()
@@ -216,7 +217,7 @@ class FluorescenceEnhancer(Observable, Observer):
             self._productIndex)
         element_maps: list[ElementMap] = list()
 
-        if self._settings.useVSPI.value:
+        if self._settings.useVSPI.getValue():
             measured_emaps = self._measured.element_maps
             A = VSPILinearOperator(reconstructInput.product, len(measured_emaps))
             B = numpy.stack([b.counts_per_second.flatten() for b in measured_emaps]).T
@@ -272,16 +273,17 @@ class FluorescenceEnhancer(Observable, Observer):
         writer.write(filePath, self._enhanced)
 
     def _openFluorescenceFileFromSettings(self) -> None:
-        self.openMeasuredDataset(self._settings.filePath.value, self._settings.fileType.value)
+        self.openMeasuredDataset(self._settings.filePath.getValue(),
+                                 self._settings.fileType.getValue())
 
     def update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
             self._openFluorescenceFileFromSettings()
         elif observable is self._upscalingStrategyChooser:
             strategy = self._upscalingStrategyChooser.currentPlugin.simpleName
-            self._settings.upscalingStrategy.value = strategy
+            self._settings.upscalingStrategy.setValue(strategy)
             self.notifyObservers()
         elif observable is self._deconvolutionStrategyChooser:
             strategy = self._deconvolutionStrategyChooser.currentPlugin.simpleName
-            self._settings.deconvolutionStrategy.value = strategy
+            self._settings.deconvolutionStrategy.setValue(strategy)
             self.notifyObservers()

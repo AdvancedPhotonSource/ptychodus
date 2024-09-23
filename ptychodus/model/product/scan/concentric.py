@@ -17,14 +17,16 @@ class ConcentricScanBuilder(ScanBuilder):
 
         self.radialStepSizeInMeters = self._registerRealParameter(
             'radial_step_size_m',
-            float(settings.radialStepSizeInMeters.value),
+            float(settings.radialStepSizeInMeters.getValue()),
             minimum=0.,
         )
         self.numberOfShells = self._registerIntegerParameter('number_of_shells',
-                                                             settings.numberOfShells.value,
+                                                             settings.numberOfShells.getValue(),
                                                              minimum=0)
         self.numberOfPointsInFirstShell = self._registerIntegerParameter(
-            'number_of_points_1st_shell', settings.numberOfPointsInFirstShell.value, minimum=0)
+            'number_of_points_1st_shell',
+            settings.numberOfPointsInFirstShell.getValue(),
+            minimum=0)
 
     def copy(self) -> ConcentricScanBuilder:
         builder = ConcentricScanBuilder(self._settings)

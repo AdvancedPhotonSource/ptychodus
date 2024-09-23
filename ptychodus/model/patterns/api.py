@@ -64,14 +64,14 @@ class PatternsAPI:
                      cropExtent: ImageExtent | None = None,
                      assemble: bool = True) -> str | None:
         if cropCenter is not None:
-            self._settings.cropCenterXInPixels.value = cropCenter.positionXInPixels
-            self._settings.cropCenterYInPixels.value = cropCenter.positionYInPixels
+            self._settings.cropCenterXInPixels.setValue(cropCenter.positionXInPixels)
+            self._settings.cropCenterYInPixels.setValue(cropCenter.positionYInPixels)
 
         if cropExtent is not None:
-            self._settings.cropWidthInPixels.value = cropExtent.widthInPixels
-            self._settings.cropHeightInPixels.value = cropExtent.heightInPixels
+            self._settings.cropWidthInPixels.setValue(cropExtent.widthInPixels)
+            self._settings.cropHeightInPixels.setValue(cropExtent.heightInPixels)
 
-        fileType_ = self._settings.fileType.value if fileType is None else fileType
+        fileType_ = self._settings.fileType.getValue() if fileType is None else fileType
         self._fileReaderChooser.setCurrentPluginByName(fileType_)
 
         if filePath.is_file():

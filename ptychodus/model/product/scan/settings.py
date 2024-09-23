@@ -64,7 +64,7 @@ class ScanSettings(Observable, Observer):
 
     @property
     def numberOfPoints(self) -> int:
-        return self.numberOfPointsX.value * self.numberOfPointsY.value
+        return self.numberOfPointsX.getValue() * self.numberOfPointsY.getValue()
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

@@ -42,14 +42,14 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
         if fileType is None:
             logger.error('Failed to load diffraction dataset.')
         else:
-            self._settings.fileType.value = fileType
-            self._settings.filePath.value = filePath
+            self._settings.fileType.setValue(fileType)
+            self._settings.filePath.setValue(filePath)
 
         self.notifyObservers()
 
     def _openDiffractionFileFromSettings(self) -> None:
-        self._patternsAPI.openPatterns(filePath=self._settings.filePath.value,
-                                       fileType=self._settings.fileType.value,
+        self._patternsAPI.openPatterns(filePath=self._settings.filePath.getValue(),
+                                       fileType=self._settings.fileType.getValue(),
                                        assemble=True)
 
     def startAssemblingDiffractionPatterns(self) -> None:

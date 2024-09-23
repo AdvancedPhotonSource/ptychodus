@@ -82,7 +82,8 @@ class ScanAPI:
 
     def openScan(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         builder = self._builderFactory.createScanFromFile(
-            filePath, self._settings.fileType.value if fileType is None else fileType)
+            filePath,
+            self._settings.fileType.getValue() if fileType is None else fileType)
 
         try:
             item = self._repository[index]
@@ -184,7 +185,8 @@ class ProbeAPI:
 
     def openProbe(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         builder = self._builderFactory.createProbeFromFile(
-            filePath, self._settings.fileType.value if fileType is None else fileType)
+            filePath,
+            self._settings.fileType.getValue() if fileType is None else fileType)
 
         try:
             item = self._repository[index]
@@ -286,7 +288,8 @@ class ObjectAPI:
 
     def openObject(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         builder = self._builderFactory.createObjectFromFile(
-            filePath, self._settings.fileType.value if fileType is None else fileType)
+            filePath,
+            self._settings.fileType.getValue() if fileType is None else fileType)
 
         try:
             item = self._repository[index]
@@ -368,7 +371,7 @@ class ProductAPI:
     def openProduct(self, filePath: Path, *, fileType: str | None = None) -> int:
         if filePath.is_file():
             self._fileReaderChooser.setCurrentPluginByName(
-                self._settings.fileType.value if fileType is None else fileType)
+                self._settings.fileType.getValue() if fileType is None else fileType)
             fileType = self._fileReaderChooser.currentPlugin.simpleName
             logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
             fileReader = self._fileReaderChooser.currentPlugin.strategy
@@ -397,8 +400,8 @@ class ProductAPI:
             logger.warning(f'Failed to save product {index}!')
             return
 
-        self._fileWriterChooser.setCurrentPluginByName(self._settings.fileType.value if fileType is
-                                                       None else fileType)
+        self._fileWriterChooser.setCurrentPluginByName(
+            self._settings.fileType.getValue() if fileType is None else fileType)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
         writer = self._fileWriterChooser.currentPlugin.strategy

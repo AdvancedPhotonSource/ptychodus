@@ -64,10 +64,10 @@ class WorkflowParametersPresenter(Observable, Observer):
         return self._inputDataLocator.getPosixPath()
 
     def setComputeEndpointID(self, endpointID: UUID) -> None:
-        self._settings.computeEndpointID.value = endpointID
+        self._settings.computeEndpointID.setValue(endpointID)
 
     def getComputeEndpointID(self) -> UUID:
-        return self._settings.computeEndpointID.value
+        return self._settings.computeEndpointID.getValue()
 
     def setComputeDataEndpointID(self, endpointID: UUID) -> None:
         self._computeDataLocator.setEndpointID(endpointID)
@@ -150,10 +150,10 @@ class WorkflowStatusPresenter:
 
     def getRefreshIntervalInSeconds(self) -> int:
         limits = self.getRefreshIntervalLimitsInSeconds()
-        return limits.clamp(self._settings.statusRefreshIntervalInSeconds.value)
+        return limits.clamp(self._settings.statusRefreshIntervalInSeconds.getValue())
 
     def setRefreshIntervalInSeconds(self, seconds: int) -> None:
-        self._settings.statusRefreshIntervalInSeconds.value = seconds
+        self._settings.statusRefreshIntervalInSeconds.setValue(seconds)
 
     @overload
     def __getitem__(self, index: int) -> WorkflowStatus:
