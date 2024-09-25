@@ -2,8 +2,8 @@ from .core import AutomationCore, AutomationPresenter, AutomationProcessingPrese
 from .repository import AutomationDatasetState
 
 __all__ = [
-    'AutomationCore',
-    'AutomationDatasetState',
-    'AutomationPresenter',
-    'AutomationProcessingPresenter',
+    "AutomationCore",
+    "AutomationDatasetState",
+    "AutomationPresenter",
+    "AutomationProcessingPresenter",
 ]

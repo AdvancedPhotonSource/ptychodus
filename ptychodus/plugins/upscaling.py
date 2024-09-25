@@ -7,13 +7,11 @@ from ptychodus.api.product import Product
 
 
 class IdentityUpscaling(UpscalingStrategy):
-
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
         return emap
 
 
 class GridDataUpscaling(UpscalingStrategy):
-
     def __init__(self, method: str) -> None:
         self._method = method
 
@@ -28,23 +26,25 @@ class GridDataUpscaling(UpscalingStrategy):
 
         points = numpy.reshape(scanCoordinatesInPixels, (-1, 2))
         values = emap.counts_per_second.flat
-        YY, XX = numpy.mgrid[:objectGeometry.heightInPixels, :objectGeometry.widthInPixels]
+        YY, XX = numpy.mgrid[: objectGeometry.heightInPixels, : objectGeometry.widthInPixels]
         query_points = numpy.transpose((YY.flat, XX.flat))
 
-        cps = griddata(points, values, query_points, method=self._method,
-                       fill_value=0.).reshape(XX.shape)
+        cps = griddata(points, values, query_points, method=self._method, fill_value=0.0).reshape(
+            XX.shape
+        )
 
         return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype))
 
 
 class RadialBasisFunctionUpscaling(UpscalingStrategy):
-
-    def __init__(self,
-                 kernel: str,
-                 *,
-                 neighbors: int | None = 25,
-                 epsilon: float | None = None,
-                 degree: int | None = None) -> None:
+    def __init__(
+        self,
+        kernel: str,
+        *,
+        neighbors: int | None = 25,
+        epsilon: float | None = None,
+        degree: int | None = None,
+    ) -> None:
         self._kernel = kernel
         self._neighbors = neighbors
         self._epsilon = epsilon
@@ -67,7 +67,7 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
             epsilon=self._epsilon,
             degree=self._degree,
         )
-        YY, XX = numpy.mgrid[:objectGeometry.heightInPixels, :objectGeometry.widthInPixels]
+        YY, XX = numpy.mgrid[: objectGeometry.heightInPixels, : objectGeometry.widthInPixels]
         cps = interpolator(numpy.transpose((YY.flat, XX.flat)))
         return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype).reshape(XX.shape))
 
@@ -79,49 +79,49 @@ def registerPlugins(registry: PluginRegistry) -> None:
 
     registry.upscalingStrategies.registerPlugin(
         IdentityUpscaling(),
-        displayName='Identity',
+        displayName="Identity",
     )
     registry.upscalingStrategies.registerPlugin(
-        GridDataUpscaling('nearest'),
-        displayName='Nearest Neighbor',
+        GridDataUpscaling("nearest"),
+        displayName="Nearest Neighbor",
     )
     registry.upscalingStrategies.registerPlugin(
-        GridDataUpscaling('linear'),
-        displayName='Linear',
+        GridDataUpscaling("linear"),
+        displayName="Linear",
     )
     registry.upscalingStrategies.registerPlugin(
-        GridDataUpscaling('cubic'),
-        displayName='Cubic',
+        GridDataUpscaling("cubic"),
+        displayName="Cubic",
     )
     registry.upscalingStrategies.registerPlugin(
-        RadialBasisFunctionUpscaling('linear'),
-        displayName='Linear RBF',
+        RadialBasisFunctionUpscaling("linear"),
+        displayName="Linear RBF",
     )
     registry.upscalingStrategies.registerPlugin(
-        RadialBasisFunctionUpscaling('thin_plate_spline'),
-        displayName='Thin Plate Spline RBF',
+        RadialBasisFunctionUpscaling("thin_plate_spline"),
+        displayName="Thin Plate Spline RBF",
     )
     registry.upscalingStrategies.registerPlugin(
-        RadialBasisFunctionUpscaling('cubic'),
-        displayName='Cubic RBF',
+        RadialBasisFunctionUpscaling("cubic"),
+        displayName="Cubic RBF",
     )
     registry.upscalingStrategies.registerPlugin(
-        RadialBasisFunctionUpscaling('quintic'),
-        displayName='Quintic RBF',
+        RadialBasisFunctionUpscaling("quintic"),
+        displayName="Quintic RBF",
     )
     registry.upscalingStrategies.registerPlugin(
-        RadialBasisFunctionUpscaling('multiquadric'),
-        displayName='Multiquadric RBF',
+        RadialBasisFunctionUpscaling("multiquadric"),
+        displayName="Multiquadric RBF",
     )
     registry.upscalingStrategies.registerPlugin(
-        RadialBasisFunctionUpscaling('inverse_multiquadric'),
-        displayName='Inverse Multiquadric RBF',
+        RadialBasisFunctionUpscaling("inverse_multiquadric"),
+        displayName="Inverse Multiquadric RBF",
     )
     registry.upscalingStrategies.registerPlugin(
-        RadialBasisFunctionUpscaling('inverse_quadratic'),
-        displayName='Inverse Quadratic RBF',
+        RadialBasisFunctionUpscaling("inverse_quadratic"),
+        displayName="Inverse Quadratic RBF",
     )
     registry.upscalingStrategies.registerPlugin(
-        RadialBasisFunctionUpscaling('gaussian'),
-        displayName='Gaussian RBF',
+        RadialBasisFunctionUpscaling("gaussian"),
+        displayName="Gaussian RBF",
     )

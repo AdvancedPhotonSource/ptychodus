@@ -14,29 +14,34 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
 from ptychodus.api.scan import Scan, ScanPoint
 
-from .multigrid import TikeMultigridSettings
-from .objectCorrection import TikeObjectCorrectionSettings
-from .positionCorrection import TikePositionCorrectionSettings
-from .probeCorrection import TikeProbeCorrectionSettings
-from .settings import TikeSettings
+from .settings import (
+    TikeMultigridSettings,
+    TikeObjectCorrectionSettings,
+    TikePositionCorrectionSettings,
+    TikeProbeCorrectionSettings,
+    TikeSettings,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class TikeReconstructor:
-
-    def __init__(self, settings: TikeSettings, multigridSettings: TikeMultigridSettings,
-                 positionCorrectionSettings: TikePositionCorrectionSettings,
-                 probeCorrectionSettings: TikeProbeCorrectionSettings,
-                 objectCorrectionSettings: TikeObjectCorrectionSettings) -> None:
+    def __init__(
+        self,
+        settings: TikeSettings,
+        multigridSettings: TikeMultigridSettings,
+        positionCorrectionSettings: TikePositionCorrectionSettings,
+        probeCorrectionSettings: TikeProbeCorrectionSettings,
+        objectCorrectionSettings: TikeObjectCorrectionSettings,
+    ) -> None:
         self._settings = settings
         self._multigridSettings = multigridSettings
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
         self._objectCorrectionSettings = objectCorrectionSettings
 
-        tikeVersion = version('tike')
-        logger.info(f'\tTike {tikeVersion}')
+        tikeVersion = version("tike")
+        logger.info(f"\tTike {tikeVersion}")
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings
@@ -54,8 +59,9 @@ class TikeReconstructor:
 
         return options
 
-    def getPositionOptions(self,
-                           initialScan: numpy.typing.NDArray[Any]) -> tike.ptycho.PositionOptions:
+    def getPositionOptions(
+        self, initialScan: numpy.typing.NDArray[Any]
+    ) -> tike.ptycho.PositionOptions:
         settings = self._positionCorrectionSettings
         options = None
 
@@ -76,8 +82,11 @@ class TikeReconstructor:
         options = None
 
         if settings.useProbeCorrection.getValue():
-            probeSupport = float(settings.probeSupportWeight.getValue()) \
-                    if settings.useFiniteProbeSupport.getValue() else 0.
+            probeSupport = (
+                float(settings.probeSupportWeight.getValue())
+                if settings.useFiniteProbeSupport.getValue()
+                else 0.0
+            )
 
             options = tike.ptycho.ProbeOptions(
                 force_orthogonality=settings.forceOrthogonality.getValue(),
@@ -96,28 +105,29 @@ class TikeReconstructor:
 
     def getNumGpus(self) -> int | tuple[int, ...]:
         numGpus = self._settings.numGpus.getValue()
-        onlyDigitsAndCommas = all(c.isdigit() or c == ',' for c in numGpus)
+        onlyDigitsAndCommas = all(c.isdigit() or c == "," for c in numGpus)
         hasDigit = any(c.isdigit() for c in numGpus)
 
         if onlyDigitsAndCommas and hasDigit:
-            if ',' in numGpus:
-                return tuple(int(n) for n in numGpus.split(',') if n)
+            if "," in numGpus:
+                return tuple(int(n) for n in numGpus.split(",") if n)
             else:
                 return int(numGpus)
 
         return 1
 
-    def __call__(self, parameters: ReconstructInput,
-                 algorithmOptions: tike.ptycho.solvers.IterativeOptions) -> ReconstructOutput:
+    def __call__(
+        self, parameters: ReconstructInput, algorithmOptions: tike.ptycho.solvers.IterativeOptions
+    ) -> ReconstructOutput:
         patternsArray = numpy.fft.ifftshift(parameters.patterns, axes=(-2, -1))
 
         objectInput = parameters.product.object_
         objectGeometry = objectInput.getGeometry()
         # TODO change array[0] -> array when multislice is available
-        objectInputArray = objectInput.array[0].astype('complex64')
+        objectInputArray = objectInput.array[0].astype("complex64")
 
         probeInput = parameters.product.probe
-        probeInputArray = probeInput.array[numpy.newaxis, numpy.newaxis, ...].astype('complex64')
+        probeInputArray = probeInput.array[numpy.newaxis, numpy.newaxis, ...].astype("complex64")
 
         scanInput = parameters.product.scan
         scanInputCoords: list[float] = list()
@@ -137,14 +147,14 @@ class TikeReconstructor:
         ).reshape(len(scanInput), 2)
         scanMin = scanInputArray.min(axis=0)
         scanMax = scanInputArray.max(axis=0)
-        logger.debug(f'Scan range [px]: {scanMin} -> {scanMax}')
+        logger.debug(f"Scan range [px]: {scanMin} -> {scanMax}")
         numGpus = self.getNumGpus()
 
-        logger.debug(f'data shape={patternsArray.shape}')
-        logger.debug(f'scan shape={scanInputArray.shape}')
-        logger.debug(f'probe shape={probeInputArray.shape}')
-        logger.debug(f'object shape={objectInputArray.shape}')
-        logger.debug(f'num_gpu={numGpus}')
+        logger.debug(f"data shape={patternsArray.shape}")
+        logger.debug(f"scan shape={scanInputArray.shape}")
+        logger.debug(f"probe shape={probeInputArray.shape}")
+        logger.debug(f"object shape={objectInputArray.shape}")
+        logger.debug(f"num_gpu={numGpus}")
 
         exitwave_options = tike.ptycho.ExitWaveOptions(
             # TODO: Use a user supplied `measured_pixels` instead
@@ -175,15 +185,15 @@ class TikeReconstructor:
         else:
             # TODO support interactive reconstructions
             with tike.ptycho.Reconstruction(
-                    data=patternsArray,
-                    parameters=ptychoParameters,
-                    num_gpu=numGpus,
-                    use_mpi=False,
+                data=patternsArray,
+                parameters=ptychoParameters,
+                num_gpu=numGpus,
+                use_mpi=False,
             ) as context:
                 context.iterate(ptychoParameters.algorithm_options.num_iter)
             result = context.parameters
 
-        logger.debug(f'Result: {pprint.pformat(result)}')
+        logger.debug(f"Result: {pprint.pformat(result)}")
 
         scanOutputPoints: list[ScanPoint] = list()
 
@@ -226,7 +236,6 @@ class TikeReconstructor:
 
 
 class RegularizedPIEReconstructor(Reconstructor):
-
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.RpieOptions()
@@ -250,33 +259,9 @@ class RegularizedPIEReconstructor(Reconstructor):
 
 
 class IterativeLeastSquaresReconstructor(Reconstructor):
-
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.LstsqOptions()
-        self._tikeReconstructor = tikeReconstructor
-
-    @property
-    def name(self) -> str:
-        return self._algorithmOptions.name
-
-    @property
-    def _settings(self) -> TikeSettings:
-        return self._tikeReconstructor._settings
-
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        self._algorithmOptions.num_batch = self._settings.numBatch.getValue()
-        self._algorithmOptions.batch_method = self._settings.batchMethod.getValue()
-        self._algorithmOptions.num_iter = self._settings.numIter.getValue()
-        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.getValue()
-        return self._tikeReconstructor(parameters, self._algorithmOptions)
-
-
-class DifferenceMapReconstructor(Reconstructor):
-
-    def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
-        super().__init__()
-        self._algorithmOptions = tike.ptycho.solvers.DmOptions()
         self._tikeReconstructor = tikeReconstructor
 
     @property

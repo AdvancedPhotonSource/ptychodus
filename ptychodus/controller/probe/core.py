@@ -6,8 +6,12 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
-from ...model.analysis import (ExposureAnalyzer, FluorescenceEnhancer, ProbePropagator,
-                               STXMSimulator)
+from ...model.analysis import (
+    ExposureAnalyzer,
+    FluorescenceEnhancer,
+    ProbePropagator,
+    STXMSimulator,
+)
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
@@ -26,15 +30,23 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeController(SequenceObserver[ProbeRepositoryItem]):
-
-    def __init__(self, repository: ProbeRepository, api: ProbeAPI,
-                 imageController: ImageController, propagator: ProbePropagator,
-                 propagatorVisualizationEngine: VisualizationEngine, stxmSimulator: STXMSimulator,
-                 stxmVisualizationEngine: VisualizationEngine, exposureAnalyzer: ExposureAnalyzer,
-                 exposureVisualizationEngine: VisualizationEngine,
-                 fluorescenceEnhancer: FluorescenceEnhancer,
-                 fluorescenceVisualizationEngine: VisualizationEngine, view: RepositoryTreeView,
-                 fileDialogFactory: FileDialogFactory, treeModel: ProbeTreeModel) -> None:
+    def __init__(
+        self,
+        repository: ProbeRepository,
+        api: ProbeAPI,
+        imageController: ImageController,
+        propagator: ProbePropagator,
+        propagatorVisualizationEngine: VisualizationEngine,
+        stxmSimulator: STXMSimulator,
+        stxmVisualizationEngine: VisualizationEngine,
+        exposureAnalyzer: ExposureAnalyzer,
+        exposureVisualizationEngine: VisualizationEngine,
+        fluorescenceEnhancer: FluorescenceEnhancer,
+        fluorescenceVisualizationEngine: VisualizationEngine,
+        view: RepositoryTreeView,
+        fileDialogFactory: FileDialogFactory,
+        treeModel: ProbeTreeModel,
+    ) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
@@ -45,32 +57,53 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._editorFactory = ProbeEditorViewControllerFactory()
 
         self._propagationViewController = ProbePropagationViewController(
-            propagator, propagatorVisualizationEngine, fileDialogFactory)
-        self._stxmViewController = STXMViewController(stxmSimulator, stxmVisualizationEngine,
-                                                      fileDialogFactory)
-        self._exposureViewController = ExposureViewController(exposureAnalyzer,
-                                                              exposureVisualizationEngine,
-                                                              fileDialogFactory)
+            propagator, propagatorVisualizationEngine, fileDialogFactory
+        )
+        self._stxmViewController = STXMViewController(
+            stxmSimulator, stxmVisualizationEngine, fileDialogFactory
+        )
+        self._exposureViewController = ExposureViewController(
+            exposureAnalyzer, exposureVisualizationEngine, fileDialogFactory
+        )
         self._fluorescenceViewController = FluorescenceViewController(
-            fluorescenceEnhancer, fluorescenceVisualizationEngine, fileDialogFactory)
+            fluorescenceEnhancer, fluorescenceVisualizationEngine, fileDialogFactory
+        )
 
     @classmethod
-    def createInstance(cls, repository: ProbeRepository, api: ProbeAPI,
-                       imageController: ImageController, propagator: ProbePropagator,
-                       propagatorVisualizationEngine: VisualizationEngine,
-                       stxmSimulator: STXMSimulator, stxmVisualizationEngine: VisualizationEngine,
-                       exposureAnalyzer: ExposureAnalyzer,
-                       exposureVisualizationEngine: VisualizationEngine,
-                       fluorescenceEnhancer: FluorescenceEnhancer,
-                       fluorescenceVisualizationEngine: VisualizationEngine,
-                       view: RepositoryTreeView,
-                       fileDialogFactory: FileDialogFactory) -> ProbeController:
+    def createInstance(
+        cls,
+        repository: ProbeRepository,
+        api: ProbeAPI,
+        imageController: ImageController,
+        propagator: ProbePropagator,
+        propagatorVisualizationEngine: VisualizationEngine,
+        stxmSimulator: STXMSimulator,
+        stxmVisualizationEngine: VisualizationEngine,
+        exposureAnalyzer: ExposureAnalyzer,
+        exposureVisualizationEngine: VisualizationEngine,
+        fluorescenceEnhancer: FluorescenceEnhancer,
+        fluorescenceVisualizationEngine: VisualizationEngine,
+        view: RepositoryTreeView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ProbeTreeModel(repository, api)
-        controller = cls(repository, api, imageController, propagator,
-                         propagatorVisualizationEngine, stxmSimulator, stxmVisualizationEngine,
-                         exposureAnalyzer, exposureVisualizationEngine, fluorescenceEnhancer,
-                         fluorescenceVisualizationEngine, view, fileDialogFactory, treeModel)
+        controller = cls(
+            repository,
+            api,
+            imageController,
+            propagator,
+            propagatorVisualizationEngine,
+            stxmSimulator,
+            stxmVisualizationEngine,
+            exposureAnalyzer,
+            exposureVisualizationEngine,
+            fluorescenceEnhancer,
+            fluorescenceVisualizationEngine,
+            view,
+            fileDialogFactory,
+            treeModel,
+        )
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -85,13 +118,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         view.treeView.selectionModel().currentChanged.connect(controller._updateView)
         controller._updateView(QModelIndex(), QModelIndex())
 
-        loadFromFileAction = view.buttonBox.loadMenu.addAction('Open File...')
+        loadFromFileAction = view.buttonBox.loadMenu.addAction("Open File...")
         loadFromFileAction.triggered.connect(controller._loadCurrentProbeFromFile)
 
-        copyAction = view.buttonBox.loadMenu.addAction('Copy...')
+        copyAction = view.buttonBox.loadMenu.addAction("Copy...")
         copyAction.triggered.connect(controller._copyToCurrentProbe)
 
-        view.copierDialog.setWindowTitle('Copy Probe')
+        view.copierDialog.setWindowTitle("Copy Probe")
         view.copierDialog.sourceComboBox.setModel(treeModel)
         view.copierDialog.destinationComboBox.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingProbe)
@@ -99,16 +132,16 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         view.buttonBox.editButton.clicked.connect(controller._editCurrentProbe)
         view.buttonBox.saveButton.clicked.connect(controller._saveCurrentProbe)
 
-        propagateAction = view.buttonBox.analyzeMenu.addAction('Propagate...')
+        propagateAction = view.buttonBox.analyzeMenu.addAction("Propagate...")
         propagateAction.triggered.connect(controller._propagateProbe)
 
-        stxmAction = view.buttonBox.analyzeMenu.addAction('Simulate STXM...')
+        stxmAction = view.buttonBox.analyzeMenu.addAction("Simulate STXM...")
         stxmAction.triggered.connect(controller._simulateSTXM)
 
-        exposureAction = view.buttonBox.analyzeMenu.addAction('Exposure...')
+        exposureAction = view.buttonBox.analyzeMenu.addAction("Exposure...")
         exposureAction.triggered.connect(controller._analyzeExposure)
 
-        fluorescenceAction = view.buttonBox.analyzeMenu.addAction('Enhance Fluorescence...')
+        fluorescenceAction = view.buttonBox.analyzeMenu.addAction("Enhance Fluorescence...")
         fluorescenceAction.triggered.connect(controller._enhanceFluorescence)
 
         return controller
@@ -125,7 +158,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
             return modelIndex.row()
 
-        logger.warning('No current index!')
+        logger.warning("No current index!")
         return -1
 
     def _loadCurrentProbeFromFile(self) -> None:
@@ -136,16 +169,17 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
-            'Open Probe',
+            "Open Probe",
             nameFilters=self._api.getOpenFileFilterList(),
-            selectedNameFilter=self._api.getOpenFileFilter())
+            selectedNameFilter=self._api.getOpenFileFilter(),
+        )
 
         if filePath:
             try:
                 self._api.openProbe(itemIndex, filePath, fileType=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.showException("File Reader", err)
 
     def _copyToCurrentProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -179,22 +213,23 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
-            'Save Probe',
+            "Save Probe",
             nameFilters=self._api.getSaveFileFilterList(),
-            selectedNameFilter=self._api.getSaveFileFilter())
+            selectedNameFilter=self._api.getSaveFileFilter(),
+        )
 
         if filePath:
             try:
                 self._api.saveProbe(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Writer', err)
+                ExceptionDialog.showException("File Writer", err)
 
     def _propagateProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning('No current item!')
+            logger.warning("No current item!")
         else:
             self._propagationViewController.launch(itemIndex)
 
@@ -202,7 +237,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning('No current item!')
+            logger.warning("No current item!")
         else:
             self._stxmViewController.launch(itemIndex)
 
@@ -210,7 +245,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning('No current item!')
+            logger.warning("No current item!")
         else:
             self._exposureViewController.analyze(itemIndex)
 
@@ -218,7 +253,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning('No current item!')
+            logger.warning("No current item!")
         else:
             self._fluorescenceViewController.launch(itemIndex)
 
@@ -237,11 +272,14 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             try:
                 item = self._repository[itemIndex]
             except IndexError:
-                logger.warning('Unable to access item for visualization!')
+                logger.warning("Unable to access item for visualization!")
             else:
                 probe = item.getProbe()
-                array = probe.getMode(current.row()) if current.parent().isValid() \
-                        else probe.getModesFlattened()
+                array = (
+                    probe.getMode(current.row())
+                    if current.parent().isValid()
+                    else probe.getModesFlattened()
+                )
                 self._imageController.setArray(array, probe.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ProbeRepositoryItem) -> None:

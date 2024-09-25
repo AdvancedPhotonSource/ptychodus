@@ -9,14 +9,14 @@ from .progressBarItemDelegate import ProgressBarItemDelegate
 from .uuidLineEdit import UUIDLineEdit
 
 __all__ = [
-    'AngleWidget',
-    'BottomTitledGroupBox',
-    'ComboBoxItemDelegate',
-    'DecimalLineEdit',
-    'DecimalSlider',
-    'ExceptionDialog',
-    'GroupBoxWithPresets',
-    'LengthWidget',
-    'ProgressBarItemDelegate',
-    'UUIDLineEdit',
+    "AngleWidget",
+    "BottomTitledGroupBox",
+    "ComboBoxItemDelegate",
+    "DecimalLineEdit",
+    "DecimalSlider",
+    "ExceptionDialog",
+    "GroupBoxWithPresets",
+    "LengthWidget",
+    "ProgressBarItemDelegate",
+    "UUIDLineEdit",
 ]

@@ -3,7 +3,6 @@ from collections.abc import Iterator
 
 
 class PtychoPackDevice(ABC):
-
     @abstractmethod
     def get_available_devices(self) -> Iterator[str]:
         pass
@@ -18,12 +17,11 @@ class PtychoPackDevice(ABC):
 
 
 class NullPtychoPackDevice(PtychoPackDevice):
-
     def get_available_devices(self) -> Iterator[str]:
         return iter([])
 
     def get_device(self) -> str:
-        return ''
+        return ""
 
     def set_device(self, name: str) -> None:
         pass

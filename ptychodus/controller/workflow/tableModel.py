@@ -7,24 +7,22 @@ from ...model.workflow import WorkflowStatusPresenter
 
 
 class WorkflowTableModel(QAbstractTableModel):
-
     def __init__(self, presenter: WorkflowStatusPresenter, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._sectionHeaders = [
-            'Label',
-            'Start Time',
-            'Completion Time',
-            'Status',
-            'Action',
-            'Run ID',
+            "Label",
+            "Start Time",
+            "Completion Time",
+            "Status",
+            "Action",
+            "Run ID",
         ]
-        self._dtFormat = '%Y-%m-%d %H:%M:%S'
+        self._dtFormat = "%Y-%m-%d %H:%M:%S"
 
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def headerData(
+        self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole
+    ) -> Any:
         if role == Qt.ItemDataRole.DisplayRole:
             if orientation == Qt.Orientation.Horizontal:
                 return self._sectionHeaders[section]

@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import ParameterRepository
+from ptychodus.api.parametric import ParameterGroup, RealArrayParameter
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
@@ -13,19 +13,21 @@ from .settings import ObjectSettings
 logger = logging.getLogger(__name__)
 
 
-class ObjectRepositoryItem(ParameterRepository):
-
-    def __init__(self, geometryProvider: ObjectGeometryProvider, settings: ObjectSettings,
-                 builder: ObjectBuilder) -> None:
-        super().__init__('Object')
+class ObjectRepositoryItem(ParameterGroup):
+    def __init__(
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        settings: ObjectSettings,
+        builder: ObjectBuilder,
+    ) -> None:
+        super().__init__()
         self._geometryProvider = geometryProvider
         self._settings = settings
         self._builder = builder
         self._object = Object()
 
-        self._addParameterRepository(builder, observe=True)
-        self.layerDistanceInMeters = self._registerRealArrayParameter(
-            'layer_distance_m', [numpy.inf])
+        self._addGroup("builder", builder, observe=True)
+        self.layerDistanceInMeters = RealArrayParameter(self, "layer_distance_m", [numpy.inf])
 
         self._rebuild()
 
@@ -61,11 +63,11 @@ class ObjectRepositoryItem(ParameterRepository):
         return self._builder
 
     def setBuilder(self, builder: ObjectBuilder) -> None:
-        self._removeParameterRepository(self._builder)
+        self._removeGroup("builder")
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
-        self._addParameterRepository(self._builder, observe=True)
+        self._addGroup("builder", self._builder, observe=True)
         self._rebuild()
 
     def _rebuild(self) -> None:
@@ -77,7 +79,7 @@ class ObjectRepositoryItem(ParameterRepository):
         try:
             object_ = self._builder.build(self._geometryProvider, layerDistanceInMeters)
         except Exception as exc:
-            logger.error(''.join(exc.args))
+            logger.error("".join(exc.args))
             return
 
         self._object = object_

@@ -4,11 +4,10 @@ from PyQt5.QtWidgets import QHBoxLayout, QListView, QPushButton, QVBoxLayout, QW
 
 
 class SettingsButtonBox(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.openButton = QPushButton('Open')
-        self.saveButton = QPushButton('Save')
+        self.openButton = QPushButton("Open")
+        self.saveButton = QPushButton("Save")
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> SettingsButtonBox:
@@ -24,7 +23,6 @@ class SettingsButtonBox(QWidget):
 
 
 class SettingsView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.listView = QListView()

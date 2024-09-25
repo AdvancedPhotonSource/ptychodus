@@ -9,15 +9,15 @@ from .stxm import STXMSimulator
 from .xmcd import XMCDAnalyzer, XMCDResult
 
 __all__ = [
-    'AnalysisCore',
-    'ExposureAnalyzer',
-    'ExposureMap',
-    'FluorescenceEnhancer',
-    'FourierRingCorrelator',
-    'ObjectLinearInterpolator',
-    'ObjectStitcher',
-    'ProbePropagator',
-    'STXMSimulator',
-    'XMCDAnalyzer',
-    'XMCDResult',
+    "AnalysisCore",
+    "ExposureAnalyzer",
+    "ExposureMap",
+    "FluorescenceEnhancer",
+    "FourierRingCorrelator",
+    "ObjectLinearInterpolator",
+    "ObjectStitcher",
+    "ProbePropagator",
+    "STXMSimulator",
+    "XMCDAnalyzer",
+    "XMCDResult",
 ]

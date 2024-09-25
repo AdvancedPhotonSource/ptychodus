@@ -8,18 +8,20 @@ from .adaptiveMoment import TikeAdaptiveMomentController
 
 
 class TikePositionCorrectionController(Observer):
-
-    def __init__(self, presenter: TikePositionCorrectionPresenter,
-                 view: TikePositionCorrectionView) -> None:
+    def __init__(
+        self, presenter: TikePositionCorrectionPresenter, view: TikePositionCorrectionView
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._adaptiveMomentController = TikeAdaptiveMomentController.createInstance(
-            presenter, view.adaptiveMomentView)
+            presenter, view.adaptiveMomentView
+        )
 
     @classmethod
-    def createInstance(cls, presenter: TikePositionCorrectionPresenter,
-                       view: TikePositionCorrectionView) -> TikePositionCorrectionController:
+    def createInstance(
+        cls, presenter: TikePositionCorrectionPresenter, view: TikePositionCorrectionView
+    ) -> TikePositionCorrectionController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -27,7 +29,8 @@ class TikePositionCorrectionController(Observer):
         view.toggled.connect(presenter.setPositionCorrectionEnabled)
 
         view.positionRegularizationCheckBox.toggled.connect(
-            presenter.setPositionRegularizationEnabled)
+            presenter.setPositionRegularizationEnabled
+        )
         view.updateMagnitudeLimitLineEdit.valueChanged.connect(presenter.setUpdateMagnitudeLimit)
 
         controller._syncModelToView()
@@ -38,7 +41,8 @@ class TikePositionCorrectionController(Observer):
         self._view.setChecked(self._presenter.isPositionCorrectionEnabled())
 
         self._view.positionRegularizationCheckBox.setChecked(
-            self._presenter.isPositionRegularizationEnabled())
+            self._presenter.isPositionRegularizationEnabled()
+        )
         self._view.updateMagnitudeLimitLineEdit.setValue(self._presenter.getUpdateMagnitudeLimit())
 
     def update(self, observable: Observable) -> None:

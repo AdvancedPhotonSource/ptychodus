@@ -1,27 +1,41 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QListView, QPushButton, QRadioButton, QSlider,
-                             QSpinBox, QStatusBar, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QListView,
+    QPushButton,
+    QRadioButton,
+    QSlider,
+    QSpinBox,
+    QStatusBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .visualization import VisualizationParametersView, VisualizationWidget
 from .widgets import DecimalLineEdit, LengthWidget
 
 
 class ProbePropagationParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Parameters', parent)
+        super().__init__("Parameters", parent)
         self.beginCoordinateWidget = LengthWidget.createInstance(isSigned=True)
         self.endCoordinateWidget = LengthWidget.createInstance(isSigned=True)
         self.numberOfStepsSpinBox = QSpinBox()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
 
         propagationLayout = QFormLayout()
-        propagationLayout.addRow('Begin Coordinate:', self.beginCoordinateWidget)
-        propagationLayout.addRow('End Coordinate:', self.endCoordinateWidget)
-        propagationLayout.addRow('Number of Steps:', self.numberOfStepsSpinBox)
+        propagationLayout.addRow("Begin Coordinate:", self.beginCoordinateWidget)
+        propagationLayout.addRow("End Coordinate:", self.endCoordinateWidget)
+        propagationLayout.addRow("Number of Steps:", self.numberOfStepsSpinBox)
 
-        propagationGroupBox = QGroupBox('Propagation')
+        propagationGroupBox = QGroupBox("Propagation")
         propagationGroupBox.setLayout(propagationLayout)
 
         layout = QVBoxLayout()
@@ -32,15 +46,14 @@ class ProbePropagationParametersView(QGroupBox):
 
 
 class ProbePropagationDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.xyView = VisualizationWidget.createInstance('XY Plane')
-        self.zxView = VisualizationWidget.createInstance('ZX Plane')
+        self.xyView = VisualizationWidget.createInstance("XY Plane")
+        self.zxView = VisualizationWidget.createInstance("ZX Plane")
         self.parametersView = ProbePropagationParametersView()
-        self.zyView = VisualizationWidget.createInstance('ZY Plane')
-        self.propagateButton = QPushButton('Propagate')
-        self.saveButton = QPushButton('Save')
+        self.zyView = VisualizationWidget.createInstance("ZY Plane")
+        self.propagateButton = QPushButton("Propagate")
+        self.saveButton = QPushButton("Save")
         self.coordinateSlider = QSlider(Qt.Orientation.Horizontal)
         self.coordinateLabel = QLabel()
         self.statusBar = QStatusBar()
@@ -71,12 +84,11 @@ class ProbePropagationDialog(QDialog):
 
 
 class STXMDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.visualizationWidget = VisualizationWidget.createInstance('Transmission')
+        self.visualizationWidget = VisualizationWidget.createInstance("Transmission")
         self.visualizationParametersView = VisualizationParametersView.createInstance()
-        self.saveButton = QPushButton('Save')
+        self.saveButton = QPushButton("Save")
         self.statusBar = QStatusBar()
 
         parameterLayout = QVBoxLayout()
@@ -95,34 +107,32 @@ class STXMDialog(QDialog):
 
 
 class ExposureParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Parameters', parent)
-        self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
+        super().__init__("Parameters", parent)
+        self.quantitativeProbeCheckBox = QCheckBox("Quantitative Probe")
         self.photonFluxLineEdit = DecimalLineEdit.createInstance()
         self.exposureTimeLineEdit = DecimalLineEdit.createInstance()
-        self.massAttenuationLabel = QLabel('Mass Attenuation [m\u00B2/kg]:')
+        self.massAttenuationLabel = QLabel("Mass Attenuation [m\u00b2/kg]:")
         self.massAttenuationLineEdit = DecimalLineEdit.createInstance()
 
         layout = QFormLayout()
         layout.addRow(self.quantitativeProbeCheckBox)
-        layout.addRow('Photon Flux [ph/s]:', self.photonFluxLineEdit)
-        layout.addRow('Exposure Time [s]:', self.exposureTimeLineEdit)
+        layout.addRow("Photon Flux [ph/s]:", self.photonFluxLineEdit)
+        layout.addRow("Exposure Time [s]:", self.exposureTimeLineEdit)
         layout.addRow(self.massAttenuationLabel)
         layout.addRow(self.massAttenuationLineEdit)
         self.setLayout(layout)
 
 
 class ExposureQuantityView(QGroupBox):
-
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Quantity', parent)
-        self.photonCountButton = QRadioButton('Photon Count')
-        self.photonFluxButton = QRadioButton('Photon Flux [Hz]')
-        self.exposureButton = QRadioButton('Exposure [J/m\u00B2]')
-        self.irradianceButton = QRadioButton('Irradiance [W/m\u00B2]')
-        self.doseButton = QRadioButton('Dose [Gy]')
-        self.doseRateButton = QRadioButton('Dose Rate [Gy/s]')
+        super().__init__("Quantity", parent)
+        self.photonCountButton = QRadioButton("Photon Count")
+        self.photonFluxButton = QRadioButton("Photon Flux [Hz]")
+        self.exposureButton = QRadioButton("Exposure [J/m\u00b2]")
+        self.irradianceButton = QRadioButton("Irradiance [W/m\u00b2]")
+        self.doseButton = QRadioButton("Dose [Gy]")
+        self.doseRateButton = QRadioButton("Dose Rate [Gy/s]")
 
         layout = QVBoxLayout()
         layout.addWidget(self.photonCountButton)
@@ -135,14 +145,13 @@ class ExposureQuantityView(QGroupBox):
 
 
 class ExposureDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.visualizationWidget = VisualizationWidget.createInstance('Visualization')
+        self.visualizationWidget = VisualizationWidget.createInstance("Visualization")
         self.exposureParametersView = ExposureParametersView()
         self.exposureQuantityView = ExposureQuantityView()
         self.visualizationParametersView = VisualizationParametersView.createInstance()
-        self.saveButton = QPushButton('Save')
+        self.saveButton = QPushButton("Save")
         self.statusBar = QStatusBar()
 
         parameterLayout = QVBoxLayout()
@@ -163,32 +172,30 @@ class ExposureDialog(QDialog):
 
 
 class FluorescenceParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Parameters', parent)
-        self.openButton = QPushButton('Open')
+        super().__init__("Parameters", parent)
+        self.openButton = QPushButton("Open")
         self.enhancementStrategyComboBox = QComboBox()
         self.upscalingStrategyComboBox = QComboBox()
         self.deconvolutionStrategyComboBox = QComboBox()
-        self.enhanceButton = QPushButton('Enhance')
-        self.saveButton = QPushButton('Save')
+        self.enhanceButton = QPushButton("Enhance")
+        self.saveButton = QPushButton("Save")
 
         layout = QFormLayout()
-        layout.addRow('Measured Dataset:', self.openButton)
-        layout.addRow('Enhancement Strategy:', self.enhancementStrategyComboBox)
-        layout.addRow('Upscaling Strategy:', self.upscalingStrategyComboBox)
-        layout.addRow('Deconvolution Strategy:', self.deconvolutionStrategyComboBox)
+        layout.addRow("Measured Dataset:", self.openButton)
+        layout.addRow("Enhancement Strategy:", self.enhancementStrategyComboBox)
+        layout.addRow("Upscaling Strategy:", self.upscalingStrategyComboBox)
+        layout.addRow("Deconvolution Strategy:", self.deconvolutionStrategyComboBox)
         layout.addRow(self.enhanceButton)
-        layout.addRow('Enhanced Dataset:', self.saveButton)
+        layout.addRow("Enhanced Dataset:", self.saveButton)
         self.setLayout(layout)
 
 
 class FluorescenceDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.measuredWidget = VisualizationWidget.createInstance('Measured')
-        self.enhancedWidget = VisualizationWidget.createInstance('Enhanced')
+        self.measuredWidget = VisualizationWidget.createInstance("Measured")
+        self.enhancedWidget = VisualizationWidget.createInstance("Enhanced")
         self.fluorescenceParametersView = FluorescenceParametersView()
         self.fluorescenceChannelListView = QListView()
         self.visualizationParametersView = VisualizationParametersView.createInstance()

@@ -9,9 +9,9 @@ from .settings import AutomationSettings
 
 
 class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
-
-    def __init__(self, settings: AutomationSettings,
-                 workflowChooser: PluginChooser[FileBasedWorkflow]) -> None:
+    def __init__(
+        self, settings: AutomationSettings, workflowChooser: PluginChooser[FileBasedWorkflow]
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._workflowChooser = workflowChooser

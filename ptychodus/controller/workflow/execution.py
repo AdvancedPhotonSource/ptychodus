@@ -14,23 +14,32 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowExecutionController:
-
-    def __init__(self, parametersPresenter: WorkflowParametersPresenter,
-                 executionPresenter: WorkflowExecutionPresenter,
-                 view: WorkflowExecutionView) -> None:
+    def __init__(
+        self,
+        parametersPresenter: WorkflowParametersPresenter,
+        executionPresenter: WorkflowExecutionPresenter,
+        view: WorkflowExecutionView,
+    ) -> None:
         self._executionPresenter = executionPresenter
         self._view = view
         self._inputDataController = WorkflowInputDataController.createInstance(
-            parametersPresenter, view.inputDataView)
+            parametersPresenter, view.inputDataView
+        )
         self._computeController = WorkflowComputeController.createInstance(
-            parametersPresenter, view.computeView)
+            parametersPresenter, view.computeView
+        )
         self._outputDataController = WorkflowOutputDataController.createInstance(
-            parametersPresenter, view.outputDataView)
+            parametersPresenter, view.outputDataView
+        )
 
     @classmethod
-    def createInstance(cls, parametersPresenter: WorkflowParametersPresenter,
-                       executionPresenter: WorkflowExecutionPresenter, view: WorkflowExecutionView,
-                       productItemModel: QAbstractItemModel) -> WorkflowExecutionController:
+    def createInstance(
+        cls,
+        parametersPresenter: WorkflowParametersPresenter,
+        executionPresenter: WorkflowExecutionPresenter,
+        view: WorkflowExecutionView,
+        productItemModel: QAbstractItemModel,
+    ) -> WorkflowExecutionController:
         controller = cls(parametersPresenter, executionPresenter, view)
         view.productComboBox.setModel(productItemModel)
         view.executeButton.clicked.connect(controller._execute)
@@ -40,11 +49,11 @@ class WorkflowExecutionController:
         inputProductIndex = self._view.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
-            logger.debug('No current index!')
+            logger.debug("No current index!")
             return
 
         try:
             self._executionPresenter.runFlow(inputProductIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Reconstructor', err)
+            ExceptionDialog.showException("Reconstructor", err)

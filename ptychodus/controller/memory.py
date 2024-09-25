@@ -7,7 +7,6 @@ from ..model.memory import MemoryPresenter
 
 
 class MemoryController:
-
     def __init__(self, presenter: MemoryPresenter, progressBar: QProgressBar) -> None:
         self._presenter = presenter
         self._progressBar = progressBar
@@ -20,11 +19,11 @@ class MemoryController:
     def _updateProgressBar(self) -> None:
         stats = self._presenter.getStatistics()
         totalMemMB = int(stats.totalMemoryInBytes / 1e6)
-        totalMem = f'Total Memory: {totalMemMB} MB'
+        totalMem = f"Total Memory: {totalMemMB} MB"
 
         availMemMB = int(stats.availableMemoryInBytes / 1e6)
-        availMem = f'Available Memory: {availMemMB} MB'
+        availMem = f"Available Memory: {availMemMB} MB"
 
         self._progressBar.setRange(0, 100)
         self._progressBar.setValue(int(stats.memoryUsagePercent))
-        self._progressBar.setToolTip('\n'.join((totalMem, availMem)))
+        self._progressBar.setToolTip("\n".join((totalMem, availMem)))

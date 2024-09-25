@@ -10,15 +10,14 @@ from ptychodus.api.settings import PathPrefixChange
 
 
 class WorkflowProductAPI(ABC):
-
     @abstractmethod
     def openScan(self, filePath: Path, *, fileType: str | None = None) -> None:
         pass
 
     @abstractmethod
-    def buildScan(self,
-                  builderName: str | None = None,
-                  builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildScan(
+        self, builderName: str | None = None, builderParameters: Mapping[str, Any] = {}
+    ) -> None:
         pass
 
     @abstractmethod
@@ -26,9 +25,9 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildProbe(self,
-                   builderName: str | None = None,
-                   builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildProbe(
+        self, builderName: str | None = None, builderParameters: Mapping[str, Any] = {}
+    ) -> None:
         pass
 
     @abstractmethod
@@ -36,9 +35,9 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildObject(self,
-                    builderName: str | None = None,
-                    builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildObject(
+        self, builderName: str | None = None, builderParameters: Mapping[str, Any] = {}
+    ) -> None:
         pass
 
     @abstractmethod
@@ -55,7 +54,6 @@ class WorkflowProductAPI(ABC):
 
 
 class WorkflowAPI(ABC):
-
     @abstractmethod
     def openPatterns(
         self,
@@ -65,22 +63,22 @@ class WorkflowAPI(ABC):
         cropCenter: CropCenter | None = None,
         cropExtent: ImageExtent | None = None,
     ) -> None:
-        '''opens diffraction patterns from file'''
+        """opens diffraction patterns from file"""
         pass
 
     @abstractmethod
     def importProcessedPatterns(self, filePath: Path) -> None:
-        '''import processed patterns'''
+        """import processed patterns"""
         pass
 
     @abstractmethod
     def exportProcessedPatterns(self, filePath: Path) -> None:
-        '''export processed patterns'''
+        """export processed patterns"""
         pass
 
     @abstractmethod
     def openProduct(self, filePath: Path, *, fileType: str | None = None) -> WorkflowProductAPI:
-        '''opens product from file'''
+        """opens product from file"""
         pass
 
     @abstractmethod
@@ -88,36 +86,35 @@ class WorkflowAPI(ABC):
         self,
         name: str,
         *,
-        comments: str = '',
+        comments: str = "",
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
         probePhotonsPerSecond: float | None = None,
         exposureTimeInSeconds: float | None = None,
     ) -> WorkflowProductAPI:
-        '''creates a new product'''
+        """creates a new product"""
         pass
 
     @abstractmethod
-    def saveSettings(self,
-                     filePath: Path,
-                     changePathPrefix: PathPrefixChange | None = None) -> None:
+    def saveSettings(
+        self, filePath: Path, changePathPrefix: PathPrefixChange | None = None
+    ) -> None:
         pass
 
 
 class FileBasedWorkflow(ABC):
-
     @property
     @abstractmethod
     def isWatchRecursive(self) -> bool:
-        '''indicates whether the data directory must be watched recursively'''
+        """indicates whether the data directory must be watched recursively"""
         pass
 
     @abstractmethod
     def getWatchFilePattern(self) -> str:
-        '''UNIX-style filename pattern. For rules see fnmatch from Python standard library.'''
+        """UNIX-style filename pattern. For rules see fnmatch from Python standard library."""
         pass
 
     @abstractmethod
     def execute(self, api: WorkflowAPI, filePath: Path) -> None:
-        '''uses workflow API to execute the workflow'''
+        """uses workflow API to execute the workflow"""
         pass

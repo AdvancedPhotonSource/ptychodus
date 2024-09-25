@@ -5,6 +5,7 @@ import numpy
 import numpy.typing
 
 from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.parametric import RealParameter
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
 from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParameters
@@ -14,30 +15,34 @@ from .settings import ProbeSettings
 
 
 class FresnelZonePlateProbeBuilder(ProbeBuilder):
-
-    def __init__(self, settings: ProbeSettings,
-                 fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]) -> None:
-        super().__init__('fresnel_zone_plate')
+    def __init__(
+        self, settings: ProbeSettings, fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]
+    ) -> None:
+        super().__init__("fresnel_zone_plate")
         self._settings = settings
         self._fresnelZonePlateChooser = fresnelZonePlateChooser
 
-        self.zonePlateDiameterInMeters = self._registerRealParameter(
-            'zone_plate_diameter_m',
+        self.zonePlateDiameterInMeters = RealParameter(
+            self,
+            "zone_plate_diameter_m",
             float(settings.zonePlateDiameterInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.outermostZoneWidthInMeters = self._registerRealParameter(
-            'outermost_zone_width_m',
+        self.outermostZoneWidthInMeters = RealParameter(
+            self,
+            "outermost_zone_width_m",
             float(settings.outermostZoneWidthInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.centralBeamstopDiameterInMeters = self._registerRealParameter(
-            'central_beamstop_diameter_m',
+        self.centralBeamstopDiameterInMeters = RealParameter(
+            self,
+            "central_beamstop_diameter_m",
             float(settings.centralBeamstopDiameterInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.defocusDistanceInMeters = self._registerRealParameter(
-            'defocus_distance_m',
+        self.defocusDistanceInMeters = RealParameter(
+            self,
+            "defocus_distance_m",
             float(settings.defocusDistanceInMeters.getValue()),
         )  # from sample to the focal plane
 
@@ -46,7 +51,8 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         builder.zonePlateDiameterInMeters.setValue(self.zonePlateDiameterInMeters.getValue())
         builder.outermostZoneWidthInMeters.setValue(self.outermostZoneWidthInMeters.getValue())
         builder.centralBeamstopDiameterInMeters.setValue(
-            self.centralBeamstopDiameterInMeters.getValue())
+            self.centralBeamstopDiameterInMeters.getValue()
+        )
         builder.defocusDistanceInMeters.setValue(self.defocusDistanceInMeters.getValue())
         return builder
 
@@ -86,8 +92,9 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         RR_FZP = numpy.hypot(XX_FZP, YY_FZP)
 
         # transmission function of FZP
-        T = numpy.exp(-2j * numpy.pi / wavelengthInMeters * (XX_FZP**2 + YY_FZP**2) / 2 /
-                      focalLengthInMeters)
+        T = numpy.exp(
+            -2j * numpy.pi / wavelengthInMeters * (XX_FZP**2 + YY_FZP**2) / 2 / focalLengthInMeters
+        )
         C = RR_FZP <= zonePlate.zonePlateDiameterInMeters / 2
         H = RR_FZP >= zonePlate.centralBeamstopDiameterInMeters / 2
         fzpTransmissionFunction = T * C * H

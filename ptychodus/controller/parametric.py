@@ -5,8 +5,17 @@ from typing import Final
 import logging
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QAbstractButton,
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
@@ -17,19 +26,17 @@ from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWi
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'ParameterDialogBuilder',
+    "ParameterDialogBuilder",
 ]
 
 
 class ParameterViewController(ABC):
-
     @abstractmethod
     def getWidget(self) -> QWidget:
         pass
 
 
 class CheckBoxParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: BooleanParameter) -> None:
         super().__init__()
         self._parameter = parameter
@@ -70,7 +77,7 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
         maximum = self._parameter.getMaximum()
 
         if minimum is None:
-            logger.error('Minimum not provided!')
+            logger.error("Minimum not provided!")
         else:
             self._widget.blockSignals(True)
 
@@ -88,7 +95,6 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
 
 class DecimalLineEditParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: RealParameter, *, isSigned: bool = False) -> None:
         super().__init__()
         self._parameter = parameter
@@ -113,7 +119,6 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 
 
 class DecimalSliderParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: RealParameter) -> None:
         super().__init__()
         self._parameter = parameter
@@ -134,7 +139,7 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
         maximum = self._parameter.getMaximum()
 
         if minimum is None or maximum is None:
-            logger.error('Range not provided!')
+            logger.error("Range not provided!")
         else:
             value = Decimal(repr(self._parameter.getValue()))
             range_ = Interval[Decimal](Decimal(repr(minimum)), Decimal(repr(maximum)))
@@ -146,7 +151,6 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
 
 
 class LengthWidgetParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: RealParameter, *, isSigned: bool = False) -> None:
         super().__init__()
         self._parameter = parameter
@@ -171,7 +175,6 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
 
 
 class AngleWidgetParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: RealParameter) -> None:
         super().__init__()
         self._parameter = parameter
@@ -196,9 +199,12 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
 
 
 class ParameterDialog(QDialog):
-
-    def __init__(self, viewControllers: Sequence[ParameterViewController],
-                 buttonBox: QDialogButtonBox, parent: QWidget | None) -> None:
+    def __init__(
+        self,
+        viewControllers: Sequence[ParameterViewController],
+        buttonBox: QDialogButtonBox,
+        parent: QWidget | None,
+    ) -> None:
         super().__init__(parent)
         self._viewControllers = viewControllers
         self._buttonBox = buttonBox
@@ -216,43 +222,41 @@ class ParameterDialog(QDialog):
 
 
 class ParameterDialogBuilder:
-
     def __init__(self) -> None:
         self._viewControllersTop: list[ParameterViewController] = list()
         self._viewControllers: dict[tuple[str, str], ParameterViewController] = dict()
         self._viewControllersBottom: list[ParameterViewController] = list()
 
-    def addCheckBox(self, parameter: BooleanParameter, label: str, group: str = '') -> None:
+    def addCheckBox(self, parameter: BooleanParameter, label: str, group: str = "") -> None:
         viewController = CheckBoxParameterViewController(parameter)
         self.addViewController(viewController, label, group)
 
-    def addSpinBox(self, parameter: IntegerParameter, label: str, group: str = '') -> None:
+    def addSpinBox(self, parameter: IntegerParameter, label: str, group: str = "") -> None:
         viewController = SpinBoxParameterViewController(parameter)
         self.addViewController(viewController, label, group)
 
-    def addDecimalLineEdit(self, parameter: RealParameter, label: str, group: str = '') -> None:
+    def addDecimalLineEdit(self, parameter: RealParameter, label: str, group: str = "") -> None:
         viewController = DecimalLineEditParameterViewController(parameter)
         self.addViewController(viewController, label, group)
 
-    def addDecimalSlider(self, parameter: RealParameter, label: str, group: str = '') -> None:
+    def addDecimalSlider(self, parameter: RealParameter, label: str, group: str = "") -> None:
         viewController = DecimalSliderParameterViewController(parameter)
         self.addViewController(viewController, label, group)
 
-    def addLengthWidget(self, parameter: RealParameter, label: str, group: str = '') -> None:
+    def addLengthWidget(self, parameter: RealParameter, label: str, group: str = "") -> None:
         viewController = LengthWidgetParameterViewController(parameter)
         self.addViewController(viewController, label, group)
 
-    def addAngleWidget(self, parameter: RealParameter, label: str, group: str = '') -> None:
+    def addAngleWidget(self, parameter: RealParameter, label: str, group: str = "") -> None:
         viewController = AngleWidgetParameterViewController(parameter)
         self.addViewController(viewController, label, group)
 
     def addViewControllerToTop(self, viewController: ParameterViewController) -> None:
         self._viewControllersTop.append(viewController)
 
-    def addViewController(self,
-                          viewController: ParameterViewController,
-                          label: str,
-                          group: str = '') -> None:
+    def addViewController(
+        self, viewController: ParameterViewController, label: str, group: str = ""
+    ) -> None:
         self._viewControllers[group, label] = viewController
 
     def addViewControllerToBottom(self, viewController: ParameterViewController) -> None:

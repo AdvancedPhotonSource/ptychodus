@@ -18,10 +18,14 @@ from .workflow import CurrentFileBasedWorkflow
 
 
 class AutomationPresenter(Observable, Observer):
-
-    def __init__(self, settings: AutomationSettings, workflow: CurrentFileBasedWorkflow,
-                 watcher: DataDirectoryWatcher, datasetBuffer: AutomationDatasetBuffer,
-                 datasetRepository: AutomationDatasetRepository) -> None:
+    def __init__(
+        self,
+        settings: AutomationSettings,
+        workflow: CurrentFileBasedWorkflow,
+        watcher: DataDirectoryWatcher,
+        datasetBuffer: AutomationDatasetBuffer,
+        datasetRepository: AutomationDatasetRepository,
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._workflow = workflow
@@ -59,7 +63,7 @@ class AutomationPresenter(Observable, Observer):
 
     def loadExistingDatasetsToRepository(self) -> None:
         dataDirectory = self.getDataDirectory()
-        pattern = '**/' if self._workflow.isWatchRecursive else ''
+        pattern = "**/" if self._workflow.isWatchRecursive else ""
         pattern += self._workflow.getWatchFilePattern()
         scanFileList = sorted(scanFile for scanFile in dataDirectory.glob(pattern))
 
@@ -102,9 +106,12 @@ class AutomationPresenter(Observable, Observer):
 
 
 class AutomationProcessingPresenter(Observable, Observer):
-
-    def __init__(self, settings: AutomationSettings, repository: AutomationDatasetRepository,
-                 processor: AutomationDatasetProcessor) -> None:
+    def __init__(
+        self,
+        settings: AutomationSettings,
+        repository: AutomationDatasetRepository,
+        processor: AutomationDatasetProcessor,
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._repository = repository
@@ -139,23 +146,29 @@ class AutomationProcessingPresenter(Observable, Observer):
 
 
 class AutomationCore:
-
-    def __init__(self, settingsRegistry: SettingsRegistry, workflowAPI: WorkflowAPI,
-                 workflowChooser: PluginChooser[FileBasedWorkflow]) -> None:
+    def __init__(
+        self,
+        settingsRegistry: SettingsRegistry,
+        workflowAPI: WorkflowAPI,
+        workflowChooser: PluginChooser[FileBasedWorkflow],
+    ) -> None:
         self._settings = AutomationSettings(settingsRegistry)
         self.repository = AutomationDatasetRepository(self._settings)
         self._workflow = CurrentFileBasedWorkflow(self._settings, workflowChooser)
         self._processingQueue: queue.Queue[Path] = queue.Queue()
-        self._processor = AutomationDatasetProcessor(self._settings, self.repository,
-                                                     self._workflow, workflowAPI,
-                                                     self._processingQueue)
-        self._datasetBuffer = AutomationDatasetBuffer(self._settings, self.repository,
-                                                      self._processor)
+        self._processor = AutomationDatasetProcessor(
+            self._settings, self.repository, self._workflow, workflowAPI, self._processingQueue
+        )
+        self._datasetBuffer = AutomationDatasetBuffer(
+            self._settings, self.repository, self._processor
+        )
         self._watcher = DataDirectoryWatcher(self._settings, self._workflow, self._datasetBuffer)
-        self.presenter = AutomationPresenter(self._settings, self._workflow, self._watcher,
-                                             self._datasetBuffer, self.repository)
-        self.processingPresenter = AutomationProcessingPresenter(self._settings, self.repository,
-                                                                 self._processor)
+        self.presenter = AutomationPresenter(
+            self._settings, self._workflow, self._watcher, self._datasetBuffer, self.repository
+        )
+        self.processingPresenter = AutomationProcessingPresenter(
+            self._settings, self.repository, self._processor
+        )
 
     def start(self) -> None:
         self._datasetBuffer.start()

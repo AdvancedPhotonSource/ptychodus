@@ -31,11 +31,11 @@ class ScanBoundingBox:
 
     @property
     def centerXInMeters(self) -> float:
-        return self.minimumXInMeters + self.widthInMeters / 2.
+        return self.minimumXInMeters + self.widthInMeters / 2.0
 
     @property
     def centerYInMeters(self) -> float:
-        return self.minimumYInMeters + self.heightInMeters / 2.
+        return self.minimumYInMeters + self.heightInMeters / 2.0
 
     def hull(self, bbox: ScanBoundingBox) -> ScanBoundingBox:
         return ScanBoundingBox(
@@ -47,7 +47,6 @@ class ScanBoundingBox:
 
 
 class Scan(Sequence[ScanPoint]):
-
     def __init__(self, pointSeq: Sequence[ScanPoint] | None = None) -> None:
         self._pointSeq: Sequence[ScanPoint] = [] if pointSeq is None else pointSeq
 
@@ -55,12 +54,10 @@ class Scan(Sequence[ScanPoint]):
         return Scan(list(self._pointSeq))
 
     @overload
-    def __getitem__(self, index: int) -> ScanPoint:
-        ...
+    def __getitem__(self, index: int) -> ScanPoint: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ScanPoint]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[ScanPoint]: ...
 
     def __getitem__(self, index: int | slice) -> ScanPoint | Sequence[ScanPoint]:
         return self._pointSeq[index]
@@ -76,23 +73,24 @@ class Scan(Sequence[ScanPoint]):
 
 
 class ScanPointParseError(Exception):
-    '''raised when the scan file cannot be parsed'''
+    """raised when the scan file cannot be parsed"""
+
     pass
 
 
 class ScanFileReader(ABC):
-    '''interface for plugins that read scan files'''
+    """interface for plugins that read scan files"""
 
     @abstractmethod
     def read(self, filePath: Path) -> Scan:
-        '''reads a scan dictionary from file'''
+        """reads a scan dictionary from file"""
         pass
 
 
 class ScanFileWriter(ABC):
-    '''interface for plugins that write scan files'''
+    """interface for plugins that write scan files"""
 
     @abstractmethod
     def write(self, filePath: Path, scan: Scan) -> None:
-        '''writes a scan dictionary to file'''
+        """writes a scan dictionary to file"""
         pass

@@ -5,21 +5,24 @@ import threading
 
 import numpy
 
-from ptychodus.api.patterns import (DiffractionDataset, DiffractionPatternArray,
-                                    DiffractionPatternState, SimpleDiffractionPatternArray)
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionPatternArray,
+    DiffractionPatternState,
+    SimpleDiffractionPatternArray,
+)
 
 from .active import ActiveDiffractionDataset
 from .settings import PatternSettings
 
 __all__ = [
-    'ActiveDiffractionDatasetBuilder',
+    "ActiveDiffractionDatasetBuilder",
 ]
 
 logger = logging.getLogger(__name__)
 
 
 class ActiveDiffractionDatasetBuilder:
-
     def __init__(self, settings: PatternSettings, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
@@ -31,7 +34,7 @@ class ActiveDiffractionDatasetBuilder:
 
     @property
     def isAssembling(self) -> bool:
-        return (len(self._workers) > 0)
+        return len(self._workers) > 0
 
     def _getArrayAndAssemble(self) -> None:
         while not self._stopWorkEvent.is_set():
@@ -45,10 +48,10 @@ class ActiveDiffractionDatasetBuilder:
             except queue.Empty:
                 pass
             except Exception:
-                logger.exception('Error while assembling array!')
+                logger.exception("Error while assembling array!")
 
     def _assemble(self, array: DiffractionPatternArray) -> None:
-        logger.info(f'Assembling {array.getLabel()}...')
+        logger.info(f"Assembling {array.getLabel()}...")
 
         try:
             data = array.getData()
@@ -78,18 +81,18 @@ class ActiveDiffractionDatasetBuilder:
             self.stop(finishAssembling=False)
 
         if self._unassembledDataset is None:
-            logger.debug('Skipping data assembler reset.')
+            logger.debug("Skipping data assembler reset.")
         else:
-            logger.info('Resetting data assembler...')
+            logger.info("Resetting data assembler...")
 
             self._dataset.realloc()
 
             for array in self._unassembledDataset:
                 self.insertArray(array)
 
-            logger.info('Data assembler reset.')
+            logger.info("Data assembler reset.")
 
-        logger.info('Starting data assembler...')
+        logger.info("Starting data assembler...")
         self._stopWorkEvent.clear()
 
         for idx in range(self._settings.numberOfDataThreads.getValue()):
@@ -97,13 +100,13 @@ class ActiveDiffractionDatasetBuilder:
             thread.start()
             self._workers.append(thread)
 
-        logger.info('Data assembler started.')
+        logger.info("Data assembler started.")
 
     def stop(self, finishAssembling: bool) -> None:
         if finishAssembling:
             self._arrayQueue.join()
 
-        logger.info('Stopping data assembler...')
+        logger.info("Stopping data assembler...")
         self._stopWorkEvent.set()
 
         while self._workers:
@@ -113,7 +116,7 @@ class ActiveDiffractionDatasetBuilder:
         with self._arrayQueue.mutex:
             self._arrayQueue.queue.clear()
 
-        logger.info('Data assembler stopped.')
+        logger.info("Data assembler stopped.")
 
     def getAssemblyQueueSize(self) -> int:
         return self._arrayQueue.qsize()

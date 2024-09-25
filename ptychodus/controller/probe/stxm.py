@@ -13,9 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class STXMViewController(Observer):
-
-    def __init__(self, simulator: STXMSimulator, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        simulator: STXMSimulator,
+        engine: VisualizationEngine,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._simulator = simulator
         self._fileDialogFactory = fileDialogFactory
@@ -24,9 +27,11 @@ class STXMViewController(Observer):
         self._dialog.saveButton.clicked.connect(self._saveResult)
 
         self._visualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.visualizationWidget, self._dialog.statusBar, fileDialogFactory)
+            engine, self._dialog.visualizationWidget, self._dialog.statusBar, fileDialogFactory
+        )
         self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.visualizationParametersView)
+            engine, self._dialog.visualizationParametersView
+        )
 
         simulator.addObserver(self)
 
@@ -37,20 +42,21 @@ class STXMViewController(Observer):
             itemName = self._simulator.getProductName()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Launch', err)
+            ExceptionDialog.showException("Launch", err)
         else:
-            self._dialog.setWindowTitle(f'Simulate STXM: {itemName}')
+            self._dialog.setWindowTitle(f"Simulate STXM: {itemName}")
             self._dialog.open()
 
         self._simulator.simulate()
 
     def _saveResult(self) -> None:
-        title = 'Save STXM Image'
+        title = "Save STXM Image"
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
             title,
             nameFilters=self._simulator.getSaveFileFilterList(),
-            selectedNameFilter=self._simulator.getSaveFileFilter())
+            selectedNameFilter=self._simulator.getSaveFileFilter(),
+        )
 
         if filePath:
             try:
@@ -66,7 +72,7 @@ class STXMViewController(Observer):
             self._visualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Update Views', err)
+            ExceptionDialog.showException("Update Views", err)
         else:
             self._visualizationWidgetController.setArray(image.intensity, image.pixel_geometry)
 

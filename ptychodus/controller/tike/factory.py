@@ -7,7 +7,6 @@ from .controller import TikeParametersController
 
 
 class TikeViewControllerFactory(ReconstructorViewControllerFactory):
-
     def __init__(self, model: TikeReconstructorLibrary) -> None:
         super().__init__()
         self._model = model
@@ -15,16 +14,16 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
 
     @property
     def backendName(self) -> str:
-        return 'Tike'
+        return "Tike"
 
     def createViewController(self, reconstructorName: str) -> QWidget:
         view = None
 
-        if reconstructorName == 'rpie':
+        if reconstructorName == "rpie":
             view = TikeParametersView.createInstance(showAlpha=True, showStepLength=False)
-        elif reconstructorName == 'lstsq_grad':
+        elif reconstructorName == "lstsq_grad":
             view = TikeParametersView.createInstance(showAlpha=False, showStepLength=False)
-        elif reconstructorName == 'dm':
+        elif reconstructorName == "dm":
             view = TikeParametersView.createInstance(showAlpha=False, showStepLength=False)
         else:
             view = TikeParametersView.createInstance(showAlpha=True, showStepLength=True)

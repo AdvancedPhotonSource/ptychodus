@@ -2,8 +2,15 @@ import logging
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import (QApplication, QComboBox, QStyle, QStyleOptionComboBox,
-                             QStyleOptionViewItem, QStyledItemDelegate, QWidget)
+from PyQt5.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QStyle,
+    QStyleOptionComboBox,
+    QStyleOptionViewItem,
+    QStyledItemDelegate,
+    QWidget,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +28,16 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
             opt = QStyleOptionComboBox()
             opt.rect = option.rect
             opt.currentText = index.data(Qt.DisplayRole)
-            QApplication.style().drawComplexControl(QStyle.ComplexControl.CC_ComboBox, opt,
-                                                    painter)
+            QApplication.style().drawComplexControl(
+                QStyle.ComplexControl.CC_ComboBox, opt, painter
+            )
             QApplication.style().drawControl(QStyle.ControlElement.CE_ComboBoxLabel, opt, painter)
         else:
             super().paint(painter, option, index)
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem,
-                     index: QModelIndex) -> QWidget:
+    def createEditor(
+        self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> QWidget:
         comboBox = QComboBox(parent)
         comboBox.activated.connect(self._commitDataAndCloseEditor)
         comboBox.setModel(self._model)
@@ -52,8 +61,9 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
         else:
             super().setModelData(editor, model, index)
 
-    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem,
-                             index: QModelIndex) -> None:
+    def updateEditorGeometry(
+        self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> None:
         editor.setGeometry(option.rect)
 
     def _commitDataAndCloseEditor(self) -> None:
@@ -63,4 +73,4 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
             self.commitData.emit(editor)
             self.closeEditor.emit(editor)
         else:
-            logger.warning('Failed to commit data and close editor! Unexpected editor.')
+            logger.warning("Failed to commit data and close editor! Unexpected editor.")

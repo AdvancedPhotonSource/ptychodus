@@ -13,25 +13,31 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectRepositoryItemFactory:
-
-    def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings,
-                 builderFactory: ObjectBuilderFactory) -> None:
+    def __init__(
+        self,
+        rng: numpy.random.Generator,
+        settings: ObjectSettings,
+        builderFactory: ObjectBuilderFactory,
+    ) -> None:
         self._rng = rng
         self._settings = settings
         self._builderFactory = builderFactory
 
-    def create(self,
-               geometryProvider: ObjectGeometryProvider,
-               object_: Object | None = None) -> ObjectRepositoryItem:
-        builder = self._builderFactory.createDefault() if object_ is None \
-                else FromMemoryObjectBuilder(object_)
+    def create(
+        self, geometryProvider: ObjectGeometryProvider, object_: Object | None = None
+    ) -> ObjectRepositoryItem:
+        builder = (
+            self._builderFactory.createDefault()
+            if object_ is None
+            else FromMemoryObjectBuilder(object_)
+        )
         return ObjectRepositoryItem(geometryProvider, self._settings, builder)
 
     def createFromSettings(self, geometryProvider: ObjectGeometryProvider) -> ObjectRepositoryItem:
         try:
             builder = self._builderFactory.createFromSettings()
         except Exception as exc:
-            logger.error(''.join(exc.args))
+            logger.error("".join(exc.args))
             builder = self._builderFactory.createDefault()
 
         return ObjectRepositoryItem(geometryProvider, self._settings, builder)

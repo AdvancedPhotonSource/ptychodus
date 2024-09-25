@@ -10,21 +10,22 @@ from ...view.tike import TikeBasicParametersView
 
 
 class TikeBasicParametersController(Observer):
-
     def __init__(self, presenter: TikePresenter, view: TikeBasicParametersView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: TikePresenter,
-                       view: TikeBasicParametersView) -> TikeBasicParametersController:
+    def createInstance(
+        cls, presenter: TikePresenter, view: TikeBasicParametersView
+    ) -> TikeBasicParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
         view.numGpusLineEdit.editingFinished.connect(controller._syncNumGpusToModel)
         view.numGpusLineEdit.setValidator(
-            QRegularExpressionValidator(QRegularExpression('[\\d,]+')))
+            QRegularExpressionValidator(QRegularExpression("[\\d,]+"))
+        )
 
         for model in presenter.getNoiseModelList():
             view.noiseModelComboBox.addItem(model)
@@ -61,32 +62,39 @@ class TikeBasicParametersController(Observer):
         self._view.noiseModelComboBox.setCurrentText(self._presenter.getNoiseModel())
 
         self._view.numBatchSpinBox.blockSignals(True)
-        self._view.numBatchSpinBox.setRange(self._presenter.getNumBatchLimits().lower,
-                                            self._presenter.getNumBatchLimits().upper)
+        self._view.numBatchSpinBox.setRange(
+            self._presenter.getNumBatchLimits().lower, self._presenter.getNumBatchLimits().upper
+        )
         self._view.numBatchSpinBox.setValue(self._presenter.getNumBatch())
         self._view.numBatchSpinBox.blockSignals(False)
 
         self._view.batchMethodComboBox.setCurrentText(self._presenter.getBatchMethod())
 
         self._view.numIterSpinBox.blockSignals(True)
-        self._view.numIterSpinBox.setRange(self._presenter.getNumIterLimits().lower,
-                                           self._presenter.getNumIterLimits().upper)
+        self._view.numIterSpinBox.setRange(
+            self._presenter.getNumIterLimits().lower, self._presenter.getNumIterLimits().upper
+        )
         self._view.numIterSpinBox.setValue(self._presenter.getNumIter())
         self._view.numIterSpinBox.blockSignals(False)
 
         self._view.convergenceWindowSpinBox.blockSignals(True)
         self._view.convergenceWindowSpinBox.setRange(
             self._presenter.getConvergenceWindowLimits().lower,
-            self._presenter.getConvergenceWindowLimits().upper)
+            self._presenter.getConvergenceWindowLimits().upper,
+        )
         self._view.convergenceWindowSpinBox.setValue(self._presenter.getConvergenceWindow())
         self._view.convergenceWindowSpinBox.blockSignals(False)
 
-        self._view.alphaSlider.setValueAndRange(self._presenter.getAlpha(),
-                                                self._presenter.getAlphaLimits(),
-                                                blockValueChangedSignal=True)
-        self._view.stepLengthSlider.setValueAndRange(self._presenter.getStepLength(),
-                                                     self._presenter.getStepLengthLimits(),
-                                                     blockValueChangedSignal=True)
+        self._view.alphaSlider.setValueAndRange(
+            self._presenter.getAlpha(),
+            self._presenter.getAlphaLimits(),
+            blockValueChangedSignal=True,
+        )
+        self._view.stepLengthSlider.setValueAndRange(
+            self._presenter.getStepLength(),
+            self._presenter.getStepLengthLimits(),
+            blockValueChangedSignal=True,
+        )
         self._view.logLevelComboBox.setCurrentText(self._presenter.getLogLevel())
 
     def update(self, observable: Observable) -> None:

@@ -7,16 +7,17 @@ from ...view.tike import TikeProbeSupportView
 
 
 class TikeProbeSupportController(Observer):
-
-    def __init__(self, presenter: TikeProbeCorrectionPresenter,
-                 view: TikeProbeSupportView) -> None:
+    def __init__(
+        self, presenter: TikeProbeCorrectionPresenter, view: TikeProbeSupportView
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: TikeProbeCorrectionPresenter,
-                       view: TikeProbeSupportView) -> TikeProbeSupportController:
+    def createInstance(
+        cls, presenter: TikeProbeCorrectionPresenter, view: TikeProbeSupportView
+    ) -> TikeProbeSupportController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -37,9 +38,11 @@ class TikeProbeSupportController(Observer):
         self._view.weightLineEdit.setMinimum(self._presenter.getProbeSupportWeightMinimum())
         self._view.weightLineEdit.setValue(self._presenter.getProbeSupportWeight())
 
-        self._view.radiusSlider.setValueAndRange(self._presenter.getProbeSupportRadius(),
-                                                 self._presenter.getProbeSupportRadiusLimits(),
-                                                 blockValueChangedSignal=True)
+        self._view.radiusSlider.setValueAndRange(
+            self._presenter.getProbeSupportRadius(),
+            self._presenter.getProbeSupportRadiusLimits(),
+            blockValueChangedSignal=True,
+        )
 
         self._view.degreeLineEdit.setMinimum(self._presenter.getProbeSupportDegreeMinimum())
         self._view.degreeLineEdit.setValue(self._presenter.getProbeSupportDegree())

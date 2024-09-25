@@ -11,9 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class ExposureViewController:
-
-    def __init__(self, analyzer: ExposureAnalyzer, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        analyzer: ExposureAnalyzer,
+        engine: VisualizationEngine,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._analyzer = analyzer
         self._engine = engine
@@ -22,9 +25,11 @@ class ExposureViewController:
         self._dialog.saveButton.clicked.connect(self._saveResult)
 
         self._visualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.visualizationWidget, self._dialog.statusBar, fileDialogFactory)
+            engine, self._dialog.visualizationWidget, self._dialog.statusBar, fileDialogFactory
+        )
         self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.visualizationParametersView)
+            engine, self._dialog.visualizationParametersView
+        )
         self._result: ExposureMap | None = None
 
     def analyze(self, itemIndex: int) -> None:
@@ -32,7 +37,7 @@ class ExposureViewController:
             result = self._analyzer.analyze(itemIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Exposure Analysis', err)
+            ExceptionDialog.showException("Exposure Analysis", err)
             return
 
         self._result = result
@@ -40,15 +45,16 @@ class ExposureViewController:
 
     def _saveResult(self) -> None:
         if self._result is None:
-            logger.debug('No result to save!')
+            logger.debug("No result to save!")
             return
 
-        title = 'Save Result'
+        title = "Save Result"
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
             title,
             nameFilters=self._analyzer.getSaveFileFilterList(),
-            selectedNameFilter=self._analyzer.getSaveFileFilter())
+            selectedNameFilter=self._analyzer.getSaveFileFilter(),
+        )
 
         if filePath:
             try:

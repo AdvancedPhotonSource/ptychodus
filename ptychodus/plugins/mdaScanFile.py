@@ -15,7 +15,7 @@ import numpy
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -112,15 +112,15 @@ class MDAHeader:
 
     @property
     def has_extra_pvs(self) -> bool:
-        return (self.extra_pvs_offset > 0)
+        return self.extra_pvs_offset > 0
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'version': self.version,
-            'scan_number': self.scan_number,
-            'dimensions': self.dimensions,
-            'is_regular': self.is_regular,
-            'extra_pvs_offset': self.extra_pvs_offset,
+            "version": self.version,
+            "scan_number": self.scan_number,
+            "dimensions": self.dimensions,
+            "is_regular": self.is_regular,
+            "extra_pvs_offset": self.extra_pvs_offset,
         }
 
 
@@ -147,10 +147,10 @@ class MDAScanHeader:
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'rank': self.rank,
-            'num_requested_points': self.num_requested_points,
-            'current_point': self.current_point,
-            'lower_scan_offsets': self.lower_scan_offsets,
+            "rank": self.rank,
+            "num_requested_points": self.num_requested_points,
+            "current_point": self.current_point,
+            "lower_scan_offsets": self.lower_scan_offsets,
         }
 
 
@@ -176,19 +176,27 @@ class MDAScanPositionerInfo:
         readback_description = read_counted_string_from_buffer(fp)
         readback_unit = read_counted_string_from_buffer(fp)
 
-        return cls(number, name, description, step_mode, unit, readback_name, readback_description,
-                   readback_unit)
+        return cls(
+            number,
+            name,
+            description,
+            step_mode,
+            unit,
+            readback_name,
+            readback_description,
+            readback_unit,
+        )
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'number': self.number,
-            'name': self.name,
-            'description': self.description,
-            'step_mode': self.step_mode,
-            'unit': self.unit,
-            'readback_name': self.readback_name,
-            'readback_description': self.readback_description,
-            'readback_unit': self.readback_unit,
+            "number": self.number,
+            "name": self.name,
+            "description": self.description,
+            "step_mode": self.step_mode,
+            "unit": self.unit,
+            "readback_name": self.readback_name,
+            "readback_description": self.readback_description,
+            "readback_unit": self.readback_unit,
         }
 
 
@@ -209,10 +217,10 @@ class MDAScanDetectorInfo:
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'number': self.number,
-            'name': self.name,
-            'description': self.description,
-            'unit': self.unit,
+            "number": self.number,
+            "name": self.name,
+            "description": self.description,
+            "unit": self.unit,
         }
 
 
@@ -231,9 +239,9 @@ class MDAScanTriggerInfo:
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'number': self.number,
-            'name': self.name,
-            'command': self.command,
+            "number": self.number,
+            "name": self.name,
+            "command": self.command,
         }
 
 
@@ -275,11 +283,11 @@ class MDAScanInfo:
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'scan_name': self.scan_name,
-            'time_stamp': self.time_stamp,
-            'positioner': [pos.to_mapping() for pos in self.positioner],
-            'detector': [det.to_mapping() for det in self.detector],
-            'trigger': [tri.to_mapping() for tri in self.trigger],
+            "scan_name": self.scan_name,
+            "time_stamp": self.time_stamp,
+            "positioner": [pos.to_mapping() for pos in self.positioner],
+            "detector": [det.to_mapping() for det in self.detector],
+            "trigger": [tri.to_mapping() for tri in self.trigger],
         }
 
 
@@ -289,8 +297,9 @@ class MDAScanData:
     detector_array: numpy.typing.NDArray[numpy.floating[Any]]  # float, shape: nd x npts
 
     @classmethod
-    def read(cls, fp: typing.BinaryIO, scanHeader: MDAScanHeader,
-             scanInfo: MDAScanInfo) -> MDAScanData:
+    def read(
+        cls, fp: typing.BinaryIO, scanHeader: MDAScanHeader, scanInfo: MDAScanInfo
+    ) -> MDAScanData:
         npts = scanHeader.num_requested_points
         np = scanInfo.num_positioners
         nd = scanInfo.num_detectors
@@ -307,8 +316,8 @@ class MDAScanData:
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'readback_array': f'{self.readback_array.dtype}{self.readback_array.shape}',
-            'detector_array': f'{self.detector_array.dtype}{self.detector_array.shape}',
+            "readback_array": f"{self.readback_array.dtype}{self.readback_array.shape}",
+            "detector_array": f"{self.detector_array.dtype}{self.detector_array.shape}",
         }
 
 
@@ -335,10 +344,10 @@ class MDAScan:
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'header': self.header.to_mapping(),
-            'info': self.info.to_mapping(),
-            'data': self.data.to_mapping(),
-            'lower_scans': [scan.to_mapping() for scan in self.lower_scans],
+            "header": self.header.to_mapping(),
+            "info": self.info.to_mapping(),
+            "data": self.data.to_mapping(),
+            "lower_scans": [scan.to_mapping() for scan in self.lower_scans],
         }
 
     def __str__(self) -> str:
@@ -355,11 +364,11 @@ class MDAProcessVariable(Generic[T]):
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'name': self.name,
-            'description': self.description,
-            'epicsType': self.epicsType.name,
-            'unit': self.unit,
-            'value': self.value,
+            "name": self.name,
+            "description": self.description,
+            "epicsType": self.epicsType.name,
+            "unit": self.unit,
+            "value": self.value,
         }
 
 
@@ -384,7 +393,7 @@ class MDAFile:
 
         if pvType == EpicsType.DBR_CTRL_CHAR:
             valueChar = unpacker.unpack_fstring(count).decode()
-            valueChar = valueChar.split('\x00', 1)[0]  # treat as null-terminated string
+            valueChar = valueChar.split("\x00", 1)[0]  # treat as null-terminated string
             return MDAProcessVariable[str](pvName, pvDesc, pvType, pvUnit, valueChar)
         elif pvType == EpicsType.DBR_CTRL_SHORT:
             valueShort = unpacker.unpack_farray(count, unpacker.unpack_int)
@@ -406,7 +415,7 @@ class MDAFile:
         extra_pvs: list[MDAProcessVariable[Any]] = list()
 
         try:
-            with filePath.open(mode='rb') as fp:
+            with filePath.open(mode="rb") as fp:
                 header = MDAHeader.read(fp)
                 scan = MDAScan.read(fp)
 
@@ -425,9 +434,9 @@ class MDAFile:
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
-            'header': self.header.to_mapping(),
-            'scan': self.scan.to_mapping(),
-            'extra_pvs': [pv.to_mapping() for pv in self.extra_pvs],
+            "header": self.header.to_mapping(),
+            "scan": self.scan.to_mapping(),
+            "extra_pvs": [pv.to_mapping() for pv in self.extra_pvs],
         }
 
     def __str__(self) -> str:
@@ -435,7 +444,7 @@ class MDAFile:
 
 
 class MDAScanFileReader(ScanFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.e-6
+    MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     def read(self, filePath: Path) -> Scan:
         pointList: list[ScanPoint] = list()
@@ -460,7 +469,7 @@ class MDAScanFileReader(ScanFileReader):
 
 
 class HXNScanFileReader(ScanFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.e-6
+    MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     def read(self, filePath: Path) -> Scan:
         pointList = list()
@@ -484,22 +493,22 @@ class HXNScanFileReader(ScanFileReader):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.scanFileReaders.registerPlugin(
         MDAScanFileReader(),
-        simpleName='MDA',
-        displayName='EPICS MDA Files (*.mda)',
+        simpleName="MDA",
+        displayName="EPICS MDA Files (*.mda)",
     )
     registry.scanFileReaders.registerPlugin(
         MDAScanFileReader(),
-        simpleName='APS_2ID',
-        displayName='APS 2-ID MDA Files (*.mda)',
+        simpleName="APS_2ID",
+        displayName="APS 2-ID MDA Files (*.mda)",
     )
     registry.scanFileReaders.registerPlugin(
         HXNScanFileReader(),
-        simpleName='APS_HXN',
-        displayName='CNM/APS HXN Scan Files (*.mda)',
+        simpleName="APS_HXN",
+        displayName="CNM/APS HXN Scan Files (*.mda)",
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     filePath = Path(sys.argv[1])
     mdaFile = MDAFile.read(filePath)
     print(mdaFile)

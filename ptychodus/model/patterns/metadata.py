@@ -9,9 +9,13 @@ from .settings import PatternSettings, ProductSettings
 
 
 class DiffractionMetadataPresenter(Observable, Observer):
-
-    def __init__(self, diffractionDataset: DiffractionDataset, detector: Detector,
-                 patternSettings: PatternSettings, productSettings: ProductSettings) -> None:
+    def __init__(
+        self,
+        diffractionDataset: DiffractionDataset,
+        detector: Detector,
+        patternSettings: PatternSettings,
+        productSettings: ProductSettings,
+    ) -> None:
         super().__init__()
         self._diffractionDataset = diffractionDataset
         self._detector = detector
@@ -25,7 +29,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
         return self._diffractionDataset.getMetadata()
 
     def canSyncDetectorPixelCount(self) -> bool:
-        return (self._metadata.detectorExtent is not None)
+        return self._metadata.detectorExtent is not None
 
     def syncDetectorPixelCount(self) -> None:
         detectorExtent = self._metadata.detectorExtent
@@ -34,7 +38,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
             self._detector.setImageExtent(detectorExtent)
 
     def canSyncDetectorPixelSize(self) -> bool:
-        return (self._metadata.detectorPixelGeometry is not None)
+        return self._metadata.detectorPixelGeometry is not None
 
     def syncDetectorPixelSize(self) -> None:
         pixelGeometry = self._metadata.detectorPixelGeometry
@@ -43,7 +47,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
             self._detector.setPixelGeometry(pixelGeometry)
 
     def canSyncDetectorBitDepth(self) -> bool:
-        return (self._metadata.detectorBitDepth is not None)
+        return self._metadata.detectorBitDepth is not None
 
     def syncDetectorBitDepth(self) -> None:
         bitDepth = self._metadata.detectorBitDepth
@@ -52,11 +56,10 @@ class DiffractionMetadataPresenter(Observable, Observer):
             self._detector.setBitDepth(bitDepth)
 
     def canSyncPatternCropCenter(self) -> bool:
-        return (self._metadata.cropCenter is not None \
-                or self._metadata.detectorExtent is not None)
+        return self._metadata.cropCenter is not None or self._metadata.detectorExtent is not None
 
     def canSyncPatternCropExtent(self) -> bool:
-        return (self._metadata.detectorExtent is not None)
+        return self._metadata.detectorExtent is not None
 
     def syncPatternCrop(self, syncCenter: bool, syncExtent: bool) -> None:
         if syncCenter:
@@ -67,9 +70,11 @@ class DiffractionMetadataPresenter(Observable, Observer):
                 self._patternSettings.cropCenterYInPixels.setValue(cropCenter.positionYInPixels)
             elif self._metadata.detectorExtent:
                 self._patternSettings.cropCenterXInPixels.setValue(
-                    int(self._metadata.detectorExtent.widthInPixels) // 2)
+                    int(self._metadata.detectorExtent.widthInPixels) // 2
+                )
                 self._patternSettings.cropCenterYInPixels.setValue(
-                    int(self._metadata.detectorExtent.heightInPixels) // 2)
+                    int(self._metadata.detectorExtent.heightInPixels) // 2
+                )
 
         if syncExtent and self._metadata.detectorExtent:
             centerX = self._patternSettings.cropCenterXInPixels.getValue()
@@ -90,24 +95,26 @@ class DiffractionMetadataPresenter(Observable, Observer):
             self._patternSettings.cropHeightInPixels.setValue(cropDiameterInPixels)
 
     def canSyncProbeEnergy(self) -> bool:
-        return (self._metadata.probeEnergyInElectronVolts is not None)
+        return self._metadata.probeEnergyInElectronVolts is not None
 
     def syncProbeEnergy(self) -> None:
         energyInElectronVolts = self._metadata.probeEnergyInElectronVolts
 
         if energyInElectronVolts:
             self._productSettings.probeEnergyInElectronVolts.setValue(
-                Decimal.from_float(energyInElectronVolts))
+                Decimal.from_float(energyInElectronVolts)
+            )
 
     def canSyncDetectorDistance(self) -> bool:
-        return (self._metadata.detectorDistanceInMeters is not None)
+        return self._metadata.detectorDistanceInMeters is not None
 
     def syncDetectorDistance(self) -> None:
         distanceInMeters = self._metadata.detectorDistanceInMeters
 
         if distanceInMeters:
             self._productSettings.detectorDistanceInMeters.setValue(
-                Decimal.from_float(distanceInMeters))
+                Decimal.from_float(distanceInMeters)
+            )
 
     def update(self, observable: Observable) -> None:
         if observable is self._diffractionDataset:

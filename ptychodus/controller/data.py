@@ -5,7 +5,6 @@ from PyQt5.QtWidgets import QDialog, QFileDialog, QWidget
 
 
 class FileDialogFactory:
-
     def __init__(self) -> None:
         self._openWorkingDirectory = Path.cwd()
         self._saveWorkingDirectory = Path.cwd()
@@ -16,12 +15,14 @@ class FileDialogFactory:
     def setOpenWorkingDirectory(self, directory: Path) -> None:
         self._openWorkingDirectory = directory if directory.is_dir() else directory.parent
 
-    def getOpenFilePath(self,
-                        parent: QWidget,
-                        caption: str,
-                        nameFilters: Sequence[str] | None = None,
-                        mimeTypeFilters: Sequence[str] | None = None,
-                        selectedNameFilter: str | None = None) -> tuple[Path | None, str]:
+    def getOpenFilePath(
+        self,
+        parent: QWidget,
+        caption: str,
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+    ) -> tuple[Path | None, str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self.getOpenWorkingDirectory()))
@@ -47,12 +48,14 @@ class FileDialogFactory:
 
         return filePath, dialog.selectedNameFilter()
 
-    def getSaveFilePath(self,
-                        parent: QWidget,
-                        caption: str,
-                        nameFilters: Sequence[str] | None = None,
-                        mimeTypeFilters: Sequence[str] | None = None,
-                        selectedNameFilter: str | None = None) -> tuple[Path | None, str]:
+    def getSaveFilePath(
+        self,
+        parent: QWidget,
+        caption: str,
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+    ) -> tuple[Path | None, str]:
         filePath = None
 
         dialog = QFileDialog(parent, caption, str(self._saveWorkingDirectory))
@@ -82,8 +85,11 @@ class FileDialogFactory:
         dirPath = None
 
         dirName = QFileDialog.getExistingDirectory(
-            parent, caption, str(self.getOpenWorkingDirectory()),
-            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks)
+            parent,
+            caption,
+            str(self.getOpenWorkingDirectory()),
+            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
+        )
 
         if dirName:
             dirPath = Path(dirName)

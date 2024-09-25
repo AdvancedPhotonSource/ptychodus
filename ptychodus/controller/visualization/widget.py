@@ -12,12 +12,17 @@ from .controller import VisualizationController
 
 
 class VisualizationWidgetController:
-
-    def __init__(self, engine: VisualizationEngine, widget: VisualizationWidget,
-                 statusBar: QStatusBar, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        engine: VisualizationEngine,
+        widget: VisualizationWidget,
+        statusBar: QStatusBar,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         self._widget = widget
-        self._controller = VisualizationController.createInstance(engine, widget.visualizationView,
-                                                                  statusBar, fileDialogFactory)
+        self._controller = VisualizationController.createInstance(
+            engine, widget.visualizationView, statusBar, fileDialogFactory
+        )
 
         self._widget.homeAction.triggered.connect(self._controller.zoomToFit)
         self._widget.saveAction.triggered.connect(self._controller.saveImage)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy
 
+from ptychodus.api.parametric import RealParameter
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
 from .builder import ProbeBuilder
@@ -9,25 +10,27 @@ from .settings import ProbeSettings
 
 
 class SuperGaussianProbeBuilder(ProbeBuilder):
-
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('super_gaussian')
+        super().__init__("super_gaussian")
         self._settings = settings
 
-        self.annularRadiusInMeters = self._registerRealParameter(
-            'annular_radius_m',
+        self.annularRadiusInMeters = RealParameter(
+            self,
+            "annular_radius_m",
             float(settings.superGaussianAnnularRadiusInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.fwhmInMeters = self._registerRealParameter(
-            'full_width_at_half_maximum_m',
+        self.fwhmInMeters = RealParameter(
+            self,
+            "full_width_at_half_maximum_m",
             float(settings.superGaussianWidthInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.orderParameter = self._registerRealParameter(
-            'order_parameter',
+        self.orderParameter = RealParameter(
+            self,
+            "order_parameter",
             float(settings.superGaussianOrderParameter.getValue()),
-            minimum=1.,
+            minimum=1.0,
         )
 
     def copy(self) -> SuperGaussianProbeBuilder:
@@ -41,8 +44,9 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
         geometry = geometryProvider.getProbeGeometry()
         coords = self.getTransverseCoordinates(geometry)
 
-        Z = (coords.positionRInMeters - self.annularRadiusInMeters.getValue()) \
-                / self.fwhmInMeters.getValue()
+        Z = (
+            coords.positionRInMeters - self.annularRadiusInMeters.getValue()
+        ) / self.fwhmInMeters.getValue()
         ZP = numpy.power(2 * Z, 2 * self.orderParameter.getValue())
 
         return Probe(

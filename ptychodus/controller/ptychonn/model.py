@@ -8,22 +8,30 @@ from ..data import FileDialogFactory
 
 
 class PtychoNNModelParametersController(Observer):
-
-    def __init__(self, presenter: PtychoNNModelPresenter, view: PtychoNNModelParametersView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        presenter: PtychoNNModelPresenter,
+        view: PtychoNNModelParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, presenter: PtychoNNModelPresenter, view: PtychoNNModelParametersView,
-                       fileDialogFactory: FileDialogFactory) -> PtychoNNModelParametersController:
+    def createInstance(
+        cls,
+        presenter: PtychoNNModelPresenter,
+        view: PtychoNNModelParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> PtychoNNModelParametersController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
         view.numberOfConvolutionKernelsSpinBox.valueChanged.connect(
-            presenter.setNumberOfConvolutionKernels)
+            presenter.setNumberOfConvolutionKernels
+        )
         view.batchSizeSpinBox.valueChanged.connect(presenter.setBatchSize)
         view.useBatchNormalizationCheckBox.toggled.connect(presenter.setBatchNormalizationEnabled)
 
@@ -35,19 +43,23 @@ class PtychoNNModelParametersController(Observer):
         self._view.numberOfConvolutionKernelsSpinBox.blockSignals(True)
         self._view.numberOfConvolutionKernelsSpinBox.setRange(
             self._presenter.getNumberOfConvolutionKernelsLimits().lower,
-            self._presenter.getNumberOfConvolutionKernelsLimits().upper)
+            self._presenter.getNumberOfConvolutionKernelsLimits().upper,
+        )
         self._view.numberOfConvolutionKernelsSpinBox.setValue(
-            self._presenter.getNumberOfConvolutionKernels())
+            self._presenter.getNumberOfConvolutionKernels()
+        )
         self._view.numberOfConvolutionKernelsSpinBox.blockSignals(False)
 
         self._view.batchSizeSpinBox.blockSignals(True)
-        self._view.batchSizeSpinBox.setRange(self._presenter.getBatchSizeLimits().lower,
-                                             self._presenter.getBatchSizeLimits().upper)
+        self._view.batchSizeSpinBox.setRange(
+            self._presenter.getBatchSizeLimits().lower, self._presenter.getBatchSizeLimits().upper
+        )
         self._view.batchSizeSpinBox.setValue(self._presenter.getBatchSize())
         self._view.batchSizeSpinBox.blockSignals(False)
 
         self._view.useBatchNormalizationCheckBox.setChecked(
-            self._presenter.isBatchNormalizationEnabled())
+            self._presenter.isBatchNormalizationEnabled()
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

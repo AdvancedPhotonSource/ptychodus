@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductRepositoryObserver):
-
     def __init__(self, repository: ProductRepository) -> None:
         super().__init__()
         self._repository = repository
@@ -28,15 +27,14 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
         self._repository[index].setName(name)
 
     @overload
-    def __getitem__(self, index: int) -> ObjectRepositoryItem:
-        ...
+    def __getitem__(self, index: int) -> ObjectRepositoryItem: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ObjectRepositoryItem]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[ObjectRepositoryItem]: ...
 
-    def __getitem__(self,
-                    index: int | slice) -> ObjectRepositoryItem | Sequence[ObjectRepositoryItem]:
+    def __getitem__(
+        self, index: int | slice
+    ) -> ObjectRepositoryItem | Sequence[ObjectRepositoryItem]:
         if isinstance(index, slice):
             return [item.getObject() for item in self._repository[index]]
         else:

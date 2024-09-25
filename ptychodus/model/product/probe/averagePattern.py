@@ -10,9 +10,8 @@ from .builder import ProbeBuilder
 
 
 class AveragePatternProbeBuilder(ProbeBuilder):
-
     def __init__(self, detector: Detector, patterns: ActiveDiffractionDataset) -> None:
-        super().__init__('average_pattern')
+        super().__init__("average_pattern")
         self._detector = detector
         self._patterns = patterns
 

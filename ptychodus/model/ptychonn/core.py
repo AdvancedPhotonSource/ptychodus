@@ -6,8 +6,12 @@ import logging
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
-                                         TrainableReconstructor)
+from ptychodus.api.reconstructor import (
+    NullReconstructor,
+    Reconstructor,
+    ReconstructorLibrary,
+    TrainableReconstructor,
+)
 from ptychodus.api.settings import SettingsRegistry
 
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
@@ -120,10 +124,12 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
-
-    def __init__(self, modelSettings: PtychoNNModelSettings,
-                 trainingSettings: PtychoNNTrainingSettings,
-                 reconstructors: Sequence[Reconstructor]) -> None:
+    def __init__(
+        self,
+        modelSettings: PtychoNNModelSettings,
+        trainingSettings: PtychoNNTrainingSettings,
+        reconstructors: Sequence[Reconstructor],
+    ) -> None:
         super().__init__()
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
@@ -132,35 +138,37 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry,
-                       isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
+    def createInstance(
+        cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool
+    ) -> PtychoNNReconstructorLibrary:
         modelSettings = PtychoNNModelSettings(settingsRegistry)
         trainingSettings = PtychoNNTrainingSettings(settingsRegistry)
-        phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
-        amplitudePhaseReconstructor: TrainableReconstructor = NullReconstructor('AmplitudePhase')
+        phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor("PhaseOnly")
+        amplitudePhaseReconstructor: TrainableReconstructor = NullReconstructor("AmplitudePhase")
         reconstructors: list[TrainableReconstructor] = list()
 
         try:
             from .model import PtychoNNModelProvider
             from .reconstructor import PtychoNNTrainableReconstructor
         except ModuleNotFoundError:
-            logger.info('PtychoNN not found.')
+            logger.info("PtychoNN not found.")
 
             if isDeveloperModeEnabled:
                 reconstructors.append(phaseOnlyReconstructor)
                 reconstructors.append(amplitudePhaseReconstructor)
         else:
-            phaseOnlyModelProvider = PtychoNNModelProvider(modelSettings,
-                                                           trainingSettings,
-                                                           enableAmplitude=False)
-            phaseOnlyReconstructor = PtychoNNTrainableReconstructor(modelSettings,
-                                                                    trainingSettings,
-                                                                    phaseOnlyModelProvider)
-            amplitudePhaseModelProvider = PtychoNNModelProvider(modelSettings,
-                                                                trainingSettings,
-                                                                enableAmplitude=True)
+            phaseOnlyModelProvider = PtychoNNModelProvider(
+                modelSettings, trainingSettings, enableAmplitude=False
+            )
+            phaseOnlyReconstructor = PtychoNNTrainableReconstructor(
+                modelSettings, trainingSettings, phaseOnlyModelProvider
+            )
+            amplitudePhaseModelProvider = PtychoNNModelProvider(
+                modelSettings, trainingSettings, enableAmplitude=True
+            )
             amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(
-                modelSettings, trainingSettings, amplitudePhaseModelProvider)
+                modelSettings, trainingSettings, amplitudePhaseModelProvider
+            )
             reconstructors.append(phaseOnlyReconstructor)
             reconstructors.append(amplitudePhaseReconstructor)
 
@@ -168,7 +176,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
     @property
     def name(self) -> str:
-        return 'PtychoNN'
+        return "PtychoNN"
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)

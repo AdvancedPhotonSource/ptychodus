@@ -15,7 +15,7 @@ from ptychodus.api.visualization import RealArrayType
 from ..reconstructor import DiffractionPatternPositionMatcher
 
 __all__ = [
-    'STXMSimulator',
+    "STXMSimulator",
 ]
 
 logger = logging.getLogger(__name__)
@@ -35,27 +35,29 @@ class STXMImage:
 
 
 class STXMStitcher:
-
     def __init__(self, geometry: ObjectGeometry) -> None:
         self._geometry = geometry
         self._weights = numpy.zeros((geometry.heightInPixels, geometry.widthInPixels))
         self._intensity = numpy.zeros_like(self._weights)
 
-    def _addPatchPart(self, ixSlice: slice, iySlice: slice, intensity: float,
-                      probeProfile: RealArrayType) -> None:
+    def _addPatchPart(
+        self, ixSlice: slice, iySlice: slice, intensity: float, probeProfile: RealArrayType
+    ) -> None:
         idx = numpy.s_[iySlice, ixSlice]
         self._weights[idx] += probeProfile
         self._intensity[idx] += intensity * probeProfile
 
-    def addMeasurement(self, point: ScanPoint, intensity: float,
-                       probeProfile: RealArrayType) -> None:
+    def addMeasurement(
+        self, point: ScanPoint, intensity: float, probeProfile: RealArrayType
+    ) -> None:
         geometry = self._geometry
 
         patchWidth = probeProfile.shape[-1]
         patchRadiusXInMeters = geometry.pixelWidthInMeters * patchWidth / 2
         patchMinimumXInMeters = point.positionXInMeters - patchRadiusXInMeters
-        ixBeginF, xi = divmod(patchMinimumXInMeters - geometry.minimumXInMeters,
-                              geometry.pixelWidthInMeters)
+        ixBeginF, xi = divmod(
+            patchMinimumXInMeters - geometry.minimumXInMeters, geometry.pixelWidthInMeters
+        )
         ixBegin = int(ixBeginF)
         ixEnd = ixBegin + patchWidth
         ixSlice0 = slice(ixBegin, ixEnd)
@@ -64,15 +66,16 @@ class STXMStitcher:
         patchHeight = probeProfile.shape[-2]
         patchRadiusYInMeters = geometry.pixelHeightInMeters * patchHeight / 2
         patchMinimumYInMeters = point.positionYInMeters - patchRadiusYInMeters
-        iyBeginF, eta = divmod(patchMinimumYInMeters - geometry.minimumYInMeters,
-                               geometry.pixelHeightInMeters)
+        iyBeginF, eta = divmod(
+            patchMinimumYInMeters - geometry.minimumYInMeters, geometry.pixelHeightInMeters
+        )
         iyBegin = int(iyBeginF)
         iyEnd = iyBegin + patchHeight
         iySlice0 = slice(iyBegin, iyEnd)
         iySlice1 = slice(iyBegin + 1, iyEnd + 1)
 
-        xiC = 1. - xi
-        etaC = 1. - eta
+        xiC = 1.0 - xi
+        etaC = 1.0 - eta
 
         self._addPatchPart(ixSlice0, iySlice0, xiC * etaC, probeProfile)
         self._addPatchPart(ixSlice1, iySlice0, xi * etaC, probeProfile)
@@ -80,10 +83,12 @@ class STXMStitcher:
         self._addPatchPart(ixSlice1, iySlice1, xi * eta, probeProfile)
 
     def build(self) -> STXMImage:
-        intensity = numpy.divide(self._intensity,
-                                 self._weights,
-                                 out=numpy.zeros_like(self._weights),
-                                 where=(self._weights > 0))
+        intensity = numpy.divide(
+            self._intensity,
+            self._weights,
+            out=numpy.zeros_like(self._weights),
+            where=(self._weights > 0),
+        )
         return STXMImage(
             intensity=intensity,
             pixel_width_m=self._geometry.pixelWidthInMeters,
@@ -94,7 +99,6 @@ class STXMStitcher:
 
 
 class STXMSimulator(Observable):
-
     def __init__(self, dataMatcher: DiffractionPatternPositionMatcher) -> None:
         super().__init__()
         self._dataMatcher = dataMatcher
@@ -113,12 +117,13 @@ class STXMSimulator(Observable):
 
     def simulate(self) -> None:
         reconstructInput = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            self._productIndex)
+            self._productIndex
+        )
         product = reconstructInput.product
         stitcher = STXMStitcher(product.object_.getGeometry())
 
         probeIntensity = product.probe.getIntensity()
-        probeProfile = probeIntensity / numpy.sqrt(numpy.sum(numpy.abs(probeIntensity)**2))
+        probeProfile = probeIntensity / numpy.sqrt(numpy.sum(numpy.abs(probeIntensity) ** 2))
 
         for pattern, scanPoint in zip(reconstructInput.patterns, product.scan):
             patternIntensity = pattern.sum()
@@ -129,7 +134,7 @@ class STXMSimulator(Observable):
 
     def getImage(self) -> STXMImage:
         if self._image is None:
-            raise ValueError('No simulated image!')
+            raise ValueError("No simulated image!")
 
         return self._image
 
@@ -137,22 +142,22 @@ class STXMSimulator(Observable):
         return [self.getSaveFileFilter()]
 
     def getSaveFileFilter(self) -> str:
-        return 'NumPy Zipped Archive (*.npz)'
+        return "NumPy Zipped Archive (*.npz)"
 
     def saveImage(self, filePath: Path) -> None:
         if self._image is None:
-            raise ValueError('No simulated image!')
+            raise ValueError("No simulated image!")
 
         numpy.savez(
             filePath,
-            'pixel_height_m',
+            "pixel_height_m",
             self._image.pixel_height_m,
-            'pixel_width_m',
+            "pixel_width_m",
             self._image.pixel_width_m,
-            'center_x_m',
+            "center_x_m",
             self._image.center_x_m,
-            'center_y_m',
+            "center_y_m",
             self._image.center_y_m,
-            'intensity',
+            "intensity",
             self._image.intensity,
         )

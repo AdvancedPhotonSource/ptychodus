@@ -8,13 +8,16 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
 
 from .colorAxis import ColorAxis
-from .colorModel import CylindricalColorModelParameter
 from .colorModelRenderer import CylindricalColorModelRenderer
 from .colormap import ColormapParameter
 from .colormapRenderer import ColormapRenderer
-from .components import (AmplitudeArrayComponent, ImaginaryArrayComponent,
-                         PhaseInRadiansArrayComponent, RealArrayComponent,
-                         UnwrappedPhaseInRadiansArrayComponent)
+from .components import (
+    AmplitudeArrayComponent,
+    ImaginaryArrayComponent,
+    PhaseInRadiansArrayComponent,
+    RealArrayComponent,
+    UnwrappedPhaseInRadiansArrayComponent,
+)
 
 from .renderer import Renderer
 from .transformation import ScalarTransformationParameter
@@ -23,7 +26,6 @@ logger = logging.getLogger(__name__)
 
 
 class VisualizationEngine(Observable, Observer):
-
     def __init__(self, *, isComplex: bool) -> None:
         super().__init__()
         self._rendererChooser = PluginChooser[Renderer]()
@@ -32,43 +34,54 @@ class VisualizationEngine(Observable, Observer):
         acyclicColormap = ColormapParameter(isCyclic=False)
 
         self._rendererChooser.registerPlugin(
-            ColormapRenderer(RealArrayComponent(), self._transformation, self._colorAxis,
-                             acyclicColormap),
-            displayName='Real',
+            ColormapRenderer(
+                RealArrayComponent(), self._transformation, self._colorAxis, acyclicColormap
+            ),
+            displayName="Real",
         )
 
         if isComplex:
             amplitudeComponent = AmplitudeArrayComponent()
             phaseComponent = PhaseInRadiansArrayComponent()
             cyclicColormap = ColormapParameter(isCyclic=True)
-            colorModel = CylindricalColorModelParameter()
 
             self._rendererChooser.registerPlugin(
-                ColormapRenderer(ImaginaryArrayComponent(), self._transformation, self._colorAxis,
-                                 acyclicColormap),
-                displayName='Imaginary',
+                ColormapRenderer(
+                    ImaginaryArrayComponent(),
+                    self._transformation,
+                    self._colorAxis,
+                    acyclicColormap,
+                ),
+                displayName="Imaginary",
             )
             self._rendererChooser.registerPlugin(
-                ColormapRenderer(amplitudeComponent, self._transformation, self._colorAxis,
-                                 acyclicColormap),
-                displayName='Amplitude',
+                ColormapRenderer(
+                    amplitudeComponent, self._transformation, self._colorAxis, acyclicColormap
+                ),
+                displayName="Amplitude",
             )
             self._rendererChooser.registerPlugin(
-                ColormapRenderer(phaseComponent, self._transformation, self._colorAxis,
-                                 cyclicColormap),
-                displayName='Phase',
+                ColormapRenderer(
+                    phaseComponent, self._transformation, self._colorAxis, cyclicColormap
+                ),
+                displayName="Phase",
             )
             self._rendererChooser.registerPlugin(
-                ColormapRenderer(UnwrappedPhaseInRadiansArrayComponent(), self._transformation,
-                                 self._colorAxis, acyclicColormap),
-                displayName='Phase (Unwrapped)',
+                ColormapRenderer(
+                    UnwrappedPhaseInRadiansArrayComponent(),
+                    self._transformation,
+                    self._colorAxis,
+                    acyclicColormap,
+                ),
+                displayName="Phase (Unwrapped)",
             )
             self._rendererChooser.registerPlugin(
-                CylindricalColorModelRenderer(amplitudeComponent, phaseComponent,
-                                              self._transformation, self._colorAxis, colorModel),
-                displayName='Complex',
+                CylindricalColorModelRenderer(
+                    amplitudeComponent, phaseComponent, self._transformation, self._colorAxis
+                ),
+                displayName="Complex",
             )
-            self._rendererChooser.setCurrentPluginByName('Complex')
+            self._rendererChooser.setCurrentPluginByName("Complex")
 
         self._rendererChooser.addObserver(self)
         self._rendererPlugin = self._rendererChooser.currentPlugin
@@ -123,11 +136,12 @@ class VisualizationEngine(Observable, Observer):
     def colorize(self, array: NumberArrayType) -> RealArrayType:
         return self._rendererPlugin.strategy.colorize(array)
 
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
-               autoscaleColorAxis: bool) -> VisualizationProduct:
-        return self._rendererPlugin.strategy.render(array,
-                                                    pixelGeometry,
-                                                    autoscaleColorAxis=autoscaleColorAxis)
+    def render(
+        self, array: NumberArrayType, pixelGeometry: PixelGeometry, *, autoscaleColorAxis: bool
+    ) -> VisualizationProduct:
+        return self._rendererPlugin.strategy.render(
+            array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._rendererChooser:

@@ -3,18 +3,17 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import Interval
-from ptychodus.api.parametric import ParameterRepository
+from ptychodus.api.parametric import ParameterGroup, RealParameter
 from ptychodus.api.visualization import RealArrayType
 
 logger = logging.getLogger(__name__)
 
 
-class ColorAxis(ParameterRepository):
-
+class ColorAxis(ParameterGroup):
     def __init__(self) -> None:
-        super().__init__('color_axis')
-        self.lower = self._registerRealParameter('lower', 0.)
-        self.upper = self._registerRealParameter('upper', 1.)
+        super().__init__()
+        self.lower = RealParameter(self, "lower", 0.0)
+        self.upper = RealParameter(self, "upper", 1.0)
 
     def getRange(self) -> Interval[float]:
         return Interval[float].createProper(
@@ -34,14 +33,14 @@ class ColorAxis(ParameterRepository):
 
             if numpy.isfinite(lower) and numpy.isfinite(upper):
                 if lower == upper:
-                    logger.debug('Array values are uniform.')
+                    logger.debug("Array values are uniform.")
                     lower -= 0.5
                     upper += 0.5
             else:
-                logger.warning('Array values not finite!')
-                lower = 0.
-                upper = 1.
+                logger.warning("Array values not finite!")
+                lower = 0.0
+                upper = 1.0
 
             self.setRange(lower, upper)
         else:
-            logger.warning('Array has zero size!')
+            logger.warning("Array has zero size!")

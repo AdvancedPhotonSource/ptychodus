@@ -14,10 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructorPresenter(Observable, Observer):
-
-    def __init__(self, settings: ReconstructorSettings,
-                 reconstructorChooser: PluginChooser[Reconstructor],
-                 reconstructorAPI: ReconstructorAPI, reinitObservable: Observable) -> None:
+    def __init__(
+        self,
+        settings: ReconstructorSettings,
+        reconstructorChooser: PluginChooser[Reconstructor],
+        reconstructorAPI: ReconstructorAPI,
+        reinitObservable: Observable,
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._reconstructorChooser = reconstructorChooser
@@ -43,12 +46,15 @@ class ReconstructorPresenter(Observable, Observer):
     def _syncToSettings(self) -> None:
         self._settings.algorithm.setValue(self._reconstructorChooser.currentPlugin.simpleName)
 
-    def reconstruct(self,
-                    inputProductIndex: int,
-                    outputProductName: str,
-                    indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> int:
-        return self._reconstructorAPI.reconstruct(inputProductIndex, outputProductName,
-                                                  indexFilter)
+    def reconstruct(
+        self,
+        inputProductIndex: int,
+        outputProductName: str,
+        indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
+    ) -> int:
+        return self._reconstructorAPI.reconstruct(
+            inputProductIndex, outputProductName, indexFilter
+        )
 
     def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
         return self._reconstructorAPI.reconstructSplit(inputProductIndex, outputProductName)
@@ -67,7 +73,7 @@ class ReconstructorPresenter(Observable, Observer):
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getOpenTrainingDataFileFilterList()
         else:
-            logger.warning('Reconstructor is not trainable!')
+            logger.warning("Reconstructor is not trainable!")
 
         return list()
 
@@ -77,7 +83,7 @@ class ReconstructorPresenter(Observable, Observer):
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getOpenTrainingDataFileFilter()
         else:
-            logger.warning('Reconstructor is not trainable!')
+            logger.warning("Reconstructor is not trainable!")
 
         return str()
 
@@ -90,7 +96,7 @@ class ReconstructorPresenter(Observable, Observer):
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getSaveTrainingDataFileFilterList()
         else:
-            logger.warning('Reconstructor is not trainable!')
+            logger.warning("Reconstructor is not trainable!")
 
         return list()
 
@@ -100,7 +106,7 @@ class ReconstructorPresenter(Observable, Observer):
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getSaveTrainingDataFileFilter()
         else:
-            logger.warning('Reconstructor is not trainable!')
+            logger.warning("Reconstructor is not trainable!")
 
         return str()
 
@@ -119,7 +125,7 @@ class ReconstructorPresenter(Observable, Observer):
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getOpenModelFileFilterList()
         else:
-            logger.warning('Reconstructor is not trainable!')
+            logger.warning("Reconstructor is not trainable!")
 
         return list()
 
@@ -129,7 +135,7 @@ class ReconstructorPresenter(Observable, Observer):
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getOpenModelFileFilter()
         else:
-            logger.warning('Reconstructor is not trainable!')
+            logger.warning("Reconstructor is not trainable!")
 
         return str()
 
@@ -142,7 +148,7 @@ class ReconstructorPresenter(Observable, Observer):
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getSaveModelFileFilterList()
         else:
-            logger.warning('Reconstructor is not trainable!')
+            logger.warning("Reconstructor is not trainable!")
 
         return list()
 
@@ -152,7 +158,7 @@ class ReconstructorPresenter(Observable, Observer):
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.getSaveModelFileFilter()
         else:
-            logger.warning('Reconstructor is not trainable!')
+            logger.warning("Reconstructor is not trainable!")
 
         return str()
 

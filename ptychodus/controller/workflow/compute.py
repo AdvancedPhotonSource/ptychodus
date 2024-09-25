@@ -9,20 +9,21 @@ from ...view.workflow import WorkflowComputeView
 
 
 class WorkflowComputeController(Observer):
-
     def __init__(self, presenter: WorkflowParametersPresenter, view: WorkflowComputeView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: WorkflowParametersPresenter,
-                       view: WorkflowComputeView) -> WorkflowComputeController:
+    def createInstance(
+        cls, presenter: WorkflowParametersPresenter, view: WorkflowComputeView
+    ) -> WorkflowComputeController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
         view.computeEndpointIDLineEdit.editingFinished.connect(
-            controller._syncComputeEndpointIDToModel)
+            controller._syncComputeEndpointIDToModel
+        )
         view.dataEndpointIDLineEdit.editingFinished.connect(controller._syncDataEndpointIDToModel)
         view.dataGlobusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
         view.dataPosixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)

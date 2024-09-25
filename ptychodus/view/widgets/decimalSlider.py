@@ -21,11 +21,13 @@ class DecimalSlider(QWidget):
         self._maximum = Decimal()
 
     @classmethod
-    def createInstance(cls,
-                       orientation: Qt.Orientation,
-                       parent: QWidget | None = None,
-                       *,
-                       numberOfTicks: int = 1000) -> DecimalSlider:
+    def createInstance(
+        cls,
+        orientation: Qt.Orientation,
+        parent: QWidget | None = None,
+        *,
+        numberOfTicks: int = 1000,
+    ) -> DecimalSlider:
         slider = QSlider(orientation)
         slider.setRange(0, numberOfTicks)
         slider.setTickPosition(QSlider.TickPosition.TicksBelow)
@@ -50,14 +52,13 @@ class DecimalSlider(QWidget):
         if self._setValueToSlider(value):
             self._emitValueChanged()
 
-    def setValueAndRange(self,
-                         value: Decimal,
-                         range_: Interval[Decimal],
-                         blockValueChangedSignal: bool = False) -> None:
+    def setValueAndRange(
+        self, value: Decimal, range_: Interval[Decimal], blockValueChangedSignal: bool = False
+    ) -> None:
         shouldEmit = False
 
         if range_.upper <= range_.lower:
-            raise ValueError(f'maximum <= minimum ({range_.upper} <= {range_.lower})')
+            raise ValueError(f"maximum <= minimum ({range_.upper} <= {range_.lower})")
 
         if range_.lower != self._minimum:
             self._minimum = range_.lower
@@ -110,7 +111,7 @@ class DecimalSlider(QWidget):
         return shouldEmit
 
     def _updateLabel(self) -> None:
-        self._label.setText(f'{self._value:.3f}')
+        self._label.setText(f"{self._value:.3f}")
 
     def _emitValueChanged(self) -> None:
         self.valueChanged.emit(self._value)

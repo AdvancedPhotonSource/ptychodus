@@ -1,20 +1,31 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGridLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QLineEdit, QListView, QPushButton, QSpinBox,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListView,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class AutomationProcessingView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Processing', parent)
-        self.strategyLabel = QLabel('Strategy:')
+        super().__init__("Processing", parent)
+        self.strategyLabel = QLabel("Strategy:")
         self.strategyComboBox = QComboBox()
-        self.directoryLabel = QLabel('Directory:')
+        self.directoryLabel = QLabel("Directory:")
         self.directoryLineEdit = QLineEdit()
-        self.directoryBrowseButton = QPushButton('Browse')
-        self.intervalLabel = QLabel('Interval [sec]:')
+        self.directoryBrowseButton = QPushButton("Browse")
+        self.intervalLabel = QLabel("Interval [sec]:")
         self.intervalSpinBox = QSpinBox()
 
     @classmethod
@@ -36,18 +47,17 @@ class AutomationProcessingView(QGroupBox):
 
 
 class AutomationWatchdogView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Watchdog', parent)
+        super().__init__("Watchdog", parent)
         self.delaySpinBox = QSpinBox()
-        self.usePollingObserverCheckBox = QCheckBox('Use Polling Observer')
+        self.usePollingObserverCheckBox = QCheckBox("Use Polling Observer")
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> AutomationWatchdogView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Delay [sec]:', view.delaySpinBox)
+        layout.addRow("Delay [sec]:", view.delaySpinBox)
         layout.addRow(view.usePollingObserverCheckBox)
         view.setLayout(layout)
 
@@ -55,16 +65,15 @@ class AutomationWatchdogView(QGroupBox):
 
 
 class AutomationView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.processingView = AutomationProcessingView.createInstance()
         self.watchdogView = AutomationWatchdogView.createInstance()
         self.processingListView = QListView()
-        self.loadButton = QPushButton('Load')
-        self.watchButton = QPushButton('Watch')
-        self.processButton = QPushButton('Process')
-        self.clearButton = QPushButton('Clear')
+        self.loadButton = QPushButton("Load")
+        self.watchButton = QPushButton("Watch")
+        self.processButton = QPushButton("Process")
+        self.clearButton = QPushButton("Clear")
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> AutomationView:

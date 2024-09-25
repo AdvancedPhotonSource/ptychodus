@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 class RealPtychoPackDevice(PtychoPackDevice):
-
     def __init__(self) -> None:
         self._available_devices = ptychopack.list_available_devices()
         self._device = self._available_devices[0]
@@ -27,7 +26,7 @@ class RealPtychoPackDevice(PtychoPackDevice):
                 self._device = device
                 return
 
-        logger.warning(f'Failed to set device \"{name}\"')
+        logger.warning(f'Failed to set device "{name}"')
 
     def get_ptychopack_device(self) -> ptychopack.Device:
         return self._device

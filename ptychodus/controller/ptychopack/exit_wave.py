@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPackExitWaveCorrectionController(Observer):
-
-    def __init__(self, presenter: PtychoPackPresenter,
-                 view: PtychoPackExitWaveCorrectionView) -> None:
+    def __init__(
+        self, presenter: PtychoPackPresenter, view: PtychoPackExitWaveCorrectionView
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
@@ -27,11 +27,13 @@ class PtychoPackExitWaveCorrectionController(Observer):
         self._view.dm_relaxation_slider.setValueAndRange(
             self._presenter.get_dm_exit_wave_relaxation(),
             self._presenter.get_dm_exit_wave_relaxation_limits(),
-            blockValueChangedSignal=True)
+            blockValueChangedSignal=True,
+        )
         self._view.raar_relaxation_slider.setValueAndRange(
             self._presenter.get_raar_exit_wave_relaxation(),
             self._presenter.get_raar_exit_wave_relaxation_limits(),
-            blockValueChangedSignal=True)
+            blockValueChangedSignal=True,
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

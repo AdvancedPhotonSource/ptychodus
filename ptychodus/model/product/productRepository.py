@@ -19,12 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemObserver):
-
-    def __init__(self, settings: ProductSettings, patternSizer: PatternSizer,
-                 patterns: ActiveDiffractionDataset,
-                 scanRepositoryItemFactory: ScanRepositoryItemFactory,
-                 probeRepositoryItemFactory: ProbeRepositoryItemFactory,
-                 objectRepositoryItemFactory: ObjectRepositoryItemFactory) -> None:
+    def __init__(
+        self,
+        settings: ProductSettings,
+        patternSizer: PatternSizer,
+        patterns: ActiveDiffractionDataset,
+        scanRepositoryItemFactory: ScanRepositoryItemFactory,
+        probeRepositoryItemFactory: ProbeRepositoryItemFactory,
+        objectRepositoryItemFactory: ObjectRepositoryItemFactory,
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._patternSizer = patternSizer
@@ -39,15 +42,14 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         ]
 
     @overload
-    def __getitem__(self, index: int) -> ProductRepositoryItem:
-        ...
+    def __getitem__(self, index: int) -> ProductRepositoryItem: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ProductRepositoryItem]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[ProductRepositoryItem]: ...
 
-    def __getitem__(self,
-                    index: int | slice) -> ProductRepositoryItem | Sequence[ProductRepositoryItem]:
+    def __getitem__(
+        self, index: int | slice
+    ) -> ProductRepositoryItem | Sequence[ProductRepositoryItem]:
         return self._itemList[index]
 
     def __len__(self) -> int:
@@ -62,22 +64,25 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         return index
 
-    def insertNewProduct(self,
-                         name: str,
-                         *,
-                         comments: str = '',
-                         detectorDistanceInMeters: float | None = None,
-                         probeEnergyInElectronVolts: float | None = None,
-                         probePhotonsPerSecond: float | None = None,
-                         exposureTimeInSeconds: float | None = None,
-                         likeIndex: int) -> int:
+    def insertNewProduct(
+        self,
+        name: str,
+        *,
+        comments: str = "",
+        detectorDistanceInMeters: float | None = None,
+        probeEnergyInElectronVolts: float | None = None,
+        probePhotonsPerSecond: float | None = None,
+        exposureTimeInSeconds: float | None = None,
+        likeIndex: int,
+    ) -> int:
         metadataItem = self._metadataRepositoryItemFactory.createDefault(
             name,
             comments=comments,
             detectorDistanceInMeters=detectorDistanceInMeters,
             probeEnergyInElectronVolts=probeEnergyInElectronVolts,
             probePhotonsPerSecond=probePhotonsPerSecond,
-            exposureTimeInSeconds=exposureTimeInSeconds)
+            exposureTimeInSeconds=exposureTimeInSeconds,
+        )
         scanItem = self._scanRepositoryItemFactory.create()
         geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.create(geometry)
@@ -105,7 +110,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def insertProductFromSettings(self) -> int:
         # TODO add mechanism to sync product state to settings
-        metadataItem = self._metadataRepositoryItemFactory.createDefault('FromSettings')
+        metadataItem = self._metadataRepositoryItemFactory.createDefault("FromSettings")
         scanItem = self._scanRepositoryItemFactory.createFromSettings()
         geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.createFromSettings(geometry)
@@ -148,7 +153,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         try:
             item = self._itemList.pop(index)
         except IndexError:
-            logger.debug(f'Failed to remove product item {index}!')
+            logger.debug(f"Failed to remove product item {index}!")
             return
 
         for observer in self._observerList:
@@ -156,7 +161,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def getInfoText(self) -> str:
         sizeInMB = sum(sys.getsizeof(prod) for prod in self._itemList) / (1024 * 1024)
-        return f'Total: {len(self)} [{sizeInMB:.2f}MB]'
+        return f"Total: {len(self)} [{sizeInMB:.2f}MB]"
 
     def addObserver(self, observer: ProductRepositoryObserver) -> None:
         if observer not in self._observerList:
@@ -173,7 +178,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         index = metadata.getIndex()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
+            logger.warning(f'Failed to look up index for "{item.getName()}"!')
             return
 
         for observer in self._observerList:
@@ -185,7 +190,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         scan = item.getScan()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
+            logger.warning(f'Failed to look up index for "{item.getName()}"!')
             return
 
         for observer in self._observerList:
@@ -197,7 +202,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         probe = item.getProbe()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
+            logger.warning(f'Failed to look up index for "{item.getName()}"!')
             return
 
         for observer in self._observerList:
@@ -209,7 +214,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         object_ = item.getObject()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
+            logger.warning(f'Failed to look up index for "{item.getName()}"!')
             return
 
         for observer in self._observerList:
@@ -221,7 +226,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         costs = item.getCosts()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for \"{item.getName()}\"!')
+            logger.warning(f'Failed to look up index for "{item.getName()}"!')
             return
 
         for observer in self._observerList:

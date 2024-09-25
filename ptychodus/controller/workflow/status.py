@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowStatusController:
-
-    def __init__(self, presenter: WorkflowStatusPresenter, view: WorkflowStatusView,
-                 tableView: QTableView) -> None:
+    def __init__(
+        self, presenter: WorkflowStatusPresenter, view: WorkflowStatusView, tableView: QTableView
+    ) -> None:
         self._presenter = presenter
         self._view = view
         self._tableView = tableView
@@ -24,8 +24,9 @@ class WorkflowStatusController:
         self._timer = QTimer()
 
     @classmethod
-    def createInstance(cls, presenter: WorkflowStatusPresenter, view: WorkflowStatusView,
-                       tableView: QTableView) -> WorkflowStatusController:
+    def createInstance(
+        cls, presenter: WorkflowStatusPresenter, view: WorkflowStatusView, tableView: QTableView
+    ) -> WorkflowStatusController:
         controller = cls(presenter, view, tableView)
 
         controller._proxyModel.setSourceModel(controller._tableModel)
@@ -46,7 +47,7 @@ class WorkflowStatusController:
     def _handleTableViewClick(self, index: QModelIndex) -> None:
         if index.column() == 5:
             url = index.data(Qt.ItemDataRole.UserRole)
-            logger.debug(f'Opening URL: \"{url.toString()}\"')
+            logger.debug(f'Opening URL: "{url.toString()}"')
             QDesktopServices.openUrl(url)
 
     def _autoRefreshStatus(self) -> None:
@@ -68,7 +69,8 @@ class WorkflowStatusController:
         refreshIntervalLimitsInSeconds = self._presenter.getRefreshIntervalLimitsInSeconds()
 
         self._view.autoRefreshSpinBox.blockSignals(True)
-        self._view.autoRefreshSpinBox.setRange(refreshIntervalLimitsInSeconds.lower,
-                                               refreshIntervalLimitsInSeconds.upper)
+        self._view.autoRefreshSpinBox.setRange(
+            refreshIntervalLimitsInSeconds.lower, refreshIntervalLimitsInSeconds.upper
+        )
         self._view.autoRefreshSpinBox.setValue(self._presenter.getRefreshIntervalInSeconds())
         self._view.autoRefreshSpinBox.blockSignals(False)

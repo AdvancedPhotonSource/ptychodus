@@ -10,7 +10,7 @@ from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseEr
 from .neXusDiffractionFile import NeXusDiffractionFileReader
 
 __all__ = [
-    'VelociprobeScanFileReader',
+    "VelociprobeScanFileReader",
 ]
 
 
@@ -22,7 +22,7 @@ class VelociprobeScanFileColumn(IntEnum):
 
 
 class VelociprobeScanFileReader(ScanFileReader):
-    NANOMETERS_TO_METERS: Final[float] = 1.e-9
+    NANOMETERS_TO_METERS: Final[float] = 1.0e-9
 
     def __init__(self, neXusReader: NeXusDiffractionFileReader, yColumn: int) -> None:
         self._neXusReader = neXusReader
@@ -30,12 +30,14 @@ class VelociprobeScanFileReader(ScanFileReader):
 
     @classmethod
     def createLaserInterferometerInstance(
-            cls, neXusReader: NeXusDiffractionFileReader) -> VelociprobeScanFileReader:
+        cls, neXusReader: NeXusDiffractionFileReader
+    ) -> VelociprobeScanFileReader:
         return cls(neXusReader, VelociprobeScanFileColumn.LASER_INTERFEROMETER_Y)
 
     @classmethod
     def createPositionEncoderInstance(
-            cls, neXusReader: NeXusDiffractionFileReader) -> VelociprobeScanFileReader:
+        cls, neXusReader: NeXusDiffractionFileReader
+    ) -> VelociprobeScanFileReader:
         return cls(neXusReader, VelociprobeScanFileColumn.POSITION_ENCODER_Y)
 
     def _applyTransform(self, scan: Scan) -> Scan:
@@ -60,15 +62,15 @@ class VelociprobeScanFileReader(ScanFileReader):
         pointList: list[ScanPoint] = list()
         minimumColumnCount = max(col.value for col in VelociprobeScanFileColumn) + 1
 
-        with filePath.open(newline='') as csvFile:
-            csvReader = csv.reader(csvFile, delimiter=',')
+        with filePath.open(newline="") as csvFile:
+            csvReader = csv.reader(csvFile, delimiter=",")
 
             for row in csvReader:
-                if row[0].startswith('#'):
+                if row[0].startswith("#"):
                     continue
 
                 if len(row) < minimumColumnCount:
-                    raise ScanPointParseError('Bad number of columns!')
+                    raise ScanPointParseError("Bad number of columns!")
 
                 trigger = int(row[VelociprobeScanFileColumn.TRIGGER])
                 x_nm = int(row[VelociprobeScanFileColumn.X])

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy
 
+from ptychodus.api.parametric import RealParameter
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
 
@@ -10,18 +11,19 @@ from .settings import ProbeSettings
 
 
 class DiskProbeBuilder(ProbeBuilder):
-
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('disk')
+        super().__init__("disk")
         self._settings = settings
 
-        self.diameterInMeters = self._registerRealParameter(
-            'diameter_m',
+        self.diameterInMeters = RealParameter(
+            self,
+            "diameter_m",
             float(settings.diskDiameterInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.defocusDistanceInMeters = self._registerRealParameter(
-            'defocus_distance_m',
+        self.defocusDistanceInMeters = RealParameter(
+            self,
+            "defocus_distance_m",
             float(settings.defocusDistanceInMeters.getValue()),
         )  # from sample to the focal plane
 
@@ -36,7 +38,7 @@ class DiskProbeBuilder(ProbeBuilder):
         coords = self.getTransverseCoordinates(geometry)
 
         R_m = coords.positionRInMeters
-        r_m = self.diameterInMeters.getValue() / 2.
+        r_m = self.diameterInMeters.getValue() / 2.0
         disk = numpy.where(R_m < r_m, 1 + 0j, 0j)
 
         propagatorParameters = PropagatorParameters(

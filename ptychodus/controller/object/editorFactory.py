@@ -7,7 +7,6 @@ from ..parametric import ParameterDialogBuilder, ParameterViewController
 
 
 class MultisliceViewController(ParameterViewController, Observer):
-
     def __init__(self, item: ObjectRepositoryItem) -> None:
         super().__init__()
         self._item = item
@@ -36,31 +35,41 @@ class MultisliceViewController(ParameterViewController, Observer):
 
 
 class ObjectEditorViewControllerFactory:
-
-    def createEditorDialog(self, itemName: str, item: ObjectRepositoryItem,
-                           parent: QWidget) -> QDialog:
+    def createEditorDialog(
+        self, itemName: str, item: ObjectRepositoryItem, parent: QWidget
+    ) -> QDialog:
         objectBuilder = item.getBuilder()
         builderName = objectBuilder.getName()
-        firstLayerGroup = 'First Layer'
-        additionalLayersGroup = 'Additional Layers'
-        title = f'{itemName} [{builderName}]'
+        firstLayerGroup = "First Layer"
+        additionalLayersGroup = "Additional Layers"
+        title = f"{itemName} [{builderName}]"
 
         if isinstance(objectBuilder, RandomObjectBuilder):
             dialogBuilder = ParameterDialogBuilder()
-            dialogBuilder.addSpinBox(objectBuilder.extraPaddingX, 'Extra Padding X:',
-                                     firstLayerGroup)
-            dialogBuilder.addSpinBox(objectBuilder.extraPaddingY, 'Extra Padding Y:',
-                                     firstLayerGroup)
-            dialogBuilder.addDecimalSlider(objectBuilder.amplitudeMean, 'Amplitude Mean:',
-                                           firstLayerGroup)
-            dialogBuilder.addDecimalSlider(objectBuilder.amplitudeDeviation,
-                                           'Amplitude Deviation:', firstLayerGroup)
-            dialogBuilder.addDecimalSlider(objectBuilder.phaseDeviation, 'Phase Deviation:',
-                                           firstLayerGroup)
-            dialogBuilder.addViewController(MultisliceViewController(item), 'Number of Layers:',
-                                            additionalLayersGroup)
+            dialogBuilder.addSpinBox(
+                objectBuilder.extraPaddingX, "Extra Padding X:", firstLayerGroup
+            )
+            dialogBuilder.addSpinBox(
+                objectBuilder.extraPaddingY, "Extra Padding Y:", firstLayerGroup
+            )
+            dialogBuilder.addDecimalSlider(
+                objectBuilder.amplitudeMean, "Amplitude Mean:", firstLayerGroup
+            )
+            dialogBuilder.addDecimalSlider(
+                objectBuilder.amplitudeDeviation, "Amplitude Deviation:", firstLayerGroup
+            )
+            dialogBuilder.addDecimalSlider(
+                objectBuilder.phaseDeviation, "Phase Deviation:", firstLayerGroup
+            )
+            dialogBuilder.addViewController(
+                MultisliceViewController(item), "Number of Layers:", additionalLayersGroup
+            )
             return dialogBuilder.build(title, parent)
 
-        return QMessageBox(QMessageBox.Icon.Information, title,
-                           f'\"{builderName}\" has no editable parameters!', QMessageBox.Ok,
-                           parent)
+        return QMessageBox(
+            QMessageBox.Icon.Information,
+            title,
+            f'"{builderName}" has no editable parameters!',
+            QMessageBox.Ok,
+            parent,
+        )

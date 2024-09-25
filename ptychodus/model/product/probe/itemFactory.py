@@ -14,18 +14,24 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeRepositoryItemFactory:
-
-    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings,
-                 builderFactory: ProbeBuilderFactory) -> None:
+    def __init__(
+        self,
+        rng: numpy.random.Generator,
+        settings: ProbeSettings,
+        builderFactory: ProbeBuilderFactory,
+    ) -> None:
         self._rng = rng
         self._settings = settings
         self._builderFactory = builderFactory
 
-    def create(self,
-               geometryProvider: ProbeGeometryProvider,
-               probe: Probe | None = None) -> ProbeRepositoryItem:
-        builder = self._builderFactory.createDefault() if probe is None \
-                else FromMemoryProbeBuilder(probe)
+    def create(
+        self, geometryProvider: ProbeGeometryProvider, probe: Probe | None = None
+    ) -> ProbeRepositoryItem:
+        builder = (
+            self._builderFactory.createDefault()
+            if probe is None
+            else FromMemoryProbeBuilder(probe)
+        )
         multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)
         return ProbeRepositoryItem(geometryProvider, builder, multimodalBuilder)
 
@@ -33,7 +39,7 @@ class ProbeRepositoryItemFactory:
         try:
             builder = self._builderFactory.createFromSettings()
         except Exception as exc:
-            logger.error(''.join(exc.args))
+            logger.error("".join(exc.args))
             builder = self._builderFactory.createDefault()
 
         multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)

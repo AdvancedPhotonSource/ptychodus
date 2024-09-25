@@ -3,6 +3,7 @@ from enum import IntEnum
 
 import numpy
 
+from ptychodus.api.parametric import IntegerParameter, RealParameter
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
@@ -21,43 +22,46 @@ class CartesianScanVariant(IntEnum):
 
     @property
     def isSnaked(self) -> bool:
-        return (self.value & 1 != 0)
+        return self.value & 1 != 0
 
     @property
     def isTriangular(self) -> bool:
-        return (self.value & 2 != 0)
+        return self.value & 2 != 0
 
     @property
     def isEquilateral(self) -> bool:
-        return (self.value & 4 != 0)
+        return self.value & 4 != 0
 
 
 class CartesianScanBuilder(ScanBuilder):
-
     def __init__(self, variant: CartesianScanVariant, settings: ScanSettings) -> None:
         super().__init__(variant.name.lower())
         self._variant = variant
         self._settings = settings
 
-        self.numberOfPointsX = self._registerIntegerParameter(
-            'number_of_points_x',
+        self.numberOfPointsX = IntegerParameter(
+            self,
+            "number_of_points_x",
             settings.numberOfPointsX.getValue(),
             minimum=0,
         )
-        self.numberOfPointsY = self._registerIntegerParameter(
-            'number_of_points_y',
+        self.numberOfPointsY = IntegerParameter(
+            self,
+            "number_of_points_y",
             settings.numberOfPointsY.getValue(),
             minimum=0,
         )
-        self.stepSizeXInMeters = self._registerRealParameter(
-            'step_size_x_m',
+        self.stepSizeXInMeters = RealParameter(
+            self,
+            "step_size_x_m",
             float(settings.stepSizeXInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.stepSizeYInMeters = self._registerRealParameter(
-            'step_size_y_m',
+        self.stepSizeYInMeters = RealParameter(
+            self,
+            "step_size_y_m",
             float(settings.stepSizeYInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
 
     def copy(self) -> CartesianScanBuilder:

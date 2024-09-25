@@ -13,10 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationDatasetProcessor:
-
-    def __init__(self, settings: AutomationSettings, repository: AutomationDatasetRepository,
-                 workflow: FileBasedWorkflow, workflowAPI: WorkflowAPI,
-                 processingQueue: queue.Queue[Path]) -> None:
+    def __init__(
+        self,
+        settings: AutomationSettings,
+        repository: AutomationDatasetRepository,
+        workflow: FileBasedWorkflow,
+        workflowAPI: WorkflowAPI,
+        processingQueue: queue.Queue[Path],
+    ) -> None:
         self._settings = settings
         self._repository = repository
         self._workflow = workflow
@@ -43,7 +47,7 @@ class AutomationDatasetProcessor:
                 self._workflow.execute(self._workflowAPI, filePath)
                 self._repository.put(filePath, AutomationDatasetState.COMPLETE)
             except Exception:
-                logger.exception('Error while processing dataset!')
+                logger.exception("Error while processing dataset!")
             finally:
                 self._processingQueue.task_done()
         except queue.Empty:
@@ -58,7 +62,7 @@ class AutomationDatasetProcessor:
 
             delayInSeconds = self._nextJobTime - time()
 
-            if delayInSeconds > 0. and self._stopWorkEvent.wait(timeout=delayInSeconds):
+            if delayInSeconds > 0.0 and self._stopWorkEvent.wait(timeout=delayInSeconds):
                 break
 
             try:
@@ -66,22 +70,22 @@ class AutomationDatasetProcessor:
                 self._workflow.execute(self._workflowAPI, filePath)
                 self._repository.put(filePath, AutomationDatasetState.COMPLETE)
             except Exception:
-                logger.exception('Error while processing dataset!')
+                logger.exception("Error while processing dataset!")
             finally:
                 self._processingQueue.task_done()
                 self._nextJobTime = self._settings.processingIntervalInSeconds.getValue() + time()
 
     def start(self) -> None:
         self.stop()
-        logger.info('Starting automation processor thread...')
+        logger.info("Starting automation processor thread...")
         self._stopWorkEvent.clear()
         self._worker = threading.Thread(target=self._run)
         self._worker.start()
-        logger.info('Automation processor thread started.')
+        logger.info("Automation processor thread started.")
 
     def stop(self) -> None:
         if self.isAlive:
-            logger.info('Stopping automation processor thread...')
+            logger.info("Stopping automation processor thread...")
             self._stopWorkEvent.set()
             self._worker.join()
-            logger.info('Automation processor thread stopped.')
+            logger.info("Automation processor thread stopped.")

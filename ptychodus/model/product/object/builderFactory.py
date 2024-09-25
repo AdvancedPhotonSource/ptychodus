@@ -15,15 +15,18 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectBuilderFactory(Iterable[str]):
-
-    def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings,
-                 fileReaderChooser: PluginChooser[ObjectFileReader],
-                 fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
+    def __init__(
+        self,
+        rng: numpy.random.Generator,
+        settings: ObjectSettings,
+        fileReaderChooser: PluginChooser[ObjectFileReader],
+        fileWriterChooser: PluginChooser[ObjectFileWriter],
+    ) -> None:
         self._settings = settings
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[], ObjectBuilder]] = {
-            'random': lambda: RandomObjectBuilder(rng, settings),
+            "random": lambda: RandomObjectBuilder(rng, settings),
         }
 
     def __iter__(self) -> Iterator[str]:
@@ -33,7 +36,7 @@ class ObjectBuilderFactory(Iterable[str]):
         try:
             factory = self._builders[name]
         except KeyError as exc:
-            raise KeyError(f'Unknown object builder \"{name}\"!') from exc
+            raise KeyError(f'Unknown object builder "{name}"!') from exc
 
         return factory()
 
@@ -44,7 +47,7 @@ class ObjectBuilderFactory(Iterable[str]):
         name = self._settings.builder.getValue()
         nameRepaired = name.casefold()
 
-        if nameRepaired == 'from_file':
+        if nameRepaired == "from_file":
             return self.createObjectFromFile(
                 self._settings.filePath.getValue(),
                 self._settings.fileType.getValue(),
@@ -73,6 +76,6 @@ class ObjectBuilderFactory(Iterable[str]):
     def saveObject(self, filePath: Path, fileFilter: str, object_: Object) -> None:
         self._fileWriterChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        logger.debug(f'Writing "{filePath}" as "{fileType}"')
         fileWriter = self._fileWriterChooser.currentPlugin.strategy
         fileWriter.write(filePath, object_)

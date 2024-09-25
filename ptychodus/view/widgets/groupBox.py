@@ -1,17 +1,25 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QFrame, QGridLayout, QGroupBox, QLabel, QMenu, QSizePolicy,
-                             QToolButton, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QLabel,
+    QMenu,
+    QSizePolicy,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class GroupBoxWithPresets(QWidget):
-
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._titleLabel = QLabel(title)
 
         self.presetsMenu = QMenu()
         self._presetsButton = QToolButton()
-        self._presetsButton.setText('Presets  ')
+        self._presetsButton.setText("Presets  ")
         self._presetsButton.setToolButtonStyle(Qt.ToolButtonTextOnly)
         self._presetsButton.setMenu(self.presetsMenu)
         self._presetsButton.setPopupMode(QToolButton.InstantPopup)
@@ -36,7 +44,6 @@ class GroupBoxWithPresets(QWidget):
 
 
 class BottomTitledGroupBox(QGroupBox):
-
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
         super().__init__(title, parent)
         self.setStyleSheet("""

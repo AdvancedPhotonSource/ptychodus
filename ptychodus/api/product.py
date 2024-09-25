@@ -47,16 +47,14 @@ class Product:
 
 
 class ProductFileReader(ABC):
-
     @abstractmethod
     def read(self, filePath: Path) -> Product:
-        '''reads a product from file'''
+        """reads a product from file"""
         pass
 
 
 class ProductFileWriter(ABC):
-
     @abstractmethod
     def write(self, filePath: Path, product: Product) -> None:
-        '''writes a product to file'''
+        """writes a product to file"""
         pass

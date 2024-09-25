@@ -9,24 +9,28 @@ import numpy
 import numpy.typing
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (DiffractionDataset, DiffractionMetadata,
-                                    DiffractionPatternArray, DiffractionPatternArrayType,
-                                    DiffractionPatternIndexes, DiffractionPatternState,
-                                    SimpleDiffractionPatternArray)
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionMetadata,
+    DiffractionPatternArray,
+    DiffractionPatternArrayType,
+    DiffractionPatternIndexes,
+    DiffractionPatternState,
+    SimpleDiffractionPatternArray,
+)
 from ptychodus.api.tree import SimpleTreeNode
 
 from .settings import PatternSettings
 from .sizer import PatternSizer
 
 __all__ = [
-    'ActiveDiffractionDataset',
+    "ActiveDiffractionDataset",
 ]
 
 logger = logging.getLogger(__name__)
 
 
 class ActiveDiffractionDataset(DiffractionDataset):
-
     def __init__(self, settings: PatternSettings, diffractionPatternSizer: PatternSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -47,22 +51,21 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     def getInfoText(self) -> str:
         filePath = self._metadata.filePath
-        label = filePath.stem if filePath else 'None'
+        label = filePath.stem if filePath else "None"
         number, height, width = self._arrayData.shape
         dtype = str(self._arrayData.dtype)
         sizeInMB = self._arrayData.nbytes / (1024 * 1024)
-        return f'{label}: {number} x {width}W x {height}H {dtype} [{sizeInMB:.2f}MB]'
+        return f"{label}: {number} x {width}W x {height}H {dtype} [{sizeInMB:.2f}MB]"
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray:
-        ...
+    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
 
-    def __getitem__(self, index: int | slice) -> \
-            DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+    def __getitem__(
+        self, index: int | slice
+    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         with self._arrayListLock:
             return self._arrayList[index]
 
@@ -91,14 +94,14 @@ class ActiveDiffractionDataset(DiffractionDataset):
             if self._settings.memmapEnabled.getValue():
                 scratchDirectory = self._settings.scratchDirectory.getValue()
                 scratchDirectory.mkdir(mode=0o755, parents=True, exist_ok=True)
-                npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix='.npy')
-                logger.debug(f'Scratch data file {npyTempFile.name} is {shape}')
-                self._arrayData = numpy.memmap(npyTempFile,
-                                               dtype=self._metadata.patternDataType,
-                                               shape=shape)
+                npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix=".npy")
+                logger.debug(f"Scratch data file {npyTempFile.name} is {shape}")
+                self._arrayData = numpy.memmap(
+                    npyTempFile, dtype=self._metadata.patternDataType, shape=shape
+                )
                 self._arrayData[:] = 0
             else:
-                logger.debug(f'Scratch memory is {shape}')
+                logger.debug(f"Scratch memory is {shape}")
                 self._arrayData = numpy.zeros(shape, dtype=self._metadata.patternDataType)
 
         self._changedEvent.set()
@@ -128,8 +131,9 @@ class ActiveDiffractionDataset(DiffractionDataset):
             dataView[:] = data
             dataView.flags.writeable = False
 
-            array = SimpleDiffractionPatternArray(array.getLabel(), array.getIndex(), dataView,
-                                                  array.getState())
+            array = SimpleDiffractionPatternArray(
+                array.getLabel(), array.getIndex(), dataView, array.getState()
+            )
 
         with self._arrayListLock:
             self._arrayList.append(array)
@@ -153,8 +157,9 @@ class ActiveDiffractionDataset(DiffractionDataset):
         indexes = self.getAssembledIndexes()
         return self._arrayData[indexes]
 
-    def setAssembledData(self, arrayData: DiffractionPatternArrayType,
-                         arrayIndexes: DiffractionPatternIndexes) -> None:
+    def setAssembledData(
+        self, arrayData: DiffractionPatternArrayType, arrayIndexes: DiffractionPatternIndexes
+    ) -> None:
         with self._arrayListLock:
             numberOfPatterns, detectorHeight, detectorWidth = arrayData.shape
 
@@ -165,12 +170,12 @@ class ActiveDiffractionDataset(DiffractionDataset):
                 detectorExtent=ImageExtent(detectorWidth, detectorHeight),
             )
 
-            self._contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+            self._contentsTree = SimpleTreeNode.createRoot(["Name", "Type", "Details"])
 
             # TODO use arrayIndexes
             self._arrayList = [
                 SimpleDiffractionPatternArray(
-                    label='Processed',
+                    label="Processed",
                     index=0,
                     data=arrayData[...],
                     state=DiffractionPatternState.LOADED,

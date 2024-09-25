@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPackParametersController(Observer):
-
     def __init__(self, presenter: PtychoPackPresenter, view: PtychoPackParametersView) -> None:
         super().__init__()
         self._presenter = presenter
@@ -38,15 +37,19 @@ class PtychoPackParametersController(Observer):
 
 
 class PtychoPackController:
-
     def __init__(self, model: PtychoPackReconstructorLibrary, view: PtychoPackView) -> None:
-        self.parameters_controller = PtychoPackParametersController(model.presenter,
-                                                                    view.parameters_view)
+        self.parameters_controller = PtychoPackParametersController(
+            model.presenter, view.parameters_view
+        )
         self.exit_wave_controller = PtychoPackExitWaveCorrectionController(
-            model.presenter, view.exit_wave_view)
+            model.presenter, view.exit_wave_view
+        )
         self.object_controller = PtychoPackObjectCorrectionController(
-            model.presenter, view.object_view)
-        self.probe_controller = PtychoPackProbeCorrectionController(model.presenter,
-                                                                    view.probe_view)
+            model.presenter, view.object_view
+        )
+        self.probe_controller = PtychoPackProbeCorrectionController(
+            model.presenter, view.probe_view
+        )
         self.position_controller = PtychoPackPositionCorrectionController(
-            model.presenter, view.position_view)
+            model.presenter, view.position_view
+        )

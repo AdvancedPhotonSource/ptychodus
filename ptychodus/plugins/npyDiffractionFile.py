@@ -5,10 +5,15 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader,
-                                    DiffractionFileWriter, DiffractionMetadata,
-                                    DiffractionPatternState, SimpleDiffractionDataset,
-                                    SimpleDiffractionPatternArray)
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionFileWriter,
+    DiffractionMetadata,
+    DiffractionPatternState,
+    SimpleDiffractionDataset,
+    SimpleDiffractionPatternArray,
+)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -16,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
-    SIMPLE_NAME: Final[str] = 'NPY'
-    DISPLAY_NAME: Final[str] = 'NumPy Binary Files (*.npy)'
+    SIMPLE_NAME: Final[str] = "NPY"
+    DISPLAY_NAME: Final[str] = "NumPy Binary Files (*.npy)"
 
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
@@ -25,7 +30,7 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         try:
             data = numpy.load(filePath)
         except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file "{filePath}".')
         else:
             if data.ndim == 2:
                 data = data[numpy.newaxis, :, :]
@@ -40,9 +45,10 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
                 filePath=filePath,
             )
 
-            contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+            contentsTree = SimpleTreeNode.createRoot(["Name", "Type", "Details"])
             contentsTree.createChild(
-                [filePath.stem, type(data).__name__, f'{data.dtype}{data.shape}'])
+                [filePath.stem, type(data).__name__, f"{data.dtype}{data.shape}"]
+            )
 
             array = SimpleDiffractionPatternArray(
                 label=filePath.stem,

@@ -22,9 +22,12 @@ logger = logging.getLogger(__name__)
 
 
 class ScanAPI:
-
-    def __init__(self, settings: ScanSettings, repository: ScanRepository,
-                 builderFactory: ScanBuilderFactory) -> None:
+    def __init__(
+        self,
+        settings: ScanSettings,
+        repository: ScanRepository,
+        builderFactory: ScanBuilderFactory,
+    ) -> None:
         self._settings = settings
         self._repository = repository
         self._builderFactory = builderFactory
@@ -32,28 +35,29 @@ class ScanAPI:
     def builderNames(self) -> Iterator[str]:
         return iter(self._builderFactory)
 
-    def buildScan(self,
-                  index: int,
-                  builderName: str,
-                  builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildScan(
+        self, index: int, builderName: str, builderParameters: Mapping[str, Any] = {}
+    ) -> None:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to access item {index}!')
+            logger.warning(f"Failed to access item {index}!")
             return
 
         try:
             builder = self._builderFactory.create(builderName)
         except KeyError:
-            logger.warning(f'Failed to create builder {builderName}!')
+            logger.warning(f"Failed to create builder {builderName}!")
             return
 
         for parameterName, parameterValue in builderParameters.items():
             try:
                 parameter = builder[parameterName]
             except KeyError:
-                logger.warning(f'Scan builder \"{builder.getName()}\" does not have'
-                               f' parameter \"{parameterName}\"!')
+                logger.warning(
+                    f'Scan builder "{builder.getName()}" does not have'
+                    f' parameter "{parameterName}"!'
+                )
             else:
                 parameter.setValue(parameterValue)
 
@@ -63,13 +67,13 @@ class ScanAPI:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to access item {index}!')
+            logger.warning(f"Failed to access item {index}!")
             return
 
         try:
             builder = self._builderFactory.createFromSettings()
         except KeyError:
-            logger.warning('Failed to create builder from settings!')
+            logger.warning("Failed to create builder from settings!")
             return
 
         item.setBuilder(builder)
@@ -82,29 +86,29 @@ class ScanAPI:
 
     def openScan(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         builder = self._builderFactory.createScanFromFile(
-            filePath,
-            self._settings.fileType.getValue() if fileType is None else fileType)
+            filePath, self._settings.fileType.getValue() if fileType is None else fileType
+        )
 
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to open scan {index}!')
+            logger.warning(f"Failed to open scan {index}!")
         else:
             item.setBuilder(builder)
 
     def copyScan(self, sourceIndex: int, destinationIndex: int) -> None:
-        logger.debug(f'Copying {sourceIndex} -> {destinationIndex}')
+        logger.debug(f"Copying {sourceIndex} -> {destinationIndex}")
 
         try:
             sourceItem = self._repository[sourceIndex]
         except IndexError:
-            logger.warning(f'Failed to access source scan {sourceIndex} for copying!')
+            logger.warning(f"Failed to access source scan {sourceIndex} for copying!")
             return
 
         try:
             destinationItem = self._repository[destinationIndex]
         except IndexError:
-            logger.warning(f'Failed to access destination scan {destinationIndex} for copying!')
+            logger.warning(f"Failed to access destination scan {destinationIndex} for copying!")
             return
 
         destinationItem.assign(sourceItem)
@@ -119,15 +123,18 @@ class ScanAPI:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to save scan {index}!')
+            logger.warning(f"Failed to save scan {index}!")
         else:
             self._builderFactory.saveScan(filePath, fileType, item.getScan())
 
 
 class ProbeAPI:
-
-    def __init__(self, settings: ProbeSettings, repository: ProbeRepository,
-                 builderFactory: ProbeBuilderFactory) -> None:
+    def __init__(
+        self,
+        settings: ProbeSettings,
+        repository: ProbeRepository,
+        builderFactory: ProbeBuilderFactory,
+    ) -> None:
         self._settings = settings
         self._repository = repository
         self._builderFactory = builderFactory
@@ -135,28 +142,29 @@ class ProbeAPI:
     def builderNames(self) -> Iterator[str]:
         return iter(self._builderFactory)
 
-    def buildProbe(self,
-                   index: int,
-                   builderName: str,
-                   builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildProbe(
+        self, index: int, builderName: str, builderParameters: Mapping[str, Any] = {}
+    ) -> None:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to access item {index}!')
+            logger.warning(f"Failed to access item {index}!")
             return
 
         try:
             builder = self._builderFactory.create(builderName)
         except KeyError:
-            logger.warning(f'Failed to create builder {builderName}!')
+            logger.warning(f"Failed to create builder {builderName}!")
             return
 
         for parameterName, parameterValue in builderParameters.items():
             try:
                 parameter = builder[parameterName]
             except KeyError:
-                logger.warning(f'Probe builder \"{builder.getName()}\" does not have'
-                               f' parameter \"{parameterName}\"!')
+                logger.warning(
+                    f'Probe builder "{builder.getName()}" does not have'
+                    f' parameter "{parameterName}"!'
+                )
             else:
                 parameter.setValue(parameterValue)
 
@@ -166,13 +174,13 @@ class ProbeAPI:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to access item {index}!')
+            logger.warning(f"Failed to access item {index}!")
             return
 
         try:
             builder = self._builderFactory.createFromSettings()
         except KeyError:
-            logger.warning('Failed to create builder from settings!')
+            logger.warning("Failed to create builder from settings!")
             return
 
         item.setBuilder(builder)
@@ -185,29 +193,29 @@ class ProbeAPI:
 
     def openProbe(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         builder = self._builderFactory.createProbeFromFile(
-            filePath,
-            self._settings.fileType.getValue() if fileType is None else fileType)
+            filePath, self._settings.fileType.getValue() if fileType is None else fileType
+        )
 
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to open probe {index}!')
+            logger.warning(f"Failed to open probe {index}!")
         else:
             item.setBuilder(builder)
 
     def copyProbe(self, sourceIndex: int, destinationIndex: int) -> None:
-        logger.debug(f'Copying {sourceIndex} -> {destinationIndex}')
+        logger.debug(f"Copying {sourceIndex} -> {destinationIndex}")
 
         try:
             sourceItem = self._repository[sourceIndex]
         except IndexError:
-            logger.warning(f'Failed to access source probe {sourceIndex} for copying!')
+            logger.warning(f"Failed to access source probe {sourceIndex} for copying!")
             return
 
         try:
             destinationItem = self._repository[destinationIndex]
         except IndexError:
-            logger.warning(f'Failed to access destination probe {destinationIndex} for copying!')
+            logger.warning(f"Failed to access destination probe {destinationIndex} for copying!")
             return
 
         destinationItem.assign(sourceItem)
@@ -222,15 +230,18 @@ class ProbeAPI:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to save probe {index}!')
+            logger.warning(f"Failed to save probe {index}!")
         else:
             self._builderFactory.saveProbe(filePath, fileType, item.getProbe())
 
 
 class ObjectAPI:
-
-    def __init__(self, settings: ObjectSettings, repository: ObjectRepository,
-                 builderFactory: ObjectBuilderFactory) -> None:
+    def __init__(
+        self,
+        settings: ObjectSettings,
+        repository: ObjectRepository,
+        builderFactory: ObjectBuilderFactory,
+    ) -> None:
         self._settings = settings
         self._repository = repository
         self._builderFactory = builderFactory
@@ -238,28 +249,29 @@ class ObjectAPI:
     def builderNames(self) -> Iterator[str]:
         return iter(self._builderFactory)
 
-    def buildObject(self,
-                    index: int,
-                    builderName: str,
-                    builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildObject(
+        self, index: int, builderName: str, builderParameters: Mapping[str, Any] = {}
+    ) -> None:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to access item {index}!')
+            logger.warning(f"Failed to access item {index}!")
             return
 
         try:
             builder = self._builderFactory.create(builderName)
         except KeyError:
-            logger.warning(f'Failed to create builder {builderName}!')
+            logger.warning(f"Failed to create builder {builderName}!")
             return
 
         for parameterName, parameterValue in builderParameters.items():
             try:
                 parameter = builder[parameterName]
             except KeyError:
-                logger.warning(f'Object builder \"{builder.getName()}\" does not have'
-                               f' parameter \"{parameterName}\"!')
+                logger.warning(
+                    f'Object builder "{builder.getName()}" does not have'
+                    f' parameter "{parameterName}"!'
+                )
             else:
                 parameter.setValue(parameterValue)
 
@@ -269,13 +281,13 @@ class ObjectAPI:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to access item {index}!')
+            logger.warning(f"Failed to access item {index}!")
             return
 
         try:
             builder = self._builderFactory.createFromSettings()
         except KeyError:
-            logger.warning('Failed to create builder from settings!')
+            logger.warning("Failed to create builder from settings!")
             return
 
         item.setBuilder(builder)
@@ -288,29 +300,29 @@ class ObjectAPI:
 
     def openObject(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         builder = self._builderFactory.createObjectFromFile(
-            filePath,
-            self._settings.fileType.getValue() if fileType is None else fileType)
+            filePath, self._settings.fileType.getValue() if fileType is None else fileType
+        )
 
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to open object {index}!')
+            logger.warning(f"Failed to open object {index}!")
         else:
             item.setBuilder(builder)
 
     def copyObject(self, sourceIndex: int, destinationIndex: int) -> None:
-        logger.debug(f'Copying {sourceIndex} -> {destinationIndex}')
+        logger.debug(f"Copying {sourceIndex} -> {destinationIndex}")
 
         try:
             sourceItem = self._repository[sourceIndex]
         except IndexError:
-            logger.warning(f'Failed to access source object {sourceIndex} for copying!')
+            logger.warning(f"Failed to access source object {sourceIndex} for copying!")
             return
 
         try:
             destinationItem = self._repository[destinationIndex]
         except IndexError:
-            logger.warning(f'Failed to access destination object {destinationIndex} for copying!')
+            logger.warning(f"Failed to access destination object {destinationIndex} for copying!")
             return
 
         destinationItem.assign(sourceItem)
@@ -325,30 +337,35 @@ class ObjectAPI:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to save object {index}!')
+            logger.warning(f"Failed to save object {index}!")
         else:
             self._builderFactory.saveObject(filePath, fileType, item.getObject())
 
 
 class ProductAPI:
-
-    def __init__(self, settings: ProductSettings, repository: ProductRepository,
-                 fileReaderChooser: PluginChooser[ProductFileReader],
-                 fileWriterChooser: PluginChooser[ProductFileWriter]) -> None:
+    def __init__(
+        self,
+        settings: ProductSettings,
+        repository: ProductRepository,
+        fileReaderChooser: PluginChooser[ProductFileReader],
+        fileWriterChooser: PluginChooser[ProductFileWriter],
+    ) -> None:
         self._settings = settings
         self._repository = repository
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
 
-    def insertNewProduct(self,
-                         name: str = 'Unnamed',
-                         *,
-                         comments: str = '',
-                         detectorDistanceInMeters: float | None = None,
-                         probeEnergyInElectronVolts: float | None = None,
-                         probePhotonsPerSecond: float | None = None,
-                         exposureTimeInSeconds: float | None = None,
-                         likeIndex: int = -1) -> int:
+    def insertNewProduct(
+        self,
+        name: str = "Unnamed",
+        *,
+        comments: str = "",
+        detectorDistanceInMeters: float | None = None,
+        probeEnergyInElectronVolts: float | None = None,
+        probePhotonsPerSecond: float | None = None,
+        exposureTimeInSeconds: float | None = None,
+        likeIndex: int = -1,
+    ) -> int:
         return self._repository.insertNewProduct(
             name,
             comments=comments,
@@ -356,7 +373,8 @@ class ProductAPI:
             probeEnergyInElectronVolts=probeEnergyInElectronVolts,
             probePhotonsPerSecond=probePhotonsPerSecond,
             exposureTimeInSeconds=exposureTimeInSeconds,
-            likeIndex=likeIndex)
+            likeIndex=likeIndex,
+        )
 
     def getItemName(self, productIndex: int) -> str:
         item = self._repository[productIndex]
@@ -371,19 +389,20 @@ class ProductAPI:
     def openProduct(self, filePath: Path, *, fileType: str | None = None) -> int:
         if filePath.is_file():
             self._fileReaderChooser.setCurrentPluginByName(
-                self._settings.fileType.getValue() if fileType is None else fileType)
+                self._settings.fileType.getValue() if fileType is None else fileType
+            )
             fileType = self._fileReaderChooser.currentPlugin.simpleName
-            logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
+            logger.debug(f'Reading "{filePath}" as "{fileType}"')
             fileReader = self._fileReaderChooser.currentPlugin.strategy
 
             try:
                 product = fileReader.read(filePath)
             except Exception as exc:
-                raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
+                raise RuntimeError(f'Failed to read "{filePath}"') from exc
             else:
                 return self._repository.insertProduct(product)
         else:
-            logger.warning(f'Refusing to create product with invalid file path \"{filePath}\"')
+            logger.warning(f'Refusing to create product with invalid file path "{filePath}"')
 
         return -1
 
@@ -397,12 +416,13 @@ class ProductAPI:
         try:
             item = self._repository[index]
         except IndexError:
-            logger.warning(f'Failed to save product {index}!')
+            logger.warning(f"Failed to save product {index}!")
             return
 
         self._fileWriterChooser.setCurrentPluginByName(
-            self._settings.fileType.getValue() if fileType is None else fileType)
+            self._settings.fileType.getValue() if fileType is None else fileType
+        )
         fileType = self._fileWriterChooser.currentPlugin.simpleName
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        logger.debug(f'Writing "{filePath}" as "{fileType}"')
         writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, item.getProduct())

@@ -10,7 +10,6 @@ from ...view.visualization import VisualizationParametersView
 
 
 class VisualizationParametersController(Observer):
-
     def __init__(self, engine: VisualizationEngine, view: VisualizationParametersView) -> None:
         super().__init__()
         self._engine = engine
@@ -20,17 +19,20 @@ class VisualizationParametersController(Observer):
         self._variantModel = QStringListModel()
 
     @classmethod
-    def createInstance(cls, engine: VisualizationEngine,
-                       view: VisualizationParametersView) -> VisualizationParametersController:
+    def createInstance(
+        cls, engine: VisualizationEngine, view: VisualizationParametersView
+    ) -> VisualizationParametersController:
         controller = cls(engine, view)
         view.rendererComboBox.setModel(controller._rendererModel)
         view.transformationComboBox.setModel(controller._transformationModel)
         view.variantComboBox.setModel(controller._variantModel)
 
         view.minDisplayValueLineEdit.valueChanged.connect(
-            lambda value: engine.setMinDisplayValue(float(value)))
+            lambda value: engine.setMinDisplayValue(float(value))
+        )
         view.maxDisplayValueLineEdit.valueChanged.connect(
-            lambda value: engine.setMaxDisplayValue(float(value)))
+            lambda value: engine.setMaxDisplayValue(float(value))
+        )
 
         controller._syncModelToView()
         engine.addObserver(controller)
@@ -58,9 +60,11 @@ class VisualizationParametersController(Observer):
         self._view.variantComboBox.blockSignals(False)
 
         self._view.minDisplayValueLineEdit.setValue(
-            Decimal(repr(self._engine.getMinDisplayValue())))
+            Decimal(repr(self._engine.getMinDisplayValue()))
+        )
         self._view.maxDisplayValueLineEdit.setValue(
-            Decimal(repr(self._engine.getMaxDisplayValue())))
+            Decimal(repr(self._engine.getMaxDisplayValue()))
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._engine:

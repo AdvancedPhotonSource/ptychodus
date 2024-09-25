@@ -26,7 +26,7 @@ class PlotAxis:
 
     @classmethod
     def createNull(cls) -> PlotAxis:
-        return cls('', [])
+        return cls("", [])
 
     def copy(self) -> PlotAxis:
         return PlotAxis(str(self.label), [series.copy() for series in self.series])
@@ -59,21 +59,26 @@ class KernelDensityEstimate:
 
 
 class VisualizationProduct:
-    EPS: Final[float] = 1.e-6
+    EPS: Final[float] = 1.0e-6
 
-    def __init__(self, valueLabel: str, values: NumberArrayType, rgba: RealArrayType,
-                 pixelGeometry: PixelGeometry) -> None:
+    def __init__(
+        self,
+        valueLabel: str,
+        values: NumberArrayType,
+        rgba: RealArrayType,
+        pixelGeometry: PixelGeometry,
+    ) -> None:
         if values.ndim != 2:
-            raise ValueError(f'Values must be a 2-dimensional ndarray (actual={values.ndim}).')
+            raise ValueError(f"Values must be a 2-dimensional ndarray (actual={values.ndim}).")
 
         if rgba.ndim != 3:
-            raise ValueError(f'RGBA must be a 3-dimensional ndarray (actual={rgba.ndim}).')
+            raise ValueError(f"RGBA must be a 3-dimensional ndarray (actual={rgba.ndim}).")
 
         if rgba.shape[2] != 4:
-            raise ValueError(f'RGBA final dimension must have length=4 (actual={rgba.shape[2]}).')
+            raise ValueError(f"RGBA final dimension must have length=4 (actual={rgba.shape[2]}).")
 
         if values.shape[0] != rgba.shape[0] or values.shape[1] != rgba.shape[1]:
-            raise ValueError(f'Shape mismatch (values={values.shape} and rgba={rgba.shape}).')
+            raise ValueError(f"Shape mismatch (values={values.shape} and rgba={rgba.shape}).")
 
         self._valueLabel = valueLabel
         self._values = values
@@ -109,8 +114,9 @@ class VisualizationProduct:
             )
 
     @staticmethod
-    def _intersectGridLines(begin: float, end: float,
-                            alphaLimits: Interval[float]) -> Iterator[float]:
+    def _intersectGridLines(
+        begin: float, end: float, alphaLimits: Interval[float]
+    ) -> Iterator[float]:
         ibegin = int(begin)
         iend = int(end)
 
@@ -131,8 +137,8 @@ class VisualizationProduct:
         alphaY = self._intersectBoundingBox(line.begin.y, line.end.y, self._values.shape[-2])
 
         return Interval[float].createProper(
-            max(0., max(alphaX.lower, alphaY.lower)),
-            min(1., min(alphaX.upper, alphaY.upper)),
+            max(0.0, max(alphaX.lower, alphaY.lower)),
+            min(1.0, min(alphaX.upper, alphaY.upper)),
         )
 
     def _intersectGrid(self, line: Line2D) -> Sequence[float]:
@@ -150,18 +156,18 @@ class VisualizationProduct:
         return sorted(alpha)
 
     def getInfoText(self, x: float, y: float) -> str:
-        ix = 0 if x < 0. else int(x)
+        ix = 0 if x < 0.0 else int(x)
         ix = min(ix, self._values.shape[-1])
-        iy = 0 if y < 0. else int(y)
+        iy = 0 if y < 0.0 else int(y)
         iy = min(iy, self._values.shape[-2])
         value = self._values[iy, ix]
 
         if numpy.iscomplex(value):
             amplitude = numpy.absolute(value)
             phase = numpy.angle(value)
-            return f'{x=:.1f} {y=:.1f} {amplitude=:6g} {phase=:6g}'
+            return f"{x=:.1f} {y=:.1f} {amplitude=:6g} {phase=:6g}"
 
-        return f'{x=:.1f} {y=:.1f} {value=:6g}'
+        return f"{x=:.1f} {y=:.1f} {value=:6g}"
 
     def getLineCut(self, line: Line2D) -> LineCut:
         intersections = self._intersectGrid(line)
@@ -174,7 +180,7 @@ class VisualizationProduct:
         values: list[float] = list()
 
         for alphaL, alphaR in zip(intersections[:-1], intersections[1:]):
-            alpha = (alphaL + alphaR) / 2.
+            alpha = (alphaL + alphaR) / 2.0
             point = line.lerp(alpha)
             value = self._values[int(point.y), int(point.x)]
 
@@ -193,8 +199,7 @@ class VisualizationProduct:
         y_end = y_range.clamp(int(box.y_end) + 1)
 
         values = self._values[..., y_begin:y_end, x_begin:x_end]
-        values = values.reshape(values.shape[-3], -1) if values.ndim > 2 \
-                else values.reshape(-1)
+        values = values.reshape(values.shape[-3], -1) if values.ndim > 2 else values.reshape(-1)
 
         if numpy.iscomplexobj(values):
             # TODO improve KDE for complex values

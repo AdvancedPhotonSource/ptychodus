@@ -1,20 +1,30 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QHBoxLayout, QMenu, QPushButton, QTableView, QTreeView, QVBoxLayout,
-                             QWidget)
+from PyQt5.QtWidgets import (
+    QAbstractButton,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QMenu,
+    QPushButton,
+    QTableView,
+    QTreeView,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class RepositoryButtonBox(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.loadButton = QPushButton('Load')
+        self.loadButton = QPushButton("Load")
         self.loadMenu = QMenu()
-        self.saveButton = QPushButton('Save')
-        self.editButton = QPushButton('Edit')
-        self.analyzeButton = QPushButton('Analyze')
+        self.saveButton = QPushButton("Save")
+        self.editButton = QPushButton("Edit")
+        self.analyzeButton = QPushButton("Analyze")
         self.analyzeMenu = QMenu()
 
     @classmethod
@@ -36,7 +46,6 @@ class RepositoryButtonBox(QWidget):
 
 
 class RepositoryItemCopierDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.sourceComboBox = QComboBox()
@@ -52,8 +61,8 @@ class RepositoryItemCopierDialog(QDialog):
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QFormLayout()
-        layout.addRow('From:', view.sourceComboBox)
-        layout.addRow('To:', view.destinationComboBox)
+        layout.addRow("From:", view.sourceComboBox)
+        layout.addRow("To:", view.destinationComboBox)
         layout.addRow(view.buttonBox)
         view.setLayout(layout)
 
@@ -67,7 +76,6 @@ class RepositoryItemCopierDialog(QDialog):
 
 
 class RepositoryTableView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.tableView = QTableView()
@@ -87,7 +95,6 @@ class RepositoryTableView(QWidget):
 
 
 class RepositoryTreeView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.treeView = QTreeView()

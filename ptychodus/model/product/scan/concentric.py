@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy
 
+from ptychodus.api.parametric import IntegerParameter, RealParameter
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
@@ -9,24 +10,27 @@ from .settings import ScanSettings
 
 
 class ConcentricScanBuilder(ScanBuilder):
-    '''https://doi.org/10.1088/1367-2630/12/3/035017'''
+    """https://doi.org/10.1088/1367-2630/12/3/035017"""
 
     def __init__(self, settings: ScanSettings) -> None:
-        super().__init__('concentric')
+        super().__init__("concentric")
         self._settings = settings
 
-        self.radialStepSizeInMeters = self._registerRealParameter(
-            'radial_step_size_m',
+        self.radialStepSizeInMeters = RealParameter(
+            self,
+            "radial_step_size_m",
             float(settings.radialStepSizeInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.numberOfShells = self._registerIntegerParameter('number_of_shells',
-                                                             settings.numberOfShells.getValue(),
-                                                             minimum=0)
-        self.numberOfPointsInFirstShell = self._registerIntegerParameter(
-            'number_of_points_1st_shell',
+        self.numberOfShells = IntegerParameter(
+            self, "number_of_shells", settings.numberOfShells.getValue(), minimum=0
+        )
+        self.numberOfPointsInFirstShell = IntegerParameter(
+            self,
+            "number_of_points_1st_shell",
             settings.numberOfPointsInFirstShell.getValue(),
-            minimum=0)
+            minimum=0,
+        )
 
     def copy(self) -> ConcentricScanBuilder:
         builder = ConcentricScanBuilder(self._settings)

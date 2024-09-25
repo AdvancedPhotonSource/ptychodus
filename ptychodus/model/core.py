@@ -21,22 +21,48 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
 
-from .analysis import (AnalysisCore, ExposureAnalyzer, FluorescenceEnhancer, FourierRingCorrelator,
-                       ProbePropagator, STXMSimulator, XMCDAnalyzer)
+from .analysis import (
+    AnalysisCore,
+    ExposureAnalyzer,
+    FluorescenceEnhancer,
+    FourierRingCorrelator,
+    ProbePropagator,
+    STXMSimulator,
+    XMCDAnalyzer,
+)
 from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
 from .memory import MemoryPresenter
-from .patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
-                       DiffractionDatasetPresenter, DiffractionMetadataPresenter,
-                       DiffractionPatternPresenter, PatternsCore)
-from .product import (ObjectAPI, ObjectRepository, ProbeAPI, ProbeRepository, ProductAPI,
-                      ProductCore, ProductRepository, ScanAPI, ScanRepository)
+from .patterns import (
+    DetectorPresenter,
+    DiffractionDatasetInputOutputPresenter,
+    DiffractionDatasetPresenter,
+    DiffractionMetadataPresenter,
+    DiffractionPatternPresenter,
+    PatternsCore,
+)
+from .product import (
+    ObjectAPI,
+    ObjectRepository,
+    ProbeAPI,
+    ProbeRepository,
+    ProductAPI,
+    ProductCore,
+    ProductRepository,
+    ScanAPI,
+    ScanRepository,
+)
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopack import PtychoPackReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .tike import TikeReconstructorLibrary
 from .visualization import VisualizationEngine
-from .workflow import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
-                       WorkflowParametersPresenter, WorkflowStatusPresenter)
+from .workflow import (
+    WorkflowAuthorizationPresenter,
+    WorkflowCore,
+    WorkflowExecutionPresenter,
+    WorkflowParametersPresenter,
+    WorkflowStatusPresenter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,23 +74,21 @@ def configureLogger(isDeveloperModeEnabled: bool) -> None:
         encoding="utf-8",
         level=logging.DEBUG if isDeveloperModeEnabled else logging.INFO,
     )
-    logging.getLogger('matplotlib').setLevel(logging.WARNING)
-    logging.getLogger('tike').setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    logging.getLogger("tike").setLevel(logging.WARNING)
 
     logger.info(f'Ptychodus {version("ptychodus")}')
     logger.info(f'NumPy {version("numpy")}')
     logger.info(f'Matplotlib {version("matplotlib")}')
     logger.info(f'HDF5Plugin {version("hdf5plugin")}')
     logger.info(f'H5Py {version("h5py")}')
-    logger.info(f'HDF5 {h5py.version.hdf5_version}')
+    logger.info(f"HDF5 {h5py.version.hdf5_version}")
 
 
 class ModelCore:
-
-    def __init__(self,
-                 settingsFile: Path | None = None,
-                 *,
-                 isDeveloperModeEnabled: bool = False) -> None:
+    def __init__(
+        self, settingsFile: Path | None = None, *, isDeveloperModeEnabled: bool = False
+    ) -> None:
         configureLogger(isDeveloperModeEnabled)
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
@@ -72,29 +96,43 @@ class ModelCore:
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry()
 
-        self._patternsCore = PatternsCore(self.settingsRegistry,
-                                          self._pluginRegistry.diffractionFileReaders,
-                                          self._pluginRegistry.diffractionFileWriters)
+        self._patternsCore = PatternsCore(
+            self.settingsRegistry,
+            self._pluginRegistry.diffractionFileReaders,
+            self._pluginRegistry.diffractionFileWriters,
+        )
         self._productCore = ProductCore(
-            self.rng, self.settingsRegistry, self._patternsCore.detector,
-            self._patternsCore.productSettings, self._patternsCore.patternSizer,
-            self._patternsCore.dataset, self._pluginRegistry.scanFileReaders,
-            self._pluginRegistry.scanFileWriters, self._pluginRegistry.fresnelZonePlates,
-            self._pluginRegistry.probeFileReaders, self._pluginRegistry.probeFileWriters,
-            self._pluginRegistry.objectFileReaders, self._pluginRegistry.objectFileWriters,
-            self._pluginRegistry.productFileReaders, self._pluginRegistry.productFileWriters,
-            self.settingsRegistry)
+            self.rng,
+            self.settingsRegistry,
+            self._patternsCore.detector,
+            self._patternsCore.productSettings,
+            self._patternsCore.patternSizer,
+            self._patternsCore.dataset,
+            self._pluginRegistry.scanFileReaders,
+            self._pluginRegistry.scanFileWriters,
+            self._pluginRegistry.fresnelZonePlates,
+            self._pluginRegistry.probeFileReaders,
+            self._pluginRegistry.probeFileWriters,
+            self._pluginRegistry.objectFileReaders,
+            self._pluginRegistry.objectFileWriters,
+            self._pluginRegistry.productFileReaders,
+            self._pluginRegistry.productFileWriters,
+            self.settingsRegistry,
+        )
 
         self.patternVisualizationEngine = VisualizationEngine(isComplex=False)
         self.probeVisualizationEngine = VisualizationEngine(isComplex=True)
         self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
 
         self.ptychoPackReconstructorLibrary = PtychoPackReconstructorLibrary(
-            self.settingsRegistry, isDeveloperModeEnabled)
+            self.settingsRegistry, isDeveloperModeEnabled
+        )
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, isDeveloperModeEnabled)
+            self.settingsRegistry, isDeveloperModeEnabled
+        )
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, isDeveloperModeEnabled)
+            self.settingsRegistry, isDeveloperModeEnabled
+        )
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             self._patternsCore.dataset,
@@ -106,18 +144,29 @@ class ModelCore:
             ],
         )
         self._analysisCore = AnalysisCore(
-            self.settingsRegistry, self._reconstructorCore.dataMatcher,
-            self._productCore.productRepository, self._productCore.objectRepository,
-            self._pluginRegistry.upscalingStrategies, self._pluginRegistry.deconvolutionStrategies,
+            self.settingsRegistry,
+            self._reconstructorCore.dataMatcher,
+            self._productCore.productRepository,
+            self._productCore.objectRepository,
+            self._pluginRegistry.upscalingStrategies,
+            self._pluginRegistry.deconvolutionStrategies,
             self._pluginRegistry.fluorescenceFileReaders,
-            self._pluginRegistry.fluorescenceFileWriters)
-        self._workflowCore = WorkflowCore(self.settingsRegistry, self._patternsCore.patternsAPI,
-                                          self._productCore.productAPI, self._productCore.scanAPI,
-                                          self._productCore.probeAPI, self._productCore.objectAPI,
-                                          self._reconstructorCore.reconstructorAPI)
-        self._automationCore = AutomationCore(self.settingsRegistry,
-                                              self._workflowCore.workflowAPI,
-                                              self._pluginRegistry.fileBasedWorkflows)
+            self._pluginRegistry.fluorescenceFileWriters,
+        )
+        self._workflowCore = WorkflowCore(
+            self.settingsRegistry,
+            self._patternsCore.patternsAPI,
+            self._productCore.productAPI,
+            self._productCore.scanAPI,
+            self._productCore.probeAPI,
+            self._productCore.objectAPI,
+            self._reconstructorCore.reconstructorAPI,
+        )
+        self._automationCore = AutomationCore(
+            self.settingsRegistry,
+            self._workflowCore.workflowAPI,
+            self._pluginRegistry.fileBasedWorkflows,
+        )
 
         if settingsFile:
             self.settingsRegistry.openSettings(settingsFile)
@@ -129,16 +178,22 @@ class ModelCore:
         return self
 
     @overload
-    def __exit__(self, exception_type: None, exception_value: None, traceback: None) -> None:
-        ...
+    def __exit__(self, exception_type: None, exception_value: None, traceback: None) -> None: ...
 
     @overload
-    def __exit__(self, exception_type: type[BaseException], exception_value: BaseException,
-                 traceback: TracebackType) -> None:
-        ...
+    def __exit__(
+        self,
+        exception_type: type[BaseException],
+        exception_value: BaseException,
+        traceback: TracebackType,
+    ) -> None: ...
 
-    def __exit__(self, exception_type: type[BaseException] | None,
-                 exception_value: BaseException | None, traceback: TracebackType | None) -> None:
+    def __exit__(
+        self,
+        exception_type: type[BaseException] | None,
+        exception_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         self._automationCore.stop()
         self._workflowCore.stop()
         self._patternsCore.stop()
@@ -200,12 +255,14 @@ class ModelCore:
         self._patternsCore.patternsAPI.assemble(array)
         self._productCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)  # FIXME
 
-    def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
-                               timeStamps: Sequence[float]) -> None:
+    def assembleScanPositionsX(
+        self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]
+    ) -> None:
         self._productCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)  # FIXME
 
-    def assembleScanPositionsY(self, valuesInMeters: Sequence[float],
-                               timeStamps: Sequence[float]) -> None:
+    def assembleScanPositionsY(
+        self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]
+    ) -> None:
         self._productCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)  # FIXME
 
     def finalizeStreamingWorkflow(self) -> None:
@@ -218,44 +275,47 @@ class ModelCore:
     def refreshActiveDataset(self) -> None:
         self._patternsCore.dataset.notifyObserversIfDatasetChanged()
 
-    def batchModeExecute(self,
-                         action: str,
-                         inputFilePath: Path,
-                         outputFilePath: Path,
-                         *,
-                         fluorescenceInputFilePath: Path | None = None,
-                         fluorescenceOutputFilePath: Path | None = None) -> int:
+    def batchModeExecute(
+        self,
+        action: str,
+        inputFilePath: Path,
+        outputFilePath: Path,
+        *,
+        fluorescenceInputFilePath: Path | None = None,
+        fluorescenceOutputFilePath: Path | None = None,
+    ) -> int:
         # TODO add enum for actions; implement using workflow API
-        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, fileType='NPZ')
+        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, fileType="NPZ")
 
         if inputProductIndex < 0:
-            logger.error(f'Failed to open product \"{inputFilePath}\"')
+            logger.error(f'Failed to open product "{inputFilePath}"')
             return -1
 
-        if action.lower() == 'reconstruct':
+        if action.lower() == "reconstruct":
             outputProductName = self._productCore.productAPI.getItemName(inputProductIndex)
             outputProductIndex = self._reconstructorCore.reconstructorAPI.reconstruct(
-                inputProductIndex, outputProductName)
+                inputProductIndex, outputProductName
+            )
 
             if outputProductIndex < 0:
-                logger.error(f'Failed to reconstruct product index=\"{inputProductIndex}\"')
+                logger.error(f'Failed to reconstruct product index="{inputProductIndex}"')
                 return -1
 
-            self._productCore.productAPI.saveProduct(outputProductIndex,
-                                                     outputFilePath,
-                                                     fileType='NPZ')
+            self._productCore.productAPI.saveProduct(
+                outputProductIndex, outputFilePath, fileType="NPZ"
+            )
 
             if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
-                self._analysisCore.enhanceFluorescence(outputProductIndex,
-                                                       fluorescenceInputFilePath,
-                                                       fluorescenceOutputFilePath)
+                self._analysisCore.enhanceFluorescence(
+                    outputProductIndex, fluorescenceInputFilePath, fluorescenceOutputFilePath
+                )
 
-        elif action.lower() == 'train':
+        elif action.lower() == "train":
             self._reconstructorCore.reconstructorAPI.ingestTrainingData(inputProductIndex)
             _ = self._reconstructorCore.reconstructorAPI.train()
             self._reconstructorCore.reconstructorAPI.saveModel(outputFilePath)
         else:
-            logger.error(f'Unknown batch mode action \"{action}\"!')
+            logger.error(f'Unknown batch mode action "{action}"!')
             return -1
 
         return 0

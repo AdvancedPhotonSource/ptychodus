@@ -9,8 +9,12 @@ import h5py
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.patterns import (DiffractionFileReader, DiffractionFileWriter,
-                                    DiffractionPatternArrayType, DiffractionPatternState)
+from ptychodus.api.patterns import (
+    DiffractionFileReader,
+    DiffractionFileWriter,
+    DiffractionPatternArrayType,
+    DiffractionPatternState,
+)
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -40,7 +44,6 @@ class DiffractionPatternArrayPresenter:
 
 
 class DiffractionDatasetPresenter(Observable, Observer):
-
     def __init__(self, settings: PatternSettings, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
@@ -87,7 +90,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
     @property
     def isAssembled(self) -> bool:
-        return (len(self._dataset) > 0)
+        return len(self._dataset) > 0
 
     def getContentsTree(self) -> SimpleTreeNode:
         return self._dataset.getContentsTree()
@@ -98,14 +101,14 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
         if filePath and h5py.is_hdf5(filePath) and dataPath:
             try:
-                with h5py.File(filePath, 'r') as h5File:
+                with h5py.File(filePath, "r") as h5File:
                     if dataPath in h5File:
                         item = h5File.get(dataPath)
 
                         if isinstance(item, h5py.Dataset):
                             data = item[()]  # TODO decode strings as needed
                     else:
-                        parentPath, attrName = dataPath.rsplit('/', 1)
+                        parentPath, attrName = dataPath.rsplit("/", 1)
 
                         if parentPath in h5File:
                             item = h5File.get(parentPath)
@@ -119,7 +122,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
                                 else:
                                     data = attr
             except OSError:
-                logger.exception('Failed to open dataset!')
+                logger.exception("Failed to open dataset!")
 
         return data
 
@@ -131,10 +134,12 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
 
 class PatternsCore:
-
-    def __init__(self, settingsRegistry: SettingsRegistry,
-                 fileReaderChooser: PluginChooser[DiffractionFileReader],
-                 fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
+    def __init__(
+        self,
+        settingsRegistry: SettingsRegistry,
+        fileReaderChooser: PluginChooser[DiffractionFileReader],
+        fileWriterChooser: PluginChooser[DiffractionFileWriter],
+    ) -> None:
         self.detector = Detector(settingsRegistry)
         self.detectorPresenter = DetectorPresenter.createInstance(self.detector)
         self.patternSettings = PatternSettings(settingsRegistry)
@@ -147,19 +152,22 @@ class PatternsCore:
 
         self.patternSizer = PatternSizer.createInstance(self.patternSettings, self.detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
-            self.patternSettings, self.patternSizer)
+            self.patternSettings, self.patternSizer
+        )
 
         self.dataset = ActiveDiffractionDataset(self.patternSettings, self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self.patternSettings, self.dataset)
-        self.patternsAPI = PatternsAPI(self.patternSettings, self._builder, self.dataset,
-                                       fileReaderChooser, fileWriterChooser)
+        self.patternsAPI = PatternsAPI(
+            self.patternSettings, self._builder, self.dataset, fileReaderChooser, fileWriterChooser
+        )
 
-        self.metadataPresenter = DiffractionMetadataPresenter(self.dataset, self.detector,
-                                                              self.patternSettings,
-                                                              self.productSettings)
+        self.metadataPresenter = DiffractionMetadataPresenter(
+            self.dataset, self.detector, self.patternSettings, self.productSettings
+        )
         self.datasetPresenter = DiffractionDatasetPresenter(self.patternSettings, self.dataset)
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter(
-            self.patternSettings, self.dataset, self.patternsAPI, settingsRegistry)
+            self.patternSettings, self.dataset, self.patternsAPI, settingsRegistry
+        )
 
     def start(self) -> None:
         pass

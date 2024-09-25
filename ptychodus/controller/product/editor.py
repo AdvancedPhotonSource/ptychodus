@@ -10,23 +10,21 @@ from ...view.product import ProductEditorDialog
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
-
     def __init__(self, product: ProductRepositoryItem, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._product = product
-        self._header = ['Property', 'Value']
+        self._header = ["Property", "Value"]
         self._properties = [
-            'Probe Wavelength [nm]',
-            'Probe Power [W]',
-            'Object Plane Pixel Width [nm]',
-            'Object Plane Pixel Height [nm]',
-            'Fresnel Number',
+            "Probe Wavelength [nm]",
+            "Probe Power [W]",
+            "Object Plane Pixel Width [nm]",
+            "Object Plane Pixel Height [nm]",
+            "Fresnel Number",
         ]
 
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def headerData(
+        self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole
+    ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._header[section]
 
@@ -38,15 +36,15 @@ class ProductPropertyTableModel(QAbstractTableModel):
                 geometry = self._product.getGeometry()
 
                 if index.row() == 0:
-                    return f'{geometry.probeWavelengthInMeters * 1e9:.4g}'
+                    return f"{geometry.probeWavelengthInMeters * 1e9:.4g}"
                 elif index.row() == 1:
-                    return f'{geometry.probePowerInWatts:.4g}'
+                    return f"{geometry.probePowerInWatts:.4g}"
                 elif index.row() == 2:
-                    return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
+                    return f"{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}"
                 elif index.row() == 3:
-                    return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                    return f"{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}"
                 elif index.row() == 4:
-                    return f'{geometry.fresnelNumber:.4g}'
+                    return f"{geometry.fresnelNumber:.4g}"
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._properties)
@@ -56,9 +54,12 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
 
 class ProductEditorViewController(Observer):
-
-    def __init__(self, product: ProductRepositoryItem, tableModel: ProductPropertyTableModel,
-                 dialog: ProductEditorDialog) -> None:
+    def __init__(
+        self,
+        product: ProductRepositoryItem,
+        tableModel: ProductPropertyTableModel,
+        dialog: ProductEditorDialog,
+    ) -> None:
         super().__init__()
         self._product = product
         self._tableModel = tableModel
@@ -71,7 +72,7 @@ class ProductEditorViewController(Observer):
         tableProxyModel.setSourceModel(tableModel)
 
         dialog = ProductEditorDialog.createInstance(parent)
-        dialog.setWindowTitle(f'Edit Product: {product.getName()}')
+        dialog.setWindowTitle(f"Edit Product: {product.getName()}")
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)
         dialog.tableView.verticalHeader().hide()

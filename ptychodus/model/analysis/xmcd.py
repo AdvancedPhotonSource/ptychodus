@@ -41,16 +41,16 @@ class XMCDAnalyzer:
         rcircObject = self._repository[rcircItemIndex].getObject()
 
         if lcircObject.widthInPixels != rcircObject.widthInPixels:
-            raise ValueError('Object width mismatch!')
+            raise ValueError("Object width mismatch!")
 
         if lcircObject.heightInPixels != rcircObject.heightInPixels:
-            raise ValueError('Object height mismatch!')
+            raise ValueError("Object height mismatch!")
 
         if lcircObject.pixelWidthInMeters != rcircObject.pixelWidthInMeters:
-            raise ValueError('Object pixel width mismatch!')
+            raise ValueError("Object pixel width mismatch!")
 
         if lcircObject.pixelHeightInMeters != rcircObject.pixelHeightInMeters:
-            raise ValueError('Object pixel height mismatch!')
+            raise ValueError("Object pixel height mismatch!")
 
         # TODO align lcircArray/rcircArray
 
@@ -62,10 +62,9 @@ class XMCDAnalyzer:
 
         polar_difference = numpy.log(ratio, out=numpy.zeros_like(ratio), where=(ratio > 0))
         polar_sum = numpy.log(product, out=numpy.zeros_like(product), where=(product > 0))
-        polar_ratio = numpy.divide(polar_difference,
-                                   polar_sum,
-                                   out=numpy.zeros_like(polar_sum),
-                                   where=(polar_sum > 0))
+        polar_ratio = numpy.divide(
+            polar_difference, polar_sum, out=numpy.zeros_like(polar_sum), where=(polar_sum > 0)
+        )
 
         return XMCDResult(
             pixel_width_m=rcircObject.pixelWidthInMeters,
@@ -81,23 +80,23 @@ class XMCDAnalyzer:
         return [self.getSaveFileFilter()]
 
     def getSaveFileFilter(self) -> str:
-        return 'NumPy Zipped Archive (*.npz)'
+        return "NumPy Zipped Archive (*.npz)"
 
     def saveResult(self, filePath: Path, result: XMCDResult) -> None:
         numpy.savez(
             filePath,
-            'pixel_height_m',
+            "pixel_height_m",
             result.pixel_height_m,
-            'pixel_width_m',
+            "pixel_width_m",
             result.pixel_width_m,
-            'center_x_m',
+            "center_x_m",
             result.center_x_m,
-            'center_y_m',
+            "center_y_m",
             result.center_y_m,
-            'polar_difference',
+            "polar_difference",
             result.polar_difference,
-            'polar_sum',
+            "polar_sum",
             result.polar_sum,
-            'polar_ratio',
+            "polar_ratio",
             result.polar_ratio,
         )

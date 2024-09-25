@@ -1,12 +1,22 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QAbstractButton, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
-                             QLabel, QMenu, QPlainTextEdit, QPushButton, QTableView, QVBoxLayout,
-                             QWidget)
+from PyQt5.QtWidgets import (
+    QAbstractButton,
+    QDialog,
+    QDialogButtonBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QPlainTextEdit,
+    QPushButton,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class ProductEditorDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.tableView = QTableView()
@@ -21,7 +31,7 @@ class ProductEditorDialog(QDialog):
         commentsLayout.setContentsMargins(0, 0, 0, 0)
         commentsLayout.addWidget(view.textEdit)
 
-        commentsBox = QGroupBox('Comments')
+        commentsBox = QGroupBox("Comments")
         commentsBox.setLayout(commentsLayout)
 
         view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
@@ -43,14 +53,13 @@ class ProductEditorDialog(QDialog):
 
 
 class ProductButtonBox(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.insertMenu = QMenu()
-        self.insertButton = QPushButton('Insert')
-        self.saveButton = QPushButton('Save')
-        self.editButton = QPushButton('Edit')
-        self.removeButton = QPushButton('Remove')
+        self.insertButton = QPushButton("Insert")
+        self.saveButton = QPushButton("Save")
+        self.editButton = QPushButton("Edit")
+        self.removeButton = QPushButton("Remove")
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ProductButtonBox:
@@ -70,7 +79,6 @@ class ProductButtonBox(QWidget):
 
 
 class ProductView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.tableView = QTableView()

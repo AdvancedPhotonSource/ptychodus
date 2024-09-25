@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Generic, TypeVar
 
-T = TypeVar('T', int, float, Decimal)
+T = TypeVar("T", int, float, Decimal)
 
 
 @dataclass(frozen=True)
@@ -12,7 +12,7 @@ class PixelGeometry:
     heightInMeters: float
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})'
+        return f"{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})"
 
 
 @dataclass(frozen=True)
@@ -22,22 +22,22 @@ class ImageExtent:
 
     @property
     def size(self) -> int:
-        '''returns the number of pixels in the image'''
+        """returns the number of pixels in the image"""
         return self.widthInPixels * self.heightInPixels
 
     @property
     def shape(self) -> tuple[int, int]:
-        '''returns the image shape (heightInPixels, widthInPixels) tuple'''
+        """returns the image shape (heightInPixels, widthInPixels) tuple"""
         return self.heightInPixels, self.widthInPixels
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ImageExtent):
-            return (self.shape == other.shape)
+            return self.shape == other.shape
 
         return False
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.widthInPixels}, {self.heightInPixels})'
+        return f"{type(self).__name__}({self.widthInPixels}, {self.heightInPixels})"
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ class Point2D:
     y: float
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.x}, {self.y})'
+        return f"{type(self).__name__}({self.x}, {self.y})"
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ class Line2D:
         return Point2D(x, y)
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.begin}, {self.end})'
+        return f"{type(self).__name__}({self.begin}, {self.end})"
 
 
 @dataclass(frozen=True)
@@ -88,11 +88,10 @@ class Box2D:
         return self.y + self.height
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.x}, {self.y}, {self.width}, {self.height})'
+        return f"{type(self).__name__}({self.x}, {self.y}, {self.width}, {self.height})"
 
 
 class Interval(Generic[T]):
-
     def __init__(self, lower: T, upper: T) -> None:
         self.lower: T = lower
         self.upper: T = upper
@@ -130,7 +129,7 @@ class Interval(Generic[T]):
         return Interval[T](self.lower, self.upper)
 
     def __contains__(self, item: T) -> bool:
-        return (self.lower <= item and item < self.upper)
+        return self.lower <= item and item < self.upper
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.lower}, {self.upper})'
+        return f"{type(self).__name__}({self.lower}, {self.upper})"

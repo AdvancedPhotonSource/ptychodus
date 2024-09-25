@@ -10,9 +10,12 @@ from ...model.patterns import DiffractionPatternArrayPresenter
 
 
 class DatasetTreeNode:
-
-    def __init__(self, parentItem: DatasetTreeNode | None,
-                 presenter: DiffractionPatternArrayPresenter, frameIndex: int) -> None:
+    def __init__(
+        self,
+        parentItem: DatasetTreeNode | None,
+        presenter: DiffractionPatternArrayPresenter,
+        frameIndex: int,
+    ) -> None:
         self.parentItem = parentItem
         self._presenter = presenter
         self._frameIndex = frameIndex
@@ -38,7 +41,7 @@ class DatasetTreeNode:
         if self._frameIndex < 0:
             return self._presenter.label
 
-        return f'Frame {self._frameIndex}'
+        return f"Frame {self._frameIndex}"
 
     @property
     def state(self) -> DiffractionPatternState:
@@ -77,11 +80,10 @@ class DatasetTreeNode:
 
 
 class DatasetTreeModel(QAbstractItemModel):
-
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rootNode = DatasetTreeNode.createRoot()
-        self._header = ['Label', 'Frames', 'Size [MB]']
+        self._header = ["Label", "Frames", "Size [MB]"]
 
     def setRootNode(self, rootNode: DatasetTreeNode) -> None:
         self.beginResetModel()
@@ -89,12 +91,10 @@ class DatasetTreeModel(QAbstractItemModel):
         self.endResetModel()
 
     @overload
-    def parent(self, child: QModelIndex) -> QModelIndex:
-        ...
+    def parent(self, child: QModelIndex) -> QModelIndex: ...
 
     @overload
-    def parent(self) -> QObject:
-        ...
+    def parent(self) -> QObject: ...
 
     def parent(self, child: QModelIndex | None = None) -> QModelIndex | QObject:
         if child is None:
@@ -113,10 +113,9 @@ class DatasetTreeModel(QAbstractItemModel):
 
             return value
 
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def headerData(
+        self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole
+    ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._header[section]
 
@@ -142,7 +141,7 @@ class DatasetTreeModel(QAbstractItemModel):
                 elif index.column() == 1:
                     return node.numberOfFrames
                 elif index.column() == 2:
-                    return f'{node.sizeInBytes / (1024 * 1024):.2f}'
+                    return f"{node.sizeInBytes / (1024 * 1024):.2f}"
             elif role == Qt.ItemDataRole.FontRole:
                 font = QFont()
                 font.setItalic(node.state == DiffractionPatternState.FOUND)

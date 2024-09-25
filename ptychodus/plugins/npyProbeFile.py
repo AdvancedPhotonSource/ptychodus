@@ -7,14 +7,12 @@ from ptychodus.api.probe import Probe, ProbeFileReader, ProbeFileWriter
 
 
 class NPYProbeFileReader(ProbeFileReader):
-
     def read(self, filePath: Path) -> Probe:
         array = numpy.load(filePath)
         return Probe(array)
 
 
 class NPYProbeFileWriter(ProbeFileWriter):
-
     def write(self, filePath: Path, probe: Probe) -> None:
         array = probe.array
         numpy.save(filePath, array)
@@ -23,11 +21,11 @@ class NPYProbeFileWriter(ProbeFileWriter):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.probeFileReaders.registerPlugin(
         NPYProbeFileReader(),
-        simpleName='NPY',
-        displayName='NumPy Binary Files (*.npy)',
+        simpleName="NPY",
+        displayName="NumPy Binary Files (*.npy)",
     )
     registry.probeFileWriters.registerPlugin(
         NPYProbeFileWriter(),
-        simpleName='NPY',
-        displayName='NumPy Binary Files (*.npy)',
+        simpleName="NPY",
+        displayName="NumPy Binary Files (*.npy)",
     )

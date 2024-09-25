@@ -4,24 +4,22 @@ from collections.abc import Sequence
 from typing import Generic, TypeVar
 
 __all__ = [
-    'Observer',
-    'Observable',
-    'SequenceObserver',
-    'ObservableSequence',
+    "Observer",
+    "Observable",
+    "SequenceObserver",
+    "ObservableSequence",
 ]
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Observer(ABC):
-
     @abstractmethod
     def update(self, observable: Observable) -> None:
         pass
 
 
 class Observable:
-
     def __init__(self) -> None:
         self._observerList: list[Observer] = list()
 
@@ -41,7 +39,6 @@ class Observable:
 
 
 class SequenceObserver(Generic[T], ABC):
-
     @abstractmethod
     def handleItemInserted(self, index: int, item: T) -> None:
         pass
@@ -56,7 +53,6 @@ class SequenceObserver(Generic[T], ABC):
 
 
 class ObservableSequence(Sequence[T]):
-
     def __init__(self) -> None:
         self._observerList: list[SequenceObserver[T]] = list()
 

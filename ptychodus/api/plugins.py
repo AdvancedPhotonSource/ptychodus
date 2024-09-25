@@ -8,8 +8,12 @@ import logging
 import pkgutil
 import re
 
-from .fluorescence import (DeconvolutionStrategy, FluorescenceFileReader, FluorescenceFileWriter,
-                           UpscalingStrategy)
+from .fluorescence import (
+    DeconvolutionStrategy,
+    FluorescenceFileReader,
+    FluorescenceFileWriter,
+    UpscalingStrategy,
+)
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
@@ -19,11 +23,11 @@ from .scan import ScanFileReader, ScanFileWriter
 from .workflow import FileBasedWorkflow
 
 __all__ = [
-    'PluginChooser',
-    'PluginRegistry',
+    "PluginChooser",
+    "PluginRegistry",
 ]
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +40,6 @@ class PluginEntry(Generic[T]):
 
 
 class PluginChooser(Sequence[PluginEntry[T]], Observable):
-
     def __init__(self) -> None:
         super().__init__()
         self._entryList: list[PluginEntry[T]] = list()
@@ -48,9 +51,9 @@ class PluginChooser(Sequence[PluginEntry[T]], Observable):
     def getDisplayNameList(self) -> Sequence[str]:
         return [entry.displayName for entry in self._entryList]
 
-    def registerPlugin(self, strategy: T, *, displayName: str, simpleName: str = '') -> None:
+    def registerPlugin(self, strategy: T, *, displayName: str, simpleName: str = "") -> None:
         if not simpleName:
-            simpleName = re.sub(r'\W+', '', displayName)
+            simpleName = re.sub(r"\W+", "", displayName)
 
         entry = PluginEntry[T](strategy, simpleName, displayName)
         self._entryList.append(entry)
@@ -71,15 +74,13 @@ class PluginChooser(Sequence[PluginEntry[T]], Observable):
 
                 return
 
-        logger.debug(f'Invalid plugin name \"{name}\"')
+        logger.debug(f'Invalid plugin name "{name}"')
 
     @overload
-    def __getitem__(self, index: int) -> PluginEntry[T]:
-        ...
+    def __getitem__(self, index: int) -> PluginEntry[T]: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[PluginEntry[T]]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[PluginEntry[T]]: ...
 
     def __getitem__(self, index: int | slice) -> PluginEntry[T] | Sequence[PluginEntry[T]]:
         return self._entryList[index]
@@ -98,7 +99,6 @@ class PluginChooser(Sequence[PluginEntry[T]], Observable):
 
 
 class PluginRegistry:
-
     def __init__(self) -> None:
         self.diffractionFileReaders = PluginChooser[DiffractionFileReader]()
         self.diffractionFileWriters = PluginChooser[DiffractionFileWriter]()
@@ -123,20 +123,21 @@ class PluginRegistry:
         registry = cls()
 
         import ptychodus.plugins
+
         ns_pkg: ModuleType = ptychodus.plugins
 
         # Specifying the second argument (prefix) to iter_modules makes the
         # returned name an absolute name instead of a relative one. This allows
         # import_module to work without having to do additional modification to
         # the name.
-        for moduleInfo in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + '.'):
+        for moduleInfo in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + "."):
             try:
                 module = importlib.import_module(moduleInfo.name)
             except ModuleNotFoundError as exc:
-                logger.info(f'Skipping {moduleInfo.name}')
+                logger.info(f"Skipping {moduleInfo.name}")
                 logger.warning(exc)
             else:
-                logger.info(f'Registering {moduleInfo.name}')
+                logger.info(f"Registering {moduleInfo.name}")
                 module.registerPlugins(registry)
 
         return registry

@@ -9,13 +9,12 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.visualization import RealArrayType
 
 __all__ = [
-    'ScalarTransformation',
-    'ScalarTransformationParameter',
+    "ScalarTransformation",
+    "ScalarTransformationParameter",
 ]
 
 
 class ScalarTransformation(ABC):
-
     @abstractmethod
     def decorateText(self, text: str) -> str:
         pass
@@ -26,7 +25,6 @@ class ScalarTransformation(ABC):
 
 
 class IdentityScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
         return text
 
@@ -35,9 +33,8 @@ class IdentityScalarTransformation(ScalarTransformation):
 
 
 class SquareRootScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
-        return f'$\\sqrt{{\\mathrm{{{text}}}}}$'
+        return f"$\\sqrt{{\\mathrm{{{text}}}}}$"
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -45,9 +42,8 @@ class SquareRootScalarTransformation(ScalarTransformation):
 
 
 class Log2ScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
-        return f'$\\log_2{{\\left(\\mathrm{{{text}}}\\right)}}$'
+        return f"$\\log_2{{\\left(\\mathrm{{{text}}}\\right)}}$"
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -55,9 +51,8 @@ class Log2ScalarTransformation(ScalarTransformation):
 
 
 class LogScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
-        return f'$\\ln{{\\left(\\mathrm{{{text}}}\\right)}}$'
+        return f"$\\ln{{\\left(\\mathrm{{{text}}}\\right)}}$"
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -65,9 +60,8 @@ class LogScalarTransformation(ScalarTransformation):
 
 
 class Log10ScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
-        return f'$\\log_{{10}}{{\\left(\\mathrm{{{text}}}\\right)}}$'
+        return f"$\\log_{{10}}{{\\left(\\mathrm{{{text}}}\\right)}}$"
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
         nil = numpy.zeros_like(array)
@@ -75,52 +69,56 @@ class Log10ScalarTransformation(ScalarTransformation):
 
 
 class ScalarTransformationParameter(Parameter[str], Observer):
-
     def __init__(self) -> None:
-        super().__init__('')
+        super().__init__()
         self._chooser = PluginChooser[ScalarTransformation]()
         self._chooser.registerPlugin(
             IdentityScalarTransformation(),
-            displayName='Identity',
+            displayName="Identity",
         )
         self._chooser.registerPlugin(
             SquareRootScalarTransformation(),
-            simpleName='sqrt',
-            displayName='Square Root',
+            simpleName="sqrt",
+            displayName="Square Root",
         )
         self._chooser.registerPlugin(
             Log2ScalarTransformation(),
-            simpleName='log2',
-            displayName='Logarithm (Base 2)',
+            simpleName="log2",
+            displayName="Logarithm (Base 2)",
         )
 
         self._chooser.registerPlugin(
             LogScalarTransformation(),
-            simpleName='ln',
-            displayName='Natural Logarithm',
+            simpleName="ln",
+            displayName="Natural Logarithm",
         )
         self._chooser.registerPlugin(
             Log10ScalarTransformation(),
-            simpleName='log10',
-            displayName='Logarithm (Base 10)',
+            simpleName="log10",
+            displayName="Logarithm (Base 10)",
         )
-        self.setValue('Identity')
+        self.setValue("Identity")
         self._chooser.addObserver(self)
 
     def choices(self) -> Iterator[str]:
         for name in self._chooser.getDisplayNameList():
             yield name
 
+    def getValue(self) -> str:
+        return self._chooser.currentPlugin.displayName
+
     def setValue(self, value: str, *, notify: bool = True) -> None:
         self._chooser.setCurrentPluginByName(value)
-        super().setValue(self._chooser.currentPlugin.displayName, notify=notify)
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(value)
 
-    def getPlugin(self) -> ScalarTransformation:
-        return self._chooser.currentPlugin.strategy
+    def decorateText(self, text: str) -> str:
+        return self._chooser.currentPlugin.strategy.decorateText(text)
+
+    def transform(self, values: RealArrayType) -> RealArrayType:
+        return self._chooser.currentPlugin.strategy(values)
 
     def update(self, observable: Observable) -> None:
         if observable is self._chooser:
-            super().setValue(self._chooser.currentPlugin.displayName)
+            self.notifyObservers()

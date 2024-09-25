@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPackObjectCorrectionController(Observer):
-
-    def __init__(self, presenter: PtychoPackPresenter,
-                 view: PtychoPackObjectCorrectionView) -> None:
+    def __init__(
+        self, presenter: PtychoPackPresenter, view: PtychoPackObjectCorrectionView
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
@@ -32,7 +32,7 @@ class PtychoPackObjectCorrectionController(Observer):
         try:
             value = int(text)
         except ValueError:
-            logger.warning(f'Failed to convert \"{text}\" to int!')
+            logger.warning(f'Failed to convert "{text}" to int!')
         else:
             self._presenter.set_object_correction_plan_start(value)
 
@@ -42,7 +42,7 @@ class PtychoPackObjectCorrectionController(Observer):
         try:
             value = int(text)
         except ValueError:
-            logger.warning(f'Failed to convert \"{text}\" to int!')
+            logger.warning(f'Failed to convert "{text}" to int!')
         else:
             self._presenter.set_object_correction_plan_stop(value)
 
@@ -52,25 +52,31 @@ class PtychoPackObjectCorrectionController(Observer):
         try:
             value = int(text)
         except ValueError:
-            logger.warning(f'Failed to convert \"{text}\" to int!')
+            logger.warning(f'Failed to convert "{text}" to int!')
         else:
             self._presenter.set_object_correction_plan_stride(value)
 
     def _sync_model_to_view(self) -> None:
         self._view.plan_widget.start_lineedit.setText(
-            str(self._presenter.get_object_correction_plan_start()))
+            str(self._presenter.get_object_correction_plan_start())
+        )
         self._view.plan_widget.stop_lineedit.setText(
-            str(self._presenter.get_object_correction_plan_stop()))
+            str(self._presenter.get_object_correction_plan_stop())
+        )
         self._view.plan_widget.stride_lineedit.setText(
-            str(self._presenter.get_object_correction_plan_stride()))
+            str(self._presenter.get_object_correction_plan_stride())
+        )
 
-        self._view.pie_alpha_slider.setValueAndRange(self._presenter.get_pie_alpha(),
-                                                     self._presenter.get_pie_alpha_limits(),
-                                                     blockValueChangedSignal=True)
+        self._view.pie_alpha_slider.setValueAndRange(
+            self._presenter.get_pie_alpha(),
+            self._presenter.get_pie_alpha_limits(),
+            blockValueChangedSignal=True,
+        )
         self._view.pie_relaxation_slider.setValueAndRange(
             self._presenter.get_pie_object_relaxation(),
             self._presenter.get_pie_object_relaxation_limits(),
-            blockValueChangedSignal=True)
+            blockValueChangedSignal=True,
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

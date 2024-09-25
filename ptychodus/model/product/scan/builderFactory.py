@@ -16,22 +16,26 @@ logger = logging.getLogger(__name__)
 
 
 class ScanBuilderFactory(Iterable[str]):
-
-    def __init__(self, settings: ScanSettings, fileReaderChooser: PluginChooser[ScanFileReader],
-                 fileWriterChooser: PluginChooser[ScanFileWriter]) -> None:
+    def __init__(
+        self,
+        settings: ScanSettings,
+        fileReaderChooser: PluginChooser[ScanFileReader],
+        fileWriterChooser: PluginChooser[ScanFileWriter],
+    ) -> None:
         self._settings = settings
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: dict[str, Callable[[], ScanBuilder]] = {
-            variant.name.lower():
-            lambda variant=variant: CartesianScanBuilder(variant, settings)  # type: ignore
+            variant.name.lower(): lambda variant=variant: CartesianScanBuilder(variant, settings)  # type: ignore
             for variant in CartesianScanVariant
         }
-        self._builders.update({
-            'concentric': lambda: ConcentricScanBuilder(settings),
-            'spiral': lambda: SpiralScanBuilder(settings),
-            'lissajous': lambda: LissajousScanBuilder(settings),
-        })
+        self._builders.update(
+            {
+                "concentric": lambda: ConcentricScanBuilder(settings),
+                "spiral": lambda: SpiralScanBuilder(settings),
+                "lissajous": lambda: LissajousScanBuilder(settings),
+            }
+        )
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._builders)
@@ -40,7 +44,7 @@ class ScanBuilderFactory(Iterable[str]):
         try:
             factory = self._builders[name]
         except KeyError as exc:
-            raise KeyError(f'Unknown scan builder \"{name}\"!') from exc
+            raise KeyError(f'Unknown scan builder "{name}"!') from exc
 
         return factory()
 
@@ -51,7 +55,7 @@ class ScanBuilderFactory(Iterable[str]):
         name = self._settings.builder.getValue()
         nameRepaired = name.casefold()
 
-        if nameRepaired == 'from_file':
+        if nameRepaired == "from_file":
             return self.createScanFromFile(
                 self._settings.filePath.getValue(),
                 self._settings.fileType.getValue(),
@@ -80,6 +84,6 @@ class ScanBuilderFactory(Iterable[str]):
     def saveScan(self, filePath: Path, fileType: str, scan: Scan) -> None:
         self._fileWriterChooser.setCurrentPluginByName(fileType)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        logger.debug(f'Writing "{filePath}" as "{fileType}"')
         fileWriter = self._fileWriterChooser.currentPlugin.strategy
         fileWriter.write(filePath, scan)

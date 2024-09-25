@@ -15,25 +15,26 @@ logger = logging.getLogger(__name__)
 
 
 class ScanIndexFilter(Enum):
-    '''filters scan points by index'''
+    """filters scan points by index"""
+
     ALL = auto()
     ODD = auto()
     EVEN = auto()
 
     def __call__(self, index: int) -> bool:
-        '''include scan point if true, exclude otherwise'''
+        """include scan point if true, exclude otherwise"""
         if self is ScanIndexFilter.ODD:
-            return (index & 1 != 0)
+            return index & 1 != 0
         elif self is ScanIndexFilter.EVEN:
-            return (index & 1 == 0)
+            return index & 1 == 0
 
         return True
 
 
 class DiffractionPatternPositionMatcher:
-
-    def __init__(self, diffractionDataset: ActiveDiffractionDataset,
-                 productRepository: ProductRepository) -> None:
+    def __init__(
+        self, diffractionDataset: ActiveDiffractionDataset, productRepository: ProductRepository
+    ) -> None:
         self._diffractionDataset = diffractionDataset
         self._productRepository = productRepository
 
@@ -47,9 +48,8 @@ class DiffractionPatternPositionMatcher:
         return objectGeometry.getPixelGeometry()
 
     def matchDiffractionPatternsWithPositions(
-            self,
-            inputProductIndex: int,
-            indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> ReconstructInput:
+        self, inputProductIndex: int, indexFilter: ScanIndexFilter = ScanIndexFilter.ALL
+    ) -> ReconstructInput:
         inputProductItem = self._productRepository[inputProductIndex]
         inputProduct = inputProductItem.getProduct()
         dataIndexes = self._diffractionDataset.getAssembledIndexes()

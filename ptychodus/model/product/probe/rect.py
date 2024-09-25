@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy
 
+from ptychodus.api.parametric import RealParameter
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
 
@@ -10,23 +11,25 @@ from .settings import ProbeSettings
 
 
 class RectangularProbeBuilder(ProbeBuilder):
-
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('rectangular')
+        super().__init__("rectangular")
         self._settings = settings
 
-        self.widthInMeters = self._registerRealParameter(
-            'width_m',
+        self.widthInMeters = RealParameter(
+            self,
+            "width_m",
             float(settings.rectangleWidthInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.heightInMeters = self._registerRealParameter(
-            'height_m',
+        self.heightInMeters = RealParameter(
+            self,
+            "height_m",
             float(settings.rectangleHeightInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.defocusDistanceInMeters = self._registerRealParameter(
-            'defocus_distance_m',
+        self.defocusDistanceInMeters = RealParameter(
+            self,
+            "defocus_distance_m",
             float(settings.defocusDistanceInMeters.getValue()),
         )  # from sample to the focal plane
 
@@ -42,9 +45,9 @@ class RectangularProbeBuilder(ProbeBuilder):
         coords = self.getTransverseCoordinates(geometry)
 
         aX_m = numpy.fabs(coords.positionXInMeters)
-        rx_m = self.widthInMeters.getValue() / 2.
+        rx_m = self.widthInMeters.getValue() / 2.0
         aY_m = numpy.fabs(coords.positionYInMeters)
-        ry_m = self.heightInMeters.getValue() / 2.
+        ry_m = self.heightInMeters.getValue() / 2.0
 
         isInside = numpy.logical_and(aX_m < rx_m, aY_m < ry_m)
         rect = numpy.where(isInside, 1 + 0j, 0j)

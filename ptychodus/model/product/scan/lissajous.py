@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy
 
+from ptychodus.api.parametric import IntegerParameter, RealParameter
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
@@ -9,36 +10,41 @@ from .settings import ScanSettings
 
 
 class LissajousScanBuilder(ScanBuilder):
-
     def __init__(self, settings: ScanSettings) -> None:
-        super().__init__('lissajous')
+        super().__init__("lissajous")
         self._settings = settings
 
-        self.numberOfPoints = self._registerIntegerParameter(
-            'number_of_points',
+        self.numberOfPoints = IntegerParameter(
+            self,
+            "number_of_points",
             settings.numberOfPoints,
             minimum=0,
         )
-        self.amplitudeXInMeters = self._registerRealParameter(
-            'amplitude_x_m',
+        self.amplitudeXInMeters = RealParameter(
+            self,
+            "amplitude_x_m",
             float(settings.amplitudeXInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.amplitudeYInMeters = self._registerRealParameter(
-            'amplitude_y_m',
+        self.amplitudeYInMeters = RealParameter(
+            self,
+            "amplitude_y_m",
             float(settings.amplitudeYInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
-        self.angularStepXInTurns = self._registerRealParameter(
-            'angular_step_x_tr',
+        self.angularStepXInTurns = RealParameter(
+            self,
+            "angular_step_x_tr",
             float(settings.angularStepXInTurns.getValue()),
         )
-        self.angularStepYInTurns = self._registerRealParameter(
-            'angular_step_y_tr',
+        self.angularStepYInTurns = RealParameter(
+            self,
+            "angular_step_y_tr",
             float(settings.angularStepYInTurns.getValue()),
         )
-        self.angularShiftInTurns = self._registerRealParameter(
-            'angular_shift_tr',
+        self.angularShiftInTurns = RealParameter(
+            self,
+            "angular_shift_tr",
             float(settings.angularShiftInTurns.getValue()),
         )
 
@@ -57,8 +63,10 @@ class LissajousScanBuilder(ScanBuilder):
 
         for index in range(self.numberOfPoints.getValue()):
             twoPi = 2 * numpy.pi
-            thetaX = twoPi * self.angularStepXInTurns.getValue() * index \
-                    + self.angularShiftInTurns.getValue()
+            thetaX = (
+                twoPi * self.angularStepXInTurns.getValue() * index
+                + self.angularShiftInTurns.getValue()
+            )
             thetaY = twoPi * self.angularStepYInTurns.getValue() * index
 
             point = ScanPoint(

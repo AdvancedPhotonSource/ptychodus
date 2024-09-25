@@ -17,10 +17,9 @@ class LengthWidget(QWidget):
         self.unitsComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls,
-                       *,
-                       isSigned: bool = False,
-                       parent: QWidget | None = None) -> LengthWidget:
+    def createInstance(
+        cls, *, isSigned: bool = False, parent: QWidget | None = None
+    ) -> LengthWidget:
         widget = cls(isSigned, parent)
 
         if not isSigned:
@@ -28,12 +27,12 @@ class LengthWidget(QWidget):
 
         widget.lineEdit.valueChanged.connect(widget._setLengthInMetersFromWidgets)
 
-        widget.unitsComboBox.addItem('m', 0)
-        widget.unitsComboBox.addItem('mm', -3)
-        widget.unitsComboBox.addItem('\u00B5m', -6)
-        widget.unitsComboBox.addItem('nm', -9)
-        widget.unitsComboBox.addItem('\u212B', -10)
-        widget.unitsComboBox.addItem('pm', -12)
+        widget.unitsComboBox.addItem("m", 0)
+        widget.unitsComboBox.addItem("mm", -3)
+        widget.unitsComboBox.addItem("\u00b5m", -6)
+        widget.unitsComboBox.addItem("nm", -9)
+        widget.unitsComboBox.addItem("\u212b", -10)
+        widget.unitsComboBox.addItem("pm", -12)
         widget.unitsComboBox.activated.connect(widget._updateDisplay)
 
         layout = QHBoxLayout()
@@ -58,7 +57,8 @@ class LengthWidget(QWidget):
 
         if not lengthInMeters.is_zero():
             exponent = 3 * int(
-                (abs(lengthInMeters).log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
+                (abs(lengthInMeters).log10() / 3).to_integral_exact(rounding=ROUND_FLOOR)
+            )
             index = self.unitsComboBox.findData(exponent)
 
             if index != -1:
@@ -69,7 +69,7 @@ class LengthWidget(QWidget):
     @property
     def _scaleToMeters(self) -> Decimal:
         exponent = self.unitsComboBox.currentData()
-        return Decimal(f'1e{exponent:+d}')
+        return Decimal(f"1e{exponent:+d}")
 
     def _setLengthInMetersFromWidgets(self, magnitude: Decimal) -> None:
         self.lengthInMeters = magnitude * self._scaleToMeters

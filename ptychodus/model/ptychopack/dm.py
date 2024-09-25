@@ -1,6 +1,11 @@
 import numpy
-from ptychopack import (CorrectionPlan, CorrectionPlanElement, DataProduct, DetectorData,
-                        DifferenceMap)
+from ptychopack import (
+    CorrectionPlan,
+    CorrectionPlanElement,
+    DataProduct,
+    DetectorData,
+    DifferenceMap,
+)
 
 from ptychodus.api.object import Object, ObjectPoint
 from ptychodus.api.probe import Probe
@@ -13,14 +18,13 @@ from .settings import PtychoPackSettings
 
 
 class DifferenceMapReconstructor(Reconstructor):
-
     def __init__(self, settings: PtychoPackSettings, device: RealPtychoPackDevice) -> None:
         self._settings = settings
         self._device = device
 
     @property
     def name(self) -> str:
-        return 'DM'
+        return "DM"
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         scan_input = parameters.product.scan
@@ -67,8 +71,9 @@ class DifferenceMapReconstructor(Reconstructor):
         pp_output_product = algorithm.get_product()
         scan_output_points: list[ScanPoint] = list()
 
-        for scan_point_input, (y_px, x_px) in zip(scan_input,
-                                                  pp_output_product.positions_px.numpy()):
+        for scan_point_input, (y_px, x_px) in zip(
+            scan_input, pp_output_product.positions_px.numpy()
+        ):
             object_point = ObjectPoint(scan_point_input.index, float(x_px), float(y_px))
             scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
             scan_output_points.append(scan_point)

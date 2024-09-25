@@ -11,29 +11,99 @@ import logging
 from .observer import Observable, Observer
 
 __all__ = [
-    'BooleanParameter',
-    'ComplexArrayParameter',
-    'DecimalParameter',
-    'IntegerParameter',
-    'Parameter',
-    'ParameterRepository',
-    'PathParameter',
-    'RealArrayParameter',
-    'RealParameter',
-    'StringParameter',
-    'UUIDParameter',
+    "BooleanParameter",
+    "ComplexArrayParameter",
+    "DecimalParameter",
+    "IntegerParameter",
+    "Parameter",
+    "ParameterGroup",
+    "PathParameter",
+    "RealArrayParameter",
+    "RealParameter",
+    "StringParameter",
+    "UUIDParameter",
 ]
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Parameter(ABC, Generic[T], Observable):
+    @abstractmethod
+    def getValue(self) -> T:
+        pass
 
-    def __init__(self, value: T) -> None:
+    @abstractmethod
+    def setValue(self, value: T, *, notify: bool = True) -> None:
+        pass
+
+    @abstractmethod
+    def setValueFromString(self, value: str) -> None:
+        pass
+
+
+class ParameterGroup(Observable, Observer):
+    def __init__(self) -> None:
+        super().__init__()
+        self._parameters: dict[str, Parameter[Any]] = dict()
+        self._groups: dict[str, ParameterGroup] = dict()
+
+    def parameters(self) -> Mapping[str, Parameter[Any]]:
+        return self._parameters
+
+    def _addParameter(self, name: str, parameter: Parameter[Any]) -> None:
+        if self._parameters.setdefault(name, parameter) is parameter:
+            parameter.addObserver(self)
+        else:
+            raise ValueError(f'Parameter "{name}" already exists!')
+
+    def _removeParameter(self, name: str) -> None:
+        try:
+            parameter = self._parameters.pop(name)
+        except KeyError:
+            pass
+        else:
+            parameter.removeObserver(self)
+
+    def groups(self) -> Mapping[str, ParameterGroup]:
+        return self._groups
+
+    def _addGroup(self, name: str, group: ParameterGroup, *, observe: bool = False) -> None:
+        if self._groups.setdefault(name, group) is group:
+            if observe:
+                group.addObserver(self)
+        else:
+            raise ValueError(f'Group "{name}" already exists!')
+
+    def _removeGroup(self, name: str) -> None:
+        try:
+            group = self._groups.pop(name)
+        except KeyError:
+            pass
+        else:
+            group.removeObserver(self)
+
+    def createGroup(self, name: str) -> ParameterGroup:
+        group = ParameterGroup()
+        self._addGroup(name, group)
+        return group
+
+    def getGroup(self, name: str) -> ParameterGroup:
+        return self._groups[name]
+
+    def update(self, observable: Observable) -> None:
+        if observable in self._parameters.values():
+            self.notifyObservers()
+        elif observable in self._groups.values():
+            self.notifyObservers()
+
+
+class ParameterBase(Parameter[T]):
+    def __init__(self, parent: ParameterGroup, name: str, value: T) -> None:
         super().__init__()
         self._value = value
+        parent._addParameter(name, self)
 
     def getValue(self) -> T:
         return self._value
@@ -45,27 +115,21 @@ class Parameter(ABC, Generic[T], Observable):
             if notify:
                 self.notifyObservers()
 
-    @abstractmethod
-    def setValueFromString(self, value: str) -> None:
-        pass
-
     def __str__(self) -> str:
         return str(self._value)
 
 
-class StringParameter(Parameter[str]):
-
-    def __init__(self, value: str) -> None:
-        super().__init__(value)
+class StringParameter(ParameterBase[str]):
+    def __init__(self, parent: ParameterGroup, name: str, value: str) -> None:
+        super().__init__(parent, name, value)
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(str(value))
 
 
-class PathParameter(Parameter[Path]):
-
-    def __init__(self, value: Path) -> None:
-        super().__init__(value)
+class PathParameter(ParameterBase[Path]):
+    def __init__(self, parent: ParameterGroup, name: str, value: Path) -> None:
+        super().__init__(parent, name, value)
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(Path(value))
@@ -83,38 +147,43 @@ class PathParameter(Parameter[Path]):
         return value
 
 
-class DecimalParameter(Parameter[Decimal]):
-
-    def __init__(self, value: Decimal | str) -> None:
-        super().__init__(Decimal(value) if isinstance(value, str) else value)
+class DecimalParameter(ParameterBase[Decimal]):
+    def __init__(self, parent: ParameterGroup, name: str, value: Decimal | str) -> None:
+        super().__init__(parent, name, Decimal(value) if isinstance(value, str) else value)
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(Decimal(value))
 
 
-class UUIDParameter(Parameter[UUID]):
-
-    def __init__(self, value: UUID) -> None:
-        super().__init__(value)
+class UUIDParameter(ParameterBase[UUID]):
+    def __init__(self, parent: ParameterGroup, name: str, value: UUID) -> None:
+        super().__init__(parent, name, value)
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(UUID(value))
 
 
-class BooleanParameter(Parameter[bool]):
-    TRUE_VALUES: Final = ('1', 'true', 't', 'yes', 'y')
+class BooleanParameter(ParameterBase[bool]):
+    TRUE_VALUES: Final = ("1", "true", "t", "yes", "y")
 
-    def __init__(self, value: bool) -> None:
-        super().__init__(value)
+    def __init__(self, parent: ParameterGroup, name: str, value: bool) -> None:
+        super().__init__(parent, name, value)
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(value.lower() in BooleanParameter.TRUE_VALUES)
 
 
-class IntegerParameter(Parameter[int]):
-
-    def __init__(self, value: int, *, minimum: int | None, maximum: int | None) -> None:
-        super().__init__(value)
+class IntegerParameter(ParameterBase[int]):
+    def __init__(
+        self,
+        parent: ParameterGroup,
+        name: str,
+        value: int,
+        *,
+        minimum: int | None = None,
+        maximum: int | None = None,
+    ) -> None:
+        super().__init__(parent, name, value)
         self._minimum = minimum
         self._maximum = maximum
 
@@ -139,10 +208,17 @@ class IntegerParameter(Parameter[int]):
         self.setValue(int(value))
 
 
-class RealParameter(Parameter[float]):
-
-    def __init__(self, value: float, *, minimum: float | None, maximum: float | None) -> None:
-        super().__init__(value)
+class RealParameter(ParameterBase[float]):
+    def __init__(
+        self,
+        parent: ParameterGroup,
+        name: str,
+        value: float,
+        *,
+        minimum: float | None = None,
+        maximum: float | None = None,
+    ) -> None:
+        super().__init__(parent, name, value)
         self._minimum = minimum
         self._maximum = maximum
 
@@ -167,10 +243,9 @@ class RealParameter(Parameter[float]):
         self.setValue(float(value))
 
 
-class RealArrayParameter(Parameter[MutableSequence[float]]):
-
-    def __init__(self, value: Sequence[float]) -> None:
-        super().__init__(list(value))
+class RealArrayParameter(ParameterBase[MutableSequence[float]]):
+    def __init__(self, parent: ParameterGroup, name: str, value: Sequence[float]) -> None:
+        super().__init__(parent, name, list(value))
 
     def __iter__(self) -> Iterator[float]:
         return iter(self._value)
@@ -205,10 +280,9 @@ class RealArrayParameter(Parameter[MutableSequence[float]]):
         self.setValue(json.loads(value))  # FIXME
 
 
-class ComplexArrayParameter(Parameter[MutableSequence[complex]]):
-
-    def __init__(self, value: Sequence[complex]) -> None:
-        super().__init__(list(value))
+class ComplexArrayParameter(ParameterBase[MutableSequence[complex]]):
+    def __init__(self, parent: ParameterGroup, name: str, value: Sequence[complex]) -> None:
+        super().__init__(parent, name, list(value))
 
     def __iter__(self) -> Iterator[complex]:
         return iter(self._value)
@@ -241,127 +315,3 @@ class ComplexArrayParameter(Parameter[MutableSequence[complex]]):
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(json.loads(value))  # FIXME
-
-
-class ParameterRepository(Mapping[str, Parameter[Any]], Observable, Observer):
-
-    def __init__(self, repositoryName: str, parent: ParameterRepository | None = None) -> None:
-        super().__init__()
-        self._repositoryName = repositoryName
-        self._contents: dict[str, Parameter[Any]] = dict()
-        self._repositoryList: list[ParameterRepository] = list()
-
-        if parent is not None:
-            parent._addParameterRepository(self)
-
-    @property
-    def repositoryName(self) -> str:
-        return self._repositoryName
-
-    def _addParameterRepository(self,
-                                repository: ParameterRepository,
-                                *,
-                                observe: bool = False) -> None:
-        if repository not in self._repositoryList:
-            self._repositoryList.append(repository)
-
-        if observe:
-            repository.addObserver(self)
-
-    def _removeParameterRepository(self, repository: ParameterRepository) -> None:
-        try:
-            self._repositoryList.remove(repository)
-        except ValueError:
-            pass
-        else:
-            repository.removeObserver(self)
-
-    def _registerParameter(self, name: str, parameter: Parameter[Any]) -> None:
-        if self._contents.setdefault(name, parameter) == parameter:
-            parameter.addObserver(self)
-        else:
-            raise ValueError('Name already exists!')
-
-    def _registerStringParameter(self, name: str, value: str) -> StringParameter:
-        parameter = StringParameter(value)
-        self._registerParameter(name, parameter)
-        return parameter
-
-    def _registerPathParameter(self, name: str, value: Path) -> PathParameter:
-        parameter = PathParameter(value)
-        self._registerParameter(name, parameter)
-        return parameter
-
-    def _registerUUIDParameter(self, name: str, value: UUID) -> UUIDParameter:
-        parameter = UUIDParameter(value)
-        self._registerParameter(name, parameter)
-        return parameter
-
-    def _registerBooleanParameter(self, name: str, value: bool) -> BooleanParameter:
-        parameter = BooleanParameter(value)
-        self._registerParameter(name, parameter)
-        return parameter
-
-    def _registerIntegerParameter(self,
-                                  name: str,
-                                  value: int,
-                                  *,
-                                  minimum: int | None = None,
-                                  maximum: int | None = None) -> IntegerParameter:
-        parameter = IntegerParameter(value, minimum=minimum, maximum=maximum)
-        self._registerParameter(name, parameter)
-        return parameter
-
-    def _registerRealParameter(self,
-                               name: str,
-                               value: float,
-                               *,
-                               minimum: float | None = None,
-                               maximum: float | None = None) -> RealParameter:
-        parameter = RealParameter(value, minimum=minimum, maximum=maximum)
-        self._registerParameter(name, parameter)
-        return parameter
-
-    def _registerRealArrayParameter(self, name: str, value: Sequence[float]) -> RealArrayParameter:
-        parameter = RealArrayParameter(value)
-        self._registerParameter(name, parameter)
-        return parameter
-
-    def _registerComplexArrayParameter(self, name: str,
-                                       value: Sequence[complex]) -> ComplexArrayParameter:
-        parameter = ComplexArrayParameter(value)
-        self._registerParameter(name, parameter)
-        return parameter
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._contents)
-
-    def __getitem__(self, name: str) -> Parameter[Any]:
-        return self._contents[name]
-
-    def __len__(self) -> int:
-        return len(self._contents)
-
-    def setParameters(self, parameterMap: Mapping[str, Parameter[Any]]) -> None:
-        for key, value in parameterMap.items():
-            try:
-                parameter = self._contents[key]
-            except KeyError:
-                logger.debug(f'Parameter \"{key}\" not found!')
-            else:
-                valueOld = parameter.getValue()
-                logger.debug(f'Parameter \"{key}\": {valueOld} -> {value}')
-
-                if type(value) is type(valueOld):
-                    parameter.setValue(value, notify=False)
-                else:
-                    raise ValueError(
-                        f'Parameter \"{key}\" type mismatch! {type(valueOld)} != {type(value)}')
-
-        self.notifyObservers()
-
-    def update(self, observable: Observable) -> None:
-        if observable in self._contents.values():
-            self.notifyObservers()
-        elif observable in self._repositoryList:
-            self.notifyObservers()

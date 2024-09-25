@@ -7,7 +7,6 @@ from .core import PtychoPackController
 
 
 class PtychoPackViewControllerFactory(ReconstructorViewControllerFactory):
-
     def __init__(self, model: PtychoPackReconstructorLibrary) -> None:
         super().__init__()
         self._model = model
@@ -15,12 +14,12 @@ class PtychoPackViewControllerFactory(ReconstructorViewControllerFactory):
 
     @property
     def backendName(self) -> str:
-        return 'PtychoPack'
+        return "PtychoPack"
 
     def createViewController(self, reconstructorName: str) -> QWidget:
-        if reconstructorName.casefold() == 'dm':
+        if reconstructorName.casefold() == "dm":
             view = PtychoPackView(PtychoPackAlgorithm.DM)
-        elif reconstructorName.casefold() == 'raar':
+        elif reconstructorName.casefold() == "raar":
             view = PtychoPackView(PtychoPackAlgorithm.RAAR)
         else:
             view = PtychoPackView(PtychoPackAlgorithm.PIE)

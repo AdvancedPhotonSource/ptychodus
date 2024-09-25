@@ -6,6 +6,7 @@ import numpy
 import numpy.typing
 import scipy.special
 
+from ptychodus.api.parametric import ComplexArrayParameter, RealParameter
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from ptychodus.api.typing import RealArrayType
 
@@ -47,13 +48,15 @@ class ZernikePolynomial:
         return values
 
     def _angular_function(self, angle: RealArrayType) -> RealArrayType:
-        return numpy.sin(-self.angular_frequency * angle) if self.angular_frequency < 0 \
-                else numpy.cos(self.angular_frequency * angle)
+        return (
+            numpy.sin(-self.angular_frequency * angle)
+            if self.angular_frequency < 0
+            else numpy.cos(self.angular_frequency * angle)
+        )
 
-    def __call__(self,
-                 distance: RealArrayType,
-                 angle: RealArrayType,
-                 undefined_value: float = 0.) -> RealArrayType:
+    def __call__(
+        self, distance: RealArrayType, angle: RealArrayType, undefined_value: float = 0.0
+    ) -> RealArrayType:
         rvalue = self._radial_polynomial(distance)
         avalue = self._angular_function(angle)
         nvalue_sq = self.radial_degree + 1
@@ -61,28 +64,31 @@ class ZernikePolynomial:
         if self.angular_frequency != 0:
             nvalue_sq *= 2
 
-        return numpy.where(numpy.logical_and(0 < distance, distance <= 1),
-                           numpy.sqrt(nvalue_sq) * rvalue * avalue, undefined_value)
+        return numpy.where(
+            numpy.logical_and(0 < distance, distance <= 1),
+            numpy.sqrt(nvalue_sq) * rvalue * avalue,
+            undefined_value,
+        )
 
     def __str__(self) -> str:
-        return f'$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$'
+        return f"$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$"
 
 
 class ZernikeProbeBuilder(ProbeBuilder):
-
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('zernike')
+        super().__init__("zernike")
         self._settings = settings
         self._polynomials: list[ZernikePolynomial] = list()
         self._order = 0
 
-        self.diameterInMeters = self._registerRealParameter(
-            'diameter_m',
+        self.diameterInMeters = RealParameter(
+            self,
+            "diameter_m",
             float(settings.diskDiameterInMeters.getValue()),
-            minimum=0.,
+            minimum=0.0,
         )
         # TODO init zernike coefficients from settings
-        self.coefficients = self._registerComplexArrayParameter('coefficients', [1 + 0j])
+        self.coefficients = ComplexArrayParameter(self, "coefficients", [1 + 0j])
 
         self.setOrder(1)
 
@@ -95,7 +101,7 @@ class ZernikeProbeBuilder(ProbeBuilder):
 
     def setOrder(self, order: int) -> None:
         if order < 1:
-            logger.warning('Order must be strictly positive!')
+            logger.warning("Order must be strictly positive!")
             return
 
         if self._order == order:
@@ -138,7 +144,7 @@ class ZernikeProbeBuilder(ProbeBuilder):
         geometry = geometryProvider.getProbeGeometry()
         coords = self.getTransverseCoordinates(geometry)
 
-        radius = self.diameterInMeters.getValue() / 2.
+        radius = self.diameterInMeters.getValue() / 2.0
         distance = numpy.hypot(coords.positionYInMeters, coords.positionXInMeters) / radius
         angle = numpy.arctan2(coords.positionYInMeters, coords.positionXInMeters)
         array = numpy.zeros_like(distance, dtype=complex)

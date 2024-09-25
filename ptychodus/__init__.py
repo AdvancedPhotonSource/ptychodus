@@ -1,7 +1,7 @@
 from importlib.metadata import version, PackageNotFoundError
 
 try:
-    __version__ = version('ptychodus')
+    __version__ = version("ptychodus")
 except PackageNotFoundError:
     pass
 
@@ -11,9 +11,9 @@ except ModuleNotFoundError:
     pass
 
 __all__ = [
-    'api',
-    'model',
-    'view',
-    'controller',
-    'PtychodusAdImageProcessor',
+    "api",
+    "model",
+    "view",
+    "controller",
+    "PtychodusAdImageProcessor",
 ]

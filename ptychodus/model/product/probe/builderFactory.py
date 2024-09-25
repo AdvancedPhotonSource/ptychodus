@@ -19,12 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeBuilderFactory(Iterable[str]):
-
-    def __init__(self, settings: ProbeSettings, detector: Detector,
-                 patterns: ActiveDiffractionDataset,
-                 fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
-                 fileReaderChooser: PluginChooser[ProbeFileReader],
-                 fileWriterChooser: PluginChooser[ProbeFileWriter]) -> None:
+    def __init__(
+        self,
+        settings: ProbeSettings,
+        detector: Detector,
+        patterns: ActiveDiffractionDataset,
+        fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
+        fileReaderChooser: PluginChooser[ProbeFileReader],
+        fileWriterChooser: PluginChooser[ProbeFileWriter],
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._detector = detector
@@ -33,12 +36,12 @@ class ProbeBuilderFactory(Iterable[str]):
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[], ProbeBuilder]] = {
-            'disk': lambda: DiskProbeBuilder(settings),
-            'average_pattern': self._createAveragePatternBuilder,
-            'fresnel_zone_plate': self._createFresnelZonePlateBuilder,
-            'rectangular': lambda: RectangularProbeBuilder(settings),
-            'super_gaussian': lambda: SuperGaussianProbeBuilder(settings),
-            'zernike': lambda: ZernikeProbeBuilder(settings),
+            "disk": lambda: DiskProbeBuilder(settings),
+            "average_pattern": self._createAveragePatternBuilder,
+            "fresnel_zone_plate": self._createFresnelZonePlateBuilder,
+            "rectangular": lambda: RectangularProbeBuilder(settings),
+            "super_gaussian": lambda: SuperGaussianProbeBuilder(settings),
+            "zernike": lambda: ZernikeProbeBuilder(settings),
         }
 
     def __iter__(self) -> Iterator[str]:
@@ -48,7 +51,7 @@ class ProbeBuilderFactory(Iterable[str]):
         try:
             factory = self._builders[name]
         except KeyError as exc:
-            raise KeyError(f'Unknown probe builder \"{name}\"!') from exc
+            raise KeyError(f'Unknown probe builder "{name}"!') from exc
 
         return factory()
 
@@ -59,7 +62,7 @@ class ProbeBuilderFactory(Iterable[str]):
         name = self._settings.builder.getValue()
         nameRepaired = name.casefold()
 
-        if nameRepaired == 'from_file':
+        if nameRepaired == "from_file":
             return self.createProbeFromFile(
                 self._settings.filePath.getValue(),
                 self._settings.fileType.getValue(),
@@ -94,6 +97,6 @@ class ProbeBuilderFactory(Iterable[str]):
     def saveProbe(self, filePath: Path, fileFilter: str, probe: Probe) -> None:
         self._fileWriterChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        logger.debug(f'Writing "{filePath}" as "{fileType}"')
         fileWriter = self._fileWriterChooser.currentPlugin.strategy
         fileWriter.write(filePath, probe)

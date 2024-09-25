@@ -6,10 +6,25 @@ import numpy
 
 from PyQt5.QtCore import pyqtSignal, Qt, QObject, QPointF, QLineF, QRectF, QSize, QSizeF
 from PyQt5.QtGui import QIcon, QImage, QPalette, QPen, QPixmap, QWheelEvent
-from PyQt5.QtWidgets import (QAction, QApplication, QComboBox, QDialog, QFormLayout,
-                             QGraphicsLineItem, QGraphicsPixmapItem, QGraphicsRectItem,
-                             QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
-                             QGroupBox, QLineEdit, QStatusBar, QToolBar, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QAction,
+    QApplication,
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QGraphicsLineItem,
+    QGraphicsPixmapItem,
+    QGraphicsRectItem,
+    QGraphicsSceneHoverEvent,
+    QGraphicsSceneMouseEvent,
+    QGraphicsView,
+    QGroupBox,
+    QLineEdit,
+    QStatusBar,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -35,7 +50,6 @@ class ImageMouseTool(Enum):
 
 
 class ImageItem(QGraphicsPixmapItem):
-
     def __init__(self, events: ImageItemEvents, statusBar: QStatusBar) -> None:
         super().__init__()
         self._events = events
@@ -60,8 +74,13 @@ class ImageItem(QGraphicsPixmapItem):
         imageRGBAi = numpy.multiply(imageRGBAf, 255).astype(numpy.uint8).copy()
 
         try:
-            image = QImage(imageRGBAi.data, imageRGBAi.shape[1], imageRGBAi.shape[0],
-                           imageRGBAi.strides[0], QImage.Format.Format_RGBA8888)
+            image = QImage(
+                imageRGBAi.data,
+                imageRGBAi.shape[1],
+                imageRGBAi.shape[0],
+                imageRGBAi.strides[0],
+                QImage.Format.Format_RGBA8888,
+            )
             pixmap = QPixmap.fromImage(image)
         except Exception as exc:
             logger.exception(exc)
@@ -153,25 +172,25 @@ class ImageItem(QGraphicsPixmapItem):
             line = QLineF(origin, event.pos())
             self.prepareGeometryChange()
             self._lineItem.setLine(line)
-            message1 = f'{line.length():.1f} pixels, {line.angle():.2f}\u00b0'
-            message2 = f'{line.dx():.1f} \u00d7 {line.dy():.1f}'
-            self._statusBar.showMessage(f'{message1} ({message2})')
+            message1 = f"{line.length():.1f} pixels, {line.angle():.2f}\u00b0"
+            message2 = f"{line.dx():.1f} \u00d7 {line.dy():.1f}"
+            self._statusBar.showMessage(f"{message1} ({message2})")
         elif self._mouseTool == ImageMouseTool.RECTANGLE_TOOL:
             rect = QRectF(self._rectangleOrigin, event.pos()).normalized()
             center = rect.center()
             self.prepareGeometryChange()
             self._rectangleItem.setRect(rect)
-            message1 = f'{rect.width():.1f} \u00d7 {rect.height():.1f}'
-            message2 = f'{center.x():.1f}, {center.y():.1f}'
-            self._statusBar.showMessage(f'Rectangle: {message1} (Center: {message2})')
+            message1 = f"{rect.width():.1f} \u00d7 {rect.height():.1f}"
+            message2 = f"{center.x():.1f}, {center.y():.1f}"
+            self._statusBar.showMessage(f"Rectangle: {message1} (Center: {message2})")
         elif self._mouseTool == ImageMouseTool.LINE_CUT_TOOL:
             origin = self._lineItem.line().p1()
             line = QLineF(origin, event.pos())
             self.prepareGeometryChange()
             self._lineItem.setLine(line)
-            message1 = f'{line.length():.1f} pixels, {line.angle():.2f}\u00b0'
-            message2 = f'{line.dx():.1f} \u00d7 {line.dy():.1f}'
-            self._statusBar.showMessage(f'{message1} ({message2})')
+            message1 = f"{line.length():.1f} pixels, {line.angle():.2f}\u00b0"
+            message2 = f"{line.dx():.1f} \u00d7 {line.dy():.1f}"
+            self._statusBar.showMessage(f"{message1} ({message2})")
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if self._mouseTool == ImageMouseTool.MOVE_TOOL:
@@ -190,7 +209,6 @@ class ImageItem(QGraphicsPixmapItem):
 
 
 class LineCutDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
@@ -201,7 +219,7 @@ class LineCutDialog(QDialog):
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> LineCutDialog:
         view = cls(parent)
-        view.setWindowTitle('Line-Cut Dialog')
+        view.setWindowTitle("Line-Cut Dialog")
 
         layout = QVBoxLayout()
         layout.addWidget(view.navigationToolbar)
@@ -212,7 +230,6 @@ class LineCutDialog(QDialog):
 
 
 class RectangleView(QGroupBox):
-
     @staticmethod
     def _createReadOnlyLineEdit() -> QLineEdit:
         lineEdit = QLineEdit()
@@ -228,7 +245,7 @@ class RectangleView(QGroupBox):
         return lineEdit
 
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Rectangle', parent)
+        super().__init__("Rectangle", parent)
         self.centerXLineEdit = RectangleView._createReadOnlyLineEdit()
         self.centerYLineEdit = RectangleView._createReadOnlyLineEdit()
         self.widthLineEdit = RectangleView._createReadOnlyLineEdit()
@@ -239,17 +256,16 @@ class RectangleView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Center X:', view.centerXLineEdit)
-        layout.addRow('Center Y:', view.centerYLineEdit)
-        layout.addRow('Width:', view.widthLineEdit)
-        layout.addRow('Height:', view.heightLineEdit)
+        layout.addRow("Center X:", view.centerXLineEdit)
+        layout.addRow("Center Y:", view.centerYLineEdit)
+        layout.addRow("Width:", view.widthLineEdit)
+        layout.addRow("Height:", view.heightLineEdit)
         view.setLayout(layout)
 
         return view
 
 
 class HistogramDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
@@ -261,7 +277,7 @@ class HistogramDialog(QDialog):
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> HistogramDialog:
         view = cls(parent)
-        view.setWindowTitle('Histogram')
+        view.setWindowTitle("Histogram")
 
         layout = QVBoxLayout()
         layout.addWidget(view.navigationToolbar)
@@ -273,12 +289,11 @@ class HistogramDialog(QDialog):
 
 
 class VisualizationView(QGraphicsView):
-
     def wheelEvent(self, event: QWheelEvent) -> None:
         oldPosition = self.mapToScene(event.pos())
 
         zoomBase = 1.25
-        zoom = zoomBase if event.angleDelta().y() > 0 else 1. / zoomBase
+        zoom = zoomBase if event.angleDelta().y() > 0 else 1.0 / zoomBase
         self.scale(zoom, zoom)
 
         newPosition = self.mapToScene(event.pos())
@@ -288,13 +303,12 @@ class VisualizationView(QGraphicsView):
 
 
 class VisualizationWidget(QGroupBox):
-
     def __init__(self, title: str, parent: QWidget | None) -> None:
         super().__init__(title, parent)
-        self.toolBar = QToolBar('Tools')
-        self.homeAction = QAction(QIcon(':/icons/home'), 'Home')
-        self.saveAction = QAction(QIcon(':/icons/save'), 'Save Image')
-        self.autoscaleAction = QAction(QIcon(':/icons/autoscale'), 'Autoscale Color Axis')
+        self.toolBar = QToolBar("Tools")
+        self.homeAction = QAction(QIcon(":/icons/home"), "Home")
+        self.saveAction = QAction(QIcon(":/icons/save"), "Save Image")
+        self.autoscaleAction = QAction(QIcon(":/icons/autoscale"), "Autoscale Color Axis")
         self.visualizationView = VisualizationView()
 
     @classmethod
@@ -318,9 +332,8 @@ class VisualizationWidget(QGroupBox):
 
 
 class VisualizationParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Visualization', parent)
+        super().__init__("Visualization", parent)
 
         self.rendererComboBox = QComboBox()
         self.transformationComboBox = QComboBox()
@@ -333,11 +346,11 @@ class VisualizationParametersView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Renderer:', view.rendererComboBox)
-        layout.addRow('Transform:', view.transformationComboBox)
-        layout.addRow('Variant:', view.variantComboBox)
-        layout.addRow('Min Display Value:', view.minDisplayValueLineEdit)
-        layout.addRow('Max Display Value:', view.maxDisplayValueLineEdit)
+        layout.addRow("Renderer:", view.rendererComboBox)
+        layout.addRow("Transform:", view.transformationComboBox)
+        layout.addRow("Variant:", view.variantComboBox)
+        layout.addRow("Min Display Value:", view.minDisplayValueLineEdit)
+        layout.addRow("Max Display Value:", view.maxDisplayValueLineEdit)
         view.setLayout(layout)
 
         return view

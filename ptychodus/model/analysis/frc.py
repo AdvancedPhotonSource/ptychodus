@@ -25,22 +25,21 @@ class FourierRingCorrelation:
         # TODO threshold from bits
         for freq_rm, frc in zip(self.spatialFrequency_rm, self.correlation):
             if frc < threshold:
-                return 1. / freq_rm
+                return 1.0 / freq_rm
 
         return numpy.nan
 
     def getPlot(self) -> Plot2D:
-        freqSeries = PlotSeries('freq', [1.e-9 * freq for freq in self.spatialFrequency_rm])
-        frcSeries = PlotSeries('frc', self.correlation)
+        freqSeries = PlotSeries("freq", [1.0e-9 * freq for freq in self.spatialFrequency_rm])
+        frcSeries = PlotSeries("frc", self.correlation)
 
         return Plot2D(
-            axisX=PlotAxis('Spatial Frequency [1/nm]', [freqSeries]),
-            axisY=PlotAxis('Fourier Ring Correlation', [frcSeries]),
+            axisX=PlotAxis("Spatial Frequency [1/nm]", [freqSeries]),
+            axisY=PlotAxis("Fourier Ring Correlation", [frcSeries]),
         )
 
 
 class FourierRingCorrelator:
-
     def __init__(self, repository: ObjectRepository) -> None:
         self._repository = repository
 
@@ -54,12 +53,12 @@ class FourierRingCorrelator:
         return total
 
     def correlate(self, itemIndex1: int, itemIndex2: int) -> FourierRingCorrelation:
-        '''
+        """
         See: Joan Vila-Comamala, Ana Diaz, Manuel Guizar-Sicairos, Alexandre Mantion,
         Cameron M. Kewish, Andreas Menzel, Oliver Bunk, and Christian David,
         "Characterization of high-resolution diffractive X-ray optics by ptychographic
         coherent diffractive imaging," Opt. Express 19, 21333-21344 (2011)
-        '''
+        """
 
         object1 = self._repository[itemIndex1].getObject()
         object2 = self._repository[itemIndex2].getObject()
@@ -69,10 +68,10 @@ class FourierRingCorrelator:
         array2 = object2.getLayer(0)
 
         if numpy.ndim(array1) != 2 or numpy.ndim(array2) != 2:
-            raise ValueError('Arrays must be 2D!')
+            raise ValueError("Arrays must be 2D!")
 
         if numpy.shape(array1) != numpy.shape(array2):
-            raise ValueError('Arrays must have same shape!')
+            raise ValueError("Arrays must have same shape!")
 
         # TODO verify compatible pixel geometry
         pixelGeometry = object2.getPixelGeometry()
