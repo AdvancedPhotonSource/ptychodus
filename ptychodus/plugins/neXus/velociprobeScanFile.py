@@ -30,14 +30,12 @@ class VelociprobeScanFileReader(ScanFileReader):
 
     @classmethod
     def createLaserInterferometerInstance(
-        cls, neXusReader: NeXusDiffractionFileReader
-    ) -> VelociprobeScanFileReader:
+            cls, neXusReader: NeXusDiffractionFileReader) -> VelociprobeScanFileReader:
         return cls(neXusReader, VelociprobeScanFileColumn.LASER_INTERFEROMETER_Y)
 
     @classmethod
     def createPositionEncoderInstance(
-        cls, neXusReader: NeXusDiffractionFileReader
-    ) -> VelociprobeScanFileReader:
+            cls, neXusReader: NeXusDiffractionFileReader) -> VelociprobeScanFileReader:
         return cls(neXusReader, VelociprobeScanFileColumn.POSITION_ENCODER_Y)
 
     def _applyTransform(self, scan: Scan) -> Scan:

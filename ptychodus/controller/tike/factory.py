@@ -7,6 +7,7 @@ from .controller import TikeParametersController
 
 
 class TikeViewControllerFactory(ReconstructorViewControllerFactory):
+
     def __init__(self, model: TikeReconstructorLibrary) -> None:
         super().__init__()
         self._model = model

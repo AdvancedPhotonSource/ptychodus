@@ -48,14 +48,14 @@ class ZernikePolynomial:
         return values
 
     def _angular_function(self, angle: RealArrayType) -> RealArrayType:
-        return (
-            numpy.sin(-self.angular_frequency * angle)
-            if self.angular_frequency < 0
-            else numpy.cos(self.angular_frequency * angle)
-        )
+        return (numpy.sin(-self.angular_frequency * angle)
+                if self.angular_frequency < 0 else numpy.cos(self.angular_frequency * angle))
 
     def __call__(
-        self, distance: RealArrayType, angle: RealArrayType, undefined_value: float = 0.0
+        self,
+        distance: RealArrayType,
+        angle: RealArrayType,
+        undefined_value: float = 0.0,
     ) -> RealArrayType:
         rvalue = self._radial_polynomial(distance)
         avalue = self._angular_function(angle)
@@ -75,6 +75,7 @@ class ZernikePolynomial:
 
 
 class ZernikeProbeBuilder(ProbeBuilder):
+
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__("zernike")
         self._settings = settings
@@ -145,7 +146,7 @@ class ZernikeProbeBuilder(ProbeBuilder):
         coords = self.getTransverseCoordinates(geometry)
 
         radius = self.diameterInMeters.getValue() / 2.0
-        distance = numpy.hypot(coords.positionYInMeters, coords.positionXInMeters) / radius
+        distance = (numpy.hypot(coords.positionYInMeters, coords.positionXInMeters) / radius)
         angle = numpy.arctan2(coords.positionYInMeters, coords.positionXInMeters)
         array = numpy.zeros_like(distance, dtype=complex)
 

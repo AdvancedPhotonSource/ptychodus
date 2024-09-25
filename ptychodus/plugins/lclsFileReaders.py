@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class PyTablesDiffractionPatternArray(DiffractionPatternArray):
+
     def __init__(self, label: str, index: int, filePath: Path, dataPath: str) -> None:
         super().__init__()
         self._label = label
@@ -55,8 +56,7 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
                     self._state = DiffractionPatternState.FOUND
                 else:
                     raise ValueError(
-                        f"Symlink {self._filePath}:{self._dataPath} is not a tables File!"
-                    )
+                        f"Symlink {self._filePath}:{self._dataPath} is not a tables File!")
 
             data = item[:]
 
@@ -64,6 +64,7 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
 
 
 class LCLSDiffractionFileReader(DiffractionFileReader):
+
     def __init__(self) -> None:
         self._dataPath = "/jungfrau1M/image_img"
         self._treeBuilder = H5DiffractionFileTreeBuilder()
@@ -110,7 +111,10 @@ class LCLSScanFileReader(ScanFileReader):
     MICRONS_TO_METERS: Final[float] = 1e-6
 
     def __init__(
-        self, tomographyAngleInDegrees: float, ipm2LowThreshold: float, ipm2HighThreshold: float
+        self,
+        tomographyAngleInDegrees: float,
+        ipm2LowThreshold: float,
+        ipm2HighThreshold: float,
     ) -> None:
         self._tomographyAngleInDegrees = tomographyAngleInDegrees
         self._ipm2LowThreshold = ipm2LowThreshold

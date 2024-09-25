@@ -23,6 +23,7 @@ from matplotlib.figure import Figure
 
 
 class ReconstructorView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Parameters", parent)
         self.algorithmComboBox = QComboBox()
@@ -58,6 +59,7 @@ class ReconstructorView(QGroupBox):
 
 
 class ReconstructorProgressDialog(QDialog):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.textEdit = QPlainTextEdit()
@@ -83,12 +85,13 @@ class ReconstructorProgressDialog(QDialog):
 
 
 class ReconstructorParametersView(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.reconstructorView = ReconstructorView.createInstance()
         self.stackedWidget = QStackedWidget()
         self.scrollArea = QScrollArea()
-        self.progressDialog = ReconstructorProgressDialog.createInstance()  # TODO use this
+        self.progressDialog = (ReconstructorProgressDialog.createInstance())  # TODO use this
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ReconstructorParametersView:
@@ -108,6 +111,7 @@ class ReconstructorParametersView(QWidget):
 
 
 class ReconstructorPlotView(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()

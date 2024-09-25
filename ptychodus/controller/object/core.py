@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectController(SequenceObserver[ObjectRepositoryItem]):
+
     def __init__(
         self,
         repository: ObjectRepository,
@@ -45,9 +46,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._editorFactory = ObjectEditorViewControllerFactory()
 
         self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel)
-        self._xmcdViewController = XMCDViewController(
-            xmcdAnalyzer, xmcdVisualizationEngine, fileDialogFactory, treeModel
-        )
+        self._xmcdViewController = XMCDViewController(xmcdAnalyzer, xmcdVisualizationEngine,
+                                                      fileDialogFactory, treeModel)
 
     @classmethod
     def createInstance(
@@ -153,7 +153,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
     def _finishCopyingObject(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
-            destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
+            destinationIndex = (self._view.copierDialog.destinationComboBox.currentIndex())
             self._api.copyObject(sourceIndex, destinationIndex)
 
     def _editCurrentObject(self) -> None:
@@ -221,11 +221,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 logger.warning("Unable to access item for visualization!")
             else:
                 object_ = item.getObject()
-                array = (
-                    object_.getLayer(current.row())
-                    if current.parent().isValid()
-                    else object_.getLayersFlattened()
-                )
+                array = (object_.getLayer(current.row())
+                         if current.parent().isValid() else object_.getLayersFlattened())
                 self._imageController.setArray(array, object_.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ObjectRepositoryItem) -> None:

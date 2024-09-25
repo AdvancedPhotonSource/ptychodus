@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectBuilderFactory(Iterable[str]):
+
     def __init__(
         self,
         rng: numpy.random.Generator,

@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class CXIScanFileReader(ScanFileReader):
+
     def read(self, filePath: Path) -> Scan:
         pointList: list[ScanPoint] = list()
 

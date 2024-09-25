@@ -7,8 +7,11 @@ from ...view.workflow import WorkflowAuthorizationDialog
 
 
 class WorkflowAuthorizationController:
+
     def __init__(
-        self, presenter: WorkflowAuthorizationPresenter, dialog: WorkflowAuthorizationDialog
+        self,
+        presenter: WorkflowAuthorizationPresenter,
+        dialog: WorkflowAuthorizationDialog,
     ) -> None:
         super().__init__()
         self._presenter = presenter
@@ -16,7 +19,9 @@ class WorkflowAuthorizationController:
 
     @classmethod
     def createInstance(
-        cls, presenter: WorkflowAuthorizationPresenter, dialog: WorkflowAuthorizationDialog
+        cls,
+        presenter: WorkflowAuthorizationPresenter,
+        dialog: WorkflowAuthorizationDialog,
     ) -> WorkflowAuthorizationController:
         controller = cls(presenter, dialog)
 

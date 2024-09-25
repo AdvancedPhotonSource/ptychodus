@@ -23,17 +23,16 @@ from .workflow import WorkflowController
 
 
 class ControllerCore:
+
     def __init__(self, model: ModelCore, view: ViewCore) -> None:
         self.view = view
 
         self._memoryController = MemoryController(model.memoryPresenter, view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
         self._ptychoPackViewControllerFactory = PtychoPackViewControllerFactory(
-            model.ptychoPackReconstructorLibrary
-        )
+            model.ptychoPackReconstructorLibrary)
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
-            model.ptychonnReconstructorLibrary, self._fileDialogFactory
-        )
+            model.ptychonnReconstructorLibrary, self._fileDialogFactory)
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
         self._settingsController = SettingsController(
             model.settingsRegistry,
@@ -58,7 +57,10 @@ class ControllerCore:
             self._fileDialogFactory,
         )
         self._productController = ProductController.createInstance(
-            model.productRepository, model.productAPI, view.productView, self._fileDialogFactory
+            model.productRepository,
+            model.productAPI,
+            view.productView,
+            self._fileDialogFactory,
         )
         self._scanController = ScanController.createInstance(
             model.scanRepository,
@@ -104,7 +106,7 @@ class ControllerCore:
             view.objectView,
             self._fileDialogFactory,
         )
-        self._reconstructorParametersController = ReconstructorController.createInstance(
+        self._reconstructorParametersController = (ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,
             view.reconstructorParametersView,
@@ -116,7 +118,7 @@ class ControllerCore:
                 self._ptychonnViewControllerFactory,
                 self._tikeViewControllerFactory,
             ],
-        )
+        ))
         self._workflowController = WorkflowController.createInstance(
             model.workflowParametersPresenter,
             model.workflowAuthorizationPresenter,
@@ -139,8 +141,7 @@ class ControllerCore:
         self._refreshDataTimer.start(1000)  # TODO make configurable
 
         view.navigationActionGroup.triggered.connect(
-            lambda action: self.swapCentralWidgets(action)
-        )
+            lambda action: self.swapCentralWidgets(action))
         view.workflowAction.setVisible(model.areWorkflowsSupported)
 
     def showMainWindow(self, windowTitle: str) -> None:

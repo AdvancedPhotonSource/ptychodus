@@ -7,15 +7,15 @@ from ...view.patterns import DetectorView
 
 
 class DetectorController(Observer):
+
     def __init__(self, presenter: DetectorPresenter, view: DetectorView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(
-        cls, presenter: DetectorPresenter, view: DetectorView
-    ) -> DetectorController:
+    def createInstance(cls, presenter: DetectorPresenter,
+                       view: DetectorView) -> DetectorController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -51,7 +51,8 @@ class DetectorController(Observer):
 
         self._view.bitDepthSpinBox.blockSignals(True)
         self._view.bitDepthSpinBox.setRange(
-            self._presenter.getBitDepthLimits().lower, self._presenter.getBitDepthLimits().upper
+            self._presenter.getBitDepthLimits().lower,
+            self._presenter.getBitDepthLimits().upper,
         )
         self._view.bitDepthSpinBox.setValue(self._presenter.getBitDepth())
         self._view.bitDepthSpinBox.blockSignals(False)

@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowParametersPresenter(Observable, Observer):
+
     def __init__(
         self,
         settings: WorkflowSettings,
@@ -131,6 +132,7 @@ class WorkflowParametersPresenter(Observable, Observer):
 
 
 class WorkflowAuthorizationPresenter:
+
     def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         self._authorizer = authorizer
 
@@ -146,9 +148,9 @@ class WorkflowAuthorizationPresenter:
 
 
 class WorkflowStatusPresenter:
-    def __init__(
-        self, settings: WorkflowSettings, statusRepository: WorkflowStatusRepository
-    ) -> None:
+
+    def __init__(self, settings: WorkflowSettings,
+                 statusRepository: WorkflowStatusRepository) -> None:
         self._settings = settings
         self._statusRepository = statusRepository
 
@@ -163,10 +165,12 @@ class WorkflowStatusPresenter:
         self._settings.statusRefreshIntervalInSeconds.setValue(seconds)
 
     @overload
-    def __getitem__(self, index: int) -> WorkflowStatus: ...
+    def __getitem__(self, index: int) -> WorkflowStatus:
+        ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]: ...
+    def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]:
+        ...
 
     def __getitem__(self, index: int | slice) -> WorkflowStatus | Sequence[WorkflowStatus]:
         return self._statusRepository[index]
@@ -182,6 +186,7 @@ class WorkflowStatusPresenter:
 
 
 class WorkflowExecutionPresenter:
+
     def __init__(self, executor: WorkflowExecutor) -> None:
         self._executor = executor
 
@@ -190,6 +195,7 @@ class WorkflowExecutionPresenter:
 
 
 class WorkflowCore:
+
     def __init__(
         self,
         settingsRegistry: SettingsRegistry,
@@ -202,12 +208,10 @@ class WorkflowCore:
     ) -> None:
         self._settings = WorkflowSettings(settingsRegistry)
         self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, "Input")
-        self._computeDataLocator = SimpleDataLocator.createInstance(
-            self._settings.group, "Compute"
-        )
-        self._outputDataLocator = OutputDataLocator.createInstance(
-            self._settings.group, "Output", self._inputDataLocator
-        )
+        self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group,
+                                                                    "Compute")
+        self._outputDataLocator = OutputDataLocator.createInstance(self._settings.group, "Output",
+                                                                   self._inputDataLocator)
         self._authorizer = WorkflowAuthorizer()
         self._statusRepository = WorkflowStatusRepository()
         self._executor = WorkflowExecutor(
@@ -236,9 +240,9 @@ class WorkflowCore:
         except ModuleNotFoundError:
             logger.info("Globus not found.")
         else:
-            self._thread = GlobusWorkflowThread.createInstance(
-                self._authorizer, self._statusRepository, self._executor
-            )
+            self._thread = GlobusWorkflowThread.createInstance(self._authorizer,
+                                                               self._statusRepository,
+                                                               self._executor)
 
         self.parametersPresenter = WorkflowParametersPresenter.createInstance(
             self._settings,

@@ -4,6 +4,7 @@ from ptychodus.api.settings import SettingsRegistry
 
 
 class ReconstructorSettings(Observable, Observer):
+
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup("Reconstructor")

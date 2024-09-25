@@ -10,28 +10,23 @@ from .probeCorrection import TikeProbeCorrectionController
 
 
 class TikeParametersController:
+
     def __init__(self, model: TikeReconstructorLibrary, view: TikeParametersView) -> None:
         self._model = model
         self._view = view
         self._multigridController = TikeMultigridController.createInstance(
-            model.multigridPresenter, view.multigridView
-        )
-        self._positionCorrectionController = TikePositionCorrectionController.createInstance(
-            model.positionCorrectionPresenter, view.positionCorrectionView
-        )
+            model.multigridPresenter, view.multigridView)
+        self._positionCorrectionController = (TikePositionCorrectionController.createInstance(
+            model.positionCorrectionPresenter, view.positionCorrectionView))
         self._probeCorrectionController = TikeProbeCorrectionController.createInstance(
-            model.probeCorrectionPresenter, view.probeCorrectionView
-        )
-        self._objectCorrectionController = TikeObjectCorrectionController.createInstance(
-            model.objectCorrectionPresenter, view.objectCorrectionView
-        )
+            model.probeCorrectionPresenter, view.probeCorrectionView)
+        self._objectCorrectionController = (TikeObjectCorrectionController.createInstance(
+            model.objectCorrectionPresenter, view.objectCorrectionView))
         self._basicParametersController = TikeBasicParametersController.createInstance(
-            model.presenter, view.basicParametersView
-        )
+            model.presenter, view.basicParametersView)
 
     @classmethod
-    def createInstance(
-        cls, model: TikeReconstructorLibrary, view: TikeParametersView
-    ) -> TikeParametersController:
+    def createInstance(cls, model: TikeReconstructorLibrary,
+                       view: TikeParametersView) -> TikeParametersController:
         controller = cls(model, view)
         return controller

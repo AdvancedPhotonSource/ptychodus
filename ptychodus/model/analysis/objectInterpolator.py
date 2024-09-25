@@ -4,6 +4,7 @@ from ptychodus.api.scan import ScanPoint
 
 
 class ObjectLinearInterpolator(ObjectInterpolator):
+
     def __init__(self, object_: Object) -> None:
         self._object = object_
 
@@ -14,7 +15,8 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         patchRadiusXInMeters = geometry.pixelWidthInMeters * patchWidth / 2
         patchMinimumXInMeters = patchCenter.positionXInMeters - patchRadiusXInMeters
         ixBeginF, xi = divmod(
-            patchMinimumXInMeters - geometry.minimumXInMeters, geometry.pixelWidthInMeters
+            patchMinimumXInMeters - geometry.minimumXInMeters,
+            geometry.pixelWidthInMeters,
         )
         ixBegin = int(ixBeginF)
         ixEnd = ixBegin + patchWidth
@@ -25,7 +27,8 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         patchRadiusYInMeters = geometry.pixelHeightInMeters * patchHeight / 2
         patchMinimumYInMeters = patchCenter.positionYInMeters - patchRadiusYInMeters
         iyBeginF, eta = divmod(
-            patchMinimumYInMeters - geometry.minimumYInMeters, geometry.pixelHeightInMeters
+            patchMinimumYInMeters - geometry.minimumYInMeters,
+            geometry.pixelHeightInMeters,
         )
         iyBegin = int(iyBeginF)
         iyEnd = iyBegin + patchHeight

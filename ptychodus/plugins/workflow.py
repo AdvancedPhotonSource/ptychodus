@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
+
     @property
     def isWatchRecursive(self) -> bool:
         return True
@@ -23,6 +24,7 @@ class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):
+
     @property
     def isWatchRecursive(self) -> bool:
         return False
@@ -34,7 +36,7 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
         scanName = filePath.stem
         scanID = int(re.findall(r"\d+", scanName)[-1])
 
-        diffractionFilePath = filePath.parents[1] / "raw_data" / f"scan{scanID}_master.h5"
+        diffractionFilePath = (filePath.parents[1] / "raw_data" / f"scan{scanID}_master.h5")
         workflowAPI.openPatterns(diffractionFilePath, fileType="NeXus")
         productAPI = workflowAPI.createProduct(f"scan{scanID}")
         productAPI.openScan(filePath, fileType="CSV")
@@ -44,6 +46,7 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
 
 
 class APS26IDFileBasedWorkflow(FileBasedWorkflow):
+
     @property
     def isWatchRecursive(self) -> bool:
         return False
@@ -93,6 +96,7 @@ class APS31IDEMetadata:
 
 
 class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
+
     @property
     def isWatchRecursive(self) -> bool:
         return True
@@ -149,9 +153,8 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             inputProductAPI.buildObject()
             # TODO would prefer to write instructions and submit to queue
             outputProductAPI = inputProductAPI.reconstructLocal(f"{productName}_out")
-            outputProductAPI.saveProduct(
-                experimentDir / "ptychodus" / f"{productName}.h5", fileType="HDF5"
-            )
+            outputProductAPI.saveProduct(experimentDir / "ptychodus" / f"{productName}.h5",
+                                         fileType="HDF5")
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

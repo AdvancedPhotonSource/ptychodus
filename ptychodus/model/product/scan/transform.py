@@ -10,30 +10,25 @@ from .settings import ScanSettings
 
 
 class ScanPointTransform(ParameterGroup):
+
     def __init__(self, rng: numpy.random.Generator, settings: ScanSettings) -> None:
         super().__init__()
         self._rng = rng
         self._settings = settings
 
-        self.affineAX = RealParameter(
-            self, "affine_ax", float(settings.affineTransformAX.getValue())
-        )
-        self.affineAY = RealParameter(
-            self, "affine_ay", float(settings.affineTransformAY.getValue())
-        )
-        self.affineATInMeters = RealParameter(
-            self, "affine_at_m", float(settings.affineTransformATInMeters.getValue())
-        )
+        self.affineAX = RealParameter(self, "affine_ax",
+                                      float(settings.affineTransformAX.getValue()))
+        self.affineAY = RealParameter(self, "affine_ay",
+                                      float(settings.affineTransformAY.getValue()))
+        self.affineATInMeters = RealParameter(self, "affine_at_m",
+                                              float(settings.affineTransformATInMeters.getValue()))
 
-        self.affineBX = RealParameter(
-            self, "affine_bx", float(settings.affineTransformBX.getValue())
-        )
-        self.affineBY = RealParameter(
-            self, "affine_by", float(settings.affineTransformBY.getValue())
-        )
-        self.affineBTInMeters = RealParameter(
-            self, "affine_bt_m", float(settings.affineTransformBTInMeters.getValue())
-        )
+        self.affineBX = RealParameter(self, "affine_bx",
+                                      float(settings.affineTransformBX.getValue()))
+        self.affineBY = RealParameter(self, "affine_by",
+                                      float(settings.affineTransformBY.getValue()))
+        self.affineBTInMeters = RealParameter(self, "affine_bt_m",
+                                              float(settings.affineTransformBTInMeters.getValue()))
 
         self.jitterRadiusInMeters = RealParameter(
             self,

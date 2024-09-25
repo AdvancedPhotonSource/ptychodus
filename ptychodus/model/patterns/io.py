@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class DiffractionDatasetInputOutputPresenter(Observable, Observer):
+
     def __init__(
         self,
         settings: PatternSettings,
@@ -36,9 +37,9 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
 
     def openDiffractionFile(self, filePath: Path, fileFilter: str) -> None:
         try:
-            fileType = self._patternsAPI.openPatterns(
-                filePath=filePath, fileType=fileFilter, assemble=False
-            )
+            fileType = self._patternsAPI.openPatterns(filePath=filePath,
+                                                      fileType=fileFilter,
+                                                      assemble=False)
         except Exception:
             logger.exception("Failed to load diffraction dataset.")
             return

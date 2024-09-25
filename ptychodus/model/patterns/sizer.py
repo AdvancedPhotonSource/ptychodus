@@ -9,6 +9,7 @@ from .settings import PatternSettings
 
 
 class PatternSizer(Observable, Observer):
+
     def __init__(self, settings: PatternSettings, detector: Detector) -> None:
         super().__init__()
         self._settings = settings
@@ -35,22 +36,16 @@ class PatternSizer(Observable, Observer):
 
     def getWidthInPixels(self) -> int:
         limitsInPixels = self.getWidthLimitsInPixels()
-        return (
-            limitsInPixels.clamp(self._settings.cropWidthInPixels.getValue())
-            if self.isCropEnabled()
-            else limitsInPixels.upper
-        )
+        return (limitsInPixels.clamp(self._settings.cropWidthInPixels.getValue())
+                if self.isCropEnabled() else limitsInPixels.upper)
 
     def getCenterXLimitsInPixels(self) -> Interval[int]:
         return Interval[int](0, self._detector.getImageExtent().widthInPixels)
 
     def getCenterXInPixels(self) -> int:
         limitsInPixels = self.getCenterXLimitsInPixels()
-        return (
-            limitsInPixels.clamp(self._settings.cropCenterXInPixels.getValue())
-            if self.isCropEnabled()
-            else limitsInPixels.midrange
-        )
+        return (limitsInPixels.clamp(self._settings.cropCenterXInPixels.getValue())
+                if self.isCropEnabled() else limitsInPixels.midrange)
 
     def _getSafeCenterXInPixels(self) -> int:
         lower = self.getWidthInPixels() // 2
@@ -69,22 +64,16 @@ class PatternSizer(Observable, Observer):
 
     def getHeightInPixels(self) -> int:
         limitsInPixels = self.getHeightLimitsInPixels()
-        return (
-            limitsInPixels.clamp(self._settings.cropHeightInPixels.getValue())
-            if self.isCropEnabled()
-            else limitsInPixels.upper
-        )
+        return (limitsInPixels.clamp(self._settings.cropHeightInPixels.getValue())
+                if self.isCropEnabled() else limitsInPixels.upper)
 
     def getCenterYLimitsInPixels(self) -> Interval[int]:
         return Interval[int](0, self._detector.getImageExtent().heightInPixels)
 
     def getCenterYInPixels(self) -> int:
         limitsInPixels = self.getCenterYLimitsInPixels()
-        return (
-            limitsInPixels.clamp(self._settings.cropCenterYInPixels.getValue())
-            if self.isCropEnabled()
-            else limitsInPixels.midrange
-        )
+        return (limitsInPixels.clamp(self._settings.cropCenterYInPixels.getValue())
+                if self.isCropEnabled() else limitsInPixels.midrange)
 
     def _getSafeCenterYInPixels(self) -> int:
         lower = self.getHeightInPixels() // 2

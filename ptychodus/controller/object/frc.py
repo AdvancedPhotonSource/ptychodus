@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class FourierRingCorrelationViewController:
+
     def __init__(self, correlator: FourierRingCorrelator, treeModel: ObjectTreeModel) -> None:
         super().__init__()
         self._correlator = correlator

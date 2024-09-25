@@ -15,8 +15,11 @@ from .settings import ProbeSettings
 
 
 class FresnelZonePlateProbeBuilder(ProbeBuilder):
+
     def __init__(
-        self, settings: ProbeSettings, fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]
+        self,
+        settings: ProbeSettings,
+        fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
     ) -> None:
         super().__init__("fresnel_zone_plate")
         self._settings = settings
@@ -51,8 +54,7 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         builder.zonePlateDiameterInMeters.setValue(self.zonePlateDiameterInMeters.getValue())
         builder.outermostZoneWidthInMeters.setValue(self.outermostZoneWidthInMeters.getValue())
         builder.centralBeamstopDiameterInMeters.setValue(
-            self.centralBeamstopDiameterInMeters.getValue()
-        )
+            self.centralBeamstopDiameterInMeters.getValue())
         builder.defocusDistanceInMeters.setValue(self.defocusDistanceInMeters.getValue())
         return builder
 
@@ -92,9 +94,8 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         RR_FZP = numpy.hypot(XX_FZP, YY_FZP)
 
         # transmission function of FZP
-        T = numpy.exp(
-            -2j * numpy.pi / wavelengthInMeters * (XX_FZP**2 + YY_FZP**2) / 2 / focalLengthInMeters
-        )
+        T = numpy.exp(-2j * numpy.pi / wavelengthInMeters * (XX_FZP**2 + YY_FZP**2) / 2 /
+                      focalLengthInMeters)
         C = RR_FZP <= zonePlate.zonePlateDiameterInMeters / 2
         H = RR_FZP >= zonePlate.centralBeamstopDiameterInMeters / 2
         fzpTransmissionFunction = T * C * H

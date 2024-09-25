@@ -11,17 +11,20 @@ from .settings import ObjectSettings
 
 
 class RandomObjectBuilder(ObjectBuilder):
+
     def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings) -> None:
         super().__init__("random")
         self._rng = rng
         self._settings = settings
 
-        self.extraPaddingX = IntegerParameter(
-            self, "extra_padding_x", settings.extraPaddingX.getValue(), minimum=0
-        )
-        self.extraPaddingY = IntegerParameter(
-            self, "extra_padding_y", settings.extraPaddingY.getValue(), minimum=0
-        )
+        self.extraPaddingX = IntegerParameter(self,
+                                              "extra_padding_x",
+                                              settings.extraPaddingX.getValue(),
+                                              minimum=0)
+        self.extraPaddingY = IntegerParameter(self,
+                                              "extra_padding_y",
+                                              settings.extraPaddingY.getValue(),
+                                              minimum=0)
 
         self.amplitudeMean = RealParameter(
             self,
@@ -55,7 +58,9 @@ class RandomObjectBuilder(ObjectBuilder):
         return builder
 
     def build(
-        self, geometryProvider: ObjectGeometryProvider, layerDistanceInMeters: Sequence[float]
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        layerDistanceInMeters: Sequence[float],
     ) -> Object:
         geometry = geometryProvider.getObjectGeometry()
         heightInPixels = geometry.heightInPixels + 2 * self.extraPaddingY.getValue()

@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScanBuilderFactory(Iterable[str]):
+
     def __init__(
         self,
         settings: ScanSettings,
@@ -26,16 +27,15 @@ class ScanBuilderFactory(Iterable[str]):
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: dict[str, Callable[[], ScanBuilder]] = {
-            variant.name.lower(): lambda variant=variant: CartesianScanBuilder(variant, settings)  # type: ignore
+            variant.name.lower():
+            lambda variant=variant: CartesianScanBuilder(variant, settings)  # type: ignore
             for variant in CartesianScanVariant
         }
-        self._builders.update(
-            {
-                "concentric": lambda: ConcentricScanBuilder(settings),
-                "spiral": lambda: SpiralScanBuilder(settings),
-                "lissajous": lambda: LissajousScanBuilder(settings),
-            }
-        )
+        self._builders.update({
+            "concentric": lambda: ConcentricScanBuilder(settings),
+            "spiral": lambda: SpiralScanBuilder(settings),
+            "lissajous": lambda: LissajousScanBuilder(settings),
+        })
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._builders)

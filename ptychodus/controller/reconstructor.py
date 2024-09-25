@@ -8,7 +8,11 @@ from PyQt5.QtWidgets import QLabel, QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
-from ..model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
+from ..model.product import (
+    ProductRepository,
+    ProductRepositoryItem,
+    ProductRepositoryObserver,
+)
 from ..model.product.metadata import MetadataRepositoryItem
 from ..model.product.object import ObjectRepositoryItem
 from ..model.product.probe import ProbeRepositoryItem
@@ -22,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructorViewControllerFactory(ABC):
+
     @property
     @abstractmethod
     def backendName(self) -> str:
@@ -33,6 +38,7 @@ class ReconstructorViewControllerFactory(ABC):
 
 
 class ReconstructorController(ProductRepositoryObserver, Observer):
+
     def __init__(
         self,
         presenter: ReconstructorPresenter,
@@ -49,7 +55,8 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._plotView = plotView
         self._fileDialogFactory = fileDialogFactory
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = {
-            vcf.backendName: vcf for vcf in viewControllerFactoryList
+            vcf.backendName: vcf
+            for vcf in viewControllerFactoryList
         }
 
     @classmethod
@@ -79,8 +86,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         view.reconstructorView.algorithmComboBox.textActivated.connect(presenter.setReconstructor)
         view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
-            view.stackedWidget.setCurrentIndex
-        )
+            view.stackedWidget.setCurrentIndex)
 
         view.reconstructorView.productComboBox.textActivated.connect(controller._redrawPlot)
         view.reconstructorView.productComboBox.setModel(productTableModel)
@@ -91,28 +97,23 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         saveModelAction.triggered.connect(controller._saveModel)
 
         openTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            "Open Training Data..."
-        )
+            "Open Training Data...")
         openTrainingDataAction.triggered.connect(controller._openTrainingData)
         saveTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            "Save Training Data..."
-        )
+            "Save Training Data...")
         saveTrainingDataAction.triggered.connect(controller._saveTrainingData)
         ingestTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            "Ingest Training Data"
-        )
+            "Ingest Training Data")
         ingestTrainingDataAction.triggered.connect(controller._ingestTrainingData)
         clearTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            "Clear Training Data"
-        )
+            "Clear Training Data")
         clearTrainingDataAction.triggered.connect(controller._clearTrainingData)
         view.reconstructorView.trainerMenu.addSeparator()
         trainAction = view.reconstructorView.trainerMenu.addAction("Train")
         trainAction.triggered.connect(controller._train)
 
         reconstructSplitAction = view.reconstructorView.reconstructorMenu.addAction(
-            "Reconstruct Odd/Even Split"
-        )
+            "Reconstruct Odd/Even Split")
         reconstructSplitAction.triggered.connect(controller._reconstructSplit)
         reconstructAction = view.reconstructorView.reconstructorMenu.addAction("Reconstruct")
         reconstructAction.triggered.connect(controller._reconstruct)
@@ -124,8 +125,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
     def _addReconstructor(self, name: str) -> None:
         backendName, reconstructorName = name.split("/")  # TODO REDO
         self._view.reconstructorView.algorithmComboBox.addItem(
-            name, self._view.reconstructorView.algorithmComboBox.count()
-        )
+            name, self._view.reconstructorView.algorithmComboBox.count())
 
         if backendName in self._viewControllerFactoryDict:
             viewControllerFactory = self._viewControllerFactoryDict[backendName]
@@ -271,8 +271,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
     def _syncAlgorithmToView(self) -> None:
         self._view.reconstructorView.algorithmComboBox.setCurrentText(
-            self._presenter.getReconstructor()
-        )
+            self._presenter.getReconstructor())
 
         isTrainable = self._presenter.isTrainable
         self._view.reconstructorView.modelButton.setVisible(isTrainable)

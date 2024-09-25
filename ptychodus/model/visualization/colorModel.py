@@ -13,42 +13,50 @@ __all__ = [
 
 
 class CylindricalColorModel(ABC):
+
     @abstractmethod
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         pass
 
 
 class HSVSaturationColorModel(CylindricalColorModel):
+
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, x, 1.0), 1.0
 
 
 class HSVValueColorModel(CylindricalColorModel):
+
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, x), 1.0
 
 
 class HSVAlphaColorModel(CylindricalColorModel):
+
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, 1.0), x
 
 
 class HLSLightnessColorModel(CylindricalColorModel):
+
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, x, 1.0), 1.0
 
 
 class HLSSaturationColorModel(CylindricalColorModel):
+
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, x), 1.0
 
 
 class HLSAlphaColorModel(CylindricalColorModel):
+
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, 1.0), x
 
 
 class CylindricalColorModelParameter(Parameter[str], Observer):
+
     def __init__(self, parent: ParameterGroup) -> None:
         super().__init__()
         self._chooser = PluginChooser[CylindricalColorModel]()

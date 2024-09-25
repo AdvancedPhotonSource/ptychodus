@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScanAPI:
+
     def __init__(
         self,
         settings: ScanSettings,
@@ -35,9 +36,10 @@ class ScanAPI:
     def builderNames(self) -> Iterator[str]:
         return iter(self._builderFactory)
 
-    def buildScan(
-        self, index: int, builderName: str, builderParameters: Mapping[str, Any] = {}
-    ) -> None:
+    def buildScan(self,
+                  index: int,
+                  builderName: str,
+                  builderParameters: Mapping[str, Any] = {}) -> None:
         try:
             item = self._repository[index]
         except IndexError:
@@ -54,10 +56,8 @@ class ScanAPI:
             try:
                 parameter = builder[parameterName]
             except KeyError:
-                logger.warning(
-                    f'Scan builder "{builder.getName()}" does not have'
-                    f' parameter "{parameterName}"!'
-                )
+                logger.warning(f'Scan builder "{builder.getName()}" does not have'
+                               f' parameter "{parameterName}"!')
             else:
                 parameter.setValue(parameterValue)
 
@@ -86,7 +86,8 @@ class ScanAPI:
 
     def openScan(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         builder = self._builderFactory.createScanFromFile(
-            filePath, self._settings.fileType.getValue() if fileType is None else fileType
+            filePath,
+            self._settings.fileType.getValue() if fileType is None else fileType,
         )
 
         try:
@@ -129,6 +130,7 @@ class ScanAPI:
 
 
 class ProbeAPI:
+
     def __init__(
         self,
         settings: ProbeSettings,
@@ -142,9 +144,10 @@ class ProbeAPI:
     def builderNames(self) -> Iterator[str]:
         return iter(self._builderFactory)
 
-    def buildProbe(
-        self, index: int, builderName: str, builderParameters: Mapping[str, Any] = {}
-    ) -> None:
+    def buildProbe(self,
+                   index: int,
+                   builderName: str,
+                   builderParameters: Mapping[str, Any] = {}) -> None:
         try:
             item = self._repository[index]
         except IndexError:
@@ -161,10 +164,8 @@ class ProbeAPI:
             try:
                 parameter = builder[parameterName]
             except KeyError:
-                logger.warning(
-                    f'Probe builder "{builder.getName()}" does not have'
-                    f' parameter "{parameterName}"!'
-                )
+                logger.warning(f'Probe builder "{builder.getName()}" does not have'
+                               f' parameter "{parameterName}"!')
             else:
                 parameter.setValue(parameterValue)
 
@@ -193,7 +194,8 @@ class ProbeAPI:
 
     def openProbe(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         builder = self._builderFactory.createProbeFromFile(
-            filePath, self._settings.fileType.getValue() if fileType is None else fileType
+            filePath,
+            self._settings.fileType.getValue() if fileType is None else fileType,
         )
 
         try:
@@ -236,6 +238,7 @@ class ProbeAPI:
 
 
 class ObjectAPI:
+
     def __init__(
         self,
         settings: ObjectSettings,
@@ -249,9 +252,10 @@ class ObjectAPI:
     def builderNames(self) -> Iterator[str]:
         return iter(self._builderFactory)
 
-    def buildObject(
-        self, index: int, builderName: str, builderParameters: Mapping[str, Any] = {}
-    ) -> None:
+    def buildObject(self,
+                    index: int,
+                    builderName: str,
+                    builderParameters: Mapping[str, Any] = {}) -> None:
         try:
             item = self._repository[index]
         except IndexError:
@@ -268,10 +272,8 @@ class ObjectAPI:
             try:
                 parameter = builder[parameterName]
             except KeyError:
-                logger.warning(
-                    f'Object builder "{builder.getName()}" does not have'
-                    f' parameter "{parameterName}"!'
-                )
+                logger.warning(f'Object builder "{builder.getName()}" does not have'
+                               f' parameter "{parameterName}"!')
             else:
                 parameter.setValue(parameterValue)
 
@@ -300,7 +302,8 @@ class ObjectAPI:
 
     def openObject(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         builder = self._builderFactory.createObjectFromFile(
-            filePath, self._settings.fileType.getValue() if fileType is None else fileType
+            filePath,
+            self._settings.fileType.getValue() if fileType is None else fileType,
         )
 
         try:
@@ -343,6 +346,7 @@ class ObjectAPI:
 
 
 class ProductAPI:
+
     def __init__(
         self,
         settings: ProductSettings,
@@ -389,8 +393,7 @@ class ProductAPI:
     def openProduct(self, filePath: Path, *, fileType: str | None = None) -> int:
         if filePath.is_file():
             self._fileReaderChooser.setCurrentPluginByName(
-                self._settings.fileType.getValue() if fileType is None else fileType
-            )
+                self._settings.fileType.getValue() if fileType is None else fileType)
             fileType = self._fileReaderChooser.currentPlugin.simpleName
             logger.debug(f'Reading "{filePath}" as "{fileType}"')
             fileReader = self._fileReaderChooser.currentPlugin.strategy
@@ -420,8 +423,7 @@ class ProductAPI:
             return
 
         self._fileWriterChooser.setCurrentPluginByName(
-            self._settings.fileType.getValue() if fileType is None else fileType
-        )
+            self._settings.fileType.getValue() if fileType is None else fileType)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
         logger.debug(f'Writing "{filePath}" as "{fileType}"')
         writer = self._fileWriterChooser.currentPlugin.strategy

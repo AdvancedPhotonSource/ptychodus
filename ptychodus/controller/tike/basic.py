@@ -10,22 +10,21 @@ from ...view.tike import TikeBasicParametersView
 
 
 class TikeBasicParametersController(Observer):
+
     def __init__(self, presenter: TikePresenter, view: TikeBasicParametersView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(
-        cls, presenter: TikePresenter, view: TikeBasicParametersView
-    ) -> TikeBasicParametersController:
+    def createInstance(cls, presenter: TikePresenter,
+                       view: TikeBasicParametersView) -> TikeBasicParametersController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
         view.numGpusLineEdit.editingFinished.connect(controller._syncNumGpusToModel)
         view.numGpusLineEdit.setValidator(
-            QRegularExpressionValidator(QRegularExpression("[\\d,]+"))
-        )
+            QRegularExpressionValidator(QRegularExpression("[\\d,]+")))
 
         for model in presenter.getNoiseModelList():
             view.noiseModelComboBox.addItem(model)
@@ -63,7 +62,8 @@ class TikeBasicParametersController(Observer):
 
         self._view.numBatchSpinBox.blockSignals(True)
         self._view.numBatchSpinBox.setRange(
-            self._presenter.getNumBatchLimits().lower, self._presenter.getNumBatchLimits().upper
+            self._presenter.getNumBatchLimits().lower,
+            self._presenter.getNumBatchLimits().upper,
         )
         self._view.numBatchSpinBox.setValue(self._presenter.getNumBatch())
         self._view.numBatchSpinBox.blockSignals(False)
@@ -72,7 +72,8 @@ class TikeBasicParametersController(Observer):
 
         self._view.numIterSpinBox.blockSignals(True)
         self._view.numIterSpinBox.setRange(
-            self._presenter.getNumIterLimits().lower, self._presenter.getNumIterLimits().upper
+            self._presenter.getNumIterLimits().lower,
+            self._presenter.getNumIterLimits().upper,
         )
         self._view.numIterSpinBox.setValue(self._presenter.getNumIter())
         self._view.numIterSpinBox.blockSignals(False)

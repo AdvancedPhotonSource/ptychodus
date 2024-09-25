@@ -23,6 +23,7 @@ from .widgets import DecimalLineEdit, LengthWidget
 
 
 class ProbePropagationParametersView(QGroupBox):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Parameters", parent)
         self.beginCoordinateWidget = LengthWidget.createInstance(isSigned=True)
@@ -46,6 +47,7 @@ class ProbePropagationParametersView(QGroupBox):
 
 
 class ProbePropagationDialog(QDialog):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.xyView = VisualizationWidget.createInstance("XY Plane")
@@ -84,6 +86,7 @@ class ProbePropagationDialog(QDialog):
 
 
 class STXMDialog(QDialog):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.visualizationWidget = VisualizationWidget.createInstance("Transmission")
@@ -107,6 +110,7 @@ class STXMDialog(QDialog):
 
 
 class ExposureParametersView(QGroupBox):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Parameters", parent)
         self.quantitativeProbeCheckBox = QCheckBox("Quantitative Probe")
@@ -125,6 +129,7 @@ class ExposureParametersView(QGroupBox):
 
 
 class ExposureQuantityView(QGroupBox):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Quantity", parent)
         self.photonCountButton = QRadioButton("Photon Count")
@@ -145,6 +150,7 @@ class ExposureQuantityView(QGroupBox):
 
 
 class ExposureDialog(QDialog):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.visualizationWidget = VisualizationWidget.createInstance("Visualization")
@@ -172,6 +178,7 @@ class ExposureDialog(QDialog):
 
 
 class FluorescenceParametersView(QGroupBox):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Parameters", parent)
         self.openButton = QPushButton("Open")
@@ -192,6 +199,7 @@ class FluorescenceParametersView(QGroupBox):
 
 
 class FluorescenceDialog(QDialog):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.measuredWidget = VisualizationWidget.createInstance("Measured")

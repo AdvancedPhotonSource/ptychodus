@@ -5,7 +5,11 @@ import logging
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
+from ptychodus.api.visualization import (
+    NumberArrayType,
+    RealArrayType,
+    VisualizationProduct,
+)
 
 from .colorAxis import ColorAxis
 from .colorModelRenderer import CylindricalColorModelRenderer
@@ -26,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class VisualizationEngine(Observable, Observer):
+
     def __init__(self, *, isComplex: bool) -> None:
         super().__init__()
         self._rendererChooser = PluginChooser[Renderer]()
@@ -35,7 +40,10 @@ class VisualizationEngine(Observable, Observer):
 
         self._rendererChooser.registerPlugin(
             ColormapRenderer(
-                RealArrayComponent(), self._transformation, self._colorAxis, acyclicColormap
+                RealArrayComponent(),
+                self._transformation,
+                self._colorAxis,
+                acyclicColormap,
             ),
             displayName="Real",
         )
@@ -56,13 +64,19 @@ class VisualizationEngine(Observable, Observer):
             )
             self._rendererChooser.registerPlugin(
                 ColormapRenderer(
-                    amplitudeComponent, self._transformation, self._colorAxis, acyclicColormap
+                    amplitudeComponent,
+                    self._transformation,
+                    self._colorAxis,
+                    acyclicColormap,
                 ),
                 displayName="Amplitude",
             )
             self._rendererChooser.registerPlugin(
                 ColormapRenderer(
-                    phaseComponent, self._transformation, self._colorAxis, cyclicColormap
+                    phaseComponent,
+                    self._transformation,
+                    self._colorAxis,
+                    cyclicColormap,
                 ),
                 displayName="Phase",
             )
@@ -77,7 +91,10 @@ class VisualizationEngine(Observable, Observer):
             )
             self._rendererChooser.registerPlugin(
                 CylindricalColorModelRenderer(
-                    amplitudeComponent, phaseComponent, self._transformation, self._colorAxis
+                    amplitudeComponent,
+                    phaseComponent,
+                    self._transformation,
+                    self._colorAxis,
                 ),
                 displayName="Complex",
             )
@@ -137,11 +154,15 @@ class VisualizationEngine(Observable, Observer):
         return self._rendererPlugin.strategy.colorize(array)
 
     def render(
-        self, array: NumberArrayType, pixelGeometry: PixelGeometry, *, autoscaleColorAxis: bool
+        self,
+        array: NumberArrayType,
+        pixelGeometry: PixelGeometry,
+        *,
+        autoscaleColorAxis: bool,
     ) -> VisualizationProduct:
-        return self._rendererPlugin.strategy.render(
-            array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
-        )
+        return self._rendererPlugin.strategy.render(array,
+                                                    pixelGeometry,
+                                                    autoscaleColorAxis=autoscaleColorAxis)
 
     def update(self, observable: Observable) -> None:
         if observable is self._rendererChooser:

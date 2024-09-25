@@ -8,20 +8,18 @@ from .adaptiveMoment import TikeAdaptiveMomentController
 
 
 class TikeObjectCorrectionController(Observer):
-    def __init__(
-        self, presenter: TikeObjectCorrectionPresenter, view: TikeObjectCorrectionView
-    ) -> None:
+
+    def __init__(self, presenter: TikeObjectCorrectionPresenter,
+                 view: TikeObjectCorrectionView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._adaptiveMomentController = TikeAdaptiveMomentController.createInstance(
-            presenter, view.adaptiveMomentView
-        )
+            presenter, view.adaptiveMomentView)
 
     @classmethod
-    def createInstance(
-        cls, presenter: TikeObjectCorrectionPresenter, view: TikeObjectCorrectionView
-    ) -> TikeObjectCorrectionController:
+    def createInstance(cls, presenter: TikeObjectCorrectionPresenter,
+                       view: TikeObjectCorrectionView) -> TikeObjectCorrectionController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -49,8 +47,7 @@ class TikeObjectCorrectionController(Observer):
             blockValueChangedSignal=True,
         )
         self._view.useMagnitudeClippingCheckBox.setChecked(
-            self._presenter.isMagnitudeClippingEnabled()
-        )
+            self._presenter.isMagnitudeClippingEnabled())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

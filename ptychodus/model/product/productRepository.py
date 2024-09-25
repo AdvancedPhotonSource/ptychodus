@@ -7,7 +7,11 @@ import sys
 from ptychodus.api.product import Product
 
 from ..patterns import ActiveDiffractionDataset, PatternSizer, ProductSettings
-from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
+from .item import (
+    ProductRepositoryItem,
+    ProductRepositoryItemObserver,
+    ProductRepositoryObserver,
+)
 from .metadataFactory import MetadataRepositoryItemFactory
 from .object import ObjectRepositoryItemFactory
 from .probe import ProbeRepositoryItemFactory
@@ -19,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemObserver):
+
     def __init__(
         self,
         settings: ProductSettings,
@@ -42,14 +47,15 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         ]
 
     @overload
-    def __getitem__(self, index: int) -> ProductRepositoryItem: ...
+    def __getitem__(self, index: int) -> ProductRepositoryItem:
+        ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ProductRepositoryItem]: ...
+    def __getitem__(self, index: slice) -> Sequence[ProductRepositoryItem]:
+        ...
 
-    def __getitem__(
-        self, index: int | slice
-    ) -> ProductRepositoryItem | Sequence[ProductRepositoryItem]:
+    def __getitem__(self,
+                    index: int | slice) -> ProductRepositoryItem | Sequence[ProductRepositoryItem]:
         return self._itemList[index]
 
     def __len__(self) -> int:

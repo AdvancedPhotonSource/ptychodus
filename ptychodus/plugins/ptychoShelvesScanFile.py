@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoShelvesScanFileReader(ScanFileReader):
+
     def read(self, filePath: Path) -> Scan:
         pointList: list[ScanPoint] = list()
 

@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
 
 
 class RepositoryButtonBox(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.loadButton = QPushButton("Load")
@@ -46,6 +47,7 @@ class RepositoryButtonBox(QWidget):
 
 
 class RepositoryItemCopierDialog(QDialog):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.sourceComboBox = QComboBox()
@@ -76,6 +78,7 @@ class RepositoryItemCopierDialog(QDialog):
 
 
 class RepositoryTableView(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.tableView = QTableView()
@@ -95,6 +98,7 @@ class RepositoryTableView(QWidget):
 
 
 class RepositoryTreeView(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.treeView = QTreeView()

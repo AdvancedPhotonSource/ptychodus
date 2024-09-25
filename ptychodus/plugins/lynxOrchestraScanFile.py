@@ -60,8 +60,7 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
                 raise ScanPointParseError(
                     "Bad LYNX Orchestra header!\n"
                     f"Expected: {LYNXOrchestraScanFileReader.EXPECTED_HEADER}\n"
-                    f"Found:    {columnHeaderRow}\n"
-                )
+                    f"Found:    {columnHeaderRow}\n")
 
             for row in csvIterator:
                 if row[0].startswith("#"):

@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class APS2IDDiffractionFileReader(DiffractionFileReader):
+
     def _getFileSeries(self, filePath: Path) -> tuple[Mapping[int, Path], str]:
         filePathDict: dict[int, Path] = dict()
 
@@ -58,7 +59,7 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
                 except KeyError:
                     logger.warning(f"File {filePath} is not an APS 2-ID data file.")
                 else:
-                    numberOfPatternsPerArray, detectorHeight, detectorWidth = h5data.shape
+                    numberOfPatternsPerArray, detectorHeight, detectorWidth = (h5data.shape)
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=numberOfPatternsPerArray,
                         numberOfPatternsTotal=numberOfPatternsPerArray * len(arrayList),

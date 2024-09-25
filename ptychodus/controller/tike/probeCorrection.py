@@ -9,23 +9,20 @@ from .probeSupport import TikeProbeSupportController
 
 
 class TikeProbeCorrectionController(Observer):
-    def __init__(
-        self, presenter: TikeProbeCorrectionPresenter, view: TikeProbeCorrectionView
-    ) -> None:
+
+    def __init__(self, presenter: TikeProbeCorrectionPresenter,
+                 view: TikeProbeCorrectionView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._probeSupportController = TikeProbeSupportController.createInstance(
-            presenter, view.probeSupportView
-        )
+            presenter, view.probeSupportView)
         self._adaptiveMomentController = TikeAdaptiveMomentController.createInstance(
-            presenter, view.adaptiveMomentView
-        )
+            presenter, view.adaptiveMomentView)
 
     @classmethod
-    def createInstance(
-        cls, presenter: TikeProbeCorrectionPresenter, view: TikeProbeCorrectionView
-    ) -> TikeProbeCorrectionController:
+    def createInstance(cls, presenter: TikeProbeCorrectionPresenter,
+                       view: TikeProbeCorrectionView) -> TikeProbeCorrectionController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -35,11 +32,9 @@ class TikeProbeCorrectionController(Observer):
         view.forceSparsitySlider.valueChanged.connect(presenter.setForceSparsity)
         view.forceOrthogonalityCheckBox.toggled.connect(presenter.setForceOrthogonalityEnabled)
         view.forceCenteredIntensityCheckBox.toggled.connect(
-            presenter.setForceCenteredIntensityEnabled
-        )
+            presenter.setForceCenteredIntensityEnabled)
         view.additionalProbePenaltyLineEdit.valueChanged.connect(
-            presenter.setAdditionalProbePenalty
-        )
+            presenter.setAdditionalProbePenalty)
 
         controller._syncModelToView()
 
@@ -54,17 +49,13 @@ class TikeProbeCorrectionController(Observer):
             blockValueChangedSignal=True,
         )
         self._view.forceOrthogonalityCheckBox.setChecked(
-            self._presenter.isForceOrthogonalityEnabled()
-        )
+            self._presenter.isForceOrthogonalityEnabled())
         self._view.forceCenteredIntensityCheckBox.setChecked(
-            self._presenter.isForceCenteredIntensityEnabled()
-        )
+            self._presenter.isForceCenteredIntensityEnabled())
         self._view.additionalProbePenaltyLineEdit.setMinimum(
-            self._presenter.getAdditionalProbePenaltyMinimum()
-        )
+            self._presenter.getAdditionalProbePenaltyMinimum())
         self._view.additionalProbePenaltyLineEdit.setValue(
-            self._presenter.getAdditionalProbePenalty()
-        )
+            self._presenter.getAdditionalProbePenalty())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

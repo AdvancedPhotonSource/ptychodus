@@ -8,17 +8,16 @@ from ...view.tike import TikeAdaptiveMomentView
 
 
 class TikeAdaptiveMomentController(Observer):
-    def __init__(
-        self, presenter: TikeAdaptiveMomentPresenter[Any], view: TikeAdaptiveMomentView
-    ) -> None:
+
+    def __init__(self, presenter: TikeAdaptiveMomentPresenter[Any],
+                 view: TikeAdaptiveMomentView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(
-        cls, presenter: TikeAdaptiveMomentPresenter[Any], view: TikeAdaptiveMomentView
-    ) -> TikeAdaptiveMomentController:
+    def createInstance(cls, presenter: TikeAdaptiveMomentPresenter[Any],
+                       view: TikeAdaptiveMomentView) -> TikeAdaptiveMomentController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 

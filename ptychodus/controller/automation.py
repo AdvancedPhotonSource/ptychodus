@@ -13,11 +13,16 @@ from ..model.automation import (
     AutomationPresenter,
     AutomationProcessingPresenter,
 )
-from ..view.automation import AutomationView, AutomationProcessingView, AutomationWatchdogView
+from ..view.automation import (
+    AutomationView,
+    AutomationProcessingView,
+    AutomationWatchdogView,
+)
 from .data import FileDialogFactory
 
 
 class AutomationProcessingController(Observer):
+
     def __init__(
         self,
         presenter: AutomationPresenter,
@@ -56,9 +61,8 @@ class AutomationProcessingController(Observer):
         self._presenter.setDataDirectory(dataDirectory)
 
     def _browseDirectory(self) -> None:
-        dirPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, "Choose Data Directory"
-        )
+        dirPath = self._fileDialogFactory.getExistingDirectoryPath(self._view,
+                                                                   "Choose Data Directory")
 
         if dirPath:
             self._presenter.setDataDirectory(dirPath)
@@ -78,9 +82,8 @@ class AutomationProcessingController(Observer):
         intervalLimitsInSeconds = self._presenter.getProcessingIntervalLimitsInSeconds()
 
         self._view.intervalSpinBox.blockSignals(True)
-        self._view.intervalSpinBox.setRange(
-            intervalLimitsInSeconds.lower, intervalLimitsInSeconds.upper
-        )
+        self._view.intervalSpinBox.setRange(intervalLimitsInSeconds.lower,
+                                            intervalLimitsInSeconds.upper)
         self._view.intervalSpinBox.setValue(self._presenter.getProcessingIntervalInSeconds())
         self._view.intervalSpinBox.blockSignals(False)
 
@@ -90,22 +93,21 @@ class AutomationProcessingController(Observer):
 
 
 class AutomationWatchdogController(Observer):
+
     def __init__(self, presenter: AutomationPresenter, view: AutomationWatchdogView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(
-        cls, presenter: AutomationPresenter, view: AutomationWatchdogView
-    ) -> AutomationWatchdogController:
+    def createInstance(cls, presenter: AutomationPresenter,
+                       view: AutomationWatchdogView) -> AutomationWatchdogController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
         view.delaySpinBox.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
         view.usePollingObserverCheckBox.toggled.connect(
-            presenter.setWatchdogPollingObserverEnabled
-        )
+            presenter.setWatchdogPollingObserverEnabled)
 
         controller._syncModelToView()
 
@@ -120,8 +122,7 @@ class AutomationWatchdogController(Observer):
         self._view.delaySpinBox.blockSignals(False)
 
         self._view.usePollingObserverCheckBox.setChecked(
-            self._presenter.isWatchdogPollingObserverEnabled()
-        )
+            self._presenter.isWatchdogPollingObserverEnabled())
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
@@ -129,9 +130,10 @@ class AutomationWatchdogController(Observer):
 
 
 class AutomationProcessingListModel(QAbstractListModel):
-    def __init__(
-        self, presenter: AutomationProcessingPresenter, parent: QObject | None = None
-    ) -> None:
+
+    def __init__(self,
+                 presenter: AutomationProcessingPresenter,
+                 parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
 
@@ -155,6 +157,7 @@ class AutomationProcessingListModel(QAbstractListModel):
 
 
 class AutomationController(Observer):
+
     def __init__(
         self,
         core: AutomationCore,
@@ -167,11 +170,9 @@ class AutomationController(Observer):
         self._core = core
         self._presenter = presenter
         self._processingController = AutomationProcessingController.createInstance(
-            presenter, view.processingView, fileDialogFactory
-        )
+            presenter, view.processingView, fileDialogFactory)
         self._watchdogController = AutomationWatchdogController.createInstance(
-            presenter, view.watchdogView
-        )
+            presenter, view.watchdogView)
         self._processingPresenter = processingPresenter
         self._listModel = AutomationProcessingListModel(processingPresenter)
         self._view = view

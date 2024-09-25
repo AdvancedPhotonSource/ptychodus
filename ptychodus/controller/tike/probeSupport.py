@@ -7,17 +7,16 @@ from ...view.tike import TikeProbeSupportView
 
 
 class TikeProbeSupportController(Observer):
-    def __init__(
-        self, presenter: TikeProbeCorrectionPresenter, view: TikeProbeSupportView
-    ) -> None:
+
+    def __init__(self, presenter: TikeProbeCorrectionPresenter,
+                 view: TikeProbeSupportView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(
-        cls, presenter: TikeProbeCorrectionPresenter, view: TikeProbeSupportView
-    ) -> TikeProbeSupportController:
+    def createInstance(cls, presenter: TikeProbeCorrectionPresenter,
+                       view: TikeProbeSupportView) -> TikeProbeSupportController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 

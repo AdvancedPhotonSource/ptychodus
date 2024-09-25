@@ -47,8 +47,7 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
 
             contentsTree = SimpleTreeNode.createRoot(["Name", "Type", "Details"])
             contentsTree.createChild(
-                [filePath.stem, type(data).__name__, f"{data.dtype}{data.shape}"]
-            )
+                [filePath.stem, type(data).__name__, f"{data.dtype}{data.shape}"])
 
             array = SimpleDiffractionPatternArray(
                 label=filePath.stem,

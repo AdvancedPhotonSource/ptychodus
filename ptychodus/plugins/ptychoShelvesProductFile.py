@@ -3,7 +3,11 @@ from typing import Final, Sequence
 
 import scipy.io
 
-from ptychodus.api.constants import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
+from ptychodus.api.constants import (
+    ELECTRON_VOLT_J,
+    LIGHT_SPEED_M_PER_S,
+    PLANCK_CONSTANT_J_PER_HZ,
+)
 from ptychodus.api.object import Object, ObjectArrayType, ObjectFileWriter
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileWriter
@@ -105,6 +109,7 @@ class MATProductFileReader(ProductFileReader):
 
 
 class MATObjectFileWriter(ObjectFileWriter):
+
     def write(self, filePath: Path, object_: Object) -> None:
         array = object_.array
         matDict = {"object": array.transpose(1, 2, 0)}
@@ -113,6 +118,7 @@ class MATObjectFileWriter(ObjectFileWriter):
 
 
 class MATProbeFileWriter(ProbeFileWriter):
+
     def write(self, filePath: Path, probe: Probe) -> None:
         array = probe.array
         matDict = {"probe": array.transpose(1, 2, 0)}

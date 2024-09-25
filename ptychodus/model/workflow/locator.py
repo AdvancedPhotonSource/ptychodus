@@ -14,6 +14,7 @@ from ptychodus.api.parametric import (
 
 
 class DataLocator(ABC, Observable):
+
     @abstractmethod
     def setEndpointID(self, endpointID: UUID) -> None:
         pass
@@ -40,14 +41,19 @@ class DataLocator(ABC, Observable):
 
 
 class SimpleDataLocator(DataLocator, Observer):
+
     def __init__(self, group: ParameterGroup, entryPrefix: str) -> None:
         super().__init__()
         self._endpointID = UUIDParameter(group, f"{entryPrefix}DataEndpointID", UUID(int=0))
         self._globusPath = StringParameter(
-            group, f"{entryPrefix}DataGlobusPath", f"/~/path/to/{entryPrefix.lower()}/data"
+            group,
+            f"{entryPrefix}DataGlobusPath",
+            f"/~/path/to/{entryPrefix.lower()}/data",
         )
         self._posixPath = PathParameter(
-            group, f"{entryPrefix}DataPosixPath", Path(f"/path/to/{entryPrefix.lower()}/data")
+            group,
+            f"{entryPrefix}DataPosixPath",
+            Path(f"/path/to/{entryPrefix.lower()}/data"),
         )
 
     @classmethod
@@ -86,18 +92,17 @@ class SimpleDataLocator(DataLocator, Observer):
 
 
 class OutputDataLocator(DataLocator, Observer):
-    def __init__(
-        self, group: ParameterGroup, entryPrefix: str, inputDataLocator: DataLocator
-    ) -> None:
+
+    def __init__(self, group: ParameterGroup, entryPrefix: str,
+                 inputDataLocator: DataLocator) -> None:
         super().__init__()
         self._useRoundTrip = BooleanParameter(group, "UseRoundTrip", True)
         self._outputDataLocator = SimpleDataLocator.createInstance(group, entryPrefix)
         self._inputDataLocator = inputDataLocator
 
     @classmethod
-    def createInstance(
-        cls, group: ParameterGroup, entryPrefix: str, inputDataLocator: DataLocator
-    ) -> OutputDataLocator:
+    def createInstance(cls, group: ParameterGroup, entryPrefix: str,
+                       inputDataLocator: DataLocator) -> OutputDataLocator:
         locator = cls(group, entryPrefix, inputDataLocator)
         locator._useRoundTrip.addObserver(locator)
         locator._inputDataLocator.addObserver(locator)
@@ -114,31 +119,22 @@ class OutputDataLocator(DataLocator, Observer):
         self._outputDataLocator.setEndpointID(endpointID)
 
     def getEndpointID(self) -> UUID:
-        return (
-            self._inputDataLocator.getEndpointID()
-            if self._useRoundTrip.getValue()
-            else self._outputDataLocator.getEndpointID()
-        )
+        return (self._inputDataLocator.getEndpointID()
+                if self._useRoundTrip.getValue() else self._outputDataLocator.getEndpointID())
 
     def setGlobusPath(self, globusPath: str) -> None:
         self._outputDataLocator.setGlobusPath(globusPath)
 
     def getGlobusPath(self) -> str:
-        return (
-            self._inputDataLocator.getGlobusPath()
-            if self._useRoundTrip.getValue()
-            else self._outputDataLocator.getGlobusPath()
-        )
+        return (self._inputDataLocator.getGlobusPath()
+                if self._useRoundTrip.getValue() else self._outputDataLocator.getGlobusPath())
 
     def setPosixPath(self, posixPath: Path) -> None:
         self._outputDataLocator.setPosixPath(posixPath)
 
     def getPosixPath(self) -> Path:
-        return (
-            self._inputDataLocator.getPosixPath()
-            if self._useRoundTrip.getValue()
-            else self._outputDataLocator.getPosixPath()
-        )
+        return (self._inputDataLocator.getPosixPath()
+                if self._useRoundTrip.getValue() else self._outputDataLocator.getPosixPath())
 
     def update(self, observable: Observable) -> None:
         if observable is self._useRoundTrip:

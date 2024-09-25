@@ -8,6 +8,7 @@ from matplotlib.figure import Figure
 
 
 class ScanPlotView(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()

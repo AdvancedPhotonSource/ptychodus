@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class TiffDiffractionPatternArray(DiffractionPatternArray):
+
     def __init__(self, filePath: Path, index: int) -> None:
         super().__init__()
         self._filePath = filePath
@@ -57,6 +58,7 @@ class TiffDiffractionPatternArray(DiffractionPatternArray):
 
 
 class TiffDiffractionFileReader(DiffractionFileReader):
+
     def _getFileSeries(self, filePath: Path) -> tuple[Mapping[int, Path], str]:
         filePathDict: dict[int, Path] = dict()
 

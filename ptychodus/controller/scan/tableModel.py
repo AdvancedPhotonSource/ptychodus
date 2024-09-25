@@ -7,9 +7,11 @@ from ...model.product.scan import ScanRepositoryItem
 
 
 class ScanTableModel(QAbstractTableModel):
-    def __init__(
-        self, repository: ScanRepository, api: ScanAPI, parent: QObject | None = None
-    ) -> None:
+
+    def __init__(self,
+                 repository: ScanRepository,
+                 api: ScanAPI,
+                 parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._repository = repository
         self._api = api
@@ -33,9 +35,12 @@ class ScanTableModel(QAbstractTableModel):
         return itemIndex in self._checkedItemIndexes
 
     def headerData(
-        self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+        if (orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole):
             return self._header[section]
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -60,11 +65,8 @@ class ScanTableModel(QAbstractTableModel):
                 return f"{scan.sizeInBytes / (1024 * 1024):.2f}"
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:
-                return (
-                    Qt.CheckState.Checked
-                    if index.row() in self._checkedItemIndexes
-                    else Qt.CheckState.Unchecked
-                )
+                return (Qt.CheckState.Checked
+                        if index.row() in self._checkedItemIndexes else Qt.CheckState.Unchecked)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -78,9 +80,10 @@ class ScanTableModel(QAbstractTableModel):
 
         return value
 
-    def setData(
-        self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole
-    ) -> bool:
+    def setData(self,
+                index: QModelIndex,
+                value: Any,
+                role: int = Qt.ItemDataRole.EditRole) -> bool:
         if not index.isValid():
             return False
 

@@ -16,7 +16,11 @@ from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTreeView
-from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog, ProgressBarItemDelegate
+from ...view.widgets import (
+    ComboBoxItemDelegate,
+    ExceptionDialog,
+    ProgressBarItemDelegate,
+)
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .editorFactory import ProbeEditorViewControllerFactory
@@ -30,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeController(SequenceObserver[ProbeRepositoryItem]):
+
     def __init__(
         self,
         repository: ProbeRepository,
@@ -57,17 +62,14 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._editorFactory = ProbeEditorViewControllerFactory()
 
         self._propagationViewController = ProbePropagationViewController(
-            propagator, propagatorVisualizationEngine, fileDialogFactory
-        )
-        self._stxmViewController = STXMViewController(
-            stxmSimulator, stxmVisualizationEngine, fileDialogFactory
-        )
-        self._exposureViewController = ExposureViewController(
-            exposureAnalyzer, exposureVisualizationEngine, fileDialogFactory
-        )
+            propagator, propagatorVisualizationEngine, fileDialogFactory)
+        self._stxmViewController = STXMViewController(stxmSimulator, stxmVisualizationEngine,
+                                                      fileDialogFactory)
+        self._exposureViewController = ExposureViewController(exposureAnalyzer,
+                                                              exposureVisualizationEngine,
+                                                              fileDialogFactory)
         self._fluorescenceViewController = FluorescenceViewController(
-            fluorescenceEnhancer, fluorescenceVisualizationEngine, fileDialogFactory
-        )
+            fluorescenceEnhancer, fluorescenceVisualizationEngine, fileDialogFactory)
 
     @classmethod
     def createInstance(
@@ -191,7 +193,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
     def _finishCopyingProbe(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
-            destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
+            destinationIndex = (self._view.copierDialog.destinationComboBox.currentIndex())
             self._api.copyProbe(sourceIndex, destinationIndex)
 
     def _editCurrentProbe(self) -> None:
@@ -275,11 +277,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 logger.warning("Unable to access item for visualization!")
             else:
                 probe = item.getProbe()
-                array = (
-                    probe.getMode(current.row())
-                    if current.parent().isValid()
-                    else probe.getModesFlattened()
-                )
+                array = (probe.getMode(current.row())
+                         if current.parent().isValid() else probe.getModesFlattened())
                 self._imageController.setArray(array, probe.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ProbeRepositoryItem) -> None:

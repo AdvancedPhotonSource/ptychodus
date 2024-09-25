@@ -11,7 +11,11 @@ import tike.ptycho
 from ptychodus.api.object import Object, ObjectPoint
 from ptychodus.api.probe import Probe
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstructor import (
+    Reconstructor,
+    ReconstructInput,
+    ReconstructOutput,
+)
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .settings import (
@@ -26,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class TikeReconstructor:
+
     def __init__(
         self,
         settings: TikeSettings,
@@ -59,9 +64,8 @@ class TikeReconstructor:
 
         return options
 
-    def getPositionOptions(
-        self, initialScan: numpy.typing.NDArray[Any]
-    ) -> tike.ptycho.PositionOptions:
+    def getPositionOptions(self,
+                           initialScan: numpy.typing.NDArray[Any]) -> tike.ptycho.PositionOptions:
         settings = self._positionCorrectionSettings
         options = None
 
@@ -82,11 +86,8 @@ class TikeReconstructor:
         options = None
 
         if settings.useProbeCorrection.getValue():
-            probeSupport = (
-                float(settings.probeSupportWeight.getValue())
-                if settings.useFiniteProbeSupport.getValue()
-                else 0.0
-            )
+            probeSupport = (float(settings.probeSupportWeight.getValue())
+                            if settings.useFiniteProbeSupport.getValue() else 0.0)
 
             options = tike.ptycho.ProbeOptions(
                 force_orthogonality=settings.forceOrthogonality.getValue(),
@@ -117,7 +118,9 @@ class TikeReconstructor:
         return 1
 
     def __call__(
-        self, parameters: ReconstructInput, algorithmOptions: tike.ptycho.solvers.IterativeOptions
+        self,
+        parameters: ReconstructInput,
+        algorithmOptions: tike.ptycho.solvers.IterativeOptions,
     ) -> ReconstructOutput:
         patternsArray = numpy.fft.ifftshift(parameters.patterns, axes=(-2, -1))
 
@@ -185,10 +188,10 @@ class TikeReconstructor:
         else:
             # TODO support interactive reconstructions
             with tike.ptycho.Reconstruction(
-                data=patternsArray,
-                parameters=ptychoParameters,
-                num_gpu=numGpus,
-                use_mpi=False,
+                    data=patternsArray,
+                    parameters=ptychoParameters,
+                    num_gpu=numGpus,
+                    use_mpi=False,
             ) as context:
                 context.iterate(ptychoParameters.algorithm_options.num_iter)
             result = context.parameters
@@ -236,6 +239,7 @@ class TikeReconstructor:
 
 
 class RegularizedPIEReconstructor(Reconstructor):
+
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.RpieOptions()
@@ -253,12 +257,13 @@ class RegularizedPIEReconstructor(Reconstructor):
         self._algorithmOptions.num_batch = self._settings.numBatch.getValue()
         self._algorithmOptions.batch_method = self._settings.batchMethod.getValue()
         self._algorithmOptions.num_iter = self._settings.numIter.getValue()
-        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.getValue()
+        self._algorithmOptions.convergence_window = (self._settings.convergenceWindow.getValue())
         self._algorithmOptions.alpha = float(self._settings.alpha.getValue())
         return self._tikeReconstructor(parameters, self._algorithmOptions)
 
 
 class IterativeLeastSquaresReconstructor(Reconstructor):
+
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.LstsqOptions()
@@ -276,5 +281,5 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
         self._algorithmOptions.num_batch = self._settings.numBatch.getValue()
         self._algorithmOptions.batch_method = self._settings.batchMethod.getValue()
         self._algorithmOptions.num_iter = self._settings.numIter.getValue()
-        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.getValue()
+        self._algorithmOptions.convergence_window = (self._settings.convergenceWindow.getValue())
         return self._tikeReconstructor(parameters, self._algorithmOptions)

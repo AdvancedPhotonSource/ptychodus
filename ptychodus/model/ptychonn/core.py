@@ -124,6 +124,7 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
+
     def __init__(
         self,
         modelSettings: PtychoNNModelSettings,
@@ -138,9 +139,8 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(
-        cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool
-    ) -> PtychoNNReconstructorLibrary:
+    def createInstance(cls, settingsRegistry: SettingsRegistry,
+                       isDeveloperModeEnabled: bool) -> PtychoNNReconstructorLibrary:
         modelSettings = PtychoNNModelSettings(settingsRegistry)
         trainingSettings = PtychoNNTrainingSettings(settingsRegistry)
         phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor("PhaseOnly")
@@ -157,18 +157,17 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
                 reconstructors.append(phaseOnlyReconstructor)
                 reconstructors.append(amplitudePhaseReconstructor)
         else:
-            phaseOnlyModelProvider = PtychoNNModelProvider(
-                modelSettings, trainingSettings, enableAmplitude=False
-            )
-            phaseOnlyReconstructor = PtychoNNTrainableReconstructor(
-                modelSettings, trainingSettings, phaseOnlyModelProvider
-            )
-            amplitudePhaseModelProvider = PtychoNNModelProvider(
-                modelSettings, trainingSettings, enableAmplitude=True
-            )
+            phaseOnlyModelProvider = PtychoNNModelProvider(modelSettings,
+                                                           trainingSettings,
+                                                           enableAmplitude=False)
+            phaseOnlyReconstructor = PtychoNNTrainableReconstructor(modelSettings,
+                                                                    trainingSettings,
+                                                                    phaseOnlyModelProvider)
+            amplitudePhaseModelProvider = PtychoNNModelProvider(modelSettings,
+                                                                trainingSettings,
+                                                                enableAmplitude=True)
             amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(
-                modelSettings, trainingSettings, amplitudePhaseModelProvider
-            )
+                modelSettings, trainingSettings, amplitudePhaseModelProvider)
             reconstructors.append(phaseOnlyReconstructor)
             reconstructors.append(amplitudePhaseReconstructor)
 

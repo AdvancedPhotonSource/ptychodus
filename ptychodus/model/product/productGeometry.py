@@ -3,7 +3,11 @@ import numpy
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
-from ptychodus.api.constants import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
+from ptychodus.api.constants import (
+    ELECTRON_VOLT_J,
+    LIGHT_SPEED_M_PER_S,
+    PLANCK_CONSTANT_J_PER_HZ,
+)
 
 from ..patterns import PatternSizer
 from .metadata import MetadataRepositoryItem
@@ -11,6 +15,7 @@ from .scan import ScanRepositoryItem
 
 
 class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable, Observer):
+
     def __init__(
         self,
         patternSizer: PatternSizer,
@@ -45,7 +50,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def probePowerInWatts(self) -> float:
-        return self.probeEnergyInJoules * self._metadata.probePhotonsPerSecond.getValue()
+        return (self.probeEnergyInJoules * self._metadata.probePhotonsPerSecond.getValue())
 
     @property
     def _lambdaZInSquareMeters(self) -> float:
@@ -77,13 +82,10 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     def isProbeGeometryValid(self, geometry: ProbeGeometry) -> bool:
         expected = self.getProbeGeometry()
-        widthIsValid = (
-            geometry.pixelWidthInMeters > 0.0 and geometry.widthInMeters == expected.widthInMeters
-        )
-        heightIsValid = (
-            geometry.pixelHeightInMeters > 0.0
-            and geometry.heightInMeters == expected.heightInMeters
-        )
+        widthIsValid = (geometry.pixelWidthInMeters > 0.0
+                        and geometry.widthInMeters == expected.widthInMeters)
+        heightIsValid = (geometry.pixelHeightInMeters > 0.0
+                         and geometry.heightInMeters == expected.heightInMeters)
         return widthIsValid and heightIsValid
 
     def getObjectGeometry(self) -> ObjectGeometry:
@@ -115,7 +117,8 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     def isObjectGeometryValid(self, geometry: ObjectGeometry) -> bool:
         expectedGeometry = self.getObjectGeometry()
-        pixelSizeIsValid = geometry.pixelWidthInMeters > 0.0 and geometry.pixelHeightInMeters > 0.0
+        pixelSizeIsValid = (geometry.pixelWidthInMeters > 0.0
+                            and geometry.pixelHeightInMeters > 0.0)
         return pixelSizeIsValid and geometry.contains(expectedGeometry)
 
     def update(self, observable: Observable) -> None:

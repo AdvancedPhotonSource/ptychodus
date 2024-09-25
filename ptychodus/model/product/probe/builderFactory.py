@@ -3,7 +3,12 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeFileReader, ProbeFileWriter
+from ptychodus.api.probe import (
+    FresnelZonePlate,
+    Probe,
+    ProbeFileReader,
+    ProbeFileWriter,
+)
 
 from ...patterns import ActiveDiffractionDataset, Detector
 from .averagePattern import AveragePatternProbeBuilder
@@ -19,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeBuilderFactory(Iterable[str]):
+
     def __init__(
         self,
         settings: ProbeSettings,

@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProductRepositoryItemObserver(ABC):
+
     @abstractmethod
     def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
         pass
@@ -40,6 +41,7 @@ class ProductRepositoryItemObserver(ABC):
 
 
 class ProductRepositoryItem(ParameterGroup):
+
     def __init__(
         self,
         parent: ProductRepositoryItemObserver,
@@ -119,6 +121,7 @@ class ProductRepositoryItem(ParameterGroup):
 
 
 class ProductRepositoryObserver(ABC):
+
     @abstractmethod
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
         pass

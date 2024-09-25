@@ -31,6 +31,7 @@ class DiffractionPatternState(Enum):
 
 
 class DiffractionPatternArray(Observable):
+
     @abstractmethod
     def getLabel(self) -> str:
         pass
@@ -52,6 +53,7 @@ class DiffractionPatternArray(Observable):
 
 
 class SimpleDiffractionPatternArray(DiffractionPatternArray):
+
     def __init__(
         self,
         label: str,
@@ -103,6 +105,7 @@ class DiffractionMetadata:
 
 
 class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):
+
     @abstractmethod
     def getMetadata(self) -> DiffractionMetadata:
         pass
@@ -113,6 +116,7 @@ class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):
 
 
 class SimpleDiffractionDataset(DiffractionDataset):
+
     def __init__(
         self,
         metadata: DiffractionMetadata,
@@ -138,14 +142,16 @@ class SimpleDiffractionDataset(DiffractionDataset):
         return self._contentsTree
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
+    def __getitem__(self, index: int) -> DiffractionPatternArray:
+        ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
+        ...
 
     def __getitem__(
-        self, index: int | slice
-    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+            self,
+            index: int | slice) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         return self._arrayList[index]
 
     def __len__(self) -> int:

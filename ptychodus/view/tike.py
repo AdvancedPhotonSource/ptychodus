@@ -17,6 +17,7 @@ from .widgets import DecimalLineEdit, DecimalSlider
 
 
 class TikeBasicParametersView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__("Tike Parameters", parent)
         self.numGpusLineEdit = QLineEdit()
@@ -30,30 +31,26 @@ class TikeBasicParametersView(QGroupBox):
         self.logLevelComboBox = QComboBox()
 
     @classmethod
-    def createInstance(
-        cls, showAlpha: bool, showStepLength: bool, parent: Optional[QWidget] = None
-    ) -> TikeBasicParametersView:
+    def createInstance(cls,
+                       showAlpha: bool,
+                       showStepLength: bool,
+                       parent: Optional[QWidget] = None) -> TikeBasicParametersView:
         view = cls(parent)
 
         view.numGpusLineEdit.setToolTip(
             "The number of GPUs to use. If the number of GPUs is less than the requested number, "
-            "only workers for the available GPUs are allocated."
-        )
+            "only workers for the available GPUs are allocated.")
         view.noiseModelComboBox.setToolTip("The noise model to use for the cost function.")
-        view.numBatchSpinBox.setToolTip(
-            "The dataset is divided into this number of groups "
-            "where each group is processed sequentially."
-        )
+        view.numBatchSpinBox.setToolTip("The dataset is divided into this number of groups "
+                                        "where each group is processed sequentially.")
         view.batchMethodComboBox.setToolTip("The name of the batch selection method.")
         view.numIterSpinBox.setToolTip("The number of epochs to process before returning.")
         view.convergenceWindowSpinBox.setToolTip(
             "The number of epochs to consider for convergence monitoring. "
-            "Set to any value less than 2 to disable."
-        )
+            "Set to any value less than 2 to disable.")
         view.alphaSlider.setToolTip("RPIE becomes EPIE when this parameter is 1.")
         view.stepLengthSlider.setToolTip(
-            "Scales the inital search directions before the line search."
-        )
+            "Scales the inital search directions before the line search.")
 
         layout = QFormLayout()
         layout.addRow("Number of GPUs:", view.numGpusLineEdit)
@@ -77,6 +74,7 @@ class TikeBasicParametersView(QGroupBox):
 
 
 class TikeAdaptiveMomentView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__("Adaptive Moment", parent)
         self.mdecaySlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
@@ -86,12 +84,10 @@ class TikeAdaptiveMomentView(QGroupBox):
     def createInstance(cls, parent: Optional[QWidget] = None) -> TikeAdaptiveMomentView:
         view = cls(parent)
 
-        view.mdecaySlider.setToolTip(
-            "The proportion of the first moment " "that is previous first moments."
-        )
-        view.vdecaySlider.setToolTip(
-            "The proportion of the second moment " "that is previous second moments."
-        )
+        view.mdecaySlider.setToolTip("The proportion of the first moment "
+                                     "that is previous first moments.")
+        view.vdecaySlider.setToolTip("The proportion of the second moment "
+                                     "that is previous second moments.")
 
         layout = QFormLayout()
         layout.addRow("M Decay:", view.mdecaySlider)
@@ -102,6 +98,7 @@ class TikeAdaptiveMomentView(QGroupBox):
 
 
 class TikeMultigridView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__("Multigrid", parent)
         self.numLevelsSpinBox = QSpinBox()
@@ -111,8 +108,7 @@ class TikeMultigridView(QGroupBox):
         view = cls(parent)
 
         view.numLevelsSpinBox.setToolTip(
-            "The number of times to reduce the problem by a factor of two."
-        )
+            "The number of times to reduce the problem by a factor of two.")
 
         layout = QFormLayout()
         layout.addRow("Number of Levels:", view.numLevelsSpinBox)
@@ -122,6 +118,7 @@ class TikeMultigridView(QGroupBox):
 
 
 class TikePositionCorrectionView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__("Position Correction", parent)
         self.positionRegularizationCheckBox = QCheckBox("Use Regularization")
@@ -133,12 +130,10 @@ class TikePositionCorrectionView(QGroupBox):
         view = cls(parent)
 
         view.positionRegularizationCheckBox.setToolTip(
-            "Whether the positions are constrained to fit a random error plus affine error model."
-        )
+            "Whether the positions are constrained to fit a random error plus affine error model.")
         view.updateMagnitudeLimitLineEdit.setToolTip(
             "When set to a positive number, x and y update magnitudes are clipped (limited) "
-            "to this value."
-        )
+            "to this value.")
 
         layout = QFormLayout()
         layout.addRow(view.positionRegularizationCheckBox)
@@ -150,6 +145,7 @@ class TikePositionCorrectionView(QGroupBox):
 
 
 class TikeProbeSupportView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__("Finite Probe Support", parent)
         self.weightLineEdit = DecimalLineEdit.createInstance()
@@ -174,6 +170,7 @@ class TikeProbeSupportView(QGroupBox):
 
 
 class TikeProbeCorrectionView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__("Probe Correction", parent)
         self.forceSparsitySlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
@@ -189,14 +186,11 @@ class TikeProbeCorrectionView(QGroupBox):
 
         view.forceSparsitySlider.setToolTip("Forces this proportion of zero elements.")
         view.forceOrthogonalityCheckBox.setToolTip(
-            "Forces probes to be orthogonal each iteration."
-        )
+            "Forces probes to be orthogonal each iteration.")
         view.forceCenteredIntensityCheckBox.setToolTip(
-            "Forces the probe intensity to be centered."
-        )
+            "Forces the probe intensity to be centered.")
         view.additionalProbePenaltyLineEdit.setToolTip(
-            "Penalty applied to the last probe for existing."
-        )
+            "Penalty applied to the last probe for existing.")
 
         layout = QFormLayout()
         layout.addRow("Force Sparsity:", view.forceSparsitySlider)
@@ -211,6 +205,7 @@ class TikeProbeCorrectionView(QGroupBox):
 
 
 class TikeObjectCorrectionView(QGroupBox):
+
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__("Object Correction", parent)
         self.positivityConstraintSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
@@ -235,20 +230,21 @@ class TikeObjectCorrectionView(QGroupBox):
 
 
 class TikeParametersView(QWidget):
+
     def __init__(self, showAlpha: bool, showStepLength: bool, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.basicParametersView = TikeBasicParametersView.createInstance(
-            showAlpha, showStepLength
-        )
+            showAlpha, showStepLength)
         self.multigridView = TikeMultigridView.createInstance()
         self.positionCorrectionView = TikePositionCorrectionView.createInstance()
         self.probeCorrectionView = TikeProbeCorrectionView.createInstance()
         self.objectCorrectionView = TikeObjectCorrectionView.createInstance()
 
     @classmethod
-    def createInstance(
-        cls, showAlpha: bool, showStepLength: bool, parent: Optional[QWidget] = None
-    ) -> TikeParametersView:
+    def createInstance(cls,
+                       showAlpha: bool,
+                       showStepLength: bool,
+                       parent: Optional[QWidget] = None) -> TikeParametersView:
         view = cls(showAlpha, showStepLength, parent)
 
         layout = QVBoxLayout()

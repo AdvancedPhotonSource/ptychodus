@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class CXIProbeFileReader(ProbeFileReader):
+
     def read(self, filePath: Path) -> Probe:
         array = numpy.zeros((0, 0, 0), dtype=complex)
 

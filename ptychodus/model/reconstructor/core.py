@@ -2,7 +2,11 @@ from collections.abc import Sequence
 import logging
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
+from ptychodus.api.reconstructor import (
+    NullReconstructor,
+    Reconstructor,
+    ReconstructorLibrary,
+)
 from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import ActiveDiffractionDataset
@@ -16,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructorCore:
+
     def __init__(
         self,
         settingsRegistry: SettingsRegistry,
@@ -37,9 +42,7 @@ class ReconstructorCore:
             self._pluginChooser.registerPlugin(NullReconstructor("None"), displayName="None/None")
 
         self.dataMatcher = DiffractionPatternPositionMatcher(diffractionDataset, productRepository)
-        self.reconstructorAPI = ReconstructorAPI(
-            self.dataMatcher, productRepository, self._pluginChooser
-        )
-        self.presenter = ReconstructorPresenter(
-            self.settings, self._pluginChooser, self.reconstructorAPI, settingsRegistry
-        )
+        self.reconstructorAPI = ReconstructorAPI(self.dataMatcher, productRepository,
+                                                 self._pluginChooser)
+        self.presenter = ReconstructorPresenter(self.settings, self._pluginChooser,
+                                                self.reconstructorAPI, settingsRegistry)

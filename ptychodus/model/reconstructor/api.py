@@ -3,7 +3,11 @@ import logging
 import time
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.reconstructor import Reconstructor, TrainableReconstructor, TrainOutput
+from ptychodus.api.reconstructor import (
+    Reconstructor,
+    TrainableReconstructor,
+    TrainOutput,
+)
 
 from ..product import ProductRepository
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
@@ -12,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructorAPI:
+
     def __init__(
         self,
         dataMatcher: DiffractionPatternPositionMatcher,
@@ -30,8 +35,7 @@ class ReconstructorAPI:
     ) -> int:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
         parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            inputProductIndex, indexFilter
-        )
+            inputProductIndex, indexFilter)
 
         tic = time.perf_counter()
         result = reconstructor.reconstruct(parameters)
@@ -62,8 +66,7 @@ class ReconstructorAPI:
             logger.info("Preparing input data...")
             tic = time.perf_counter()
             parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-                inputProductIndex, ScanIndexFilter.ALL
-            )
+                inputProductIndex, ScanIndexFilter.ALL)
             toc = time.perf_counter()
             logger.info(f"Data preparation time {toc - tic:.4f} seconds.")
 

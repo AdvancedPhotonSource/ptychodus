@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryObserver):
+
     def __init__(self, repository: ProductRepository) -> None:
         super().__init__()
         self._repository = repository
@@ -27,10 +28,12 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
         self._repository[index].setName(name)
 
     @overload
-    def __getitem__(self, index: int) -> ScanRepositoryItem: ...
+    def __getitem__(self, index: int) -> ScanRepositoryItem:
+        ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ScanRepositoryItem]: ...
+    def __getitem__(self, index: slice) -> Sequence[ScanRepositoryItem]:
+        ...
 
     def __getitem__(self, index: int | slice) -> ScanRepositoryItem | Sequence[ScanRepositoryItem]:
         if isinstance(index, slice):

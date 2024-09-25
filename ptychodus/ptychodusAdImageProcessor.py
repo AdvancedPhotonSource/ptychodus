@@ -17,6 +17,7 @@ import ptychodus
 
 
 class ReconstructionThread(threading.Thread):
+
     def __init__(
         self,
         ptychodus: ModelCore,
@@ -41,9 +42,8 @@ class ReconstructionThread(threading.Thread):
                 logging.debug("ReconstructionThread: Begin assembling scan positions")
                 self._ptychodus.finalizeStreamingWorkflow()
                 logging.debug("ReconstructionThread: End assembling scan positions")
-                self._ptychodus.batchModeExecute(
-                    "reconstruct", self._inputProductPath, self._outputProductPath
-                )
+                self._ptychodus.batchModeExecute("reconstruct", self._inputProductPath,
+                                                 self._outputProductPath)
                 self._reconstructEvent.clear()
                 # reconstruction done; indicate that results are ready
                 self._channel.put(0)
@@ -64,6 +64,7 @@ class ReconstructionThread(threading.Thread):
 
 
 class PtychodusAdImageProcessor(AdImageProcessor):
+
     def __init__(self, configDict: dict[str, Any] = {}) -> None:
         super().__init__(configDict)
 
@@ -135,7 +136,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 break
             else:
                 self._ptychodus.assembleScanPositionsX(
-                    posX["values"], [TimeUtility.getTimeStampAsFloat(ts) for ts in posX["t"]]
+                    posX["values"],
+                    [TimeUtility.getTimeStampAsFloat(ts) for ts in posX["t"]],
                 )
 
         posYQueue = self.metadataQueueMap[self._posYPV]
@@ -147,7 +149,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 break
             else:
                 self._ptychodus.assembleScanPositionsY(
-                    posY["values"], [TimeUtility.getTimeStampAsFloat(ts) for ts in posY["t"]]
+                    posY["values"],
+                    [TimeUtility.getTimeStampAsFloat(ts) for ts in posY["t"]],
                 )
 
         processingEndTime = time.time()

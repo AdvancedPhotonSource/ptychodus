@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeRepositoryItem(ParameterGroup):
+
     def __init__(
         self,
         geometryProvider: ProbeGeometryProvider,

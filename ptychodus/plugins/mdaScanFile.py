@@ -297,9 +297,8 @@ class MDAScanData:
     detector_array: numpy.typing.NDArray[numpy.floating[Any]]  # float, shape: nd x npts
 
     @classmethod
-    def read(
-        cls, fp: typing.BinaryIO, scanHeader: MDAScanHeader, scanInfo: MDAScanInfo
-    ) -> MDAScanData:
+    def read(cls, fp: typing.BinaryIO, scanHeader: MDAScanHeader,
+             scanInfo: MDAScanInfo) -> MDAScanData:
         npts = scanHeader.num_requested_points
         np = scanInfo.num_positioners
         nd = scanInfo.num_detectors

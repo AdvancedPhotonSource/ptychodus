@@ -31,12 +31,13 @@ class ProbeTransverseCoordinates:
 
 
 class ProbeBuilder(ParameterGroup):
+
     def __init__(self, name: str) -> None:
         super().__init__()
         self._name = StringParameter(self, "name", name)
 
     def getTransverseCoordinates(self, geometry: ProbeGeometry) -> ProbeTransverseCoordinates:
-        Y, X = numpy.mgrid[: geometry.heightInPixels, : geometry.widthInPixels]
+        Y, X = numpy.mgrid[:geometry.heightInPixels, :geometry.widthInPixels]
         positionXInPixels = X - (geometry.widthInPixels - 1) / 2
         positionYInPixels = Y - (geometry.heightInPixels - 1) / 2
 
@@ -49,7 +50,7 @@ class ProbeBuilder(ParameterGroup):
         )
 
     def normalize(self, array: WavefieldArrayType) -> WavefieldArrayType:
-        return array / numpy.sqrt(numpy.sum(numpy.abs(array) ** 2))
+        return array / numpy.sqrt(numpy.sum(numpy.abs(array)**2))
 
     def getName(self) -> str:
         return self._name.getValue()
@@ -64,6 +65,7 @@ class ProbeBuilder(ParameterGroup):
 
 
 class FromMemoryProbeBuilder(ProbeBuilder):
+
     def __init__(self, probe: Probe) -> None:
         super().__init__("from_memory")
         self._probe = probe.copy()
@@ -76,6 +78,7 @@ class FromMemoryProbeBuilder(ProbeBuilder):
 
 
 class FromFileProbeBuilder(ProbeBuilder):
+
     def __init__(self, filePath: Path, fileType: str, fileReader: ProbeFileReader) -> None:
         super().__init__("from_file")
         self.filePath = PathParameter(self, "file_path", filePath)
@@ -83,9 +86,8 @@ class FromFileProbeBuilder(ProbeBuilder):
         self._fileReader = fileReader
 
     def copy(self) -> FromFileProbeBuilder:
-        return FromFileProbeBuilder(
-            self.filePath.getValue(), self.fileType.getValue(), self._fileReader
-        )
+        return FromFileProbeBuilder(self.filePath.getValue(), self.fileType.getValue(),
+                                    self._fileReader)
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         filePath = self.filePath.getValue()

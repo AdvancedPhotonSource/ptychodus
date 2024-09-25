@@ -8,6 +8,7 @@ from ptychodus.api.plugins import PluginRegistry
 
 
 class MATObjectFileReader(ObjectFileReader):
+
     def read(self, filePath: Path) -> Object:
         matDict = scipy.io.loadmat(filePath)
         array = matDict["object"]
@@ -29,6 +30,7 @@ class MATObjectFileReader(ObjectFileReader):
 
 
 class MATObjectFileWriter(ObjectFileWriter):
+
     def write(self, filePath: Path, object_: Object) -> None:
         array = object_.array
         matDict = {"object": array.transpose(1, 2, 0)}

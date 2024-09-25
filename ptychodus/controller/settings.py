@@ -13,6 +13,7 @@ from .data import FileDialogFactory
 
 
 class SettingsTableModel(QAbstractTableModel):
+
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._names: Sequence[str] = list()
@@ -25,9 +26,12 @@ class SettingsTableModel(QAbstractTableModel):
         self.endResetModel()
 
     def headerData(
-        self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
+        if (role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal):
             if section == 0:
                 return "Name"
             elif section == 1:
@@ -48,6 +52,7 @@ class SettingsTableModel(QAbstractTableModel):
 
 
 class SettingsController(Observer):
+
     def __init__(
         self,
         settingsRegistry: SettingsRegistry,

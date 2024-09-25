@@ -4,7 +4,11 @@ from matplotlib.colors import Normalize
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
+from ptychodus.api.visualization import (
+    NumberArrayType,
+    RealArrayType,
+    VisualizationProduct,
+)
 
 from .colorAxis import ColorAxis
 from .colorModel import CylindricalColorModelParameter
@@ -14,6 +18,7 @@ from .transformation import ScalarTransformationParameter
 
 
 class CylindricalColorModelRenderer(Renderer):
+
     def __init__(
         self,
         amplitudeComponent: AmplitudeArrayComponent,
@@ -43,9 +48,8 @@ class CylindricalColorModelRenderer(Renderer):
     def isCyclic(self) -> bool:
         return True
 
-    def _colorize(
-        self, amplitudeTransformed: RealArrayType, phaseInRadians: RealArrayType
-    ) -> RealArrayType:
+    def _colorize(self, amplitudeTransformed: RealArrayType,
+                  phaseInRadians: RealArrayType) -> RealArrayType:
         vrange = self._colorAxis.getRange()
         norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
 
@@ -61,7 +65,11 @@ class CylindricalColorModelRenderer(Renderer):
         return self._colorize(amplitudeTransformed, phaseInRadians)
 
     def render(
-        self, array: NumberArrayType, pixelGeometry: PixelGeometry, *, autoscaleColorAxis: bool
+        self,
+        array: NumberArrayType,
+        pixelGeometry: PixelGeometry,
+        *,
+        autoscaleColorAxis: bool,
     ) -> VisualizationProduct:
         amplitude = self._amplitudeComponent.calculate(array)
         amplitudeTransformed = self._transformation.transform(amplitude)

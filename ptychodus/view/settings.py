@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QHBoxLayout, QListView, QPushButton, QVBoxLayout, QW
 
 
 class SettingsButtonBox(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.openButton = QPushButton("Open")
@@ -23,6 +24,7 @@ class SettingsButtonBox(QWidget):
 
 
 class SettingsView(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.listView = QListView()

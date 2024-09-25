@@ -21,6 +21,7 @@ from .widgets import UUIDLineEdit
 
 
 class WorkflowAuthorizationDialog(QDialog):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.label = QLabel()
@@ -56,6 +57,7 @@ class WorkflowAuthorizationDialog(QDialog):
 
 
 class WorkflowInputDataView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Input Data", parent)
         self.endpointIDLineEdit = UUIDLineEdit()
@@ -76,6 +78,7 @@ class WorkflowInputDataView(QGroupBox):
 
 
 class WorkflowOutputDataView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Output Data", parent)
         self.roundTripCheckBox = QCheckBox("Round Trip")
@@ -98,6 +101,7 @@ class WorkflowOutputDataView(QGroupBox):
 
 
 class WorkflowComputeView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Compute", parent)
         self.computeEndpointIDLineEdit = UUIDLineEdit()
@@ -120,6 +124,7 @@ class WorkflowComputeView(QGroupBox):
 
 
 class WorkflowExecutionView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Execution", parent)
         self.productComboBox = QComboBox()
@@ -144,6 +149,7 @@ class WorkflowExecutionView(QGroupBox):
 
 
 class WorkflowStatusView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Status", parent)
         self.autoRefreshCheckBox = QCheckBox("Auto Refresh [sec]:")
@@ -163,6 +169,7 @@ class WorkflowStatusView(QGroupBox):
 
 
 class WorkflowParametersView(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.executionView = WorkflowExecutionView.createInstance()

@@ -3,7 +3,11 @@ from collections.abc import Iterator, Sequence
 import logging
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
+from ptychodus.api.reconstructor import (
+    NullReconstructor,
+    Reconstructor,
+    ReconstructorLibrary,
+)
 from ptychodus.api.settings import SettingsRegistry
 
 from .settings import (
@@ -18,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class TikePresenter(Observable, Observer):
+
     def __init__(self, settings: TikeSettings) -> None:
         super().__init__()
         self._settings = settings
@@ -77,6 +82,7 @@ class TikePresenter(Observable, Observer):
 
 
 class TikeReconstructorLibrary(ReconstructorLibrary):
+
     def __init__(self, settingsRegistry: SettingsRegistry) -> None:
         super().__init__()
         self._settings = TikeSettings(settingsRegistry)
@@ -89,9 +95,8 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod
-    def createInstance(
-        cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool
-    ) -> TikeReconstructorLibrary:
+    def createInstance(cls, settingsRegistry: SettingsRegistry,
+                       isDeveloperModeEnabled: bool) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)
 
         try:

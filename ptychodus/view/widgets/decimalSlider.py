@@ -53,7 +53,10 @@ class DecimalSlider(QWidget):
             self._emitValueChanged()
 
     def setValueAndRange(
-        self, value: Decimal, range_: Interval[Decimal], blockValueChangedSignal: bool = False
+        self,
+        value: Decimal,
+        range_: Interval[Decimal],
+        blockValueChangedSignal: bool = False,
     ) -> None:
         shouldEmit = False
 

@@ -1,6 +1,12 @@
 from typing import Any
 
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
+from PyQt5.QtCore import (
+    Qt,
+    QAbstractTableModel,
+    QModelIndex,
+    QObject,
+    QSortFilterProxyModel,
+)
 from PyQt5.QtWidgets import QWidget
 
 from ptychodus.api.observer import Observable, Observer
@@ -10,6 +16,7 @@ from ...view.product import ProductEditorDialog
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
+
     def __init__(self, product: ProductRepositoryItem, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._product = product
@@ -23,9 +30,12 @@ class ProductPropertyTableModel(QAbstractTableModel):
         ]
 
     def headerData(
-        self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+        if (orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole):
             return self._header[section]
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -54,6 +64,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
 
 class ProductEditorViewController(Observer):
+
     def __init__(
         self,
         product: ProductRepositoryItem,

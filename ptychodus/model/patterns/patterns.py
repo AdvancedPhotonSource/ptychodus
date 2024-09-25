@@ -17,9 +17,8 @@ class DiffractionPatternPresenter(Observable, Observer):
         self._sizer = sizer
 
     @classmethod
-    def createInstance(
-        cls, settings: PatternSettings, sizer: PatternSizer
-    ) -> DiffractionPatternPresenter:
+    def createInstance(cls, settings: PatternSettings,
+                       sizer: PatternSizer) -> DiffractionPatternPresenter:
         presenter = cls(settings, sizer)
         sizer.addObserver(presenter)
         return presenter

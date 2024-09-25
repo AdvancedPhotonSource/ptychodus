@@ -13,8 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowStatusController:
+
     def __init__(
-        self, presenter: WorkflowStatusPresenter, view: WorkflowStatusView, tableView: QTableView
+        self,
+        presenter: WorkflowStatusPresenter,
+        view: WorkflowStatusView,
+        tableView: QTableView,
     ) -> None:
         self._presenter = presenter
         self._view = view
@@ -25,7 +29,10 @@ class WorkflowStatusController:
 
     @classmethod
     def createInstance(
-        cls, presenter: WorkflowStatusPresenter, view: WorkflowStatusView, tableView: QTableView
+        cls,
+        presenter: WorkflowStatusPresenter,
+        view: WorkflowStatusView,
+        tableView: QTableView,
     ) -> WorkflowStatusController:
         controller = cls(presenter, view, tableView)
 
@@ -66,11 +73,10 @@ class WorkflowStatusController:
         self._tableModel.endResetModel()
 
     def _syncModelToView(self) -> None:
-        refreshIntervalLimitsInSeconds = self._presenter.getRefreshIntervalLimitsInSeconds()
+        refreshIntervalLimitsInSeconds = (self._presenter.getRefreshIntervalLimitsInSeconds())
 
         self._view.autoRefreshSpinBox.blockSignals(True)
-        self._view.autoRefreshSpinBox.setRange(
-            refreshIntervalLimitsInSeconds.lower, refreshIntervalLimitsInSeconds.upper
-        )
+        self._view.autoRefreshSpinBox.setRange(refreshIntervalLimitsInSeconds.lower,
+                                               refreshIntervalLimitsInSeconds.upper)
         self._view.autoRefreshSpinBox.setValue(self._presenter.getRefreshIntervalInSeconds())
         self._view.autoRefreshSpinBox.blockSignals(False)

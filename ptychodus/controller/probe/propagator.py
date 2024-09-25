@@ -8,12 +8,16 @@ from ...model.visualization import VisualizationEngine
 from ...view.probe import ProbePropagationDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..visualization import VisualizationParametersController, VisualizationWidgetController
+from ..visualization import (
+    VisualizationParametersController,
+    VisualizationWidgetController,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class ProbePropagationViewController(Observer):
+
     def __init__(
         self,
         propagator: ProbePropagator,
@@ -31,17 +35,14 @@ class ProbePropagationViewController(Observer):
         self._dialog.parametersView.numberOfStepsSpinBox.setRange(1, 999)
 
         self._xyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.xyView, self._dialog.statusBar, fileDialogFactory
-        )
+            engine, self._dialog.xyView, self._dialog.statusBar, fileDialogFactory)
         self._zxVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zxView, self._dialog.statusBar, fileDialogFactory
-        )
-        self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.parametersView.visualizationParametersView
-        )
+            engine, self._dialog.zxView, self._dialog.statusBar, fileDialogFactory)
+        self._visualizationParametersController = (
+            VisualizationParametersController.createInstance(
+                engine, self._dialog.parametersView.visualizationParametersView))
         self._zyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory
-        )
+            engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory)
 
         propagator.addObserver(self)
         self._syncModelToView()
@@ -69,9 +70,8 @@ class ProbePropagationViewController(Observer):
             logger.exception(err)
             ExceptionDialog.showException("Update Current Coordinate", err)
         else:
-            self._xyVisualizationWidgetController.setArray(
-                xyProjection, self._propagator.getPixelGeometry()
-            )
+            self._xyVisualizationWidgetController.setArray(xyProjection,
+                                                           self._propagator.getPixelGeometry())
 
         # TODO auto-units
         lerpValue *= Decimal("1e6")
@@ -137,12 +137,10 @@ class ProbePropagationViewController(Observer):
         self._updateCurrentCoordinate(self._dialog.coordinateSlider.value())
 
         try:
-            self._zxVisualizationWidgetController.setArray(
-                self._propagator.getZXProjection(), self._propagator.getPixelGeometry()
-            )
-            self._zyVisualizationWidgetController.setArray(
-                self._propagator.getZYProjection(), self._propagator.getPixelGeometry()
-            )
+            self._zxVisualizationWidgetController.setArray(self._propagator.getZXProjection(),
+                                                           self._propagator.getPixelGeometry())
+            self._zyVisualizationWidgetController.setArray(self._propagator.getZYProjection(),
+                                                           self._propagator.getPixelGeometry())
         except ValueError:
             self._zxVisualizationWidgetController.clearArray()
             self._zyVisualizationWidgetController.clearArray()

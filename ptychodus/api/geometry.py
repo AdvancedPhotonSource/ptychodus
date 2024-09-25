@@ -92,6 +92,7 @@ class Box2D:
 
 
 class Interval(Generic[T]):
+
     def __init__(self, lower: T, upper: T) -> None:
         self.lower: T = lower
         self.upper: T = upper

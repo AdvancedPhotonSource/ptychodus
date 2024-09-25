@@ -10,6 +10,7 @@ from ...model.patterns import DiffractionPatternArrayPresenter
 
 
 class DatasetTreeNode:
+
     def __init__(
         self,
         parentItem: DatasetTreeNode | None,
@@ -80,6 +81,7 @@ class DatasetTreeNode:
 
 
 class DatasetTreeModel(QAbstractItemModel):
+
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rootNode = DatasetTreeNode.createRoot()
@@ -91,10 +93,12 @@ class DatasetTreeModel(QAbstractItemModel):
         self.endResetModel()
 
     @overload
-    def parent(self, child: QModelIndex) -> QModelIndex: ...
+    def parent(self, child: QModelIndex) -> QModelIndex:
+        ...
 
     @overload
-    def parent(self) -> QObject: ...
+    def parent(self) -> QObject:
+        ...
 
     def parent(self, child: QModelIndex | None = None) -> QModelIndex | QObject:
         if child is None:
@@ -114,9 +118,12 @@ class DatasetTreeModel(QAbstractItemModel):
             return value
 
     def headerData(
-        self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+        if (orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole):
             return self._header[section]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
@@ -151,7 +158,7 @@ class DatasetTreeModel(QAbstractItemModel):
         value = QModelIndex()
 
         if self.hasIndex(row, column, parent):
-            parentItem = parent.internalPointer() if parent.isValid() else self._rootNode
+            parentItem = (parent.internalPointer() if parent.isValid() else self._rootNode)
             childItem = parentItem.childItems[row]
 
             if childItem:

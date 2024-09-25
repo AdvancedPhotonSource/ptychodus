@@ -10,6 +10,7 @@ from .settings import ProbeSettings
 
 
 class SuperGaussianProbeBuilder(ProbeBuilder):
+
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__("super_gaussian")
         self._settings = settings
@@ -44,9 +45,8 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
         geometry = geometryProvider.getProbeGeometry()
         coords = self.getTransverseCoordinates(geometry)
 
-        Z = (
-            coords.positionRInMeters - self.annularRadiusInMeters.getValue()
-        ) / self.fwhmInMeters.getValue()
+        Z = (coords.positionRInMeters -
+             self.annularRadiusInMeters.getValue()) / self.fwhmInMeters.getValue()
         ZP = numpy.power(2 * Z, 2 * self.orderParameter.getValue())
 
         return Probe(

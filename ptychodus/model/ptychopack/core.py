@@ -5,7 +5,11 @@ import logging
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.reconstructor import NullReconstructor, Reconstructor, ReconstructorLibrary
+from ptychodus.api.reconstructor import (
+    NullReconstructor,
+    Reconstructor,
+    ReconstructorLibrary,
+)
 from ptychodus.api.settings import SettingsRegistry
 
 from .device import NullPtychoPackDevice, PtychoPackDevice
@@ -15,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPackPresenter(Observable, Observer):
+
     def __init__(self, settings: PtychoPackSettings, device: PtychoPackDevice) -> None:
         super().__init__()
         self._settings = settings
@@ -175,6 +180,7 @@ class PtychoPackPresenter(Observable, Observer):
 
 
 class PtychoPackReconstructorLibrary(ReconstructorLibrary):
+
     def __init__(self, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool) -> None:
         super().__init__()
         self._settings = PtychoPackSettings(settingsRegistry)
@@ -196,14 +202,11 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
         else:
             self._device = RealPtychoPackDevice()
             self.reconstructor_list.append(
-                PtychographicIterativeEngineReconstructor(self._settings, self._device)
-            )
+                PtychographicIterativeEngineReconstructor(self._settings, self._device))
+            self.reconstructor_list.append(DifferenceMapReconstructor(
+                self._settings, self._device))
             self.reconstructor_list.append(
-                DifferenceMapReconstructor(self._settings, self._device)
-            )
-            self.reconstructor_list.append(
-                RelaxedAveragedAlternatingReflectionsReconstructor(self._settings, self._device)
-            )
+                RelaxedAveragedAlternatingReflectionsReconstructor(self._settings, self._device))
 
         self.presenter = PtychoPackPresenter(self._settings, self._device)
 

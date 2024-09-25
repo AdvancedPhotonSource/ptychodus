@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class PatternsAPI:
+
     def __init__(
         self,
         settings: PatternSettings,

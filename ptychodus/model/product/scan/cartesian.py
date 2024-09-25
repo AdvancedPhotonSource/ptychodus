@@ -34,6 +34,7 @@ class CartesianScanVariant(IntEnum):
 
 
 class CartesianScanBuilder(ScanBuilder):
+
     def __init__(self, variant: CartesianScanVariant, settings: ScanSettings) -> None:
         super().__init__(variant.name.lower())
         self._variant = variant

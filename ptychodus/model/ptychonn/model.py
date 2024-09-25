@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoNNModelProvider:
+
     def __init__(
         self,
         modelSettings: PtychoNNModelSettings,
@@ -30,11 +31,8 @@ class PtychoNNModelProvider:
         return 2 if self._enableAmplitude else 1
 
     def getModel(self) -> ptychonn.LitReconSmallModel:
-        if (
-            self._model is None
-            and self._trainer is not None
-            and self._trainer.lightning_module is not None
-        ):
+        if (self._model is None and self._trainer is not None
+                and self._trainer.lightning_module is not None):
             return self._trainer.lightning_module
         else:
             logger.debug("Initializing model from settings")

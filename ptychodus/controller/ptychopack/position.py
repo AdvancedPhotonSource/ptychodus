@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPackPositionCorrectionController(Observer):
-    def __init__(
-        self, presenter: PtychoPackPresenter, view: PtychoPackPositionCorrectionView
-    ) -> None:
+
+    def __init__(self, presenter: PtychoPackPresenter,
+                 view: PtychoPackPositionCorrectionView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
@@ -21,8 +21,7 @@ class PtychoPackPositionCorrectionController(Observer):
         view.plan_widget.stop_lineedit.editingFinished.connect(self._sync_plan_stop_to_model)
         view.plan_widget.stride_lineedit.editingFinished.connect(self._sync_plan_stride_to_model)
         view.probe_threshold_slider.valueChanged.connect(
-            presenter.set_position_correction_probe_threshold
-        )
+            presenter.set_position_correction_probe_threshold)
         view.feedback_line_edit.valueChanged.connect(presenter.set_position_correction_feedback)
 
         self._sync_model_to_view()
@@ -60,14 +59,11 @@ class PtychoPackPositionCorrectionController(Observer):
 
     def _sync_model_to_view(self) -> None:
         self._view.plan_widget.start_lineedit.setText(
-            str(self._presenter.get_position_correction_plan_start())
-        )
+            str(self._presenter.get_position_correction_plan_start()))
         self._view.plan_widget.stop_lineedit.setText(
-            str(self._presenter.get_position_correction_plan_stop())
-        )
+            str(self._presenter.get_position_correction_plan_stop()))
         self._view.plan_widget.stride_lineedit.setText(
-            str(self._presenter.get_position_correction_plan_stride())
-        )
+            str(self._presenter.get_position_correction_plan_stride()))
 
         self._view.probe_threshold_slider.setValueAndRange(
             self._presenter.get_position_correction_probe_threshold(),

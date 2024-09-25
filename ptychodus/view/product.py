@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (
 
 
 class ProductEditorDialog(QDialog):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.tableView = QTableView()
@@ -53,6 +54,7 @@ class ProductEditorDialog(QDialog):
 
 
 class ProductButtonBox(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.insertMenu = QMenu()
@@ -79,6 +81,7 @@ class ProductButtonBox(QWidget):
 
 
 class ProductView(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.tableView = QTableView()

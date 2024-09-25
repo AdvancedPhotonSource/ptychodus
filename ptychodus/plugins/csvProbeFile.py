@@ -7,6 +7,7 @@ from ptychodus.api.probe import Probe, ProbeFileReader, ProbeFileWriter
 
 
 class CSVProbeFileReader(ProbeFileReader):
+
     def read(self, filePath: Path) -> Probe:
         arrayFlat = numpy.genfromtxt(filePath, delimiter=",", dtype="complex")
         numberOfModes, remainder = divmod(arrayFlat.shape[0], arrayFlat.shape[1])
@@ -21,6 +22,7 @@ class CSVProbeFileReader(ProbeFileReader):
 
 
 class CSVProbeFileWriter(ProbeFileWriter):
+
     def write(self, filePath: Path, probe: Probe) -> None:
         array = probe.array
         arrayFlat = array.reshape(-1, array.shape[-1])

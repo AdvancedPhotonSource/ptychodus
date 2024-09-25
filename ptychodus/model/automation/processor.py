@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationDatasetProcessor:
+
     def __init__(
         self,
         settings: AutomationSettings,
@@ -73,7 +74,8 @@ class AutomationDatasetProcessor:
                 logger.exception("Error while processing dataset!")
             finally:
                 self._processingQueue.task_done()
-                self._nextJobTime = self._settings.processingIntervalInSeconds.getValue() + time()
+                self._nextJobTime = (self._settings.processingIntervalInSeconds.getValue() +
+                                     time())
 
     def start(self) -> None:
         self.stop()

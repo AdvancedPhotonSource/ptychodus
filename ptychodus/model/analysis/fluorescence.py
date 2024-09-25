@@ -28,9 +28,8 @@ from .settings import FluorescenceSettings
 logger = logging.getLogger(__name__)
 
 
-def get_axis_weights_and_indexes(
-    xmin_o: float, dx_o: float, xmin_p: float, dx_p: float, N_p: int
-) -> tuple[Sequence[float], Sequence[int]]:
+def get_axis_weights_and_indexes(xmin_o: float, dx_o: float, xmin_p: float, dx_p: float,
+                                 N_p: int) -> tuple[Sequence[float], Sequence[int]]:
     weight: list[float] = []
     index: list[int] = []
 
@@ -63,6 +62,7 @@ def get_axis_weights_and_indexes(
 
 
 class VSPILinearOperator(LinearOperator):
+
     def __init__(self, product: Product, xrf_nchannels: int) -> None:
         """
         M: number of XRF positions
@@ -92,12 +92,10 @@ class VSPILinearOperator(LinearOperator):
             xmin_p_m = point.positionXInMeters - probeGeometry.widthInMeters / 2
             ymin_p_m = point.positionYInMeters - probeGeometry.heightInMeters / 2
 
-            wx, ix = get_axis_weights_and_indexes(
-                xmin_o_m, dx_o_m, xmin_p_m, dx_p_m, probeGeometry.widthInPixels
-            )
-            wy, iy = get_axis_weights_and_indexes(
-                ymin_o_m, dy_o_m, ymin_p_m, dy_p_m, probeGeometry.heightInPixels
-            )
+            wx, ix = get_axis_weights_and_indexes(xmin_o_m, dx_o_m, xmin_p_m, dx_p_m,
+                                                  probeGeometry.widthInPixels)
+            wy, iy = get_axis_weights_and_indexes(ymin_o_m, dy_o_m, ymin_p_m, dy_p_m,
+                                                  probeGeometry.heightInPixels)
 
             IY, IX = numpy.meshgrid(iy, ix)
             i_nz = numpy.ravel_multi_index(list(zip(IY.flat, IX.flat)), objectShape)
@@ -139,8 +137,7 @@ class FluorescenceEnhancer(Observable, Observer):
         upscalingStrategyChooser.setCurrentPluginByName(settings.upscalingStrategy.getValue())
         deconvolutionStrategyChooser.addObserver(self)
         deconvolutionStrategyChooser.setCurrentPluginByName(
-            settings.deconvolutionStrategy.getValue()
-        )
+            settings.deconvolutionStrategy.getValue())
         fileReaderChooser.setCurrentPluginByName(settings.fileType.getValue())
         fileWriterChooser.setCurrentPluginByName(settings.fileType.getValue())
         reinitObservable.addObserver(self)
@@ -223,8 +220,7 @@ class FluorescenceEnhancer(Observable, Observer):
             raise ValueError("Fluorescence dataset not loaded!")
 
         reconstructInput = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            self._productIndex
-        )
+            self._productIndex)
         element_maps: list[ElementMap] = list()
 
         if self._settings.useVSPI.getValue():
@@ -283,9 +279,8 @@ class FluorescenceEnhancer(Observable, Observer):
         writer.write(filePath, self._enhanced)
 
     def _openFluorescenceFileFromSettings(self) -> None:
-        self.openMeasuredDataset(
-            self._settings.filePath.getValue(), self._settings.fileType.getValue()
-        )
+        self.openMeasuredDataset(self._settings.filePath.getValue(),
+                                 self._settings.fileType.getValue())
 
     def update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:

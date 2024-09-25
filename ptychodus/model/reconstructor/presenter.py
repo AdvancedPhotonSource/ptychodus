@@ -4,7 +4,11 @@ import logging
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.reconstructor import Reconstructor, TrainableReconstructor, TrainOutput
+from ptychodus.api.reconstructor import (
+    Reconstructor,
+    TrainableReconstructor,
+    TrainOutput,
+)
 
 from .api import ReconstructorAPI
 from .matcher import ScanIndexFilter
@@ -14,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructorPresenter(Observable, Observer):
+
     def __init__(
         self,
         settings: ReconstructorSettings,
@@ -52,9 +57,8 @@ class ReconstructorPresenter(Observable, Observer):
         outputProductName: str,
         indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
     ) -> int:
-        return self._reconstructorAPI.reconstruct(
-            inputProductIndex, outputProductName, indexFilter
-        )
+        return self._reconstructorAPI.reconstruct(inputProductIndex, outputProductName,
+                                                  indexFilter)
 
     def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
         return self._reconstructorAPI.reconstructSplit(inputProductIndex, outputProductName)

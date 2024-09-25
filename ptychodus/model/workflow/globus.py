@@ -22,7 +22,7 @@ from .status import WorkflowStatus, WorkflowStatusRepository
 
 logger = logging.getLogger(__name__)
 
-AuthorizerTypes: TypeAlias = globus_sdk.AccessTokenAuthorizer | globus_sdk.RefreshTokenAuthorizer
+AuthorizerTypes: TypeAlias = (globus_sdk.AccessTokenAuthorizer | globus_sdk.RefreshTokenAuthorizer)
 ScopeAuthorizerMapping: TypeAlias = Mapping[str, AuthorizerTypes]
 
 PTYCHODUS_CLIENT_ID: Final[str] = "5c0fb474-ae53-44c2-8c32-dd0db9965c57"
@@ -71,6 +71,7 @@ class PtychodusClient(gladier.GladierBaseClient):
 
 
 class CustomCodeHandler(fair_research_login.CodeHandler):
+
     def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         super().__init__()
         self._authorizer = authorizer
@@ -85,12 +86,14 @@ class CustomCodeHandler(fair_research_login.CodeHandler):
 
 
 class PtychodusClientBuilder(ABC):
+
     @abstractmethod
     def build(self) -> gladier.GladierBaseClient:
         pass
 
 
 class NativePtychodusClientBuilder(PtychodusClientBuilder):
+
     def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         super().__init__()
         self._authClient = fair_research_login.NativeClient(
@@ -125,6 +128,7 @@ class NativePtychodusClientBuilder(PtychodusClientBuilder):
 
 
 class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
+
     def __init__(self, clientID: str, clientSecret: str, flowID: str | None) -> None:
         super().__init__()
         self._authClient = globus_sdk.ConfidentialAppAuthClient(
@@ -154,6 +158,7 @@ class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
 
 
 class GlobusWorkflowThread(threading.Thread):
+
     def __init__(
         self,
         authorizer: WorkflowAuthorizer,

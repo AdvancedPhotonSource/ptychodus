@@ -27,6 +27,7 @@ from .widgets import LengthWidget
 
 
 class DetectorView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Detector", parent)
         self.widthInPixelsSpinBox = QSpinBox()
@@ -51,6 +52,7 @@ class DetectorView(QGroupBox):
 
 
 class PatternsButtonBox(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.openButton = QPushButton("Open")
@@ -74,6 +76,7 @@ class PatternsButtonBox(QWidget):
 
 
 class OpenDatasetWizardPage(QWizardPage):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self._isComplete = False
@@ -88,6 +91,7 @@ class OpenDatasetWizardPage(QWizardPage):
 
 
 class OpenDatasetWizardFilesPage(OpenDatasetWizardPage):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.directoryComboBox = QComboBox()
@@ -109,6 +113,7 @@ class OpenDatasetWizardFilesPage(OpenDatasetWizardPage):
 
 
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.detectorPixelCountCheckBox = QCheckBox("Detector Pixel Count")
@@ -139,6 +144,7 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
 
 
 class OpenDatasetWizardPatternLoadView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Load", parent)
         self.numberOfThreadsSpinBox = QSpinBox()
@@ -155,6 +161,7 @@ class OpenDatasetWizardPatternLoadView(QGroupBox):
 
 
 class OpenDatasetWizardPatternCropView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Crop", parent)
         self.centerLabel = QLabel("Center [px]:")
@@ -183,6 +190,7 @@ class OpenDatasetWizardPatternCropView(QGroupBox):
 
 
 class OpenDatasetWizardPatternTransformView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Transform", parent)
         self.valueLowerBoundCheckBox = QCheckBox("Value Lower Bound:")
@@ -194,9 +202,8 @@ class OpenDatasetWizardPatternTransformView(QGroupBox):
         self.flipYCheckBox = QCheckBox("Flip Y")
 
     @classmethod
-    def createInstance(
-        cls, parent: QWidget | None = None
-    ) -> OpenDatasetWizardPatternTransformView:
+    def createInstance(cls,
+                       parent: QWidget | None = None) -> OpenDatasetWizardPatternTransformView:
         view = cls(parent)
 
         layout = QGridLayout()
@@ -215,6 +222,7 @@ class OpenDatasetWizardPatternTransformView(QGroupBox):
 
 
 class OpenDatasetWizardPatternMemoryMapView(QGroupBox):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Memory Map Diffraction Data", parent)
         self.scratchDirectoryLabel = QLabel("Scratch Directory:")
@@ -222,9 +230,8 @@ class OpenDatasetWizardPatternMemoryMapView(QGroupBox):
         self.scratchDirectoryBrowseButton = QPushButton("Browse")
 
     @classmethod
-    def createInstance(
-        cls, parent: QWidget | None = None
-    ) -> OpenDatasetWizardPatternMemoryMapView:
+    def createInstance(cls,
+                       parent: QWidget | None = None) -> OpenDatasetWizardPatternMemoryMapView:
         view = cls(parent)
 
         layout = QGridLayout()
@@ -238,6 +245,7 @@ class OpenDatasetWizardPatternMemoryMapView(QGroupBox):
 
 
 class OpenDatasetWizardPatternsPage(OpenDatasetWizardPage):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.loadView = OpenDatasetWizardPatternLoadView.createInstance()
@@ -262,6 +270,7 @@ class OpenDatasetWizardPatternsPage(OpenDatasetWizardPage):
 
 
 class OpenDatasetWizard(QWizard):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.filesPage = OpenDatasetWizardFilesPage.createInstance()
@@ -281,6 +290,7 @@ class OpenDatasetWizard(QWizard):
 
 
 class PatternsInfoDialog(QDialog):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.treeView = QTreeView()
@@ -309,6 +319,7 @@ class PatternsInfoDialog(QDialog):
 
 
 class PatternsView(QWidget):
+
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.detectorView = DetectorView.createInstance()

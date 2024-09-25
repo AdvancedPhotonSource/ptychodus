@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
 
 
 class GroupBoxWithPresets(QWidget):
+
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._titleLabel = QLabel(title)
@@ -44,6 +45,7 @@ class GroupBoxWithPresets(QWidget):
 
 
 class BottomTitledGroupBox(QGroupBox):
+
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
         super().__init__(title, parent)
         self.setStyleSheet("""

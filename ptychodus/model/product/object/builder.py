@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectBuilder(ParameterGroup):
+
     def __init__(self, name: str) -> None:
         super().__init__()
         self._name = StringParameter(self, "name", name)
@@ -24,12 +25,15 @@ class ObjectBuilder(ParameterGroup):
 
     @abstractmethod
     def build(
-        self, geometryProvider: ObjectGeometryProvider, layerDistanceInMeters: Sequence[float]
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        layerDistanceInMeters: Sequence[float],
     ) -> Object:
         pass
 
 
 class FromMemoryObjectBuilder(ObjectBuilder):
+
     def __init__(self, object_: Object) -> None:
         super().__init__("from_memory")
         self._object = object_.copy()
@@ -38,12 +42,15 @@ class FromMemoryObjectBuilder(ObjectBuilder):
         return FromMemoryObjectBuilder(self._object)
 
     def build(
-        self, geometryProvider: ObjectGeometryProvider, layerDistanceInMeters: Sequence[float]
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        layerDistanceInMeters: Sequence[float],
     ) -> Object:
         return self._object
 
 
 class FromFileObjectBuilder(ObjectBuilder):
+
     def __init__(self, filePath: Path, fileType: str, fileReader: ObjectFileReader) -> None:
         super().__init__("from_file")
         self.filePath = PathParameter(self, "file_path", filePath)
@@ -51,12 +58,13 @@ class FromFileObjectBuilder(ObjectBuilder):
         self._fileReader = fileReader
 
     def copy(self) -> FromFileObjectBuilder:
-        return FromFileObjectBuilder(
-            self.filePath.getValue(), self.fileType.getValue(), self._fileReader
-        )
+        return FromFileObjectBuilder(self.filePath.getValue(), self.fileType.getValue(),
+                                     self._fileReader)
 
     def build(
-        self, geometryProvider: ObjectGeometryProvider, layerDistanceInMeters: Sequence[float]
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        layerDistanceInMeters: Sequence[float],
     ) -> Object:
         filePath = self.filePath.getValue()
         fileType = self.fileType.getValue()

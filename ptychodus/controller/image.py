@@ -41,9 +41,8 @@ class ImageToolsController:
         self._mouseToolButtonGroup = mouseToolButtonGroup
 
     @classmethod
-    def createInstance(
-        cls, view: ImageToolsGroupBox, visualizationController: VisualizationController
-    ) -> ImageToolsController:
+    def createInstance(cls, view: ImageToolsGroupBox,
+                       visualizationController: VisualizationController) -> ImageToolsController:
         view.moveButton.setCheckable(True)
         view.moveButton.setChecked(True)
         view.rulerButton.setCheckable(True)
@@ -69,6 +68,7 @@ class ImageToolsController:
 
 
 class ImageRendererController(Observer):
+
     def __init__(self, engine: VisualizationEngine, view: ImageRendererGroupBox) -> None:
         super().__init__()
         self._engine = engine
@@ -78,9 +78,8 @@ class ImageRendererController(Observer):
         self._variantModel = QStringListModel()
 
     @classmethod
-    def createInstance(
-        cls, engine: VisualizationEngine, view: ImageRendererGroupBox
-    ) -> ImageRendererController:
+    def createInstance(cls, engine: VisualizationEngine,
+                       view: ImageRendererGroupBox) -> ImageRendererController:
         controller = cls(engine, view)
 
         view.rendererComboBox.setModel(controller._rendererModel)
@@ -118,6 +117,7 @@ class ImageRendererController(Observer):
 
 
 class ImageDataRangeController(Observer):
+
     def __init__(
         self,
         engine: VisualizationEngine,
@@ -147,11 +147,9 @@ class ImageDataRangeController(Observer):
         engine.addObserver(controller)
 
         view.minDisplayValueSlider.valueChanged.connect(
-            lambda value: engine.setMinDisplayValue(float(value))
-        )
+            lambda value: engine.setMinDisplayValue(float(value)))
         view.maxDisplayValueSlider.valueChanged.connect(
-            lambda value: engine.setMaxDisplayValue(float(value))
-        )
+            lambda value: engine.setMaxDisplayValue(float(value)))
         view.autoButton.clicked.connect(controller._autoDisplayRange)
         view.editButton.clicked.connect(displayRangeDialog.open)
         displayRangeDialog.finished.connect(controller._finishEditingDisplayRange)
@@ -177,9 +175,8 @@ class ImageDataRangeController(Observer):
             self._displayRangeIsLocked = True
 
     def _syncColorLegendToView(self) -> None:
-        values = numpy.linspace(
-            self._engine.getMinDisplayValue(), self._engine.getMaxDisplayValue(), 1000
-        )
+        values = numpy.linspace(self._engine.getMinDisplayValue(),
+                                self._engine.getMaxDisplayValue(), 1000)
         self._imageWidget.setColorLegendColors(
             values,
             self._engine.colorize(values),
@@ -209,6 +206,7 @@ class ImageDataRangeController(Observer):
 
 
 class ImageController:
+
     def __init__(
         self,
         engine: VisualizationEngine,
@@ -217,13 +215,14 @@ class ImageController:
     ) -> None:
         self._visualizationController = visualizationController
         self._toolsController = ImageToolsController.createInstance(
-            view.imageRibbon.imageToolsGroupBox, visualizationController
-        )
+            view.imageRibbon.imageToolsGroupBox, visualizationController)
         self._rendererController = ImageRendererController.createInstance(
-            engine, view.imageRibbon.colormapGroupBox
-        )
+            engine, view.imageRibbon.colormapGroupBox)
         self._dataRangeController = ImageDataRangeController.createInstance(
-            engine, view.imageRibbon.dataRangeGroupBox, view.imageWidget, visualizationController
+            engine,
+            view.imageRibbon.dataRangeGroupBox,
+            view.imageWidget,
+            visualizationController,
         )
 
     @classmethod
@@ -235,8 +234,7 @@ class ImageController:
         fileDialogFactory: FileDialogFactory,
     ) -> ImageController:
         visualizationController = VisualizationController.createInstance(
-            engine, view.imageWidget, statusBar, fileDialogFactory
-        )
+            engine, view.imageWidget, statusBar, fileDialogFactory)
         return cls(engine, view, visualizationController)
 
     def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:

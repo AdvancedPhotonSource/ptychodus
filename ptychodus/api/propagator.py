@@ -50,7 +50,7 @@ class PropagatorParameters:
         return numpy.square(self.dx) / numpy.absolute(self.z)
 
     def get_spatial_coordinates(self) -> tuple[RealArrayType, RealArrayType]:
-        JJ, II = numpy.mgrid[: self.height_px, : self.width_px]
+        JJ, II = numpy.mgrid[:self.height_px, :self.width_px]
         XX = II - self.width_px // 2
         YY = JJ - self.height_px // 2
         return YY, XX
@@ -63,12 +63,14 @@ class PropagatorParameters:
 
 
 class Propagator(ABC):
+
     @abstractmethod
     def propagate(self, wavefield: WavefieldArrayType) -> WavefieldArrayType:
         pass
 
 
 class AngularSpectrumPropagator(Propagator):
+
     def __init__(self, parameters: PropagatorParameters) -> None:
         ar = parameters.pixel_aspect_ratio
 
@@ -85,6 +87,7 @@ class AngularSpectrumPropagator(Propagator):
 
 
 class FresnelTransferFunctionPropagator(Propagator):
+
     def __init__(self, parameters: PropagatorParameters) -> None:
         ar = parameters.pixel_aspect_ratio
 
@@ -100,6 +103,7 @@ class FresnelTransferFunctionPropagator(Propagator):
 
 
 class FresnelTransformPropagator(Propagator):
+
     def __init__(self, parameters: PropagatorParameters) -> None:
         ipi = 1j * numpy.pi
 
@@ -126,6 +130,7 @@ class FresnelTransformPropagator(Propagator):
 
 
 class FraunhoferPropagator(Propagator):
+
     def __init__(self, parameters: PropagatorParameters) -> None:
         ipi = 1j * numpy.pi
 

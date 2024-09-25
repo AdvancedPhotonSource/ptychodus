@@ -17,6 +17,7 @@ class WorkflowStatus:
 
 
 class WorkflowStatusRepository(Sequence[WorkflowStatus]):
+
     def __init__(self) -> None:
         super().__init__()
         self._statusLock = threading.Lock()
@@ -25,10 +26,12 @@ class WorkflowStatusRepository(Sequence[WorkflowStatus]):
         self.refreshStatusEvent = threading.Event()
 
     @overload
-    def __getitem__(self, index: int) -> WorkflowStatus: ...
+    def __getitem__(self, index: int) -> WorkflowStatus:
+        ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]: ...
+    def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]:
+        ...
 
     def __getitem__(self, index: int | slice) -> WorkflowStatus | Sequence[WorkflowStatus]:
         with self._statusLock:

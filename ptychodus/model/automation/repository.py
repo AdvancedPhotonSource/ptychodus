@@ -18,6 +18,7 @@ class AutomationDatasetState(Enum):
 
 
 class AutomationDatasetRepository(Observable):
+
     def __init__(self, settings: AutomationSettings) -> None:
         super().__init__()
         self._settings = settings

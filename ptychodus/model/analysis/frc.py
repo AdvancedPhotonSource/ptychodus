@@ -40,6 +40,7 @@ class FourierRingCorrelation:
 
 
 class FourierRingCorrelator:
+
     def __init__(self, repository: ObjectRepository) -> None:
         self._repository = repository
 

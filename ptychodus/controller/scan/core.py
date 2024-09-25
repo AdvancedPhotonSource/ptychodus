@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScanController(SequenceObserver[ScanRepositoryItem]):
+
     def __init__(
         self,
         repository: ScanRepository,
@@ -51,12 +52,10 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         tableModel = ScanTableModel(repository, api)
         proxyModel = QSortFilterProxyModel()
         proxyModel.setSourceModel(tableModel)
-        controller = cls(
-            repository, api, view, plotView, fileDialogFactory, tableModel, proxyModel
-        )
+        controller = cls(repository, api, view, plotView, fileDialogFactory, tableModel,
+                         proxyModel)
         proxyModel.dataChanged.connect(
-            lambda topLeft, bottomRight, roles: controller._redrawPlot()
-        )
+            lambda topLeft, bottomRight, roles: controller._redrawPlot())
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -71,8 +70,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         controller._updateView(QModelIndex(), QModelIndex())
 
         view.tableView.horizontalHeader().sectionClicked.connect(
-            lambda logicalIndex: controller._redrawPlot()
-        )
+            lambda logicalIndex: controller._redrawPlot())
 
         loadFromFileAction = view.buttonBox.loadMenu.addAction("Open File...")
         loadFromFileAction.triggered.connect(controller._loadCurrentScanFromFile)
@@ -130,7 +128,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
     def _finishCopyingScan(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
-            destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
+            destinationIndex = (self._view.copierDialog.destinationComboBox.currentIndex())
             self._api.copyScan(sourceIndex, destinationIndex)
 
     def _editCurrentScan(self) -> None:

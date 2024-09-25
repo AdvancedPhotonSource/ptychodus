@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPackObjectCorrectionController(Observer):
-    def __init__(
-        self, presenter: PtychoPackPresenter, view: PtychoPackObjectCorrectionView
-    ) -> None:
+
+    def __init__(self, presenter: PtychoPackPresenter,
+                 view: PtychoPackObjectCorrectionView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
@@ -58,14 +58,11 @@ class PtychoPackObjectCorrectionController(Observer):
 
     def _sync_model_to_view(self) -> None:
         self._view.plan_widget.start_lineedit.setText(
-            str(self._presenter.get_object_correction_plan_start())
-        )
+            str(self._presenter.get_object_correction_plan_start()))
         self._view.plan_widget.stop_lineedit.setText(
-            str(self._presenter.get_object_correction_plan_stop())
-        )
+            str(self._presenter.get_object_correction_plan_stop()))
         self._view.plan_widget.stride_lineedit.setText(
-            str(self._presenter.get_object_correction_plan_stride())
-        )
+            str(self._presenter.get_object_correction_plan_stride()))
 
         self._view.pie_alpha_slider.setValueAndRange(
             self._presenter.get_pie_alpha(),

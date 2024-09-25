@@ -28,6 +28,7 @@ class ExposureMap:
 
 
 class ExposureAnalyzer:
+
     def __init__(self, repository: ProductRepository) -> None:
         self._repository = repository
 

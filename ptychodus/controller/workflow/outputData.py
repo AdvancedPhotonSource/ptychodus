@@ -9,17 +9,16 @@ from ...view.workflow import WorkflowOutputDataView
 
 
 class WorkflowOutputDataController(Observer):
-    def __init__(
-        self, presenter: WorkflowParametersPresenter, view: WorkflowOutputDataView
-    ) -> None:
+
+    def __init__(self, presenter: WorkflowParametersPresenter,
+                 view: WorkflowOutputDataView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(
-        cls, presenter: WorkflowParametersPresenter, view: WorkflowOutputDataView
-    ) -> WorkflowOutputDataController:
+    def createInstance(cls, presenter: WorkflowParametersPresenter,
+                       view: WorkflowOutputDataView) -> WorkflowOutputDataController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 

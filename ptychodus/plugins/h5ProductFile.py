@@ -7,7 +7,12 @@ import h5py
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe
-from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter, ProductMetadata
+from ptychodus.api.product import (
+    Product,
+    ProductFileReader,
+    ProductFileWriter,
+    ProductMetadata,
+)
 from ptychodus.api.scan import Scan, ScanPoint
 
 logger = logging.getLogger(__name__)
@@ -104,7 +109,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             metadata = product.metadata
             h5File.attrs[self.NAME] = metadata.name
             h5File.attrs[self.COMMENTS] = metadata.comments
-            h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorDistanceInMeters
+            h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = (metadata.detectorDistanceInMeters)
             h5File.attrs[self.PROBE_ENERGY] = metadata.probeEnergyInElectronVolts
             h5File.attrs[self.PROBE_PHOTON_FLUX] = metadata.probePhotonsPerSecond
             h5File.attrs[self.EXPOSURE_TIME] = metadata.exposureTimeInSeconds
@@ -125,7 +130,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5Object.attrs[self.OBJECT_CENTER_X] = objectGeometry.centerXInMeters
             h5Object.attrs[self.OBJECT_CENTER_Y] = objectGeometry.centerYInMeters
             h5Object.attrs[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixelWidthInMeters
-            h5Object.attrs[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixelHeightInMeters
+            h5Object.attrs[self.OBJECT_PIXEL_HEIGHT] = (objectGeometry.pixelHeightInMeters)
             h5File.create_dataset(self.OBJECT_LAYER_DISTANCE, data=object_.layerDistanceInMeters)
 
             h5File.create_dataset(self.COSTS_ARRAY, data=product.costs)

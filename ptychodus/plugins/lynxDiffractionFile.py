@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class LYNXDiffractionFileReader(DiffractionFileReader):
+
     def __init__(self) -> None:
         self._dataPath = "/entry/data/eiger_4"
         self._treeBuilder = H5DiffractionFileTreeBuilder()

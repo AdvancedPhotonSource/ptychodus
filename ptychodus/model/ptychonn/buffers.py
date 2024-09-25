@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class PatternCircularBuffer:
+
     def __init__(self, extent: ImageExtent, maxSize: int) -> None:
         self._buffer: Float32ArrayType = numpy.zeros(
             (maxSize, *extent.shape),
@@ -37,7 +38,7 @@ class PatternCircularBuffer:
             self._full = True
 
     def getBuffer(self) -> Float32ArrayType:
-        return self._buffer if self._full else self._buffer[: self._pos]
+        return self._buffer if self._full else self._buffer[:self._pos]
 
     def setBuffer(self, array: Float32ArrayType) -> None:
         self._buffer = array
@@ -46,6 +47,7 @@ class PatternCircularBuffer:
 
 
 class ObjectPatchCircularBuffer:
+
     def __init__(self, extent: ImageExtent, channels: int, maxSize: int) -> None:
         self._buffer: Float32ArrayType = numpy.zeros(
             (maxSize, channels, *extent.shape),
@@ -75,7 +77,7 @@ class ObjectPatchCircularBuffer:
             self._full = True
 
     def getBuffer(self) -> Float32ArrayType:
-        return self._buffer if self._full else self._buffer[: self._pos]
+        return self._buffer if self._full else self._buffer[:self._pos]
 
     def setBuffer(self, array: Float32ArrayType) -> None:
         self._buffer = array

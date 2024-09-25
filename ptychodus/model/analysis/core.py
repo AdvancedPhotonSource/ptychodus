@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class AnalysisCore:
+
     def __init__(
         self,
         settingsRegistry: SettingsRegistry,
@@ -60,9 +61,8 @@ class AnalysisCore:
         self.xmcdAnalyzer = XMCDAnalyzer(objectRepository)
         self.xmcdVisualizationEngine = VisualizationEngine(isComplex=False)
 
-    def enhanceFluorescence(
-        self, productIndex: int, inputFilePath: Path, outputFilePath: Path
-    ) -> int:
+    def enhanceFluorescence(self, productIndex: int, inputFilePath: Path,
+                            outputFilePath: Path) -> int:
         fileType = "XRF-Maps"
 
         try:

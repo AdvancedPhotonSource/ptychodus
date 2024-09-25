@@ -24,6 +24,7 @@ class PtychoPackAlgorithm(enum.Enum):
 
 
 class PtychoPackParametersView(QGroupBox):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("PtychoPack", parent)
         self.device_combobox = QComboBox()
@@ -39,6 +40,7 @@ class PtychoPackParametersView(QGroupBox):
 
 
 class PtychoPackExitWaveCorrectionView(QGroupBox):
+
     def __init__(self, algorithm: PtychoPackAlgorithm, parent: QWidget | None = None) -> None:
         super().__init__("Exit Wave Correction", parent)
         self.dm_relaxation_slider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
@@ -56,6 +58,7 @@ class PtychoPackExitWaveCorrectionView(QGroupBox):
 
 
 class PtychoPackCorrectionPlanWidget(QWidget):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.start_lineedit = QLineEdit()
@@ -79,6 +82,7 @@ class PtychoPackCorrectionPlanWidget(QWidget):
 
 
 class PtychoPackObjectCorrectionView(QGroupBox):
+
     def __init__(self, algorithm: PtychoPackAlgorithm, parent: QWidget | None = None) -> None:
         super().__init__("Object Correction", parent)
         self.plan_widget = PtychoPackCorrectionPlanWidget()
@@ -96,6 +100,7 @@ class PtychoPackObjectCorrectionView(QGroupBox):
 
 
 class PtychoPackProbeCorrectionView(QGroupBox):
+
     def __init__(self, algorithm: PtychoPackAlgorithm, parent: QWidget | None = None) -> None:
         super().__init__("Probe Correction", parent)
         self.plan_widget = PtychoPackCorrectionPlanWidget()
@@ -113,6 +118,7 @@ class PtychoPackProbeCorrectionView(QGroupBox):
 
 
 class PtychoPackPositionCorrectionView(QGroupBox):
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Position Correction", parent)
         self.plan_widget = PtychoPackCorrectionPlanWidget()
@@ -127,6 +133,7 @@ class PtychoPackPositionCorrectionView(QGroupBox):
 
 
 class PtychoPackView(QWidget):
+
     def __init__(self, algorithm: PtychoPackAlgorithm, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.parameters_view = PtychoPackParametersView()

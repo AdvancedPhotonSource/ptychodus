@@ -30,7 +30,11 @@ from .analysis import (
     STXMSimulator,
     XMCDAnalyzer,
 )
-from .automation import AutomationCore, AutomationPresenter, AutomationProcessingPresenter
+from .automation import (
+    AutomationCore,
+    AutomationPresenter,
+    AutomationProcessingPresenter,
+)
 from .memory import MemoryPresenter
 from .patterns import (
     DetectorPresenter,
@@ -86,9 +90,11 @@ def configureLogger(isDeveloperModeEnabled: bool) -> None:
 
 
 class ModelCore:
-    def __init__(
-        self, settingsFile: Path | None = None, *, isDeveloperModeEnabled: bool = False
-    ) -> None:
+
+    def __init__(self,
+                 settingsFile: Path | None = None,
+                 *,
+                 isDeveloperModeEnabled: bool = False) -> None:
         configureLogger(isDeveloperModeEnabled)
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.loadPlugins()
@@ -125,14 +131,11 @@ class ModelCore:
         self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
 
         self.ptychoPackReconstructorLibrary = PtychoPackReconstructorLibrary(
-            self.settingsRegistry, isDeveloperModeEnabled
-        )
+            self.settingsRegistry, isDeveloperModeEnabled)
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, isDeveloperModeEnabled
-        )
+            self.settingsRegistry, isDeveloperModeEnabled)
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, isDeveloperModeEnabled
-        )
+            self.settingsRegistry, isDeveloperModeEnabled)
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             self._patternsCore.dataset,
@@ -178,7 +181,8 @@ class ModelCore:
         return self
 
     @overload
-    def __exit__(self, exception_type: None, exception_value: None, traceback: None) -> None: ...
+    def __exit__(self, exception_type: None, exception_value: None, traceback: None) -> None:
+        ...
 
     @overload
     def __exit__(
@@ -186,7 +190,8 @@ class ModelCore:
         exception_type: type[BaseException],
         exception_value: BaseException,
         traceback: TracebackType,
-    ) -> None: ...
+    ) -> None:
+        ...
 
     def __exit__(
         self,
@@ -199,7 +204,7 @@ class ModelCore:
         self._patternsCore.stop()
 
     @property
-    def diffractionDatasetInputOutputPresenter(self) -> DiffractionDatasetInputOutputPresenter:
+    def diffractionDatasetInputOutputPresenter(self, ) -> DiffractionDatasetInputOutputPresenter:
         return self._patternsCore.datasetInputOutputPresenter
 
     @property
@@ -255,14 +260,12 @@ class ModelCore:
         self._patternsCore.patternsAPI.assemble(array)
         self._productCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)  # FIXME
 
-    def assembleScanPositionsX(
-        self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]
-    ) -> None:
+    def assembleScanPositionsX(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._productCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)  # FIXME
 
-    def assembleScanPositionsY(
-        self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]
-    ) -> None:
+    def assembleScanPositionsY(self, valuesInMeters: Sequence[float],
+                               timeStamps: Sequence[float]) -> None:
         self._productCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)  # FIXME
 
     def finalizeStreamingWorkflow(self) -> None:
@@ -294,20 +297,21 @@ class ModelCore:
         if action.lower() == "reconstruct":
             outputProductName = self._productCore.productAPI.getItemName(inputProductIndex)
             outputProductIndex = self._reconstructorCore.reconstructorAPI.reconstruct(
-                inputProductIndex, outputProductName
-            )
+                inputProductIndex, outputProductName)
 
             if outputProductIndex < 0:
                 logger.error(f'Failed to reconstruct product index="{inputProductIndex}"')
                 return -1
 
-            self._productCore.productAPI.saveProduct(
-                outputProductIndex, outputFilePath, fileType="NPZ"
-            )
+            self._productCore.productAPI.saveProduct(outputProductIndex,
+                                                     outputFilePath,
+                                                     fileType="NPZ")
 
-            if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
+            if (fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None):
                 self._analysisCore.enhanceFluorescence(
-                    outputProductIndex, fluorescenceInputFilePath, fluorescenceOutputFilePath
+                    outputProductIndex,
+                    fluorescenceInputFilePath,
+                    fluorescenceOutputFilePath,
                 )
 
         elif action.lower() == "train":

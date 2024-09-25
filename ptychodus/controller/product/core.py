@@ -3,7 +3,13 @@ from collections.abc import Sequence
 from typing import Any
 import logging
 
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
+from PyQt5.QtCore import (
+    Qt,
+    QAbstractTableModel,
+    QModelIndex,
+    QObject,
+    QSortFilterProxyModel,
+)
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
 from ...model.product import (
@@ -25,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProductRepositoryTableModel(QAbstractTableModel):
+
     def __init__(self, repository: ProductRepository, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._repository = repository
@@ -48,9 +55,12 @@ class ProductRepositoryTableModel(QAbstractTableModel):
         return value
 
     def headerData(
-        self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+        if (orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole):
             return self._header[section]
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -83,9 +93,10 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     product = item.getProduct()
                     return f"{product.sizeInBytes / (1024 * 1024):.2f}"
 
-    def setData(
-        self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole
-    ) -> bool:
+    def setData(self,
+                index: QModelIndex,
+                value: Any,
+                role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             try:
                 item = self._repository[index.row()]
@@ -141,6 +152,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
 
 class ProductController(ProductRepositoryObserver):
+
     def __init__(
         self,
         repository: ProductRepository,
@@ -177,7 +189,13 @@ class ProductController(ProductRepositoryObserver):
         tableProxyModel.setSourceModel(tableModel)
 
         controller = cls(
-            repository, api, view, fileDialogFactory, duplicateAction, tableModel, tableProxyModel
+            repository,
+            api,
+            view,
+            fileDialogFactory,
+            duplicateAction,
+            tableModel,
+            tableProxyModel,
         )
         repository.addObserver(controller)
         controller._updateInfoText()

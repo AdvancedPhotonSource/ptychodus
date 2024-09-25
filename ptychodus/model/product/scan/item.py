@@ -17,8 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 class ScanRepositoryItem(ParameterGroup):
+
     def __init__(
-        self, settings: ScanSettings, builder: ScanBuilder, transform: ScanPointTransform
+        self,
+        settings: ScanSettings,
+        builder: ScanBuilder,
+        transform: ScanPointTransform,
     ) -> None:
         super().__init__()
         self._builder = builder
@@ -32,9 +36,8 @@ class ScanRepositoryItem(ParameterGroup):
         self._addGroup("builder", builder, observe=True)
         self._addGroup("transform", transform, observe=True)
 
-        self.expandBoundingBox = BooleanParameter(
-            self, "expand_bbox", settings.expandBoundingBox.getValue()
-        )
+        self.expandBoundingBox = BooleanParameter(self, "expand_bbox",
+                                                  settings.expandBoundingBox.getValue())
         self.expandedBoundingBoxMinimumXInMeters = RealParameter(
             self,
             "expanded_bbox_xmin_m",
@@ -91,7 +94,7 @@ class ScanRepositoryItem(ParameterGroup):
                 minimumYInMeters=self.expandedBoundingBoxMinimumYInMeters.getValue(),
                 maximumYInMeters=self.expandedBoundingBoxMaximumYInMeters.getValue(),
             )
-            bbox = expandedBoundingBox if bbox is None else bbox.hull(expandedBoundingBox)
+            bbox = (expandedBoundingBox if bbox is None else bbox.hull(expandedBoundingBox))
 
         return bbox
 

@@ -4,7 +4,11 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
+from ptychodus.api.visualization import (
+    NumberArrayType,
+    RealArrayType,
+    VisualizationProduct,
+)
 
 from .colorAxis import ColorAxis
 from .colormap import ColormapParameter
@@ -14,6 +18,7 @@ from .transformation import ScalarTransformationParameter
 
 
 class ColormapRenderer(Renderer):
+
     def __init__(
         self,
         component: DataArrayComponent,
@@ -55,7 +60,11 @@ class ColormapRenderer(Renderer):
         return self._colorize(valuesTransformed)
 
     def render(
-        self, array: NumberArrayType, pixelGeometry: PixelGeometry, *, autoscaleColorAxis: bool
+        self,
+        array: NumberArrayType,
+        pixelGeometry: PixelGeometry,
+        *,
+        autoscaleColorAxis: bool,
     ) -> VisualizationProduct:
         values = self._component.calculate(array)
         valuesTransformed = self._transformation.transform(values)
