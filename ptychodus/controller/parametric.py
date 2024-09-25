@@ -26,7 +26,7 @@ from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWi
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "ParameterDialogBuilder",
+    "ParameterViewBuilder",
 ]
 
 
@@ -204,6 +204,15 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
             self._syncModelToView()
 
 
+class ParameterWidget(QWidget):
+
+    def __init__(self,
+                 viewControllers: Sequence[ParameterViewController],
+                 parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._viewControllers = viewControllers
+
+
 class ParameterDialog(QDialog):
 
     def __init__(
@@ -228,7 +237,7 @@ class ParameterDialog(QDialog):
             self.reject()
 
 
-class ParameterDialogBuilder:
+class ParameterViewBuilder:
 
     def __init__(self) -> None:
         self._viewControllersTop: list[ParameterViewController] = list()
@@ -317,7 +326,7 @@ class ParameterDialogBuilder:
     def addViewControllerToBottom(self, viewController: ParameterViewController) -> None:
         self._viewControllersBottom.append(viewController)
 
-    def build(self, windowTitle: str, parent: QWidget | None) -> QDialog:
+    def _buildLayout(self) -> QVBoxLayout:
         groupDict: dict[str, QFormLayout] = dict()
 
         for (groupName, widgetLabel), vc in self._viewControllers.items():
@@ -345,20 +354,35 @@ class ParameterDialogBuilder:
         for viewController in self._viewControllersBottom:
             layout.addWidget(viewController.getWidget())
 
-        buttonBox = QDialogButtonBox()
-        layout.addWidget(buttonBox)
+        return layout
 
+    def _flushViewControllers(self) -> Sequence[ParameterViewController]:
         viewControllers: list[ParameterViewController] = list()
         viewControllers.extend(self._viewControllersTop)
         viewControllers.extend(self._viewControllers.values())
         viewControllers.extend(self._viewControllersBottom)
 
-        dialog = ParameterDialog(list(self._viewControllers.values()), buttonBox, parent)
-        dialog.setLayout(layout)
-        dialog.setWindowTitle(windowTitle)
-
         self._viewControllersTop.clear()
         self._viewControllers.clear()
         self._viewControllersBottom.clear()
+
+        return viewControllers
+
+    def buildWidget(self) -> QWidget:
+        layout = self._buildLayout()
+
+        widget = ParameterWidget(self._flushViewControllers())
+        widget.setLayout(layout)
+
+        return widget
+
+    def buildDialog(self, windowTitle: str, parent: QWidget | None) -> QDialog:
+        buttonBox = QDialogButtonBox()
+        layout = self._buildLayout()
+        layout.addWidget(buttonBox)
+
+        dialog = ParameterDialog(self._flushViewControllers(), buttonBox, parent)
+        dialog.setLayout(layout)
+        dialog.setWindowTitle(windowTitle)
 
         return dialog

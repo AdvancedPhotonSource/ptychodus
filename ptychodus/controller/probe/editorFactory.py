@@ -28,7 +28,7 @@ from ...model.product.probe import (
 from ...view.widgets import GroupBoxWithPresets
 from ..parametric import (
     LengthWidgetParameterViewController,
-    ParameterDialogBuilder,
+    ParameterViewBuilder,
     ParameterViewController,
 )
 from .zernike import ZernikeTableModel
@@ -167,7 +167,7 @@ class ProbeEditorViewControllerFactory:
 
     def _appendAdditionalModes(
         self,
-        dialogBuilder: ParameterDialogBuilder,
+        dialogBuilder: ParameterViewBuilder,
         modesBuilder: MultimodalProbeBuilder,
     ) -> None:
         additionalModesGroup = "Additional Modes"
@@ -201,11 +201,11 @@ class ProbeEditorViewControllerFactory:
         title = f"{itemName} [{builderName}]"
 
         if isinstance(probeBuilder, AveragePatternProbeBuilder):
-            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder = ParameterViewBuilder()
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build(title, parent)
+            return dialogBuilder.buildDialog(title, parent)
         elif isinstance(probeBuilder, DiskProbeBuilder):
-            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.diameterInMeters,
                 "Diameter:",
@@ -217,15 +217,15 @@ class ProbeEditorViewControllerFactory:
                 group=primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build(title, parent)
+            return dialogBuilder.buildDialog(title, parent)
         elif isinstance(probeBuilder, FresnelZonePlateProbeBuilder):
-            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addViewControllerToTop(
                 FresnelZonePlateViewController(primaryModeGroup, probeBuilder))
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build(title, parent)
+            return dialogBuilder.buildDialog(title, parent)
         elif isinstance(probeBuilder, RectangularProbeBuilder):
-            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.widthInMeters,
                 "Width:",
@@ -242,9 +242,9 @@ class ProbeEditorViewControllerFactory:
                 group=primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build(title, parent)
+            return dialogBuilder.buildDialog(title, parent)
         elif isinstance(probeBuilder, SuperGaussianProbeBuilder):
-            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.annularRadiusInMeters,
                 "Annular Radius:",
@@ -261,13 +261,13 @@ class ProbeEditorViewControllerFactory:
                 group=primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build(title, parent)
+            return dialogBuilder.buildDialog(title, parent)
         elif isinstance(probeBuilder, ZernikeProbeBuilder):
-            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addViewControllerToTop(
                 ZernikeViewController(primaryModeGroup, probeBuilder))
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build(title, parent)
+            return dialogBuilder.buildDialog(title, parent)
 
         return QMessageBox(
             QMessageBox.Icon.Information,

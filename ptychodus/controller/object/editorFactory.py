@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QDialog, QMessageBox, QSpinBox, QWidget
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.product.object import ObjectRepositoryItem, RandomObjectBuilder
-from ..parametric import ParameterDialogBuilder, ParameterViewController
+from ..parametric import ParameterViewBuilder, ParameterViewController
 
 
 class MultisliceViewController(ParameterViewController, Observer):
@@ -46,7 +46,7 @@ class ObjectEditorViewControllerFactory:
         title = f"{itemName} [{builderName}]"
 
         if isinstance(objectBuilder, RandomObjectBuilder):
-            dialogBuilder = ParameterDialogBuilder()
+            dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addSpinBox(objectBuilder.extraPaddingX,
                                      "Extra Padding X:",
                                      group=firstLayerGroup)
@@ -69,7 +69,7 @@ class ObjectEditorViewControllerFactory:
                 "Number of Layers:",
                 group=additionalLayersGroup,
             )
-            return dialogBuilder.build(title, parent)
+            return dialogBuilder.buildDialog(title, parent)
 
         return QMessageBox(
             QMessageBox.Icon.Information,
