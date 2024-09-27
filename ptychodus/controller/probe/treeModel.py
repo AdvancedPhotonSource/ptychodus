@@ -35,13 +35,13 @@ class ProbeTreeModel(QAbstractItemModel):
         self._api = api
         self._treeRoot = ProbeTreeNode()
         self._header = [
-            "Name",
-            "Relative Power",
-            "Builder",
-            "Data Type",
-            "Width [px]",
-            "Height [px]",
-            "Size [MB]",
+            'Name',
+            'Relative Power',
+            'Builder',
+            'Data Type',
+            'Width [px]',
+            'Height [px]',
+            'Size [MB]',
         ]
 
         for index, item in enumerate(repository):
@@ -143,7 +143,7 @@ class ProbeTreeModel(QAbstractItemModel):
             item = self._repository[parent.row()]
 
             if role == Qt.ItemDataRole.DisplayRole and index.column() == 0:
-                return f"Mode {index.row() + 1}"
+                return f'Mode {index.row() + 1}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.getProbe()
 
@@ -172,7 +172,7 @@ class ProbeTreeModel(QAbstractItemModel):
                 elif index.column() == 5:
                     return probe.heightInPixels
                 elif index.column() == 6:
-                    return f"{probe.sizeInBytes / (1024 * 1024):.2f}"
+                    return f'{probe.sizeInBytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.getProbe()
                 coherence = probe.getCoherence()

@@ -50,19 +50,19 @@ class ExposureAnalyzer:
         return [self.getSaveFileFilter()]
 
     def getSaveFileFilter(self) -> str:
-        return "NumPy Zipped Archive (*.npz)"
+        return 'NumPy Zipped Archive (*.npz)'
 
     def saveResult(self, filePath: Path, result: ExposureMap) -> None:
         numpy.savez(
             filePath,
-            "pixel_height_m",
+            'pixel_height_m',
             result.pixel_height_m,
-            "pixel_width_m",
+            'pixel_width_m',
             result.pixel_width_m,
-            "center_x_m",
+            'center_x_m',
             result.center_x_m,
-            "center_y_m",
+            'center_y_m',
             result.center_y_m,
-            "counts",
+            'counts',
             result.counts,
         )

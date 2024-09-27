@@ -35,9 +35,9 @@ class AutomationDatasetRepository(Observable):
                     self._fileList.append(filePath)
                     self._fileState[filePath] = state
                 else:
-                    logger.error(f"{filePath}: UNKNOWN -> {state}")
+                    logger.error(f'{filePath}: UNKNOWN -> {state}')
             else:
-                logger.debug(f"{filePath}: {priorState} -> {state}")
+                logger.debug(f'{filePath}: {priorState} -> {state}')
                 self._fileState[filePath] = state
 
             self._changedEvent.set()

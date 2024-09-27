@@ -13,17 +13,17 @@ class SpiralScanBuilder(ScanBuilder):
     """https://doi.org/10.1364/OE.22.012634"""
 
     def __init__(self, settings: ScanSettings) -> None:
-        super().__init__("spiral")
+        super().__init__('spiral')
         self._settings = settings
         self.numberOfPoints = IntegerParameter(
             self,
-            "number_of_points",
+            'number_of_points',
             settings.numberOfPoints,
             minimum=0,
         )
         self.radiusScalarInMeters = RealParameter(
             self,
-            "radius_scalar_m",
+            'radius_scalar_m',
             float(settings.radiusScalarInMeters.getValue()),
             minimum=0.0,
         )

@@ -28,7 +28,7 @@ class DifferenceMapReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return "DM"
+        return 'DM'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         scan_input = parameters.product.scan

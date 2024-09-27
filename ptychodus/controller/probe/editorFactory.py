@@ -34,7 +34,7 @@ from ..parametric import (
 from .zernike import ZernikeTableModel
 
 __all__ = [
-    "ProbeEditorViewControllerFactory",
+    'ProbeEditorViewControllerFactory',
 ]
 
 
@@ -62,16 +62,16 @@ class FresnelZonePlateViewController(ParameterViewController):
 
         layout = QFormLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addRow("Zone Plate Diameter:", self._zonePlateDiameterViewController.getWidget())
+        layout.addRow('Zone Plate Diameter:', self._zonePlateDiameterViewController.getWidget())
         layout.addRow(
-            "Outermost Zone Width:",
+            'Outermost Zone Width:',
             self._outermostZoneWidthInMetersViewController.getWidget(),
         )
         layout.addRow(
-            "Central Beamstop Diameter:",
+            'Central Beamstop Diameter:',
             self._centralBeamstopDiameterInMetersViewController.getWidget(),
         )
-        layout.addRow("Defocus Distance:", self._defocusDistanceInMetersViewController.getWidget())
+        layout.addRow('Defocus Distance:', self._defocusDistanceInMetersViewController.getWidget())
         self._widget.contents.setLayout(layout)
 
     def getWidget(self) -> QWidget:
@@ -93,8 +93,8 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._coefficientsTableView.setModel(self._coefficientsTableModel)
 
         layout = QFormLayout()
-        layout.addRow("Diameter:", self._diameterViewController.getWidget())
-        layout.addRow("Order:", self._orderSpinBox)
+        layout.addRow('Diameter:', self._diameterViewController.getWidget())
+        layout.addRow('Order:', self._orderSpinBox)
         layout.addRow(self._coefficientsTableView)
         self._widget.setLayout(layout)
 
@@ -121,8 +121,8 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
     def __init__(self, parameter: StringParameter) -> None:
         super().__init__()
         self._parameter = parameter
-        self._polynomialDecayButton = QRadioButton("Polynomial")
-        self._exponentialDecayButton = QRadioButton("Exponential")
+        self._polynomialDecayButton = QRadioButton('Polynomial')
+        self._exponentialDecayButton = QRadioButton('Exponential')
 
         self._buttonGroup = QButtonGroup()
         self._buttonGroup.addButton(
@@ -173,25 +173,25 @@ class ProbeEditorViewControllerFactory:
         dialogBuilder: ParameterViewBuilder,
         modesBuilder: MultimodalProbeBuilder,
     ) -> None:
-        additionalModesGroup = "Additional Modes"
+        additionalModesGroup = 'Additional Modes'
         dialogBuilder.addSpinBox(
             modesBuilder.numberOfModes,
-            "Number of Modes:",
+            'Number of Modes:',
             group=additionalModesGroup,
         )
         dialogBuilder.addCheckBox(
             modesBuilder.isOrthogonalizeModesEnabled,
-            "Orthogonalize Modes:",
+            'Orthogonalize Modes:',
             group=additionalModesGroup,
         )
         dialogBuilder.addViewController(
             DecayTypeParameterViewController(modesBuilder.modeDecayType),
-            "Decay Type:",
+            'Decay Type:',
             group=additionalModesGroup,
         )
         dialogBuilder.addDecimalSlider(
             modesBuilder.modeDecayRatio,
-            "Decay Ratio:",
+            'Decay Ratio:',
             group=additionalModesGroup,
         )
 
@@ -201,8 +201,8 @@ class ProbeEditorViewControllerFactory:
         probeBuilder = item.getBuilder()
         builderName = probeBuilder.getName()
         modesBuilder = item.getAdditionalModesBuilder()
-        primaryModeGroup = "Primary Mode"
-        title = f"{itemName} [{builderName}]"
+        primaryModeGroup = 'Primary Mode'
+        title = f'{itemName} [{builderName}]'
 
         if isinstance(probeBuilder, AveragePatternProbeBuilder):
             dialogBuilder = ParameterViewBuilder()
@@ -212,12 +212,12 @@ class ProbeEditorViewControllerFactory:
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.diameterInMeters,
-                "Diameter:",
+                'Diameter:',
                 group=primaryModeGroup,
             )
             dialogBuilder.addLengthWidget(
                 probeBuilder.defocusDistanceInMeters,
-                "Defocus Distance:",
+                'Defocus Distance:',
                 group=primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
@@ -233,17 +233,17 @@ class ProbeEditorViewControllerFactory:
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.widthInMeters,
-                "Width:",
+                'Width:',
                 group=primaryModeGroup,
             )
             dialogBuilder.addLengthWidget(
                 probeBuilder.heightInMeters,
-                "Height:",
+                'Height:',
                 group=primaryModeGroup,
             )
             dialogBuilder.addLengthWidget(
                 probeBuilder.defocusDistanceInMeters,
-                "Defocus Distance:",
+                'Defocus Distance:',
                 group=primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
@@ -252,17 +252,17 @@ class ProbeEditorViewControllerFactory:
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addLengthWidget(
                 probeBuilder.annularRadiusInMeters,
-                "Annular Radius:",
+                'Annular Radius:',
                 group=primaryModeGroup,
             )
             dialogBuilder.addLengthWidget(
                 probeBuilder.fwhmInMeters,
-                "Full Width at Half Maximum:",
+                'Full Width at Half Maximum:',
                 group=primaryModeGroup,
             )
             dialogBuilder.addDecimalLineEdit(
                 probeBuilder.orderParameter,
-                "Order Parameter:",
+                'Order Parameter:',
                 group=primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)

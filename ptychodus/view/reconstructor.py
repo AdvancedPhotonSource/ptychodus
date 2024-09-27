@@ -24,14 +24,14 @@ from matplotlib.figure import Figure
 
 class ReconstructorView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__("Parameters", parent)
+        super().__init__('Parameters', parent)
         self.algorithmComboBox = QComboBox()
         self.productComboBox = QComboBox()
-        self.modelButton = QPushButton("Model")
+        self.modelButton = QPushButton('Model')
         self.modelMenu = QMenu()
-        self.trainerButton = QPushButton("Trainer")
+        self.trainerButton = QPushButton('Trainer')
         self.trainerMenu = QMenu()
-        self.reconstructorButton = QPushButton("Reconstructor")
+        self.reconstructorButton = QPushButton('Reconstructor')
         self.reconstructorMenu = QMenu()
 
     @classmethod
@@ -49,9 +49,9 @@ class ReconstructorView(QGroupBox):
         actionLayout.addWidget(view.reconstructorButton)
 
         layout = QFormLayout()
-        layout.addRow("Algorithm:", view.algorithmComboBox)
-        layout.addRow("Product:", view.productComboBox)
-        layout.addRow("Action:", actionLayout)
+        layout.addRow('Algorithm:', view.algorithmComboBox)
+        layout.addRow('Product:', view.productComboBox)
+        layout.addRow('Action:', actionLayout)
         view.setLayout(layout)
 
         return view
@@ -67,7 +67,7 @@ class ReconstructorProgressDialog(QDialog):
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ReconstructorProgressDialog:
         dialog = cls(parent)
-        dialog.setWindowTitle("Reconstruction Progress")
+        dialog.setWindowTitle('Reconstruction Progress')
         dialog.buttonBox.addButton(QDialogButtonBox.Ok)
         dialog.buttonBox.accepted.connect(dialog.accept)
         dialog.buttonBox.addButton(QDialogButtonBox.Cancel)

@@ -32,17 +32,17 @@ class ReconstructionThread(threading.Thread):
         self._reconstructEvent = threading.Event()
         self._stopEvent = threading.Event()
 
-        self._channel.subscribe("reconstructor", self._monitor)
+        self._channel.subscribe('reconstructor', self._monitor)
         self._channel.startMonitor()
 
     def run(self) -> None:
         while not self._stopEvent.is_set():
             if self._reconstructEvent.wait(timeout=1.0):
-                logging.debug("ReconstructionThread: Begin assembling scan positions")
+                logging.debug('ReconstructionThread: Begin assembling scan positions')
                 self._ptychodus.finalizeStreamingWorkflow()
-                logging.debug("ReconstructionThread: End assembling scan positions")
+                logging.debug('ReconstructionThread: End assembling scan positions')
                 self._ptychodus.batchModeExecute(
-                    "reconstruct", self._inputProductPath, self._outputProductPath
+                    'reconstruct', self._inputProductPath, self._outputProductPath
                 )
                 self._reconstructEvent.clear()
                 # reconstruction done; indicate that results are ready
@@ -50,14 +50,14 @@ class ReconstructionThread(threading.Thread):
 
     def _monitor(self, pvObject: pvaccess.PvObject) -> None:
         # NOTE caput bdpgp:gp:bit3 1
-        logging.debug(f"ReconstructionThread::monitor {pvObject}")
+        logging.debug(f'ReconstructionThread::monitor {pvObject}')
 
-        if pvObject["value"]["index"] == 1:
-            logging.debug("ReconstructionThread: Reconstruct PV triggered!")
+        if pvObject['value']['index'] == 1:
+            logging.debug('ReconstructionThread: Reconstruct PV triggered!')
             # start reconstructing
             self._reconstructEvent.set()
         else:
-            logging.debug("ReconstructionThread: Reconstruct PV not triggered!")
+            logging.debug('ReconstructionThread: Reconstruct PV not triggered!')
 
     def stop(self) -> None:
         self._stopEvent.set()
@@ -67,18 +67,18 @@ class PtychodusAdImageProcessor(AdImageProcessor):
     def __init__(self, configDict: dict[str, Any] = {}) -> None:
         super().__init__(configDict)
 
-        self.logger.debug(f"{ptychodus.__name__.title()} ({ptychodus.__version__})")
+        self.logger.debug(f'{ptychodus.__name__.title()} ({ptychodus.__version__})')
 
-        settingsFile = configDict.get("settingsFile")
+        settingsFile = configDict.get('settingsFile')
         self._ptychodus = ModelCore(settingsFile)
         self._reconstructionThread = ReconstructionThread(
             self._ptychodus,
-            Path(configDict.get("inputProductPath", "input.npz")),
-            Path(configDict.get("outputProductPath", "output.npz")),
-            configDict.get("reconstructPV", "bdpgp:gp:bit3"),
+            Path(configDict.get('inputProductPath', 'input.npz')),
+            Path(configDict.get('outputProductPath', 'output.npz')),
+            configDict.get('reconstructPV', 'bdpgp:gp:bit3'),
         )
-        self._posXPV = configDict.get("posXPV", "bluesky:pos_x")
-        self._posYPV = configDict.get("posYPV", "bluesky:pos_y")
+        self._posXPV = configDict.get('posXPV', 'bluesky:pos_x')
+        self._posYPV = configDict.get('posYPV', 'bluesky:pos_y')
         self._nFramesProcessed = 0
         self._processingTime = 0.0
 
@@ -95,9 +95,9 @@ class PtychodusAdImageProcessor(AdImageProcessor):
 
     def configure(self, configDict: dict[str, Any]) -> None:
         """Configures user processor"""
-        numberOfPatternsTotal = configDict["nPatternsTotal"]
-        numberOfPatternsPerArray = configDict.get("nPatternsPerArray", 1)
-        patternDataType = configDict.get("PatternDataType", "uint16")
+        numberOfPatternsTotal = configDict['nPatternsTotal']
+        numberOfPatternsPerArray = configDict.get('nPatternsPerArray', 1)
+        patternDataType = configDict.get('PatternDataType', 'uint16')
 
         metadata = ptychodus.api.patterns.DiffractionMetadata(
             numberOfPatternsPerArray=int(numberOfPatternsPerArray),
@@ -111,15 +111,15 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         processingBeginTime = time.time()
 
         (frameId, image, nx, ny, nz, colorMode, fieldKey) = self.reshapeNtNdArray(pvObject)
-        frameTimeStamp = TimeUtility.getTimeStampAsFloat(pvObject["timeStamp"])
+        frameTimeStamp = TimeUtility.getTimeStampAsFloat(pvObject['timeStamp'])
 
         if nx is None:
-            self.logger.debug(f"Frame id {frameId} contains an empty image.")
+            self.logger.debug(f'Frame id {frameId} contains an empty image.')
         else:
-            self.logger.debug(f"Frame id {frameId} time stamp {frameTimeStamp}")
+            self.logger.debug(f'Frame id {frameId} time stamp {frameTimeStamp}')
             image3d = image[numpy.newaxis, :, :].copy()
             array = ptychodus.api.patterns.SimpleDiffractionPatternArray(
-                label=f"Frame{frameId}",
+                label=f'Frame{frameId}',
                 index=frameId,
                 data=image3d,
                 state=ptychodus.api.patterns.DiffractionPatternState.LOADED,
@@ -135,8 +135,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 break
             else:
                 self._ptychodus.assembleScanPositionsX(
-                    posX["values"],
-                    [TimeUtility.getTimeStampAsFloat(ts) for ts in posX["t"]],
+                    posX['values'],
+                    [TimeUtility.getTimeStampAsFloat(ts) for ts in posX['t']],
                 )
 
         posYQueue = self.metadataQueueMap[self._posYPV]
@@ -148,8 +148,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 break
             else:
                 self._ptychodus.assembleScanPositionsY(
-                    posY["values"],
-                    [TimeUtility.getTimeStampAsFloat(ts) for ts in posY["t"]],
+                    posY['values'],
+                    [TimeUtility.getTimeStampAsFloat(ts) for ts in posY['t']],
                 )
 
         processingEndTime = time.time()
@@ -172,17 +172,17 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             processedFrameRate = self.nFramesProcessed / self.processingTime
 
         return {
-            "nFramesProcessed": self.nFramesProcessed,
-            "nFramesQueued": nFramesQueued,
-            "processingTime": FloatWithUnits(self.processingTime, "s"),
-            "processedFrameRate": FloatWithUnits(processedFrameRate, "fps"),
+            'nFramesProcessed': self.nFramesProcessed,
+            'nFramesQueued': nFramesQueued,
+            'processingTime': FloatWithUnits(self.processingTime, 's'),
+            'processedFrameRate': FloatWithUnits(processedFrameRate, 'fps'),
         }
 
     def getStatsPvaTypes(self) -> dict[str, pvaccess.ScalarType]:
         """Defines PVA types for different stats variables"""
         return {
-            "nFramesProcessed": pvaccess.UINT,
-            "nFramesQueued": pvaccess.UINT,
-            "processingTime": pvaccess.DOUBLE,
-            "processingFrameRate": pvaccess.DOUBLE,
+            'nFramesProcessed': pvaccess.UINT,
+            'nFramesQueued': pvaccess.UINT,
+            'processingTime': pvaccess.DOUBLE,
+            'processingFrameRate': pvaccess.DOUBLE,
         }

@@ -7,8 +7,8 @@ from ptychodus.api.parametric import Parameter, ParameterGroup
 from ptychodus.api.plugins import PluginChooser
 
 __all__ = [
-    "CylindricalColorModel",
-    "CylindricalColorModelParameter",
+    'CylindricalColorModel',
+    'CylindricalColorModelParameter',
 ]
 
 
@@ -54,35 +54,35 @@ class CylindricalColorModelParameter(Parameter[str], Observer):
         self._chooser = PluginChooser[CylindricalColorModel]()
         self._chooser.registerPlugin(
             HSVSaturationColorModel(),
-            simpleName="HSV-S",
-            displayName="HSV Saturation",
+            simpleName='HSV-S',
+            displayName='HSV Saturation',
         )
         self._chooser.registerPlugin(
             HSVValueColorModel(),
-            simpleName="HSV-V",
-            displayName="HSV Value",
+            simpleName='HSV-V',
+            displayName='HSV Value',
         )
         self._chooser.registerPlugin(
             HSVAlphaColorModel(),
-            simpleName="HSV-A",
-            displayName="HSV Alpha",
+            simpleName='HSV-A',
+            displayName='HSV Alpha',
         )
         self._chooser.registerPlugin(
             HLSLightnessColorModel(),
-            simpleName="HLS-L",
-            displayName="HLS Lightness",
+            simpleName='HLS-L',
+            displayName='HLS Lightness',
         )
         self._chooser.registerPlugin(
             HLSSaturationColorModel(),
-            simpleName="HLS-S",
-            displayName="HLS Saturation",
+            simpleName='HLS-S',
+            displayName='HLS Saturation',
         )
         self._chooser.registerPlugin(
             HLSAlphaColorModel(),
-            simpleName="HLS-A",
-            displayName="HLS Alpha",
+            simpleName='HLS-A',
+            displayName='HLS Alpha',
         )
-        self.setValue("HSV-V")
+        self.setValue('HSV-V')
         self._chooser.addObserver(self)
 
     def choices(self) -> Iterator[str]:

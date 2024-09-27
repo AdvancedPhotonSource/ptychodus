@@ -109,7 +109,7 @@ class FluorescenceViewController(Observer):
         enhancer.addObserver(self)
 
     def _openMeasuredDataset(self) -> None:
-        title = "Open Measured Fluorescence Dataset"
+        title = 'Open Measured Fluorescence Dataset'
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._dialog,
             title,
@@ -129,7 +129,7 @@ class FluorescenceViewController(Observer):
             self._enhancer.enhanceFluorescence()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Enhance Fluorescence", err)
+            ExceptionDialog.showException('Enhance Fluorescence', err)
 
     def launch(self, productIndex: int) -> None:
         self._enhancer.setProduct(productIndex)
@@ -138,13 +138,13 @@ class FluorescenceViewController(Observer):
             itemName = self._enhancer.getProductName()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Launch", err)
+            ExceptionDialog.showException('Launch', err)
         else:
-            self._dialog.setWindowTitle(f"Enhance Fluorescence: {itemName}")
+            self._dialog.setWindowTitle(f'Enhance Fluorescence: {itemName}')
             self._dialog.open()
 
     def _saveEnhancedDataset(self) -> None:
-        title = "Save Enhanced Fluorescence Dataset"
+        title = 'Save Enhanced Fluorescence Dataset'
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
             title,
@@ -184,7 +184,7 @@ class FluorescenceViewController(Observer):
         except Exception as err:
             logger.exception(err)
             self._measuredWidgetController.clearArray()
-            ExceptionDialog.showException("Render Measured Element Map", err)
+            ExceptionDialog.showException('Render Measured Element Map', err)
         else:
             self._measuredWidgetController.setArray(
                 emap_measured.counts_per_second, self._enhancer.getPixelGeometry()
@@ -195,7 +195,7 @@ class FluorescenceViewController(Observer):
         except Exception as err:
             logger.exception(err)
             self._enhancedWidgetController.clearArray()
-            ExceptionDialog.showException("Render Enhanced Element Map", err)
+            ExceptionDialog.showException('Render Enhanced Element Map', err)
         else:
             self._enhancedWidgetController.setArray(
                 emap_enhanced.counts_per_second, self._enhancer.getPixelGeometry()

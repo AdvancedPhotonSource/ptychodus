@@ -12,24 +12,24 @@ from .settings import ProbeSettings
 
 class RectangularProbeBuilder(ProbeBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__("rectangular")
+        super().__init__('rectangular')
         self._settings = settings
 
         self.widthInMeters = RealParameter(
             self,
-            "width_m",
+            'width_m',
             float(settings.rectangleWidthInMeters.getValue()),
             minimum=0.0,
         )
         self.heightInMeters = RealParameter(
             self,
-            "height_m",
+            'height_m',
             float(settings.rectangleHeightInMeters.getValue()),
             minimum=0.0,
         )
         self.defocusDistanceInMeters = RealParameter(
             self,
-            "defocus_distance_m",
+            'defocus_distance_m',
             float(settings.defocusDistanceInMeters.getValue()),
         )  # from sample to the focal plane
 

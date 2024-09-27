@@ -13,7 +13,7 @@ from ptychodus.api.visualization import (
 class Renderer(ParameterGroup):
     def __init__(self, name: str) -> None:
         super().__init__()
-        self._name = StringParameter(self, "name", name)
+        self._name = StringParameter(self, 'name', name)
 
     def getName(self) -> str:
         return self._name.getValue()

@@ -101,14 +101,14 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
         if filePath and h5py.is_hdf5(filePath) and dataPath:
             try:
-                with h5py.File(filePath, "r") as h5File:
+                with h5py.File(filePath, 'r') as h5File:
                     if dataPath in h5File:
                         item = h5File.get(dataPath)
 
                         if isinstance(item, h5py.Dataset):
                             data = item[()]  # TODO decode strings as needed
                     else:
-                        parentPath, attrName = dataPath.rsplit("/", 1)
+                        parentPath, attrName = dataPath.rsplit('/', 1)
 
                         if parentPath in h5File:
                             item = h5File.get(parentPath)
@@ -122,7 +122,7 @@ class DiffractionDatasetPresenter(Observable, Observer):
                                 else:
                                     data = attr
             except OSError:
-                logger.exception("Failed to open dataset!")
+                logger.exception('Failed to open dataset!')
 
         return data
 

@@ -32,9 +32,9 @@ class SettingsTableModel(QAbstractTableModel):
     ) -> Any:
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             if section == 0:
-                return "Name"
+                return 'Name'
             elif section == 1:
-                return "Value"
+                return 'Value'
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
@@ -82,7 +82,7 @@ class SettingsController(Observer):
     def _openSettings(self) -> None:
         filePath, _ = self._fileDialogFactory.getOpenFilePath(
             self._view,
-            "Open Settings",
+            'Open Settings',
             nameFilters=self._settingsRegistry.getOpenFileFilterList(),
             selectedNameFilter=self._settingsRegistry.getOpenFileFilter(),
         )
@@ -93,7 +93,7 @@ class SettingsController(Observer):
     def _saveSettings(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
             self._view,
-            "Save Settings",
+            'Save Settings',
             nameFilters=self._settingsRegistry.getSaveFileFilterList(),
             selectedNameFilter=self._settingsRegistry.getSaveFileFilter(),
         )

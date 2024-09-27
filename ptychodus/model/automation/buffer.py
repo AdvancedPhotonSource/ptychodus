@@ -58,14 +58,14 @@ class AutomationDatasetBuffer:
         if self._worker.is_alive():
             self.stop()
 
-        logger.info("Starting automation thread...")
+        logger.info('Starting automation thread...')
         self._stopWorkEvent.clear()
         self._worker = threading.Thread(target=self._process)
         self._worker.start()
-        logger.info("Automation thread started.")
+        logger.info('Automation thread started.')
 
     def stop(self) -> None:
-        logger.info("Stopping automation thread...")
+        logger.info('Stopping automation thread...')
         self._stopWorkEvent.set()
         self._worker.join()
-        logger.info("Automation thread stopped.")
+        logger.info('Automation thread stopped.')

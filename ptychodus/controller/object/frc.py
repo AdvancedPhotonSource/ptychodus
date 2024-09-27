@@ -13,7 +13,7 @@ class FourierRingCorrelationViewController:
         super().__init__()
         self._correlator = correlator
         self._dialog = FourierRingCorrelationDialog()
-        self._dialog.setWindowTitle("Fourier Ring Correlation")
+        self._dialog.setWindowTitle('Fourier Ring Correlation')
         self._dialog.product1ComboBox.setModel(treeModel)
         self._dialog.product1ComboBox.textActivated.connect(self._redrawPlot)
         self._dialog.product2ComboBox.setModel(treeModel)
@@ -30,7 +30,7 @@ class FourierRingCorrelationViewController:
         currentIndex2 = self._dialog.product2ComboBox.currentIndex()
 
         if currentIndex1 < 0 or currentIndex2 < 0:
-            logger.warning("Invalid item index for FRC!")
+            logger.warning('Invalid item index for FRC!')
             return
 
         frc = self._correlator.correlate(currentIndex1, currentIndex2)
@@ -48,11 +48,11 @@ class FourierRingCorrelationViewController:
             sx = axisX.series[0]
 
             for sy in axisY.series:
-                ax.plot(sx.values, sy.values, ".-", label=sy.label, linewidth=1.5)
+                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
         else:
-            logger.warning("Failed to broadcast plot series!")
+            logger.warning('Failed to broadcast plot series!')
 
         if len(axisX.series) > 1:
-            ax.legend(loc="upper right")
+            ax.legend(loc='upper right')
 
         self._dialog.figureCanvas.draw()

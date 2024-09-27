@@ -20,31 +20,31 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         settings: ProbeSettings,
         fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
     ) -> None:
-        super().__init__("fresnel_zone_plate")
+        super().__init__('fresnel_zone_plate')
         self._settings = settings
         self._fresnelZonePlateChooser = fresnelZonePlateChooser
 
         self.zonePlateDiameterInMeters = RealParameter(
             self,
-            "zone_plate_diameter_m",
+            'zone_plate_diameter_m',
             float(settings.zonePlateDiameterInMeters.getValue()),
             minimum=0.0,
         )
         self.outermostZoneWidthInMeters = RealParameter(
             self,
-            "outermost_zone_width_m",
+            'outermost_zone_width_m',
             float(settings.outermostZoneWidthInMeters.getValue()),
             minimum=0.0,
         )
         self.centralBeamstopDiameterInMeters = RealParameter(
             self,
-            "central_beamstop_diameter_m",
+            'central_beamstop_diameter_m',
             float(settings.centralBeamstopDiameterInMeters.getValue()),
             minimum=0.0,
         )
         self.defocusDistanceInMeters = RealParameter(
             self,
-            "defocus_distance_m",
+            'defocus_distance_m',
             float(settings.defocusDistanceInMeters.getValue()),
         )  # from sample to the focal plane
 

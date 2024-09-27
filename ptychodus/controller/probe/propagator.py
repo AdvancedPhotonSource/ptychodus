@@ -62,7 +62,7 @@ class ProbePropagationViewController(Observer):
             z1 = self._propagator.getEndCoordinateInMeters()
             lerpValue = (1 - alpha) * z0 + alpha * z1
         else:
-            logger.error("Bad slider range!")
+            logger.error('Bad slider range!')
 
         try:
             xyProjection = self._propagator.getXYProjection(step)
@@ -70,15 +70,15 @@ class ProbePropagationViewController(Observer):
             self._xyVisualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Update Current Coordinate", err)
+            ExceptionDialog.showException('Update Current Coordinate', err)
         else:
             self._xyVisualizationWidgetController.setArray(
                 xyProjection, self._propagator.getPixelGeometry()
             )
 
         # TODO auto-units
-        lerpValue *= Decimal("1e6")
-        self._dialog.coordinateLabel.setText(f"{lerpValue:.1f} \u00b5m")
+        lerpValue *= Decimal('1e6')
+        self._dialog.coordinateLabel.setText(f'{lerpValue:.1f} \u00b5m')
 
     def _propagate(self) -> None:
         view = self._dialog.parametersView
@@ -91,7 +91,7 @@ class ProbePropagationViewController(Observer):
             )
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Propagate Probe", err)
+            ExceptionDialog.showException('Propagate Probe', err)
 
     def launch(self, productIndex: int) -> None:
         self._propagator.setProduct(productIndex)
@@ -100,13 +100,13 @@ class ProbePropagationViewController(Observer):
             itemName = self._propagator.getProductName()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Launch", err)
+            ExceptionDialog.showException('Launch', err)
         else:
-            self._dialog.setWindowTitle(f"Propagate Probe: {itemName}")
+            self._dialog.setWindowTitle(f'Propagate Probe: {itemName}')
             self._dialog.open()
 
     def _savePropagatedProbe(self) -> None:
-        title = "Save Propagated Probe"
+        title = 'Save Propagated Probe'
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
             title,
@@ -151,7 +151,7 @@ class ProbePropagationViewController(Observer):
             self._zyVisualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Update Views", err)
+            ExceptionDialog.showException('Update Views', err)
 
     def update(self, observable: Observable) -> None:
         if observable is self._propagator:

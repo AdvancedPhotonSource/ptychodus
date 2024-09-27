@@ -26,7 +26,7 @@ class ObjectBuilderFactory(Iterable[str]):
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[], ObjectBuilder]] = {
-            "random": lambda: RandomObjectBuilder(rng, settings),
+            'random': lambda: RandomObjectBuilder(rng, settings),
         }
 
     def __iter__(self) -> Iterator[str]:
@@ -47,7 +47,7 @@ class ObjectBuilderFactory(Iterable[str]):
         name = self._settings.builder.getValue()
         nameRepaired = name.casefold()
 
-        if nameRepaired == "from_file":
+        if nameRepaired == 'from_file':
             return self.createObjectFromFile(
                 self._settings.filePath.getValue(),
                 self._settings.fileType.getValue(),

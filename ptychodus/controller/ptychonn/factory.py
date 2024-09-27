@@ -19,7 +19,7 @@ class PtychoNNViewControllerFactory(ReconstructorViewControllerFactory):
 
     @property
     def backendName(self) -> str:
-        return "PtychoNN"
+        return 'PtychoNN'
 
     def createViewController(self, reconstructorName: str) -> QWidget:
         view = PtychoNNParametersView.createInstance()

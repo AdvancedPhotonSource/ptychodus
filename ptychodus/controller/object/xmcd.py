@@ -27,7 +27,7 @@ class XMCDViewController:
         self._engine = engine
         self._fileDialogFactory = fileDialogFactory
         self._dialog = XMCDDialog()
-        self._dialog.setWindowTitle("XMCD Analysis")
+        self._dialog.setWindowTitle('XMCD Analysis')
         self._dialog.parametersView.lcircComboBox.setModel(treeModel)
         self._dialog.parametersView.lcircComboBox.currentIndexChanged.connect(self._analyze)
         self._dialog.parametersView.rcircComboBox.setModel(treeModel)
@@ -62,7 +62,7 @@ class XMCDViewController:
             result = self._analyzer.analyze(lcircItemIndex, rcircItemIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("XMCD Analysis", err)
+            ExceptionDialog.showException('XMCD Analysis', err)
             return
 
         self._result = result
@@ -85,10 +85,10 @@ class XMCDViewController:
 
     def _saveResult(self) -> None:
         if self._result is None:
-            logger.debug("No result to save!")
+            logger.debug('No result to save!')
             return
 
-        title = "Save Result"
+        title = 'Save Result'
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
             title,

@@ -29,7 +29,7 @@ from ..data import FileDialogFactory
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "OpenDatasetWizardController",
+    'OpenDatasetWizardController',
 ]
 
 
@@ -129,11 +129,11 @@ class OpenDatasetWizardFilesController(Observer):
         self._page._setComplete(fileInfo.isFile())
 
     def _setNameFiltersInFileSystemModel(self, currentText: str) -> None:
-        z = re.search(r"\((.+)\)", currentText)
+        z = re.search(r'\((.+)\)', currentText)
 
         if z:
             nameFilters = z.group(1).split()
-            logger.debug(f"Dataset File Name Filters: {nameFilters}")
+            logger.debug(f'Dataset File Name Filters: {nameFilters}')
             self._fileSystemModel.setNameFilters(nameFilters)
 
     def _syncModelToView(self) -> None:
@@ -295,7 +295,7 @@ class PatternMemoryMapController(Observer):
 
     def _browseScratchDirectory(self) -> None:
         dirPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, "Choose Scratch ScratchDirectory"
+            self._view, 'Choose Scratch ScratchDirectory'
         )
 
         if dirPath:

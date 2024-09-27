@@ -15,7 +15,7 @@ from ptychodus.api.visualization import RealArrayType
 from ..reconstructor import DiffractionPatternPositionMatcher
 
 __all__ = [
-    "STXMSimulator",
+    'STXMSimulator',
 ]
 
 logger = logging.getLogger(__name__)
@@ -140,7 +140,7 @@ class STXMSimulator(Observable):
 
     def getImage(self) -> STXMImage:
         if self._image is None:
-            raise ValueError("No simulated image!")
+            raise ValueError('No simulated image!')
 
         return self._image
 
@@ -148,22 +148,22 @@ class STXMSimulator(Observable):
         return [self.getSaveFileFilter()]
 
     def getSaveFileFilter(self) -> str:
-        return "NumPy Zipped Archive (*.npz)"
+        return 'NumPy Zipped Archive (*.npz)'
 
     def saveImage(self, filePath: Path) -> None:
         if self._image is None:
-            raise ValueError("No simulated image!")
+            raise ValueError('No simulated image!')
 
         numpy.savez(
             filePath,
-            "pixel_height_m",
+            'pixel_height_m',
             self._image.pixel_height_m,
-            "pixel_width_m",
+            'pixel_width_m',
             self._image.pixel_width_m,
-            "center_x_m",
+            'center_x_m',
             self._image.center_x_m,
-            "center_y_m",
+            'center_y_m',
             self._image.center_y_m,
-            "intensity",
+            'intensity',
             self._image.intensity,
         )

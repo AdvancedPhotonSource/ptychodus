@@ -37,7 +37,7 @@ class ProbeRepositoryItemFactory:
         try:
             builder = self._builderFactory.createFromSettings()
         except Exception as exc:
-            logger.error("".join(exc.args))
+            logger.error(''.join(exc.args))
             builder = self._builderFactory.createDefault()
 
         multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)

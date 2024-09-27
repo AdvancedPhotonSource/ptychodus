@@ -44,8 +44,8 @@ class TikeReconstructor:
         self._probeCorrectionSettings = probeCorrectionSettings
         self._objectCorrectionSettings = objectCorrectionSettings
 
-        tikeVersion = version("tike")
-        logger.info(f"\tTike {tikeVersion}")
+        tikeVersion = version('tike')
+        logger.info(f'\tTike {tikeVersion}')
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings
@@ -109,12 +109,12 @@ class TikeReconstructor:
 
     def getNumGpus(self) -> int | tuple[int, ...]:
         numGpus = self._settings.numGpus.getValue()
-        onlyDigitsAndCommas = all(c.isdigit() or c == "," for c in numGpus)
+        onlyDigitsAndCommas = all(c.isdigit() or c == ',' for c in numGpus)
         hasDigit = any(c.isdigit() for c in numGpus)
 
         if onlyDigitsAndCommas and hasDigit:
-            if "," in numGpus:
-                return tuple(int(n) for n in numGpus.split(",") if n)
+            if ',' in numGpus:
+                return tuple(int(n) for n in numGpus.split(',') if n)
             else:
                 return int(numGpus)
 
@@ -130,10 +130,10 @@ class TikeReconstructor:
         objectInput = parameters.product.object_
         objectGeometry = objectInput.getGeometry()
         # TODO change array[0] -> array when multislice is available
-        objectInputArray = objectInput.array[0].astype("complex64")
+        objectInputArray = objectInput.array[0].astype('complex64')
 
         probeInput = parameters.product.probe
-        probeInputArray = probeInput.array[numpy.newaxis, numpy.newaxis, ...].astype("complex64")
+        probeInputArray = probeInput.array[numpy.newaxis, numpy.newaxis, ...].astype('complex64')
 
         scanInput = parameters.product.scan
         scanInputCoords: list[float] = list()
@@ -153,14 +153,14 @@ class TikeReconstructor:
         ).reshape(len(scanInput), 2)
         scanMin = scanInputArray.min(axis=0)
         scanMax = scanInputArray.max(axis=0)
-        logger.debug(f"Scan range [px]: {scanMin} -> {scanMax}")
+        logger.debug(f'Scan range [px]: {scanMin} -> {scanMax}')
         numGpus = self.getNumGpus()
 
-        logger.debug(f"data shape={patternsArray.shape}")
-        logger.debug(f"scan shape={scanInputArray.shape}")
-        logger.debug(f"probe shape={probeInputArray.shape}")
-        logger.debug(f"object shape={objectInputArray.shape}")
-        logger.debug(f"num_gpu={numGpus}")
+        logger.debug(f'data shape={patternsArray.shape}')
+        logger.debug(f'scan shape={scanInputArray.shape}')
+        logger.debug(f'probe shape={probeInputArray.shape}')
+        logger.debug(f'object shape={objectInputArray.shape}')
+        logger.debug(f'num_gpu={numGpus}')
 
         exitwave_options = tike.ptycho.ExitWaveOptions(
             # TODO: Use a user supplied `measured_pixels` instead
@@ -199,7 +199,7 @@ class TikeReconstructor:
                 context.iterate(ptychoParameters.algorithm_options.num_iter)
             result = context.parameters
 
-        logger.debug(f"Result: {pprint.pformat(result)}")
+        logger.debug(f'Result: {pprint.pformat(result)}')
 
         scanOutputPoints: list[ScanPoint] = list()
 

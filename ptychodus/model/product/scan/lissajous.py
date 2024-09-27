@@ -11,40 +11,40 @@ from .settings import ScanSettings
 
 class LissajousScanBuilder(ScanBuilder):
     def __init__(self, settings: ScanSettings) -> None:
-        super().__init__("lissajous")
+        super().__init__('lissajous')
         self._settings = settings
 
         self.numberOfPoints = IntegerParameter(
             self,
-            "number_of_points",
+            'number_of_points',
             settings.numberOfPoints,
             minimum=0,
         )
         self.amplitudeXInMeters = RealParameter(
             self,
-            "amplitude_x_m",
+            'amplitude_x_m',
             float(settings.amplitudeXInMeters.getValue()),
             minimum=0.0,
         )
         self.amplitudeYInMeters = RealParameter(
             self,
-            "amplitude_y_m",
+            'amplitude_y_m',
             float(settings.amplitudeYInMeters.getValue()),
             minimum=0.0,
         )
         self.angularStepXInTurns = RealParameter(
             self,
-            "angular_step_x_tr",
+            'angular_step_x_tr',
             float(settings.angularStepXInTurns.getValue()),
         )
         self.angularStepYInTurns = RealParameter(
             self,
-            "angular_step_y_tr",
+            'angular_step_y_tr',
             float(settings.angularStepYInTurns.getValue()),
         )
         self.angularShiftInTurns = RealParameter(
             self,
-            "angular_shift_tr",
+            'angular_shift_tr',
             float(settings.angularShiftInTurns.getValue()),
         )
 

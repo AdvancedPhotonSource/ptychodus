@@ -39,7 +39,7 @@ class PtychoPackPresenter(Observable, Observer):
         iterations = self._settings.object_correction_plan_stop.getValue()
         iterations = max(iterations, self._settings.probe_correction_plan_stop.getValue())
         iterations = max(iterations, self._settings.position_correction_plan_stop.getValue())
-        return f"Planned Iterations: {iterations}"
+        return f'Planned Iterations: {iterations}'
 
     def get_dm_exit_wave_relaxation_limits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
@@ -191,12 +191,12 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
             from .raar import RelaxedAveragedAlternatingReflectionsReconstructor
             from .real_device import RealPtychoPackDevice
         except ModuleNotFoundError:
-            logger.info("PtychoPack not found.")
+            logger.info('PtychoPack not found.')
 
             if isDeveloperModeEnabled:
-                self.reconstructor_list.append(NullReconstructor("PIE"))
-                self.reconstructor_list.append(NullReconstructor("DM"))
-                self.reconstructor_list.append(NullReconstructor("RAAR"))
+                self.reconstructor_list.append(NullReconstructor('PIE'))
+                self.reconstructor_list.append(NullReconstructor('DM'))
+                self.reconstructor_list.append(NullReconstructor('RAAR'))
         else:
             self._device = RealPtychoPackDevice()
             self.reconstructor_list.append(
@@ -211,7 +211,7 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
 
     @property
     def name(self) -> str:
-        return "PtychoPack"
+        return 'PtychoPack'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self.reconstructor_list)

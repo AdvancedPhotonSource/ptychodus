@@ -43,47 +43,47 @@ class ViewCore(QMainWindow):
         self.memoryProgressBar = QProgressBar()
 
         self.settingsAction = self.navigationToolBar.addAction(
-            QIcon(":/icons/settings"), "Settings"
+            QIcon(':/icons/settings'), 'Settings'
         )
         self.settingsView = SettingsView.createInstance()
         self.settingsTableView = QTableView()
 
         self.patternsAction = self.navigationToolBar.addAction(
-            QIcon(":/icons/patterns"), "Patterns"
+            QIcon(':/icons/patterns'), 'Patterns'
         )
         self.patternsView = PatternsView.createInstance()
         self.patternsImageView = ImageView.createInstance()
 
-        self.productAction = self.navigationToolBar.addAction(QIcon(":/icons/products"), "Products")
+        self.productAction = self.navigationToolBar.addAction(QIcon(':/icons/products'), 'Products')
         self.productView = ProductView.createInstance()
         self.productDiagramView = QWidget()
 
-        self.scanAction = self.navigationToolBar.addAction(QIcon(":/icons/scan"), "Scan")
+        self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
         self.scanView = RepositoryTableView.createInstance()
         self.scanPlotView = ScanPlotView.createInstance()
 
-        self.probeAction = self.navigationToolBar.addAction(QIcon(":/icons/probe"), "Probe")
+        self.probeAction = self.navigationToolBar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probeView = RepositoryTreeView.createInstance()
         self.probeImageView = ImageView.createInstance()
 
-        self.objectAction = self.navigationToolBar.addAction(QIcon(":/icons/object"), "Object")
+        self.objectAction = self.navigationToolBar.addAction(QIcon(':/icons/object'), 'Object')
         self.objectView = RepositoryTreeView.createInstance()
         self.objectImageView = ImageView.createInstance()
 
         self.reconstructorAction = self.navigationToolBar.addAction(
-            QIcon(":/icons/reconstructor"), "Reconstructor"
+            QIcon(':/icons/reconstructor'), 'Reconstructor'
         )
         self.reconstructorParametersView = ReconstructorParametersView.createInstance()
         self.reconstructorPlotView = ReconstructorPlotView.createInstance()
 
         self.workflowAction = self.navigationToolBar.addAction(
-            QIcon(":/icons/workflow"), "Workflow"
+            QIcon(':/icons/workflow'), 'Workflow'
         )
         self.workflowParametersView = WorkflowParametersView.createInstance()
         self.workflowTableView = QTableView()
 
         self.automationAction = self.navigationToolBar.addAction(
-            QIcon(":/icons/automate"), "Automation"
+            QIcon(':/icons/automate'), 'Automation'
         )
         self.automationView = AutomationView.createInstance()
         self.automationWidget = QWidget()
@@ -92,11 +92,11 @@ class ViewCore(QMainWindow):
     def createInstance(
         cls, isDeveloperModeEnabled: bool, parent: QWidget | None = None
     ) -> ViewCore:
-        logger.info(f"PyQt {PYQT_VERSION_STR}")
-        logger.info(f"Qt {QT_VERSION_STR}")
+        logger.info(f'PyQt {PYQT_VERSION_STR}')
+        logger.info(f'Qt {QT_VERSION_STR}')
 
         view = cls(parent)
-        view.setWindowIcon(QIcon(":/icons/ptychodus"))
+        view.setWindowIcon(QIcon(':/icons/ptychodus'))
 
         view.navigationToolBar.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
         view.addToolBar(Qt.ToolBarArea.LeftToolBarArea, view.navigationToolBar)
@@ -152,6 +152,6 @@ class ViewCore(QMainWindow):
             QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred
         )
         view.statusBar().addPermanentWidget(view.memoryProgressBar)
-        view.statusBar().showMessage("Ready")
+        view.statusBar().showMessage('Ready')
 
         return view

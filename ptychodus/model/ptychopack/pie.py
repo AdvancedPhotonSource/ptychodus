@@ -28,7 +28,7 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return "PIE"
+        return 'PIE'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         scan_input = parameters.product.scan

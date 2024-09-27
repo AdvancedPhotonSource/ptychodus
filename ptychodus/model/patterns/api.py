@@ -41,7 +41,7 @@ class PatternsAPI:
         self._fileWriterChooser = fileWriterChooser
 
     def initializeStreaming(self, metadata: DiffractionMetadata) -> None:
-        contentsTree = SimpleTreeNode.createRoot(["Name", "Type", "Details"])
+        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
         dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
         self._builder.switchTo(dataset)
@@ -96,7 +96,7 @@ class PatternsAPI:
             else:
                 self._builder.switchTo(dataset)
         else:
-            logger.warning(f"Refusing to read invalid file path {filePath}")
+            logger.warning(f'Refusing to read invalid file path {filePath}')
             return None
 
         if assemble:
@@ -128,16 +128,16 @@ class PatternsAPI:
                 raise RuntimeError(f'Failed to read "{filePath}"') from exc
 
             self._builder.stop(finishAssembling=False)
-            self._dataset.setAssembledData(contents["patterns"], contents["indexes"])
+            self._dataset.setAssembledData(contents['patterns'], contents['indexes'])
             self._builder.start()
             self._builder.stop(finishAssembling=True)
         else:
-            logger.warning(f"Refusing to read invalid file path {filePath}")
+            logger.warning(f'Refusing to read invalid file path {filePath}')
 
     def exportProcessedPatterns(self, filePath: Path) -> None:
         contents: dict[str, Any] = {
-            "indexes": numpy.array(self._dataset.getAssembledIndexes()),
-            "patterns": numpy.array(self._dataset.getAssembledData()),
+            'indexes': numpy.array(self._dataset.getAssembledIndexes()),
+            'patterns': numpy.array(self._dataset.getAssembledData()),
         }
         logger.debug(f'Writing processed patterns to "{filePath}"')
         numpy.savez(filePath, **contents)

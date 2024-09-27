@@ -86,13 +86,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         view.treeView.selectionModel().currentChanged.connect(controller._updateView)
         controller._updateView(QModelIndex(), QModelIndex())
 
-        loadFromFileAction = view.buttonBox.loadMenu.addAction("Open File...")
+        loadFromFileAction = view.buttonBox.loadMenu.addAction('Open File...')
         loadFromFileAction.triggered.connect(controller._loadCurrentObjectFromFile)
 
-        copyAction = view.buttonBox.loadMenu.addAction("Copy...")
+        copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentObject)
 
-        view.copierDialog.setWindowTitle("Copy Object")
+        view.copierDialog.setWindowTitle('Copy Object')
         view.copierDialog.sourceComboBox.setModel(treeModel)
         view.copierDialog.destinationComboBox.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingObject)
@@ -100,10 +100,10 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         view.buttonBox.editButton.clicked.connect(controller._editCurrentObject)
         view.buttonBox.saveButton.clicked.connect(controller._saveCurrentObject)
 
-        frcAction = view.buttonBox.analyzeMenu.addAction("Fourier Ring Correlation...")
+        frcAction = view.buttonBox.analyzeMenu.addAction('Fourier Ring Correlation...')
         frcAction.triggered.connect(controller._analyzeFRC)
 
-        xmcdAction = view.buttonBox.analyzeMenu.addAction("XMCD...")
+        xmcdAction = view.buttonBox.analyzeMenu.addAction('XMCD...')
         xmcdAction.triggered.connect(controller._analyzeXMCD)
 
         return controller
@@ -120,7 +120,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
             return modelIndex.row()
 
-        logger.warning("No current index!")
+        logger.warning('No current index!')
         return -1
 
     def _loadCurrentObjectFromFile(self) -> None:
@@ -131,7 +131,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
-            "Open Object",
+            'Open Object',
             nameFilters=self._api.getOpenFileFilterList(),
             selectedNameFilter=self._api.getOpenFileFilter(),
         )
@@ -141,7 +141,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 self._api.openObject(itemIndex, filePath, fileType=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("File Reader", err)
+                ExceptionDialog.showException('File Reader', err)
 
     def _copyToCurrentObject(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -175,7 +175,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
-            "Save Object",
+            'Save Object',
             nameFilters=self._api.getSaveFileFilterList(),
             selectedNameFilter=self._api.getSaveFileFilter(),
         )
@@ -185,13 +185,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 self._api.saveObject(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("File Writer", err)
+                ExceptionDialog.showException('File Writer', err)
 
     def _analyzeFRC(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning("No current item!")
+            logger.warning('No current item!')
         else:
             self._frcViewController.analyze(itemIndex, itemIndex)
 
@@ -199,7 +199,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning("No current item!")
+            logger.warning('No current item!')
         else:
             self._xmcdViewController.analyze(itemIndex, itemIndex)
 
@@ -218,7 +218,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             try:
                 item = self._repository[itemIndex]
             except IndexError:
-                logger.warning("Unable to access item for visualization!")
+                logger.warning('Unable to access item for visualization!')
             else:
                 object_ = item.getObject()
                 array = (

@@ -25,15 +25,15 @@ class CylindricalColorModelRenderer(Renderer):
         transformation: ScalarTransformationParameter,
         colorAxis: ColorAxis,
     ) -> None:
-        super().__init__("Complex")
+        super().__init__('Complex')
         self._amplitudeComponent = amplitudeComponent
         self._phaseComponent = phaseComponent
         self._transformation = transformation
-        self._addParameter("transformation", transformation)
+        self._addParameter('transformation', transformation)
         self._colorAxis = colorAxis
-        self._addGroup("color_axis", colorAxis, observe=True)
+        self._addGroup('color_axis', colorAxis, observe=True)
         self._colorModel = CylindricalColorModelParameter(self)
-        self._addParameter("color_model", self._colorModel)
+        self._addParameter('color_model', self._colorModel)
 
     def variants(self) -> Iterator[str]:
         return self._colorModel.choices()

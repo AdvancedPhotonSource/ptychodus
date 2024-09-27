@@ -122,13 +122,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         view.treeView.selectionModel().currentChanged.connect(controller._updateView)
         controller._updateView(QModelIndex(), QModelIndex())
 
-        loadFromFileAction = view.buttonBox.loadMenu.addAction("Open File...")
+        loadFromFileAction = view.buttonBox.loadMenu.addAction('Open File...')
         loadFromFileAction.triggered.connect(controller._loadCurrentProbeFromFile)
 
-        copyAction = view.buttonBox.loadMenu.addAction("Copy...")
+        copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentProbe)
 
-        view.copierDialog.setWindowTitle("Copy Probe")
+        view.copierDialog.setWindowTitle('Copy Probe')
         view.copierDialog.sourceComboBox.setModel(treeModel)
         view.copierDialog.destinationComboBox.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingProbe)
@@ -136,16 +136,16 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         view.buttonBox.editButton.clicked.connect(controller._editCurrentProbe)
         view.buttonBox.saveButton.clicked.connect(controller._saveCurrentProbe)
 
-        propagateAction = view.buttonBox.analyzeMenu.addAction("Propagate...")
+        propagateAction = view.buttonBox.analyzeMenu.addAction('Propagate...')
         propagateAction.triggered.connect(controller._propagateProbe)
 
-        stxmAction = view.buttonBox.analyzeMenu.addAction("Simulate STXM...")
+        stxmAction = view.buttonBox.analyzeMenu.addAction('Simulate STXM...')
         stxmAction.triggered.connect(controller._simulateSTXM)
 
-        exposureAction = view.buttonBox.analyzeMenu.addAction("Exposure...")
+        exposureAction = view.buttonBox.analyzeMenu.addAction('Exposure...')
         exposureAction.triggered.connect(controller._analyzeExposure)
 
-        fluorescenceAction = view.buttonBox.analyzeMenu.addAction("Enhance Fluorescence...")
+        fluorescenceAction = view.buttonBox.analyzeMenu.addAction('Enhance Fluorescence...')
         fluorescenceAction.triggered.connect(controller._enhanceFluorescence)
 
         return controller
@@ -162,7 +162,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
             return modelIndex.row()
 
-        logger.warning("No current index!")
+        logger.warning('No current index!')
         return -1
 
     def _loadCurrentProbeFromFile(self) -> None:
@@ -173,7 +173,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
-            "Open Probe",
+            'Open Probe',
             nameFilters=self._api.getOpenFileFilterList(),
             selectedNameFilter=self._api.getOpenFileFilter(),
         )
@@ -183,7 +183,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 self._api.openProbe(itemIndex, filePath, fileType=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("File Reader", err)
+                ExceptionDialog.showException('File Reader', err)
 
     def _copyToCurrentProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -217,7 +217,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
-            "Save Probe",
+            'Save Probe',
             nameFilters=self._api.getSaveFileFilterList(),
             selectedNameFilter=self._api.getSaveFileFilter(),
         )
@@ -227,13 +227,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 self._api.saveProbe(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("File Writer", err)
+                ExceptionDialog.showException('File Writer', err)
 
     def _propagateProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning("No current item!")
+            logger.warning('No current item!')
         else:
             self._propagationViewController.launch(itemIndex)
 
@@ -241,7 +241,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning("No current item!")
+            logger.warning('No current item!')
         else:
             self._stxmViewController.launch(itemIndex)
 
@@ -249,7 +249,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning("No current item!")
+            logger.warning('No current item!')
         else:
             self._exposureViewController.analyze(itemIndex)
 
@@ -257,7 +257,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            logger.warning("No current item!")
+            logger.warning('No current item!')
         else:
             self._fluorescenceViewController.launch(itemIndex)
 
@@ -276,7 +276,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             try:
                 item = self._repository[itemIndex]
             except IndexError:
-                logger.warning("Unable to access item for visualization!")
+                logger.warning('Unable to access item for visualization!')
             else:
                 probe = item.getProbe()
                 array = (

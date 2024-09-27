@@ -34,11 +34,11 @@ class ReconstructorCore:
             for reconstructor in library:
                 self._pluginChooser.registerPlugin(
                     reconstructor,
-                    displayName=f"{library.name}/{reconstructor.name}",
+                    displayName=f'{library.name}/{reconstructor.name}',
                 )
 
         if not self._pluginChooser:
-            self._pluginChooser.registerPlugin(NullReconstructor("None"), displayName="None/None")
+            self._pluginChooser.registerPlugin(NullReconstructor('None'), displayName='None/None')
 
         self.dataMatcher = DiffractionPatternPositionMatcher(diffractionDataset, productRepository)
         self.reconstructorAPI = ReconstructorAPI(

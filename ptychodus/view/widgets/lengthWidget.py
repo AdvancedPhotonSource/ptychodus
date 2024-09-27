@@ -27,12 +27,12 @@ class LengthWidget(QWidget):
 
         widget.lineEdit.valueChanged.connect(widget._setLengthInMetersFromWidgets)
 
-        widget.unitsComboBox.addItem("m", 0)
-        widget.unitsComboBox.addItem("mm", -3)
-        widget.unitsComboBox.addItem("\u00b5m", -6)
-        widget.unitsComboBox.addItem("nm", -9)
-        widget.unitsComboBox.addItem("\u212b", -10)
-        widget.unitsComboBox.addItem("pm", -12)
+        widget.unitsComboBox.addItem('m', 0)
+        widget.unitsComboBox.addItem('mm', -3)
+        widget.unitsComboBox.addItem('\u00b5m', -6)
+        widget.unitsComboBox.addItem('nm', -9)
+        widget.unitsComboBox.addItem('\u212b', -10)
+        widget.unitsComboBox.addItem('pm', -12)
         widget.unitsComboBox.activated.connect(widget._updateDisplay)
 
         layout = QHBoxLayout()
@@ -69,7 +69,7 @@ class LengthWidget(QWidget):
     @property
     def _scaleToMeters(self) -> Decimal:
         exponent = self.unitsComboBox.currentData()
-        return Decimal(f"1e{exponent:+d}")
+        return Decimal(f'1e{exponent:+d}')
 
     def _setLengthInMetersFromWidgets(self, magnitude: Decimal) -> None:
         self.lengthInMeters = magnitude * self._scaleToMeters

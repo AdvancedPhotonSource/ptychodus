@@ -42,11 +42,11 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
             from .reconstructor import RegularizedPIEReconstructor
             from .reconstructor import TikeReconstructor
         except ModuleNotFoundError:
-            logger.info("Tike not found.")
+            logger.info('Tike not found.')
 
             if isDeveloperModeEnabled:
-                core.reconstructorList.append(NullReconstructor("rpie"))
-                core.reconstructorList.append(NullReconstructor("lstsq_grad"))
+                core.reconstructorList.append(NullReconstructor('rpie'))
+                core.reconstructorList.append(NullReconstructor('lstsq_grad'))
         else:
             tikeReconstructor = TikeReconstructor(
                 core.settings,
@@ -62,7 +62,7 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
 
     @property
     def name(self) -> str:
-        return "Tike"
+        return 'Tike'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self.reconstructorList)

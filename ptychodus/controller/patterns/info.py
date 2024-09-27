@@ -20,7 +20,7 @@ class PatternsInfoViewController(Observer):
         presenter.addObserver(controller)
 
         dialog = PatternsInfoDialog.createInstance(parent)
-        dialog.setWindowTitle("Patterns Info")
+        dialog.setWindowTitle('Patterns Info')
         dialog.treeView.setModel(treeModel)
         dialog.finished.connect(controller._finish)
 

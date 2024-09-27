@@ -34,7 +34,7 @@ from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWi
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "ParameterViewBuilder",
+    'ParameterViewBuilder',
 ]
 
 
@@ -45,7 +45,7 @@ class ParameterViewController(ABC):
 
 
 class CheckBoxParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: BooleanParameter, text: str, *, tooltip: str = "") -> None:
+    def __init__(self, parameter: BooleanParameter, text: str, *, tooltip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = QCheckBox(text)
@@ -71,7 +71,7 @@ class CheckBoxParameterViewController(ParameterViewController, Observer):
 class SpinBoxParameterViewController(ParameterViewController, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, parameter: IntegerParameter, *, tooltip: str = "") -> None:
+    def __init__(self, parameter: IntegerParameter, *, tooltip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = QSpinBox()
@@ -91,7 +91,7 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
         maximum = self._parameter.getMaximum()
 
         if minimum is None:
-            logger.error("Minimum not provided!")
+            logger.error('Minimum not provided!')
         else:
             self._widget.blockSignals(True)
 
@@ -110,7 +110,7 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
 class ComboBoxParameterViewController(ParameterViewController, Observer):
     def __init__(
-        self, parameter: StringParameter, items: Sequence[str], *, tooltip: str = ""
+        self, parameter: StringParameter, items: Sequence[str], *, tooltip: str = ''
     ) -> None:
         super().__init__()
         self._parameter = parameter
@@ -139,7 +139,7 @@ class ComboBoxParameterViewController(ParameterViewController, Observer):
 
 class LineEditParameterViewController(ParameterViewController, Observer):
     def __init__(
-        self, parameter: StringParameter, validator: QValidator | None = None, *, tooltip: str = ""
+        self, parameter: StringParameter, validator: QValidator | None = None, *, tooltip: str = ''
     ) -> None:
         super().__init__()
         self._parameter = parameter
@@ -171,7 +171,7 @@ class LineEditParameterViewController(ParameterViewController, Observer):
 
 class DecimalLineEditParameterViewController(ParameterViewController, Observer):
     def __init__(
-        self, parameter: RealParameter, *, isSigned: bool = False, tooltip: str = ""
+        self, parameter: RealParameter, *, isSigned: bool = False, tooltip: str = ''
     ) -> None:
         super().__init__()
         self._parameter = parameter
@@ -199,7 +199,7 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 
 
 class DecimalSliderParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: RealParameter, *, tooltip: str = "") -> None:
+    def __init__(self, parameter: RealParameter, *, tooltip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
@@ -222,7 +222,7 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
         maximum = self._parameter.getMaximum()
 
         if minimum is None or maximum is None:
-            logger.error("Range not provided!")
+            logger.error('Range not provided!')
         else:
             value = Decimal(repr(self._parameter.getValue()))
             range_ = Interval[Decimal](Decimal(repr(minimum)), Decimal(repr(maximum)))
@@ -323,10 +323,10 @@ class ParameterViewBuilder:
         parameter: BooleanParameter,
         label: str,
         *,
-        tooltip: str = "",
-        group: str = "",
+        tooltip: str = '',
+        group: str = '',
     ) -> None:
-        viewController = CheckBoxParameterViewController(parameter, "")
+        viewController = CheckBoxParameterViewController(parameter, '')
         self.addViewController(viewController, label, tooltip=tooltip, group=group)
 
     def addSpinBox(
@@ -334,8 +334,8 @@ class ParameterViewBuilder:
         parameter: IntegerParameter,
         label: str,
         *,
-        tooltip: str = "",
-        group: str = "",
+        tooltip: str = '',
+        group: str = '',
     ) -> None:
         viewController = SpinBoxParameterViewController(parameter)
         self.addViewController(viewController, label, tooltip=tooltip, group=group)
@@ -345,8 +345,8 @@ class ParameterViewBuilder:
         parameter: RealParameter,
         label: str,
         *,
-        tooltip: str = "",
-        group: str = "",
+        tooltip: str = '',
+        group: str = '',
     ) -> None:
         viewController = DecimalLineEditParameterViewController(parameter)
         self.addViewController(viewController, label, tooltip=tooltip, group=group)
@@ -356,8 +356,8 @@ class ParameterViewBuilder:
         parameter: RealParameter,
         label: str,
         *,
-        tooltip: str = "",
-        group: str = "",
+        tooltip: str = '',
+        group: str = '',
     ) -> None:
         viewController = DecimalSliderParameterViewController(parameter)
         self.addViewController(viewController, label, tooltip=tooltip, group=group)
@@ -367,8 +367,8 @@ class ParameterViewBuilder:
         parameter: RealParameter,
         label: str,
         *,
-        tooltip: str = "",
-        group: str = "",
+        tooltip: str = '',
+        group: str = '',
     ) -> None:
         viewController = LengthWidgetParameterViewController(parameter)
         self.addViewController(viewController, label, tooltip=tooltip, group=group)
@@ -378,8 +378,8 @@ class ParameterViewBuilder:
         parameter: RealParameter,
         label: str,
         *,
-        tooltip: str = "",
-        group: str = "",
+        tooltip: str = '',
+        group: str = '',
     ) -> None:
         viewController = AngleWidgetParameterViewController(parameter)
         self.addViewController(viewController, label, tooltip=tooltip, group=group)
@@ -392,8 +392,8 @@ class ParameterViewBuilder:
         viewController: ParameterViewController,
         label: str,
         *,
-        tooltip: str = "",
-        group: str = "",
+        tooltip: str = '',
+        group: str = '',
     ) -> None:
         self._viewControllers[group, label] = viewController
 

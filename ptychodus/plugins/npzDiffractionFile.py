@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
-    SIMPLE_NAME: Final[str] = "NPZ"
-    DISPLAY_NAME: Final[str] = "NumPy Zipped Archive (*.npz)"
+    SIMPLE_NAME: Final[str] = 'NPZ'
+    DISPLAY_NAME: Final[str] = 'NumPy Zipped Archive (*.npz)'
 
-    INDEXES: Final[str] = "indexes"  # TODO include indexes
-    PATTERNS: Final[str] = "patterns"
+    INDEXES: Final[str] = 'indexes'  # TODO include indexes
+    PATTERNS: Final[str] = 'patterns'
 
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
@@ -52,12 +52,12 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
             filePath=filePath,
         )
 
-        contentsTree = SimpleTreeNode.createRoot(["Name", "Type", "Details"])
+        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         contentsTree.createChild(
             [
                 filePath.stem,
                 type(patterns).__name__,
-                f"{patterns.dtype}{patterns.shape}",
+                f'{patterns.dtype}{patterns.shape}',
             ]
         )
 

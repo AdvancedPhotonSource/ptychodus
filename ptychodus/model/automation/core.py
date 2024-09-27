@@ -63,7 +63,7 @@ class AutomationPresenter(Observable, Observer):
 
     def loadExistingDatasetsToRepository(self) -> None:
         dataDirectory = self.getDataDirectory()
-        pattern = "**/" if self._workflow.isWatchRecursive else ""
+        pattern = '**/' if self._workflow.isWatchRecursive else ''
         pattern += self._workflow.getWatchFilePattern()
         scanFileList = sorted(scanFile for scanFile in dataDirectory.glob(pattern))
 

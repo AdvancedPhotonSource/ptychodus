@@ -71,4 +71,4 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
             self.commitData.emit(editor)
             self.closeEditor.emit(editor)
         else:
-            logger.warning("Failed to commit data and close editor! Unexpected editor.")
+            logger.warning('Failed to commit data and close editor! Unexpected editor.')

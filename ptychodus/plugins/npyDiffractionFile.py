@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
-    SIMPLE_NAME: Final[str] = "NPY"
-    DISPLAY_NAME: Final[str] = "NumPy Binary Files (*.npy)"
+    SIMPLE_NAME: Final[str] = 'NPY'
+    DISPLAY_NAME: Final[str] = 'NumPy Binary Files (*.npy)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
@@ -45,9 +45,9 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
                 filePath=filePath,
             )
 
-            contentsTree = SimpleTreeNode.createRoot(["Name", "Type", "Details"])
+            contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
             contentsTree.createChild(
-                [filePath.stem, type(data).__name__, f"{data.dtype}{data.shape}"]
+                [filePath.stem, type(data).__name__, f'{data.dtype}{data.shape}']
             )
 
             array = SimpleDiffractionPatternArray(

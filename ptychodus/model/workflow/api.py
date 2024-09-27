@@ -70,7 +70,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._objectAPI.buildObject(self._productIndex, builderName, builderParameters)
 
     def reconstructLocal(self, outputProductName: str) -> WorkflowProductAPI:
-        logger.debug(f"Reconstruct: index={self._productIndex}")
+        logger.debug(f'Reconstruct: index={self._productIndex}')
         outputProductIndex = self._reconstructorAPI.reconstruct(
             self._productIndex, outputProductName
         )
@@ -85,7 +85,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         )
 
     def reconstructRemote(self) -> None:
-        logger.debug(f"Execute Workflow: index={self._productIndex}")
+        logger.debug(f'Execute Workflow: index={self._productIndex}')
         self._executor.runFlow(self._productIndex)
 
     def saveProduct(self, filePath: Path, *, fileType: str | None = None) -> None:
@@ -115,7 +115,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
 
     def _createProductAPI(self, productIndex: int) -> WorkflowProductAPI:
         if productIndex < 0:
-            raise ValueError(f"Bad product index ({productIndex=})!")
+            raise ValueError(f'Bad product index ({productIndex=})!')
 
         return ConcreteWorkflowProductAPI(
             self._productAPI,
@@ -153,7 +153,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self,
         name: str,
         *,
-        comments: str = "",
+        comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
         probePhotonsPerSecond: float | None = None,

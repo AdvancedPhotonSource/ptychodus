@@ -103,9 +103,9 @@ class Probe:
                 elif array.ndim == 3:
                     self._array = array
                 else:
-                    raise ValueError("Probe must be 2- or 3-dimensional ndarray.")
+                    raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
             else:
-                raise TypeError("Probe must be a complex-valued ndarray")
+                raise TypeError('Probe must be a complex-valued ndarray')
 
         self._modeRelativePower = Probe._calculateModeRelativePower(self._array)
         self._pixelWidthInMeters = pixelWidthInMeters

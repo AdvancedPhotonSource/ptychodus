@@ -12,34 +12,34 @@ from .settings import ObjectSettings
 
 class RandomObjectBuilder(ObjectBuilder):
     def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings) -> None:
-        super().__init__("random")
+        super().__init__('random')
         self._rng = rng
         self._settings = settings
 
         self.extraPaddingX = IntegerParameter(
-            self, "extra_padding_x", settings.extraPaddingX.getValue(), minimum=0
+            self, 'extra_padding_x', settings.extraPaddingX.getValue(), minimum=0
         )
         self.extraPaddingY = IntegerParameter(
-            self, "extra_padding_y", settings.extraPaddingY.getValue(), minimum=0
+            self, 'extra_padding_y', settings.extraPaddingY.getValue(), minimum=0
         )
 
         self.amplitudeMean = RealParameter(
             self,
-            "amplitude_mean",
+            'amplitude_mean',
             float(settings.amplitudeMean.getValue()),
             minimum=0.0,
             maximum=1.0,
         )
         self.amplitudeDeviation = RealParameter(
             self,
-            "amplitude_deviation",
+            'amplitude_deviation',
             float(settings.amplitudeDeviation.getValue()),
             minimum=0.0,
             maximum=1.0,
         )
         self.phaseDeviation = RealParameter(
             self,
-            "phase_deviation",
+            'phase_deviation',
             float(settings.phaseDeviation.getValue()),
             minimum=0.0,
             maximum=numpy.pi,

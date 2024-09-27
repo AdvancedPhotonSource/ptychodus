@@ -42,16 +42,16 @@ class DataLocator(ABC, Observable):
 class SimpleDataLocator(DataLocator, Observer):
     def __init__(self, group: ParameterGroup, entryPrefix: str) -> None:
         super().__init__()
-        self._endpointID = UUIDParameter(group, f"{entryPrefix}DataEndpointID", UUID(int=0))
+        self._endpointID = UUIDParameter(group, f'{entryPrefix}DataEndpointID', UUID(int=0))
         self._globusPath = StringParameter(
             group,
-            f"{entryPrefix}DataGlobusPath",
-            f"/~/path/to/{entryPrefix.lower()}/data",
+            f'{entryPrefix}DataGlobusPath',
+            f'/~/path/to/{entryPrefix.lower()}/data',
         )
         self._posixPath = PathParameter(
             group,
-            f"{entryPrefix}DataPosixPath",
-            Path(f"/path/to/{entryPrefix.lower()}/data"),
+            f'{entryPrefix}DataPosixPath',
+            Path(f'/path/to/{entryPrefix.lower()}/data'),
         )
 
     @classmethod
@@ -94,7 +94,7 @@ class OutputDataLocator(DataLocator, Observer):
         self, group: ParameterGroup, entryPrefix: str, inputDataLocator: DataLocator
     ) -> None:
         super().__init__()
-        self._useRoundTrip = BooleanParameter(group, "UseRoundTrip", True)
+        self._useRoundTrip = BooleanParameter(group, 'UseRoundTrip', True)
         self._outputDataLocator = SimpleDataLocator.createInstance(group, entryPrefix)
         self._inputDataLocator = inputDataLocator
 

@@ -26,15 +26,15 @@ class DelimitedScanFileReader(ScanFileReader):
             xcol = 0
             ycol = 1
 
-        with filePath.open(newline="") as csvFile:
+        with filePath.open(newline='') as csvFile:
             csvReader = csv.reader(csvFile, delimiter=self._delimiter)
 
             for idx, row in enumerate(csvReader):
-                if row[0].startswith("#"):
+                if row[0].startswith('#'):
                     continue
 
                 if len(row) < 2:
-                    raise ScanPointParseError("Bad number of columns!")
+                    raise ScanPointParseError('Bad number of columns!')
 
                 point = ScanPoint(idx, float(row[xcol]), float(row[ycol]))
                 pointList.append(point)
@@ -48,34 +48,34 @@ class DelimitedScanFileWriter(ScanFileWriter):
         self._swapXY = swapXY
 
     def write(self, filePath: Path, scan: Scan) -> None:
-        with filePath.open(mode="wt") as csvFile:
+        with filePath.open(mode='wt') as csvFile:
             for point in scan:
                 x = point.positionXInMeters
                 y = point.positionYInMeters
                 line = (
-                    f"{y}{self._delimiter}{x}\n" if self._swapXY else f"{x}{self._delimiter}{y}\n"
+                    f'{y}{self._delimiter}{x}\n' if self._swapXY else f'{x}{self._delimiter}{y}\n'
                 )
                 csvFile.write(line)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.scanFileReaders.registerPlugin(
-        DelimitedScanFileReader(" ", swapXY=False),
-        simpleName="TXT",
-        displayName="Space-Separated Values Files (*.txt)",
+        DelimitedScanFileReader(' ', swapXY=False),
+        simpleName='TXT',
+        displayName='Space-Separated Values Files (*.txt)',
     )
     registry.scanFileWriters.registerPlugin(
-        DelimitedScanFileWriter(" ", swapXY=False),
-        simpleName="TXT",
-        displayName="Space-Separated Values Files (*.txt)",
+        DelimitedScanFileWriter(' ', swapXY=False),
+        simpleName='TXT',
+        displayName='Space-Separated Values Files (*.txt)',
     )
     registry.scanFileReaders.registerPlugin(
-        DelimitedScanFileReader(",", swapXY=True),
-        simpleName="CSV",
-        displayName="Comma-Separated Values Files (*.csv)",
+        DelimitedScanFileReader(',', swapXY=True),
+        simpleName='CSV',
+        displayName='Comma-Separated Values Files (*.csv)',
     )
     registry.scanFileWriters.registerPlugin(
-        DelimitedScanFileWriter(",", swapXY=True),
-        simpleName="CSV",
-        displayName="Comma-Separated Values Files (*.csv)",
+        DelimitedScanFileWriter(',', swapXY=True),
+        simpleName='CSV',
+        displayName='Comma-Separated Values Files (*.csv)',
     )

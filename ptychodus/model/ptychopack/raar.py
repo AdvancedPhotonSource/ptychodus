@@ -28,7 +28,7 @@ class RelaxedAveragedAlternatingReflectionsReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return "RAAR"
+        return 'RAAR'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         scan_input = parameters.product.scan

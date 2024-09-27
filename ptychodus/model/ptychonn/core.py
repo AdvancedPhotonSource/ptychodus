@@ -143,15 +143,15 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
     ) -> PtychoNNReconstructorLibrary:
         modelSettings = PtychoNNModelSettings(settingsRegistry)
         trainingSettings = PtychoNNTrainingSettings(settingsRegistry)
-        phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor("PhaseOnly")
-        amplitudePhaseReconstructor: TrainableReconstructor = NullReconstructor("AmplitudePhase")
+        phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
+        amplitudePhaseReconstructor: TrainableReconstructor = NullReconstructor('AmplitudePhase')
         reconstructors: list[TrainableReconstructor] = list()
 
         try:
             from .model import PtychoNNModelProvider
             from .reconstructor import PtychoNNTrainableReconstructor
         except ModuleNotFoundError:
-            logger.info("PtychoNN not found.")
+            logger.info('PtychoNN not found.')
 
             if isDeveloperModeEnabled:
                 reconstructors.append(phaseOnlyReconstructor)
@@ -176,7 +176,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
 
     @property
     def name(self) -> str:
-        return "PtychoNN"
+        return 'PtychoNN'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)

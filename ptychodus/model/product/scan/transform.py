@@ -16,28 +16,28 @@ class ScanPointTransform(ParameterGroup):
         self._settings = settings
 
         self.affineAX = RealParameter(
-            self, "affine_ax", float(settings.affineTransformAX.getValue())
+            self, 'affine_ax', float(settings.affineTransformAX.getValue())
         )
         self.affineAY = RealParameter(
-            self, "affine_ay", float(settings.affineTransformAY.getValue())
+            self, 'affine_ay', float(settings.affineTransformAY.getValue())
         )
         self.affineATInMeters = RealParameter(
-            self, "affine_at_m", float(settings.affineTransformATInMeters.getValue())
+            self, 'affine_at_m', float(settings.affineTransformATInMeters.getValue())
         )
 
         self.affineBX = RealParameter(
-            self, "affine_bx", float(settings.affineTransformBX.getValue())
+            self, 'affine_bx', float(settings.affineTransformBX.getValue())
         )
         self.affineBY = RealParameter(
-            self, "affine_by", float(settings.affineTransformBY.getValue())
+            self, 'affine_by', float(settings.affineTransformBY.getValue())
         )
         self.affineBTInMeters = RealParameter(
-            self, "affine_bt_m", float(settings.affineTransformBTInMeters.getValue())
+            self, 'affine_bt_m', float(settings.affineTransformBTInMeters.getValue())
         )
 
         self.jitterRadiusInMeters = RealParameter(
             self,
-            "jitter_radius_m",
+            'jitter_radius_m',
             float(settings.jitterRadiusInMeters.getValue()),
             minimum=0.0,
         )
@@ -67,10 +67,10 @@ class ScanPointTransform(ParameterGroup):
 
     def labelsForPresets(self) -> Iterator[str]:
         for index in range(8):
-            xp = "\u2212x" if self.negateX(index) else "\u002bx"
-            yp = "\u2212y" if self.negateY(index) else "\u002by"
-            fxy = f"{yp}, {xp}" if self.swapXY(index) else f"{xp}, {yp}"
-            yield f"(x, y) \u2192 ({fxy})"
+            xp = '\u2212x' if self.negateX(index) else '\u002bx'
+            yp = '\u2212y' if self.negateY(index) else '\u002by'
+            fxy = f'{yp}, {xp}' if self.swapXY(index) else f'{xp}, {yp}'
+            yield f'(x, y) \u2192 ({fxy})'
 
     def applyPresets(self, index: int) -> None:
         if self.swapXY(index):

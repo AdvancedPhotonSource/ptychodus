@@ -9,7 +9,7 @@ class WorkflowAuthorizer:
         super().__init__()
         self._authorizeLock = threading.Lock()
         self._authorizeCode = str()
-        self._authorizeURL = "https://aps.anl.gov"
+        self._authorizeURL = 'https://aps.anl.gov'
         self.isAuthorizedEvent = threading.Event()
         self.isAuthorizedEvent.set()
         self.shutdownEvent = threading.Event()
@@ -32,7 +32,7 @@ class WorkflowAuthorizer:
             return self._authorizeCode
 
     def authenticate(self, authorizeURL: str) -> None:
-        logger.info(f"Authenticate at {authorizeURL}")
+        logger.info(f'Authenticate at {authorizeURL}')
 
         with self._authorizeLock:
             self._authorizeURL = authorizeURL

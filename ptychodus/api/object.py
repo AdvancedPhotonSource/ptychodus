@@ -108,9 +108,9 @@ class Object:
                 elif array.ndim == 3:
                     self._array = array
                 else:
-                    raise ValueError("Object must be 2- or 3-dimensional ndarray.")
+                    raise ValueError('Object must be 2- or 3-dimensional ndarray.')
             else:
-                raise TypeError("Object must be a complex-valued ndarray")
+                raise TypeError('Object must be a complex-valued ndarray')
 
         if layerDistanceInMeters is None:
             self._layerDistanceInMeters: Sequence[float] = [numpy.inf]
@@ -121,7 +121,7 @@ class Object:
         actualLayers = len(self._layerDistanceInMeters)
 
         if actualLayers < expectedLayers:
-            raise ValueError(f"Expected {expectedLayers} layer distances; got {actualLayers}!")
+            raise ValueError(f'Expected {expectedLayers} layer distances; got {actualLayers}!')
 
         self._pixelWidthInMeters = pixelWidthInMeters
         self._pixelHeightInMeters = pixelHeightInMeters

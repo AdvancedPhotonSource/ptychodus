@@ -76,12 +76,12 @@ class DetectorSpecificGroup:
 
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorSpecificGroup:
-        nimages = group["nimages"]
-        ntrigger = group["ntrigger"]
-        photonEnergy = group["photon_energy"]
-        assert photonEnergy.attrs["units"] == b"eV"
-        xPixelsInDetector = group["x_pixels_in_detector"]
-        yPixelsInDetector = group["y_pixels_in_detector"]
+        nimages = group['nimages']
+        ntrigger = group['ntrigger']
+        photonEnergy = group['photon_energy']
+        assert photonEnergy.attrs['units'] == b'eV'
+        xPixelsInDetector = group['x_pixels_in_detector']
+        yPixelsInDetector = group['y_pixels_in_detector']
         return cls(
             int(nimages[()]),
             int(ntrigger[()]),
@@ -103,18 +103,18 @@ class DetectorGroup:
 
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorGroup:
-        detectorSpecific = DetectorSpecificGroup.read(group["detectorSpecific"])
-        h5DetectorDistance = group["detector_distance"]
-        assert h5DetectorDistance.attrs["units"] == b"m"
-        h5BeamCenterX = group["beam_center_x"]
-        assert h5BeamCenterX.attrs["units"] == b"pixel"
-        h5BeamCenterY = group["beam_center_y"]
-        assert h5BeamCenterY.attrs["units"] == b"pixel"
-        h5BitDepthReadout = group["bit_depth_readout"]
-        h5XPixelSize = group["x_pixel_size"]
-        assert h5XPixelSize.attrs["units"] == b"m"
-        h5YPixelSize = group["y_pixel_size"]
-        assert h5YPixelSize.attrs["units"] == b"m"
+        detectorSpecific = DetectorSpecificGroup.read(group['detectorSpecific'])
+        h5DetectorDistance = group['detector_distance']
+        assert h5DetectorDistance.attrs['units'] == b'm'
+        h5BeamCenterX = group['beam_center_x']
+        assert h5BeamCenterX.attrs['units'] == b'pixel'
+        h5BeamCenterY = group['beam_center_y']
+        assert h5BeamCenterY.attrs['units'] == b'pixel'
+        h5BitDepthReadout = group['bit_depth_readout']
+        h5XPixelSize = group['x_pixel_size']
+        assert h5XPixelSize.attrs['units'] == b'm'
+        h5YPixelSize = group['y_pixel_size']
+        assert h5YPixelSize.attrs['units'] == b'm'
         return cls(
             detectorSpecific,
             float(h5DetectorDistance[()]),
@@ -132,7 +132,7 @@ class InstrumentGroup:
 
     @classmethod
     def read(cls, group: h5py.Group) -> InstrumentGroup:
-        detector = DetectorGroup.read(group["detector"])
+        detector = DetectorGroup.read(group['detector'])
         return cls(detector)
 
 
@@ -142,17 +142,17 @@ class GoniometerGroup:
 
     @classmethod
     def read(cls, group: h5py.Group) -> GoniometerGroup:
-        chiItem = group["chi"]
+        chiItem = group['chi']
         chiSpace = chiItem.id.get_space()
 
-        assert chiItem.attrs["units"] == b"degree"
+        assert chiItem.attrs['units'] == b'degree'
 
         if chiSpace.get_simple_extent_type() == h5py.h5s.SCALAR:
             chiDeg = float(chiItem[()])
         elif isinstance(chiItem, h5py.Dataset):
             chiDeg = float(chiItem[0])
         else:
-            raise ValueError("Failed to read goniometer angle (chi)!")
+            raise ValueError('Failed to read goniometer angle (chi)!')
 
         return cls(chiDeg)
 
@@ -163,7 +163,7 @@ class SampleGroup:
 
     @classmethod
     def read(cls, group: h5py.Group) -> SampleGroup:
-        goniometer = GoniometerGroup.read(group["goniometer"])
+        goniometer = GoniometerGroup.read(group['goniometer'])
         return cls(goniometer)
 
 
@@ -175,9 +175,9 @@ class EntryGroup:
 
     @classmethod
     def read(cls, group: h5py.Group) -> EntryGroup:
-        data = DataGroup.read(group["data"])
-        instrument = InstrumentGroup.read(group["instrument"])
-        sample = SampleGroup.read(group["sample"])
+        data = DataGroup.read(group['data'])
+        instrument = InstrumentGroup.read(group['instrument'])
+        sample = SampleGroup.read(group['sample'])
         return cls(data, instrument, sample)
 
 
@@ -223,15 +223,15 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         dataset: DiffractionDataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
         try:
-            with h5py.File(filePath, "r") as h5File:
+            with h5py.File(filePath, 'r') as h5File:
                 metadata = DiffractionMetadata.createNullInstance(filePath)
                 contentsTree = self._treeBuilder.build(h5File)
 
                 try:
-                    entry = EntryGroup.read(h5File["entry"])
-                    h5Dataset = h5File["/entry/data/data_000001"]
+                    entry = EntryGroup.read(h5File['entry'])
+                    h5Dataset = h5File['/entry/data/data_000001']
                 except KeyError:
-                    logger.warning(f"File {filePath} is not a NeXus data file.")
+                    logger.warning(f'File {filePath} is not a NeXus data file.')
                 else:
                     detector = entry.instrument.detector
                     detectorPixelGeometry = PixelGeometry(

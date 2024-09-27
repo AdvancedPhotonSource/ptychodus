@@ -27,7 +27,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
         self,
         name: str,
         *,
-        comments: str = "",
+        comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
         probePhotonsPerSecond: float | None = None,
@@ -71,7 +71,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
 
         while name in reservedNames:
             match += 1
-            name = candidateName + f"-{match}"
+            name = candidateName + f'-{match}'
 
         return name
 

@@ -40,11 +40,11 @@ class DiffractionDatasetInputOutputPresenter(Observable, Observer):
                 filePath=filePath, fileType=fileFilter, assemble=False
             )
         except Exception:
-            logger.exception("Failed to load diffraction dataset.")
+            logger.exception('Failed to load diffraction dataset.')
             return
 
         if fileType is None:
-            logger.error("Failed to load diffraction dataset.")
+            logger.error('Failed to load diffraction dataset.')
         else:
             self._settings.fileType.setValue(fileType)
             self._settings.filePath.setValue(filePath)

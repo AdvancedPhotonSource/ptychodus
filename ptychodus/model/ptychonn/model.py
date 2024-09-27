@@ -24,7 +24,7 @@ class PtychoNNModelProvider:
         self._trainer: lightning.Trainer | None = None
 
     def getModelName(self) -> str:
-        return "AmplitudePhase" if self._enableAmplitude else "PhaseOnly"
+        return 'AmplitudePhase' if self._enableAmplitude else 'PhaseOnly'
 
     def getNumberOfChannels(self) -> int:
         return 2 if self._enableAmplitude else 1
@@ -37,7 +37,7 @@ class PtychoNNModelProvider:
         ):
             return self._trainer.lightning_module
         else:
-            logger.debug("Initializing model from settings")
+            logger.debug('Initializing model from settings')
             self._model = ptychonn.LitReconSmallModel(
                 nconv=self._modelSettings.numberOfConvolutionKernels.getValue(),
                 use_batch_norm=self._modelSettings.useBatchNormalization.getValue(),
@@ -59,7 +59,7 @@ class PtychoNNModelProvider:
 
     def saveModel(self, filePath: Path) -> None:
         if self._trainer is None:
-            logger.warning("Need trainer to save model!")
+            logger.warning('Need trainer to save model!')
         else:
             logger.debug(f'Writing model to "{filePath}"')
             self._trainer.save_checkpoint(filePath)

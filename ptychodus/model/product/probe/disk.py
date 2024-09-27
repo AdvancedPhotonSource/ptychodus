@@ -12,18 +12,18 @@ from .settings import ProbeSettings
 
 class DiskProbeBuilder(ProbeBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__("disk")
+        super().__init__('disk')
         self._settings = settings
 
         self.diameterInMeters = RealParameter(
             self,
-            "diameter_m",
+            'diameter_m',
             float(settings.diskDiameterInMeters.getValue()),
             minimum=0.0,
         )
         self.defocusDistanceInMeters = RealParameter(
             self,
-            "defocus_distance_m",
+            'defocus_distance_m',
             float(settings.defocusDistanceInMeters.getValue()),
         )  # from sample to the focal plane
 

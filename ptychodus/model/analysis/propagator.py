@@ -108,13 +108,13 @@ class ProbePropagator(Observable):
 
     def getXYProjection(self, step: int) -> RealArrayType:
         if self._propagatedIntensity is None:
-            raise ValueError("No propagated wavefield!")
+            raise ValueError('No propagated wavefield!')
 
         return self._propagatedIntensity[step]
 
     def getZXProjection(self) -> RealArrayType:
         if self._propagatedIntensity is None:
-            raise ValueError("No propagated wavefield!")
+            raise ValueError('No propagated wavefield!')
 
         sz = self._propagatedIntensity.shape[-2]
         cutPlaneL = self._propagatedIntensity[:, (sz - 1) // 2, :]
@@ -123,7 +123,7 @@ class ProbePropagator(Observable):
 
     def getZYProjection(self) -> RealArrayType:
         if self._propagatedIntensity is None:
-            raise ValueError("No propagated wavefield!")
+            raise ValueError('No propagated wavefield!')
 
         sz = self._propagatedIntensity.shape[-1]
         cutPlaneL = self._propagatedIntensity[:, :, (sz - 1) // 2]
@@ -134,25 +134,25 @@ class ProbePropagator(Observable):
         return [self.getSaveFileFilter()]
 
     def getSaveFileFilter(self) -> str:
-        return "NumPy Zipped Archive (*.npz)"
+        return 'NumPy Zipped Archive (*.npz)'
 
     def savePropagatedProbe(self, filePath: Path) -> None:
         if self._propagatedWavefield is None or self._propagatedIntensity is None:
-            raise ValueError("No propagated wavefield!")
+            raise ValueError('No propagated wavefield!')
 
         pixelGeometry = self.getPixelGeometry()
         numpy.savez(
             filePath,
-            "begin_coordinate_m",
+            'begin_coordinate_m',
             float(self.getBeginCoordinateInMeters()),
-            "end_coordinate_m",
+            'end_coordinate_m',
             float(self.getEndCoordinateInMeters()),
-            "pixel_height_m",
+            'pixel_height_m',
             pixelGeometry.heightInMeters,
-            "pixel_width_m",
+            'pixel_width_m',
             pixelGeometry.widthInMeters,
-            "wavefield",
+            'wavefield',
             self._propagatedWavefield,
-            "intensity",
+            'intensity',
             self._propagatedIntensity,
         )

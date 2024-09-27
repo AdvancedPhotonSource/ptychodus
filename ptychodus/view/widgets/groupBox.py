@@ -19,7 +19,7 @@ class GroupBoxWithPresets(QWidget):
 
         self.presetsMenu = QMenu()
         self._presetsButton = QToolButton()
-        self._presetsButton.setText("Presets  ")
+        self._presetsButton.setText('Presets  ')
         self._presetsButton.setToolButtonStyle(Qt.ToolButtonTextOnly)
         self._presetsButton.setMenu(self.presetsMenu)
         self._presetsButton.setPopupMode(QToolButton.InstantPopup)

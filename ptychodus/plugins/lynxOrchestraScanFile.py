@@ -10,47 +10,47 @@ logger = logging.getLogger(__name__)
 
 
 class LYNXOrchestraScanFileReader(ScanFileReader):
-    SIMPLE_NAME: Final[str] = "LYNXOrchestra"
+    SIMPLE_NAME: Final[str] = 'LYNXOrchestra'
     MICRONS_TO_METERS: Final[float] = 1.0e-6
     DATA_POINT_COLUMN: Final[int] = 0
     X_COLUMN: Final[int] = 3
     Y_COLUMN: Final[int] = 6
 
     EXPECTED_HEADER: Final[list[str]] = [
-        "DataPoint",
-        "TotalPoints",
-        "Target_x",
-        "Average_x_st_fzp",
-        "Stdev_x_st_fzp",
-        "Target_y",
-        "Average_y_st_fzp",
-        "Stdev_y_st_fzp",
-        "Average_cap1",
-        "Stdev_cap1",
-        "Average_cap2",
-        "Stdev_cap2",
-        "Average_cap3",
-        "Stdev_cap3",
-        "Average_cap4",
-        "Stdev_cap4",
-        "Average_cap5",
-        "Stdev_cap5",
+        'DataPoint',
+        'TotalPoints',
+        'Target_x',
+        'Average_x_st_fzp',
+        'Stdev_x_st_fzp',
+        'Target_y',
+        'Average_y_st_fzp',
+        'Stdev_y_st_fzp',
+        'Average_cap1',
+        'Stdev_cap1',
+        'Average_cap2',
+        'Stdev_cap2',
+        'Average_cap3',
+        'Stdev_cap3',
+        'Average_cap4',
+        'Stdev_cap4',
+        'Average_cap5',
+        'Stdev_cap5',
     ]
 
     def read(self, filePath: Path) -> Scan:
         pointList: list[ScanPoint] = list()
         scanName = self.SIMPLE_NAME
 
-        with filePath.open(newline="") as csvFile:
-            csvReader = csv.reader(csvFile, delimiter=" ", skipinitialspace=True)
+        with filePath.open(newline='') as csvFile:
+            csvReader = csv.reader(csvFile, delimiter=' ', skipinitialspace=True)
             csvIterator = iter(csvReader)
 
             titleRow = next(csvIterator)
 
             try:
-                scanName = " ".join(titleRow).split(",", maxsplit=1)[0]
+                scanName = ' '.join(titleRow).split(',', maxsplit=1)[0]
             except IndexError:
-                raise ScanPointParseError("Bad scan name!")
+                raise ScanPointParseError('Bad scan name!')
 
             columnHeaderRow = next(csvIterator)
 
@@ -58,17 +58,17 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
                 logger.debug(f'Reading scan positions for "{scanName}"...')
             else:
                 raise ScanPointParseError(
-                    "Bad LYNX Orchestra header!\n"
-                    f"Expected: {LYNXOrchestraScanFileReader.EXPECTED_HEADER}\n"
-                    f"Found:    {columnHeaderRow}\n"
+                    'Bad LYNX Orchestra header!\n'
+                    f'Expected: {LYNXOrchestraScanFileReader.EXPECTED_HEADER}\n'
+                    f'Found:    {columnHeaderRow}\n'
                 )
 
             for row in csvIterator:
-                if row[0].startswith("#"):
+                if row[0].startswith('#'):
                     continue
 
                 if len(row) != len(columnHeaderRow):
-                    raise ScanPointParseError("Bad number of columns!")
+                    raise ScanPointParseError('Bad number of columns!')
 
                 point = ScanPoint(
                     int(row[self.DATA_POINT_COLUMN]),
@@ -84,5 +84,5 @@ def registerPlugins(registry: PluginRegistry) -> None:
     registry.scanFileReaders.registerPlugin(
         LYNXOrchestraScanFileReader(),
         simpleName=LYNXOrchestraScanFileReader.SIMPLE_NAME,
-        displayName="LYNX Orchestra Scan Files (*.dat)",
+        displayName='LYNX Orchestra Scan Files (*.dat)',
     )

@@ -21,9 +21,9 @@ from .visualization import VisualizationParametersView, VisualizationWidget
 class FourierRingCorrelationDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.product1Label = QLabel("Product 1:")
+        self.product1Label = QLabel('Product 1:')
         self.product1ComboBox = QComboBox()
-        self.product2Label = QLabel("Product 2:")
+        self.product2Label = QLabel('Product 2:')
         self.product2ComboBox = QComboBox()
         self.figure = Figure()
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
@@ -47,17 +47,17 @@ class FourierRingCorrelationDialog(QDialog):
 
 class XMCDParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Parameters", parent)
+        super().__init__('Parameters', parent)
 
-        self.polarizationGroupBox = QGroupBox("Polarization")
+        self.polarizationGroupBox = QGroupBox('Polarization')
         self.lcircComboBox = QComboBox()
         self.rcircComboBox = QComboBox()
-        self.saveButton = QPushButton("Save")
+        self.saveButton = QPushButton('Save')
         self.visualizationParametersView = VisualizationParametersView.createInstance()
 
         polarizationLayout = QFormLayout()
-        polarizationLayout.addRow("Left Circular:", self.lcircComboBox)
-        polarizationLayout.addRow("Right Circular:", self.rcircComboBox)
+        polarizationLayout.addRow('Left Circular:', self.lcircComboBox)
+        polarizationLayout.addRow('Right Circular:', self.rcircComboBox)
         polarizationLayout.addRow(self.saveButton)
         self.polarizationGroupBox.setLayout(polarizationLayout)
 
@@ -71,9 +71,9 @@ class XMCDParametersView(QGroupBox):
 class XMCDDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.differenceWidget = VisualizationWidget.createInstance("Difference")
-        self.ratioWidget = VisualizationWidget.createInstance("Ratio")
-        self.sumWidget = VisualizationWidget.createInstance("Sum")
+        self.differenceWidget = VisualizationWidget.createInstance('Difference')
+        self.ratioWidget = VisualizationWidget.createInstance('Ratio')
+        self.sumWidget = VisualizationWidget.createInstance('Sum')
         self.parametersView = XMCDParametersView()
         self.statusBar = QStatusBar()
 

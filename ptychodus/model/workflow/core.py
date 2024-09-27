@@ -201,10 +201,10 @@ class WorkflowCore:
         reconstructorAPI: ReconstructorAPI,
     ) -> None:
         self._settings = WorkflowSettings(settingsRegistry)
-        self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, "Input")
-        self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group, "Compute")
+        self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Input')
+        self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Compute')
         self._outputDataLocator = OutputDataLocator.createInstance(
-            self._settings.group, "Output", self._inputDataLocator
+            self._settings.group, 'Output', self._inputDataLocator
         )
         self._authorizer = WorkflowAuthorizer()
         self._statusRepository = WorkflowStatusRepository()
@@ -232,7 +232,7 @@ class WorkflowCore:
         try:
             from .globus import GlobusWorkflowThread
         except ModuleNotFoundError:
-            logger.info("Globus not found.")
+            logger.info('Globus not found.')
         else:
             self._thread = GlobusWorkflowThread.createInstance(
                 self._authorizer, self._statusRepository, self._executor
@@ -253,19 +253,19 @@ class WorkflowCore:
         return self._thread is not None
 
     def start(self) -> None:
-        logger.info("Starting workflow thread...")
+        logger.info('Starting workflow thread...')
 
         if self._thread:
             self._thread.start()
 
-        logger.info("Workflow thread started.")
+        logger.info('Workflow thread started.')
 
     def stop(self) -> None:
-        logger.info("Stopping workflow thread...")
+        logger.info('Stopping workflow thread...')
         self._executor.jobQueue.join()
         self._authorizer.shutdownEvent.set()
 
         if self._thread:
             self._thread.join()
 
-        logger.info("Workflow thread stopped.")
+        logger.info('Workflow thread stopped.')

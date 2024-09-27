@@ -21,7 +21,7 @@ class SettingsRegistry(Observable):
     def __init__(self) -> None:
         super().__init__()
         self._parameterGroup = ParameterGroup()
-        self._fileFilterList: list[str] = ["Initialization Files (*.ini)"]
+        self._fileFilterList: list[str] = ['Initialization Files (*.ini)']
 
     def createGroup(self, name: str) -> ParameterGroup:
         return self._parameterGroup.createGroup(name)
@@ -73,7 +73,7 @@ class SettingsRegistry(Observable):
         self, filePath: Path, changePathPrefix: PathPrefixChange | None = None
     ) -> None:
         config = configparser.ConfigParser(interpolation=None)
-        setattr(config, "optionxform", lambda option: option)
+        setattr(config, 'optionxform', lambda option: option)
 
         for groupName, group in self._parameterGroup.groups().items():
             config.add_section(groupName)
@@ -92,5 +92,5 @@ class SettingsRegistry(Observable):
 
         logger.debug(f'Writing settings to "{filePath}"')
 
-        with filePath.open(mode="w") as configFile:
+        with filePath.open(mode='w') as configFile:
             config.write(configFile)

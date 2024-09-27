@@ -69,7 +69,7 @@ class SimpleDiffractionPatternArray(DiffractionPatternArray):
     def createNullInstance(cls) -> SimpleDiffractionPatternArray:
         data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
         state = DiffractionPatternState.MISSING
-        return cls("Null", 0, data, state)
+        return cls('Null', 0, data, state)
 
     def getLabel(self) -> str:
         return self._label

@@ -13,21 +13,21 @@ class ConcentricScanBuilder(ScanBuilder):
     """https://doi.org/10.1088/1367-2630/12/3/035017"""
 
     def __init__(self, settings: ScanSettings) -> None:
-        super().__init__("concentric")
+        super().__init__('concentric')
         self._settings = settings
 
         self.radialStepSizeInMeters = RealParameter(
             self,
-            "radial_step_size_m",
+            'radial_step_size_m',
             float(settings.radialStepSizeInMeters.getValue()),
             minimum=0.0,
         )
         self.numberOfShells = IntegerParameter(
-            self, "number_of_shells", settings.numberOfShells.getValue(), minimum=0
+            self, 'number_of_shells', settings.numberOfShells.getValue(), minimum=0
         )
         self.numberOfPointsInFirstShell = IntegerParameter(
             self,
-            "number_of_points_1st_shell",
+            'number_of_points_1st_shell',
             settings.numberOfPointsInFirstShell.getValue(),
             minimum=0,
         )

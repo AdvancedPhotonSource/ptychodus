@@ -11,24 +11,24 @@ from .settings import ProbeSettings
 
 class SuperGaussianProbeBuilder(ProbeBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__("super_gaussian")
+        super().__init__('super_gaussian')
         self._settings = settings
 
         self.annularRadiusInMeters = RealParameter(
             self,
-            "annular_radius_m",
+            'annular_radius_m',
             float(settings.superGaussianAnnularRadiusInMeters.getValue()),
             minimum=0.0,
         )
         self.fwhmInMeters = RealParameter(
             self,
-            "full_width_at_half_maximum_m",
+            'full_width_at_half_maximum_m',
             float(settings.superGaussianWidthInMeters.getValue()),
             minimum=0.0,
         )
         self.orderParameter = RealParameter(
             self,
-            "order_parameter",
+            'order_parameter',
             float(settings.superGaussianOrderParameter.getValue()),
             minimum=1.0,
         )

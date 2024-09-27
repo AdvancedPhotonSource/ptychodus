@@ -26,7 +26,7 @@ class PlotAxis:
 
     @classmethod
     def createNull(cls) -> PlotAxis:
-        return cls("", [])
+        return cls('', [])
 
     def copy(self) -> PlotAxis:
         return PlotAxis(str(self.label), [series.copy() for series in self.series])
@@ -69,16 +69,16 @@ class VisualizationProduct:
         pixelGeometry: PixelGeometry,
     ) -> None:
         if values.ndim != 2:
-            raise ValueError(f"Values must be a 2-dimensional ndarray (actual={values.ndim}).")
+            raise ValueError(f'Values must be a 2-dimensional ndarray (actual={values.ndim}).')
 
         if rgba.ndim != 3:
-            raise ValueError(f"RGBA must be a 3-dimensional ndarray (actual={rgba.ndim}).")
+            raise ValueError(f'RGBA must be a 3-dimensional ndarray (actual={rgba.ndim}).')
 
         if rgba.shape[2] != 4:
-            raise ValueError(f"RGBA final dimension must have length=4 (actual={rgba.shape[2]}).")
+            raise ValueError(f'RGBA final dimension must have length=4 (actual={rgba.shape[2]}).')
 
         if values.shape[0] != rgba.shape[0] or values.shape[1] != rgba.shape[1]:
-            raise ValueError(f"Shape mismatch (values={values.shape} and rgba={rgba.shape}).")
+            raise ValueError(f'Shape mismatch (values={values.shape} and rgba={rgba.shape}).')
 
         self._valueLabel = valueLabel
         self._values = values
@@ -165,9 +165,9 @@ class VisualizationProduct:
         if numpy.iscomplex(value):
             amplitude = numpy.absolute(value)
             phase = numpy.angle(value)
-            return f"{x=:.1f} {y=:.1f} {amplitude=:6g} {phase=:6g}"
+            return f'{x=:.1f} {y=:.1f} {amplitude=:6g} {phase=:6g}'
 
-        return f"{x=:.1f} {y=:.1f} {value=:6g}"
+        return f'{x=:.1f} {y=:.1f} {value=:6g}'
 
     def getLineCut(self, line: Line2D) -> LineCut:
         intersections = self._intersectGrid(line)

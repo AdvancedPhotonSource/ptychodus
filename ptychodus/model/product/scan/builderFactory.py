@@ -31,9 +31,9 @@ class ScanBuilderFactory(Iterable[str]):
         }
         self._builders.update(
             {
-                "concentric": lambda: ConcentricScanBuilder(settings),
-                "spiral": lambda: SpiralScanBuilder(settings),
-                "lissajous": lambda: LissajousScanBuilder(settings),
+                'concentric': lambda: ConcentricScanBuilder(settings),
+                'spiral': lambda: SpiralScanBuilder(settings),
+                'lissajous': lambda: LissajousScanBuilder(settings),
             }
         )
 
@@ -55,7 +55,7 @@ class ScanBuilderFactory(Iterable[str]):
         name = self._settings.builder.getValue()
         nameRepaired = name.casefold()
 
-        if nameRepaired == "from_file":
+        if nameRepaired == 'from_file':
             return self.createScanFromFile(
                 self._settings.filePath.getValue(),
                 self._settings.fileType.getValue(),

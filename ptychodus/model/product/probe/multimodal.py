@@ -33,25 +33,25 @@ class MultimodalProbeBuilder(ParameterGroup):
 
         self.numberOfModes = IntegerParameter(
             self,
-            "number_of_modes",
+            'number_of_modes',
             settings.numberOfModes.getValue(),
             minimum=1,
         )
         self.modeDecayType = StringParameter(
             self,
-            "mode_decay_type",
+            'mode_decay_type',
             settings.modeDecayType.getValue(),
         )
         self.modeDecayRatio = RealParameter(
             self,
-            "mode_decay_ratio",
+            'mode_decay_ratio',
             float(settings.modeDecayRatio.getValue()),
             minimum=0.0,
             maximum=1.0,
         )
         self.isOrthogonalizeModesEnabled = BooleanParameter(
             self,
-            "orthogonalize_modes",
+            'orthogonalize_modes',
             settings.orthogonalizeModesEnabled.getValue(),
         )
 
@@ -77,7 +77,7 @@ class MultimodalProbeBuilder(ParameterGroup):
             for mode in probe3D:
                 modeList.append(mode)
         else:
-            raise ValueError("Probe array must contain at least two dimensions.")
+            raise ValueError('Probe array must contain at least two dimensions.')
 
         for mode in range(self.numberOfModes.getValue() - 1):
             # randomly shift the first mode

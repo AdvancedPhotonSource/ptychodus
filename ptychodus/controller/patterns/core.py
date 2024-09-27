@@ -107,7 +107,7 @@ class PatternsController(Observer):
     def _saveDataset(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
-            "Save Diffraction File",
+            'Save Diffraction File',
             nameFilters=self._ioPresenter.getSaveFileFilterList(),
             selectedNameFilter=self._ioPresenter.getSaveFileFilter(),
         )
@@ -117,7 +117,7 @@ class PatternsController(Observer):
                 self._ioPresenter.saveDiffractionFile(filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("File Writer", err)
+                ExceptionDialog.showException('File Writer', err)
 
     def _openPatternsInfo(self) -> None:
         PatternsInfoViewController.showInfo(self._datasetPresenter, self._view)
@@ -125,14 +125,14 @@ class PatternsController(Observer):
     def _closeDataset(self) -> None:
         button = QMessageBox.question(
             self._view,
-            "Confirm Close",
-            "This will free the diffraction data from memory. Do you want to continue?",
+            'Confirm Close',
+            'This will free the diffraction data from memory. Do you want to continue?',
         )
 
         if button != QMessageBox.StandardButton.Yes:
             return
 
-        logger.error("Close not implemented!")  # TODO
+        logger.error('Close not implemented!')  # TODO
 
     def _syncModelToView(self) -> None:
         rootNode = DatasetTreeNode.createRoot()

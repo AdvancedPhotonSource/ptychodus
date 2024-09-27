@@ -9,9 +9,9 @@ else:
 class Tester:
     def printQtStatus(self) -> None:
         if FOUND_QT:
-            print("Qt FOUND!")
+            print('Qt FOUND!')
         else:
-            print("Qt MISSING!")
+            print('Qt MISSING!')
 
     if FOUND_QT:
 
@@ -19,7 +19,7 @@ class Tester:
             return QWidget()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     tester = Tester()
     tester.printQtStatus()
     widget = tester.getWidget()

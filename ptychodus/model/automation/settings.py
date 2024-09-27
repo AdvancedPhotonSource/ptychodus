@@ -14,21 +14,21 @@ from ptychodus.api.parametric import (
 class AutomationSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup("Automation")
+        self._settingsGroup = registry.createGroup('Automation')
         self._settingsGroup.addObserver(self)
 
-        self.strategy = StringParameter(self._settingsGroup, "Strategy", "APS2ID")
+        self.strategy = StringParameter(self._settingsGroup, 'Strategy', 'APS2ID')
         self.dataDirectory = PathParameter(
-            self._settingsGroup, "DataDirectory", Path("/path/to/data")
+            self._settingsGroup, 'DataDirectory', Path('/path/to/data')
         )
         self.processingIntervalInSeconds = IntegerParameter(
-            self._settingsGroup, "ProcessingIntervalInSeconds", 0
+            self._settingsGroup, 'ProcessingIntervalInSeconds', 0
         )
         self.useWatchdogPollingObserver = BooleanParameter(
-            self._settingsGroup, "UseWatchdogPollingObserver", False
+            self._settingsGroup, 'UseWatchdogPollingObserver', False
         )
         self.watchdogDelayInSeconds = IntegerParameter(
-            self._settingsGroup, "WatchdogDelayInSeconds", 15
+            self._settingsGroup, 'WatchdogDelayInSeconds', 15
         )
 
     def update(self, observable: Observable) -> None:

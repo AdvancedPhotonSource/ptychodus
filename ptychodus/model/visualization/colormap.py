@@ -11,7 +11,7 @@ from ptychodus.api.plugins import PluginChooser
 
 class ColormapParameter(Parameter[str], Observer):
     # See https://matplotlib.org/stable/gallery/color/colormap_reference.html
-    CYCLIC_COLORMAPS: Final[tuple[str, ...]] = ("hsv", "twilight", "twilight_shifted")
+    CYCLIC_COLORMAPS: Final[tuple[str, ...]] = ('hsv', 'twilight', 'twilight_shifted')
 
     def __init__(self, *, isCyclic: bool) -> None:
         super().__init__()
@@ -23,7 +23,7 @@ class ColormapParameter(Parameter[str], Observer):
             if isCyclic == isCyclicColormap:
                 self._chooser.registerPlugin(cmap, displayName=name)
 
-        self.setValue("hsv" if isCyclic else "gray")
+        self.setValue('hsv' if isCyclic else 'gray')
         self._chooser.addObserver(self)
 
     def choices(self) -> Iterator[str]:

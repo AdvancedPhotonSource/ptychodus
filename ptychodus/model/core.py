@@ -73,20 +73,20 @@ logger = logging.getLogger(__name__)
 
 def configureLogger(isDeveloperModeEnabled: bool) -> None:
     logging.basicConfig(
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         stream=sys.stdout,
-        encoding="utf-8",
+        encoding='utf-8',
         level=logging.DEBUG if isDeveloperModeEnabled else logging.INFO,
     )
-    logging.getLogger("matplotlib").setLevel(logging.WARNING)
-    logging.getLogger("tike").setLevel(logging.WARNING)
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
+    logging.getLogger('tike').setLevel(logging.WARNING)
 
     logger.info(f'Ptychodus {version("ptychodus")}')
     logger.info(f'NumPy {version("numpy")}')
     logger.info(f'Matplotlib {version("matplotlib")}')
     logger.info(f'HDF5Plugin {version("hdf5plugin")}')
     logger.info(f'H5Py {version("h5py")}')
-    logger.info(f"HDF5 {h5py.version.hdf5_version}")
+    logger.info(f'HDF5 {h5py.version.hdf5_version}')
 
 
 class ModelCore:
@@ -291,13 +291,13 @@ class ModelCore:
         fluorescenceOutputFilePath: Path | None = None,
     ) -> int:
         # TODO add enum for actions; implement using workflow API
-        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, fileType="NPZ")
+        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, fileType='NPZ')
 
         if inputProductIndex < 0:
             logger.error(f'Failed to open product "{inputFilePath}"')
             return -1
 
-        if action.lower() == "reconstruct":
+        if action.lower() == 'reconstruct':
             outputProductName = self._productCore.productAPI.getItemName(inputProductIndex)
             outputProductIndex = self._reconstructorCore.reconstructorAPI.reconstruct(
                 inputProductIndex, outputProductName
@@ -308,7 +308,7 @@ class ModelCore:
                 return -1
 
             self._productCore.productAPI.saveProduct(
-                outputProductIndex, outputFilePath, fileType="NPZ"
+                outputProductIndex, outputFilePath, fileType='NPZ'
             )
 
             if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
@@ -318,7 +318,7 @@ class ModelCore:
                     fluorescenceOutputFilePath,
                 )
 
-        elif action.lower() == "train":
+        elif action.lower() == 'train':
             self._reconstructorCore.reconstructorAPI.ingestTrainingData(inputProductIndex)
             _ = self._reconstructorCore.reconstructorAPI.train()
             self._reconstructorCore.reconstructorAPI.saveModel(outputFilePath)

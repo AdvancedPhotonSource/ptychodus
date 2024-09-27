@@ -26,8 +26,8 @@ class ObjectRepositoryItem(ParameterGroup):
         self._builder = builder
         self._object = Object()
 
-        self._addGroup("builder", builder, observe=True)
-        self.layerDistanceInMeters = RealArrayParameter(self, "layer_distance_m", [numpy.inf])
+        self._addGroup('builder', builder, observe=True)
+        self.layerDistanceInMeters = RealArrayParameter(self, 'layer_distance_m', [numpy.inf])
 
         self._rebuild()
 
@@ -63,11 +63,11 @@ class ObjectRepositoryItem(ParameterGroup):
         return self._builder
 
     def setBuilder(self, builder: ObjectBuilder) -> None:
-        self._removeGroup("builder")
+        self._removeGroup('builder')
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
-        self._addGroup("builder", self._builder, observe=True)
+        self._addGroup('builder', self._builder, observe=True)
         self._rebuild()
 
     def _rebuild(self) -> None:
@@ -79,7 +79,7 @@ class ObjectRepositoryItem(ParameterGroup):
         try:
             object_ = self._builder.build(self._geometryProvider, layerDistanceInMeters)
         except Exception as exc:
-            logger.error("".join(exc.args))
+            logger.error(''.join(exc.args))
             return
 
         self._object = object_

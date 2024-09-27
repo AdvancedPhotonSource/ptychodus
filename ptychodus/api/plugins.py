@@ -23,11 +23,11 @@ from .scan import ScanFileReader, ScanFileWriter
 from .workflow import FileBasedWorkflow
 
 __all__ = [
-    "PluginChooser",
-    "PluginRegistry",
+    'PluginChooser',
+    'PluginRegistry',
 ]
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +51,9 @@ class PluginChooser(Sequence[PluginEntry[T]], Observable):
     def getDisplayNameList(self) -> Sequence[str]:
         return [entry.displayName for entry in self._entryList]
 
-    def registerPlugin(self, strategy: T, *, displayName: str, simpleName: str = "") -> None:
+    def registerPlugin(self, strategy: T, *, displayName: str, simpleName: str = '') -> None:
         if not simpleName:
-            simpleName = re.sub(r"\W+", "", displayName)
+            simpleName = re.sub(r'\W+', '', displayName)
 
         entry = PluginEntry[T](strategy, simpleName, displayName)
         self._entryList.append(entry)
@@ -130,14 +130,14 @@ class PluginRegistry:
         # returned name an absolute name instead of a relative one. This allows
         # import_module to work without having to do additional modification to
         # the name.
-        for moduleInfo in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + "."):
+        for moduleInfo in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + '.'):
             try:
                 module = importlib.import_module(moduleInfo.name)
             except ModuleNotFoundError as exc:
-                logger.info(f"Skipping {moduleInfo.name}")
+                logger.info(f'Skipping {moduleInfo.name}')
                 logger.warning(exc)
             else:
-                logger.info(f"Registering {moduleInfo.name}")
+                logger.info(f'Registering {moduleInfo.name}')
                 module.registerPlugins(registry)
 
         return registry

@@ -43,7 +43,7 @@ class ExposureViewController:
             result = self._analyzer.analyze(itemIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Exposure Analysis", err)
+            ExceptionDialog.showException('Exposure Analysis', err)
             return
 
         self._result = result
@@ -51,10 +51,10 @@ class ExposureViewController:
 
     def _saveResult(self) -> None:
         if self._result is None:
-            logger.debug("No result to save!")
+            logger.debug('No result to save!')
             return
 
-        title = "Save Result"
+        title = 'Save Result'
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
             title,

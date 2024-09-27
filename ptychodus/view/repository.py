@@ -20,11 +20,11 @@ from PyQt5.QtWidgets import (
 class RepositoryButtonBox(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.loadButton = QPushButton("Load")
+        self.loadButton = QPushButton('Load')
         self.loadMenu = QMenu()
-        self.saveButton = QPushButton("Save")
-        self.editButton = QPushButton("Edit")
-        self.analyzeButton = QPushButton("Analyze")
+        self.saveButton = QPushButton('Save')
+        self.editButton = QPushButton('Edit')
+        self.analyzeButton = QPushButton('Analyze')
         self.analyzeMenu = QMenu()
 
     @classmethod
@@ -61,8 +61,8 @@ class RepositoryItemCopierDialog(QDialog):
         view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
 
         layout = QFormLayout()
-        layout.addRow("From:", view.sourceComboBox)
-        layout.addRow("To:", view.destinationComboBox)
+        layout.addRow('From:', view.sourceComboBox)
+        layout.addRow('To:', view.destinationComboBox)
         layout.addRow(view.buttonBox)
         view.setLayout(layout)
 

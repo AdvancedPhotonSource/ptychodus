@@ -11,22 +11,22 @@ import logging
 from .observer import Observable, Observer
 
 __all__ = [
-    "BooleanParameter",
-    "ComplexArrayParameter",
-    "DecimalParameter",
-    "IntegerParameter",
-    "Parameter",
-    "ParameterGroup",
-    "PathParameter",
-    "RealArrayParameter",
-    "RealParameter",
-    "StringParameter",
-    "UUIDParameter",
+    'BooleanParameter',
+    'ComplexArrayParameter',
+    'DecimalParameter',
+    'IntegerParameter',
+    'Parameter',
+    'ParameterGroup',
+    'PathParameter',
+    'RealArrayParameter',
+    'RealParameter',
+    'StringParameter',
+    'UUIDParameter',
 ]
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 class Parameter(ABC, Generic[T], Observable):
@@ -164,7 +164,7 @@ class UUIDParameter(ParameterBase[UUID]):
 
 
 class BooleanParameter(ParameterBase[bool]):
-    TRUE_VALUES: Final = ("1", "true", "t", "yes", "y")
+    TRUE_VALUES: Final = ('1', 'true', 't', 'yes', 'y')
 
     def __init__(self, parent: ParameterGroup, name: str, value: bool) -> None:
         super().__init__(parent, name, value)

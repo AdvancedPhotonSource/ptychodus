@@ -4,13 +4,13 @@ from collections.abc import Sequence
 from typing import Generic, TypeVar
 
 __all__ = [
-    "Observer",
-    "Observable",
-    "SequenceObserver",
-    "ObservableSequence",
+    'Observer',
+    'Observable',
+    'SequenceObserver',
+    'ObservableSequence',
 ]
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 class Observer(ABC):

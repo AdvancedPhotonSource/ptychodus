@@ -74,24 +74,24 @@ class ZernikePolynomial:
         )
 
     def __str__(self) -> str:
-        return f"$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$"
+        return f'$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$'
 
 
 class ZernikeProbeBuilder(ProbeBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__("zernike")
+        super().__init__('zernike')
         self._settings = settings
         self._polynomials: list[ZernikePolynomial] = list()
         self._order = 0
 
         self.diameterInMeters = RealParameter(
             self,
-            "diameter_m",
+            'diameter_m',
             float(settings.diskDiameterInMeters.getValue()),
             minimum=0.0,
         )
         # TODO init zernike coefficients from settings
-        self.coefficients = ComplexArrayParameter(self, "coefficients", [1 + 0j])
+        self.coefficients = ComplexArrayParameter(self, 'coefficients', [1 + 0j])
 
         self.setOrder(1)
 
@@ -104,7 +104,7 @@ class ZernikeProbeBuilder(ProbeBuilder):
 
     def setOrder(self, order: int) -> None:
         if order < 1:
-            logger.warning("Order must be strictly positive!")
+            logger.warning('Order must be strictly positive!')
             return
 
         if self._order == order:

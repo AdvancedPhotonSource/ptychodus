@@ -15,33 +15,33 @@ from ptychodus.api.fluorescence import (
 
 
 class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
-    SIMPLE_NAME: Final[str] = "XRF-Maps"
-    DISPLAY_NAME: Final[str] = "XRF-Maps Fluorescence Dataset (*.h5 *.hdf5)"
+    SIMPLE_NAME: Final[str] = 'XRF-Maps'
+    DISPLAY_NAME: Final[str] = 'XRF-Maps Fluorescence Dataset (*.h5 *.hdf5)'
 
     @staticmethod
     def _split_path(data_path: str) -> tuple[str, str]:
-        parts = data_path.split("/")
-        return "/".join(parts[:-1]), parts[-1]
+        parts = data_path.split('/')
+        return '/'.join(parts[:-1]), parts[-1]
 
     def read(cls, filePath: Path) -> FluorescenceDataset:
         element_maps: list[ElementMap] = list()
         counts_per_second_path = str()
         channel_names_path = str()
 
-        with h5py.File(filePath, "r") as h5file:
+        with h5py.File(filePath, 'r') as h5file:
             # try to see if v10 layout, Non Negative Lease squares fitting tech was used
-            h5_counts_per_second = h5file["/MAPS/XRF_Analyzed/NNLS/Counts_Per_Sec"]
-            h5_channel_names = h5file["/MAPS/XRF_Analyzed/NNLS/Channel_Names"]
+            h5_counts_per_second = h5file['/MAPS/XRF_Analyzed/NNLS/Counts_Per_Sec']
+            h5_channel_names = h5file['/MAPS/XRF_Analyzed/NNLS/Channel_Names']
 
             if h5_counts_per_second is None:
                 # try to see if v10 layout, iterative matrix fitting tech was used
-                h5_counts_per_second = h5file["/MAPS/XRF_Analyzed/Fitted/Counts_Per_Sec"]
-                h5_channel_names = h5file["/MAPS/XRF_Analyzed/Fitted/Channel_Names"]
+                h5_counts_per_second = h5file['/MAPS/XRF_Analyzed/Fitted/Counts_Per_Sec']
+                h5_channel_names = h5file['/MAPS/XRF_Analyzed/Fitted/Channel_Names']
 
                 if h5_counts_per_second is None:
                     # try to see if was saved in v9 layout
-                    h5_counts_per_second = h5file["/MAPS/XRF_fits"]
-                    h5_channel_names = h5file["/MAPS/channel_names"]
+                    h5_counts_per_second = h5file['/MAPS/XRF_fits']
+                    h5_channel_names = h5file['/MAPS/channel_names']
 
             if h5_counts_per_second is not None:
                 # Counts_Per_Sec is an N x H x W
@@ -75,11 +75,11 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
         cps_group_path, cps_dataset_name = self._split_path(dataset.counts_per_second_path)
         ch_group_path, ch_dataset_name = self._split_path(dataset.channel_names_path)
 
-        with h5py.File(filePath, "w") as h5file:
+        with h5py.File(filePath, 'w') as h5file:
             cps_group = h5file.require_group(cps_group_path)
             cps_group.create_dataset(cps_dataset_name, data=numpy.stack(counts_per_sec))
             ch_group = h5file.require_group(ch_group_path)
-            ch_group.create_dataset(ch_dataset_name, data=channel_names, dtype="S256")
+            ch_group.create_dataset(ch_dataset_name, data=channel_names, dtype='S256')
 
 
 class NPZFluorescenceFileWriter(FluorescenceFileWriter):
@@ -103,6 +103,6 @@ def registerPlugins(registry: PluginRegistry) -> None:
     )
     registry.fluorescenceFileWriters.registerPlugin(
         NPZFluorescenceFileWriter(),
-        simpleName="NPZ",
-        displayName="NumPy Zipped Archive (*.npz)",
+        simpleName='NPZ',
+        displayName='NumPy Zipped Archive (*.npz)',
     )

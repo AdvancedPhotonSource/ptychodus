@@ -19,36 +19,36 @@ logger = logging.getLogger(__name__)
 
 
 class H5ProductFileIO(ProductFileReader, ProductFileWriter):
-    SIMPLE_NAME: Final[str] = "HDF5"
-    DISPLAY_NAME: Final[str] = "Ptychodus Product Files (*.h5 *.hdf5)"
+    SIMPLE_NAME: Final[str] = 'HDF5'
+    DISPLAY_NAME: Final[str] = 'Ptychodus Product Files (*.h5 *.hdf5)'
 
-    NAME: Final[str] = "name"
-    COMMENTS: Final[str] = "comments"
-    DETECTOR_OBJECT_DISTANCE: Final[str] = "detector_object_distance_m"
-    PROBE_ENERGY: Final[str] = "probe_energy_eV"
-    PROBE_PHOTON_FLUX: Final[str] = "probe_photons_per_s"
-    EXPOSURE_TIME: Final[str] = "exposure_time_s"
+    NAME: Final[str] = 'name'
+    COMMENTS: Final[str] = 'comments'
+    DETECTOR_OBJECT_DISTANCE: Final[str] = 'detector_object_distance_m'
+    PROBE_ENERGY: Final[str] = 'probe_energy_eV'
+    PROBE_PHOTON_FLUX: Final[str] = 'probe_photons_per_s'
+    EXPOSURE_TIME: Final[str] = 'exposure_time_s'
 
-    PROBE_ARRAY: Final[str] = "probe"
-    PROBE_PIXEL_HEIGHT: Final[str] = "pixel_height_m"
-    PROBE_PIXEL_WIDTH: Final[str] = "pixel_width_m"
-    PROBE_POSITION_INDEXES: Final[str] = "probe_position_indexes"
-    PROBE_POSITION_X: Final[str] = "probe_position_x_m"
-    PROBE_POSITION_Y: Final[str] = "probe_position_y_m"
+    PROBE_ARRAY: Final[str] = 'probe'
+    PROBE_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
+    PROBE_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
+    PROBE_POSITION_INDEXES: Final[str] = 'probe_position_indexes'
+    PROBE_POSITION_X: Final[str] = 'probe_position_x_m'
+    PROBE_POSITION_Y: Final[str] = 'probe_position_y_m'
 
-    OBJECT_ARRAY: Final[str] = "object"
-    OBJECT_CENTER_X: Final[str] = "center_x_m"
-    OBJECT_CENTER_Y: Final[str] = "center_y_m"
-    OBJECT_LAYER_DISTANCE: Final[str] = "object_layer_distance_m"
-    OBJECT_PIXEL_HEIGHT: Final[str] = "pixel_height_m"
-    OBJECT_PIXEL_WIDTH: Final[str] = "pixel_width_m"
+    OBJECT_ARRAY: Final[str] = 'object'
+    OBJECT_CENTER_X: Final[str] = 'center_x_m'
+    OBJECT_CENTER_Y: Final[str] = 'center_y_m'
+    OBJECT_LAYER_DISTANCE: Final[str] = 'object_layer_distance_m'
+    OBJECT_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
+    OBJECT_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
 
-    COSTS_ARRAY: Final[str] = "costs"
+    COSTS_ARRAY: Final[str] = 'costs'
 
     def read(self, filePath: Path) -> Product:
         scanPointList: list[ScanPoint] = list()
 
-        with h5py.File(filePath, "r") as h5File:
+        with h5py.File(filePath, 'r') as h5File:
             metadata = ProductMetadata(
                 name=str(h5File.attrs[self.NAME]),
                 comments=str(h5File.attrs[self.COMMENTS]),
@@ -105,7 +105,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             scanXInMeters.append(point.positionXInMeters)
             scanYInMeters.append(point.positionYInMeters)
 
-        with h5py.File(filePath, "w") as h5File:
+        with h5py.File(filePath, 'w') as h5File:
             metadata = product.metadata
             h5File.attrs[self.NAME] = metadata.name
             h5File.attrs[self.COMMENTS] = metadata.comments

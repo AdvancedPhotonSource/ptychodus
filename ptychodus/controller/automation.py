@@ -61,7 +61,7 @@ class AutomationProcessingController(Observer):
 
     def _browseDirectory(self) -> None:
         dirPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, "Choose Data Directory"
+            self._view, 'Choose Data Directory'
         )
 
         if dirPath:

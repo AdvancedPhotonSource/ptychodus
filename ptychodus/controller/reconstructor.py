@@ -89,36 +89,36 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         view.reconstructorView.productComboBox.textActivated.connect(controller._redrawPlot)
         view.reconstructorView.productComboBox.setModel(productTableModel)
 
-        openModelAction = view.reconstructorView.modelMenu.addAction("Open...")
+        openModelAction = view.reconstructorView.modelMenu.addAction('Open...')
         openModelAction.triggered.connect(controller._openModel)
-        saveModelAction = view.reconstructorView.modelMenu.addAction("Save...")
+        saveModelAction = view.reconstructorView.modelMenu.addAction('Save...')
         saveModelAction.triggered.connect(controller._saveModel)
 
         openTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            "Open Training Data..."
+            'Open Training Data...'
         )
         openTrainingDataAction.triggered.connect(controller._openTrainingData)
         saveTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            "Save Training Data..."
+            'Save Training Data...'
         )
         saveTrainingDataAction.triggered.connect(controller._saveTrainingData)
         ingestTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            "Ingest Training Data"
+            'Ingest Training Data'
         )
         ingestTrainingDataAction.triggered.connect(controller._ingestTrainingData)
         clearTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            "Clear Training Data"
+            'Clear Training Data'
         )
         clearTrainingDataAction.triggered.connect(controller._clearTrainingData)
         view.reconstructorView.trainerMenu.addSeparator()
-        trainAction = view.reconstructorView.trainerMenu.addAction("Train")
+        trainAction = view.reconstructorView.trainerMenu.addAction('Train')
         trainAction.triggered.connect(controller._train)
 
         reconstructSplitAction = view.reconstructorView.reconstructorMenu.addAction(
-            "Reconstruct Odd/Even Split"
+            'Reconstruct Odd/Even Split'
         )
         reconstructSplitAction.triggered.connect(controller._reconstructSplit)
-        reconstructAction = view.reconstructorView.reconstructorMenu.addAction("Reconstruct")
+        reconstructAction = view.reconstructorView.reconstructorMenu.addAction('Reconstruct')
         reconstructAction.triggered.connect(controller._reconstruct)
 
         controller._syncAlgorithmToView()
@@ -126,7 +126,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         return controller
 
     def _addReconstructor(self, name: str) -> None:
-        backendName, reconstructorName = name.split("/")  # TODO REDO
+        backendName, reconstructorName = name.split('/')  # TODO REDO
         self._view.reconstructorView.algorithmComboBox.addItem(
             name, self._view.reconstructorView.algorithmComboBox.count()
         )
@@ -135,7 +135,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             viewControllerFactory = self._viewControllerFactoryDict[backendName]
             widget = viewControllerFactory.createViewController(reconstructorName)
         else:
-            widget = QLabel(f"{backendName} not found!")
+            widget = QLabel(f'{backendName} not found!')
             widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self._view.stackedWidget.addWidget(widget)
@@ -151,7 +151,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             self._presenter.reconstruct(inputProductIndex, outputProductName)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Reconstructor", err)
+            ExceptionDialog.showException('Reconstructor', err)
 
     def _reconstructSplit(self) -> None:
         outputProductName = self._presenter.getReconstructor()
@@ -164,12 +164,12 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             self._presenter.reconstructSplit(inputProductIndex, outputProductName)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Split Reconstructor", err)
+            ExceptionDialog.showException('Split Reconstructor', err)
 
     def _openModel(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
-            "Open Model",
+            'Open Model',
             nameFilters=self._presenter.getOpenModelFileFilterList(),
             selectedNameFilter=self._presenter.getOpenModelFileFilter(),
         )
@@ -179,12 +179,12 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 self._presenter.openModel(filePath)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("Model Reader", err)
+                ExceptionDialog.showException('Model Reader', err)
 
     def _saveModel(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
             self._view,
-            "Save Model",
+            'Save Model',
             nameFilters=self._presenter.getSaveModelFileFilterList(),
             selectedNameFilter=self._presenter.getSaveModelFileFilter(),
         )
@@ -194,12 +194,12 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 self._presenter.saveModel(filePath)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("Model Writer", err)
+                ExceptionDialog.showException('Model Writer', err)
 
     def _openTrainingData(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
-            "Open Training Data",
+            'Open Training Data',
             nameFilters=self._presenter.getOpenTrainingDataFileFilterList(),
             selectedNameFilter=self._presenter.getOpenTrainingDataFileFilter(),
         )
@@ -209,12 +209,12 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 self._presenter.openTrainingData(filePath)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("Training Data Reader", err)
+                ExceptionDialog.showException('Training Data Reader', err)
 
     def _saveTrainingData(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
             self._view,
-            "Save Training Data",
+            'Save Training Data',
             nameFilters=self._presenter.getSaveTrainingDataFileFilterList(),
             selectedNameFilter=self._presenter.getSaveTrainingDataFileFilter(),
         )
@@ -224,7 +224,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 self._presenter.saveTrainingData(filePath)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("Training Data Writer", err)
+                ExceptionDialog.showException('Training Data Writer', err)
 
     def _ingestTrainingData(self) -> None:
         inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
@@ -236,21 +236,21 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             self._presenter.ingestTrainingData(inputProductIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Ingester", err)
+            ExceptionDialog.showException('Ingester', err)
 
     def _clearTrainingData(self) -> None:
         try:
             self._presenter.clearTrainingData()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Clear", err)
+            ExceptionDialog.showException('Clear', err)
 
     def _train(self) -> None:
         try:
             self._presenter.train()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Trainer", err)
+            ExceptionDialog.showException('Trainer', err)
 
     def _redrawPlot(self) -> None:
         productIndex = self._view.reconstructorView.productComboBox.currentIndex()
@@ -267,10 +267,10 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         ax = self._plotView.axes
         ax.clear()
-        ax.set_xlabel("Iteration")
-        ax.set_ylabel("Cost")
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel('Cost')
         ax.grid(True)
-        ax.plot(item.getCosts(), ".-", label="Cost", linewidth=1.5)
+        ax.plot(item.getCosts(), '.-', label='Cost', linewidth=1.5)
         self._plotView.figureCanvas.draw()
 
     def _syncAlgorithmToView(self) -> None:

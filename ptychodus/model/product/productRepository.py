@@ -72,7 +72,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         self,
         name: str,
         *,
-        comments: str = "",
+        comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
         probePhotonsPerSecond: float | None = None,
@@ -114,7 +114,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def insertProductFromSettings(self) -> int:
         # TODO add mechanism to sync product state to settings
-        metadataItem = self._metadataRepositoryItemFactory.createDefault("FromSettings")
+        metadataItem = self._metadataRepositoryItemFactory.createDefault('FromSettings')
         scanItem = self._scanRepositoryItemFactory.createFromSettings()
         geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.createFromSettings(geometry)
@@ -157,7 +157,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         try:
             item = self._itemList.pop(index)
         except IndexError:
-            logger.debug(f"Failed to remove product item {index}!")
+            logger.debug(f'Failed to remove product item {index}!')
             return
 
         for observer in self._observerList:
@@ -165,7 +165,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def getInfoText(self) -> str:
         sizeInMB = sum(sys.getsizeof(prod) for prod in self._itemList) / (1024 * 1024)
-        return f"Total: {len(self)} [{sizeInMB:.2f}MB]"
+        return f'Total: {len(self)} [{sizeInMB:.2f}MB]'
 
     def addObserver(self, observer: ProductRepositoryObserver) -> None:
         if observer not in self._observerList:

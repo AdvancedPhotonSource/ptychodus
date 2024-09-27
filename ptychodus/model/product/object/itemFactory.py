@@ -37,7 +37,7 @@ class ObjectRepositoryItemFactory:
         try:
             builder = self._builderFactory.createFromSettings()
         except Exception as exc:
-            logger.error("".join(exc.args))
+            logger.error(''.join(exc.args))
             builder = self._builderFactory.createDefault()
 
         return ObjectRepositoryItem(geometryProvider, self._settings, builder)

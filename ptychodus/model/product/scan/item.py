@@ -32,41 +32,41 @@ class ScanRepositoryItem(ParameterGroup):
         self._boundingBoxBuilder = ScanBoundingBoxBuilder()
         self._lengthInMeters = 0.0
 
-        self._addGroup("builder", builder, observe=True)
-        self._addGroup("transform", transform, observe=True)
+        self._addGroup('builder', builder, observe=True)
+        self._addGroup('transform', transform, observe=True)
 
         self.expandBoundingBox = BooleanParameter(
-            self, "expand_bbox", settings.expandBoundingBox.getValue()
+            self, 'expand_bbox', settings.expandBoundingBox.getValue()
         )
         self.expandedBoundingBoxMinimumXInMeters = RealParameter(
             self,
-            "expanded_bbox_xmin_m",
+            'expanded_bbox_xmin_m',
             float(settings.expandedBoundingBoxMinimumXInMeters.getValue()),
         )
         self.expandedBoundingBoxMaximumXInMeters = RealParameter(
             self,
-            "expanded_bbox_xmax_m",
+            'expanded_bbox_xmax_m',
             float(settings.expandedBoundingBoxMaximumXInMeters.getValue()),
         )
         self.expandedBoundingBoxMinimumYInMeters = RealParameter(
             self,
-            "expanded_bbox_ymin_m",
+            'expanded_bbox_ymin_m',
             float(settings.expandedBoundingBoxMinimumYInMeters.getValue()),
         )
         self.expandedBoundingBoxMaximumYInMeters = RealParameter(
             self,
-            "expanded_bbox_ymax_m",
+            'expanded_bbox_ymax_m',
             float(settings.expandedBoundingBoxMaximumYInMeters.getValue()),
         )
 
         self._rebuild()
 
     def assign(self, item: ScanRepositoryItem) -> None:
-        self._removeGroup("transform")
+        self._removeGroup('transform')
         self._transform.removeObserver(self)
         self._transform = item.getTransform().copy()
         self._transform.addObserver(self)
-        self._addGroup("transform", self._transform)
+        self._addGroup('transform', self._transform)
 
         self.setBuilder(item.getBuilder().copy())
 
@@ -77,11 +77,11 @@ class ScanRepositoryItem(ParameterGroup):
         return self._builder
 
     def setBuilder(self, builder: ScanBuilder) -> None:
-        self._removeGroup("builder")
+        self._removeGroup('builder')
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
-        self._addGroup("builder", self._builder)
+        self._addGroup('builder', self._builder)
         self._rebuild()
 
     def getBoundingBox(self) -> ScanBoundingBox | None:
@@ -125,7 +125,7 @@ class ScanRepositoryItem(ParameterGroup):
         try:
             scan = self._builder.build()
         except Exception as exc:
-            logger.error("".join(exc.args))
+            logger.error(''.join(exc.args))
         else:
             self._untransformedScan = scan
             self._transformScan()

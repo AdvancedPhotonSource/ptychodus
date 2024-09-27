@@ -16,17 +16,17 @@ class NanoMaxScanFileReader(ScanFileReader):
     def read(self, filePath: Path) -> Scan:
         pointList: list[ScanPoint] = list()
 
-        with h5py.File(filePath, "r") as h5File:
+        with h5py.File(filePath, 'r') as h5File:
             try:
-                positionX = h5File["/entry/measurement/pseudo/x"][()]
-                positionY = h5File["/entry/measurement/pseudo/y"][()]
+                positionX = h5File['/entry/measurement/pseudo/x'][()]
+                positionY = h5File['/entry/measurement/pseudo/y'][()]
             except KeyError:
-                logger.exception("Unable to load scan.")
+                logger.exception('Unable to load scan.')
             else:
                 if positionX.shape == positionY.shape:
-                    logger.debug(f"Coordinate arrays have shape {positionX.shape}.")
+                    logger.debug(f'Coordinate arrays have shape {positionX.shape}.')
                 else:
-                    raise ScanPointParseError("Coordinate array shape mismatch!")
+                    raise ScanPointParseError('Coordinate array shape mismatch!')
 
                 for idx, (x, y) in enumerate(zip(positionX, positionY)):
                     point = ScanPoint(
@@ -42,6 +42,6 @@ class NanoMaxScanFileReader(ScanFileReader):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.scanFileReaders.registerPlugin(
         NanoMaxScanFileReader(),
-        simpleName="NanoMax",
-        displayName="NanoMax DiffractionEndStation Scan Files (*.h5 *.hdf5)",
+        simpleName='NanoMax',
+        displayName='NanoMax DiffractionEndStation Scan Files (*.h5 *.hdf5)',
     )

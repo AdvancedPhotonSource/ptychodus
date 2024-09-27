@@ -41,12 +41,12 @@ class ProbeBuilderFactory(Iterable[str]):
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
         self._builders: Mapping[str, Callable[[], ProbeBuilder]] = {
-            "disk": lambda: DiskProbeBuilder(settings),
-            "average_pattern": self._createAveragePatternBuilder,
-            "fresnel_zone_plate": self._createFresnelZonePlateBuilder,
-            "rectangular": lambda: RectangularProbeBuilder(settings),
-            "super_gaussian": lambda: SuperGaussianProbeBuilder(settings),
-            "zernike": lambda: ZernikeProbeBuilder(settings),
+            'disk': lambda: DiskProbeBuilder(settings),
+            'average_pattern': self._createAveragePatternBuilder,
+            'fresnel_zone_plate': self._createFresnelZonePlateBuilder,
+            'rectangular': lambda: RectangularProbeBuilder(settings),
+            'super_gaussian': lambda: SuperGaussianProbeBuilder(settings),
+            'zernike': lambda: ZernikeProbeBuilder(settings),
         }
 
     def __iter__(self) -> Iterator[str]:
@@ -67,7 +67,7 @@ class ProbeBuilderFactory(Iterable[str]):
         name = self._settings.builder.getValue()
         nameRepaired = name.casefold()
 
-        if nameRepaired == "from_file":
+        if nameRepaired == 'from_file':
             return self.createProbeFromFile(
                 self._settings.filePath.getValue(),
                 self._settings.fileType.getValue(),

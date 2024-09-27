@@ -40,17 +40,17 @@ def registerPlugins(registry: PluginRegistry) -> None:
     # TODO Implement method from https://doi.org/10.1364/OE.20.018287
     registry.deconvolutionStrategies.registerPlugin(
         IdentityDeconvolution(),
-        displayName="Identity",
+        displayName='Identity',
     )
     registry.deconvolutionStrategies.registerPlugin(
         RichardsonLucyDeconvolution(),
-        displayName="Richardson-Lucy",
+        displayName='Richardson-Lucy',
     )
     registry.deconvolutionStrategies.registerPlugin(
         WienerDeconvolution(),
-        displayName="Wiener",
+        displayName='Wiener',
     )
     registry.deconvolutionStrategies.registerPlugin(
         UnsupervisedWienerDeconvolution(),
-        displayName="Unsupervised Wiener",
+        displayName='Unsupervised Wiener',
     )

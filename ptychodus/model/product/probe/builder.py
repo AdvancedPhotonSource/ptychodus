@@ -33,7 +33,7 @@ class ProbeTransverseCoordinates:
 class ProbeBuilder(ParameterGroup):
     def __init__(self, name: str) -> None:
         super().__init__()
-        self._name = StringParameter(self, "name", name)
+        self._name = StringParameter(self, 'name', name)
 
     def getTransverseCoordinates(self, geometry: ProbeGeometry) -> ProbeTransverseCoordinates:
         Y, X = numpy.mgrid[: geometry.heightInPixels, : geometry.widthInPixels]
@@ -65,7 +65,7 @@ class ProbeBuilder(ParameterGroup):
 
 class FromMemoryProbeBuilder(ProbeBuilder):
     def __init__(self, probe: Probe) -> None:
-        super().__init__("from_memory")
+        super().__init__('from_memory')
         self._probe = probe.copy()
 
     def copy(self) -> FromMemoryProbeBuilder:
@@ -77,9 +77,9 @@ class FromMemoryProbeBuilder(ProbeBuilder):
 
 class FromFileProbeBuilder(ProbeBuilder):
     def __init__(self, filePath: Path, fileType: str, fileReader: ProbeFileReader) -> None:
-        super().__init__("from_file")
-        self.filePath = PathParameter(self, "file_path", filePath)
-        self.fileType = StringParameter(self, "file_type", fileType)
+        super().__init__('from_file')
+        self.filePath = PathParameter(self, 'file_path', filePath)
+        self.fileType = StringParameter(self, 'file_type', fileType)
         self._fileReader = fileReader
 
     def copy(self) -> FromFileProbeBuilder:

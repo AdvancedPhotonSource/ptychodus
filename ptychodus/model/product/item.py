@@ -61,10 +61,10 @@ class ProductRepositoryItem(ParameterGroup):
         self._validator = validator
         self._costs = list(costs)
 
-        self._addGroup("metadata", self._metadata, observe=True)
-        self._addGroup("scan", self._scan, observe=True)
-        self._addGroup("probe", self._probe, observe=True)
-        self._addGroup("object", self._object, observe=True)
+        self._addGroup('metadata', self._metadata, observe=True)
+        self._addGroup('scan', self._scan, observe=True)
+        self._addGroup('probe', self._probe, observe=True)
+        self._addGroup('object', self._object, observe=True)
 
     def getName(self) -> str:
         return self._metadata.getName()

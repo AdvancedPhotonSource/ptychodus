@@ -60,15 +60,15 @@ class TiffDiffractionFileReader(DiffractionFileReader):
     def _getFileSeries(self, filePath: Path) -> tuple[Mapping[int, Path], str]:
         filePathDict: dict[int, Path] = dict()
 
-        digits = re.findall(r"\d+", filePath.stem)
+        digits = re.findall(r'\d+', filePath.stem)
         longest_digits = max(digits, key=len)
-        filePattern = filePath.name.replace(longest_digits, f"(\\d{{{len(longest_digits)}}})")
+        filePattern = filePath.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
 
         for fp in filePath.parent.iterdir():
             z = re.match(filePattern, fp.name)
 
             if z:
-                index = int(z.group(1).lstrip("0"))
+                index = int(z.group(1).lstrip('0'))
                 filePathDict[index] = fp
 
         return filePathDict, filePattern
@@ -77,12 +77,12 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         dataset = SimpleDiffractionDataset.createNullInstance(filePath)
 
         filePathMapping, filePattern = self._getFileSeries(filePath)
-        contentsTree = SimpleTreeNode.createRoot(["Name", "Type", "Details"])
+        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
 
         for idx, (_, fp) in enumerate(sorted(filePathMapping.items())):  # TODO use keys
             array = TiffDiffractionPatternArray(fp, idx)
-            contentsTree.createChild([array.getLabel(), "TIFF", str(idx)])
+            contentsTree.createChild([array.getLabel(), 'TIFF', str(idx)])
             arrayList.append(array)
 
         try:
@@ -112,12 +112,12 @@ class TiffDiffractionFileReader(DiffractionFileReader):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.diffractionFileReaders.registerPlugin(
         TiffDiffractionFileReader(),
-        simpleName="TIFF",
-        displayName="Tagged Image File Format Files (*.tif *.tiff)",
+        simpleName='TIFF',
+        displayName='Tagged Image File Format Files (*.tif *.tiff)',
     )
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     filePath = Path(sys.argv[1])
     reader = TiffDiffractionFileReader()
     tiffFile = reader.read(filePath)

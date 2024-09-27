@@ -36,13 +36,13 @@ class ObjectTreeModel(QAbstractItemModel):
         self._api = api
         self._treeRoot = ObjectTreeNode()
         self._header = [
-            "Name",
-            "Distance [m]",
-            "Builder",
-            "Data Type",
-            "Width [px]",
-            "Height [px]",
-            "Size [MB]",
+            'Name',
+            'Distance [m]',
+            'Builder',
+            'Data Type',
+            'Width [px]',
+            'Height [px]',
+            'Size [MB]',
         ]
 
         for index, item in enumerate(repository):
@@ -145,12 +145,12 @@ class ObjectTreeModel(QAbstractItemModel):
 
             if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
-                    return f"Layer {index.row() + 1}"
+                    return f'Layer {index.row() + 1}'
                 elif index.column() == 1:
                     try:
                         return item.layerDistanceInMeters[index.row()]
                     except IndexError:
-                        return float("NaN")
+                        return float('NaN')
         else:
             item = self._repository[index.row()]
             object_ = item.getObject()
@@ -169,7 +169,7 @@ class ObjectTreeModel(QAbstractItemModel):
                 elif index.column() == 5:
                     return object_.heightInPixels
                 elif index.column() == 6:
-                    return f"{object_.sizeInBytes / (1024 * 1024):.2f}"
+                    return f'{object_.sizeInBytes / (1024 * 1024):.2f}'
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)

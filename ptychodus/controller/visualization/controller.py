@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class VisualizationController(Observer):
-    MIME_TYPES = ["image/bmp", "image/jpeg", "image/png", "image/x-portable-pixmap"]
+    MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
     def __init__(
         self,
@@ -83,7 +83,7 @@ class VisualizationController(Observer):
             )
         except ValueError as err:
             logger.exception(err)
-            ExceptionDialog.showException("Renderer", err)
+            ExceptionDialog.showException('Renderer', err)
         else:
             self._item.setProduct(product)
 
@@ -95,7 +95,7 @@ class VisualizationController(Observer):
 
     def saveImage(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view, "Save Image", mimeTypeFilters=VisualizationController.MIME_TYPES
+            self._view, 'Save Image', mimeTypeFilters=VisualizationController.MIME_TYPES
         )
 
         if filePath:
@@ -110,7 +110,7 @@ class VisualizationController(Observer):
         product = self._item.getProduct()
 
         if product is None:
-            logger.warning("No visualization product!")
+            logger.warning('No visualization product!')
             return
 
         valueLabel = product.getValueLabel()
@@ -118,8 +118,8 @@ class VisualizationController(Observer):
 
         ax = self._lineCutDialog.axes
         ax.clear()
-        ax.plot(lineCut.distanceInMeters, lineCut.value, ".-", linewidth=1.5)
-        ax.set_xlabel("Distance [m]")
+        ax.plot(lineCut.distanceInMeters, lineCut.value, '.-', linewidth=1.5)
+        ax.set_xlabel('Distance [m]')
         ax.set_ylabel(valueLabel)
         ax.grid(True)
         self._lineCutDialog.figureCanvas.draw()
@@ -127,7 +127,7 @@ class VisualizationController(Observer):
 
     def _analyzeRegion(self, rect: QRectF) -> None:
         if rect.isEmpty():
-            logger.debug("QRectF is empty!")
+            logger.debug('QRectF is empty!')
             return
 
         box = Box2D(
@@ -140,7 +140,7 @@ class VisualizationController(Observer):
         product = self._item.getProduct()
 
         if product is None:
-            logger.warning("No visualization product!")
+            logger.warning('No visualization product!')
             return
 
         valueLabel = product.getValueLabel()
@@ -149,18 +149,18 @@ class VisualizationController(Observer):
 
         ax = self._histogramDialog.axes
         ax.clear()
-        ax.plot(values, kde.kde(values), ".-", linewidth=1.5)
+        ax.plot(values, kde.kde(values), '.-', linewidth=1.5)
         ax.set_xlabel(valueLabel)
-        ax.set_ylabel("Density")
+        ax.set_ylabel('Density')
         ax.grid(True)
         self._histogramDialog.figureCanvas.draw()
 
         rectangleView = self._histogramDialog.rectangleView
         rectCenter = rect.center()
-        rectangleView.centerXLineEdit.setText(f"{rectCenter.x():.1f}")
-        rectangleView.centerYLineEdit.setText(f"{rectCenter.y():.1f}")
-        rectangleView.widthLineEdit.setText(f"{rect.width():.1f}")
-        rectangleView.heightLineEdit.setText(f"{rect.height():.1f}")
+        rectangleView.centerXLineEdit.setText(f'{rectCenter.x():.1f}')
+        rectangleView.centerYLineEdit.setText(f'{rectCenter.y():.1f}')
+        rectangleView.widthLineEdit.setText(f'{rect.width():.1f}')
+        rectangleView.heightLineEdit.setText(f'{rect.height():.1f}')
 
         # TODO use rect for crop
         self._histogramDialog.open()

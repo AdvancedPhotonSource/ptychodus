@@ -7,15 +7,15 @@ from .productRepository import ProductRepository
 from .scanRepository import ScanRepository
 
 __all__ = [
-    "ObjectAPI",
-    "ObjectRepository",
-    "ProbeAPI",
-    "ProbeRepository",
-    "ProductAPI",
-    "ProductCore",
-    "ProductRepository",
-    "ProductRepositoryItem",
-    "ProductRepositoryObserver",
-    "ScanAPI",
-    "ScanRepository",
+    'ObjectAPI',
+    'ObjectRepository',
+    'ProbeAPI',
+    'ProbeRepository',
+    'ProductAPI',
+    'ProductCore',
+    'ProductRepository',
+    'ProductRepositoryItem',
+    'ProductRepositoryObserver',
+    'ScanAPI',
+    'ScanRepository',
 ]

@@ -28,11 +28,11 @@ class ColormapRenderer(Renderer):
         super().__init__(component.name)
         self._component = component
         self._transformation = transformation
-        self._addParameter("transformation", transformation)
+        self._addParameter('transformation', transformation)
         self._colorAxis = colorAxis
-        self._addGroup("color_axis", colorAxis, observe=True)
+        self._addGroup('color_axis', colorAxis, observe=True)
         self._colormap = colormap
-        self._addParameter("colormap", colormap)
+        self._addParameter('colormap', colormap)
 
     def variants(self) -> Iterator[str]:
         return self._colormap.choices()

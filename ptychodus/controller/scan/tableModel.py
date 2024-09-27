@@ -13,7 +13,7 @@ class ScanTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._repository = repository
         self._api = api
-        self._header = ["Name", "Plot", "Builder", "Points", "Length [m]", "Size [MB]"]
+        self._header = ['Name', 'Plot', 'Builder', 'Points', 'Length [m]', 'Size [MB]']
         self._checkedItemIndexes: set[int] = set()
 
     def insertItem(self, index: int, item: ScanRepositoryItem) -> None:
@@ -58,9 +58,9 @@ class ScanTableModel(QAbstractTableModel):
             elif index.column() == 3:
                 return len(scan)
             elif index.column() == 4:
-                return f"{item.getLengthInMeters():.6f}"
+                return f'{item.getLengthInMeters():.6f}'
             elif index.column() == 5:
-                return f"{scan.sizeInBytes / (1024 * 1024):.2f}"
+                return f'{scan.sizeInBytes / (1024 * 1024):.2f}'
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:
                 return (

@@ -21,11 +21,11 @@ class NPYObjectFileWriter(ObjectFileWriter):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.objectFileReaders.registerPlugin(
         NPYObjectFileReader(),
-        simpleName="NPY",
-        displayName="NumPy Binary Files (*.npy)",
+        simpleName='NPY',
+        displayName='NumPy Binary Files (*.npy)',
     )
     registry.objectFileWriters.registerPlugin(
         NPYObjectFileWriter(),
-        simpleName="NPY",
-        displayName="NumPy Binary Files (*.npy)",
+        simpleName='NPY',
+        displayName='NumPy Binary Files (*.npy)',
     )

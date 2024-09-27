@@ -48,15 +48,15 @@ class STXMViewController(Observer):
             itemName = self._simulator.getProductName()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Launch", err)
+            ExceptionDialog.showException('Launch', err)
         else:
-            self._dialog.setWindowTitle(f"Simulate STXM: {itemName}")
+            self._dialog.setWindowTitle(f'Simulate STXM: {itemName}')
             self._dialog.open()
 
         self._simulator.simulate()
 
     def _saveResult(self) -> None:
-        title = "Save STXM Image"
+        title = 'Save STXM Image'
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
             title,
@@ -78,7 +78,7 @@ class STXMViewController(Observer):
             self._visualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Update Views", err)
+            ExceptionDialog.showException('Update Views', err)
         else:
             self._visualizationWidgetController.setArray(image.intensity, image.pixel_geometry)
 

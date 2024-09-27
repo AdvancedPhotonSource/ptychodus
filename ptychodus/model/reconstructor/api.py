@@ -40,7 +40,7 @@ class ReconstructorAPI:
         tic = time.perf_counter()
         result = reconstructor.reconstruct(parameters)
         toc = time.perf_counter()
-        logger.info(f"Reconstruction time {toc - tic:.4f} seconds. (code={result.result})")
+        logger.info(f'Reconstruction time {toc - tic:.4f} seconds. (code={result.result})')
 
         outputProductIndex = self._productRepository.insertProduct(result.product)
         return outputProductIndex
@@ -48,12 +48,12 @@ class ReconstructorAPI:
     def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
         outputProductIndexOdd = self.reconstruct(
             inputProductIndex,
-            f"{outputProductName}_odd",
+            f'{outputProductName}_odd',
             ScanIndexFilter.ODD,
         )
         outputProductIndexEven = self.reconstruct(
             inputProductIndex,
-            f"{outputProductName}_even",
+            f'{outputProductName}_even',
             ScanIndexFilter.EVEN,
         )
 
@@ -63,58 +63,58 @@ class ReconstructorAPI:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info("Preparing input data...")
+            logger.info('Preparing input data...')
             tic = time.perf_counter()
             parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
                 inputProductIndex, ScanIndexFilter.ALL
             )
             toc = time.perf_counter()
-            logger.info(f"Data preparation time {toc - tic:.4f} seconds.")
+            logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
 
-            logger.info("Ingesting...")
+            logger.info('Ingesting...')
             tic = time.perf_counter()
             reconstructor.ingestTrainingData(parameters)
             toc = time.perf_counter()
-            logger.info(f"Ingest time {toc - tic:.4f} seconds.")
+            logger.info(f'Ingest time {toc - tic:.4f} seconds.')
         else:
-            logger.warning("Reconstructor is not trainable!")
+            logger.warning('Reconstructor is not trainable!')
 
     def openTrainingData(self, filePath: Path) -> None:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info("Opening training data...")
+            logger.info('Opening training data...')
             tic = time.perf_counter()
             reconstructor.openTrainingData(filePath)
             toc = time.perf_counter()
-            logger.info(f"Open time {toc - tic:.4f} seconds.")
+            logger.info(f'Open time {toc - tic:.4f} seconds.')
         else:
-            logger.warning("Reconstructor is not trainable!")
+            logger.warning('Reconstructor is not trainable!')
 
     def saveTrainingData(self, filePath: Path) -> None:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info("Saving training data...")
+            logger.info('Saving training data...')
             tic = time.perf_counter()
             reconstructor.saveTrainingData(filePath)
             toc = time.perf_counter()
-            logger.info(f"Save time {toc - tic:.4f} seconds.")
+            logger.info(f'Save time {toc - tic:.4f} seconds.')
         else:
-            logger.warning("Reconstructor is not trainable!")
+            logger.warning('Reconstructor is not trainable!')
 
     def train(self) -> TrainOutput:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
         result = TrainOutput([], [], -1)
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info("Training...")
+            logger.info('Training...')
             tic = time.perf_counter()
             result = reconstructor.train()
             toc = time.perf_counter()
-            logger.info(f"Training time {toc - tic:.4f} seconds. (code={result.result})")
+            logger.info(f'Training time {toc - tic:.4f} seconds. (code={result.result})')
         else:
-            logger.warning("Reconstructor is not trainable!")
+            logger.warning('Reconstructor is not trainable!')
 
         return result
 
@@ -122,34 +122,34 @@ class ReconstructorAPI:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info("Resetting...")
+            logger.info('Resetting...')
             tic = time.perf_counter()
             reconstructor.clearTrainingData()
             toc = time.perf_counter()
-            logger.info(f"Reset time {toc - tic:.4f} seconds.")
+            logger.info(f'Reset time {toc - tic:.4f} seconds.')
         else:
-            logger.warning("Reconstructor is not trainable!")
+            logger.warning('Reconstructor is not trainable!')
 
     def openModel(self, filePath: Path) -> None:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info("Opening model...")
+            logger.info('Opening model...')
             tic = time.perf_counter()
             reconstructor.openModel(filePath)
             toc = time.perf_counter()
-            logger.info(f"Open time {toc - tic:.4f} seconds.")
+            logger.info(f'Open time {toc - tic:.4f} seconds.')
         else:
-            logger.warning("Reconstructor is not trainable!")
+            logger.warning('Reconstructor is not trainable!')
 
     def saveModel(self, filePath: Path) -> None:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info("Saving model...")
+            logger.info('Saving model...')
             tic = time.perf_counter()
             reconstructor.saveModel(filePath)
             toc = time.perf_counter()
-            logger.info(f"Save time {toc - tic:.4f} seconds.")
+            logger.info(f'Save time {toc - tic:.4f} seconds.')
         else:
-            logger.warning("Reconstructor is not trainable!")
+            logger.warning('Reconstructor is not trainable!')

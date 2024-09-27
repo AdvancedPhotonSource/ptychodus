@@ -61,7 +61,7 @@ class DecimalSlider(QWidget):
         shouldEmit = False
 
         if range_.upper <= range_.lower:
-            raise ValueError(f"maximum <= minimum ({range_.upper} <= {range_.lower})")
+            raise ValueError(f'maximum <= minimum ({range_.upper} <= {range_.lower})')
 
         if range_.lower != self._minimum:
             self._minimum = range_.lower
@@ -114,7 +114,7 @@ class DecimalSlider(QWidget):
         return shouldEmit
 
     def _updateLabel(self) -> None:
-        self._label.setText(f"{self._value:.3f}")
+        self._label.setText(f'{self._value:.3f}')
 
     def _emitValueChanged(self) -> None:
         self.valueChanged.emit(self._value)

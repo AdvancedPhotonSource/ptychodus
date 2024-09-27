@@ -44,7 +44,7 @@ class VisualizationEngine(Observable, Observer):
                 self._colorAxis,
                 acyclicColormap,
             ),
-            displayName="Real",
+            displayName='Real',
         )
 
         if isComplex:
@@ -59,7 +59,7 @@ class VisualizationEngine(Observable, Observer):
                     self._colorAxis,
                     acyclicColormap,
                 ),
-                displayName="Imaginary",
+                displayName='Imaginary',
             )
             self._rendererChooser.registerPlugin(
                 ColormapRenderer(
@@ -68,7 +68,7 @@ class VisualizationEngine(Observable, Observer):
                     self._colorAxis,
                     acyclicColormap,
                 ),
-                displayName="Amplitude",
+                displayName='Amplitude',
             )
             self._rendererChooser.registerPlugin(
                 ColormapRenderer(
@@ -77,7 +77,7 @@ class VisualizationEngine(Observable, Observer):
                     self._colorAxis,
                     cyclicColormap,
                 ),
-                displayName="Phase",
+                displayName='Phase',
             )
             self._rendererChooser.registerPlugin(
                 ColormapRenderer(
@@ -86,7 +86,7 @@ class VisualizationEngine(Observable, Observer):
                     self._colorAxis,
                     acyclicColormap,
                 ),
-                displayName="Phase (Unwrapped)",
+                displayName='Phase (Unwrapped)',
             )
             self._rendererChooser.registerPlugin(
                 CylindricalColorModelRenderer(
@@ -95,9 +95,9 @@ class VisualizationEngine(Observable, Observer):
                     self._transformation,
                     self._colorAxis,
                 ),
-                displayName="Complex",
+                displayName='Complex',
             )
-            self._rendererChooser.setCurrentPluginByName("Complex")
+            self._rendererChooser.setCurrentPluginByName('Complex')
 
         self._rendererChooser.addObserver(self)
         self._rendererPlugin = self._rendererChooser.currentPlugin

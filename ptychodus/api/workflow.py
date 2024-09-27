@@ -86,7 +86,7 @@ class WorkflowAPI(ABC):
         self,
         name: str,
         *,
-        comments: str = "",
+        comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
         probePhotonsPerSecond: float | None = None,

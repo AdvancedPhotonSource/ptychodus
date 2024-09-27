@@ -41,7 +41,7 @@ class DatasetTreeNode:
         if self._frameIndex < 0:
             return self._presenter.label
 
-        return f"Frame {self._frameIndex}"
+        return f'Frame {self._frameIndex}'
 
     @property
     def state(self) -> DiffractionPatternState:
@@ -83,7 +83,7 @@ class DatasetTreeModel(QAbstractItemModel):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rootNode = DatasetTreeNode.createRoot()
-        self._header = ["Label", "Frames", "Size [MB]"]
+        self._header = ['Label', 'Frames', 'Size [MB]']
 
     def setRootNode(self, rootNode: DatasetTreeNode) -> None:
         self.beginResetModel()
@@ -144,7 +144,7 @@ class DatasetTreeModel(QAbstractItemModel):
                 elif index.column() == 1:
                     return node.numberOfFrames
                 elif index.column() == 2:
-                    return f"{node.sizeInBytes / (1024 * 1024):.2f}"
+                    return f'{node.sizeInBytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.FontRole:
                 font = QFont()
                 font.setItalic(node.state == DiffractionPatternState.FOUND)

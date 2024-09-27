@@ -5,7 +5,7 @@ from .core import (
 )
 
 __all__ = [
-    "PtychoNNModelPresenter",
-    "PtychoNNReconstructorLibrary",
-    "PtychoNNTrainingPresenter",
+    'PtychoNNModelPresenter',
+    'PtychoNNReconstructorLibrary',
+    'PtychoNNTrainingPresenter',
 ]

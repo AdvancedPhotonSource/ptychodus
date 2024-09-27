@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class ImageToolsController:
-    MIME_TYPES = ["image/bmp", "image/jpeg", "image/png", "image/x-portable-pixmap"]
+    MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
     def __init__(
         self,

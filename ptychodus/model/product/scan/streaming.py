@@ -9,7 +9,7 @@ from .builder import ScanBuilder
 
 class StreamingScanBuilder(ScanBuilder):
     def __init__(self, pointSeq: Sequence[ScanPoint]) -> None:
-        super().__init__("Streaming")
+        super().__init__('Streaming')
         self._pointList = list(pointSeq)
 
     def append(self, point: ScanPoint) -> None:

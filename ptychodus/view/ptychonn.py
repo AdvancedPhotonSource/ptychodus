@@ -15,18 +15,18 @@ from .widgets import DecimalLineEdit, DecimalSlider
 
 class PtychoNNModelParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__("Model Parameters", parent)
+        super().__init__('Model Parameters', parent)
         self.numberOfConvolutionKernelsSpinBox = QSpinBox()
         self.batchSizeSpinBox = QSpinBox()
-        self.useBatchNormalizationCheckBox = QCheckBox("Use Batch Normalization")
+        self.useBatchNormalizationCheckBox = QCheckBox('Use Batch Normalization')
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> PtychoNNModelParametersView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow("Convolution Kernels:", view.numberOfConvolutionKernelsSpinBox)
-        layout.addRow("Batch Size:", view.batchSizeSpinBox)
+        layout.addRow('Convolution Kernels:', view.numberOfConvolutionKernelsSpinBox)
+        layout.addRow('Batch Size:', view.batchSizeSpinBox)
         layout.addRow(view.useBatchNormalizationCheckBox)
         view.setLayout(layout)
 
@@ -35,7 +35,7 @@ class PtychoNNModelParametersView(QGroupBox):
 
 class PtychoNNTrainingParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__("Training Parameters", parent)
+        super().__init__('Training Parameters', parent)
         self.validationSetFractionalSizeSlider = DecimalSlider.createInstance(
             Qt.Orientation.Horizontal, numberOfTicks=20
         )
@@ -49,11 +49,11 @@ class PtychoNNTrainingParametersView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow("Validation Set Fractional Size:", view.validationSetFractionalSizeSlider)
-        layout.addRow("Maximum Learning Rate:", view.maximumLearningRateLineEdit)
-        layout.addRow("Minimum Learning Rate:", view.minimumLearningRateLineEdit)
-        layout.addRow("Training Epochs:", view.trainingEpochsSpinBox)
-        layout.addRow("Status Interval:", view.statusIntervalSpinBox)
+        layout.addRow('Validation Set Fractional Size:', view.validationSetFractionalSizeSlider)
+        layout.addRow('Maximum Learning Rate:', view.maximumLearningRateLineEdit)
+        layout.addRow('Minimum Learning Rate:', view.minimumLearningRateLineEdit)
+        layout.addRow('Training Epochs:', view.trainingEpochsSpinBox)
+        layout.addRow('Status Interval:', view.statusIntervalSpinBox)
         view.setLayout(layout)
 
         return view

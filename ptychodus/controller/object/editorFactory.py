@@ -40,32 +40,32 @@ class ObjectEditorViewControllerFactory:
     ) -> QDialog:
         objectBuilder = item.getBuilder()
         builderName = objectBuilder.getName()
-        firstLayerGroup = "First Layer"
-        additionalLayersGroup = "Additional Layers"
-        title = f"{itemName} [{builderName}]"
+        firstLayerGroup = 'First Layer'
+        additionalLayersGroup = 'Additional Layers'
+        title = f'{itemName} [{builderName}]'
 
         if isinstance(objectBuilder, RandomObjectBuilder):
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addSpinBox(
-                objectBuilder.extraPaddingX, "Extra Padding X:", group=firstLayerGroup
+                objectBuilder.extraPaddingX, 'Extra Padding X:', group=firstLayerGroup
             )
             dialogBuilder.addSpinBox(
-                objectBuilder.extraPaddingY, "Extra Padding Y:", group=firstLayerGroup
+                objectBuilder.extraPaddingY, 'Extra Padding Y:', group=firstLayerGroup
             )
             dialogBuilder.addDecimalSlider(
-                objectBuilder.amplitudeMean, "Amplitude Mean:", group=firstLayerGroup
+                objectBuilder.amplitudeMean, 'Amplitude Mean:', group=firstLayerGroup
             )
             dialogBuilder.addDecimalSlider(
                 objectBuilder.amplitudeDeviation,
-                "Amplitude Deviation:",
+                'Amplitude Deviation:',
                 group=firstLayerGroup,
             )
             dialogBuilder.addDecimalSlider(
-                objectBuilder.phaseDeviation, "Phase Deviation:", group=firstLayerGroup
+                objectBuilder.phaseDeviation, 'Phase Deviation:', group=firstLayerGroup
             )
             dialogBuilder.addViewController(
                 MultisliceViewController(item),
-                "Number of Layers:",
+                'Number of Layers:',
                 group=additionalLayersGroup,
             )
             return dialogBuilder.buildDialog(title, parent)

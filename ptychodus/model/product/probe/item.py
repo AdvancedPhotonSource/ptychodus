@@ -24,17 +24,17 @@ class ProbeRepositoryItem(ParameterGroup):
         self._additionalModesBuilder = additionalModesBuilder
         self._probe = Probe()
 
-        self._addGroup("builder", builder, observe=True)
-        self._addGroup("additional_modes", additionalModesBuilder, observe=True)
+        self._addGroup('builder', builder, observe=True)
+        self._addGroup('additional_modes', additionalModesBuilder, observe=True)
 
         self._rebuild()
 
     def assign(self, item: ProbeRepositoryItem) -> None:
-        self._removeGroup("additional_modes")
+        self._removeGroup('additional_modes')
         self._additionalModesBuilder.removeObserver(self)
         self._additionalModesBuilder = item.getAdditionalModesBuilder().copy()
         self._additionalModesBuilder.addObserver(self)
-        self._addGroup("additional_modes", self._additionalModesBuilder, observe=True)
+        self._addGroup('additional_modes', self._additionalModesBuilder, observe=True)
 
         self.setBuilder(item.getBuilder().copy())
 
@@ -45,18 +45,18 @@ class ProbeRepositoryItem(ParameterGroup):
         return self._builder
 
     def setBuilder(self, builder: ProbeBuilder) -> None:
-        self._removeGroup("builder")
+        self._removeGroup('builder')
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
-        self._addGroup("builder", self._builder, observe=True)
+        self._addGroup('builder', self._builder, observe=True)
         self._rebuild()
 
     def _rebuild(self) -> None:
         try:
             probe = self._builder.build(self._geometryProvider)
         except Exception as exc:
-            logger.error("".join(exc.args))
+            logger.error(''.join(exc.args))
             return
 
         self._probe = self._additionalModesBuilder.build(probe)

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Generic, TypeVar
 
-T = TypeVar("T", int, float, Decimal)
+T = TypeVar('T', int, float, Decimal)
 
 
 @dataclass(frozen=True)
@@ -12,7 +12,7 @@ class PixelGeometry:
     heightInMeters: float
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})"
+        return f'{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})'
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ class ImageExtent:
         return False
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.widthInPixels}, {self.heightInPixels})"
+        return f'{type(self).__name__}({self.widthInPixels}, {self.heightInPixels})'
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ class Point2D:
     y: float
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.x}, {self.y})"
+        return f'{type(self).__name__}({self.x}, {self.y})'
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ class Line2D:
         return Point2D(x, y)
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.begin}, {self.end})"
+        return f'{type(self).__name__}({self.begin}, {self.end})'
 
 
 @dataclass(frozen=True)
@@ -88,7 +88,7 @@ class Box2D:
         return self.y + self.height
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.x}, {self.y}, {self.width}, {self.height})"
+        return f'{type(self).__name__}({self.x}, {self.y}, {self.width}, {self.height})'
 
 
 class Interval(Generic[T]):
@@ -132,4 +132,4 @@ class Interval(Generic[T]):
         return self.lower <= item and item < self.upper
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.lower}, {self.upper})"
+        return f'{type(self).__name__}({self.lower}, {self.upper})'

@@ -10,7 +10,7 @@ from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseEr
 from .neXusDiffractionFile import NeXusDiffractionFileReader
 
 __all__ = [
-    "VelociprobeScanFileReader",
+    'VelociprobeScanFileReader',
 ]
 
 
@@ -62,15 +62,15 @@ class VelociprobeScanFileReader(ScanFileReader):
         pointList: list[ScanPoint] = list()
         minimumColumnCount = max(col.value for col in VelociprobeScanFileColumn) + 1
 
-        with filePath.open(newline="") as csvFile:
-            csvReader = csv.reader(csvFile, delimiter=",")
+        with filePath.open(newline='') as csvFile:
+            csvReader = csv.reader(csvFile, delimiter=',')
 
             for row in csvReader:
-                if row[0].startswith("#"):
+                if row[0].startswith('#'):
                     continue
 
                 if len(row) < minimumColumnCount:
-                    raise ScanPointParseError("Bad number of columns!")
+                    raise ScanPointParseError('Bad number of columns!')
 
                 trigger = int(row[VelociprobeScanFileColumn.TRIGGER])
                 x_nm = int(row[VelociprobeScanFileColumn.X])

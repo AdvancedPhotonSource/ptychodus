@@ -9,7 +9,7 @@ from ptychodus.api.probe import Probe, ProbeFileReader, ProbeFileWriter
 class MATProbeFileReader(ProbeFileReader):
     def read(self, filePath: Path) -> Probe:
         matDict = scipy.io.loadmat(filePath)
-        array = matDict["probe"]
+        array = matDict['probe']
 
         if array.ndim == 4:
             # array[width, height, num_shared_modes, num_varying_modes]
@@ -25,18 +25,18 @@ class MATProbeFileReader(ProbeFileReader):
 class MATProbeFileWriter(ProbeFileWriter):
     def write(self, filePath: Path, probe: Probe) -> None:
         array = probe.array
-        matDict = {"probe": array.transpose(1, 2, 0)}
+        matDict = {'probe': array.transpose(1, 2, 0)}
         scipy.io.savemat(filePath, matDict)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.probeFileReaders.registerPlugin(
         MATProbeFileReader(),
-        simpleName="MAT",
-        displayName="MAT Files (*.mat)",
+        simpleName='MAT',
+        displayName='MAT Files (*.mat)',
     )
     registry.probeFileWriters.registerPlugin(
         MATProbeFileWriter(),
-        simpleName="MAT",
-        displayName="MAT Files (*.mat)",
+        simpleName='MAT',
+        displayName='MAT Files (*.mat)',
     )

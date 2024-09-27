@@ -109,8 +109,8 @@ class VSPILinearOperator(LinearOperator):
 
 
 class FluorescenceEnhancer(Observable, Observer):
-    VSPI: Final[str] = "Virtual Single Pixel Imaging"
-    TWO_STEP: Final[str] = "Upscale and Deconvolve"
+    VSPI: Final[str] = 'Virtual Single Pixel Imaging'
+    TWO_STEP: Final[str] = 'Upscale and Deconvolve'
 
     def __init__(
         self,
@@ -187,7 +187,7 @@ class FluorescenceEnhancer(Observable, Observer):
 
     def getMeasuredElementMap(self, channelIndex: int) -> ElementMap:
         if self._measured is None:
-            raise ValueError("Fluorescence dataset not loaded!")
+            raise ValueError('Fluorescence dataset not loaded!')
 
         return self._measured.element_maps[channelIndex]
 
@@ -220,7 +220,7 @@ class FluorescenceEnhancer(Observable, Observer):
 
     def enhanceFluorescence(self) -> None:
         if self._measured is None:
-            raise ValueError("Fluorescence dataset not loaded!")
+            raise ValueError('Fluorescence dataset not loaded!')
 
         reconstructInput = self._dataMatcher.matchDiffractionPatternsWithPositions(
             self._productIndex
@@ -234,7 +234,7 @@ class FluorescenceEnhancer(Observable, Observer):
             X, info = gmres(A, B, atol=1e-5)  # TODO expose atol
 
             if info != 0:
-                logger.warning(f"Convergence to tolerance not achieved! {info=}")
+                logger.warning(f'Convergence to tolerance not achieved! {info=}')
 
             for m_emap, e_cps in zip(measured_emaps, X.T):
                 e_emap = ElementMap(m_emap.name, e_cps.reshape(m_emap.counts_per_second.shape))
@@ -262,7 +262,7 @@ class FluorescenceEnhancer(Observable, Observer):
 
     def getEnhancedElementMap(self, channelIndex: int) -> ElementMap:
         if self._enhanced is None:
-            raise ValueError("Fluorescence dataset not enhanced!")
+            raise ValueError('Fluorescence dataset not enhanced!')
 
         return self._enhanced.element_maps[channelIndex]
 
@@ -274,7 +274,7 @@ class FluorescenceEnhancer(Observable, Observer):
 
     def saveEnhancedDataset(self, filePath: Path, fileFilter: str) -> None:
         if self._enhanced is None:
-            raise ValueError("Fluorescence dataset not enhanced!")
+            raise ValueError('Fluorescence dataset not enhanced!')
 
         self._fileWriterChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileWriterChooser.currentPlugin.simpleName

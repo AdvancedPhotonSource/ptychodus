@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class ColorAxis(ParameterGroup):
     def __init__(self) -> None:
         super().__init__()
-        self.lower = RealParameter(self, "lower", 0.0)
-        self.upper = RealParameter(self, "upper", 1.0)
+        self.lower = RealParameter(self, 'lower', 0.0)
+        self.upper = RealParameter(self, 'upper', 1.0)
 
     def getRange(self) -> Interval[float]:
         return Interval[float].createProper(
@@ -33,14 +33,14 @@ class ColorAxis(ParameterGroup):
 
             if numpy.isfinite(lower) and numpy.isfinite(upper):
                 if lower == upper:
-                    logger.debug("Array values are uniform.")
+                    logger.debug('Array values are uniform.')
                     lower -= 0.5
                     upper += 0.5
             else:
-                logger.warning("Array values not finite!")
+                logger.warning('Array values not finite!')
                 lower = 0.0
                 upper = 1.0
 
             self.setRange(lower, upper)
         else:
-            logger.warning("Array has zero size!")
+            logger.warning('Array has zero size!')

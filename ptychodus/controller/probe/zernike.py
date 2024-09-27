@@ -15,10 +15,10 @@ class ZernikeTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._builder = builder
         self._header = [
-            "Radial Degree",
-            "Angular Frequency",
-            "Amplitude",
-            "Phase [tr]",
+            'Radial Degree',
+            'Angular Frequency',
+            'Amplitude',
+            'Phase [tr]',
         ]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
@@ -55,9 +55,9 @@ class ZernikeTableModel(QAbstractTableModel):
             elif index.column() == 1:
                 return poly.angular_frequency
             elif index.column() == 2:
-                return f"{numpy.absolute(coef):.6g}"
+                return f'{numpy.absolute(coef):.6g}'
             elif index.column() == 3:
-                return f"{numpy.angle(coef):.6g}"
+                return f'{numpy.angle(coef):.6g}'
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
         if not index.isValid():

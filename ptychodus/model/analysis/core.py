@@ -63,7 +63,7 @@ class AnalysisCore:
     def enhanceFluorescence(
         self, productIndex: int, inputFilePath: Path, outputFilePath: Path
     ) -> int:
-        fileType = "XRF-Maps"
+        fileType = 'XRF-Maps'
 
         try:
             self.fluorescenceEnhancer.setProduct(productIndex)

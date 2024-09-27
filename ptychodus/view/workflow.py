@@ -33,7 +33,7 @@ class WorkflowAuthorizationDialog(QDialog):
     def createInstance(cls, parent: QWidget | None = None) -> WorkflowAuthorizationDialog:
         view = cls(parent)
 
-        view.setWindowTitle("Authorize Workflow")
+        view.setWindowTitle('Authorize Workflow')
         view.label.setTextFormat(Qt.TextFormat.RichText)
         view.label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         view.label.setOpenExternalLinks(True)
@@ -57,7 +57,7 @@ class WorkflowAuthorizationDialog(QDialog):
 
 class WorkflowInputDataView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__("Input Data", parent)
+        super().__init__('Input Data', parent)
         self.endpointIDLineEdit = UUIDLineEdit()
         self.globusPathLineEdit = QLineEdit()
         self.posixPathLineEdit = QLineEdit()
@@ -67,9 +67,9 @@ class WorkflowInputDataView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow("Endpoint ID:", view.endpointIDLineEdit)
-        layout.addRow("Globus Path:", view.globusPathLineEdit)
-        layout.addRow("POSIX Path:", view.posixPathLineEdit)
+        layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
+        layout.addRow('Globus Path:', view.globusPathLineEdit)
+        layout.addRow('POSIX Path:', view.posixPathLineEdit)
         view.setLayout(layout)
 
         return view
@@ -77,8 +77,8 @@ class WorkflowInputDataView(QGroupBox):
 
 class WorkflowOutputDataView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__("Output Data", parent)
-        self.roundTripCheckBox = QCheckBox("Round Trip")
+        super().__init__('Output Data', parent)
+        self.roundTripCheckBox = QCheckBox('Round Trip')
         self.endpointIDLineEdit = UUIDLineEdit()
         self.globusPathLineEdit = QLineEdit()
         self.posixPathLineEdit = QLineEdit()
@@ -89,9 +89,9 @@ class WorkflowOutputDataView(QGroupBox):
 
         layout = QFormLayout()
         layout.addRow(view.roundTripCheckBox)
-        layout.addRow("Endpoint ID:", view.endpointIDLineEdit)
-        layout.addRow("Globus Path:", view.globusPathLineEdit)
-        layout.addRow("POSIX Path:", view.posixPathLineEdit)
+        layout.addRow('Endpoint ID:', view.endpointIDLineEdit)
+        layout.addRow('Globus Path:', view.globusPathLineEdit)
+        layout.addRow('POSIX Path:', view.posixPathLineEdit)
         view.setLayout(layout)
 
         return view
@@ -99,7 +99,7 @@ class WorkflowOutputDataView(QGroupBox):
 
 class WorkflowComputeView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__("Compute", parent)
+        super().__init__('Compute', parent)
         self.computeEndpointIDLineEdit = UUIDLineEdit()
         self.dataEndpointIDLineEdit = UUIDLineEdit()
         self.dataGlobusPathLineEdit = QLineEdit()
@@ -110,10 +110,10 @@ class WorkflowComputeView(QGroupBox):
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow("Compute Endpoint ID:", view.computeEndpointIDLineEdit)
-        layout.addRow("Data Endpoint ID:", view.dataEndpointIDLineEdit)
-        layout.addRow("Data Globus Path:", view.dataGlobusPathLineEdit)
-        layout.addRow("Data POSIX Path:", view.dataPosixPathLineEdit)
+        layout.addRow('Compute Endpoint ID:', view.computeEndpointIDLineEdit)
+        layout.addRow('Data Endpoint ID:', view.dataEndpointIDLineEdit)
+        layout.addRow('Data Globus Path:', view.dataGlobusPathLineEdit)
+        layout.addRow('Data POSIX Path:', view.dataPosixPathLineEdit)
         view.setLayout(layout)
 
         return view
@@ -121,19 +121,19 @@ class WorkflowComputeView(QGroupBox):
 
 class WorkflowExecutionView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__("Execution", parent)
+        super().__init__('Execution', parent)
         self.productComboBox = QComboBox()
         self.inputDataView = WorkflowInputDataView.createInstance()
         self.computeView = WorkflowComputeView.createInstance()
         self.outputDataView = WorkflowOutputDataView.createInstance()
-        self.executeButton = QPushButton("Execute")
+        self.executeButton = QPushButton('Execute')
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> WorkflowExecutionView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow("Product:", view.productComboBox)
+        layout.addRow('Product:', view.productComboBox)
         layout.addRow(view.inputDataView)
         layout.addRow(view.computeView)
         layout.addRow(view.outputDataView)
@@ -145,10 +145,10 @@ class WorkflowExecutionView(QGroupBox):
 
 class WorkflowStatusView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
-        super().__init__("Status", parent)
-        self.autoRefreshCheckBox = QCheckBox("Auto Refresh [sec]:")
+        super().__init__('Status', parent)
+        self.autoRefreshCheckBox = QCheckBox('Auto Refresh [sec]:')
         self.autoRefreshSpinBox = QSpinBox()
-        self.refreshButton = QPushButton("Refresh")
+        self.refreshButton = QPushButton('Refresh')
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> WorkflowStatusView:

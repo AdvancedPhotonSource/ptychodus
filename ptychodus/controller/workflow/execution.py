@@ -49,11 +49,11 @@ class WorkflowExecutionController:
         inputProductIndex = self._view.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
-            logger.debug("No current index!")
+            logger.debug('No current index!')
             return
 
         try:
             self._executionPresenter.runFlow(inputProductIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException("Reconstructor", err)
+            ExceptionDialog.showException('Reconstructor', err)

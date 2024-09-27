@@ -3,7 +3,7 @@ from .parameters import VisualizationParametersController
 from .widget import VisualizationWidgetController
 
 __all__ = [
-    "VisualizationController",
-    "VisualizationParametersController",
-    "VisualizationWidgetController",
+    'VisualizationController',
+    'VisualizationParametersController',
+    'VisualizationWidgetController',
 ]

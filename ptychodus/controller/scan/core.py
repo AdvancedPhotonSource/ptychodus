@@ -70,13 +70,13 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             lambda logicalIndex: controller._redrawPlot()
         )
 
-        loadFromFileAction = view.buttonBox.loadMenu.addAction("Open File...")
+        loadFromFileAction = view.buttonBox.loadMenu.addAction('Open File...')
         loadFromFileAction.triggered.connect(controller._loadCurrentScanFromFile)
 
-        copyAction = view.buttonBox.loadMenu.addAction("Copy...")
+        copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentScan)
 
-        view.copierDialog.setWindowTitle("Copy Scan")
+        view.copierDialog.setWindowTitle('Copy Scan')
         view.copierDialog.sourceComboBox.setModel(tableModel)
         view.copierDialog.destinationComboBox.setModel(tableModel)
         view.copierDialog.finished.connect(controller._finishCopyingScan)
@@ -93,7 +93,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             modelIndex = self._proxyModel.mapToSource(proxyIndex)
             return modelIndex.row()
 
-        logger.warning("No current index!")
+        logger.warning('No current index!')
         return -1
 
     def _loadCurrentScanFromFile(self) -> None:
@@ -104,7 +104,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
 
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
-            "Open Scan",
+            'Open Scan',
             nameFilters=self._api.getOpenFileFilterList(),
             selectedNameFilter=self._api.getOpenFileFilter(),
         )
@@ -114,7 +114,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
                 self._api.openScan(itemIndex, filePath, fileType=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("File Reader", err)
+                ExceptionDialog.showException('File Reader', err)
 
     def _copyToCurrentScan(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -148,7 +148,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
 
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
-            "Save Scan",
+            'Save Scan',
             nameFilters=self._api.getSaveFileFilterList(),
             selectedNameFilter=self._api.getSaveFileFilter(),
         )
@@ -158,7 +158,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
                 self._api.saveScan(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException("File Writer", err)
+                ExceptionDialog.showException('File Writer', err)
 
     def _redrawPlot(self) -> None:
         self._plotView.axes.clear()
@@ -172,16 +172,16 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
                 scan = self._repository[itemIndex].getScan()
                 x = [point.positionXInMeters for point in scan]
                 y = [point.positionYInMeters for point in scan]
-                self._plotView.axes.plot(x, y, ".-", label=itemName, linewidth=1.5)
+                self._plotView.axes.plot(x, y, '.-', label=itemName, linewidth=1.5)
 
         self._plotView.axes.invert_yaxis()
-        self._plotView.axes.axis("equal")
+        self._plotView.axes.axis('equal')
         self._plotView.axes.grid(True)
-        self._plotView.axes.set_xlabel("X [m]")
-        self._plotView.axes.set_ylabel("Y [m]")
+        self._plotView.axes.set_xlabel('X [m]')
+        self._plotView.axes.set_ylabel('Y [m]')
 
         if len(self._plotView.axes.lines) > 0:
-            self._plotView.axes.legend(loc="best")
+            self._plotView.axes.legend(loc='best')
 
         self._plotView.figureCanvas.draw()
 

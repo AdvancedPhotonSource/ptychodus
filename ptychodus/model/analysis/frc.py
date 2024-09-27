@@ -30,12 +30,12 @@ class FourierRingCorrelation:
         return numpy.nan
 
     def getPlot(self) -> Plot2D:
-        freqSeries = PlotSeries("freq", [1.0e-9 * freq for freq in self.spatialFrequency_rm])
-        frcSeries = PlotSeries("frc", self.correlation)
+        freqSeries = PlotSeries('freq', [1.0e-9 * freq for freq in self.spatialFrequency_rm])
+        frcSeries = PlotSeries('frc', self.correlation)
 
         return Plot2D(
-            axisX=PlotAxis("Spatial Frequency [1/nm]", [freqSeries]),
-            axisY=PlotAxis("Fourier Ring Correlation", [frcSeries]),
+            axisX=PlotAxis('Spatial Frequency [1/nm]', [freqSeries]),
+            axisY=PlotAxis('Fourier Ring Correlation', [frcSeries]),
         )
 
 
@@ -68,10 +68,10 @@ class FourierRingCorrelator:
         array2 = object2.getLayer(0)
 
         if numpy.ndim(array1) != 2 or numpy.ndim(array2) != 2:
-            raise ValueError("Arrays must be 2D!")
+            raise ValueError('Arrays must be 2D!')
 
         if numpy.shape(array1) != numpy.shape(array2):
-            raise ValueError("Arrays must have same shape!")
+            raise ValueError('Arrays must have same shape!')
 
         # TODO verify compatible pixel geometry
         pixelGeometry = object2.getPixelGeometry()

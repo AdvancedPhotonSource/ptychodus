@@ -13,17 +13,17 @@ class CXIScanFileReader(ScanFileReader):
     def read(self, filePath: Path) -> Scan:
         pointList: list[ScanPoint] = list()
 
-        with h5py.File(filePath, "r") as h5File:
+        with h5py.File(filePath, 'r') as h5File:
             try:
-                xyzArray = h5File["/entry_1/data_1/translation"][()]
+                xyzArray = h5File['/entry_1/data_1/translation'][()]
             except KeyError:
-                logger.exception("Unable to load scan.")
+                logger.exception('Unable to load scan.')
             else:
                 for idx, xyz in enumerate(xyzArray):
                     try:
                         x, y, z = xyz
                     except ValueError:
-                        logger.exception(f"Unable to load scan point {xyz=}.")
+                        logger.exception(f'Unable to load scan point {xyz=}.')
                     else:
                         point = ScanPoint(idx, x, y)
                         pointList.append(point)
@@ -34,6 +34,6 @@ class CXIScanFileReader(ScanFileReader):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.scanFileReaders.registerPlugin(
         CXIScanFileReader(),
-        simpleName="CXI",
-        displayName="Coherent X-ray Imaging Files (*.cxi)",
+        simpleName='CXI',
+        displayName='Coherent X-ray Imaging Files (*.cxi)',
     )

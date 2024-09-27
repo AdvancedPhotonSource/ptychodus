@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
-    MODEL_FILE_FILTER: Final[str] = "PyTorch Lightning Checkpoint Files (*.ckpt)"
-    TRAINING_DATA_FILE_FILTER: Final[str] = "NumPy Zipped Archive (*.npz)"
-    PATCHES_KW: Final[str] = "real"
-    PATTERNS_KW: Final[str] = "reciprocal"
+    MODEL_FILE_FILTER: Final[str] = 'PyTorch Lightning Checkpoint Files (*.ckpt)'
+    TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
+    PATCHES_KW: Final[str] = 'real'
+    PATTERNS_KW: Final[str] = 'reciprocal'
 
     def __init__(
         self,
@@ -43,8 +43,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         self._patternBuffer = PatternCircularBuffer.createZeroSized()
         self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
 
-        ptychonnVersion = version("ptychonn")
-        logger.info(f"\tPtychoNN {ptychonnVersion}")
+        ptychonnVersion = version('ptychonn')
+        logger.info(f'\tPtychoNN {ptychonnVersion}')
 
     @property
     def name(self) -> str:
@@ -56,12 +56,12 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         dataSize = data.shape[-1]
 
         if dataSize != data.shape[-2]:
-            raise ValueError("PtychoNN expects square diffraction data!")
+            raise ValueError('PtychoNN expects square diffraction data!')
 
         isDataSizePow2 = dataSize & (dataSize - 1) == 0 and dataSize > 0
 
         if not isDataSizePow2:
-            raise ValueError("PtychoNN expects that the diffraction data size is a power of two!")
+            raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
 
         # Bin diffraction data
         # TODO extract binning to data loading (and verify that x-y coordinates are correct)
@@ -85,13 +85,13 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         model = self._modelProvider.getModel()
 
-        logger.debug("Inferring...")
+        logger.debug('Inferring...')
         objectPatches = ptychonn.infer(
             data=binnedData.astype(numpy.float32),
             model=model,
         )
 
-        logger.debug("Stitching...")
+        logger.debug('Stitching...')
         stitcher = ObjectStitcher(parameters.product.object_.getGeometry())
 
         for scanPoint, objectPatchChannels in zip(parameters.product.scan, objectPatches):
@@ -164,7 +164,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def train(self) -> TrainOutput:
         model = self._modelProvider.getModel()
-        logger.debug("Training...")
+        logger.debug('Training...')
         trainingSetFractionalSize = (
             1 - self._trainingSettings.validationSetFractionalSize.getValue()
         )
@@ -177,7 +177,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             epochs=self._trainingSettings.trainingEpochs.getValue(),
             training_fraction=float(trainingSetFractionalSize),
             log_frequency=self._trainingSettings.statusIntervalInEpochs.getValue(),
-            strategy="ddp_notebook",
+            strategy='ddp_notebook',
         )
         self._modelProvider.setTrainer(trainer)
 
@@ -186,8 +186,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         for entry in trainerLog.logs:
             try:
-                tloss = entry["training_loss"]
-                vloss = entry["validation_loss"]
+                tloss = entry['training_loss']
+                vloss = entry['validation_loss']
             except KeyError:
                 pass
             else:
