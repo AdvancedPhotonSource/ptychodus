@@ -45,9 +45,8 @@ class XMCDViewController:
             engine, self._dialog.sumWidget, self._dialog.statusBar, fileDialogFactory)
         self._ratioVisualizationWidgetController = VisualizationWidgetController(
             engine, self._dialog.ratioWidget, self._dialog.statusBar, fileDialogFactory)
-        self._visualizationParametersController = (
-            VisualizationParametersController.createInstance(
-                engine, self._dialog.parametersView.visualizationParametersView))
+        self._visualizationParametersController = VisualizationParametersController.createInstance(
+            engine, self._dialog.parametersView.visualizationParametersView)
         self._result: XMCDResult | None = None
 
     def _analyze(self) -> None:

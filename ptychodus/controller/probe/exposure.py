@@ -34,9 +34,8 @@ class ExposureViewController:
             self._dialog.statusBar,
             fileDialogFactory,
         )
-        self._visualizationParametersController = (
-            VisualizationParametersController.createInstance(
-                engine, self._dialog.visualizationParametersView))
+        self._visualizationParametersController = VisualizationParametersController.createInstance(
+            engine, self._dialog.visualizationParametersView)
         self._result: ExposureMap | None = None
 
     def analyze(self, itemIndex: int) -> None:

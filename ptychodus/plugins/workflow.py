@@ -36,7 +36,7 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
         scanName = filePath.stem
         scanID = int(re.findall(r"\d+", scanName)[-1])
 
-        diffractionFilePath = (filePath.parents[1] / "raw_data" / f"scan{scanID}_master.h5")
+        diffractionFilePath = filePath.parents[1] / "raw_data" / f"scan{scanID}_master.h5"
         workflowAPI.openPatterns(diffractionFilePath, fileType="NeXus")
         productAPI = workflowAPI.createProduct(f"scan{scanID}")
         productAPI.openScan(filePath, fileType="CSV")

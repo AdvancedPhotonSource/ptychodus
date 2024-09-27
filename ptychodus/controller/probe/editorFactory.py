@@ -50,12 +50,12 @@ class FresnelZonePlateViewController(ParameterViewController):
 
         self._zonePlateDiameterViewController = LengthWidgetParameterViewController(
             probeBuilder.zonePlateDiameterInMeters)
-        self._outermostZoneWidthInMetersViewController = (LengthWidgetParameterViewController(
-            probeBuilder.outermostZoneWidthInMeters))
-        self._centralBeamstopDiameterInMetersViewController = (LengthWidgetParameterViewController(
-            probeBuilder.centralBeamstopDiameterInMeters))
-        self._defocusDistanceInMetersViewController = (LengthWidgetParameterViewController(
-            probeBuilder.defocusDistanceInMeters))
+        self._outermostZoneWidthInMetersViewController = LengthWidgetParameterViewController(
+            probeBuilder.outermostZoneWidthInMeters)
+        self._centralBeamstopDiameterInMetersViewController = LengthWidgetParameterViewController(
+            probeBuilder.centralBeamstopDiameterInMeters)
+        self._defocusDistanceInMetersViewController = LengthWidgetParameterViewController(
+            probeBuilder.defocusDistanceInMeters)
 
         layout = QFormLayout()
         layout.setContentsMargins(0, 0, 0, 0)

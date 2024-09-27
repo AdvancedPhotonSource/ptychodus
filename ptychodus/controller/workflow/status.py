@@ -73,7 +73,7 @@ class WorkflowStatusController:
         self._tableModel.endResetModel()
 
     def _syncModelToView(self) -> None:
-        refreshIntervalLimitsInSeconds = (self._presenter.getRefreshIntervalLimitsInSeconds())
+        refreshIntervalLimitsInSeconds = self._presenter.getRefreshIntervalLimitsInSeconds()
 
         self._view.autoRefreshSpinBox.blockSignals(True)
         self._view.autoRefreshSpinBox.setRange(refreshIntervalLimitsInSeconds.lower,

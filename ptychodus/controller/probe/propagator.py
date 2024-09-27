@@ -38,9 +38,8 @@ class ProbePropagationViewController(Observer):
             engine, self._dialog.xyView, self._dialog.statusBar, fileDialogFactory)
         self._zxVisualizationWidgetController = VisualizationWidgetController(
             engine, self._dialog.zxView, self._dialog.statusBar, fileDialogFactory)
-        self._visualizationParametersController = (
-            VisualizationParametersController.createInstance(
-                engine, self._dialog.parametersView.visualizationParametersView))
+        self._visualizationParametersController = VisualizationParametersController.createInstance(
+            engine, self._dialog.parametersView.visualizationParametersView)
         self._zyVisualizationWidgetController = VisualizationWidgetController(
             engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory)
 

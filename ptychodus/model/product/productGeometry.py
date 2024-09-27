@@ -50,7 +50,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def probePowerInWatts(self) -> float:
-        return (self.probeEnergyInJoules * self._metadata.probePhotonsPerSecond.getValue())
+        return self.probeEnergyInJoules * self._metadata.probePhotonsPerSecond.getValue()
 
     @property
     def _lambdaZInSquareMeters(self) -> float:
@@ -117,8 +117,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     def isObjectGeometryValid(self, geometry: ObjectGeometry) -> bool:
         expectedGeometry = self.getObjectGeometry()
-        pixelSizeIsValid = (geometry.pixelWidthInMeters > 0.0
-                            and geometry.pixelHeightInMeters > 0.0)
+        pixelSizeIsValid = geometry.pixelWidthInMeters > 0.0 and geometry.pixelHeightInMeters > 0.0
         return pixelSizeIsValid and geometry.contains(expectedGeometry)
 
     def update(self, observable: Observable) -> None:

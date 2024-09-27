@@ -22,7 +22,7 @@ from .status import WorkflowStatus, WorkflowStatusRepository
 
 logger = logging.getLogger(__name__)
 
-AuthorizerTypes: TypeAlias = (globus_sdk.AccessTokenAuthorizer | globus_sdk.RefreshTokenAuthorizer)
+AuthorizerTypes: TypeAlias = globus_sdk.AccessTokenAuthorizer | globus_sdk.RefreshTokenAuthorizer
 ScopeAuthorizerMapping: TypeAlias = Mapping[str, AuthorizerTypes]
 
 PTYCHODUS_CLIENT_ID: Final[str] = "5c0fb474-ae53-44c2-8c32-dd0db9965c57"

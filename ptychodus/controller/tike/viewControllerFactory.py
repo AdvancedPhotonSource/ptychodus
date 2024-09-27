@@ -24,8 +24,6 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
             view = TikeParametersView.createInstance(showAlpha=True, showStepLength=False)
         elif reconstructorName == "lstsq_grad":
             view = TikeParametersView.createInstance(showAlpha=False, showStepLength=False)
-        elif reconstructorName == "dm":
-            view = TikeParametersView.createInstance(showAlpha=False, showStepLength=False)
         else:
             view = TikeParametersView.createInstance(showAlpha=True, showStepLength=True)
 

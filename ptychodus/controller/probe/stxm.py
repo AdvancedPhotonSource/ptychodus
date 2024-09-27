@@ -36,9 +36,8 @@ class STXMViewController(Observer):
             self._dialog.statusBar,
             fileDialogFactory,
         )
-        self._visualizationParametersController = (
-            VisualizationParametersController.createInstance(
-                engine, self._dialog.visualizationParametersView))
+        self._visualizationParametersController = VisualizationParametersController.createInstance(
+            engine, self._dialog.visualizationParametersView)
 
         simulator.addObserver(self)
 

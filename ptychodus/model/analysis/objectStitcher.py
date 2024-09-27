@@ -15,7 +15,7 @@ class ObjectStitcher:
                       patchArray: ObjectArrayType) -> None:
         idx = numpy.s_[iySlice, ixSlice]
         self._weights[idx] += weight
-        self._array[idx] += ((patchArray - self._array[idx]) * weight / self._weights[idx])
+        self._array[idx] += (patchArray - self._array[idx]) * weight / self._weights[idx]
 
     def addPatch(self, patchCenter: ScanPoint, patchArray: ObjectArrayType) -> None:
         geometry = self._geometry

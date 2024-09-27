@@ -51,9 +51,9 @@ class ConcentricScanBuilder(ScanBuilder):
 
         for index in range(self._numberOfPoints):
             triangle = index // self.numberOfPointsInFirstShell.getValue()
-            shellIndex = (int((1 + numpy.sqrt(1 + 8 * triangle)) / 2) - 1)  # see OEIS A002024
+            shellIndex = int((1 + numpy.sqrt(1 + 8 * triangle)) / 2) - 1  # see OEIS A002024
             shellTriangle = (shellIndex * (shellIndex + 1)) // 2
-            firstIndexInShell = (self.numberOfPointsInFirstShell.getValue() * shellTriangle)
+            firstIndexInShell = self.numberOfPointsInFirstShell.getValue() * shellTriangle
             pointIndexInShell = index - firstIndexInShell
 
             radiusInMeters = self.radialStepSizeInMeters.getValue() * (shellIndex + 1)

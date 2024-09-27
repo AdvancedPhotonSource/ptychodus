@@ -68,7 +68,7 @@ class PluginChooser(Sequence[PluginEntry[T]], Observable):
         namecf = name.casefold()
 
         for index, entry in enumerate(self._entryList):
-            if (namecf == entry.simpleName.casefold() or namecf == entry.displayName.casefold()):
+            if namecf == entry.simpleName.casefold() or namecf == entry.displayName.casefold():
                 if self._currentIndex != index:
                     self._currentIndex = index
                     self.notifyObservers()

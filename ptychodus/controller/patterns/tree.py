@@ -47,7 +47,7 @@ class SimpleTreeModel(QAbstractItemModel):
         orientation: Qt.Orientation,
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if (orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._rootNode.data(section)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
@@ -57,7 +57,7 @@ class SimpleTreeModel(QAbstractItemModel):
         value = QModelIndex()
 
         if self.hasIndex(row, column, parent):
-            parentItem = (parent.internalPointer() if parent.isValid() else self._rootNode)
+            parentItem = parent.internalPointer() if parent.isValid() else self._rootNode
             childItem = parentItem.childItems[row]
 
             if childItem:

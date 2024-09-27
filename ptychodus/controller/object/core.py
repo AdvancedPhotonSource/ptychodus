@@ -153,7 +153,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
     def _finishCopyingObject(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
-            destinationIndex = (self._view.copierDialog.destinationComboBox.currentIndex())
+            destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
             self._api.copyObject(sourceIndex, destinationIndex)
 
     def _editCurrentObject(self) -> None:

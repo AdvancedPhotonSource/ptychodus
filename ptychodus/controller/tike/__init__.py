@@ -1,4 +1,4 @@
-from .factory import TikeViewControllerFactory
+from .viewControllerFactory import TikeViewControllerFactory
 
 __all__ = [
     "TikeViewControllerFactory",

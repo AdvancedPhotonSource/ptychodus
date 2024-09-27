@@ -57,7 +57,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
             self._detector.setBitDepth(bitDepth)
 
     def canSyncPatternCropCenter(self) -> bool:
-        return (self._metadata.cropCenter is not None or self._metadata.detectorExtent is not None)
+        return self._metadata.cropCenter is not None or self._metadata.detectorExtent is not None
 
     def canSyncPatternCropExtent(self) -> bool:
         return self._metadata.detectorExtent is not None

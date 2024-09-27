@@ -14,7 +14,7 @@ class FileDialogFactory:
         return self._openWorkingDirectory
 
     def setOpenWorkingDirectory(self, directory: Path) -> None:
-        self._openWorkingDirectory = (directory if directory.is_dir() else directory.parent)
+        self._openWorkingDirectory = directory if directory.is_dir() else directory.parent
 
     def getOpenFilePath(
         self,

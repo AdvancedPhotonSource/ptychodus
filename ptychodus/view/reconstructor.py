@@ -91,7 +91,7 @@ class ReconstructorParametersView(QWidget):
         self.reconstructorView = ReconstructorView.createInstance()
         self.stackedWidget = QStackedWidget()
         self.scrollArea = QScrollArea()
-        self.progressDialog = (ReconstructorProgressDialog.createInstance())  # TODO use this
+        self.progressDialog = ReconstructorProgressDialog.createInstance()  # TODO use this
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> ReconstructorParametersView:

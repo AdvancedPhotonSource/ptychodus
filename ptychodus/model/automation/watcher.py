@@ -50,7 +50,7 @@ class DataDirectoryWatcher(Observable, Observer):
         self._settings = settings
         self._workflow = workflow
         self._datasetBuffer = datasetBuffer
-        self._observer: watchdog.observers.api.BaseObserver = (watchdog.observers.Observer())
+        self._observer: watchdog.observers.api.BaseObserver = watchdog.observers.Observer()
 
         settings.addObserver(self)
         workflow.addObserver(self)

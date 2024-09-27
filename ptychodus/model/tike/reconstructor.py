@@ -257,7 +257,7 @@ class RegularizedPIEReconstructor(Reconstructor):
         self._algorithmOptions.num_batch = self._settings.numBatch.getValue()
         self._algorithmOptions.batch_method = self._settings.batchMethod.getValue()
         self._algorithmOptions.num_iter = self._settings.numIter.getValue()
-        self._algorithmOptions.convergence_window = (self._settings.convergenceWindow.getValue())
+        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.getValue()
         self._algorithmOptions.alpha = float(self._settings.alpha.getValue())
         return self._tikeReconstructor(parameters, self._algorithmOptions)
 
@@ -281,5 +281,5 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
         self._algorithmOptions.num_batch = self._settings.numBatch.getValue()
         self._algorithmOptions.batch_method = self._settings.batchMethod.getValue()
         self._algorithmOptions.num_iter = self._settings.numIter.getValue()
-        self._algorithmOptions.convergence_window = (self._settings.convergenceWindow.getValue())
+        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.getValue()
         return self._tikeReconstructor(parameters, self._algorithmOptions)

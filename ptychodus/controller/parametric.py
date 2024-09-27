@@ -5,17 +5,8 @@ from typing import Final
 import logging
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
-    QAbstractButton,
-    QCheckBox,
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QGroupBox,
-    QSpinBox,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
+                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
@@ -39,10 +30,13 @@ class ParameterViewController(ABC):
 
 class CheckBoxParameterViewController(ParameterViewController, Observer):
 
-    def __init__(self, parameter: BooleanParameter) -> None:
+    def __init__(self, parameter: BooleanParameter, text: str, *, tooltip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = QCheckBox()
+        self._widget = QCheckBox(text)
+
+        if tooltip:
+            self._widget.setToolTip(tooltip)
 
         self._syncModelToView()
         self._widget.toggled.connect(parameter.setValue)
@@ -62,10 +56,13 @@ class CheckBoxParameterViewController(ParameterViewController, Observer):
 class SpinBoxParameterViewController(ParameterViewController, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, parameter: IntegerParameter) -> None:
+    def __init__(self, parameter: IntegerParameter, *, tooltip: str = "") -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = QSpinBox()
+
+        if tooltip:
+            self._widget.setToolTip(tooltip)
 
         self._syncModelToView()
         self._widget.valueChanged.connect(parameter.setValue)
@@ -98,10 +95,17 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
 class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 
-    def __init__(self, parameter: RealParameter, *, isSigned: bool = False) -> None:
+    def __init__(self,
+                 parameter: RealParameter,
+                 *,
+                 isSigned: bool = False,
+                 tooltip: str = "") -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = DecimalLineEdit.createInstance(isSigned=isSigned)
+
+        if tooltip:
+            self._widget.setToolTip(tooltip)
 
         self._syncModelToView()
         self._widget.valueChanged.connect(self._syncViewToModel)
@@ -123,10 +127,13 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 
 class DecimalSliderParameterViewController(ParameterViewController, Observer):
 
-    def __init__(self, parameter: RealParameter) -> None:
+    def __init__(self, parameter: RealParameter, *, tooltip: str = "") -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+
+        if tooltip:
+            self._widget.setToolTip(tooltip)
 
         self._syncModelToView()
         self._widget.valueChanged.connect(self._syncViewToModel)
@@ -252,7 +259,7 @@ class ParameterViewBuilder:
         tooltip: str = "",
         group: str = "",
     ) -> None:
-        viewController = CheckBoxParameterViewController(parameter)
+        viewController = CheckBoxParameterViewController(parameter, '')
         self.addViewController(viewController, label, tooltip=tooltip, group=group)
 
     def addSpinBox(

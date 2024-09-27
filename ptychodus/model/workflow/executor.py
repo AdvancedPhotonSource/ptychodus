@@ -43,9 +43,7 @@ class WorkflowExecutor:
         self.jobQueue: queue.Queue[WorkflowJob] = queue.Queue()
 
     def runFlow(self, inputProductIndex: int) -> None:
-        transferSyncLevel = (
-            3  # Copy files if checksums of the source and destination mismatch
-        )
+        transferSyncLevel = 3  # Copy files if checksums of the source and destination mismatch
         ptychodusAction = "reconstruct"  # TODO or 'train'
 
         try:
@@ -58,7 +56,7 @@ class WorkflowExecutor:
         computeDataPosixPath = self._computeDataLocator.getPosixPath() / flowLabel
 
         inputDataGlobusPath = f"{self._inputDataLocator.getGlobusPath()}/{flowLabel}"
-        computeDataGlobusPath = (f"{self._computeDataLocator.getGlobusPath()}/{flowLabel}")
+        computeDataGlobusPath = f"{self._computeDataLocator.getGlobusPath()}/{flowLabel}"
         outputDataGlobusPath = f"{self._outputDataLocator.getGlobusPath()}/{flowLabel}"
 
         settingsFile = "settings.ini"

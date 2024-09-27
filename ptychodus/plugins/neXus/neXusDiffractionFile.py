@@ -254,7 +254,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                         detectorSpecific.xPixelsInDetector,
                         detectorSpecific.yPixelsInDetector,
                     )
-                    probeEnergyInElectronVolts = (detectorSpecific.photonEnergyInElectronVolts)
+                    probeEnergyInElectronVolts = detectorSpecific.photonEnergyInElectronVolts
 
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=h5Dataset.shape[0],

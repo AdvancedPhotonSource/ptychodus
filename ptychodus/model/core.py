@@ -307,7 +307,7 @@ class ModelCore:
                                                      outputFilePath,
                                                      fileType="NPZ")
 
-            if (fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None):
+            if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
                 self._analysisCore.enhanceFluorescence(
                     outputProductIndex,
                     fluorescenceInputFilePath,

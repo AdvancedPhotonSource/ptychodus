@@ -146,7 +146,7 @@ class ZernikeProbeBuilder(ProbeBuilder):
         coords = self.getTransverseCoordinates(geometry)
 
         radius = self.diameterInMeters.getValue() / 2.0
-        distance = (numpy.hypot(coords.positionYInMeters, coords.positionXInMeters) / radius)
+        distance = numpy.hypot(coords.positionYInMeters, coords.positionXInMeters) / radius
         angle = numpy.arctan2(coords.positionYInMeters, coords.positionXInMeters)
         array = numpy.zeros_like(distance, dtype=complex)
 

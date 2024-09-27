@@ -106,7 +106,7 @@ class ControllerCore:
             view.objectView,
             self._fileDialogFactory,
         )
-        self._reconstructorParametersController = (ReconstructorController.createInstance(
+        self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,
             view.reconstructorParametersView,
@@ -118,7 +118,7 @@ class ControllerCore:
                 self._ptychonnViewControllerFactory,
                 self._tikeViewControllerFactory,
             ],
-        ))
+        )
         self._workflowController = WorkflowController.createInstance(
             model.workflowParametersPresenter,
             model.workflowAuthorizationPresenter,

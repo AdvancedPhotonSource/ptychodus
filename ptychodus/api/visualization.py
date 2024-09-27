@@ -198,7 +198,7 @@ class VisualizationProduct:
         y_end = y_range.clamp(int(box.y_end) + 1)
 
         values = self._values[..., y_begin:y_end, x_begin:x_end]
-        values = (values.reshape(values.shape[-3], -1) if values.ndim > 2 else values.reshape(-1))
+        values = values.reshape(values.shape[-3], -1) if values.ndim > 2 else values.reshape(-1)
 
         if numpy.iscomplexobj(values):
             # TODO improve KDE for complex values

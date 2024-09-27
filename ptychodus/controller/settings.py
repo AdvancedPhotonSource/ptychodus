@@ -31,7 +31,7 @@ class SettingsTableModel(QAbstractTableModel):
         orientation: Qt.Orientation,
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if (role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal):
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             if section == 0:
                 return "Name"
             elif section == 1:

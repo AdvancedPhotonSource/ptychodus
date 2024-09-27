@@ -1,15 +1,5 @@
-from PyQt5.QtWidgets import (
-    QComboBox,
-    QDialog,
-    QFormLayout,
-    QGridLayout,
-    QGroupBox,
-    QLabel,
-    QPushButton,
-    QStatusBar,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt5.QtWidgets import (QComboBox, QDialog, QFormLayout, QGridLayout, QGroupBox, QLabel,
+                             QPushButton, QStatusBar, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar

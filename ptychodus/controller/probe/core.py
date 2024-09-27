@@ -193,7 +193,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
     def _finishCopyingProbe(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
-            destinationIndex = (self._view.copierDialog.destinationComboBox.currentIndex())
+            destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
             self._api.copyProbe(sourceIndex, destinationIndex)
 
     def _editCurrentProbe(self) -> None:

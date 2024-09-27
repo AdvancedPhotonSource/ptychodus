@@ -94,7 +94,7 @@ class ScanRepositoryItem(ParameterGroup):
                 minimumYInMeters=self.expandedBoundingBoxMinimumYInMeters.getValue(),
                 maximumYInMeters=self.expandedBoundingBoxMaximumYInMeters.getValue(),
             )
-            bbox = (expandedBoundingBox if bbox is None else bbox.hull(expandedBoundingBox))
+            bbox = expandedBoundingBox if bbox is None else bbox.hull(expandedBoundingBox)
 
         return bbox
 
