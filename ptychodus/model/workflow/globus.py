@@ -71,7 +71,6 @@ class PtychodusClient(gladier.GladierBaseClient):
 
 
 class CustomCodeHandler(fair_research_login.CodeHandler):
-
     def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         super().__init__()
         self._authorizer = authorizer
@@ -86,14 +85,12 @@ class CustomCodeHandler(fair_research_login.CodeHandler):
 
 
 class PtychodusClientBuilder(ABC):
-
     @abstractmethod
     def build(self) -> gladier.GladierBaseClient:
         pass
 
 
 class NativePtychodusClientBuilder(PtychodusClientBuilder):
-
     def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         super().__init__()
         self._authClient = fair_research_login.NativeClient(
@@ -128,7 +125,6 @@ class NativePtychodusClientBuilder(PtychodusClientBuilder):
 
 
 class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
-
     def __init__(self, clientID: str, clientSecret: str, flowID: str | None) -> None:
         super().__init__()
         self._authClient = globus_sdk.ConfidentialAppAuthClient(
@@ -158,7 +154,6 @@ class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
 
 
 class GlobusWorkflowThread(threading.Thread):
-
     def __init__(
         self,
         authorizer: WorkflowAuthorizer,

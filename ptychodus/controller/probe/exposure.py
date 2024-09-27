@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class ExposureViewController:
-
     def __init__(
         self,
         analyzer: ExposureAnalyzer,
@@ -35,7 +34,8 @@ class ExposureViewController:
             fileDialogFactory,
         )
         self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.visualizationParametersView)
+            engine, self._dialog.visualizationParametersView
+        )
         self._result: ExposureMap | None = None
 
     def analyze(self, itemIndex: int) -> None:

@@ -8,7 +8,6 @@ from ...model.product.object import ObjectRepositoryItem
 
 
 class ObjectTreeNode:
-
     def __init__(self, parent: ObjectTreeNode | None = None) -> None:
         self.parent = parent
         self.children: list[ObjectTreeNode] = list()
@@ -26,7 +25,6 @@ class ObjectTreeNode:
 
 
 class ObjectTreeModel(QAbstractItemModel):
-
     def __init__(
         self,
         repository: ObjectRepository,
@@ -105,12 +103,10 @@ class ObjectTreeModel(QAbstractItemModel):
             return self._header[section]
 
     @overload
-    def parent(self, index: QModelIndex) -> QModelIndex:
-        ...
+    def parent(self, index: QModelIndex) -> QModelIndex: ...
 
     @overload
-    def parent(self) -> QObject:
-        ...
+    def parent(self) -> QObject: ...
 
     def parent(self, index: QModelIndex | None = None) -> QModelIndex | QObject:
         if index is None:
@@ -118,8 +114,11 @@ class ObjectTreeModel(QAbstractItemModel):
         elif index.isValid():
             node = index.internalPointer()
             parentNode = node.parent
-            return (QModelIndex() if parentNode is self._treeRoot else self.createIndex(
-                parentNode.row(), 0, parentNode))
+            return (
+                QModelIndex()
+                if parentNode is self._treeRoot
+                else self.createIndex(parentNode.row(), 0, parentNode)
+            )
 
         return QModelIndex()
 
@@ -190,10 +189,7 @@ class ObjectTreeModel(QAbstractItemModel):
 
         return value
 
-    def setData(self,
-                index: QModelIndex,
-                value: Any,
-                role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             parent = index.parent()
 

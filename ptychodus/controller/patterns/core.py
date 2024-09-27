@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 
 
 class PatternsController(Observer):
-
     def __init__(
         self,
         detectorPresenter: DetectorPresenter,
@@ -45,8 +44,9 @@ class PatternsController(Observer):
         self._imageController = imageController
         self._view = view
         self._fileDialogFactory = fileDialogFactory
-        self._detectorController = DetectorController.createInstance(detectorPresenter,
-                                                                     view.detectorView)
+        self._detectorController = DetectorController.createInstance(
+            detectorPresenter, view.detectorView
+        )
         self._wizardController = OpenDatasetWizardController.createInstance(
             ioPresenter,
             metadataPresenter,

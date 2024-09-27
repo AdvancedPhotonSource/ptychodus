@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationDatasetBuffer:
-
     def __init__(
         self,
         settings: AutomationSettings,

@@ -2,11 +2,11 @@ def test_indexing() -> None:
     idx = 0
 
     for n in range(10):
-        print('')
+        print("")
 
         for m in range(-n, n + 1, 2):
             idx_calc = (n * (n + 2) + m) // 2
-            print(f'{n=} {m=:+d} {idx=} {idx_calc=}')
+            print(f"{n=} {m=:+d} {idx=} {idx_calc=}")
             assert idx == idx_calc
             idx += 1
 
@@ -14,7 +14,8 @@ def test_indexing() -> None:
 def test_pyramid() -> None:
     import numpy
     import matplotlib
-    matplotlib.use('Agg')
+
+    matplotlib.use("Agg")
     import matplotlib.colors
     import matplotlib.pyplot as plt
 
@@ -34,7 +35,7 @@ def test_pyramid() -> None:
     ###
 
     fig = plt.figure(dpi=my_dpi)
-    fig.patch.set_alpha(0.)
+    fig.patch.set_alpha(0.0)
     gs = fig.add_gridspec(max_radial_degree + 1, 2 * (max_radial_degree + 1))
 
     for radial_degree in range(max_radial_degree):
@@ -45,11 +46,11 @@ def test_pyramid() -> None:
             row = radial_degree
             col = max_radial_degree + angular_frequency
 
-            ax = fig.add_subplot(gs[row:row + 1, col:col + 2])
-            ax.pcolormesh(X, Y, Z, norm=matplotlib.colors.CenteredNorm(), cmap='seismic')
-            ax.set_aspect('equal')
+            ax = fig.add_subplot(gs[row : row + 1, col : col + 2])
+            ax.pcolormesh(X, Y, Z, norm=matplotlib.colors.CenteredNorm(), cmap="seismic")
+            ax.set_aspect("equal")
             ax.set_title(str(polynomial))
-            ax.axis('off')
+            ax.axis("off")
 
-    plt.savefig('zernike_pyramid.png', bbox_inches='tight', dpi=my_dpi)
+    plt.savefig("zernike_pyramid.png", bbox_inches="tight", dpi=my_dpi)
     plt.close(fig)

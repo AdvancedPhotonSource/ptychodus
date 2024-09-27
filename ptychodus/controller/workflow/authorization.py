@@ -7,7 +7,6 @@ from ...view.workflow import WorkflowAuthorizationDialog
 
 
 class WorkflowAuthorizationController:
-
     def __init__(
         self,
         presenter: WorkflowAuthorizationPresenter,

@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 class APS2IDDiffractionFileReader(DiffractionFileReader):
-
     def _getFileSeries(self, filePath: Path) -> tuple[Mapping[int, Path], str]:
         filePathDict: dict[int, Path] = dict()
 

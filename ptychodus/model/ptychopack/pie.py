@@ -22,7 +22,6 @@ from .settings import PtychoPackSettings
 
 
 class PtychographicIterativeEngineReconstructor(Reconstructor):
-
     def __init__(self, settings: PtychoPackSettings, device: RealPtychoPackDevice) -> None:
         self._settings = settings
         self._device = device
@@ -69,23 +68,26 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
             ),
         )
 
-        algorithm = PtychographicIterativeEngine(self._device.get_ptychopack_device(),
-                                                 detector_data, product)
+        algorithm = PtychographicIterativeEngine(
+            self._device.get_ptychopack_device(), detector_data, product
+        )
         algorithm.set_object_relaxation(float(self._settings.pie_object_relaxation.getValue()))
         algorithm.set_alpha(float(self._settings.pie_alpha.getValue()))
         algorithm.set_probe_power(probe_power)
         algorithm.set_probe_relaxation(float(self._settings.pie_probe_relaxation.getValue()))
         algorithm.set_beta(float(self._settings.pie_beta.getValue()))
         algorithm.set_pc_probe_threshold(
-            float(self._settings.position_correction_probe_threshold.getValue()))
+            float(self._settings.position_correction_probe_threshold.getValue())
+        )
         algorithm.set_pc_feedback(float(self._settings.position_correction_feedback.getValue()))
 
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()
         scan_output_points: list[ScanPoint] = list()
 
-        for scan_point_input, (y_px, x_px) in zip(scan_input,
-                                                  pp_output_product.positions_px.numpy()):
+        for scan_point_input, (y_px, x_px) in zip(
+            scan_input, pp_output_product.positions_px.numpy()
+        ):
             object_point = ObjectPoint(scan_point_input.index, float(x_px), float(y_px))
             scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
             scan_output_points.append(scan_point)

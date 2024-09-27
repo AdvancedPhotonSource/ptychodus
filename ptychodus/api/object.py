@@ -83,14 +83,12 @@ class ObjectGeometry:
 
 
 class ObjectGeometryProvider(ABC):
-
     @abstractmethod
     def getObjectGeometry(self) -> ObjectGeometry:
         pass
 
 
 class Object:
-
     def __init__(
         self,
         array: ObjectArrayType | None = None,
@@ -214,7 +212,6 @@ class Object:
 
 
 class ObjectInterpolator(ABC):
-
     @abstractmethod
     def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> Object:
         """returns an interpolated patch from the object array"""
@@ -222,7 +219,6 @@ class ObjectInterpolator(ABC):
 
 
 class ObjectPhaseCenteringStrategy(ABC):
-
     @abstractmethod
     def __call__(self, array: ObjectArrayType) -> ObjectArrayType:
         """returns the phase-centered array"""
@@ -230,7 +226,6 @@ class ObjectPhaseCenteringStrategy(ABC):
 
 
 class ObjectFileReader(ABC):
-
     @abstractmethod
     def read(self, filePath: Path) -> Object:
         """reads an object from file"""
@@ -238,7 +233,6 @@ class ObjectFileReader(ABC):
 
 
 class ObjectFileWriter(ABC):
-
     @abstractmethod
     def write(self, filePath: Path, object_: Object) -> None:
         """writes an object to file"""

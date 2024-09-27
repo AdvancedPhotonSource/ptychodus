@@ -16,7 +16,6 @@ from ...view.product import ProductEditorDialog
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
-
     def __init__(self, product: ProductRepositoryItem, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._product = product
@@ -64,7 +63,6 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
 
 class ProductEditorViewController(Observer):
-
     def __init__(
         self,
         product: ProductRepositoryItem,

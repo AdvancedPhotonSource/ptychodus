@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver):
-
-    def __init__(self, repository: Sequence[ProductRepositoryItem],
-                 settings: ProductSettings) -> None:
+    def __init__(
+        self, repository: Sequence[ProductRepositoryItem], settings: ProductSettings
+    ) -> None:
         self._repository = repository
         self._settings = settings
 
@@ -33,16 +33,26 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
         probePhotonsPerSecond: float | None = None,
         exposureTimeInSeconds: float | None = None,
     ) -> MetadataRepositoryItem:
-        detectorDistanceInMeters_ = (float(self._settings.detectorDistanceInMeters.getValue())
-                                     if detectorDistanceInMeters is None else
-                                     detectorDistanceInMeters)
-        probeEnergyInElectronVolts_ = (float(self._settings.probeEnergyInElectronVolts.getValue())
-                                       if probeEnergyInElectronVolts is None else
-                                       probeEnergyInElectronVolts)
-        probePhotonsPerSecond_ = (float(self._settings.probePhotonsPerSecond.getValue())
-                                  if probePhotonsPerSecond is None else probePhotonsPerSecond)
-        exposureTimeInSeconds_ = (float(self._settings.exposureTimeInSeconds.getValue())
-                                  if exposureTimeInSeconds is None else exposureTimeInSeconds)
+        detectorDistanceInMeters_ = (
+            float(self._settings.detectorDistanceInMeters.getValue())
+            if detectorDistanceInMeters is None
+            else detectorDistanceInMeters
+        )
+        probeEnergyInElectronVolts_ = (
+            float(self._settings.probeEnergyInElectronVolts.getValue())
+            if probeEnergyInElectronVolts is None
+            else probeEnergyInElectronVolts
+        )
+        probePhotonsPerSecond_ = (
+            float(self._settings.probePhotonsPerSecond.getValue())
+            if probePhotonsPerSecond is None
+            else probePhotonsPerSecond
+        )
+        exposureTimeInSeconds_ = (
+            float(self._settings.exposureTimeInSeconds.getValue())
+            if exposureTimeInSeconds is None
+            else exposureTimeInSeconds
+        )
 
         metadata = ProductMetadata(
             name=name,

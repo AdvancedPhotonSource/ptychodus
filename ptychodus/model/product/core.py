@@ -20,7 +20,6 @@ from .scanRepository import ScanRepository
 
 
 class ProductCore(Observer):
-
     def __init__(
         self,
         rng: numpy.random.Generator,
@@ -42,10 +41,12 @@ class ProductCore(Observer):
     ) -> None:
         super().__init__()
         self._scanSettings = ScanSettings(settingsRegistry)
-        self._scanBuilderFactory = ScanBuilderFactory(self._scanSettings, scanFileReaderChooser,
-                                                      scanFileWriterChooser)
-        self._scanRepositoryItemFactory = ScanRepositoryItemFactory(rng, self._scanSettings,
-                                                                    self._scanBuilderFactory)
+        self._scanBuilderFactory = ScanBuilderFactory(
+            self._scanSettings, scanFileReaderChooser, scanFileWriterChooser
+        )
+        self._scanRepositoryItemFactory = ScanRepositoryItemFactory(
+            rng, self._scanSettings, self._scanBuilderFactory
+        )
 
         self._probeSettings = ProbeSettings(settingsRegistry)
         self._probeBuilderFactory = ProbeBuilderFactory(
@@ -57,14 +58,16 @@ class ProductCore(Observer):
             probeFileWriterChooser,
         )
         self._probeRepositoryItemFactory = ProbeRepositoryItemFactory(
-            rng, self._probeSettings, self._probeBuilderFactory)
+            rng, self._probeSettings, self._probeBuilderFactory
+        )
 
         self._objectSettings = ObjectSettings(settingsRegistry)
-        self._objectBuilderFactory = ObjectBuilderFactory(rng, self._objectSettings,
-                                                          objectFileReaderChooser,
-                                                          objectFileWriterChooser)
+        self._objectBuilderFactory = ObjectBuilderFactory(
+            rng, self._objectSettings, objectFileReaderChooser, objectFileWriterChooser
+        )
         self._objectRepositoryItemFactory = ObjectRepositoryItemFactory(
-            rng, self._objectSettings, self._objectBuilderFactory)
+            rng, self._objectSettings, self._objectBuilderFactory
+        )
 
         self.productRepository = ProductRepository(
             settings,
@@ -83,11 +86,13 @@ class ProductCore(Observer):
         self.scanRepository = ScanRepository(self.productRepository)
         self.scanAPI = ScanAPI(self._scanSettings, self.scanRepository, self._scanBuilderFactory)
         self.probeRepository = ProbeRepository(self.productRepository)
-        self.probeAPI = ProbeAPI(self._probeSettings, self.probeRepository,
-                                 self._probeBuilderFactory)
+        self.probeAPI = ProbeAPI(
+            self._probeSettings, self.probeRepository, self._probeBuilderFactory
+        )
         self.objectRepository = ObjectRepository(self.productRepository)
-        self.objectAPI = ObjectAPI(self._objectSettings, self.objectRepository,
-                                   self._objectBuilderFactory)
+        self.objectAPI = ObjectAPI(
+            self._objectSettings, self.objectRepository, self._objectBuilderFactory
+        )
 
         # TODO vvv refactor vvv
         productFileReaderChooser.setCurrentPluginByName(settings.fileType.getValue())

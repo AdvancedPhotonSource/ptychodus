@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class ProbePropagator(Observable):
-
     def __init__(self, settings: ProbePropagationSettings, repository: ProductRepository) -> None:
         super().__init__()
         self._settings = settings
@@ -60,8 +59,9 @@ class ProbePropagator(Observable):
             dtype=probe.array.dtype,
         )
         propagatedIntensity = numpy.zeros((numberOfSteps, *probe.array.shape[-2:]))
-        distanceInMeters = numpy.linspace(float(beginCoordinateInMeters),
-                                          float(endCoordinateInMeters), numberOfSteps)
+        distanceInMeters = numpy.linspace(
+            float(beginCoordinateInMeters), float(endCoordinateInMeters), numberOfSteps
+        )
         pixelGeometry = probe.getPixelGeometry()
 
         for idx, zInMeters in enumerate(distanceInMeters):

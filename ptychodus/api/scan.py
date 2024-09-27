@@ -47,7 +47,6 @@ class ScanBoundingBox:
 
 
 class Scan(Sequence[ScanPoint]):
-
     def __init__(self, pointSeq: Sequence[ScanPoint] | None = None) -> None:
         self._pointSeq: Sequence[ScanPoint] = [] if pointSeq is None else pointSeq
 
@@ -55,12 +54,10 @@ class Scan(Sequence[ScanPoint]):
         return Scan(list(self._pointSeq))
 
     @overload
-    def __getitem__(self, index: int) -> ScanPoint:
-        ...
+    def __getitem__(self, index: int) -> ScanPoint: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ScanPoint]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[ScanPoint]: ...
 
     def __getitem__(self, index: int | slice) -> ScanPoint | Sequence[ScanPoint]:
         return self._pointSeq[index]

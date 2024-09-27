@@ -30,7 +30,6 @@ T = TypeVar("T")
 
 
 class Parameter(ABC, Generic[T], Observable):
-
     @abstractmethod
     def getValue(self) -> T:
         pass
@@ -45,7 +44,6 @@ class Parameter(ABC, Generic[T], Observable):
 
 
 class ParameterGroup(Observable, Observer):
-
     def __init__(self) -> None:
         super().__init__()
         self._parameters: dict[str, Parameter[Any]] = dict()
@@ -102,7 +100,6 @@ class ParameterGroup(Observable, Observer):
 
 
 class ParameterBase(Parameter[T]):
-
     def __init__(self, parent: ParameterGroup, name: str, value: T) -> None:
         super().__init__()
         self._value = value
@@ -123,7 +120,6 @@ class ParameterBase(Parameter[T]):
 
 
 class StringParameter(ParameterBase[str]):
-
     def __init__(self, parent: ParameterGroup, name: str, value: str) -> None:
         super().__init__(parent, name, value)
 
@@ -132,7 +128,6 @@ class StringParameter(ParameterBase[str]):
 
 
 class PathParameter(ParameterBase[Path]):
-
     def __init__(self, parent: ParameterGroup, name: str, value: Path) -> None:
         super().__init__(parent, name, value)
 
@@ -153,7 +148,6 @@ class PathParameter(ParameterBase[Path]):
 
 
 class DecimalParameter(ParameterBase[Decimal]):
-
     def __init__(self, parent: ParameterGroup, name: str, value: Decimal | str) -> None:
         super().__init__(parent, name, Decimal(value) if isinstance(value, str) else value)
 
@@ -162,7 +156,6 @@ class DecimalParameter(ParameterBase[Decimal]):
 
 
 class UUIDParameter(ParameterBase[UUID]):
-
     def __init__(self, parent: ParameterGroup, name: str, value: UUID) -> None:
         super().__init__(parent, name, value)
 
@@ -181,7 +174,6 @@ class BooleanParameter(ParameterBase[bool]):
 
 
 class IntegerParameter(ParameterBase[int]):
-
     def __init__(
         self,
         parent: ParameterGroup,
@@ -217,7 +209,6 @@ class IntegerParameter(ParameterBase[int]):
 
 
 class RealParameter(ParameterBase[float]):
-
     def __init__(
         self,
         parent: ParameterGroup,
@@ -253,7 +244,6 @@ class RealParameter(ParameterBase[float]):
 
 
 class RealArrayParameter(ParameterBase[MutableSequence[float]]):
-
     def __init__(self, parent: ParameterGroup, name: str, value: Sequence[float]) -> None:
         super().__init__(parent, name, list(value))
 
@@ -291,7 +281,6 @@ class RealArrayParameter(ParameterBase[MutableSequence[float]]):
 
 
 class ComplexArrayParameter(ParameterBase[MutableSequence[complex]]):
-
     def __init__(self, parent: ParameterGroup, name: str, value: Sequence[complex]) -> None:
         super().__init__(parent, name, list(value))
 

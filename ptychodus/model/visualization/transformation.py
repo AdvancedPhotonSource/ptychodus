@@ -15,7 +15,6 @@ __all__ = [
 
 
 class ScalarTransformation(ABC):
-
     @abstractmethod
     def decorateText(self, text: str) -> str:
         pass
@@ -26,7 +25,6 @@ class ScalarTransformation(ABC):
 
 
 class IdentityScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
         return text
 
@@ -35,7 +33,6 @@ class IdentityScalarTransformation(ScalarTransformation):
 
 
 class SquareRootScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
         return f"$\\sqrt{{\\mathrm{{{text}}}}}$"
 
@@ -45,7 +42,6 @@ class SquareRootScalarTransformation(ScalarTransformation):
 
 
 class Log2ScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
         return f"$\\log_2{{\\left(\\mathrm{{{text}}}\\right)}}$"
 
@@ -55,7 +51,6 @@ class Log2ScalarTransformation(ScalarTransformation):
 
 
 class LogScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
         return f"$\\ln{{\\left(\\mathrm{{{text}}}\\right)}}$"
 
@@ -65,7 +60,6 @@ class LogScalarTransformation(ScalarTransformation):
 
 
 class Log10ScalarTransformation(ScalarTransformation):
-
     def decorateText(self, text: str) -> str:
         return f"$\\log_{{10}}{{\\left(\\mathrm{{{text}}}\\right)}}$"
 
@@ -75,7 +69,6 @@ class Log10ScalarTransformation(ScalarTransformation):
 
 
 class ScalarTransformationParameter(Parameter[str], Observer):
-
     def __init__(self) -> None:
         super().__init__()
         self._chooser = PluginChooser[ScalarTransformation]()

@@ -11,7 +11,6 @@ from .settings import ProbeSettings
 
 
 class DiskProbeBuilder(ProbeBuilder):
-
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__("disk")
         self._settings = settings

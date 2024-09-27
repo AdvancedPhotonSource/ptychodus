@@ -7,7 +7,6 @@ from ..parametric import ParameterViewBuilder, ParameterViewController
 
 
 class MultisliceViewController(ParameterViewController, Observer):
-
     def __init__(self, item: ObjectRepositoryItem) -> None:
         super().__init__()
         self._item = item
@@ -36,9 +35,9 @@ class MultisliceViewController(ParameterViewController, Observer):
 
 
 class ObjectEditorViewControllerFactory:
-
-    def createEditorDialog(self, itemName: str, item: ObjectRepositoryItem,
-                           parent: QWidget) -> QDialog:
+    def createEditorDialog(
+        self, itemName: str, item: ObjectRepositoryItem, parent: QWidget
+    ) -> QDialog:
         objectBuilder = item.getBuilder()
         builderName = objectBuilder.getName()
         firstLayerGroup = "First Layer"
@@ -47,23 +46,23 @@ class ObjectEditorViewControllerFactory:
 
         if isinstance(objectBuilder, RandomObjectBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(objectBuilder.extraPaddingX,
-                                     "Extra Padding X:",
-                                     group=firstLayerGroup)
-            dialogBuilder.addSpinBox(objectBuilder.extraPaddingY,
-                                     "Extra Padding Y:",
-                                     group=firstLayerGroup)
-            dialogBuilder.addDecimalSlider(objectBuilder.amplitudeMean,
-                                           "Amplitude Mean:",
-                                           group=firstLayerGroup)
+            dialogBuilder.addSpinBox(
+                objectBuilder.extraPaddingX, "Extra Padding X:", group=firstLayerGroup
+            )
+            dialogBuilder.addSpinBox(
+                objectBuilder.extraPaddingY, "Extra Padding Y:", group=firstLayerGroup
+            )
+            dialogBuilder.addDecimalSlider(
+                objectBuilder.amplitudeMean, "Amplitude Mean:", group=firstLayerGroup
+            )
             dialogBuilder.addDecimalSlider(
                 objectBuilder.amplitudeDeviation,
                 "Amplitude Deviation:",
                 group=firstLayerGroup,
             )
-            dialogBuilder.addDecimalSlider(objectBuilder.phaseDeviation,
-                                           "Phase Deviation:",
-                                           group=firstLayerGroup)
+            dialogBuilder.addDecimalSlider(
+                objectBuilder.phaseDeviation, "Phase Deviation:", group=firstLayerGroup
+            )
             dialogBuilder.addViewController(
                 MultisliceViewController(item),
                 "Number of Layers:",

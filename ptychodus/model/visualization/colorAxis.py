@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class ColorAxis(ParameterGroup):
-
     def __init__(self) -> None:
         super().__init__()
         self.lower = RealParameter(self, "lower", 0.0)

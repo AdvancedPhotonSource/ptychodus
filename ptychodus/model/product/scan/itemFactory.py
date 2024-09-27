@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class ScanRepositoryItemFactory:
-
     def __init__(
         self,
         rng: numpy.random.Generator,
@@ -26,8 +25,9 @@ class ScanRepositoryItemFactory:
         self._builderFactory = builderFactory
 
     def create(self, scan: Scan | None = None) -> ScanRepositoryItem:
-        builder = (self._builderFactory.createDefault()
-                   if scan is None else FromMemoryScanBuilder(scan))
+        builder = (
+            self._builderFactory.createDefault() if scan is None else FromMemoryScanBuilder(scan)
+        )
         transform = ScanPointTransform(self._rng, self._settings)
         return ScanRepositoryItem(self._settings, builder, transform)
 

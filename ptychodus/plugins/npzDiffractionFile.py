@@ -53,11 +53,13 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         )
 
         contentsTree = SimpleTreeNode.createRoot(["Name", "Type", "Details"])
-        contentsTree.createChild([
-            filePath.stem,
-            type(patterns).__name__,
-            f"{patterns.dtype}{patterns.shape}",
-        ])
+        contentsTree.createChild(
+            [
+                filePath.stem,
+                type(patterns).__name__,
+                f"{patterns.dtype}{patterns.shape}",
+            ]
+        )
 
         array = SimpleDiffractionPatternArray(
             label=filePath.stem,

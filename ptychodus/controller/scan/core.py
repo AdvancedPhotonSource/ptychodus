@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 class ScanController(SequenceObserver[ScanRepositoryItem]):
-
     def __init__(
         self,
         repository: ScanRepository,
@@ -52,10 +51,8 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         tableModel = ScanTableModel(repository, api)
         proxyModel = QSortFilterProxyModel()
         proxyModel.setSourceModel(tableModel)
-        controller = cls(repository, api, view, plotView, fileDialogFactory, tableModel,
-                         proxyModel)
-        proxyModel.dataChanged.connect(
-            lambda topLeft, bottomRight, roles: controller._redrawPlot())
+        controller = cls(repository, api, view, plotView, fileDialogFactory, tableModel, proxyModel)
+        proxyModel.dataChanged.connect(lambda topLeft, bottomRight, roles: controller._redrawPlot())
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -70,7 +67,8 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         controller._updateView(QModelIndex(), QModelIndex())
 
         view.tableView.horizontalHeader().sectionClicked.connect(
-            lambda logicalIndex: controller._redrawPlot())
+            lambda logicalIndex: controller._redrawPlot()
+        )
 
         loadFromFileAction = view.buttonBox.loadMenu.addAction("Open File...")
         loadFromFileAction.triggered.connect(controller._loadCurrentScanFromFile)

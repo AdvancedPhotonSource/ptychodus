@@ -19,7 +19,6 @@ def versionString() -> str:
 
 
 class DirectoryType:
-
     def __init__(self, *, must_exist: bool) -> None:
         self._must_exist = must_exist
 
@@ -176,8 +175,7 @@ def main() -> int:
             replacementPathPrefix=args.remote_path_prefix,
         )
     elif bool(args.local_path_prefix) ^ bool(args.remote_path_prefix):
-        parser.error("--local_path_prefix and --remote_path_prefix"
-                     "must be given together.")
+        parser.error("--local_path_prefix and --remote_path_prefix" "must be given together.")
 
     if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
         cropCenter = CropCenter(

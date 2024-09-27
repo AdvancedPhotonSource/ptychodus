@@ -34,7 +34,6 @@ __all__ = [
 
 
 class OpenDatasetWizardFilesController(Observer):
-
     def __init__(
         self,
         presenter: DiffractionDatasetInputOutputPresenter,
@@ -76,11 +75,14 @@ class OpenDatasetWizardFilesController(Observer):
         page.fileSystemTableView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         page.fileSystemTableView.verticalHeader().hide()
         page.fileSystemTableView.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows)
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
         page.fileSystemTableView.doubleClicked.connect(
-            controller._handleFileSystemTableDoubleClicked)
+            controller._handleFileSystemTableDoubleClicked
+        )
         page.fileSystemTableView.selectionModel().currentChanged.connect(
-            controller._checkIfComplete)
+            controller._checkIfComplete
+        )
 
         for fileFilter in presenter.getOpenFileFilterList():
             page.fileTypeComboBox.addItem(fileFilter)
@@ -143,7 +145,6 @@ class OpenDatasetWizardFilesController(Observer):
 
 
 class OpenDatasetWizardMetadataController(Observer):
-
     def __init__(
         self,
         presenter: DiffractionMetadataPresenter,
@@ -221,7 +222,6 @@ class OpenDatasetWizardMetadataController(Observer):
 
 
 class PatternLoadController(Observer):
-
     def __init__(
         self,
         presenter: DiffractionDatasetPresenter,
@@ -258,7 +258,6 @@ class PatternLoadController(Observer):
 
 
 class PatternMemoryMapController(Observer):
-
     def __init__(
         self,
         presenter: DiffractionDatasetPresenter,
@@ -284,7 +283,8 @@ class PatternMemoryMapController(Observer):
         controller._syncModelToView()
         view.toggled.connect(presenter.setMemmapEnabled)
         view.scratchDirectoryLineEdit.editingFinished.connect(
-            controller._syncScratchDirectoryToModel)
+            controller._syncScratchDirectoryToModel
+        )
         view.scratchDirectoryBrowseButton.clicked.connect(controller._browseScratchDirectory)
 
         return controller
@@ -295,7 +295,8 @@ class PatternMemoryMapController(Observer):
 
     def _browseScratchDirectory(self) -> None:
         dirPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, "Choose Scratch ScratchDirectory")
+            self._view, "Choose Scratch ScratchDirectory"
+        )
 
         if dirPath:
             self._presenter.setScratchDirectory(dirPath)
@@ -315,7 +316,6 @@ class PatternMemoryMapController(Observer):
 
 
 class PatternCropController(Observer):
-
     def __init__(
         self,
         presenter: DiffractionPatternPresenter,
@@ -387,7 +387,6 @@ class PatternCropController(Observer):
 
 
 class PatternTransformController(Observer):
-
     def __init__(
         self,
         presenter: DiffractionPatternPresenter,
@@ -446,7 +445,6 @@ class PatternTransformController(Observer):
 
 
 class OpenDatasetWizardPatternsController:
-
     def __init__(
         self,
         datasetPresenter: DiffractionDatasetPresenter,
@@ -457,14 +455,14 @@ class OpenDatasetWizardPatternsController:
         self._datasetPresenter = datasetPresenter
         self._patternPresenter = patternPresenter
         self._page = page
-        self._loadController = PatternLoadController.createInstance(datasetPresenter,
-                                                                    page.loadView)
+        self._loadController = PatternLoadController.createInstance(datasetPresenter, page.loadView)
         self._memoryMapController = PatternMemoryMapController.createInstance(
-            datasetPresenter, page.memoryMapView, fileDialogFactory)
-        self._cropController = PatternCropController.createInstance(patternPresenter,
-                                                                    page.cropView)
+            datasetPresenter, page.memoryMapView, fileDialogFactory
+        )
+        self._cropController = PatternCropController.createInstance(patternPresenter, page.cropView)
         self._transformController = PatternTransformController.createInstance(
-            patternPresenter, page.transformView)
+            patternPresenter, page.transformView
+        )
 
     @classmethod
     def createInstance(
@@ -481,7 +479,6 @@ class OpenDatasetWizardPatternsController:
 
 
 class OpenDatasetWizardController:
-
     def __init__(
         self,
         ioPresenter: DiffractionDatasetInputOutputPresenter,
@@ -494,9 +491,11 @@ class OpenDatasetWizardController:
         self._ioPresenter = ioPresenter
         self._wizard = wizard
         self._filesController = OpenDatasetWizardFilesController.createInstance(
-            ioPresenter, wizard.filesPage, fileDialogFactory)
+            ioPresenter, wizard.filesPage, fileDialogFactory
+        )
         self._metadataController = OpenDatasetWizardMetadataController.createInstance(
-            metadataPresenter, wizard.metadataPage)
+            metadataPresenter, wizard.metadataPage
+        )
         self._patternsController = OpenDatasetWizardPatternsController.createInstance(
             ioPresenter,
             datasetPresenter,
@@ -524,9 +523,11 @@ class OpenDatasetWizardController:
             fileDialogFactory,
         )
         wizard.button(QWizard.WizardButton.NextButton).clicked.connect(
-            controller._executeNextButtonAction)
+            controller._executeNextButtonAction
+        )
         wizard.button(QWizard.WizardButton.FinishButton).clicked.connect(
-            controller._executeFinishButtonAction)
+            controller._executeFinishButtonAction
+        )
         return controller
 
     def _executeNextButtonAction(self) -> None:

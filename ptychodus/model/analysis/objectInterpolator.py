@@ -4,7 +4,6 @@ from ptychodus.api.scan import ScanPoint
 
 
 class ObjectLinearInterpolator(ObjectInterpolator):
-
     def __init__(self, object_: Object) -> None:
         self._object = object_
 

@@ -75,11 +75,13 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
             for i in range(inputSize):
                 for j in range(inputSize):
-                    binnedData[:, i, j] = numpy.sum(data[
-                        :,
-                        binSize * i:binSize * (i + 1),
-                        binSize * j:binSize * (j + 1),
-                    ])
+                    binnedData[:, i, j] = numpy.sum(
+                        data[
+                            :,
+                            binSize * i : binSize * (i + 1),
+                            binSize * j : binSize * (j + 1),
+                        ]
+                    )
 
         model = self._modelProvider.getModel()
 
@@ -124,7 +126,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.getValue())
             self._patternBuffer = PatternCircularBuffer(patternExtent, maximumSize)
             self._objectPatchBuffer = ObjectPatchCircularBuffer(
-                patternExtent, self._modelProvider.getNumberOfChannels(), maximumSize)
+                patternExtent, self._modelProvider.getNumberOfChannels(), maximumSize
+            )
 
         for scanPoint in parameters.product.scan:
             objectPatch = interpolator.getPatch(scanPoint, probeExtent)
@@ -162,8 +165,9 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
     def train(self) -> TrainOutput:
         model = self._modelProvider.getModel()
         logger.debug("Training...")
-        trainingSetFractionalSize = (1 -
-                                     self._trainingSettings.validationSetFractionalSize.getValue())
+        trainingSetFractionalSize = (
+            1 - self._trainingSettings.validationSetFractionalSize.getValue()
+        )
         trainer, trainerLog = ptychonn.train(
             model=model,
             batch_size=self._modelSettings.batchSize.getValue(),

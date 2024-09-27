@@ -10,15 +10,14 @@ from ptychodus.api.settings import PathPrefixChange
 
 
 class WorkflowProductAPI(ABC):
-
     @abstractmethod
     def openScan(self, filePath: Path, *, fileType: str | None = None) -> None:
         pass
 
     @abstractmethod
-    def buildScan(self,
-                  builderName: str | None = None,
-                  builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildScan(
+        self, builderName: str | None = None, builderParameters: Mapping[str, Any] = {}
+    ) -> None:
         pass
 
     @abstractmethod
@@ -26,9 +25,9 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildProbe(self,
-                   builderName: str | None = None,
-                   builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildProbe(
+        self, builderName: str | None = None, builderParameters: Mapping[str, Any] = {}
+    ) -> None:
         pass
 
     @abstractmethod
@@ -36,9 +35,9 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def buildObject(self,
-                    builderName: str | None = None,
-                    builderParameters: Mapping[str, Any] = {}) -> None:
+    def buildObject(
+        self, builderName: str | None = None, builderParameters: Mapping[str, Any] = {}
+    ) -> None:
         pass
 
     @abstractmethod
@@ -55,7 +54,6 @@ class WorkflowProductAPI(ABC):
 
 
 class WorkflowAPI(ABC):
-
     @abstractmethod
     def openPatterns(
         self,
@@ -98,14 +96,13 @@ class WorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def saveSettings(self,
-                     filePath: Path,
-                     changePathPrefix: PathPrefixChange | None = None) -> None:
+    def saveSettings(
+        self, filePath: Path, changePathPrefix: PathPrefixChange | None = None
+    ) -> None:
         pass
 
 
 class FileBasedWorkflow(ABC):
-
     @property
     @abstractmethod
     def isWatchRecursive(self) -> bool:

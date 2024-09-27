@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowStatusController:
-
     def __init__(
         self,
         presenter: WorkflowStatusPresenter,
@@ -76,7 +75,8 @@ class WorkflowStatusController:
         refreshIntervalLimitsInSeconds = self._presenter.getRefreshIntervalLimitsInSeconds()
 
         self._view.autoRefreshSpinBox.blockSignals(True)
-        self._view.autoRefreshSpinBox.setRange(refreshIntervalLimitsInSeconds.lower,
-                                               refreshIntervalLimitsInSeconds.upper)
+        self._view.autoRefreshSpinBox.setRange(
+            refreshIntervalLimitsInSeconds.lower, refreshIntervalLimitsInSeconds.upper
+        )
         self._view.autoRefreshSpinBox.setValue(self._presenter.getRefreshIntervalInSeconds())
         self._view.autoRefreshSpinBox.blockSignals(False)

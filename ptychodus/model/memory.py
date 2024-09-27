@@ -11,7 +11,6 @@ class MemoryStatistics:
 
 
 class MemoryPresenter:
-
     def getStatistics(self) -> MemoryStatistics:
         mem = psutil.virtual_memory()
         stats = MemoryStatistics(

@@ -7,7 +7,6 @@ from .core import PtychoPackController
 
 
 class PtychoPackViewControllerFactory(ReconstructorViewControllerFactory):
-
     def __init__(self, model: PtychoPackReconstructorLibrary) -> None:
         super().__init__()
         self._model = model

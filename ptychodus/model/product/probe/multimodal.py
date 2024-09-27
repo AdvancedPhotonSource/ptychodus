@@ -26,7 +26,6 @@ class ProbeModeDecayType(IntEnum):
 
 
 class MultimodalProbeBuilder(ParameterGroup):
-
     def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
         super().__init__()
         self._rng = rng
@@ -114,7 +113,7 @@ class MultimodalProbeBuilder(ParameterGroup):
                 return [b**-n for n in range(totalNumberOfModes)]
             else:
                 b = numpy.log(modeDecayRatio) / numpy.log(2.0)
-                return [(n + 1)**b for n in range(totalNumberOfModes)]
+                return [(n + 1) ** b for n in range(totalNumberOfModes)]
 
         return [1.0] + [0.0] * (totalNumberOfModes - 1)
 

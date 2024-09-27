@@ -13,7 +13,6 @@ from .data import FileDialogFactory
 
 
 class SettingsTableModel(QAbstractTableModel):
-
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._names: Sequence[str] = list()
@@ -52,7 +51,6 @@ class SettingsTableModel(QAbstractTableModel):
 
 
 class SettingsController(Observer):
-
     def __init__(
         self,
         settingsRegistry: SettingsRegistry,

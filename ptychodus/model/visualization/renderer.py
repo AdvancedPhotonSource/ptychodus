@@ -11,7 +11,6 @@ from ptychodus.api.visualization import (
 
 
 class Renderer(ParameterGroup):
-
     def __init__(self, name: str) -> None:
         super().__init__()
         self._name = StringParameter(self, "name", name)
@@ -40,6 +39,7 @@ class Renderer(ParameterGroup):
         pass
 
     @abstractmethod
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
-               autoscaleColorAxis: bool) -> VisualizationProduct:
+    def render(
+        self, array: NumberArrayType, pixelGeometry: PixelGeometry, *, autoscaleColorAxis: bool
+    ) -> VisualizationProduct:
         pass

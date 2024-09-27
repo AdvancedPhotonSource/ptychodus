@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPackExitWaveCorrectionController(Observer):
-
-    def __init__(self, presenter: PtychoPackPresenter,
-                 view: PtychoPackExitWaveCorrectionView) -> None:
+    def __init__(
+        self, presenter: PtychoPackPresenter, view: PtychoPackExitWaveCorrectionView
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view

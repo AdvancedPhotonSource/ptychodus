@@ -18,7 +18,6 @@ from .transformation import ScalarTransformationParameter
 
 
 class CylindricalColorModelRenderer(Renderer):
-
     def __init__(
         self,
         amplitudeComponent: AmplitudeArrayComponent,
@@ -48,8 +47,9 @@ class CylindricalColorModelRenderer(Renderer):
     def isCyclic(self) -> bool:
         return True
 
-    def _colorize(self, amplitudeTransformed: RealArrayType,
-                  phaseInRadians: RealArrayType) -> RealArrayType:
+    def _colorize(
+        self, amplitudeTransformed: RealArrayType, phaseInRadians: RealArrayType
+    ) -> RealArrayType:
         vrange = self._colorAxis.getRange()
         norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
 

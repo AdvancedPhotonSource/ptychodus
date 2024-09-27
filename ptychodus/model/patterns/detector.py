@@ -9,18 +9,19 @@ from ptychodus.api.settings import SettingsRegistry
 
 
 class Detector(Observable, Observer):
-
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup("Detector")
         self._settingsGroup.addObserver(self)
 
         self._widthInPixels = IntegerParameter(self._settingsGroup, "WidthInPixels", 1024)
-        self._pixelWidthInMeters = DecimalParameter(self._settingsGroup, "PixelWidthInMeters",
-                                                    "75e-6")
+        self._pixelWidthInMeters = DecimalParameter(
+            self._settingsGroup, "PixelWidthInMeters", "75e-6"
+        )
         self._heightInPixels = IntegerParameter(self._settingsGroup, "HeightInPixels", 1024)
-        self._pixelHeightInMeters = DecimalParameter(self._settingsGroup, "PixelHeightInMeters",
-                                                     "75e-6")
+        self._pixelHeightInMeters = DecimalParameter(
+            self._settingsGroup, "PixelHeightInMeters", "75e-6"
+        )
         self._bitDepth = IntegerParameter(self._settingsGroup, "BitDepth", 8)
 
     def getWidthInPixels(self) -> int:

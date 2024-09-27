@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 class ActiveDiffractionDataset(DiffractionDataset):
-
     def __init__(self, settings: PatternSettings, diffractionPatternSizer: PatternSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -59,16 +58,14 @@ class ActiveDiffractionDataset(DiffractionDataset):
         return f"{label}: {number} x {width}W x {height}H {dtype} [{sizeInMB:.2f}MB]"
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray:
-        ...
+    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
 
     def __getitem__(
-            self,
-            index: int | slice) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+        self, index: int | slice
+    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         with self._arrayListLock:
             return self._arrayList[index]
 
@@ -99,9 +96,9 @@ class ActiveDiffractionDataset(DiffractionDataset):
                 scratchDirectory.mkdir(mode=0o755, parents=True, exist_ok=True)
                 npyTempFile = tempfile.NamedTemporaryFile(dir=scratchDirectory, suffix=".npy")
                 logger.debug(f"Scratch data file {npyTempFile.name} is {shape}")
-                self._arrayData = numpy.memmap(npyTempFile,
-                                               dtype=self._metadata.patternDataType,
-                                               shape=shape)
+                self._arrayData = numpy.memmap(
+                    npyTempFile, dtype=self._metadata.patternDataType, shape=shape
+                )
                 self._arrayData[:] = 0
             else:
                 logger.debug(f"Scratch memory is {shape}")
@@ -134,8 +131,9 @@ class ActiveDiffractionDataset(DiffractionDataset):
             dataView[:] = data
             dataView.flags.writeable = False
 
-            array = SimpleDiffractionPatternArray(array.getLabel(), array.getIndex(), dataView,
-                                                  array.getState())
+            array = SimpleDiffractionPatternArray(
+                array.getLabel(), array.getIndex(), dataView, array.getState()
+            )
 
         with self._arrayListLock:
             self._arrayList.append(array)

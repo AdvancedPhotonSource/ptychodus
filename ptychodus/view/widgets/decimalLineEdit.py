@@ -21,10 +21,9 @@ class DecimalLineEdit(QWidget):
         self._maximum: Decimal | None = None
 
     @classmethod
-    def createInstance(cls,
-                       *,
-                       isSigned: bool = False,
-                       parent: QWidget | None = None) -> DecimalLineEdit:
+    def createInstance(
+        cls, *, isSigned: bool = False, parent: QWidget | None = None
+    ) -> DecimalLineEdit:
         widget = cls(parent)
 
         widget._lineEdit.setValidator(widget._validator)

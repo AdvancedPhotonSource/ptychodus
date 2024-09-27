@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationDatasetProcessor:
-
     def __init__(
         self,
         settings: AutomationSettings,

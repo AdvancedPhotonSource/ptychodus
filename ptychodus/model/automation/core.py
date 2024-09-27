@@ -18,7 +18,6 @@ from .workflow import CurrentFileBasedWorkflow
 
 
 class AutomationPresenter(Observable, Observer):
-
     def __init__(
         self,
         settings: AutomationSettings,
@@ -107,7 +106,6 @@ class AutomationPresenter(Observable, Observer):
 
 
 class AutomationProcessingPresenter(Observable, Observer):
-
     def __init__(
         self,
         settings: AutomationSettings,
@@ -148,7 +146,6 @@ class AutomationProcessingPresenter(Observable, Observer):
 
 
 class AutomationCore:
-
     def __init__(
         self,
         settingsRegistry: SettingsRegistry,
@@ -166,8 +163,9 @@ class AutomationCore:
             workflowAPI,
             self._processingQueue,
         )
-        self._datasetBuffer = AutomationDatasetBuffer(self._settings, self.repository,
-                                                      self._processor)
+        self._datasetBuffer = AutomationDatasetBuffer(
+            self._settings, self.repository, self._processor
+        )
         self._watcher = DataDirectoryWatcher(self._settings, self._workflow, self._datasetBuffer)
         self.presenter = AutomationPresenter(
             self._settings,
@@ -176,8 +174,9 @@ class AutomationCore:
             self._datasetBuffer,
             self.repository,
         )
-        self.processingPresenter = AutomationProcessingPresenter(self._settings, self.repository,
-                                                                 self._processor)
+        self.processingPresenter = AutomationProcessingPresenter(
+            self._settings, self.repository, self._processor
+        )
 
     def start(self) -> None:
         self._datasetBuffer.start()

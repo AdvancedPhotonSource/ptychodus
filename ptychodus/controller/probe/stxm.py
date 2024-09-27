@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class STXMViewController(Observer):
-
     def __init__(
         self,
         simulator: STXMSimulator,
@@ -37,7 +36,8 @@ class STXMViewController(Observer):
             fileDialogFactory,
         )
         self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.visualizationParametersView)
+            engine, self._dialog.visualizationParametersView
+        )
 
         simulator.addObserver(self)
 

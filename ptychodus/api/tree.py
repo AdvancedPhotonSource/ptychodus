@@ -3,7 +3,6 @@ from collections.abc import Sequence
 
 
 class SimpleTreeNode:
-
     def __init__(self, parentItem: SimpleTreeNode | None, itemData: Sequence[str]) -> None:
         self.parentItem = parentItem
         self.itemData = itemData

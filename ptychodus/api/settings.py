@@ -18,7 +18,6 @@ class PathPrefixChange:
 
 
 class SettingsRegistry(Observable):
-
     def __init__(self) -> None:
         super().__init__()
         self._parameterGroup = ParameterGroup()
@@ -70,9 +69,9 @@ class SettingsRegistry(Observable):
     def getSaveFileFilter(self) -> str:
         return self._fileFilterList[0]
 
-    def saveSettings(self,
-                     filePath: Path,
-                     changePathPrefix: PathPrefixChange | None = None) -> None:
+    def saveSettings(
+        self, filePath: Path, changePathPrefix: PathPrefixChange | None = None
+    ) -> None:
         config = configparser.ConfigParser(interpolation=None)
         setattr(config, "optionxform", lambda option: option)
 

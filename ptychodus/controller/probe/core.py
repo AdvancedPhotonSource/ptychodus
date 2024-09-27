@@ -34,7 +34,6 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeController(SequenceObserver[ProbeRepositoryItem]):
-
     def __init__(
         self,
         repository: ProbeRepository,
@@ -62,14 +61,17 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._editorFactory = ProbeEditorViewControllerFactory()
 
         self._propagationViewController = ProbePropagationViewController(
-            propagator, propagatorVisualizationEngine, fileDialogFactory)
-        self._stxmViewController = STXMViewController(stxmSimulator, stxmVisualizationEngine,
-                                                      fileDialogFactory)
-        self._exposureViewController = ExposureViewController(exposureAnalyzer,
-                                                              exposureVisualizationEngine,
-                                                              fileDialogFactory)
+            propagator, propagatorVisualizationEngine, fileDialogFactory
+        )
+        self._stxmViewController = STXMViewController(
+            stxmSimulator, stxmVisualizationEngine, fileDialogFactory
+        )
+        self._exposureViewController = ExposureViewController(
+            exposureAnalyzer, exposureVisualizationEngine, fileDialogFactory
+        )
         self._fluorescenceViewController = FluorescenceViewController(
-            fluorescenceEnhancer, fluorescenceVisualizationEngine, fileDialogFactory)
+            fluorescenceEnhancer, fluorescenceVisualizationEngine, fileDialogFactory
+        )
 
     @classmethod
     def createInstance(
@@ -277,8 +279,11 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 logger.warning("Unable to access item for visualization!")
             else:
                 probe = item.getProbe()
-                array = (probe.getMode(current.row())
-                         if current.parent().isValid() else probe.getModesFlattened())
+                array = (
+                    probe.getMode(current.row())
+                    if current.parent().isValid()
+                    else probe.getModesFlattened()
+                )
                 self._imageController.setArray(array, probe.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ProbeRepositoryItem) -> None:

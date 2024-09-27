@@ -3,11 +3,9 @@ from PyQt5.QtWidgets import QWidget
 from ...model.tike import TikeReconstructorLibrary
 from ...view.tike import TikeParametersView
 from ..reconstructor import ReconstructorViewControllerFactory
-from .controller import TikeParametersController
 
 
 class TikeViewControllerFactory(ReconstructorViewControllerFactory):
-
     def __init__(self, model: TikeReconstructorLibrary) -> None:
         super().__init__()
         self._model = model

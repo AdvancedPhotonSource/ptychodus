@@ -48,16 +48,14 @@ class DataGroup:
         return iter(self.arrayList)
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray:
-        ...
+    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
 
     def __getitem__(
-            self,
-            index: int | slice) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+        self, index: int | slice
+    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         return self.arrayList[index]
 
     def __len__(self) -> int:
@@ -184,7 +182,6 @@ class EntryGroup:
 
 
 class NeXusDiffractionDataset(DiffractionDataset):
-
     def __init__(
         self,
         metadata: DiffractionMetadata,
@@ -202,16 +199,14 @@ class NeXusDiffractionDataset(DiffractionDataset):
         return self._contentsTree
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray:
-        ...
+    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
 
     def __getitem__(
-            self,
-            index: int | slice) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+        self, index: int | slice
+    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         return self._entry.data[index]
 
     def __len__(self) -> int:
@@ -219,7 +214,6 @@ class NeXusDiffractionDataset(DiffractionDataset):
 
 
 class NeXusDiffractionFileReader(DiffractionFileReader):
-
     def __init__(self) -> None:
         super().__init__()
         self._treeBuilder = H5DiffractionFileTreeBuilder()

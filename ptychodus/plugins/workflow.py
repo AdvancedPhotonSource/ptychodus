@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
-
     @property
     def isWatchRecursive(self) -> bool:
         return True
@@ -24,7 +23,6 @@ class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):
-
     @property
     def isWatchRecursive(self) -> bool:
         return False
@@ -46,7 +44,6 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
 
 
 class APS26IDFileBasedWorkflow(FileBasedWorkflow):
-
     @property
     def isWatchRecursive(self) -> bool:
         return False
@@ -96,7 +93,6 @@ class APS31IDEMetadata:
 
 
 class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
-
     @property
     def isWatchRecursive(self) -> bool:
         return True
@@ -153,8 +149,9 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             inputProductAPI.buildObject()
             # TODO would prefer to write instructions and submit to queue
             outputProductAPI = inputProductAPI.reconstructLocal(f"{productName}_out")
-            outputProductAPI.saveProduct(experimentDir / "ptychodus" / f"{productName}.h5",
-                                         fileType="HDF5")
+            outputProductAPI.saveProduct(
+                experimentDir / "ptychodus" / f"{productName}.h5", fileType="HDF5"
+            )
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

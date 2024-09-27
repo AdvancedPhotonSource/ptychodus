@@ -30,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 
 class VisualizationEngine(Observable, Observer):
-
     def __init__(self, *, isComplex: bool) -> None:
         super().__init__()
         self._rendererChooser = PluginChooser[Renderer]()
@@ -160,9 +159,9 @@ class VisualizationEngine(Observable, Observer):
         *,
         autoscaleColorAxis: bool,
     ) -> VisualizationProduct:
-        return self._rendererPlugin.strategy.render(array,
-                                                    pixelGeometry,
-                                                    autoscaleColorAxis=autoscaleColorAxis)
+        return self._rendererPlugin.strategy.render(
+            array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._rendererChooser:

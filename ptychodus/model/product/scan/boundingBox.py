@@ -4,7 +4,6 @@ from ptychodus.api.scan import ScanBoundingBox, ScanPoint
 
 
 class ScanBoundingBoxBuilder:
-
     def __init__(self) -> None:
         self._minimumXInMeters = +numpy.inf
         self._maximumXInMeters = -numpy.inf

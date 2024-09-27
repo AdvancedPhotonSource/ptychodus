@@ -15,7 +15,6 @@ from .scan import ScanRepositoryItem
 
 
 class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable, Observer):
-
     def __init__(
         self,
         patternSizer: PatternSizer,
@@ -82,10 +81,13 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     def isProbeGeometryValid(self, geometry: ProbeGeometry) -> bool:
         expected = self.getProbeGeometry()
-        widthIsValid = (geometry.pixelWidthInMeters > 0.0
-                        and geometry.widthInMeters == expected.widthInMeters)
-        heightIsValid = (geometry.pixelHeightInMeters > 0.0
-                         and geometry.heightInMeters == expected.heightInMeters)
+        widthIsValid = (
+            geometry.pixelWidthInMeters > 0.0 and geometry.widthInMeters == expected.widthInMeters
+        )
+        heightIsValid = (
+            geometry.pixelHeightInMeters > 0.0
+            and geometry.heightInMeters == expected.heightInMeters
+        )
         return widthIsValid and heightIsValid
 
     def getObjectGeometry(self) -> ObjectGeometry:

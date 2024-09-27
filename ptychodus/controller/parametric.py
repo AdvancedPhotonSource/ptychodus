@@ -5,12 +5,29 @@ from typing import Final
 import logging
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtGui import QValidator
+from PyQt5.QtWidgets import (
+    QAbstractButton,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QLineEdit,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, IntegerParameter, RealParameter
+from ptychodus.api.parametric import (
+    BooleanParameter,
+    IntegerParameter,
+    RealParameter,
+    StringParameter,
+)
 
 from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWidget
 
@@ -22,15 +39,13 @@ __all__ = [
 
 
 class ParameterViewController(ABC):
-
     @abstractmethod
     def getWidget(self) -> QWidget:
         pass
 
 
 class CheckBoxParameterViewController(ParameterViewController, Observer):
-
-    def __init__(self, parameter: BooleanParameter, text: str, *, tooltip: str = '') -> None:
+    def __init__(self, parameter: BooleanParameter, text: str, *, tooltip: str = "") -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = QCheckBox(text)
@@ -93,13 +108,71 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
             self._syncModelToView()
 
 
-class DecimalLineEditParameterViewController(ParameterViewController, Observer):
+class ComboBoxParameterViewController(ParameterViewController, Observer):
+    def __init__(
+        self, parameter: StringParameter, items: Sequence[str], *, tooltip: str = ""
+    ) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = QComboBox()
 
-    def __init__(self,
-                 parameter: RealParameter,
-                 *,
-                 isSigned: bool = False,
-                 tooltip: str = "") -> None:
+        for item in items:
+            self._widget.addItem(item)
+
+        if tooltip:
+            self._widget.setToolTip(tooltip)
+
+        self._syncModelToView()
+        self._widget.textActivated.connect(parameter.setValue)
+        parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncModelToView(self) -> None:
+        self._widget.setCurrentText(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
+class LineEditParameterViewController(ParameterViewController, Observer):
+    def __init__(
+        self, parameter: StringParameter, validator: QValidator | None = None, *, tooltip: str = ""
+    ) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = QLineEdit()
+
+        if validator is not None:
+            self._widget.setValidator(validator)
+
+        if tooltip:
+            self._widget.setToolTip(tooltip)
+
+        self._syncModelToView()
+        self._widget.editingFinished.connect(self._syncViewToModel)
+        parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncViewToModel(self) -> None:
+        self._parameter.setValue(self._widget.text())
+
+    def _syncModelToView(self) -> None:
+        self._widget.setText(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
+class DecimalLineEditParameterViewController(ParameterViewController, Observer):
+    def __init__(
+        self, parameter: RealParameter, *, isSigned: bool = False, tooltip: str = ""
+    ) -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = DecimalLineEdit.createInstance(isSigned=isSigned)
@@ -126,7 +199,6 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 
 
 class DecimalSliderParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: RealParameter, *, tooltip: str = "") -> None:
         super().__init__()
         self._parameter = parameter
@@ -162,7 +234,6 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
 
 
 class LengthWidgetParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: RealParameter, *, isSigned: bool = False) -> None:
         super().__init__()
         self._parameter = parameter
@@ -187,7 +258,6 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
 
 
 class AngleWidgetParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: RealParameter) -> None:
         super().__init__()
         self._parameter = parameter
@@ -212,16 +282,14 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
 
 
 class ParameterWidget(QWidget):
-
-    def __init__(self,
-                 viewControllers: Sequence[ParameterViewController],
-                 parent: QWidget | None = None) -> None:
+    def __init__(
+        self, viewControllers: Sequence[ParameterViewController], parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self._viewControllers = viewControllers
 
 
 class ParameterDialog(QDialog):
-
     def __init__(
         self,
         viewControllers: Sequence[ParameterViewController],
@@ -245,7 +313,6 @@ class ParameterDialog(QDialog):
 
 
 class ParameterViewBuilder:
-
     def __init__(self) -> None:
         self._viewControllersTop: list[ParameterViewController] = list()
         self._viewControllers: dict[tuple[str, str], ParameterViewController] = dict()
@@ -259,7 +326,7 @@ class ParameterViewBuilder:
         tooltip: str = "",
         group: str = "",
     ) -> None:
-        viewController = CheckBoxParameterViewController(parameter, '')
+        viewController = CheckBoxParameterViewController(parameter, "")
         self.addViewController(viewController, label, tooltip=tooltip, group=group)
 
     def addSpinBox(

@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeBuilderFactory(Iterable[str]):
-
     def __init__(
         self,
         settings: ProbeSettings,

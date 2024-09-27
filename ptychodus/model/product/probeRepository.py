@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepositoryObserver):
-
     def __init__(self, repository: ProductRepository) -> None:
         super().__init__()
         self._repository = repository
@@ -28,15 +27,14 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
         self._repository[index].setName(name)
 
     @overload
-    def __getitem__(self, index: int) -> ProbeRepositoryItem:
-        ...
+    def __getitem__(self, index: int) -> ProbeRepositoryItem: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ProbeRepositoryItem]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[ProbeRepositoryItem]: ...
 
-    def __getitem__(self,
-                    index: int | slice) -> ProbeRepositoryItem | Sequence[ProbeRepositoryItem]:
+    def __getitem__(
+        self, index: int | slice
+    ) -> ProbeRepositoryItem | Sequence[ProbeRepositoryItem]:
         if isinstance(index, slice):
             return [item.getProbe() for item in self._repository[index]]
         else:

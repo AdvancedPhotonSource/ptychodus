@@ -8,7 +8,6 @@ from .training import PtychoNNTrainingParametersController
 
 
 class PtychoNNParametersController:
-
     def __init__(
         self,
         modelPresenter: PtychoNNModelPresenter,
@@ -18,9 +17,11 @@ class PtychoNNParametersController:
     ) -> None:
         super().__init__()
         self._modelParametersController = PtychoNNModelParametersController.createInstance(
-            modelPresenter, view.modelParametersView, fileDialogFactory)
+            modelPresenter, view.modelParametersView, fileDialogFactory
+        )
         self._trainingParametersController = PtychoNNTrainingParametersController.createInstance(
-            trainingPresenter, view.trainingParametersView, fileDialogFactory)
+            trainingPresenter, view.trainingParametersView, fileDialogFactory
+        )
 
     @classmethod
     def createInstance(

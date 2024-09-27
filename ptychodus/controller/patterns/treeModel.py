@@ -10,7 +10,6 @@ from ...model.patterns import DiffractionPatternArrayPresenter
 
 
 class DatasetTreeNode:
-
     def __init__(
         self,
         parentItem: DatasetTreeNode | None,
@@ -81,7 +80,6 @@ class DatasetTreeNode:
 
 
 class DatasetTreeModel(QAbstractItemModel):
-
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rootNode = DatasetTreeNode.createRoot()
@@ -93,12 +91,10 @@ class DatasetTreeModel(QAbstractItemModel):
         self.endResetModel()
 
     @overload
-    def parent(self, child: QModelIndex) -> QModelIndex:
-        ...
+    def parent(self, child: QModelIndex) -> QModelIndex: ...
 
     @overload
-    def parent(self) -> QObject:
-        ...
+    def parent(self) -> QObject: ...
 
     def parent(self, child: QModelIndex | None = None) -> QModelIndex | QObject:
         if child is None:

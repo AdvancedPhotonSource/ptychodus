@@ -109,7 +109,6 @@ class MATProductFileReader(ProductFileReader):
 
 
 class MATObjectFileWriter(ObjectFileWriter):
-
     def write(self, filePath: Path, object_: Object) -> None:
         array = object_.array
         matDict = {"object": array.transpose(1, 2, 0)}
@@ -118,7 +117,6 @@ class MATObjectFileWriter(ObjectFileWriter):
 
 
 class MATProbeFileWriter(ProbeFileWriter):
-
     def write(self, filePath: Path, probe: Probe) -> None:
         array = probe.array
         matDict = {"probe": array.transpose(1, 2, 0)}

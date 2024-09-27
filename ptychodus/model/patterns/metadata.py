@@ -9,7 +9,6 @@ from .settings import PatternSettings, ProductSettings
 
 
 class DiffractionMetadataPresenter(Observable, Observer):
-
     def __init__(
         self,
         diffractionDataset: DiffractionDataset,
@@ -71,9 +70,11 @@ class DiffractionMetadataPresenter(Observable, Observer):
                 self._patternSettings.cropCenterYInPixels.setValue(cropCenter.positionYInPixels)
             elif self._metadata.detectorExtent:
                 self._patternSettings.cropCenterXInPixels.setValue(
-                    int(self._metadata.detectorExtent.widthInPixels) // 2)
+                    int(self._metadata.detectorExtent.widthInPixels) // 2
+                )
                 self._patternSettings.cropCenterYInPixels.setValue(
-                    int(self._metadata.detectorExtent.heightInPixels) // 2)
+                    int(self._metadata.detectorExtent.heightInPixels) // 2
+                )
 
         if syncExtent and self._metadata.detectorExtent:
             centerX = self._patternSettings.cropCenterXInPixels.getValue()
@@ -101,7 +102,8 @@ class DiffractionMetadataPresenter(Observable, Observer):
 
         if energyInElectronVolts:
             self._productSettings.probeEnergyInElectronVolts.setValue(
-                Decimal.from_float(energyInElectronVolts))
+                Decimal.from_float(energyInElectronVolts)
+            )
 
     def canSyncDetectorDistance(self) -> bool:
         return self._metadata.detectorDistanceInMeters is not None
@@ -111,7 +113,8 @@ class DiffractionMetadataPresenter(Observable, Observer):
 
         if distanceInMeters:
             self._productSettings.detectorDistanceInMeters.setValue(
-                Decimal.from_float(distanceInMeters))
+                Decimal.from_float(distanceInMeters)
+            )
 
     def update(self, observable: Observable) -> None:
         if observable is self._diffractionDataset:

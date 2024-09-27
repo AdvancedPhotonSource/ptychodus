@@ -78,9 +78,9 @@ class VisualizationController(Observer):
         autoscaleColorAxis: bool = False,
     ) -> None:
         try:
-            product = self._engine.render(array,
-                                          pixelGeometry,
-                                          autoscaleColorAxis=autoscaleColorAxis)
+            product = self._engine.render(
+                array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
+            )
         except ValueError as err:
             logger.exception(err)
             ExceptionDialog.showException("Renderer", err)
@@ -95,7 +95,8 @@ class VisualizationController(Observer):
 
     def saveImage(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view, "Save Image", mimeTypeFilters=VisualizationController.MIME_TYPES)
+            self._view, "Save Image", mimeTypeFilters=VisualizationController.MIME_TYPES
+        )
 
         if filePath:
             pixmap = self._item.pixmap()

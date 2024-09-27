@@ -4,7 +4,6 @@ from PyQt5.QtWidgets import QMessageBox
 
 
 class ExceptionDialog(QMessageBox):
-
     @classmethod
     def showException(cls, actor: str, exception: Exception) -> None:
         dialog = cls()

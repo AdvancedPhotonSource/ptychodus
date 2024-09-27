@@ -14,7 +14,6 @@ from .widgets import DecimalLineEdit, DecimalSlider
 
 
 class PtychoNNModelParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Model Parameters", parent)
         self.numberOfConvolutionKernelsSpinBox = QSpinBox()
@@ -35,11 +34,11 @@ class PtychoNNModelParametersView(QGroupBox):
 
 
 class PtychoNNTrainingParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Training Parameters", parent)
         self.validationSetFractionalSizeSlider = DecimalSlider.createInstance(
-            Qt.Orientation.Horizontal, numberOfTicks=20)
+            Qt.Orientation.Horizontal, numberOfTicks=20
+        )
         self.maximumLearningRateLineEdit = DecimalLineEdit.createInstance()
         self.minimumLearningRateLineEdit = DecimalLineEdit.createInstance()
         self.trainingEpochsSpinBox = QSpinBox()
@@ -61,7 +60,6 @@ class PtychoNNTrainingParametersView(QGroupBox):
 
 
 class PtychoNNParametersView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.modelParametersView = PtychoNNModelParametersView.createInstance()

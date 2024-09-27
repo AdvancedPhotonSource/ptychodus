@@ -11,7 +11,6 @@ from ptychodus.api.parametric import (
 
 
 class ObjectSettings(Observable, Observer):
-
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup("Object")
@@ -21,8 +20,9 @@ class ObjectSettings(Observable, Observer):
         self.filePath = PathParameter(self._settingsGroup, "FilePath", Path("/path/to/object.npy"))
         self.fileType = StringParameter(self._settingsGroup, "FileType", "NPY")
 
-        self.objectLayerDistanceInMeters = RealParameter(self._settingsGroup,
-                                                         "ObjectLayerDistanceInMeters", 1e-6)
+        self.objectLayerDistanceInMeters = RealParameter(
+            self._settingsGroup, "ObjectLayerDistanceInMeters", 1e-6
+        )
 
         self.extraPaddingX = IntegerParameter(self._settingsGroup, "ExtraPaddingX", 1)
         self.extraPaddingY = IntegerParameter(self._settingsGroup, "ExtraPaddingY", 1)

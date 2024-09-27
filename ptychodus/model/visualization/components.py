@@ -7,7 +7,6 @@ from ptychodus.api.visualization import NumberArrayType, RealArrayType
 
 
 class DataArrayComponent(ABC):
-
     def __init__(self, name: str, *, isCyclic: bool) -> None:
         self._name = name
         self._isCyclic = isCyclic
@@ -26,7 +25,6 @@ class DataArrayComponent(ABC):
 
 
 class RealArrayComponent(DataArrayComponent):
-
     def __init__(self) -> None:
         super().__init__("real", isCyclic=False)
 
@@ -35,7 +33,6 @@ class RealArrayComponent(DataArrayComponent):
 
 
 class ImaginaryArrayComponent(DataArrayComponent):
-
     def __init__(self) -> None:
         super().__init__("imaginary", isCyclic=False)
 
@@ -44,7 +41,6 @@ class ImaginaryArrayComponent(DataArrayComponent):
 
 
 class AmplitudeArrayComponent(DataArrayComponent):
-
     def __init__(self) -> None:
         super().__init__("amplitude", isCyclic=False)
 
@@ -53,7 +49,6 @@ class AmplitudeArrayComponent(DataArrayComponent):
 
 
 class PhaseInRadiansArrayComponent(DataArrayComponent):
-
     def __init__(self) -> None:
         super().__init__("phase", isCyclic=True)
 
@@ -62,7 +57,6 @@ class PhaseInRadiansArrayComponent(DataArrayComponent):
 
 
 class UnwrappedPhaseInRadiansArrayComponent(DataArrayComponent):
-
     def __init__(self) -> None:
         super().__init__("unwrapped_phase", isCyclic=False)
 

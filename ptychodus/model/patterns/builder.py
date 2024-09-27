@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class ActiveDiffractionDatasetBuilder:
-
     def __init__(self, settings: PatternSettings, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings

@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class ScanBuilder(ParameterGroup):
-
     def __init__(self, name: str) -> None:
         super().__init__()
         self._name = StringParameter(self, "name", name)
@@ -29,7 +28,6 @@ class ScanBuilder(ParameterGroup):
 
 
 class FromMemoryScanBuilder(ScanBuilder):
-
     def __init__(self, points: Sequence[ScanPoint]) -> None:
         super().__init__("from_memory")
         self._scan = Scan(points)
@@ -42,7 +40,6 @@ class FromMemoryScanBuilder(ScanBuilder):
 
 
 class FromFileScanBuilder(ScanBuilder):
-
     def __init__(self, filePath: Path, fileType: str, fileReader: ScanFileReader) -> None:
         super().__init__("from_file")
         self.filePath = PathParameter(self, "file_path", filePath)
@@ -50,8 +47,9 @@ class FromFileScanBuilder(ScanBuilder):
         self._fileReader = fileReader
 
     def copy(self) -> FromFileScanBuilder:
-        return FromFileScanBuilder(self.filePath.getValue(), self.fileType.getValue(),
-                                   self._fileReader)
+        return FromFileScanBuilder(
+            self.filePath.getValue(), self.fileType.getValue(), self._fileReader
+        )
 
     def build(self) -> Scan:
         filePath = self.filePath.getValue()

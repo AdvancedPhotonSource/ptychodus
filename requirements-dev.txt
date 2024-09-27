@@ -17,4 +17,3 @@ tifffile
 toml
 watchdog
 wheel
-yapf

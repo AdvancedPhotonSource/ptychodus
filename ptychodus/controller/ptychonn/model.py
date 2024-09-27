@@ -8,7 +8,6 @@ from ..data import FileDialogFactory
 
 
 class PtychoNNModelParametersController(Observer):
-
     def __init__(
         self,
         presenter: PtychoNNModelPresenter,
@@ -31,7 +30,8 @@ class PtychoNNModelParametersController(Observer):
         presenter.addObserver(controller)
 
         view.numberOfConvolutionKernelsSpinBox.valueChanged.connect(
-            presenter.setNumberOfConvolutionKernels)
+            presenter.setNumberOfConvolutionKernels
+        )
         view.batchSizeSpinBox.valueChanged.connect(presenter.setBatchSize)
         view.useBatchNormalizationCheckBox.toggled.connect(presenter.setBatchNormalizationEnabled)
 
@@ -46,7 +46,8 @@ class PtychoNNModelParametersController(Observer):
             self._presenter.getNumberOfConvolutionKernelsLimits().upper,
         )
         self._view.numberOfConvolutionKernelsSpinBox.setValue(
-            self._presenter.getNumberOfConvolutionKernels())
+            self._presenter.getNumberOfConvolutionKernels()
+        )
         self._view.numberOfConvolutionKernelsSpinBox.blockSignals(False)
 
         self._view.batchSizeSpinBox.blockSignals(True)
@@ -58,7 +59,8 @@ class PtychoNNModelParametersController(Observer):
         self._view.batchSizeSpinBox.blockSignals(False)
 
         self._view.useBatchNormalizationCheckBox.setChecked(
-            self._presenter.isBatchNormalizationEnabled())
+            self._presenter.isBatchNormalizationEnabled()
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:

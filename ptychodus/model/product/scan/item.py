@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class ScanRepositoryItem(ParameterGroup):
-
     def __init__(
         self,
         settings: ScanSettings,
@@ -36,8 +35,9 @@ class ScanRepositoryItem(ParameterGroup):
         self._addGroup("builder", builder, observe=True)
         self._addGroup("transform", transform, observe=True)
 
-        self.expandBoundingBox = BooleanParameter(self, "expand_bbox",
-                                                  settings.expandBoundingBox.getValue())
+        self.expandBoundingBox = BooleanParameter(
+            self, "expand_bbox", settings.expandBoundingBox.getValue()
+        )
         self.expandedBoundingBoxMinimumXInMeters = RealParameter(
             self,
             "expanded_bbox_xmin_m",

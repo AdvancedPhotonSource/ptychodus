@@ -50,7 +50,6 @@ class ImageMouseTool(Enum):
 
 
 class ImageItem(QGraphicsPixmapItem):
-
     def __init__(self, events: ImageItemEvents, statusBar: QStatusBar) -> None:
         super().__init__()
         self._events = events
@@ -210,7 +209,6 @@ class ImageItem(QGraphicsPixmapItem):
 
 
 class LineCutDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
@@ -232,7 +230,6 @@ class LineCutDialog(QDialog):
 
 
 class RectangleView(QGroupBox):
-
     @staticmethod
     def _createReadOnlyLineEdit() -> QLineEdit:
         lineEdit = QLineEdit()
@@ -269,7 +266,6 @@ class RectangleView(QGroupBox):
 
 
 class HistogramDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
@@ -293,7 +289,6 @@ class HistogramDialog(QDialog):
 
 
 class VisualizationView(QGraphicsView):
-
     def wheelEvent(self, event: QWheelEvent) -> None:
         oldPosition = self.mapToScene(event.pos())
 
@@ -308,7 +303,6 @@ class VisualizationView(QGraphicsView):
 
 
 class VisualizationWidget(QGroupBox):
-
     def __init__(self, title: str, parent: QWidget | None) -> None:
         super().__init__(title, parent)
         self.toolBar = QToolBar("Tools")
@@ -338,7 +332,6 @@ class VisualizationWidget(QGroupBox):
 
 
 class VisualizationParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Visualization", parent)
 

@@ -28,14 +28,14 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
             opt = QStyleOptionComboBox()
             opt.rect = option.rect
             opt.currentText = index.data(Qt.DisplayRole)
-            QApplication.style().drawComplexControl(QStyle.ComplexControl.CC_ComboBox, opt,
-                                                    painter)
+            QApplication.style().drawComplexControl(QStyle.ComplexControl.CC_ComboBox, opt, painter)
             QApplication.style().drawControl(QStyle.ControlElement.CE_ComboBoxLabel, opt, painter)
         else:
             super().paint(painter, option, index)
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem,
-                     index: QModelIndex) -> QWidget:
+    def createEditor(
+        self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> QWidget:
         comboBox = QComboBox(parent)
         comboBox.activated.connect(self._commitDataAndCloseEditor)
         comboBox.setModel(self._model)
@@ -59,8 +59,9 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
         else:
             super().setModelData(editor, model, index)
 
-    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem,
-                             index: QModelIndex) -> None:
+    def updateEditorGeometry(
+        self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> None:
         editor.setGeometry(option.rect)
 
     def _commitDataAndCloseEditor(self) -> None:

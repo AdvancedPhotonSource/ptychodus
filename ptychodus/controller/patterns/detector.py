@@ -7,15 +7,13 @@ from ...view.patterns import DetectorView
 
 
 class DetectorController(Observer):
-
     def __init__(self, presenter: DetectorPresenter, view: DetectorView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: DetectorPresenter,
-                       view: DetectorView) -> DetectorController:
+    def createInstance(cls, presenter: DetectorPresenter, view: DetectorView) -> DetectorController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 

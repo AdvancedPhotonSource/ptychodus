@@ -25,7 +25,6 @@ class FluorescenceDataset:
 
 
 class FluorescenceFileReader(ABC):
-
     @abstractmethod
     def read(self, filePath: Path) -> FluorescenceDataset:
         """reads a fluorescence dataset from file"""
@@ -33,7 +32,6 @@ class FluorescenceFileReader(ABC):
 
 
 class FluorescenceFileWriter(ABC):
-
     @abstractmethod
     def write(self, filePath: Path, dataset: FluorescenceDataset) -> None:
         """writes a fluorescence dataset to file"""

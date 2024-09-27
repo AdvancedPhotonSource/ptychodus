@@ -5,14 +5,14 @@ from ptychodus.api.scan import ScanPoint
 
 
 class ObjectStitcher:
-
     def __init__(self, geometry: ObjectGeometry) -> None:
         self._geometry = geometry
         self._weights = numpy.zeros((geometry.heightInPixels, geometry.widthInPixels))
         self._array: ObjectArrayType = numpy.zeros_like(self._weights, dtype=complex)
 
-    def _addPatchPart(self, ixSlice: slice, iySlice: slice, weight: float,
-                      patchArray: ObjectArrayType) -> None:
+    def _addPatchPart(
+        self, ixSlice: slice, iySlice: slice, weight: float, patchArray: ObjectArrayType
+    ) -> None:
         idx = numpy.s_[iySlice, ixSlice]
         self._weights[idx] += weight
         self._array[idx] += (patchArray - self._array[idx]) * weight / self._weights[idx]

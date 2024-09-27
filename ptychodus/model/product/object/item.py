@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectRepositoryItem(ParameterGroup):
-
     def __init__(
         self,
         geometryProvider: ObjectGeometryProvider,

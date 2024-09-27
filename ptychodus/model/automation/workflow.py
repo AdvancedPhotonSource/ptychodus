@@ -9,7 +9,6 @@ from .settings import AutomationSettings
 
 
 class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
-
     def __init__(
         self,
         settings: AutomationSettings,

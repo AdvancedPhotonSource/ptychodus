@@ -1,14 +1,13 @@
 from .core import TikeReconstructorLibrary
 from .settings import (
-    TikeSettings,
     TikeMultigridSettings,
     TikeObjectCorrectionSettings,
     TikePositionCorrectionSettings,
     TikeProbeCorrectionSettings,
+    TikeSettings,
 )
 
 __all__ = [
-    "TikeAdaptiveMomentSettings",
     "TikeMultigridSettings",
     "TikeObjectCorrectionSettings",
     "TikePositionCorrectionSettings",

@@ -132,7 +132,6 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
 
 class NPZScanFileReader(ScanFileReader):
-
     def read(self, filePath: Path) -> Scan:
         with numpy.load(filePath) as npzFile:
             scanIndexes = npzFile[NPZProductFileIO.PROBE_POSITION_INDEXES]
@@ -149,7 +148,6 @@ class NPZScanFileReader(ScanFileReader):
 
 
 class NPZProbeFileReader(ProbeFileReader):
-
     def read(self, filePath: Path) -> Probe:
         with numpy.load(filePath) as npzFile:
             return Probe(
@@ -160,7 +158,6 @@ class NPZProbeFileReader(ProbeFileReader):
 
 
 class NPZObjectFileReader(ObjectFileReader):
-
     def read(self, filePath: Path) -> Object:
         with numpy.load(filePath) as npzFile:
             return Object(

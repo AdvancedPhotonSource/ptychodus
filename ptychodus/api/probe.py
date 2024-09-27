@@ -18,8 +18,11 @@ class FresnelZonePlate:
     centralBeamstopDiameterInMeters: float
 
     def getFocalLengthInMeters(self, centralWavelengthInMeters: float) -> float:
-        return (self.zonePlateDiameterInMeters * self.outermostZoneWidthInMeters /
-                centralWavelengthInMeters)
+        return (
+            self.zonePlateDiameterInMeters
+            * self.outermostZoneWidthInMeters
+            / centralWavelengthInMeters
+        )
 
 
 @dataclass(frozen=True)
@@ -53,7 +56,6 @@ class ProbeGeometry:
 
 
 class ProbeGeometryProvider(ABC):
-
     @property
     @abstractmethod
     def detectorDistanceInMeters(self) -> float:
@@ -75,7 +77,6 @@ class ProbeGeometryProvider(ABC):
 
 
 class Probe:
-
     @staticmethod
     def _calculateModeRelativePower(array: WavefieldArrayType) -> Sequence[float]:
         power = numpy.sum(intensity(array), axis=(-2, -1))
@@ -189,7 +190,6 @@ class Probe:
 
 
 class ProbeFileReader(ABC):
-
     @abstractmethod
     def read(self, filePath: Path) -> Probe:
         """reads a probe from file"""
@@ -197,7 +197,6 @@ class ProbeFileReader(ABC):
 
 
 class ProbeFileWriter(ABC):
-
     @abstractmethod
     def write(self, filePath: Path, probe: Probe) -> None:
         """writes a probe to file"""

@@ -44,7 +44,6 @@ class DiffractionPatternArrayPresenter:
 
 
 class DiffractionDatasetPresenter(Observable, Observer):
-
     def __init__(self, settings: PatternSettings, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
@@ -135,7 +134,6 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
 
 class PatternsCore:
-
     def __init__(
         self,
         settingsRegistry: SettingsRegistry,
@@ -154,7 +152,8 @@ class PatternsCore:
 
         self.patternSizer = PatternSizer.createInstance(self.patternSettings, self.detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
-            self.patternSettings, self.patternSizer)
+            self.patternSettings, self.patternSizer
+        )
 
         self.dataset = ActiveDiffractionDataset(self.patternSettings, self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self.patternSettings, self.dataset)
@@ -166,12 +165,13 @@ class PatternsCore:
             fileWriterChooser,
         )
 
-        self.metadataPresenter = DiffractionMetadataPresenter(self.dataset, self.detector,
-                                                              self.patternSettings,
-                                                              self.productSettings)
+        self.metadataPresenter = DiffractionMetadataPresenter(
+            self.dataset, self.detector, self.patternSettings, self.productSettings
+        )
         self.datasetPresenter = DiffractionDatasetPresenter(self.patternSettings, self.dataset)
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter(
-            self.patternSettings, self.dataset, self.patternsAPI, settingsRegistry)
+            self.patternSettings, self.dataset, self.patternsAPI, settingsRegistry
+        )
 
     def start(self) -> None:
         pass

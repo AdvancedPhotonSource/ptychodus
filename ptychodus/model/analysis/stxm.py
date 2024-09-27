@@ -35,7 +35,6 @@ class STXMImage:
 
 
 class STXMStitcher:
-
     def __init__(self, geometry: ObjectGeometry) -> None:
         self._geometry = geometry
         self._weights = numpy.zeros((geometry.heightInPixels, geometry.widthInPixels))
@@ -52,8 +51,9 @@ class STXMStitcher:
         self._weights[idx] += probeProfile
         self._intensity[idx] += intensity * probeProfile
 
-    def addMeasurement(self, point: ScanPoint, intensity: float,
-                       probeProfile: RealArrayType) -> None:
+    def addMeasurement(
+        self, point: ScanPoint, intensity: float, probeProfile: RealArrayType
+    ) -> None:
         geometry = self._geometry
 
         patchWidth = probeProfile.shape[-1]
@@ -105,7 +105,6 @@ class STXMStitcher:
 
 
 class STXMSimulator(Observable):
-
     def __init__(self, dataMatcher: DiffractionPatternPositionMatcher) -> None:
         super().__init__()
         self._dataMatcher = dataMatcher
@@ -124,12 +123,13 @@ class STXMSimulator(Observable):
 
     def simulate(self) -> None:
         reconstructInput = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            self._productIndex)
+            self._productIndex
+        )
         product = reconstructInput.product
         stitcher = STXMStitcher(product.object_.getGeometry())
 
         probeIntensity = product.probe.getIntensity()
-        probeProfile = probeIntensity / numpy.sqrt(numpy.sum(numpy.abs(probeIntensity)**2))
+        probeProfile = probeIntensity / numpy.sqrt(numpy.sum(numpy.abs(probeIntensity) ** 2))
 
         for pattern, scanPoint in zip(reconstructInput.patterns, product.scan):
             patternIntensity = pattern.sum()

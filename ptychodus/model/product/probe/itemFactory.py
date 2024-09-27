@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeRepositoryItemFactory:
-
     def __init__(
         self,
         rng: numpy.random.Generator,
@@ -25,11 +24,12 @@ class ProbeRepositoryItemFactory:
         self._settings = settings
         self._builderFactory = builderFactory
 
-    def create(self,
-               geometryProvider: ProbeGeometryProvider,
-               probe: Probe | None = None) -> ProbeRepositoryItem:
-        builder = (self._builderFactory.createDefault()
-                   if probe is None else FromMemoryProbeBuilder(probe))
+    def create(
+        self, geometryProvider: ProbeGeometryProvider, probe: Probe | None = None
+    ) -> ProbeRepositoryItem:
+        builder = (
+            self._builderFactory.createDefault() if probe is None else FromMemoryProbeBuilder(probe)
+        )
         multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)
         return ProbeRepositoryItem(geometryProvider, builder, multimodalBuilder)
 

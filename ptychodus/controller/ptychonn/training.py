@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoNNTrainingParametersController(Observer):
-
     def __init__(
         self,
         presenter: PtychoNNTrainingPresenter,
@@ -34,7 +33,8 @@ class PtychoNNTrainingParametersController(Observer):
         presenter.addObserver(controller)
 
         view.validationSetFractionalSizeSlider.valueChanged.connect(
-            presenter.setValidationSetFractionalSize)
+            presenter.setValidationSetFractionalSize
+        )
         view.maximumLearningRateLineEdit.valueChanged.connect(presenter.setMaximumLearningRate)
         view.minimumLearningRateLineEdit.valueChanged.connect(presenter.setMinimumLearningRate)
         view.trainingEpochsSpinBox.valueChanged.connect(presenter.setTrainingEpochs)

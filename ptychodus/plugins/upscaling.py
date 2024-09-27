@@ -7,13 +7,11 @@ from ptychodus.api.product import Product
 
 
 class IdentityUpscaling(UpscalingStrategy):
-
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
         return emap
 
 
 class GridDataUpscaling(UpscalingStrategy):
-
     def __init__(self, method: str) -> None:
         self._method = method
 
@@ -28,17 +26,17 @@ class GridDataUpscaling(UpscalingStrategy):
 
         points = numpy.reshape(scanCoordinatesInPixels, (-1, 2))
         values = emap.counts_per_second.flat
-        YY, XX = numpy.mgrid[:objectGeometry.heightInPixels, :objectGeometry.widthInPixels]
+        YY, XX = numpy.mgrid[: objectGeometry.heightInPixels, : objectGeometry.widthInPixels]
         query_points = numpy.transpose((YY.flat, XX.flat))
 
-        cps = griddata(points, values, query_points, method=self._method,
-                       fill_value=0.0).reshape(XX.shape)
+        cps = griddata(points, values, query_points, method=self._method, fill_value=0.0).reshape(
+            XX.shape
+        )
 
         return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype))
 
 
 class RadialBasisFunctionUpscaling(UpscalingStrategy):
-
     def __init__(
         self,
         kernel: str,
@@ -69,7 +67,7 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
             epsilon=self._epsilon,
             degree=self._degree,
         )
-        YY, XX = numpy.mgrid[:objectGeometry.heightInPixels, :objectGeometry.widthInPixels]
+        YY, XX = numpy.mgrid[: objectGeometry.heightInPixels, : objectGeometry.widthInPixels]
         cps = interpolator(numpy.transpose((YY.flat, XX.flat)))
         return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype).reshape(XX.shape))
 

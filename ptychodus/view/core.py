@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 class ViewCore(QMainWindow):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
 
@@ -43,18 +42,19 @@ class ViewCore(QMainWindow):
         self.contentsWidget = QStackedWidget()
         self.memoryProgressBar = QProgressBar()
 
-        self.settingsAction = self.navigationToolBar.addAction(QIcon(":/icons/settings"),
-                                                               "Settings")
+        self.settingsAction = self.navigationToolBar.addAction(
+            QIcon(":/icons/settings"), "Settings"
+        )
         self.settingsView = SettingsView.createInstance()
         self.settingsTableView = QTableView()
 
-        self.patternsAction = self.navigationToolBar.addAction(QIcon(":/icons/patterns"),
-                                                               "Patterns")
+        self.patternsAction = self.navigationToolBar.addAction(
+            QIcon(":/icons/patterns"), "Patterns"
+        )
         self.patternsView = PatternsView.createInstance()
         self.patternsImageView = ImageView.createInstance()
 
-        self.productAction = self.navigationToolBar.addAction(QIcon(":/icons/products"),
-                                                              "Products")
+        self.productAction = self.navigationToolBar.addAction(QIcon(":/icons/products"), "Products")
         self.productView = ProductView.createInstance()
         self.productDiagramView = QWidget()
 
@@ -70,25 +70,28 @@ class ViewCore(QMainWindow):
         self.objectView = RepositoryTreeView.createInstance()
         self.objectImageView = ImageView.createInstance()
 
-        self.reconstructorAction = self.navigationToolBar.addAction(QIcon(":/icons/reconstructor"),
-                                                                    "Reconstructor")
+        self.reconstructorAction = self.navigationToolBar.addAction(
+            QIcon(":/icons/reconstructor"), "Reconstructor"
+        )
         self.reconstructorParametersView = ReconstructorParametersView.createInstance()
         self.reconstructorPlotView = ReconstructorPlotView.createInstance()
 
-        self.workflowAction = self.navigationToolBar.addAction(QIcon(":/icons/workflow"),
-                                                               "Workflow")
+        self.workflowAction = self.navigationToolBar.addAction(
+            QIcon(":/icons/workflow"), "Workflow"
+        )
         self.workflowParametersView = WorkflowParametersView.createInstance()
         self.workflowTableView = QTableView()
 
-        self.automationAction = self.navigationToolBar.addAction(QIcon(":/icons/automate"),
-                                                                 "Automation")
+        self.automationAction = self.navigationToolBar.addAction(
+            QIcon(":/icons/automate"), "Automation"
+        )
         self.automationView = AutomationView.createInstance()
         self.automationWidget = QWidget()
 
     @classmethod
-    def createInstance(cls,
-                       isDeveloperModeEnabled: bool,
-                       parent: QWidget | None = None) -> ViewCore:
+    def createInstance(
+        cls, isDeveloperModeEnabled: bool, parent: QWidget | None = None
+    ) -> ViewCore:
         logger.info(f"PyQt {PYQT_VERSION_STR}")
         logger.info(f"Qt {QT_VERSION_STR}")
 
@@ -145,8 +148,9 @@ class ViewCore(QMainWindow):
         preferredWidth = min(desktopSize.width() * 2 // 3, 2 * preferredHeight)
         view.resize(preferredWidth, preferredHeight)
 
-        view.memoryProgressBar.setSizePolicy(QSizePolicy.Policy.Minimum,
-                                             QSizePolicy.Policy.Preferred)
+        view.memoryProgressBar.setSizePolicy(
+            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred
+        )
         view.statusBar().addPermanentWidget(view.memoryProgressBar)
         view.statusBar().showMessage("Ready")
 

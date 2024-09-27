@@ -11,7 +11,6 @@ from .settings import ProbeSettings
 
 
 class RectangularProbeBuilder(ProbeBuilder):
-
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__("rectangular")
         self._settings = settings

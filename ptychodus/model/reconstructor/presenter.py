@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructorPresenter(Observable, Observer):
-
     def __init__(
         self,
         settings: ReconstructorSettings,
@@ -57,8 +56,7 @@ class ReconstructorPresenter(Observable, Observer):
         outputProductName: str,
         indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
     ) -> int:
-        return self._reconstructorAPI.reconstruct(inputProductIndex, outputProductName,
-                                                  indexFilter)
+        return self._reconstructorAPI.reconstruct(inputProductIndex, outputProductName, indexFilter)
 
     def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
         return self._reconstructorAPI.reconstructSplit(inputProductIndex, outputProductName)

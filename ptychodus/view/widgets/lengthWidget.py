@@ -17,10 +17,9 @@ class LengthWidget(QWidget):
         self.unitsComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls,
-                       *,
-                       isSigned: bool = False,
-                       parent: QWidget | None = None) -> LengthWidget:
+    def createInstance(
+        cls, *, isSigned: bool = False, parent: QWidget | None = None
+    ) -> LengthWidget:
         widget = cls(isSigned, parent)
 
         if not isSigned:
@@ -58,7 +57,8 @@ class LengthWidget(QWidget):
 
         if not lengthInMeters.is_zero():
             exponent = 3 * int(
-                (abs(lengthInMeters).log10() / 3).to_integral_exact(rounding=ROUND_FLOOR))
+                (abs(lengthInMeters).log10() / 3).to_integral_exact(rounding=ROUND_FLOOR)
+            )
             index = self.unitsComboBox.findData(exponent)
 
             if index != -1:

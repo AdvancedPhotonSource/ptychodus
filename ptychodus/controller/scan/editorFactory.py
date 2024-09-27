@@ -37,7 +37,6 @@ __all__ = [
 
 
 class ScanTransformViewController(ParameterViewController):
-
     def __init__(self, transform: ScanPointTransform) -> None:
         super().__init__()
         self._widget = GroupBoxWithPresets("Transformation")
@@ -48,29 +47,36 @@ class ScanTransformViewController(ParameterViewController):
 
         self._labelXP = QLabel("x\u2032 =")
         self._labelXP.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._affineAXViewController = DecimalLineEditParameterViewController(transform.affineAX,
-                                                                              isSigned=True)
+        self._affineAXViewController = DecimalLineEditParameterViewController(
+            transform.affineAX, isSigned=True
+        )
         self._labelAX = QLabel("x +")
-        self._affineAYViewController = DecimalLineEditParameterViewController(transform.affineAY,
-                                                                              isSigned=True)
+        self._affineAYViewController = DecimalLineEditParameterViewController(
+            transform.affineAY, isSigned=True
+        )
         self._labelAY = QLabel("y +")
         self._affineATViewController = LengthWidgetParameterViewController(
-            transform.affineATInMeters, isSigned=True)
+            transform.affineATInMeters, isSigned=True
+        )
 
         self._labelYP = QLabel("y\u2032 =")
         self._labelYP.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._affineBXViewController = DecimalLineEditParameterViewController(transform.affineBX,
-                                                                              isSigned=True)
+        self._affineBXViewController = DecimalLineEditParameterViewController(
+            transform.affineBX, isSigned=True
+        )
         self._labelBX = QLabel("x +")
-        self._affineBYViewController = DecimalLineEditParameterViewController(transform.affineBY,
-                                                                              isSigned=True)
+        self._affineBYViewController = DecimalLineEditParameterViewController(
+            transform.affineBY, isSigned=True
+        )
         self._labelBY = QLabel("y +")
         self._affineBTViewController = LengthWidgetParameterViewController(
-            transform.affineBTInMeters, isSigned=True)
+            transform.affineBTInMeters, isSigned=True
+        )
 
         self._jitterRadiusLabel = QLabel("Jitter Radius:")
         self._jitterRadiusViewController = LengthWidgetParameterViewController(
-            transform.jitterRadiusInMeters, isSigned=False)
+            transform.jitterRadiusInMeters, isSigned=False
+        )
 
         layout = QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -97,7 +103,6 @@ class ScanTransformViewController(ParameterViewController):
 
 
 class ScanBoundingBoxViewController(ParameterViewController, Observer):
-
     def __init__(self, item: ScanRepositoryItem) -> None:
         super().__init__()
         self._parameter = item.expandBoundingBox
@@ -105,13 +110,17 @@ class ScanBoundingBoxViewController(ParameterViewController, Observer):
         self._widget.setCheckable(True)
 
         self._minimumXController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMinimumXInMeters, isSigned=True)
+            item.expandedBoundingBoxMinimumXInMeters, isSigned=True
+        )
         self._maximumXController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMaximumXInMeters, isSigned=True)
+            item.expandedBoundingBoxMaximumXInMeters, isSigned=True
+        )
         self._minimumYController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMinimumYInMeters, isSigned=True)
+            item.expandedBoundingBoxMinimumYInMeters, isSigned=True
+        )
         self._maximumYController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMaximumYInMeters, isSigned=True)
+            item.expandedBoundingBoxMaximumYInMeters, isSigned=True
+        )
 
         layout = QFormLayout()
         layout.addRow("Minimum X:", self._minimumXController.getWidget())
@@ -136,14 +145,15 @@ class ScanBoundingBoxViewController(ParameterViewController, Observer):
 
 
 class ScanEditorViewControllerFactory:
-
-    def _appendCommonControls(self, dialogBuilder: ParameterViewBuilder,
-                              item: ScanRepositoryItem) -> None:
+    def _appendCommonControls(
+        self, dialogBuilder: ParameterViewBuilder, item: ScanRepositoryItem
+    ) -> None:
         dialogBuilder.addViewControllerToBottom(ScanTransformViewController(item.getTransform()))
         dialogBuilder.addViewControllerToBottom(ScanBoundingBoxViewController(item))
 
-    def createEditorDialog(self, itemName: str, item: ScanRepositoryItem,
-                           parent: QWidget) -> QDialog:
+    def createEditorDialog(
+        self, itemName: str, item: ScanRepositoryItem, parent: QWidget
+    ) -> QDialog:
         scanBuilder = item.getBuilder()
         builderName = scanBuilder.getName()
         baseScanGroup = "Base Scan"
@@ -151,28 +161,28 @@ class ScanEditorViewControllerFactory:
 
         if isinstance(scanBuilder, CartesianScanBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(scanBuilder.numberOfPointsX,
-                                     "Number of Points X:",
-                                     group=baseScanGroup)
-            dialogBuilder.addSpinBox(scanBuilder.numberOfPointsY,
-                                     "Number of Points Y:",
-                                     group=baseScanGroup)
-            dialogBuilder.addLengthWidget(scanBuilder.stepSizeXInMeters,
-                                          "Step Size X:",
-                                          group=baseScanGroup)
+            dialogBuilder.addSpinBox(
+                scanBuilder.numberOfPointsX, "Number of Points X:", group=baseScanGroup
+            )
+            dialogBuilder.addSpinBox(
+                scanBuilder.numberOfPointsY, "Number of Points Y:", group=baseScanGroup
+            )
+            dialogBuilder.addLengthWidget(
+                scanBuilder.stepSizeXInMeters, "Step Size X:", group=baseScanGroup
+            )
 
             if not scanBuilder.isEquilateral:
-                dialogBuilder.addLengthWidget(scanBuilder.stepSizeYInMeters,
-                                              "Step Size Y:",
-                                              group=baseScanGroup)
+                dialogBuilder.addLengthWidget(
+                    scanBuilder.stepSizeYInMeters, "Step Size Y:", group=baseScanGroup
+                )
 
             self._appendCommonControls(dialogBuilder, item)
             return dialogBuilder.buildDialog(title, parent)
         elif isinstance(scanBuilder, ConcentricScanBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(scanBuilder.numberOfShells,
-                                     "Number of Shells:",
-                                     group=baseScanGroup)
+            dialogBuilder.addSpinBox(
+                scanBuilder.numberOfShells, "Number of Shells:", group=baseScanGroup
+            )
             dialogBuilder.addSpinBox(
                 scanBuilder.numberOfPointsInFirstShell,
                 "Number of Points in First Shell:",
@@ -195,34 +205,34 @@ class ScanEditorViewControllerFactory:
             return dialogBuilder.buildDialog(title, parent)
         elif isinstance(scanBuilder, SpiralScanBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(scanBuilder.numberOfPoints,
-                                     "Number of Points:",
-                                     group=baseScanGroup)
-            dialogBuilder.addLengthWidget(scanBuilder.radiusScalarInMeters,
-                                          "Radius Scalar:",
-                                          group=baseScanGroup)
+            dialogBuilder.addSpinBox(
+                scanBuilder.numberOfPoints, "Number of Points:", group=baseScanGroup
+            )
+            dialogBuilder.addLengthWidget(
+                scanBuilder.radiusScalarInMeters, "Radius Scalar:", group=baseScanGroup
+            )
             self._appendCommonControls(dialogBuilder, item)
             return dialogBuilder.buildDialog(title, parent)
         elif isinstance(scanBuilder, LissajousScanBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(scanBuilder.numberOfPoints,
-                                     "Number of Points:",
-                                     group=baseScanGroup)
-            dialogBuilder.addLengthWidget(scanBuilder.amplitudeXInMeters,
-                                          "Amplitude X:",
-                                          group=baseScanGroup)
-            dialogBuilder.addLengthWidget(scanBuilder.amplitudeYInMeters,
-                                          "Amplitude Y:",
-                                          group=baseScanGroup)
-            dialogBuilder.addAngleWidget(scanBuilder.angularStepXInTurns,
-                                         "Angular Step X:",
-                                         group=baseScanGroup)
-            dialogBuilder.addAngleWidget(scanBuilder.angularStepYInTurns,
-                                         "Angular Step Y:",
-                                         group=baseScanGroup)
-            dialogBuilder.addAngleWidget(scanBuilder.angularShiftInTurns,
-                                         "Angular Shift:",
-                                         group=baseScanGroup)
+            dialogBuilder.addSpinBox(
+                scanBuilder.numberOfPoints, "Number of Points:", group=baseScanGroup
+            )
+            dialogBuilder.addLengthWidget(
+                scanBuilder.amplitudeXInMeters, "Amplitude X:", group=baseScanGroup
+            )
+            dialogBuilder.addLengthWidget(
+                scanBuilder.amplitudeYInMeters, "Amplitude Y:", group=baseScanGroup
+            )
+            dialogBuilder.addAngleWidget(
+                scanBuilder.angularStepXInTurns, "Angular Step X:", group=baseScanGroup
+            )
+            dialogBuilder.addAngleWidget(
+                scanBuilder.angularStepYInTurns, "Angular Step Y:", group=baseScanGroup
+            )
+            dialogBuilder.addAngleWidget(
+                scanBuilder.angularShiftInTurns, "Angular Shift:", group=baseScanGroup
+            )
             self._appendCommonControls(dialogBuilder, item)
             return dialogBuilder.buildDialog(title, parent)
 

@@ -22,10 +22,9 @@ class ConcentricScanBuilder(ScanBuilder):
             float(settings.radialStepSizeInMeters.getValue()),
             minimum=0.0,
         )
-        self.numberOfShells = IntegerParameter(self,
-                                               "number_of_shells",
-                                               settings.numberOfShells.getValue(),
-                                               minimum=0)
+        self.numberOfShells = IntegerParameter(
+            self, "number_of_shells", settings.numberOfShells.getValue(), minimum=0
+        )
         self.numberOfPointsInFirstShell = IntegerParameter(
             self,
             "number_of_points_1st_shell",

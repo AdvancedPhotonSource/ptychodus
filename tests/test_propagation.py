@@ -1,4 +1,5 @@
-if __name__ == '__main__':
+if __name__ == "__main__":
     import matplotlib
-    matplotlib.use('Agg')
+
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt

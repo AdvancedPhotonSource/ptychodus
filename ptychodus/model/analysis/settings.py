@@ -12,16 +12,17 @@ from ptychodus.api.parametric import (
 
 
 class ProbePropagationSettings(Observable, Observer):
-
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup("ProbePropagation")
         self._settingsGroup.addObserver(self)
 
-        self.beginCoordinateInMeters = DecimalParameter(self._settingsGroup,
-                                                        "BeginCoordinateInMeters", "-1e-3")
-        self.endCoordinateInMeters = DecimalParameter(self._settingsGroup, "EndCoordinateInMeters",
-                                                      "+1e-3")
+        self.beginCoordinateInMeters = DecimalParameter(
+            self._settingsGroup, "BeginCoordinateInMeters", "-1e-3"
+        )
+        self.endCoordinateInMeters = DecimalParameter(
+            self._settingsGroup, "EndCoordinateInMeters", "+1e-3"
+        )
         self.numberOfSteps = IntegerParameter(self._settingsGroup, "NumberOfSteps", 100)
 
     def update(self, observable: Observable) -> None:
@@ -30,7 +31,6 @@ class ProbePropagationSettings(Observable, Observer):
 
 
 class FluorescenceSettings(Observable, Observer):
-
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup("Fluorescence")
@@ -39,10 +39,10 @@ class FluorescenceSettings(Observable, Observer):
         self.filePath = PathParameter(self._settingsGroup, "FilePath", Path("/path/to/dataset.h5"))
         self.fileType = StringParameter(self._settingsGroup, "FileType", "XRF-Maps")
         self.useVSPI = BooleanParameter(self._settingsGroup, "UseVSPI", True)
-        self.upscalingStrategy = StringParameter(self._settingsGroup, "UpscalingStrategy",
-                                                 "Linear")
-        self.deconvolutionStrategy = StringParameter(self._settingsGroup, "DeconvolutionStrategy",
-                                                     "Richardson-Lucy")
+        self.upscalingStrategy = StringParameter(self._settingsGroup, "UpscalingStrategy", "Linear")
+        self.deconvolutionStrategy = StringParameter(
+            self._settingsGroup, "DeconvolutionStrategy", "Richardson-Lucy"
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

@@ -7,7 +7,6 @@ from ...model.workflow import WorkflowStatusPresenter
 
 
 class WorkflowTableModel(QAbstractTableModel):
-
     def __init__(self, presenter: WorkflowStatusPresenter, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter

@@ -114,8 +114,9 @@ class VisualizationProduct:
             )
 
     @staticmethod
-    def _intersectGridLines(begin: float, end: float,
-                            alphaLimits: Interval[float]) -> Iterator[float]:
+    def _intersectGridLines(
+        begin: float, end: float, alphaLimits: Interval[float]
+    ) -> Iterator[float]:
         ibegin = int(begin)
         iend = int(end)
 

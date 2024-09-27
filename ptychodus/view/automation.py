@@ -18,7 +18,6 @@ from PyQt5.QtWidgets import (
 
 
 class AutomationProcessingView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Processing", parent)
         self.strategyLabel = QLabel("Strategy:")
@@ -48,7 +47,6 @@ class AutomationProcessingView(QGroupBox):
 
 
 class AutomationWatchdogView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__("Watchdog", parent)
         self.delaySpinBox = QSpinBox()
@@ -67,7 +65,6 @@ class AutomationWatchdogView(QGroupBox):
 
 
 class AutomationView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.processingView = AutomationProcessingView.createInstance()

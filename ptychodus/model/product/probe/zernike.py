@@ -48,8 +48,11 @@ class ZernikePolynomial:
         return values
 
     def _angular_function(self, angle: RealArrayType) -> RealArrayType:
-        return (numpy.sin(-self.angular_frequency * angle)
-                if self.angular_frequency < 0 else numpy.cos(self.angular_frequency * angle))
+        return (
+            numpy.sin(-self.angular_frequency * angle)
+            if self.angular_frequency < 0
+            else numpy.cos(self.angular_frequency * angle)
+        )
 
     def __call__(
         self,
@@ -75,7 +78,6 @@ class ZernikePolynomial:
 
 
 class ZernikeProbeBuilder(ProbeBuilder):
-
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__("zernike")
         self._settings = settings

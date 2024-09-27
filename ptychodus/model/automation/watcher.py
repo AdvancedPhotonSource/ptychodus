@@ -17,9 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
-
-    def __init__(self, workflow: FileBasedWorkflow,
-                 datasetBuffer: AutomationDatasetBuffer) -> None:
+    def __init__(self, workflow: FileBasedWorkflow, datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
         self._workflow = workflow
         self._datasetBuffer = datasetBuffer
@@ -39,7 +37,6 @@ class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
 
 
 class DataDirectoryWatcher(Observable, Observer):
-
     def __init__(
         self,
         settings: AutomationSettings,
@@ -78,9 +75,11 @@ class DataDirectoryWatcher(Observable, Observer):
             logger.error("Automation watchdog thread already started!")
         else:
             logger.info("Starting automation watchdog thread...")
-            self._observer = (PollingObserver()
-                              if self._settings.useWatchdogPollingObserver.getValue() else
-                              watchdog.observers.Observer())
+            self._observer = (
+                PollingObserver()
+                if self._settings.useWatchdogPollingObserver.getValue()
+                else watchdog.observers.Observer()
+            )
             self._observer.start()
             self._updateWatch()
             logger.debug("Automation watchdog thread started.")

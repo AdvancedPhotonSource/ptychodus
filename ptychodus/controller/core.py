@@ -23,16 +23,17 @@ from .workflow import WorkflowController
 
 
 class ControllerCore:
-
     def __init__(self, model: ModelCore, view: ViewCore) -> None:
         self.view = view
 
         self._memoryController = MemoryController(model.memoryPresenter, view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
         self._ptychoPackViewControllerFactory = PtychoPackViewControllerFactory(
-            model.ptychoPackReconstructorLibrary)
+            model.ptychoPackReconstructorLibrary
+        )
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
-            model.ptychonnReconstructorLibrary, self._fileDialogFactory)
+            model.ptychonnReconstructorLibrary, self._fileDialogFactory
+        )
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
         self._settingsController = SettingsController(
             model.settingsRegistry,
@@ -140,8 +141,7 @@ class ControllerCore:
         self._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
         self._refreshDataTimer.start(1000)  # TODO make configurable
 
-        view.navigationActionGroup.triggered.connect(
-            lambda action: self.swapCentralWidgets(action))
+        view.navigationActionGroup.triggered.connect(lambda action: self.swapCentralWidgets(action))
         view.workflowAction.setVisible(model.areWorkflowsSupported)
 
     def showMainWindow(self, windowTitle: str) -> None:

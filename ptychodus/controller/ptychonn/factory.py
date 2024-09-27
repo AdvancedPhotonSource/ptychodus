@@ -9,9 +9,9 @@ from .controller import PtychoNNParametersController
 
 
 class PtychoNNViewControllerFactory(ReconstructorViewControllerFactory):
-
-    def __init__(self, model: PtychoNNReconstructorLibrary,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self, model: PtychoNNReconstructorLibrary, fileDialogFactory: FileDialogFactory
+    ) -> None:
         super().__init__()
         self._model = model
         self._fileDialogFactory = fileDialogFactory

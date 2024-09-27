@@ -21,7 +21,6 @@ class ReconstructOutput:
 
 
 class Reconstructor(ABC):
-
     @property
     @abstractmethod
     def name(self) -> str:
@@ -40,7 +39,6 @@ class TrainOutput:
 
 
 class TrainableReconstructor(Reconstructor):
-
     @abstractmethod
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         pass
@@ -103,7 +101,6 @@ class TrainableReconstructor(Reconstructor):
 
 
 class NullReconstructor(TrainableReconstructor):
-
     def __init__(self, name: str) -> None:
         self._name = name
 
@@ -161,7 +158,6 @@ class NullReconstructor(TrainableReconstructor):
 
 
 class ReconstructorLibrary(Iterable[Reconstructor]):
-
     @property
     @abstractmethod
     def name(self) -> str:

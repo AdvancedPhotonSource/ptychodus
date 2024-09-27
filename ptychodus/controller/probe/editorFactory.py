@@ -39,7 +39,6 @@ __all__ = [
 
 
 class FresnelZonePlateViewController(ParameterViewController):
-
     def __init__(self, title: str, probeBuilder: FresnelZonePlateProbeBuilder) -> None:
         super().__init__()
         self._widget = GroupBoxWithPresets(title)
@@ -49,13 +48,17 @@ class FresnelZonePlateViewController(ParameterViewController):
             action.triggered.connect(lambda _, index=index: probeBuilder.applyPresets(index))
 
         self._zonePlateDiameterViewController = LengthWidgetParameterViewController(
-            probeBuilder.zonePlateDiameterInMeters)
+            probeBuilder.zonePlateDiameterInMeters
+        )
         self._outermostZoneWidthInMetersViewController = LengthWidgetParameterViewController(
-            probeBuilder.outermostZoneWidthInMeters)
+            probeBuilder.outermostZoneWidthInMeters
+        )
         self._centralBeamstopDiameterInMetersViewController = LengthWidgetParameterViewController(
-            probeBuilder.centralBeamstopDiameterInMeters)
+            probeBuilder.centralBeamstopDiameterInMeters
+        )
         self._defocusDistanceInMetersViewController = LengthWidgetParameterViewController(
-            probeBuilder.defocusDistanceInMeters)
+            probeBuilder.defocusDistanceInMeters
+        )
 
         layout = QFormLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -76,7 +79,6 @@ class FresnelZonePlateViewController(ParameterViewController):
 
 
 class ZernikeViewController(ParameterViewController, Observer):
-
     def __init__(self, title: str, probeBuilder: ZernikeProbeBuilder) -> None:
         super().__init__()
         self._widget = QGroupBox(title)
@@ -85,7 +87,8 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._coefficientsTableModel = ZernikeTableModel(probeBuilder)
         self._coefficientsTableView = QTableView()
         self._diameterViewController = LengthWidgetParameterViewController(
-            probeBuilder.diameterInMeters)
+            probeBuilder.diameterInMeters
+        )
 
         self._coefficientsTableView.setModel(self._coefficientsTableModel)
 
@@ -115,7 +118,6 @@ class ZernikeViewController(ParameterViewController, Observer):
 
 
 class DecayTypeParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: StringParameter) -> None:
         super().__init__()
         self._parameter = parameter
@@ -123,10 +125,12 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
         self._exponentialDecayButton = QRadioButton("Exponential")
 
         self._buttonGroup = QButtonGroup()
-        self._buttonGroup.addButton(self._polynomialDecayButton,
-                                    ProbeModeDecayType.POLYNOMIAL.value)
-        self._buttonGroup.addButton(self._exponentialDecayButton,
-                                    ProbeModeDecayType.EXPONENTIAL.value)
+        self._buttonGroup.addButton(
+            self._polynomialDecayButton, ProbeModeDecayType.POLYNOMIAL.value
+        )
+        self._buttonGroup.addButton(
+            self._exponentialDecayButton, ProbeModeDecayType.EXPONENTIAL.value
+        )
         self._buttonGroup.setExclusive(True)
         self._buttonGroup.idToggled.connect(self._syncViewToModel)
 
@@ -164,7 +168,6 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
 
 
 class ProbeEditorViewControllerFactory:
-
     def _appendAdditionalModes(
         self,
         dialogBuilder: ParameterViewBuilder,
@@ -192,8 +195,9 @@ class ProbeEditorViewControllerFactory:
             group=additionalModesGroup,
         )
 
-    def createEditorDialog(self, itemName: str, item: ProbeRepositoryItem,
-                           parent: QWidget) -> QDialog:
+    def createEditorDialog(
+        self, itemName: str, item: ProbeRepositoryItem, parent: QWidget
+    ) -> QDialog:
         probeBuilder = item.getBuilder()
         builderName = probeBuilder.getName()
         modesBuilder = item.getAdditionalModesBuilder()
@@ -221,7 +225,8 @@ class ProbeEditorViewControllerFactory:
         elif isinstance(probeBuilder, FresnelZonePlateProbeBuilder):
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addViewControllerToTop(
-                FresnelZonePlateViewController(primaryModeGroup, probeBuilder))
+                FresnelZonePlateViewController(primaryModeGroup, probeBuilder)
+            )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
             return dialogBuilder.buildDialog(title, parent)
         elif isinstance(probeBuilder, RectangularProbeBuilder):
@@ -265,7 +270,8 @@ class ProbeEditorViewControllerFactory:
         elif isinstance(probeBuilder, ZernikeProbeBuilder):
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addViewControllerToTop(
-                ZernikeViewController(primaryModeGroup, probeBuilder))
+                ZernikeViewController(primaryModeGroup, probeBuilder)
+            )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
             return dialogBuilder.buildDialog(title, parent)
 

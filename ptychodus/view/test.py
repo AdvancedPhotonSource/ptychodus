@@ -7,7 +7,6 @@ else:
 
 
 class Tester:
-
     def printQtStatus(self) -> None:
         if FOUND_QT:
             print("Qt FOUND!")

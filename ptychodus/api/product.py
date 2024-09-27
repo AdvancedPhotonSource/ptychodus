@@ -47,7 +47,6 @@ class Product:
 
 
 class ProductFileReader(ABC):
-
     @abstractmethod
     def read(self, filePath: Path) -> Product:
         """reads a product from file"""
@@ -55,7 +54,6 @@ class ProductFileReader(ABC):
 
 
 class ProductFileWriter(ABC):
-
     @abstractmethod
     def write(self, filePath: Path, product: Product) -> None:
         """writes a product to file"""

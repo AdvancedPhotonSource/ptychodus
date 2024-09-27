@@ -8,7 +8,6 @@ from .scan import ScanRepositoryItem
 
 
 class ProductValidator(Observable, Observer):
-
     def __init__(
         self,
         patterns: ActiveDiffractionDataset,

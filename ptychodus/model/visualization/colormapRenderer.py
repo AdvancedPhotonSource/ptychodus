@@ -18,7 +18,6 @@ from .transformation import ScalarTransformationParameter
 
 
 class ColormapRenderer(Renderer):
-
     def __init__(
         self,
         component: DataArrayComponent,

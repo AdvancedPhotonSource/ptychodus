@@ -16,7 +16,6 @@ from .status import WorkflowStatusController
 
 
 class WorkflowController:
-
     def __init__(
         self,
         parametersPresenter: WorkflowParametersPresenter,
@@ -32,9 +31,11 @@ class WorkflowController:
         self._executionPresenter = executionPresenter
         self._parametersView = parametersView
         self._authorizationController = WorkflowAuthorizationController.createInstance(
-            authorizationPresenter, parametersView.authorizationDialog)
+            authorizationPresenter, parametersView.authorizationDialog
+        )
         self._statusController = WorkflowStatusController.createInstance(
-            statusPresenter, parametersView.statusView, tableView)
+            statusPresenter, parametersView.statusView, tableView
+        )
         self._executionController = WorkflowExecutionController.createInstance(
             parametersPresenter,
             executionPresenter,

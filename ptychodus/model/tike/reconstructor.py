@@ -30,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 
 class TikeReconstructor:
-
     def __init__(
         self,
         settings: TikeSettings,
@@ -64,8 +63,9 @@ class TikeReconstructor:
 
         return options
 
-    def getPositionOptions(self,
-                           initialScan: numpy.typing.NDArray[Any]) -> tike.ptycho.PositionOptions:
+    def getPositionOptions(
+        self, initialScan: numpy.typing.NDArray[Any]
+    ) -> tike.ptycho.PositionOptions:
         settings = self._positionCorrectionSettings
         options = None
 
@@ -86,8 +86,11 @@ class TikeReconstructor:
         options = None
 
         if settings.useProbeCorrection.getValue():
-            probeSupport = (float(settings.probeSupportWeight.getValue())
-                            if settings.useFiniteProbeSupport.getValue() else 0.0)
+            probeSupport = (
+                float(settings.probeSupportWeight.getValue())
+                if settings.useFiniteProbeSupport.getValue()
+                else 0.0
+            )
 
             options = tike.ptycho.ProbeOptions(
                 force_orthogonality=settings.forceOrthogonality.getValue(),
@@ -188,10 +191,10 @@ class TikeReconstructor:
         else:
             # TODO support interactive reconstructions
             with tike.ptycho.Reconstruction(
-                    data=patternsArray,
-                    parameters=ptychoParameters,
-                    num_gpu=numGpus,
-                    use_mpi=False,
+                data=patternsArray,
+                parameters=ptychoParameters,
+                num_gpu=numGpus,
+                use_mpi=False,
             ) as context:
                 context.iterate(ptychoParameters.algorithm_options.num_iter)
             result = context.parameters
@@ -239,7 +242,6 @@ class TikeReconstructor:
 
 
 class RegularizedPIEReconstructor(Reconstructor):
-
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.RpieOptions()
@@ -263,7 +265,6 @@ class RegularizedPIEReconstructor(Reconstructor):
 
 
 class IterativeLeastSquaresReconstructor(Reconstructor):
-
     def __init__(self, tikeReconstructor: TikeReconstructor) -> None:
         super().__init__()
         self._algorithmOptions = tike.ptycho.solvers.LstsqOptions()

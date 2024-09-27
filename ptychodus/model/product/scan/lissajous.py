@@ -10,7 +10,6 @@ from .settings import ScanSettings
 
 
 class LissajousScanBuilder(ScanBuilder):
-
     def __init__(self, settings: ScanSettings) -> None:
         super().__init__("lissajous")
         self._settings = settings
@@ -64,8 +63,10 @@ class LissajousScanBuilder(ScanBuilder):
 
         for index in range(self.numberOfPoints.getValue()):
             twoPi = 2 * numpy.pi
-            thetaX = (twoPi * self.angularStepXInTurns.getValue() * index +
-                      self.angularShiftInTurns.getValue())
+            thetaX = (
+                twoPi * self.angularStepXInTurns.getValue() * index
+                + self.angularShiftInTurns.getValue()
+            )
             thetaY = twoPi * self.angularStepYInTurns.getValue() * index
 
             point = ScanPoint(

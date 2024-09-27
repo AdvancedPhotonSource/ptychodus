@@ -32,7 +32,6 @@ class ScanIndexFilter(Enum):
 
 
 class DiffractionPatternPositionMatcher:
-
     def __init__(
         self,
         diffractionDataset: ActiveDiffractionDataset,
@@ -51,9 +50,8 @@ class DiffractionPatternPositionMatcher:
         return objectGeometry.getPixelGeometry()
 
     def matchDiffractionPatternsWithPositions(
-            self,
-            inputProductIndex: int,
-            indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> ReconstructInput:
+        self, inputProductIndex: int, indexFilter: ScanIndexFilter = ScanIndexFilter.ALL
+    ) -> ReconstructInput:
         inputProductItem = self._productRepository[inputProductIndex]
         inputProduct = inputProductItem.getProduct()
         dataIndexes = self._diffractionDataset.getAssembledIndexes()

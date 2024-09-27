@@ -1,5 +1,15 @@
-from PyQt5.QtWidgets import (QComboBox, QDialog, QFormLayout, QGridLayout, QGroupBox, QLabel,
-                             QPushButton, QStatusBar, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
+    QLabel,
+    QPushButton,
+    QStatusBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -9,7 +19,6 @@ from .visualization import VisualizationParametersView, VisualizationWidget
 
 
 class FourierRingCorrelationDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.product1Label = QLabel("Product 1:")
@@ -37,7 +46,6 @@ class FourierRingCorrelationDialog(QDialog):
 
 
 class XMCDParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Parameters", parent)
 
@@ -61,7 +69,6 @@ class XMCDParametersView(QGroupBox):
 
 
 class XMCDDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.differenceWidget = VisualizationWidget.createInstance("Difference")

@@ -22,7 +22,6 @@ from .settings import PtychoPackSettings
 
 
 class RelaxedAveragedAlternatingReflectionsReconstructor(Reconstructor):
-
     def __init__(self, settings: PtychoPackSettings, device: RealPtychoPackDevice) -> None:
         self._settings = settings
         self._device = device
@@ -69,16 +68,18 @@ class RelaxedAveragedAlternatingReflectionsReconstructor(Reconstructor):
             ),
         )
 
-        algorithm = RelaxedAveragedAlternatingReflections(self._device.get_ptychopack_device(),
-                                                          detector_data, product)
+        algorithm = RelaxedAveragedAlternatingReflections(
+            self._device.get_ptychopack_device(), detector_data, product
+        )
         algorithm.set_relaxation(float(self._settings.raar_exit_wave_relaxation.getValue()))
         algorithm.set_probe_power(probe_power)
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()
         scan_output_points: list[ScanPoint] = list()
 
-        for scan_point_input, (y_px, x_px) in zip(scan_input,
-                                                  pp_output_product.positions_px.numpy()):
+        for scan_point_input, (y_px, x_px) in zip(
+            scan_input, pp_output_product.positions_px.numpy()
+        ):
             object_point = ObjectPoint(scan_point_input.index, float(x_px), float(y_px))
             scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
             scan_output_points.append(scan_point)

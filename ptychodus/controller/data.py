@@ -5,7 +5,6 @@ from PyQt5.QtWidgets import QDialog, QFileDialog, QWidget
 
 
 class FileDialogFactory:
-
     def __init__(self) -> None:
         self._openWorkingDirectory = Path.cwd()
         self._saveWorkingDirectory = Path.cwd()
