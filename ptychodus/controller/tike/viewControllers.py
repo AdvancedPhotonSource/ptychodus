@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QComboBox, QFormLayout, QGroupBox, QWidget
 from ...model.tike import (
     TikeMultigridSettings,
     TikeObjectCorrectionSettings,
+    TikePositionCorrectionSettings,
     TikeProbeCorrectionSettings,
     TikeSettings,
 )
@@ -29,8 +30,8 @@ __all__ = [
 ]
 
 
-class TikeParametersViewController(ParameterViewController, Observer):
-    def __init__(self, settings: TikeSettings, *, showAlpha: bool, showStepLength: bool) -> None:
+class TikeParametersViewController(ParameterViewController):
+    def __init__(self, settings: TikeSettings, *, showAlpha: bool) -> None:
         super().__init__()
         self._settings = settings
         self._numGpusViewController = LineEditParameterViewController(
@@ -62,11 +63,6 @@ class TikeParametersViewController(ParameterViewController, Observer):
         self._alphaViewController = DecimalSliderParameterViewController(
             settings.alpha, tooltip='RPIE becomes EPIE when this parameter is 1.'
         )
-        self._stepLengthViewController = DecimalSliderParameterViewController(
-            settings.stepLength,
-            tooltip='Scales the inital search directions before the line search.',
-        )
-
         self._logLevelComboBox = QComboBox()
 
         for model in settings.getLogLevels():
@@ -88,13 +84,13 @@ class TikeParametersViewController(ParameterViewController, Observer):
         if showAlpha:
             layout.addRow('Alpha:', self._alphaViewController.getWidget())
 
-        if showStepLength:
-            layout.addRow('Step Length:', self._stepLengthViewController.getWidget())
-
         layout.addRow('Log Level:', self._logLevelComboBox)
         self._widget.setLayout(layout)
 
         self._syncModelToView()
+
+    def getWidget(self) -> QWidget:
+        return self._widget
 
     def _syncModelToView(self) -> None:
         self._logLevelComboBox.setCurrentText(self._settings.getLogLevel())
@@ -307,22 +303,18 @@ class TikeProbeCorrectionViewController(ParameterViewController, Observer):
 
 
 class TikePositionCorrectionViewController(ParameterViewController, Observer):
-    def __init__(
-        self,
-        usePositionCorrection: BooleanParameter,
-        usePositionRegularization: BooleanParameter,
-        adaptiveMomentViewController: TikeAdaptiveMomentViewController,
-        updateMagnitudeLimit: RealParameter,
-    ) -> None:
-        self._usePositionCorrection = usePositionCorrection
+    def __init__(self, settings: TikePositionCorrectionSettings) -> None:
+        self._usePositionCorrection = settings.usePositionCorrection
         self._usePositionRegularizationViewController = CheckBoxParameterViewController(
-            usePositionRegularization,
+            settings.usePositionRegularization,
             'Use Regularization',
             tooltip='Whether the positions are constrained to fit a random error plus affine error model.',
         )
-        self._adaptiveMomentViewController = adaptiveMomentViewController
+        self._adaptiveMomentViewController = TikeAdaptiveMomentViewController(
+            settings.useAdaptiveMoment, settings.mdecay, settings.vdecay
+        )
         self._updateMagnitudeLimitViewController = DecimalLineEditParameterViewController(
-            updateMagnitudeLimit,
+            settings.updateMagnitudeLimit,
             tooltip='When set to a positive number, x and y update magnitudes are clipped (limited) to this value.',
         )
         self._widget = QGroupBox('Position Correction')
@@ -337,7 +329,7 @@ class TikePositionCorrectionViewController(ParameterViewController, Observer):
         self._widget.setLayout(layout)
 
         self._syncModelToView()
-        self._widget.toggled.connect(usePositionCorrection.setValue)
+        self._widget.toggled.connect(settings.usePositionCorrection.setValue)
         self._usePositionCorrection.addObserver(self)
 
     def getWidget(self) -> QWidget:

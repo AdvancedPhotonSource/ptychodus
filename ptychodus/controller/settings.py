@@ -102,6 +102,9 @@ class SettingsController(Observer):
             self._settingsRegistry.saveSettings(filePath)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
+        if not current.isValid():
+            return
+
         groupName = self._listModel.data(current, Qt.DisplayRole)
         group = self._settingsRegistry[groupName]
         names: list[str] = list()

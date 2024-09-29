@@ -29,9 +29,6 @@ class TikeSettings(Observable, Observer):
             self._settingsGroup, 'ConvergenceWindow', 0, minimum=0
         )
         self.alpha = RealParameter(self._settingsGroup, 'Alpha', 0.05, minimum=0.0, maximum=1.0)
-        self.stepLength = RealParameter(
-            self._settingsGroup, 'StepLength', 1.0, minimum=0.0, maximum=1.0
-        )
         self._logger = logging.getLogger('tike')
 
     def getNoiseModels(self) -> Sequence[str]:
