@@ -1,4 +1,4 @@
-from .factory import PtychoPackViewControllerFactory
+from .core import PtychoPackViewControllerFactory
 
 __all__ = [
     'PtychoPackViewControllerFactory',

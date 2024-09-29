@@ -56,13 +56,10 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
         return 'Tike'
 
     def createViewController(self, reconstructorName: str) -> QWidget:
-        viewController = None
-
         if reconstructorName == 'rpie':
             viewController = TikeViewController(self._model, showAlpha=True)
         else:
             viewController = TikeViewController(self._model, showAlpha=False)
 
         self._controllerList.append(viewController)
-
         return viewController

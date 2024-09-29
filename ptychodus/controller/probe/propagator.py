@@ -50,11 +50,11 @@ class ProbePropagationViewController(Observer):
         self._syncModelToView()
 
     def _updateCurrentCoordinate(self, step: int) -> None:
-        lerpValue = Decimal()
+        lerpValue = 0.0
 
         slider = self._dialog.coordinateSlider
-        upper = Decimal(step - slider.minimum())
-        lower = Decimal(slider.maximum() - slider.minimum())
+        upper = step - slider.minimum()
+        lower = slider.maximum() - slider.minimum()
 
         if lower > 0:
             alpha = upper / lower
@@ -77,7 +77,7 @@ class ProbePropagationViewController(Observer):
             )
 
         # TODO auto-units
-        lerpValue *= Decimal('1e6')
+        lerpValue *= 1e6
         self._dialog.coordinateLabel.setText(f'{lerpValue:.1f} \u00b5m')
 
     def _propagate(self) -> None:
@@ -86,8 +86,8 @@ class ProbePropagationViewController(Observer):
         try:
             self._propagator.propagate(
                 numberOfSteps=view.numberOfStepsSpinBox.value(),
-                beginCoordinateInMeters=view.beginCoordinateWidget.getLengthInMeters(),
-                endCoordinateInMeters=view.endCoordinateWidget.getLengthInMeters(),
+                beginCoordinateInMeters=float(view.beginCoordinateWidget.getLengthInMeters()),
+                endCoordinateInMeters=float(view.endCoordinateWidget.getLengthInMeters()),
             )
         except Exception as err:
             logger.exception(err)
@@ -123,8 +123,12 @@ class ProbePropagationViewController(Observer):
 
     def _syncModelToView(self) -> None:
         view = self._dialog.parametersView
-        view.beginCoordinateWidget.setLengthInMeters(self._propagator.getBeginCoordinateInMeters())
-        view.endCoordinateWidget.setLengthInMeters(self._propagator.getEndCoordinateInMeters())
+        view.beginCoordinateWidget.setLengthInMeters(
+            Decimal.from_float(self._propagator.getBeginCoordinateInMeters())
+        )
+        view.endCoordinateWidget.setLengthInMeters(
+            Decimal.from_float(self._propagator.getEndCoordinateInMeters())
+        )
         view.numberOfStepsSpinBox.setValue(self._propagator.getNumberOfSteps())
 
         numberOfSteps = self._propagator.getNumberOfSteps()

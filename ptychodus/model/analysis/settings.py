@@ -4,9 +4,9 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.parametric import (
     BooleanParameter,
-    DecimalParameter,
     IntegerParameter,
     PathParameter,
+    RealParameter,
     StringParameter,
 )
 
@@ -17,11 +17,11 @@ class ProbePropagationSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('ProbePropagation')
         self._settingsGroup.addObserver(self)
 
-        self.beginCoordinateInMeters = DecimalParameter(
-            self._settingsGroup, 'BeginCoordinateInMeters', '-1e-3'
+        self.beginCoordinateInMeters = RealParameter(
+            self._settingsGroup, 'BeginCoordinateInMeters', -1e-3
         )
-        self.endCoordinateInMeters = DecimalParameter(
-            self._settingsGroup, 'EndCoordinateInMeters', '+1e-3'
+        self.endCoordinateInMeters = RealParameter(
+            self._settingsGroup, 'EndCoordinateInMeters', 1e-3
         )
         self.numberOfSteps = IntegerParameter(self._settingsGroup, 'NumberOfSteps', 100)
 

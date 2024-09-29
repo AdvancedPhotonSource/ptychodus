@@ -1,55 +1,72 @@
 from __future__ import annotations
-import logging
 
-from ptychodus.api.observer import Observable, Observer
+from PyQt5.QtWidgets import (
+    QVBoxLayout,
+    QWidget,
+)
 
-from ...model.ptychopack import PtychoPackPresenter, PtychoPackReconstructorLibrary
-from ...view.ptychopack import PtychoPackParametersView, PtychoPackView
-from .exit_wave import PtychoPackExitWaveCorrectionController
-from .object import PtychoPackObjectCorrectionController
-from .position import PtychoPackPositionCorrectionController
-from .probe import PtychoPackProbeCorrectionController
+from ...model.ptychopack import PtychoPackReconstructorLibrary
+from ..reconstructor import ReconstructorViewControllerFactory
+from .viewControllers import (
+    PtychoPackAlgorithm,
+    PtychoPackExitWaveCorrectionViewController,
+    PtychoPackObjectCorrectionViewController,
+    PtychoPackParametersViewController,
+    PtychoPackPositionCorrectionViewController,
+    PtychoPackProbeCorrectionViewController,
+)
 
-logger = logging.getLogger(__name__)
+
+class PtychoPackViewController(QWidget):
+    def __init__(
+        self,
+        model: PtychoPackReconstructorLibrary,
+        algorithm: PtychoPackAlgorithm,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.parametersViewController = PtychoPackParametersViewController(model.presenter)
+        self.objectViewController = PtychoPackObjectCorrectionViewController(
+            model.settings, algorithm
+        )
+        self.probeViewController = PtychoPackProbeCorrectionViewController(
+            model.settings, algorithm
+        )
+        self.positionViewController = PtychoPackPositionCorrectionViewController(model.settings)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.parametersViewController.getWidget())
+
+        if algorithm in (PtychoPackAlgorithm.DM, PtychoPackAlgorithm.RAAR):
+            self.exit_waveViewController = PtychoPackExitWaveCorrectionViewController(
+                model.settings, algorithm
+            )
+            layout.addWidget(self.exit_waveViewController.getWidget())
+
+        layout.addWidget(self.objectViewController.getWidget())
+        layout.addWidget(self.probeViewController.getWidget())
+        layout.addWidget(self.positionViewController.getWidget())
+        layout.addStretch()
+        self.setLayout(layout)
 
 
-class PtychoPackParametersController(Observer):
-    def __init__(self, presenter: PtychoPackPresenter, view: PtychoPackParametersView) -> None:
+class PtychoPackViewControllerFactory(ReconstructorViewControllerFactory):
+    def __init__(self, model: PtychoPackReconstructorLibrary) -> None:
         super().__init__()
-        self._presenter = presenter
-        self._view = view
+        self._model = model
+        self._controllerList: list[PtychoPackViewController] = list()
 
-        for device in presenter.get_available_devices():
-            view.device_combobox.addItem(device)
+    @property
+    def backendName(self) -> str:
+        return 'PtychoPack'
 
-        view.device_combobox.textActivated.connect(presenter.set_device)
+    def createViewController(self, reconstructorName: str) -> QWidget:
+        if reconstructorName.casefold() == 'dm':
+            viewController = PtychoPackViewController(self._model, PtychoPackAlgorithm.DM)
+        elif reconstructorName.casefold() == 'raar':
+            viewController = PtychoPackViewController(self._model, PtychoPackAlgorithm.RAAR)
+        else:
+            viewController = PtychoPackViewController(self._model, PtychoPackAlgorithm.PIE)
 
-        self._sync_model_to_view()
-        presenter.addObserver(self)
-
-    def _sync_model_to_view(self) -> None:
-        self._view.device_combobox.setCurrentText(self._presenter.get_device())
-        self._view.plan_label.setText(self._presenter.get_plan())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._sync_model_to_view()
-
-
-class PtychoPackController:
-    def __init__(self, model: PtychoPackReconstructorLibrary, view: PtychoPackView) -> None:
-        self.parameters_controller = PtychoPackParametersController(
-            model.presenter, view.parameters_view
-        )
-        self.exit_wave_controller = PtychoPackExitWaveCorrectionController(
-            model.presenter, view.exit_wave_view
-        )
-        self.object_controller = PtychoPackObjectCorrectionController(
-            model.presenter, view.object_view
-        )
-        self.probe_controller = PtychoPackProbeCorrectionController(
-            model.presenter, view.probe_view
-        )
-        self.position_controller = PtychoPackPositionCorrectionController(
-            model.presenter, view.position_view
-        )
+        self._controllerList.append(viewController)
+        return viewController

@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 
-class TikeParametersViewController(ParameterViewController):
+class TikeParametersViewController(ParameterViewController, Observer):
     def __init__(self, settings: TikeSettings, *, showAlpha: bool) -> None:
         super().__init__()
         self._settings = settings
@@ -71,7 +71,6 @@ class TikeParametersViewController(ParameterViewController):
         self._logLevelComboBox.textActivated.connect(settings.setLogLevel)
 
         self._widget = QGroupBox('Tike Parameters')
-        self._widget.setCheckable(True)
 
         layout = QFormLayout()
         layout.addRow('Number of GPUs:', self._numGpusViewController.getWidget())
@@ -88,12 +87,17 @@ class TikeParametersViewController(ParameterViewController):
         self._widget.setLayout(layout)
 
         self._syncModelToView()
+        self._settings.addObserver(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncModelToView(self) -> None:
         self._logLevelComboBox.setCurrentText(self._settings.getLogLevel())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self._syncModelToView()
 
 
 class TikeMultigridViewController(ParameterViewController, Observer):

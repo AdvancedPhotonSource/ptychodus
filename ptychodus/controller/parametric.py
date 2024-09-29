@@ -5,7 +5,7 @@ from typing import Final
 import logging
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QValidator
+from PyQt5.QtGui import QIntValidator, QValidator
 from PyQt5.QtWidgets import (
     QAbstractButton,
     QCheckBox,
@@ -163,6 +163,52 @@ class LineEditParameterViewController(ParameterViewController, Observer):
 
     def _syncModelToView(self) -> None:
         self._widget.setText(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
+class IntegerLineEditParameterViewController(ParameterViewController, Observer):
+    def __init__(self, parameter: IntegerParameter, *, tooltip: str = '') -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = QLineEdit()
+
+        if tooltip:
+            self._widget.setToolTip(tooltip)
+
+        validator = QIntValidator()
+        bottom = parameter.getMinimum()
+        top = parameter.getMaximum()
+
+        if bottom is not None:
+            validator.setBottom(bottom)
+
+        if top is not None:
+            validator.setTop(top)
+
+        self._widget.setValidator(validator)
+
+        self._syncModelToView()
+        self._widget.editingFinished.connect(self._syncViewToModel)
+        parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncViewToModel(self) -> None:
+        text = self._widget.text()
+
+        try:
+            value = int(text)
+        except ValueError:
+            logger.warning(f'Failed to convert "{text}" to int!')
+        else:
+            self._parameter.setValue(value)
+
+    def _syncModelToView(self) -> None:
+        self._widget.setText(str(self._parameter.getValue()))
 
     def update(self, observable: Observable) -> None:
         if observable is self._parameter:

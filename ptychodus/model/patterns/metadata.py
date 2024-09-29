@@ -1,5 +1,4 @@
 from __future__ import annotations
-from decimal import Decimal
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.patterns import DiffractionDataset, DiffractionMetadata
@@ -101,9 +100,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
         energyInElectronVolts = self._metadata.probeEnergyInElectronVolts
 
         if energyInElectronVolts:
-            self._productSettings.probeEnergyInElectronVolts.setValue(
-                Decimal.from_float(energyInElectronVolts)
-            )
+            self._productSettings.probeEnergyInElectronVolts.setValue(energyInElectronVolts)
 
     def canSyncDetectorDistance(self) -> bool:
         return self._metadata.detectorDistanceInMeters is not None
@@ -112,9 +109,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
         distanceInMeters = self._metadata.detectorDistanceInMeters
 
         if distanceInMeters:
-            self._productSettings.detectorDistanceInMeters.setValue(
-                Decimal.from_float(distanceInMeters)
-            )
+            self._productSettings.detectorDistanceInMeters.setValue(distanceInMeters)
 
     def update(self, observable: Observable) -> None:
         if observable is self._diffractionDataset:

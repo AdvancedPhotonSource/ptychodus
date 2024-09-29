@@ -25,7 +25,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
 
     def createDefault(
         self,
-        name: str,
+        name: str = 'Unnamed',
         *,
         comments: str = '',
         detectorDistanceInMeters: float | None = None,
@@ -34,22 +34,22 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
         exposureTimeInSeconds: float | None = None,
     ) -> MetadataRepositoryItem:
         detectorDistanceInMeters_ = (
-            float(self._settings.detectorDistanceInMeters.getValue())
+            self._settings.detectorDistanceInMeters.getValue()
             if detectorDistanceInMeters is None
             else detectorDistanceInMeters
         )
         probeEnergyInElectronVolts_ = (
-            float(self._settings.probeEnergyInElectronVolts.getValue())
+            self._settings.probeEnergyInElectronVolts.getValue()
             if probeEnergyInElectronVolts is None
             else probeEnergyInElectronVolts
         )
         probePhotonsPerSecond_ = (
-            float(self._settings.probePhotonsPerSecond.getValue())
+            self._settings.probePhotonsPerSecond.getValue()
             if probePhotonsPerSecond is None
             else probePhotonsPerSecond
         )
         exposureTimeInSeconds_ = (
-            float(self._settings.exposureTimeInSeconds.getValue())
+            self._settings.exposureTimeInSeconds.getValue()
             if exposureTimeInSeconds is None
             else exposureTimeInSeconds
         )

@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from decimal import Decimal
 from pathlib import Path
 import logging
 
@@ -47,8 +46,8 @@ class ProbePropagator(Observable):
     def propagate(
         self,
         *,
-        beginCoordinateInMeters: Decimal,
-        endCoordinateInMeters: Decimal,
+        beginCoordinateInMeters: float,
+        endCoordinateInMeters: float,
         numberOfSteps: int,
     ) -> None:
         item = self._repository[self._productIndex]
@@ -60,7 +59,7 @@ class ProbePropagator(Observable):
         )
         propagatedIntensity = numpy.zeros((numberOfSteps, *probe.array.shape[-2:]))
         distanceInMeters = numpy.linspace(
-            float(beginCoordinateInMeters), float(endCoordinateInMeters), numberOfSteps
+            beginCoordinateInMeters, endCoordinateInMeters, numberOfSteps
         )
         pixelGeometry = probe.getPixelGeometry()
 
@@ -86,10 +85,10 @@ class ProbePropagator(Observable):
         self._propagatedIntensity = propagatedIntensity
         self.notifyObservers()
 
-    def getBeginCoordinateInMeters(self) -> Decimal:
+    def getBeginCoordinateInMeters(self) -> float:
         return self._settings.beginCoordinateInMeters.getValue()
 
-    def getEndCoordinateInMeters(self) -> Decimal:
+    def getEndCoordinateInMeters(self) -> float:
         return self._settings.endCoordinateInMeters.getValue()
 
     def _getProbe(self) -> Probe:

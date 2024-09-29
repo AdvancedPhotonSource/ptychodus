@@ -4,9 +4,9 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.parametric import (
     BooleanParameter,
-    DecimalParameter,
     IntegerParameter,
     PathParameter,
+    RealParameter,
     StringParameter,
 )
 
@@ -53,17 +53,17 @@ class ProductSettings(Observable, Observer):
         self._settingsGroup.addObserver(self)
 
         self.fileType = StringParameter(self._settingsGroup, 'FileType', 'HDF5')
-        self.detectorDistanceInMeters = DecimalParameter(
-            self._settingsGroup, 'DetectorDistanceInMeters', '1'
+        self.detectorDistanceInMeters = RealParameter(
+            self._settingsGroup, 'DetectorDistanceInMeters', 1.0
         )
-        self.probeEnergyInElectronVolts = DecimalParameter(
-            self._settingsGroup, 'ProbeEnergyInElectronVolts', '10000'
+        self.probeEnergyInElectronVolts = RealParameter(
+            self._settingsGroup, 'ProbeEnergyInElectronVolts', 10000.0
         )
-        self.probePhotonsPerSecond = DecimalParameter(
-            self._settingsGroup, 'ProbePhotonsPerSecond', '0'
+        self.probePhotonsPerSecond = RealParameter(
+            self._settingsGroup, 'ProbePhotonsPerSecond', 0.0
         )
-        self.exposureTimeInSeconds = DecimalParameter(
-            self._settingsGroup, 'ExposureTimeInSeconds', '0'
+        self.exposureTimeInSeconds = RealParameter(
+            self._settingsGroup, 'ExposureTimeInSeconds', 0.0
         )
 
     def update(self, observable: Observable) -> None:
