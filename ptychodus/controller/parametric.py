@@ -446,7 +446,7 @@ class ParameterViewBuilder:
     def addViewControllerToBottom(self, viewController: ParameterViewController) -> None:
         self._viewControllersBottom.append(viewController)
 
-    def _buildLayout(self) -> QVBoxLayout:
+    def _buildLayout(self, *, add_stretch: bool) -> QVBoxLayout:
         groupDict: dict[str, QFormLayout] = dict()
 
         for (groupName, widgetLabel), vc in self._viewControllers.items():
@@ -474,6 +474,9 @@ class ParameterViewBuilder:
         for viewController in self._viewControllersBottom:
             layout.addWidget(viewController.getWidget())
 
+        if add_stretch:
+            layout.addStretch()
+
         return layout
 
     def _flushViewControllers(self) -> Sequence[ParameterViewController]:
@@ -489,7 +492,7 @@ class ParameterViewBuilder:
         return viewControllers
 
     def buildWidget(self) -> QWidget:
-        layout = self._buildLayout()
+        layout = self._buildLayout(add_stretch=True)
 
         widget = ParameterWidget(self._flushViewControllers())
         widget.setLayout(layout)
@@ -498,7 +501,7 @@ class ParameterViewBuilder:
 
     def buildDialog(self, windowTitle: str, parent: QWidget | None) -> QDialog:
         buttonBox = QDialogButtonBox()
-        layout = self._buildLayout()
+        layout = self._buildLayout(add_stretch=False)
         layout.addWidget(buttonBox)
 
         dialog = ParameterDialog(self._flushViewControllers(), buttonBox, parent)
