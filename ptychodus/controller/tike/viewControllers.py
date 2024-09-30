@@ -37,31 +37,31 @@ class TikeParametersViewController(ParameterViewController, Observer):
         self._numGpusViewController = LineEditParameterViewController(
             settings.numGpus,
             QRegularExpressionValidator(QRegularExpression('[\\d,]+')),
-            tooltip='The number of GPUs to use. If the number of GPUs is less than the requested number, only workers for the available GPUs are allocated.',
+            tool_tip='The number of GPUs to use. If the number of GPUs is less than the requested number, only workers for the available GPUs are allocated.',
         )
         self._noiseModelViewController = ComboBoxParameterViewController(
             settings.noiseModel,
             settings.getNoiseModels(),
-            tooltip='The noise model to use for the cost function.',
+            tool_tip='The noise model to use for the cost function.',
         )
         self._numBatchViewController = SpinBoxParameterViewController(
             settings.numBatch,
-            tooltip='The dataset is divided into this number of groups where each group is processed sequentially.',
+            tool_tip='The dataset is divided into this number of groups where each group is processed sequentially.',
         )
         self._batchMethodViewController = ComboBoxParameterViewController(
             settings.batchMethod,
             settings.getBatchMethods(),
-            tooltip='The name of the batch selection method.',
+            tool_tip='The name of the batch selection method.',
         )
         self._numIterViewController = SpinBoxParameterViewController(
-            settings.numIter, tooltip='The number of epochs to process before returning.'
+            settings.numIter, tool_tip='The number of epochs to process before returning.'
         )
         self._convergenceWindowViewController = SpinBoxParameterViewController(
             settings.convergenceWindow,
-            tooltip='The number of epochs to consider for convergence monitoring. Set to any value less than 2 to disable.',
+            tool_tip='The number of epochs to consider for convergence monitoring. Set to any value less than 2 to disable.',
         )
         self._alphaViewController = DecimalSliderParameterViewController(
-            settings.alpha, tooltip='RPIE becomes EPIE when this parameter is 1.'
+            settings.alpha, tool_tip='RPIE becomes EPIE when this parameter is 1.'
         )
         self._logLevelComboBox = QComboBox()
 
@@ -106,7 +106,7 @@ class TikeMultigridViewController(ParameterViewController, Observer):
         self._useMultigrid = settings.useMultigrid
         self._numLevelsController = SpinBoxParameterViewController(
             settings.numLevels,
-            tooltip='The number of times to reduce the problem by a factor of two.',
+            tool_tip='The number of times to reduce the problem by a factor of two.',
         )
         self._widget = QGroupBox('Multigrid')
         self._widget.setCheckable(True)
@@ -137,10 +137,10 @@ class TikeAdaptiveMomentViewController(ParameterViewController, Observer):
         super().__init__()
         self._useAdaptiveMoment = useAdaptiveMoment
         self._mdecayViewController = DecimalSliderParameterViewController(
-            mdecay, tooltip='The proportion of the first moment that is previous first moments.'
+            mdecay, tool_tip='The proportion of the first moment that is previous first moments.'
         )
         self._vdecayViewController = DecimalSliderParameterViewController(
-            vdecay, tooltip='The proportion of the second moment that is previous second moments.'
+            vdecay, tool_tip='The proportion of the second moment that is previous second moments.'
         )
         self._widget = QGroupBox('Adaptive Moment')
         self._widget.setCheckable(True)
@@ -181,7 +181,7 @@ class TikeObjectCorrectionViewController(ParameterViewController, Observer):
         self._useMagnitudeClippingViewController = CheckBoxParameterViewController(
             settings.useMagnitudeClipping,
             'Magnitude Clipping',
-            tooltip='Forces the object magnitude to be <= 1.',
+            tool_tip='Forces the object magnitude to be <= 1.',
         )
 
         self._widget = QGroupBox('Object Correction')
@@ -218,15 +218,15 @@ class TikeProbeSupportViewController(ParameterViewController, Observer):
         super().__init__()
         self._useFiniteProbeSupport = settings.useFiniteProbeSupport
         self._weightViewController = DecimalLineEditParameterViewController(
-            settings.probeSupportWeight, tooltip='Weight of the finite probe constraint.'
+            settings.probeSupportWeight, tool_tip='Weight of the finite probe constraint.'
         )
         self._radiusViewController = DecimalSliderParameterViewController(
             settings.probeSupportRadius,
-            tooltip='Radius of probe support as fraction of probe grid.',
+            tool_tip='Radius of probe support as fraction of probe grid.',
         )
         self._degreeViewController = DecimalLineEditParameterViewController(
             settings.probeSupportDegree,
-            tooltip='Degree of the supergaussian defining the probe support.',
+            tool_tip='Degree of the supergaussian defining the probe support.',
         )
         self._widget = QGroupBox('Finite Probe Support')
         self._widget.setCheckable(True)
@@ -257,17 +257,17 @@ class TikeProbeCorrectionViewController(ParameterViewController, Observer):
         super().__init__()
         self._useProbeCorrection = settings.useProbeCorrection
         self._forceSparsityViewController = DecimalSliderParameterViewController(
-            settings.forceSparsity, tooltip='Forces this proportion of zero elements.'
+            settings.forceSparsity, tool_tip='Forces this proportion of zero elements.'
         )
         self._forceOrthogonalityViewController = CheckBoxParameterViewController(
             settings.forceOrthogonality,
             'Force Orthogonality',
-            tooltip='Forces probes to be orthogonal each iteration.',
+            tool_tip='Forces probes to be orthogonal each iteration.',
         )
         self._forceCenteredIntensityViewController = CheckBoxParameterViewController(
             settings.forceCenteredIntensity,
             'Force Centered Intensity',
-            tooltip='Forces the probe intensity to be centered.',
+            tool_tip='Forces the probe intensity to be centered.',
         )
         self._supportViewController = TikeProbeSupportViewController(settings)
         self._adaptiveMomentViewController = TikeAdaptiveMomentViewController(
@@ -275,7 +275,7 @@ class TikeProbeCorrectionViewController(ParameterViewController, Observer):
         )
         self._additionalProbePenaltyViewController = DecimalLineEditParameterViewController(
             settings.additionalProbePenalty,
-            tooltip='Penalty applied to the last probe for existing.',
+            tool_tip='Penalty applied to the last probe for existing.',
         )
         self._widget = QGroupBox('Probe Correction')
         self._widget.setCheckable(True)
@@ -312,14 +312,14 @@ class TikePositionCorrectionViewController(ParameterViewController, Observer):
         self._usePositionRegularizationViewController = CheckBoxParameterViewController(
             settings.usePositionRegularization,
             'Use Regularization',
-            tooltip='Whether the positions are constrained to fit a random error plus affine error model.',
+            tool_tip='Whether the positions are constrained to fit a random error plus affine error model.',
         )
         self._adaptiveMomentViewController = TikeAdaptiveMomentViewController(
             settings.useAdaptiveMoment, settings.mdecay, settings.vdecay
         )
         self._updateMagnitudeLimitViewController = DecimalLineEditParameterViewController(
             settings.updateMagnitudeLimit,
-            tooltip='When set to a positive number, x and y update magnitudes are clipped (limited) to this value.',
+            tool_tip='When set to a positive number, x and y update magnitudes are clipped (limited) to this value.',
         )
         self._widget = QGroupBox('Position Correction')
         self._widget.setCheckable(True)

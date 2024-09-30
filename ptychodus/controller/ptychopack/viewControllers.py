@@ -75,12 +75,12 @@ class PtychoPackExitWaveCorrectionViewController(ParameterViewController):
         if algorithm == PtychoPackAlgorithm.DM:
             self._relaxationViewController = DecimalSliderParameterViewController(
                 settings.dm_exit_wave_relaxation
-            )  # TODO tooltip
+            )  # TODO tool_tip
 
         if algorithm == PtychoPackAlgorithm.RAAR:
             self._relaxationViewController = DecimalSliderParameterViewController(
                 settings.raar_exit_wave_relaxation
-            )  # TODO tooltip
+            )  # TODO tool_tip
 
         layout = QFormLayout()
         layout.addRow('Relaxation:', self._relaxationViewController.getWidget())
@@ -96,13 +96,13 @@ class PtychoPackCorrectionPlanViewController(ParameterViewController):
     ) -> None:
         super().__init__()
         self._startViewController = IntegerLineEditParameterViewController(
-            start, tooltip='Iteration to start correcting'
+            start, tool_tip='Iteration to start correcting'
         )
         self._stopViewController = IntegerLineEditParameterViewController(
-            stop, tooltip='Iteration to stop correcting'
+            stop, tool_tip='Iteration to stop correcting'
         )
         self._strideViewController = IntegerLineEditParameterViewController(
-            stride, tooltip='Number of iterations between corrections'
+            stride, tool_tip='Number of iterations between corrections'
         )
         self._widget = QWidget()
 
@@ -133,10 +133,10 @@ class PtychoPackObjectCorrectionViewController(ParameterViewController):
         if algorithm == PtychoPackAlgorithm.PIE:
             self._pieAlphaViewController = DecimalSliderParameterViewController(
                 settings.pie_alpha
-            )  # TODO tooltip
+            )  # TODO tool_tip
             self._pieRelaxationViewController = DecimalSliderParameterViewController(
                 settings.pie_object_relaxation
-            )  # TODO tooltip
+            )  # TODO tool_tip
 
             layout.addRow('Alpha:', self._pieAlphaViewController.getWidget())
             layout.addRow('Relaxation:', self._pieRelaxationViewController.getWidget())
@@ -163,10 +163,10 @@ class PtychoPackProbeCorrectionViewController(ParameterViewController):
         if algorithm == PtychoPackAlgorithm.PIE:
             self._pieBetaViewController = DecimalSliderParameterViewController(
                 settings.pie_beta
-            )  # TODO tooltip
+            )  # TODO tool_tip
             self._pieRelaxationViewController = DecimalSliderParameterViewController(
                 settings.pie_probe_relaxation
-            )  # TODO tooltip
+            )  # TODO tool_tip
 
             layout.addRow('Beta:', self._pieBetaViewController.getWidget())
             layout.addRow('Relaxation:', self._pieRelaxationViewController.getWidget())
@@ -187,10 +187,10 @@ class PtychoPackPositionCorrectionViewController(ParameterViewController):
         )
         self._probeThresholdViewController = DecimalSliderParameterViewController(
             settings.position_correction_probe_threshold
-        )  # TODO tooltip
+        )  # TODO tool_tip
         self._feedbackViewController = DecimalLineEditParameterViewController(
             settings.position_correction_feedback
-        )  # TODO tooltip
+        )  # TODO tool_tip
         self._widget = QGroupBox('Position Correction')
 
         layout = QFormLayout()

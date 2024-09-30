@@ -48,34 +48,34 @@ class ScanTransformViewController(ParameterViewController):
         self._labelXP = QLabel('x\u2032 =')
         self._labelXP.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._affineAXViewController = DecimalLineEditParameterViewController(
-            transform.affineAX, isSigned=True
+            transform.affineAX, is_signed=True
         )
         self._labelAX = QLabel('x +')
         self._affineAYViewController = DecimalLineEditParameterViewController(
-            transform.affineAY, isSigned=True
+            transform.affineAY, is_signed=True
         )
         self._labelAY = QLabel('y +')
         self._affineATViewController = LengthWidgetParameterViewController(
-            transform.affineATInMeters, isSigned=True
+            transform.affineATInMeters, is_signed=True
         )
 
         self._labelYP = QLabel('y\u2032 =')
         self._labelYP.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._affineBXViewController = DecimalLineEditParameterViewController(
-            transform.affineBX, isSigned=True
+            transform.affineBX, is_signed=True
         )
         self._labelBX = QLabel('x +')
         self._affineBYViewController = DecimalLineEditParameterViewController(
-            transform.affineBY, isSigned=True
+            transform.affineBY, is_signed=True
         )
         self._labelBY = QLabel('y +')
         self._affineBTViewController = LengthWidgetParameterViewController(
-            transform.affineBTInMeters, isSigned=True
+            transform.affineBTInMeters, is_signed=True
         )
 
         self._jitterRadiusLabel = QLabel('Jitter Radius:')
         self._jitterRadiusViewController = LengthWidgetParameterViewController(
-            transform.jitterRadiusInMeters, isSigned=False
+            transform.jitterRadiusInMeters, is_signed=False
         )
 
         layout = QGridLayout()
@@ -110,16 +110,16 @@ class ScanBoundingBoxViewController(ParameterViewController, Observer):
         self._widget.setCheckable(True)
 
         self._minimumXController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMinimumXInMeters, isSigned=True
+            item.expandedBoundingBoxMinimumXInMeters, is_signed=True
         )
         self._maximumXController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMaximumXInMeters, isSigned=True
+            item.expandedBoundingBoxMaximumXInMeters, is_signed=True
         )
         self._minimumYController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMinimumYInMeters, isSigned=True
+            item.expandedBoundingBoxMinimumYInMeters, is_signed=True
         )
         self._maximumYController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMaximumYInMeters, isSigned=True
+            item.expandedBoundingBoxMaximumYInMeters, is_signed=True
         )
 
         layout = QFormLayout()
