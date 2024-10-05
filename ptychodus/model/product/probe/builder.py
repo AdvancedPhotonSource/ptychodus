@@ -7,7 +7,7 @@ import logging
 import numpy
 import numpy.typing
 
-from ptychodus.api.parametric import ParameterGroup, PathParameter, StringParameter
+from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe import (
     Probe,
     ProbeFileReader,
@@ -16,6 +16,8 @@ from ptychodus.api.probe import (
     WavefieldArrayType,
 )
 from ptychodus.api.typing import RealArrayType
+
+from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +33,11 @@ class ProbeTransverseCoordinates:
 
 
 class ProbeBuilder(ParameterGroup):
-    def __init__(self, name: str) -> None:
+    def __init__(self, settings: ProbeSettings, name: str) -> None:
         super().__init__()
-        self._name = StringParameter(self, 'name', name)
+        self._name = settings.builder.copy()
+        self._name.setValue(name)
+        self._addParameter('name', self._name)
 
     def getTransverseCoordinates(self, geometry: ProbeGeometry) -> ProbeTransverseCoordinates:
         Y, X = numpy.mgrid[: geometry.heightInPixels, : geometry.widthInPixels]
@@ -54,6 +58,10 @@ class ProbeBuilder(ParameterGroup):
     def getName(self) -> str:
         return self._name.getValue()
 
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
+
     @abstractmethod
     def copy(self) -> ProbeBuilder:
         pass
@@ -64,27 +72,33 @@ class ProbeBuilder(ParameterGroup):
 
 
 class FromMemoryProbeBuilder(ProbeBuilder):
-    def __init__(self, probe: Probe) -> None:
-        super().__init__('from_memory')
+    def __init__(self, settings: ProbeSettings, probe: Probe) -> None:
+        super().__init__(settings, 'from_memory')
+        self._settings = settings
         self._probe = probe.copy()
 
     def copy(self) -> FromMemoryProbeBuilder:
-        return FromMemoryProbeBuilder(self._probe)
+        return FromMemoryProbeBuilder(self._settings, self._probe)
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         return self._probe
 
 
 class FromFileProbeBuilder(ProbeBuilder):
-    def __init__(self, filePath: Path, fileType: str, fileReader: ProbeFileReader) -> None:
-        super().__init__('from_file')
-        self.filePath = PathParameter(self, 'file_path', filePath)
-        self.fileType = StringParameter(self, 'file_type', fileType)
+    def __init__(
+        self, settings: ProbeSettings, filePath: Path, fileType: str, fileReader: ProbeFileReader
+    ) -> None:
+        super().__init__(settings, 'from_file')
+        self._settings = settings
+        self.filePath = settings.filePath.copy()
+        self._addParameter('file_path', self.filePath)
+        self.fileType = settings.fileType.copy()
+        self._addParameter('file_type', self.fileType)
         self._fileReader = fileReader
 
     def copy(self) -> FromFileProbeBuilder:
         return FromFileProbeBuilder(
-            self.filePath.getValue(), self.fileType.getValue(), self._fileReader
+            self._settings, self.filePath.getValue(), self.fileType.getValue(), self._fileReader
         )
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:

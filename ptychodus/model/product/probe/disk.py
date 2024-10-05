@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.parametric import RealParameter
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
 
@@ -12,25 +11,22 @@ from .settings import ProbeSettings
 
 class DiskProbeBuilder(ProbeBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('disk')
+        super().__init__(settings, 'disk')
         self._settings = settings
 
-        self.diameterInMeters = RealParameter(
-            self,
-            'diameter_m',
-            float(settings.diskDiameterInMeters.getValue()),
-            minimum=0.0,
-        )
-        self.defocusDistanceInMeters = RealParameter(
-            self,
-            'defocus_distance_m',
-            float(settings.defocusDistanceInMeters.getValue()),
-        )  # from sample to the focal plane
+        self.diameterInMeters = settings.diskDiameterInMeters.copy()
+        self._addParameter('diameter_m', self.diameterInMeters)
+
+        # from sample to the focal plane
+        self.defocusDistanceInMeters = settings.defocusDistanceInMeters.copy()
+        self._addParameter('defocus_distance_m', self.defocusDistanceInMeters)
 
     def copy(self) -> DiskProbeBuilder:
         builder = DiskProbeBuilder(self._settings)
-        builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
-        builder.defocusDistanceInMeters.setValue(self.defocusDistanceInMeters.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value)
+
         return builder
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:

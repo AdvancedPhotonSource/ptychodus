@@ -5,7 +5,7 @@ import logging
 import numpy
 
 from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import BooleanParameter, ParameterGroup, RealParameter
+from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.scan import Scan, ScanBoundingBox, ScanPoint
 
 from .boundingBox import ScanBoundingBoxBuilder
@@ -35,29 +35,28 @@ class ScanRepositoryItem(ParameterGroup):
         self._addGroup('builder', builder, observe=True)
         self._addGroup('transform', transform, observe=True)
 
-        self.expandBoundingBox = BooleanParameter(
-            self, 'expand_bbox', settings.expandBoundingBox.getValue()
+        self.expandBoundingBox = settings.expandBoundingBox.copy()
+        self._addParameter('expand_bbox', self.expandBoundingBox)
+
+        self.expandedBoundingBoxMinimumXInMeters = (
+            settings.expandedBoundingBoxMinimumXInMeters.copy()
         )
-        self.expandedBoundingBoxMinimumXInMeters = RealParameter(
-            self,
-            'expanded_bbox_xmin_m',
-            float(settings.expandedBoundingBoxMinimumXInMeters.getValue()),
+        self._addParameter('expanded_bbox_xmin_m', self.expandedBoundingBoxMinimumXInMeters)
+
+        self.expandedBoundingBoxMaximumXInMeters = (
+            settings.expandedBoundingBoxMaximumXInMeters.copy()
         )
-        self.expandedBoundingBoxMaximumXInMeters = RealParameter(
-            self,
-            'expanded_bbox_xmax_m',
-            float(settings.expandedBoundingBoxMaximumXInMeters.getValue()),
+        self._addParameter('expanded_bbox_xmax_m', self.expandedBoundingBoxMaximumXInMeters)
+
+        self.expandedBoundingBoxMinimumYInMeters = (
+            settings.expandedBoundingBoxMinimumYInMeters.copy()
         )
-        self.expandedBoundingBoxMinimumYInMeters = RealParameter(
-            self,
-            'expanded_bbox_ymin_m',
-            float(settings.expandedBoundingBoxMinimumYInMeters.getValue()),
+        self._addParameter('expanded_bbox_ymin_m', self.expandedBoundingBoxMinimumYInMeters)
+
+        self.expandedBoundingBoxMaximumYInMeters = (
+            settings.expandedBoundingBoxMaximumYInMeters.copy()
         )
-        self.expandedBoundingBoxMaximumYInMeters = RealParameter(
-            self,
-            'expanded_bbox_ymax_m',
-            float(settings.expandedBoundingBoxMaximumYInMeters.getValue()),
-        )
+        self._addParameter('expanded_bbox_ymax_m', self.expandedBoundingBoxMaximumYInMeters)
 
         self._rebuild()
 
@@ -69,6 +68,13 @@ class ScanRepositoryItem(ParameterGroup):
         self._addGroup('transform', self._transform)
 
         self.setBuilder(item.getBuilder().copy())
+
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
+
+        self._builder.syncToSettings()
+        self._transform.syncToSettings()
 
     def getScan(self) -> Scan:
         return self._transformedScan

@@ -29,7 +29,7 @@ class ObjectRepositoryItemFactory:
         builder = (
             self._builderFactory.createDefault()
             if object_ is None
-            else FromMemoryObjectBuilder(object_)
+            else FromMemoryObjectBuilder(self._settings, object_)
         )
         return ObjectRepositoryItem(geometryProvider, self._settings, builder)
 

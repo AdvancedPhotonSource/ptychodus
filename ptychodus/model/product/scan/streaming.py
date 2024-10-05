@@ -5,11 +5,12 @@ from collections.abc import Sequence
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
+from .settings import ScanSettings
 
 
 class StreamingScanBuilder(ScanBuilder):
-    def __init__(self, pointSeq: Sequence[ScanPoint]) -> None:
-        super().__init__('Streaming')
+    def __init__(self, settings: ScanSettings, pointSeq: Sequence[ScanPoint]) -> None:
+        super().__init__(settings, 'Streaming')
         self._pointList = list(pointSeq)
 
     def append(self, point: ScanPoint) -> None:

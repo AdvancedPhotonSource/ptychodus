@@ -26,7 +26,9 @@ class ScanRepositoryItemFactory:
 
     def create(self, scan: Scan | None = None) -> ScanRepositoryItem:
         builder = (
-            self._builderFactory.createDefault() if scan is None else FromMemoryScanBuilder(scan)
+            self._builderFactory.createDefault()
+            if scan is None
+            else FromMemoryScanBuilder(self._settings, scan)
         )
         transform = ScanPointTransform(self._rng, self._settings)
         return ScanRepositoryItem(self._settings, builder, transform)

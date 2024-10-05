@@ -6,7 +6,6 @@ import numpy
 import numpy.typing
 import scipy.special
 
-from ptychodus.api.parametric import ComplexArrayParameter, RealParameter
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from ptychodus.api.typing import RealArrayType
 
@@ -55,10 +54,7 @@ class ZernikePolynomial:
         )
 
     def __call__(
-        self,
-        distance: RealArrayType,
-        angle: RealArrayType,
-        undefined_value: float = 0.0,
+        self, distance: RealArrayType, angle: RealArrayType, undefined_value: float = 0.0
     ) -> RealArrayType:
         rvalue = self._radial_polynomial(distance)
         avalue = self._angular_function(angle)
@@ -79,19 +75,16 @@ class ZernikePolynomial:
 
 class ZernikeProbeBuilder(ProbeBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('zernike')
+        super().__init__(settings, 'zernike')
         self._settings = settings
         self._polynomials: list[ZernikePolynomial] = list()
         self._order = 0
 
-        self.diameterInMeters = RealParameter(
-            self,
-            'diameter_m',
-            float(settings.diskDiameterInMeters.getValue()),
-            minimum=0.0,
-        )
+        self.diameterInMeters = settings.diskDiameterInMeters.copy()
+        self._addParameter('diameter_m', self.diameterInMeters)
+
         # TODO init zernike coefficients from settings
-        self.coefficients = ComplexArrayParameter(self, 'coefficients', [1 + 0j])
+        self.coefficients = self.createComplexArrayParameter('coefficients', [1 + 0j])
 
         self.setOrder(1)
 

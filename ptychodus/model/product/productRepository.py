@@ -80,7 +80,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         likeIndex: int,
     ) -> int:
         metadataItem = self._metadataRepositoryItemFactory.createDefault(
-            name,
+            name=name,
             comments=comments,
             detectorDistanceInMeters=detectorDistanceInMeters,
             probeEnergyInElectronVolts=probeEnergyInElectronVolts,

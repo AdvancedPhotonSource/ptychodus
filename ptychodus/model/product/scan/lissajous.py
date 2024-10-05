@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.parametric import IntegerParameter, RealParameter
+from ptychodus.api.parametric import IntegerParameter
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
@@ -11,7 +11,7 @@ from .settings import ScanSettings
 
 class LissajousScanBuilder(ScanBuilder):
     def __init__(self, settings: ScanSettings) -> None:
-        super().__init__('lissajous')
+        super().__init__(settings, 'lissajous')
         self._settings = settings
 
         self.numberOfPoints = IntegerParameter(
@@ -20,42 +20,27 @@ class LissajousScanBuilder(ScanBuilder):
             settings.numberOfPoints,
             minimum=0,
         )
-        self.amplitudeXInMeters = RealParameter(
-            self,
-            'amplitude_x_m',
-            float(settings.amplitudeXInMeters.getValue()),
-            minimum=0.0,
-        )
-        self.amplitudeYInMeters = RealParameter(
-            self,
-            'amplitude_y_m',
-            float(settings.amplitudeYInMeters.getValue()),
-            minimum=0.0,
-        )
-        self.angularStepXInTurns = RealParameter(
-            self,
-            'angular_step_x_tr',
-            float(settings.angularStepXInTurns.getValue()),
-        )
-        self.angularStepYInTurns = RealParameter(
-            self,
-            'angular_step_y_tr',
-            float(settings.angularStepYInTurns.getValue()),
-        )
-        self.angularShiftInTurns = RealParameter(
-            self,
-            'angular_shift_tr',
-            float(settings.angularShiftInTurns.getValue()),
-        )
+        self.amplitudeXInMeters = settings.amplitudeXInMeters.copy()
+        self._addParameter('amplitude_x_m', self.amplitudeXInMeters)
+
+        self.amplitudeYInMeters = settings.amplitudeYInMeters.copy()
+        self._addParameter('amplitude_y_m', self.amplitudeYInMeters)
+
+        self.angularStepXInTurns = settings.angularStepXInTurns.copy()
+        self._addParameter('angular_step_x_tr', self.angularStepXInTurns)
+
+        self.angularStepYInTurns = settings.angularStepYInTurns.copy()
+        self._addParameter('angular_step_y_tr', self.angularStepYInTurns)
+
+        self.angularShiftInTurns = settings.angularShiftInTurns.copy()
+        self._addParameter('angular_shift_tr', self.angularShiftInTurns)
 
     def copy(self) -> LissajousScanBuilder:
         builder = LissajousScanBuilder(self._settings)
-        builder.numberOfPoints.setValue(self.numberOfPoints.getValue())
-        builder.amplitudeXInMeters.setValue(self.amplitudeXInMeters.getValue())
-        builder.amplitudeYInMeters.setValue(self.amplitudeYInMeters.getValue())
-        builder.angularStepXInTurns.setValue(self.angularStepXInTurns.getValue())
-        builder.angularStepYInTurns.setValue(self.angularStepYInTurns.getValue())
-        builder.angularShiftInTurns.setValue(self.angularShiftInTurns.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value)
+
         return builder
 
     def build(self) -> Scan:

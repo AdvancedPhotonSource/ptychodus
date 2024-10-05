@@ -38,6 +38,13 @@ class ProbeRepositoryItem(ParameterGroup):
 
         self.setBuilder(item.getBuilder().copy())
 
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
+
+        self._builder.syncToSettings()
+        self._additionalModesBuilder.syncToSettings()
+
     def getProbe(self) -> Probe:
         return self._probe
 

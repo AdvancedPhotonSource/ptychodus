@@ -1,13 +1,9 @@
 from pathlib import Path
 
+import numpy
+
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.api.parametric import (
-    IntegerParameter,
-    PathParameter,
-    RealParameter,
-    StringParameter,
-)
 
 
 class ObjectSettings(Observable, Observer):
@@ -16,19 +12,31 @@ class ObjectSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('Object')
         self._settingsGroup.addObserver(self)
 
-        self.builder = StringParameter(self._settingsGroup, 'Builder', 'Random')
-        self.filePath = PathParameter(self._settingsGroup, 'FilePath', Path('/path/to/object.npy'))
-        self.fileType = StringParameter(self._settingsGroup, 'FileType', 'NPY')
+        self.builder = self._settingsGroup.createStringParameter('Builder', 'Random')
+        self.filePath = self._settingsGroup.createPathParameter(
+            'FilePath', Path('/path/to/object.npy')
+        )
+        self.fileType = self._settingsGroup.createStringParameter('FileType', 'NPY')
 
-        self.objectLayerDistanceInMeters = RealParameter(
-            self._settingsGroup, 'ObjectLayerDistanceInMeters', 1e-6
+        self.objectLayerDistanceInMeters = self._settingsGroup.createRealParameter(
+            'ObjectLayerDistanceInMeters', 1e-7
         )
 
-        self.extraPaddingX = IntegerParameter(self._settingsGroup, 'ExtraPaddingX', 1)
-        self.extraPaddingY = IntegerParameter(self._settingsGroup, 'ExtraPaddingY', 1)
-        self.amplitudeMean = RealParameter(self._settingsGroup, 'AmplitudeMean', 0.5)
-        self.amplitudeDeviation = RealParameter(self._settingsGroup, 'AmplitudeDeviation', 0.0)
-        self.phaseDeviation = RealParameter(self._settingsGroup, 'PhaseDeviation', 0.0)
+        self.extraPaddingX = self._settingsGroup.createIntegerParameter(
+            'ExtraPaddingX', 1, minimum=0
+        )
+        self.extraPaddingY = self._settingsGroup.createIntegerParameter(
+            'ExtraPaddingY', 1, minimum=0
+        )
+        self.amplitudeMean = self._settingsGroup.createRealParameter(
+            'AmplitudeMean', 1.0, minimum=0.0, maximum=1.0
+        )
+        self.amplitudeDeviation = self._settingsGroup.createRealParameter(
+            'AmplitudeDeviation', 0.0, minimum=0.0, maximum=1.0
+        )
+        self.phaseDeviation = self._settingsGroup.createRealParameter(
+            'PhaseDeviation', 0.0, minimum=0.0, maximum=numpy.pi
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

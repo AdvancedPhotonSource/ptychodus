@@ -52,7 +52,7 @@ class ScanAPI:
 
         for parameterName, parameterValue in builderParameters.items():
             try:
-                parameter = builder[parameterName]
+                parameter = builder.parameters()[parameterName]
             except KeyError:
                 logger.warning(
                     f'Scan builder "{builder.getName()}" does not have'
@@ -160,7 +160,7 @@ class ProbeAPI:
 
         for parameterName, parameterValue in builderParameters.items():
             try:
-                parameter = builder[parameterName]
+                parameter = builder.parameters()[parameterName]
             except KeyError:
                 logger.warning(
                     f'Probe builder "{builder.getName()}" does not have'
@@ -268,7 +268,7 @@ class ObjectAPI:
 
         for parameterName, parameterValue in builderParameters.items():
             try:
-                parameter = builder[parameterName]
+                parameter = builder.parameters()[parameterName]
             except KeyError:
                 logger.warning(
                     f'Object builder "{builder.getName()}" does not have'

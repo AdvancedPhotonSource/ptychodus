@@ -5,7 +5,7 @@ from .core import (
     DiffractionPatternArrayPresenter,
     PatternsCore,
 )
-from .detector import Detector, DetectorPresenter
+from .detector import Detector
 from .io import DiffractionDatasetInputOutputPresenter
 from .metadata import DiffractionMetadataPresenter
 from .patterns import DiffractionPatternPresenter
@@ -15,7 +15,6 @@ from .sizer import PatternSizer
 __all__ = [
     'ActiveDiffractionDataset',
     'Detector',
-    'DetectorPresenter',
     'DiffractionDatasetInputOutputPresenter',
     'DiffractionDatasetPresenter',
     'DiffractionMetadataPresenter',

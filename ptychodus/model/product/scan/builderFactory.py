@@ -73,7 +73,7 @@ class ScanBuilderFactory(Iterable[str]):
         self._fileReaderChooser.setCurrentPluginByName(fileType)
         fileType = self._fileReaderChooser.currentPlugin.simpleName
         fileReader = self._fileReaderChooser.currentPlugin.strategy
-        return FromFileScanBuilder(filePath, fileType, fileReader)
+        return FromFileScanBuilder(self._settings, filePath, fileType, fileReader)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()

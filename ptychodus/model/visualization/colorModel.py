@@ -3,7 +3,7 @@ from collections.abc import Iterator
 import colorsys
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import Parameter, ParameterGroup
+from ptychodus.api.parametric import Parameter
 from ptychodus.api.plugins import PluginChooser
 
 __all__ = [
@@ -49,7 +49,7 @@ class HLSAlphaColorModel(CylindricalColorModel):
 
 
 class CylindricalColorModelParameter(Parameter[str], Observer):
-    def __init__(self, parent: ParameterGroup) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self._chooser = PluginChooser[CylindricalColorModel]()
         self._chooser.registerPlugin(
@@ -97,6 +97,11 @@ class CylindricalColorModelParameter(Parameter[str], Observer):
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(value)
+
+    def copy(self) -> Parameter[str]:
+        parameter = CylindricalColorModelParameter()
+        parameter.setValue(self.getValue())
+        return parameter
 
     def getPlugin(self) -> CylindricalColorModel:
         return self._chooser.currentPlugin.strategy

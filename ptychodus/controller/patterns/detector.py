@@ -1,60 +1,29 @@
 from __future__ import annotations
 
-from ptychodus.api.observer import Observable, Observer
+from PyQt5.QtWidgets import QFormLayout
 
-from ...model.patterns import DetectorPresenter
+
+from ...model.patterns import Detector
 from ...view.patterns import DetectorView
+from ..parametric import LengthWidgetParameterViewController, SpinBoxParameterViewController
 
 
-class DetectorController(Observer):
-    def __init__(self, presenter: DetectorPresenter, view: DetectorView) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-
-    @classmethod
-    def createInstance(cls, presenter: DetectorPresenter, view: DetectorView) -> DetectorController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-
-        view.widthInPixelsSpinBox.valueChanged.connect(presenter.setWidthInPixels)
-        view.heightInPixelsSpinBox.valueChanged.connect(presenter.setHeightInPixels)
-        view.pixelWidthWidget.lengthChanged.connect(presenter.setPixelWidthInMeters)
-        view.pixelHeightWidget.lengthChanged.connect(presenter.setPixelHeightInMeters)
-        view.bitDepthSpinBox.valueChanged.connect(presenter.setBitDepth)
-
-        controller._syncModelToView()
-
-        return controller
-
-    def _syncModelToView(self) -> None:
-        self._view.widthInPixelsSpinBox.blockSignals(True)
-        self._view.widthInPixelsSpinBox.setRange(
-            self._presenter.getWidthInPixelsLimits().lower,
-            self._presenter.getWidthInPixelsLimits().upper,
+class DetectorController:
+    def __init__(self, detector: Detector, view: DetectorView) -> None:
+        self._widthInPixelsViewController = SpinBoxParameterViewController(detector.widthInPixels)
+        self._heightInPixelsViewController = SpinBoxParameterViewController(detector.heightInPixels)
+        self._pixelWidthViewController = LengthWidgetParameterViewController(
+            detector.pixelWidthInMeters
         )
-        self._view.widthInPixelsSpinBox.setValue(self._presenter.getWidthInPixels())
-        self._view.widthInPixelsSpinBox.blockSignals(False)
-
-        self._view.heightInPixelsSpinBox.blockSignals(True)
-        self._view.heightInPixelsSpinBox.setRange(
-            self._presenter.getHeightInPixelsLimits().lower,
-            self._presenter.getHeightInPixelsLimits().upper,
+        self._pixelHeightViewController = LengthWidgetParameterViewController(
+            detector.pixelHeightInMeters
         )
-        self._view.heightInPixelsSpinBox.setValue(self._presenter.getHeightInPixels())
-        self._view.heightInPixelsSpinBox.blockSignals(False)
+        self._bitDepthViewController = SpinBoxParameterViewController(detector.bitDepth)
 
-        self._view.pixelWidthWidget.setLengthInMeters(self._presenter.getPixelWidthInMeters())
-        self._view.pixelHeightWidget.setLengthInMeters(self._presenter.getPixelHeightInMeters())
-
-        self._view.bitDepthSpinBox.blockSignals(True)
-        self._view.bitDepthSpinBox.setRange(
-            self._presenter.getBitDepthLimits().lower,
-            self._presenter.getBitDepthLimits().upper,
-        )
-        self._view.bitDepthSpinBox.setValue(self._presenter.getBitDepth())
-        self._view.bitDepthSpinBox.blockSignals(False)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
+        layout = QFormLayout()
+        layout.addRow('Detector Width [px]:', self._widthInPixelsViewController.getWidget())
+        layout.addRow('Detector Height [px]:', self._heightInPixelsViewController.getWidget())
+        layout.addRow('Pixel Width:', self._pixelWidthViewController.getWidget())
+        layout.addRow('Pixel Height:', self._pixelHeightViewController.getWidget())
+        layout.addRow('Bit Depth:', self._bitDepthViewController.getWidget())
+        view.setLayout(layout)

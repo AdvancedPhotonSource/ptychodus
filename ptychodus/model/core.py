@@ -37,7 +37,7 @@ from .automation import (
 )
 from .memory import MemoryPresenter
 from .patterns import (
-    DetectorPresenter,
+    Detector,
     DiffractionDatasetInputOutputPresenter,
     DiffractionDatasetPresenter,
     DiffractionMetadataPresenter,
@@ -329,8 +329,8 @@ class ModelCore:
         return 0
 
     @property
-    def detectorPresenter(self) -> DetectorPresenter:
-        return self._patternsCore.detectorPresenter
+    def detector(self) -> Detector:
+        return self._patternsCore.detector
 
     @property
     def reconstructorPresenter(self) -> ReconstructorPresenter:

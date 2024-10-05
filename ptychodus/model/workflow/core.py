@@ -201,10 +201,10 @@ class WorkflowCore:
         reconstructorAPI: ReconstructorAPI,
     ) -> None:
         self._settings = WorkflowSettings(settingsRegistry)
-        self._inputDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Input')
-        self._computeDataLocator = SimpleDataLocator.createInstance(self._settings.group, 'Compute')
-        self._outputDataLocator = OutputDataLocator.createInstance(
-            self._settings.group, 'Output', self._inputDataLocator
+        self._inputDataLocator = SimpleDataLocator(self._settings._settingsGroup, 'Input')
+        self._computeDataLocator = SimpleDataLocator(self._settings._settingsGroup, 'Compute')
+        self._outputDataLocator = OutputDataLocator(
+            self._settings._settingsGroup, 'Output', self._inputDataLocator
         )
         self._authorizer = WorkflowAuthorizer()
         self._statusRepository = WorkflowStatusRepository()

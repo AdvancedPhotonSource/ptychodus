@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.parametric import RealParameter
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
 from .builder import ProbeBuilder
@@ -11,33 +10,24 @@ from .settings import ProbeSettings
 
 class SuperGaussianProbeBuilder(ProbeBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('super_gaussian')
+        super().__init__(settings, 'super_gaussian')
         self._settings = settings
 
-        self.annularRadiusInMeters = RealParameter(
-            self,
-            'annular_radius_m',
-            float(settings.superGaussianAnnularRadiusInMeters.getValue()),
-            minimum=0.0,
-        )
-        self.fwhmInMeters = RealParameter(
-            self,
-            'full_width_at_half_maximum_m',
-            float(settings.superGaussianWidthInMeters.getValue()),
-            minimum=0.0,
-        )
-        self.orderParameter = RealParameter(
-            self,
-            'order_parameter',
-            float(settings.superGaussianOrderParameter.getValue()),
-            minimum=1.0,
-        )
+        self.annularRadiusInMeters = settings.superGaussianAnnularRadiusInMeters.copy()
+        self._addParameter('annular_radius_m', self.annularRadiusInMeters)
+
+        self.fwhmInMeters = settings.superGaussianWidthInMeters.copy()
+        self._addParameter('full_width_at_half_maximum_m', self.fwhmInMeters)
+
+        self.orderParameter = settings.superGaussianOrderParameter.copy()
+        self._addParameter('order_parameter', self.orderParameter)
 
     def copy(self) -> SuperGaussianProbeBuilder:
         builder = SuperGaussianProbeBuilder(self._settings)
-        builder.annularRadiusInMeters.setValue(self.annularRadiusInMeters.getValue())
-        builder.fwhmInMeters.setValue(self.fwhmInMeters.getValue())
-        builder.orderParameter.setValue(self.orderParameter.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value)
+
         return builder
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:

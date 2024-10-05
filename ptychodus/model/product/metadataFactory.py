@@ -21,52 +21,41 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
         self._settings = settings
 
     def create(self, metadata: ProductMetadata) -> MetadataRepositoryItem:
-        return MetadataRepositoryItem(self, metadata)
+        return MetadataRepositoryItem(
+            self._settings,
+            self,
+            name=metadata.name,
+            comments=metadata.comments,
+            detectorDistanceInMeters=metadata.detectorDistanceInMeters,
+            probeEnergyInElectronVolts=metadata.probeEnergyInElectronVolts,
+            probePhotonsPerSecond=metadata.probePhotonsPerSecond,
+            exposureTimeInSeconds=metadata.exposureTimeInSeconds,
+        )
 
     def createDefault(
         self,
-        name: str = 'Unnamed',
         *,
+        name: str = '',
         comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
         probePhotonsPerSecond: float | None = None,
         exposureTimeInSeconds: float | None = None,
     ) -> MetadataRepositoryItem:
-        detectorDistanceInMeters_ = (
-            self._settings.detectorDistanceInMeters.getValue()
-            if detectorDistanceInMeters is None
-            else detectorDistanceInMeters
-        )
-        probeEnergyInElectronVolts_ = (
-            self._settings.probeEnergyInElectronVolts.getValue()
-            if probeEnergyInElectronVolts is None
-            else probeEnergyInElectronVolts
-        )
-        probePhotonsPerSecond_ = (
-            self._settings.probePhotonsPerSecond.getValue()
-            if probePhotonsPerSecond is None
-            else probePhotonsPerSecond
-        )
-        exposureTimeInSeconds_ = (
-            self._settings.exposureTimeInSeconds.getValue()
-            if exposureTimeInSeconds is None
-            else exposureTimeInSeconds
-        )
-
-        metadata = ProductMetadata(
+        return MetadataRepositoryItem(
+            self._settings,
+            self,
             name=name,
             comments=comments,
-            detectorDistanceInMeters=detectorDistanceInMeters_,
-            probeEnergyInElectronVolts=probeEnergyInElectronVolts_,
-            probePhotonsPerSecond=probePhotonsPerSecond_,
-            exposureTimeInSeconds=exposureTimeInSeconds_,
+            detectorDistanceInMeters=detectorDistanceInMeters,
+            probeEnergyInElectronVolts=probeEnergyInElectronVolts,
+            probePhotonsPerSecond=probePhotonsPerSecond,
+            exposureTimeInSeconds=exposureTimeInSeconds,
         )
-        return self.create(metadata)
 
     def createUniqueName(self, candidateName: str) -> str:
         reservedNames = set([item.getName() for item in self._repository])
-        name = candidateName
+        name = candidateName if candidateName else 'Unnamed'
         match = 0
 
         while name in reservedNames:

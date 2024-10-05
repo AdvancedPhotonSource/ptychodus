@@ -3,7 +3,7 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import Interval
-from ptychodus.api.parametric import ParameterGroup, RealParameter
+from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.visualization import RealArrayType
 
 logger = logging.getLogger(__name__)
@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class ColorAxis(ParameterGroup):
     def __init__(self) -> None:
         super().__init__()
-        self.lower = RealParameter(self, 'lower', 0.0)
-        self.upper = RealParameter(self, 'upper', 1.0)
+        self.lower = self.createRealParameter('lower', 0.0)
+        self.upper = self.createRealParameter('upper', 1.0)
 
     def getRange(self) -> Interval[float]:
         return Interval[float].createProper(

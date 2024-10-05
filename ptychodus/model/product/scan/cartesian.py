@@ -3,7 +3,6 @@ from enum import IntEnum
 
 import numpy
 
-from ptychodus.api.parametric import IntegerParameter, RealParameter
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
@@ -35,41 +34,28 @@ class CartesianScanVariant(IntEnum):
 
 class CartesianScanBuilder(ScanBuilder):
     def __init__(self, variant: CartesianScanVariant, settings: ScanSettings) -> None:
-        super().__init__(variant.name.lower())
+        super().__init__(settings, variant.name.lower())
         self._variant = variant
         self._settings = settings
 
-        self.numberOfPointsX = IntegerParameter(
-            self,
-            'number_of_points_x',
-            settings.numberOfPointsX.getValue(),
-            minimum=0,
-        )
-        self.numberOfPointsY = IntegerParameter(
-            self,
-            'number_of_points_y',
-            settings.numberOfPointsY.getValue(),
-            minimum=0,
-        )
-        self.stepSizeXInMeters = RealParameter(
-            self,
-            'step_size_x_m',
-            float(settings.stepSizeXInMeters.getValue()),
-            minimum=0.0,
-        )
-        self.stepSizeYInMeters = RealParameter(
-            self,
-            'step_size_y_m',
-            float(settings.stepSizeYInMeters.getValue()),
-            minimum=0.0,
-        )
+        self.numberOfPointsX = settings.numberOfPointsX.copy()
+        self._addParameter('number_of_points_x', self.numberOfPointsX)
+
+        self.numberOfPointsY = settings.numberOfPointsY.copy()
+        self._addParameter('number_of_points_y', self.numberOfPointsY)
+
+        self.stepSizeXInMeters = settings.stepSizeXInMeters.copy()
+        self._addParameter('step_size_x_m', self.stepSizeXInMeters)
+
+        self.stepSizeYInMeters = settings.stepSizeYInMeters.copy()
+        self._addParameter('step_size_y_m', self.stepSizeYInMeters)
 
     def copy(self) -> CartesianScanBuilder:
         builder = CartesianScanBuilder(self._variant, self._settings)
-        builder.numberOfPointsX.setValue(self.numberOfPointsX.getValue())
-        builder.numberOfPointsY.setValue(self.numberOfPointsY.getValue())
-        builder.stepSizeXInMeters.setValue(self.stepSizeXInMeters.getValue())
-        builder.stepSizeYInMeters.setValue(self.stepSizeYInMeters.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value)
+
         return builder
 
     @property

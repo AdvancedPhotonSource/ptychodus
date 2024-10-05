@@ -76,7 +76,7 @@ class ProbeBuilderFactory(Iterable[str]):
         return self.create(nameRepaired)
 
     def _createAveragePatternBuilder(self) -> ProbeBuilder:
-        return AveragePatternProbeBuilder(self._detector, self._patterns)
+        return AveragePatternProbeBuilder(self._settings, self._detector, self._patterns)
 
     def _createFresnelZonePlateBuilder(self) -> ProbeBuilder:
         return FresnelZonePlateProbeBuilder(self._settings, self._fresnelZonePlateChooser)
@@ -91,7 +91,7 @@ class ProbeBuilderFactory(Iterable[str]):
         self._fileReaderChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileReaderChooser.currentPlugin.simpleName
         fileReader = self._fileReaderChooser.currentPlugin.strategy
-        return FromFileProbeBuilder(filePath, fileType, fileReader)
+        return FromFileProbeBuilder(self._settings, filePath, fileType, fileReader)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()

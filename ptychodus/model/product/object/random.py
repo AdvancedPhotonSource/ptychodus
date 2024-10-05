@@ -4,7 +4,6 @@ from collections.abc import Sequence
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.parametric import IntegerParameter, RealParameter
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
@@ -12,46 +11,29 @@ from .settings import ObjectSettings
 
 class RandomObjectBuilder(ObjectBuilder):
     def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings) -> None:
-        super().__init__('random')
+        super().__init__(settings, 'random')
         self._rng = rng
         self._settings = settings
 
-        self.extraPaddingX = IntegerParameter(
-            self, 'extra_padding_x', settings.extraPaddingX.getValue(), minimum=0
-        )
-        self.extraPaddingY = IntegerParameter(
-            self, 'extra_padding_y', settings.extraPaddingY.getValue(), minimum=0
-        )
+        self.extraPaddingX = settings.extraPaddingX.copy()
+        self._addParameter('extra_padding_x', self.extraPaddingX)
+        self.extraPaddingY = settings.extraPaddingY.copy()
+        self._addParameter('extra_padding_y', self.extraPaddingY)
 
-        self.amplitudeMean = RealParameter(
-            self,
-            'amplitude_mean',
-            float(settings.amplitudeMean.getValue()),
-            minimum=0.0,
-            maximum=1.0,
-        )
-        self.amplitudeDeviation = RealParameter(
-            self,
-            'amplitude_deviation',
-            float(settings.amplitudeDeviation.getValue()),
-            minimum=0.0,
-            maximum=1.0,
-        )
-        self.phaseDeviation = RealParameter(
-            self,
-            'phase_deviation',
-            float(settings.phaseDeviation.getValue()),
-            minimum=0.0,
-            maximum=numpy.pi,
-        )
+        self.amplitudeMean = settings.amplitudeMean.copy()
+        self._addParameter('amplitude_mean', self.amplitudeMean)
+        self.amplitudeDeviation = settings.amplitudeDeviation.copy()
+        self._addParameter('amplitude_deviation', self.amplitudeDeviation)
+
+        self.phaseDeviation = settings.phaseDeviation.copy()
+        self._addParameter('phase_deviation', self.phaseDeviation)
 
     def copy(self) -> RandomObjectBuilder:
         builder = RandomObjectBuilder(self._rng, self._settings)
-        builder.extraPaddingX.setValue(self.extraPaddingX.getValue())
-        builder.extraPaddingY.setValue(self.extraPaddingY.getValue())
-        builder.amplitudeMean.setValue(self.amplitudeMean.getValue())
-        builder.amplitudeDeviation.setValue(self.amplitudeDeviation.getValue())
-        builder.phaseDeviation.setValue(self.phaseDeviation.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value)
+
         return builder
 
     def build(

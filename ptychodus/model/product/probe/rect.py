@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.parametric import RealParameter
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
 
@@ -12,32 +11,25 @@ from .settings import ProbeSettings
 
 class RectangularProbeBuilder(ProbeBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('rectangular')
+        super().__init__(settings, 'rectangular')
         self._settings = settings
 
-        self.widthInMeters = RealParameter(
-            self,
-            'width_m',
-            float(settings.rectangleWidthInMeters.getValue()),
-            minimum=0.0,
-        )
-        self.heightInMeters = RealParameter(
-            self,
-            'height_m',
-            float(settings.rectangleHeightInMeters.getValue()),
-            minimum=0.0,
-        )
-        self.defocusDistanceInMeters = RealParameter(
-            self,
-            'defocus_distance_m',
-            float(settings.defocusDistanceInMeters.getValue()),
-        )  # from sample to the focal plane
+        self.widthInMeters = settings.rectangleWidthInMeters.copy()
+        self._addParameter('width_m', self.widthInMeters)
+
+        self.heightInMeters = settings.rectangleHeightInMeters.copy()
+        self._addParameter('height_m', self.heightInMeters)
+
+        # from sample to the focal plane
+        self.defocusDistanceInMeters = settings.defocusDistanceInMeters.copy()
+        self._addParameter('defocus_distance_m', self.defocusDistanceInMeters)
 
     def copy(self) -> RectangularProbeBuilder:
         builder = RectangularProbeBuilder(self._settings)
-        builder.widthInMeters.setValue(self.widthInMeters.getValue())
-        builder.heightInMeters.setValue(self.heightInMeters.getValue())
-        builder.defocusDistanceInMeters.setValue(self.defocusDistanceInMeters.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value)
+
         return builder
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:

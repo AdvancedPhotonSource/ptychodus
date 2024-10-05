@@ -59,7 +59,7 @@ class PatternSizer(Observable, Observer):
         return limits.clamp(self.getCenterXInPixels())
 
     def getPixelWidthInMeters(self) -> float:
-        return float(self._detector.getPixelWidthInMeters())
+        return self._detector.pixelWidthInMeters.getValue()
 
     def getWidthInMeters(self) -> float:
         return self.getWidthInPixels() * self.getPixelWidthInMeters()
@@ -93,7 +93,7 @@ class PatternSizer(Observable, Observer):
         return limits.clamp(self.getCenterYInPixels())
 
     def getPixelHeightInMeters(self) -> float:
-        return float(self._detector.getPixelHeightInMeters())
+        return self._detector.pixelHeightInMeters.getValue()
 
     def getHeightInMeters(self) -> float:
         return self.getHeightInPixels() * self.getPixelHeightInMeters()

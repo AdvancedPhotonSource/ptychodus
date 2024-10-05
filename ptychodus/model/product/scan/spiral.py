@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.parametric import IntegerParameter, RealParameter
+from ptychodus.api.parametric import IntegerParameter
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
@@ -13,7 +13,7 @@ class SpiralScanBuilder(ScanBuilder):
     """https://doi.org/10.1364/OE.22.012634"""
 
     def __init__(self, settings: ScanSettings) -> None:
-        super().__init__('spiral')
+        super().__init__(settings, 'spiral')
         self._settings = settings
         self.numberOfPoints = IntegerParameter(
             self,
@@ -21,17 +21,15 @@ class SpiralScanBuilder(ScanBuilder):
             settings.numberOfPoints,
             minimum=0,
         )
-        self.radiusScalarInMeters = RealParameter(
-            self,
-            'radius_scalar_m',
-            float(settings.radiusScalarInMeters.getValue()),
-            minimum=0.0,
-        )
+        self.radiusScalarInMeters = settings.radiusScalarInMeters.copy()
+        self._addParameter('radius_scalar_m', self.radiusScalarInMeters)
 
     def copy(self) -> SpiralScanBuilder:
         builder = SpiralScanBuilder(self._settings)
-        builder.numberOfPoints.setValue(self.numberOfPoints.getValue())
-        builder.radiusScalarInMeters.setValue(self.radiusScalarInMeters.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value)
+
         return builder
 
     def build(self) -> Scan:

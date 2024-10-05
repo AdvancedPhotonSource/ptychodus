@@ -22,7 +22,7 @@ from ptychodus.api.tree import SimpleTreeNode
 from .active import ActiveDiffractionDataset
 from .api import PatternsAPI
 from .builder import ActiveDiffractionDatasetBuilder
-from .detector import Detector, DetectorPresenter
+from .detector import Detector
 from .io import DiffractionDatasetInputOutputPresenter
 from .metadata import DiffractionMetadataPresenter
 from .patterns import DiffractionPatternPresenter
@@ -141,7 +141,6 @@ class PatternsCore:
         fileWriterChooser: PluginChooser[DiffractionFileWriter],
     ) -> None:
         self.detector = Detector(settingsRegistry)
-        self.detectorPresenter = DetectorPresenter.createInstance(self.detector)
         self.patternSettings = PatternSettings(settingsRegistry)
         self.productSettings = ProductSettings(settingsRegistry)
 

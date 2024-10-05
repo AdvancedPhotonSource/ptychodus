@@ -73,30 +73,32 @@ class PtychoNNTrainingPresenter(Observable, Observer):
 
     def getValidationSetFractionalSize(self) -> Decimal:
         limits = self.getValidationSetFractionalSizeLimits()
-        return limits.clamp(self._settings.validationSetFractionalSize.getValue())
+        return limits.clamp(
+            Decimal.from_float(self._settings.validationSetFractionalSize.getValue())
+        )
 
     def setValidationSetFractionalSize(self, value: Decimal) -> None:
-        self._settings.validationSetFractionalSize.setValue(value)
+        self._settings.validationSetFractionalSize.setValue(float(value))
 
     def getMaximumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMaximumLearningRate(self) -> Decimal:
         limits = self.getMaximumLearningRateLimits()
-        return limits.clamp(self._settings.maximumLearningRate.getValue())
+        return limits.clamp(Decimal.from_float(self._settings.maximumLearningRate.getValue()))
 
     def setMaximumLearningRate(self, value: Decimal) -> None:
-        self._settings.maximumLearningRate.setValue(value)
+        self._settings.maximumLearningRate.setValue(float(value))
 
     def getMinimumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMinimumLearningRate(self) -> Decimal:
         limits = self.getMinimumLearningRateLimits()
-        return limits.clamp(self._settings.minimumLearningRate.getValue())
+        return limits.clamp(Decimal.from_float(self._settings.minimumLearningRate.getValue()))
 
     def setMinimumLearningRate(self, value: Decimal) -> None:
-        self._settings.minimumLearningRate.setValue(value)
+        self._settings.minimumLearningRate.setValue(float(value))
 
     def getTrainingEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)

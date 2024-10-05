@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.parametric import IntegerParameter, RealParameter
 from ptychodus.api.scan import Scan, ScanPoint
 
 from .builder import ScanBuilder
@@ -13,30 +12,24 @@ class ConcentricScanBuilder(ScanBuilder):
     """https://doi.org/10.1088/1367-2630/12/3/035017"""
 
     def __init__(self, settings: ScanSettings) -> None:
-        super().__init__('concentric')
+        super().__init__(settings, 'concentric')
         self._settings = settings
 
-        self.radialStepSizeInMeters = RealParameter(
-            self,
-            'radial_step_size_m',
-            float(settings.radialStepSizeInMeters.getValue()),
-            minimum=0.0,
-        )
-        self.numberOfShells = IntegerParameter(
-            self, 'number_of_shells', settings.numberOfShells.getValue(), minimum=0
-        )
-        self.numberOfPointsInFirstShell = IntegerParameter(
-            self,
-            'number_of_points_1st_shell',
-            settings.numberOfPointsInFirstShell.getValue(),
-            minimum=0,
-        )
+        self.radialStepSizeInMeters = settings.radialStepSizeInMeters.copy()
+        self._addParameter('radial_step_size_m', self.radialStepSizeInMeters)
+
+        self.numberOfShells = settings.numberOfShells.copy()
+        self._addParameter('number_of_shells', self.numberOfShells)
+
+        self.numberOfPointsInFirstShell = settings.numberOfPointsInFirstShell.copy()
+        self._addParameter('number_of_points_1st_shell', self.numberOfPointsInFirstShell)
 
     def copy(self) -> ConcentricScanBuilder:
         builder = ConcentricScanBuilder(self._settings)
-        builder.radialStepSizeInMeters.setValue(self.radialStepSizeInMeters.getValue())
-        builder.numberOfShells.setValue(self.numberOfShells.getValue())
-        builder.numberOfPointsInFirstShell.setValue(self.numberOfPointsInFirstShell.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value)
+
         return builder
 
     @property

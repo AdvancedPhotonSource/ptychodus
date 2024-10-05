@@ -6,7 +6,10 @@ import configparser
 import logging
 
 from .observer import Observable
-from .parametric import ParameterGroup, PathParameter
+from .parametric import (
+    ParameterGroup,
+    PathParameter,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,7 @@ from collections.abc import Iterator
 
 import numpy
 
-from ptychodus.api.parametric import ParameterGroup, RealParameter
+from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.scan import ScanPoint
 
 from .settings import ScanSettings
@@ -15,42 +15,37 @@ class ScanPointTransform(ParameterGroup):
         self._rng = rng
         self._settings = settings
 
-        self.affineAX = RealParameter(
-            self, 'affine_ax', float(settings.affineTransformAX.getValue())
-        )
-        self.affineAY = RealParameter(
-            self, 'affine_ay', float(settings.affineTransformAY.getValue())
-        )
-        self.affineATInMeters = RealParameter(
-            self, 'affine_at_m', float(settings.affineTransformATInMeters.getValue())
-        )
+        self.affineAX = settings.affineTransformAX.copy()
+        self._addParameter('affine_ax', self.affineAX)
 
-        self.affineBX = RealParameter(
-            self, 'affine_bx', float(settings.affineTransformBX.getValue())
-        )
-        self.affineBY = RealParameter(
-            self, 'affine_by', float(settings.affineTransformBY.getValue())
-        )
-        self.affineBTInMeters = RealParameter(
-            self, 'affine_bt_m', float(settings.affineTransformBTInMeters.getValue())
-        )
+        self.affineAY = settings.affineTransformAY.copy()
+        self._addParameter('affine_ay', self.affineAY)
 
-        self.jitterRadiusInMeters = RealParameter(
-            self,
-            'jitter_radius_m',
-            float(settings.jitterRadiusInMeters.getValue()),
-            minimum=0.0,
-        )
+        self.affineATInMeters = settings.affineTransformATInMeters.copy()
+        self._addParameter('affine_at_m', self.affineATInMeters)
+
+        self.affineBX = settings.affineTransformBX.copy()
+        self._addParameter('affine_bx', self.affineBX)
+
+        self.affineBY = settings.affineTransformBY.copy()
+        self._addParameter('affine_by', self.affineBY)
+
+        self.affineBTInMeters = settings.affineTransformBTInMeters.copy()
+        self._addParameter('affine_bt_m', self.affineBTInMeters)
+
+        self.jitterRadiusInMeters = settings.jitterRadiusInMeters.copy()
+        self._addParameter('jitter_radius_m', self.jitterRadiusInMeters)
+
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
 
     def copy(self) -> ScanPointTransform:
         transform = ScanPointTransform(self._rng, self._settings)
-        transform.affineAX.setValue(self.affineAX.getValue())
-        transform.affineAY.setValue(self.affineAY.getValue())
-        transform.affineATInMeters.setValue(self.affineATInMeters.getValue())
-        transform.affineBX.setValue(self.affineBX.getValue())
-        transform.affineBY.setValue(self.affineBY.getValue())
-        transform.affineBTInMeters.setValue(self.affineBTInMeters.getValue())
-        transform.jitterRadiusInMeters.setValue(self.jitterRadiusInMeters.getValue())
+
+        for key, value in self.parameters().items():
+            transform.parameters()[key].setValue(value)
+
         return transform
 
     @staticmethod

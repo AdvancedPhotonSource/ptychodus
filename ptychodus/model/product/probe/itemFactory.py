@@ -28,7 +28,9 @@ class ProbeRepositoryItemFactory:
         self, geometryProvider: ProbeGeometryProvider, probe: Probe | None = None
     ) -> ProbeRepositoryItem:
         builder = (
-            self._builderFactory.createDefault() if probe is None else FromMemoryProbeBuilder(probe)
+            self._builderFactory.createDefault()
+            if probe is None
+            else FromMemoryProbeBuilder(self._settings, probe)
         )
         multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)
         return ProbeRepositoryItem(geometryProvider, builder, multimodalBuilder)

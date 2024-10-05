@@ -48,7 +48,7 @@ class ControllerCore:
             self._fileDialogFactory,
         )
         self._patternsController = PatternsController.createInstance(
-            model.detectorPresenter,
+            model.detector,
             model.diffractionDatasetInputOutputPresenter,
             model.diffractionMetadataPresenter,
             model.diffractionDatasetPresenter,

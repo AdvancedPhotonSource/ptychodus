@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import ParameterGroup, RealArrayParameter
+from ptychodus.api.parametric import ParameterGroup
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
@@ -27,13 +27,20 @@ class ObjectRepositoryItem(ParameterGroup):
         self._object = Object()
 
         self._addGroup('builder', builder, observe=True)
-        self.layerDistanceInMeters = RealArrayParameter(self, 'layer_distance_m', [numpy.inf])
+        # TODO sync layer distance to/from settings
+        self.layerDistanceInMeters = self.createRealArrayParameter('layer_distance_m', [numpy.inf])
 
         self._rebuild()
 
     def assign(self, item: ObjectRepositoryItem) -> None:
         self.layerDistanceInMeters.setValue(item.layerDistanceInMeters.getValue(), notify=False)
         self.setBuilder(item.getBuilder().copy())
+
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
+
+        self._builder.syncToSettings()
 
     def getNumberOfLayers(self) -> int:
         return len(self.layerDistanceInMeters)

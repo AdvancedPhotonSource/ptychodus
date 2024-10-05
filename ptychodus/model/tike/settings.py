@@ -3,12 +3,6 @@ from collections.abc import Sequence
 import logging
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import (
-    BooleanParameter,
-    IntegerParameter,
-    RealParameter,
-    StringParameter,
-)
 from ptychodus.api.settings import SettingsRegistry
 
 logger = logging.getLogger(__name__)
@@ -20,15 +14,17 @@ class TikeSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('Tike')
         self._settingsGroup.addObserver(self)
 
-        self.numGpus = StringParameter(self._settingsGroup, 'NumGpus', '1')
-        self.noiseModel = StringParameter(self._settingsGroup, 'NoiseModel', 'gaussian')
-        self.numBatch = IntegerParameter(self._settingsGroup, 'NumBatch', 10, minimum=1)
-        self.batchMethod = StringParameter(self._settingsGroup, 'BatchMethod', 'wobbly_center')
-        self.numIter = IntegerParameter(self._settingsGroup, 'NumIter', 1, minimum=1)
-        self.convergenceWindow = IntegerParameter(
-            self._settingsGroup, 'ConvergenceWindow', 0, minimum=0
+        self.numGpus = self._settingsGroup.createStringParameter('NumGpus', '1')
+        self.noiseModel = self._settingsGroup.createStringParameter('NoiseModel', 'gaussian')
+        self.numBatch = self._settingsGroup.createIntegerParameter('NumBatch', 10, minimum=1)
+        self.batchMethod = self._settingsGroup.createStringParameter('BatchMethod', 'wobbly_center')
+        self.numIter = self._settingsGroup.createIntegerParameter('NumIter', 1, minimum=1)
+        self.convergenceWindow = self._settingsGroup.createIntegerParameter(
+            'ConvergenceWindow', 0, minimum=0
         )
-        self.alpha = RealParameter(self._settingsGroup, 'Alpha', 0.05, minimum=0.0, maximum=1.0)
+        self.alpha = self._settingsGroup.createRealParameter(
+            'Alpha', 0.05, minimum=0.0, maximum=1.0
+        )
         self._logger = logging.getLogger('tike')
 
     def getNoiseModels(self) -> Sequence[str]:
@@ -70,8 +66,8 @@ class TikeMultigridSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('TikeMultigrid')
         self._settingsGroup.addObserver(self)
 
-        self.useMultigrid = BooleanParameter(self._settingsGroup, 'UseMultigrid', False)
-        self.numLevels = IntegerParameter(self._settingsGroup, 'NumLevels', 3, minimum=1)
+        self.useMultigrid = self._settingsGroup.createBooleanParameter('UseMultigrid', False)
+        self.numLevels = self._settingsGroup.createIntegerParameter('NumLevels', 3, minimum=1)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
@@ -84,26 +80,31 @@ class TikeObjectCorrectionSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('TikeObjectCorrection')
         self._settingsGroup.addObserver(self)
 
-        self.useObjectCorrection = BooleanParameter(
-            self._settingsGroup, 'UseObjectCorrection', True
+        self.useObjectCorrection = self._settingsGroup.createBooleanParameter(
+            'UseObjectCorrection', True
         )
-        self.positivityConstraint = RealParameter(
-            self._settingsGroup, 'PositivityConstraint', 0.0, minimum=0.0, maximum=1.0
+        self.positivityConstraint = self._settingsGroup.createRealParameter(
+            'PositivityConstraint', 0.0, minimum=0.0, maximum=1.0
         )
-        self.smoothnessConstraint = RealParameter(
-            self._settingsGroup,
+        self.smoothnessConstraint = self._settingsGroup.createRealParameter(
             'SmoothnessConstraint',
             0.0,
             minimum=0.0,
             maximum=1.0 / 8,
         )
-        self.useMagnitudeClipping = BooleanParameter(
-            self._settingsGroup, 'UseMagnitudeClipping', False
+        self.useMagnitudeClipping = self._settingsGroup.createBooleanParameter(
+            'UseMagnitudeClipping', False
         )
 
-        self.useAdaptiveMoment = BooleanParameter(self._settingsGroup, 'UseAdaptiveMoment', False)
-        self.mdecay = RealParameter(self._settingsGroup, 'MDecay', 0.9, minimum=0.0, maximum=1.0)
-        self.vdecay = RealParameter(self._settingsGroup, 'VDecay', 0.999, minimum=0.0, maximum=1.0)
+        self.useAdaptiveMoment = self._settingsGroup.createBooleanParameter(
+            'UseAdaptiveMoment', False
+        )
+        self.mdecay = self._settingsGroup.createRealParameter(
+            'MDecay', 0.9, minimum=0.0, maximum=1.0
+        )
+        self.vdecay = self._settingsGroup.createRealParameter(
+            'VDecay', 0.999, minimum=0.0, maximum=1.0
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
@@ -116,33 +117,43 @@ class TikeProbeCorrectionSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('TikeProbeCorrection')
         self._settingsGroup.addObserver(self)
 
-        self.useProbeCorrection = BooleanParameter(self._settingsGroup, 'UseProbeCorrection', True)
-        self.forceOrthogonality = BooleanParameter(self._settingsGroup, 'ForceOrthogonality', False)
-        self.forceCenteredIntensity = BooleanParameter(
-            self._settingsGroup, 'ForceCenteredIntensity', False
+        self.useProbeCorrection = self._settingsGroup.createBooleanParameter(
+            'UseProbeCorrection', True
         )
-        self.forceSparsity = RealParameter(
-            self._settingsGroup, 'ForceSparsity', 0.0, minimum=0.0, maximum=1.0
+        self.forceOrthogonality = self._settingsGroup.createBooleanParameter(
+            'ForceOrthogonality', False
         )
-        self.useFiniteProbeSupport = BooleanParameter(
-            self._settingsGroup, 'UseFiniteProbeSupport', False
+        self.forceCenteredIntensity = self._settingsGroup.createBooleanParameter(
+            'ForceCenteredIntensity', False
         )
-        self.probeSupportWeight = RealParameter(
-            self._settingsGroup, 'ProbeSupportWeight', 10, minimum=0.0
+        self.forceSparsity = self._settingsGroup.createRealParameter(
+            'ForceSparsity', 0.0, minimum=0.0, maximum=1.0
         )
-        self.probeSupportRadius = RealParameter(
-            self._settingsGroup, 'ProbeSupportRadius', 0.35, minimum=0.0, maximum=0.5
+        self.useFiniteProbeSupport = self._settingsGroup.createBooleanParameter(
+            'UseFiniteProbeSupport', False
         )
-        self.probeSupportDegree = RealParameter(
-            self._settingsGroup, 'ProbeSupportDegree', 2.5, minimum=0.0
+        self.probeSupportWeight = self._settingsGroup.createRealParameter(
+            'ProbeSupportWeight', 10, minimum=0.0
         )
-        self.additionalProbePenalty = RealParameter(
-            self._settingsGroup, 'AdditionalProbePenalty', 0.0, minimum=0.0
+        self.probeSupportRadius = self._settingsGroup.createRealParameter(
+            'ProbeSupportRadius', 0.35, minimum=0.0, maximum=0.5
+        )
+        self.probeSupportDegree = self._settingsGroup.createRealParameter(
+            'ProbeSupportDegree', 2.5, minimum=0.0
+        )
+        self.additionalProbePenalty = self._settingsGroup.createRealParameter(
+            'AdditionalProbePenalty', 0.0, minimum=0.0
         )
 
-        self.useAdaptiveMoment = BooleanParameter(self._settingsGroup, 'UseAdaptiveMoment', False)
-        self.mdecay = RealParameter(self._settingsGroup, 'MDecay', 0.9, minimum=0.0, maximum=1.0)
-        self.vdecay = RealParameter(self._settingsGroup, 'VDecay', 0.999, minimum=0.0, maximum=1.0)
+        self.useAdaptiveMoment = self._settingsGroup.createBooleanParameter(
+            'UseAdaptiveMoment', False
+        )
+        self.mdecay = self._settingsGroup.createRealParameter(
+            'MDecay', 0.9, minimum=0.0, maximum=1.0
+        )
+        self.vdecay = self._settingsGroup.createRealParameter(
+            'VDecay', 0.999, minimum=0.0, maximum=1.0
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
@@ -155,21 +166,27 @@ class TikePositionCorrectionSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('TikePositionCorrection')
         self._settingsGroup.addObserver(self)
 
-        self.usePositionCorrection = BooleanParameter(
-            self._settingsGroup, 'UsePositionCorrection', False
+        self.usePositionCorrection = self._settingsGroup.createBooleanParameter(
+            'UsePositionCorrection', False
         )
-        self.usePositionRegularization = BooleanParameter(
-            self._settingsGroup, 'UsePositionRegularization', False
+        self.usePositionRegularization = self._settingsGroup.createBooleanParameter(
+            'UsePositionRegularization', False
         )
-        self.updateMagnitudeLimit = RealParameter(
-            self._settingsGroup, 'UpdateMagnitudeLimit', 0.0, minimum=0.0
+        self.updateMagnitudeLimit = self._settingsGroup.createRealParameter(
+            'UpdateMagnitudeLimit', 0.0, minimum=0.0
         )
         # TODO transform: Global transform of positions.
         # TODO origin: The rotation center of the transformation.
 
-        self.useAdaptiveMoment = BooleanParameter(self._settingsGroup, 'UseAdaptiveMoment', False)
-        self.mdecay = RealParameter(self._settingsGroup, 'MDecay', 0.9, minimum=0.0, maximum=1.0)
-        self.vdecay = RealParameter(self._settingsGroup, 'VDecay', 0.999, minimum=0.0, maximum=1.0)
+        self.useAdaptiveMoment = self._settingsGroup.createBooleanParameter(
+            'UseAdaptiveMoment', False
+        )
+        self.mdecay = self._settingsGroup.createRealParameter(
+            'MDecay', 0.9, minimum=0.0, maximum=1.0
+        )
+        self.vdecay = self._settingsGroup.createRealParameter(
+            'VDecay', 0.999, minimum=0.0, maximum=1.0
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

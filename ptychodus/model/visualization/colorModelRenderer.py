@@ -32,7 +32,7 @@ class CylindricalColorModelRenderer(Renderer):
         self._addParameter('transformation', transformation)
         self._colorAxis = colorAxis
         self._addGroup('color_axis', colorAxis, observe=True)
-        self._colorModel = CylindricalColorModelParameter(self)
+        self._colorModel = CylindricalColorModelParameter()
         self._addParameter('color_model', self._colorModel)
 
     def variants(self) -> Iterator[str]:

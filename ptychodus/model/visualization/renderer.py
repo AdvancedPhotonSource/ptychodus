@@ -2,7 +2,7 @@ from abc import abstractmethod
 from collections.abc import Iterator
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.parametric import ParameterGroup, StringParameter
+from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.visualization import (
     NumberArrayType,
     RealArrayType,
@@ -13,7 +13,7 @@ from ptychodus.api.visualization import (
 class Renderer(ParameterGroup):
     def __init__(self, name: str) -> None:
         super().__init__()
-        self._name = StringParameter(self, 'name', name)
+        self._name = self.createStringParameter('name', name)
 
     def getName(self) -> str:
         return self._name.getValue()

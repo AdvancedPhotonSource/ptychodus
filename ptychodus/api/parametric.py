@@ -1,7 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, MutableSequence, Sequence
-from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final, Generic, TypeVar
 from uuid import UUID
@@ -11,17 +10,8 @@ import logging
 from .observer import Observable, Observer
 
 __all__ = [
-    'BooleanParameter',
-    'ComplexArrayParameter',
-    'DecimalParameter',
-    'IntegerParameter',
     'Parameter',
     'ParameterGroup',
-    'PathParameter',
-    'RealArrayParameter',
-    'RealParameter',
-    'StringParameter',
-    'UUIDParameter',
 ]
 
 logger = logging.getLogger(__name__)
@@ -30,6 +20,10 @@ T = TypeVar('T')
 
 
 class Parameter(ABC, Generic[T], Observable):
+    def __init__(self, parent: Parameter[T] | None = None) -> None:
+        super().__init__()
+        self._parent = parent
+
     @abstractmethod
     def getValue(self) -> T:
         pass
@@ -41,6 +35,257 @@ class Parameter(ABC, Generic[T], Observable):
     @abstractmethod
     def setValueFromString(self, value: str) -> None:
         pass
+
+    @abstractmethod
+    def copy(self) -> Parameter[T]:
+        pass
+
+    def syncValueToParent(self) -> None:
+        if self._parent is None:
+            logger.warning('syncValueToParent: parent is None!')
+        else:
+            self._parent.setValue(self.getValue())
+
+    def syncValueFromParent(self) -> None:
+        if self._parent is None:
+            logger.warning('syncValueFromParent: parent is None!')
+        else:
+            self.setValue(self._parent.getValue())
+
+
+class ParameterBase(Parameter[T]):
+    def __init__(self, value: T, parent: Parameter[T] | None) -> None:
+        super().__init__(parent)
+        self._value = value
+
+    def getValue(self) -> T:
+        return self._value
+
+    def setValue(self, value: T, *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = value
+
+            if notify:
+                self.notifyObservers()
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+
+class StringParameter(ParameterBase[str]):
+    def __init__(self, value: str, parent: StringParameter | None) -> None:
+        super().__init__(value, parent)
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(str(value))
+
+    def copy(self) -> StringParameter:
+        return StringParameter(self.getValue(), self)
+
+
+class PathParameter(ParameterBase[Path]):
+    def __init__(self, value: Path, parent: PathParameter | None) -> None:
+        super().__init__(value, parent)
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(Path(value))
+
+    def changePathPrefix(self, find_path_prefix: Path, replacement_path_prefix: Path) -> Path:
+        value = self.getValue()
+
+        try:
+            relative_path = value.resolve().relative_to(find_path_prefix)
+        except ValueError:
+            pass
+        else:
+            return replacement_path_prefix / relative_path
+
+        return value
+
+    def copy(self) -> PathParameter:
+        return PathParameter(self.getValue(), self)
+
+
+class UUIDParameter(ParameterBase[UUID]):
+    def __init__(self, value: UUID, parent: UUIDParameter | None) -> None:
+        super().__init__(value, parent)
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(UUID(value))
+
+    def copy(self) -> UUIDParameter:
+        return UUIDParameter(self.getValue(), self)
+
+
+class BooleanParameter(ParameterBase[bool]):
+    TRUE_VALUES: Final = ('1', 'true', 't', 'yes', 'y')
+
+    def __init__(self, value: bool, parent: BooleanParameter | None) -> None:
+        super().__init__(value, parent)
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(value.lower() in BooleanParameter.TRUE_VALUES)
+
+    def copy(self) -> BooleanParameter:
+        return BooleanParameter(self.getValue(), self)
+
+
+class IntegerParameter(ParameterBase[int]):
+    def __init__(
+        self,
+        value: int,
+        parent: IntegerParameter | None,
+        *,
+        minimum: int | None = None,
+        maximum: int | None = None,
+    ) -> None:
+        super().__init__(value, parent)
+        self._minimum = minimum
+        self._maximum = maximum
+
+    def getMinimum(self) -> int | None:
+        return self._minimum
+
+    def getMaximum(self) -> int | None:
+        return self._maximum
+
+    def getValue(self) -> int:
+        value = super().getValue()
+
+        if self._minimum is not None:
+            value = max(self._minimum, value)
+
+        if self._maximum is not None:
+            value = min(value, self._maximum)
+
+        return value
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(int(value))
+
+    def copy(self) -> IntegerParameter:
+        return IntegerParameter(
+            self.getValue(), self, minimum=self.getMinimum(), maximum=self.getMaximum()
+        )
+
+
+class RealParameter(ParameterBase[float]):
+    def __init__(
+        self,
+        value: float,
+        parent: RealParameter | None,
+        *,
+        minimum: float | None = None,
+        maximum: float | None = None,
+    ) -> None:
+        super().__init__(value, parent)
+        self._minimum = minimum
+        self._maximum = maximum
+
+    def getMinimum(self) -> float | None:
+        return self._minimum
+
+    def getMaximum(self) -> float | None:
+        return self._maximum
+
+    def getValue(self) -> float:
+        value = super().getValue()
+
+        if self._minimum is not None:
+            value = max(self._minimum, value)
+
+        if self._maximum is not None:
+            value = min(value, self._maximum)
+
+        return value
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(float(value))
+
+    def copy(self) -> RealParameter:
+        return RealParameter(
+            self.getValue(), self, minimum=self.getMinimum(), maximum=self.getMaximum()
+        )
+
+
+class RealArrayParameter(ParameterBase[MutableSequence[float]]):
+    def __init__(self, value: Sequence[float], parent: RealArrayParameter | None) -> None:
+        super().__init__(list(value), parent)
+
+    def __iter__(self) -> Iterator[float]:
+        return iter(self._value)
+
+    def __getitem__(self, index: int) -> float:
+        return self._value[index]
+
+    def __setitem__(self, index: int, value: float) -> None:
+        if self._value[index] != value:
+            self._value[index] = value
+            self.notifyObservers()
+
+    def __delitem__(self, index: int) -> None:
+        del self._value[index]
+        self.notifyObservers()
+
+    def insert(self, index: int, value: float) -> None:
+        self._value.insert(index, value)
+        self.notifyObservers()
+
+    def __len__(self) -> int:
+        return len(self._value)
+
+    def setValue(self, value: Sequence[float], *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = list(value)
+
+            if notify:
+                self.notifyObservers()
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(json.loads(value))  # FIXME
+
+    def copy(self) -> RealArrayParameter:
+        return RealArrayParameter(self.getValue(), self)
+
+
+class ComplexArrayParameter(ParameterBase[MutableSequence[complex]]):
+    def __init__(self, value: Sequence[complex], parent: ComplexArrayParameter | None) -> None:
+        super().__init__(list(value), parent)
+
+    def __iter__(self) -> Iterator[complex]:
+        return iter(self._value)
+
+    def __getitem__(self, index: int) -> complex:
+        return self._value[index]
+
+    def __setitem__(self, index: int, value: complex) -> None:
+        if self._value[index] != value:
+            self._value[index] = value
+            self.notifyObservers()
+
+    def __delitem__(self, index: int) -> None:
+        del self._value[index]
+        self.notifyObservers()
+
+    def insert(self, index: int, value: complex) -> None:
+        self._value.insert(index, value)
+        self.notifyObservers()
+
+    def __len__(self) -> int:
+        return len(self._value)
+
+    def setValue(self, value: Sequence[complex], *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = list(value)
+
+            if notify:
+                self.notifyObservers()
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(json.loads(value))  # FIXME
+
+    def copy(self) -> ComplexArrayParameter:
+        return ComplexArrayParameter(self.getValue(), self)
 
 
 class ParameterGroup(Observable, Observer):
@@ -58,13 +303,51 @@ class ParameterGroup(Observable, Observer):
         else:
             raise ValueError(f'Parameter "{name}" already exists!')
 
-    def _removeParameter(self, name: str) -> None:
-        try:
-            parameter = self._parameters.pop(name)
-        except KeyError:
-            pass
-        else:
-            parameter.removeObserver(self)
+    def createStringParameter(self, name: str, value: str) -> StringParameter:
+        parameter = StringParameter(value, parent=None)
+        self._addParameter(name, parameter)
+        return parameter
+
+    def createPathParameter(self, name: str, value: Path) -> PathParameter:
+        parameter = PathParameter(value, parent=None)
+        self._addParameter(name, parameter)
+        return parameter
+
+    def createUUIDParameter(self, name: str, value: UUID) -> UUIDParameter:
+        parameter = UUIDParameter(value, parent=None)
+        self._addParameter(name, parameter)
+        return parameter
+
+    def createBooleanParameter(self, name: str, value: bool) -> BooleanParameter:
+        parameter = BooleanParameter(value, parent=None)
+        self._addParameter(name, parameter)
+        return parameter
+
+    def createIntegerParameter(
+        self, name: str, value: int, *, minimum: int | None = None, maximum: int | None = None
+    ) -> IntegerParameter:
+        parameter = IntegerParameter(value, parent=None, minimum=minimum, maximum=maximum)
+        self._addParameter(name, parameter)
+        return parameter
+
+    def createRealParameter(
+        self, name: str, value: float, *, minimum: float | None = None, maximum: float | None = None
+    ) -> RealParameter:
+        parameter = RealParameter(value, parent=None, minimum=minimum, maximum=maximum)
+        self._addParameter(name, parameter)
+        return parameter
+
+    def createRealArrayParameter(self, name: str, value: Sequence[float]) -> RealArrayParameter:
+        parameter = RealArrayParameter(value, parent=None)
+        self._addParameter(name, parameter)
+        return parameter
+
+    def createComplexArrayParameter(
+        self, name: str, value: Sequence[complex]
+    ) -> ComplexArrayParameter:
+        parameter = ComplexArrayParameter(value, parent=None)
+        self._addParameter(name, parameter)
+        return parameter
 
     def groups(self) -> Mapping[str, ParameterGroup]:
         return self._groups
@@ -97,221 +380,3 @@ class ParameterGroup(Observable, Observer):
             self.notifyObservers()
         elif observable in self._groups.values():
             self.notifyObservers()
-
-
-class ParameterBase(Parameter[T]):
-    def __init__(self, parent: ParameterGroup, name: str, value: T) -> None:
-        super().__init__()
-        self._value = value
-        parent._addParameter(name, self)
-
-    def getValue(self) -> T:
-        return self._value
-
-    def setValue(self, value: T, *, notify: bool = True) -> None:
-        if self._value != value:
-            self._value = value
-
-            if notify:
-                self.notifyObservers()
-
-    def __str__(self) -> str:
-        return str(self._value)
-
-
-class StringParameter(ParameterBase[str]):
-    def __init__(self, parent: ParameterGroup, name: str, value: str) -> None:
-        super().__init__(parent, name, value)
-
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(str(value))
-
-
-class PathParameter(ParameterBase[Path]):
-    def __init__(self, parent: ParameterGroup, name: str, value: Path) -> None:
-        super().__init__(parent, name, value)
-
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(Path(value))
-
-    def changePathPrefix(self, find_path_prefix: Path, replacement_path_prefix: Path) -> Path:
-        value = self.getValue()
-
-        try:
-            relative_path = value.resolve().relative_to(find_path_prefix)
-        except ValueError:
-            pass
-        else:
-            return replacement_path_prefix / relative_path
-
-        return value
-
-
-class DecimalParameter(ParameterBase[Decimal]):
-    def __init__(self, parent: ParameterGroup, name: str, value: Decimal | str) -> None:
-        super().__init__(parent, name, Decimal(value) if isinstance(value, str) else value)
-
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(Decimal(value))
-
-
-class UUIDParameter(ParameterBase[UUID]):
-    def __init__(self, parent: ParameterGroup, name: str, value: UUID) -> None:
-        super().__init__(parent, name, value)
-
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(UUID(value))
-
-
-class BooleanParameter(ParameterBase[bool]):
-    TRUE_VALUES: Final = ('1', 'true', 't', 'yes', 'y')
-
-    def __init__(self, parent: ParameterGroup, name: str, value: bool) -> None:
-        super().__init__(parent, name, value)
-
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(value.lower() in BooleanParameter.TRUE_VALUES)
-
-
-class IntegerParameter(ParameterBase[int]):
-    def __init__(
-        self,
-        parent: ParameterGroup,
-        name: str,
-        value: int,
-        *,
-        minimum: int | None = None,
-        maximum: int | None = None,
-    ) -> None:
-        super().__init__(parent, name, value)
-        self._minimum = minimum
-        self._maximum = maximum
-
-    def getMinimum(self) -> int | None:
-        return self._minimum
-
-    def getMaximum(self) -> int | None:
-        return self._maximum
-
-    def getValue(self) -> int:
-        value = super().getValue()
-
-        if self._minimum is not None:
-            value = max(self._minimum, value)
-
-        if self._maximum is not None:
-            value = min(value, self._maximum)
-
-        return value
-
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(int(value))
-
-
-class RealParameter(ParameterBase[float]):
-    def __init__(
-        self,
-        parent: ParameterGroup,
-        name: str,
-        value: float,
-        *,
-        minimum: float | None = None,
-        maximum: float | None = None,
-    ) -> None:
-        super().__init__(parent, name, value)
-        self._minimum = minimum
-        self._maximum = maximum
-
-    def getMinimum(self) -> float | None:
-        return self._minimum
-
-    def getMaximum(self) -> float | None:
-        return self._maximum
-
-    def getValue(self) -> float:
-        value = super().getValue()
-
-        if self._minimum is not None:
-            value = max(self._minimum, value)
-
-        if self._maximum is not None:
-            value = min(value, self._maximum)
-
-        return value
-
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(float(value))
-
-
-class RealArrayParameter(ParameterBase[MutableSequence[float]]):
-    def __init__(self, parent: ParameterGroup, name: str, value: Sequence[float]) -> None:
-        super().__init__(parent, name, list(value))
-
-    def __iter__(self) -> Iterator[float]:
-        return iter(self._value)
-
-    def __getitem__(self, index: int) -> float:
-        return self._value[index]
-
-    def __setitem__(self, index: int, value: float) -> None:
-        if self._value[index] != value:
-            self._value[index] = value
-            self.notifyObservers()
-
-    def __delitem__(self, index: int) -> None:
-        del self._value[index]
-        self.notifyObservers()
-
-    def insert(self, index: int, value: float) -> None:
-        self._value[index] = value
-        self.notifyObservers()
-
-    def __len__(self) -> int:
-        return len(self._value)
-
-    def setValue(self, value: Sequence[float], *, notify: bool = True) -> None:
-        if self._value != value:
-            self._value = list(value)
-
-            if notify:
-                self.notifyObservers()
-
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(json.loads(value))  # FIXME
-
-
-class ComplexArrayParameter(ParameterBase[MutableSequence[complex]]):
-    def __init__(self, parent: ParameterGroup, name: str, value: Sequence[complex]) -> None:
-        super().__init__(parent, name, list(value))
-
-    def __iter__(self) -> Iterator[complex]:
-        return iter(self._value)
-
-    def __getitem__(self, index: int) -> complex:
-        return self._value[index]
-
-    def __setitem__(self, index: int, value: complex) -> None:
-        if self._value[index] != value:
-            self._value[index] = value
-            self.notifyObservers()
-
-    def __delitem__(self, index: int) -> None:
-        del self._value[index]
-        self.notifyObservers()
-
-    def insert(self, index: int, value: complex) -> None:
-        self._value[index] = value
-        self.notifyObservers()
-
-    def __len__(self) -> int:
-        return len(self._value)
-
-    def setValue(self, value: Sequence[complex], *, notify: bool = True) -> None:
-        if self._value != value:
-            self._value = list(value)
-
-            if notify:
-                self.notifyObservers()
-
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(json.loads(value))  # FIXME

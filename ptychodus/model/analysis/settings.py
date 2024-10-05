@@ -2,13 +2,6 @@ from pathlib import Path
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.api.parametric import (
-    BooleanParameter,
-    IntegerParameter,
-    PathParameter,
-    RealParameter,
-    StringParameter,
-)
 
 
 class ProbePropagationSettings(Observable, Observer):
@@ -17,13 +10,13 @@ class ProbePropagationSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('ProbePropagation')
         self._settingsGroup.addObserver(self)
 
-        self.beginCoordinateInMeters = RealParameter(
-            self._settingsGroup, 'BeginCoordinateInMeters', -1e-3
+        self.beginCoordinateInMeters = self._settingsGroup.createRealParameter(
+            'BeginCoordinateInMeters', -1e-3
         )
-        self.endCoordinateInMeters = RealParameter(
-            self._settingsGroup, 'EndCoordinateInMeters', 1e-3
+        self.endCoordinateInMeters = self._settingsGroup.createRealParameter(
+            'EndCoordinateInMeters', 1e-3
         )
-        self.numberOfSteps = IntegerParameter(self._settingsGroup, 'NumberOfSteps', 100)
+        self.numberOfSteps = self._settingsGroup.createIntegerParameter('NumberOfSteps', 100)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
@@ -36,12 +29,16 @@ class FluorescenceSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('Fluorescence')
         self._settingsGroup.addObserver(self)
 
-        self.filePath = PathParameter(self._settingsGroup, 'FilePath', Path('/path/to/dataset.h5'))
-        self.fileType = StringParameter(self._settingsGroup, 'FileType', 'XRF-Maps')
-        self.useVSPI = BooleanParameter(self._settingsGroup, 'UseVSPI', True)
-        self.upscalingStrategy = StringParameter(self._settingsGroup, 'UpscalingStrategy', 'Linear')
-        self.deconvolutionStrategy = StringParameter(
-            self._settingsGroup, 'DeconvolutionStrategy', 'Richardson-Lucy'
+        self.filePath = self._settingsGroup.createPathParameter(
+            'FilePath', Path('/path/to/dataset.h5')
+        )
+        self.fileType = self._settingsGroup.createStringParameter('FileType', 'XRF-Maps')
+        self.useVSPI = self._settingsGroup.createBooleanParameter('UseVSPI', True)
+        self.upscalingStrategy = self._settingsGroup.createStringParameter(
+            'UpscalingStrategy', 'Linear'
+        )
+        self.deconvolutionStrategy = self._settingsGroup.createStringParameter(
+            'DeconvolutionStrategy', 'Richardson-Lucy'
         )
 
     def update(self, observable: Observable) -> None:

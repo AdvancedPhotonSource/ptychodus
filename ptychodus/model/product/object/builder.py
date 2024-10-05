@@ -5,18 +5,26 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.object import Object, ObjectFileReader, ObjectGeometryProvider
-from ptychodus.api.parametric import ParameterGroup, PathParameter, StringParameter
+from ptychodus.api.parametric import ParameterGroup
+
+from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
 
 
 class ObjectBuilder(ParameterGroup):
-    def __init__(self, name: str) -> None:
+    def __init__(self, settings: ObjectSettings, name: str) -> None:
         super().__init__()
-        self._name = StringParameter(self, 'name', name)
+        self._name = settings.builder.copy()
+        self._name.setValue(name)
+        self._addParameter('name', self._name)
 
     def getName(self) -> str:
         return self._name.getValue()
+
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
 
     @abstractmethod
     def copy(self) -> ObjectBuilder:
@@ -32,12 +40,13 @@ class ObjectBuilder(ParameterGroup):
 
 
 class FromMemoryObjectBuilder(ObjectBuilder):
-    def __init__(self, object_: Object) -> None:
-        super().__init__('from_memory')
+    def __init__(self, settings: ObjectSettings, object_: Object) -> None:
+        super().__init__(settings, 'from_memory')
+        self._settings = settings
         self._object = object_.copy()
 
     def copy(self) -> FromMemoryObjectBuilder:
-        return FromMemoryObjectBuilder(self._object)
+        return FromMemoryObjectBuilder(self._settings, self._object)
 
     def build(
         self,
@@ -48,15 +57,20 @@ class FromMemoryObjectBuilder(ObjectBuilder):
 
 
 class FromFileObjectBuilder(ObjectBuilder):
-    def __init__(self, filePath: Path, fileType: str, fileReader: ObjectFileReader) -> None:
-        super().__init__('from_file')
-        self.filePath = PathParameter(self, 'file_path', filePath)
-        self.fileType = StringParameter(self, 'file_type', fileType)
+    def __init__(
+        self, settings: ObjectSettings, filePath: Path, fileType: str, fileReader: ObjectFileReader
+    ) -> None:
+        super().__init__(settings, 'from_file')
+        self._settings = settings
+        self.filePath = settings.filePath.copy()
+        self._addParameter('file_path', self.filePath)
+        self.fileType = settings.fileType.copy()
+        self._addParameter('file_type', self.fileType)
         self._fileReader = fileReader
 
     def copy(self) -> FromFileObjectBuilder:
         return FromFileObjectBuilder(
-            self.filePath.getValue(), self.fileType.getValue(), self._fileReader
+            self._settings, self.filePath.getValue(), self.fileType.getValue(), self._fileReader
         )
 
     def build(

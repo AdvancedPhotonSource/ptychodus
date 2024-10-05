@@ -1,9 +1,4 @@
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import (
-    BooleanParameter,
-    DecimalParameter,
-    IntegerParameter,
-)
 from ptychodus.api.settings import SettingsRegistry
 
 
@@ -13,12 +8,12 @@ class PtychoNNModelSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('PtychoNN')
         self._settingsGroup.addObserver(self)
 
-        self.numberOfConvolutionKernels = IntegerParameter(
-            self._settingsGroup, 'NumberOfConvolutionKernels', 16
+        self.numberOfConvolutionKernels = self._settingsGroup.createIntegerParameter(
+            'NumberOfConvolutionKernels', 16
         )
-        self.batchSize = IntegerParameter(self._settingsGroup, 'BatchSize', 64)
-        self.useBatchNormalization = BooleanParameter(
-            self._settingsGroup, 'UseBatchNormalization', False
+        self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 64)
+        self.useBatchNormalization = self._settingsGroup.createBooleanParameter(
+            'UseBatchNormalization', False
         )
 
     def update(self, observable: Observable) -> None:
@@ -32,21 +27,21 @@ class PtychoNNTrainingSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('PtychoNNTraining')
         self._settingsGroup.addObserver(self)
 
-        self.maximumTrainingDatasetSize = IntegerParameter(
-            self._settingsGroup, 'MaximumTrainingDatasetSize', 100000
+        self.maximumTrainingDatasetSize = self._settingsGroup.createIntegerParameter(
+            'MaximumTrainingDatasetSize', 100000
         )
-        self.validationSetFractionalSize = DecimalParameter(
-            self._settingsGroup, 'ValidationSetFractionalSize', '0.1'
+        self.validationSetFractionalSize = self._settingsGroup.createRealParameter(
+            'ValidationSetFractionalSize', 0.1
         )
-        self.maximumLearningRate = DecimalParameter(
-            self._settingsGroup, 'MaximumLearningRate', '1e-3'
+        self.maximumLearningRate = self._settingsGroup.createRealParameter(
+            'MaximumLearningRate', 1e-3
         )
-        self.minimumLearningRate = DecimalParameter(
-            self._settingsGroup, 'MinimumLearningRate', '1e-4'
+        self.minimumLearningRate = self._settingsGroup.createRealParameter(
+            'MinimumLearningRate', 1e-4
         )
-        self.trainingEpochs = IntegerParameter(self._settingsGroup, 'TrainingEpochs', 50)
-        self.statusIntervalInEpochs = IntegerParameter(
-            self._settingsGroup, 'StatusIntervalInEpochs', 1
+        self.trainingEpochs = self._settingsGroup.createIntegerParameter('TrainingEpochs', 50)
+        self.statusIntervalInEpochs = self._settingsGroup.createIntegerParameter(
+            'StatusIntervalInEpochs', 1
         )
 
     def update(self, observable: Observable) -> None:

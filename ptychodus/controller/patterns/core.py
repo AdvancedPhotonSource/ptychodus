@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.patterns import (
-    DetectorPresenter,
+    Detector,
     DiffractionDatasetInputOutputPresenter,
     DiffractionDatasetPresenter,
     DiffractionMetadataPresenter,
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class PatternsController(Observer):
     def __init__(
         self,
-        detectorPresenter: DetectorPresenter,
+        detector: Detector,
         ioPresenter: DiffractionDatasetInputOutputPresenter,
         metadataPresenter: DiffractionMetadataPresenter,
         datasetPresenter: DiffractionDatasetPresenter,
@@ -38,15 +38,13 @@ class PatternsController(Observer):
         fileDialogFactory: FileDialogFactory,
     ) -> None:
         super().__init__()
-        self._detectorPresenter = detectorPresenter
+        self._detector = detector
         self._datasetPresenter = datasetPresenter
         self._ioPresenter = ioPresenter
         self._imageController = imageController
         self._view = view
         self._fileDialogFactory = fileDialogFactory
-        self._detectorController = DetectorController.createInstance(
-            detectorPresenter, view.detectorView
-        )
+        self._detectorController = DetectorController(detector, view.detectorView)
         self._wizardController = OpenDatasetWizardController.createInstance(
             ioPresenter,
             metadataPresenter,
@@ -60,7 +58,7 @@ class PatternsController(Observer):
     @classmethod
     def createInstance(
         cls,
-        detectorPresenter: DetectorPresenter,
+        detector: Detector,
         ioPresenter: DiffractionDatasetInputOutputPresenter,
         metadataPresenter: DiffractionMetadataPresenter,
         datasetPresenter: DiffractionDatasetPresenter,
@@ -70,7 +68,7 @@ class PatternsController(Observer):
         fileDialogFactory: FileDialogFactory,
     ) -> PatternsController:
         controller = cls(
-            detectorPresenter,
+            detector,
             ioPresenter,
             metadataPresenter,
             datasetPresenter,
@@ -99,7 +97,7 @@ class PatternsController(Observer):
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         if current.isValid():
             node = current.internalPointer()
-            pixelGeometry = self._detectorPresenter.getPixelGeometry()
+            pixelGeometry = self._detector.getPixelGeometry()
             self._imageController.setArray(node.data, pixelGeometry)
         else:
             self._imageController.clearArray()

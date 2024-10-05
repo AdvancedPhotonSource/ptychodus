@@ -15,6 +15,7 @@ class ColormapParameter(Parameter[str], Observer):
 
     def __init__(self, *, isCyclic: bool) -> None:
         super().__init__()
+        self._isCyclic = isCyclic
         self._chooser = PluginChooser[Colormap]()
 
         for name, cmap in matplotlib.colormaps.items():
@@ -38,6 +39,11 @@ class ColormapParameter(Parameter[str], Observer):
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(value)
+
+    def copy(self) -> Parameter[str]:
+        parameter = ColormapParameter(isCyclic=self._isCyclic)
+        parameter.setValue(self.getValue())
+        return parameter
 
     def getPlugin(self) -> Colormap:
         return self._chooser.currentPlugin.strategy

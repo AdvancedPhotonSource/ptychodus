@@ -113,6 +113,11 @@ class ScalarTransformationParameter(Parameter[str], Observer):
     def setValueFromString(self, value: str) -> None:
         self.setValue(value)
 
+    def copy(self) -> Parameter[str]:
+        parameter = ScalarTransformationParameter()
+        parameter.setValue(self.getValue())
+        return parameter
+
     def decorateText(self, text: str) -> str:
         return self._chooser.currentPlugin.strategy.decorateText(text)
 

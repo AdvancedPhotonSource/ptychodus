@@ -7,11 +7,7 @@ import numpy
 import scipy.linalg
 
 from ptychodus.api.parametric import (
-    BooleanParameter,
-    IntegerParameter,
     ParameterGroup,
-    RealParameter,
-    StringParameter,
 )
 from ptychodus.api.probe import Probe, WavefieldArrayType
 
@@ -31,36 +27,28 @@ class MultimodalProbeBuilder(ParameterGroup):
         self._rng = rng
         self._settings = settings
 
-        self.numberOfModes = IntegerParameter(
-            self,
-            'number_of_modes',
-            settings.numberOfModes.getValue(),
-            minimum=1,
-        )
-        self.modeDecayType = StringParameter(
-            self,
-            'mode_decay_type',
-            settings.modeDecayType.getValue(),
-        )
-        self.modeDecayRatio = RealParameter(
-            self,
-            'mode_decay_ratio',
-            float(settings.modeDecayRatio.getValue()),
-            minimum=0.0,
-            maximum=1.0,
-        )
-        self.isOrthogonalizeModesEnabled = BooleanParameter(
-            self,
-            'orthogonalize_modes',
-            settings.orthogonalizeModesEnabled.getValue(),
-        )
+        self.numberOfModes = settings.numberOfModes.copy()
+        self._addParameter('number_of_modes', self.numberOfModes)
+
+        self.modeDecayType = settings.modeDecayType.copy()
+        self._addParameter('mode_decay_type', self.modeDecayType)
+
+        self.modeDecayRatio = settings.modeDecayRatio.copy()
+        self._addParameter('mode_decay_ratio', self.modeDecayRatio)
+
+        self.isOrthogonalizeModesEnabled = settings.isOrthogonalizeModesEnabled.copy()
+        self._addParameter('orthogonalize_modes', self.isOrthogonalizeModesEnabled)
+
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
 
     def copy(self) -> MultimodalProbeBuilder:
         builder = MultimodalProbeBuilder(self._rng, self._settings)
-        builder.numberOfModes.setValue(self.numberOfModes.getValue())
-        builder.modeDecayType.setValue(self.modeDecayType.getValue())
-        builder.modeDecayRatio.setValue(self.modeDecayRatio.getValue())
-        builder.isOrthogonalizeModesEnabled.setValue(self.isOrthogonalizeModesEnabled.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value)
+
         return builder
 
     def _initializeModes(self, probe: WavefieldArrayType) -> WavefieldArrayType:

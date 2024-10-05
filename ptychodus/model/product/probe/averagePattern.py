@@ -7,16 +7,20 @@ from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParam
 
 from ...patterns import ActiveDiffractionDataset, Detector
 from .builder import ProbeBuilder
+from .settings import ProbeSettings
 
 
 class AveragePatternProbeBuilder(ProbeBuilder):
-    def __init__(self, detector: Detector, patterns: ActiveDiffractionDataset) -> None:
-        super().__init__('average_pattern')
+    def __init__(
+        self, settings: ProbeSettings, detector: Detector, patterns: ActiveDiffractionDataset
+    ) -> None:
+        super().__init__(settings, 'average_pattern')
+        self._settings = settings
         self._detector = detector
         self._patterns = patterns
 
     def copy(self) -> AveragePatternProbeBuilder:
-        return AveragePatternProbeBuilder(self._detector, self._patterns)
+        return AveragePatternProbeBuilder(self._settings, self._detector, self._patterns)
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         geometry = geometryProvider.getProbeGeometry()
