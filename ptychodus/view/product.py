@@ -17,33 +17,27 @@ from PyQt5.QtWidgets import (
 
 
 class ProductEditorDialog(QDialog):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.tableView = QTableView()
         self.textEdit = QPlainTextEdit()
         self.buttonBox = QDialogButtonBox()
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ProductEditorDialog:
-        view = cls(parent)
-
         commentsLayout = QVBoxLayout()
         commentsLayout.setContentsMargins(0, 0, 0, 0)
-        commentsLayout.addWidget(view.textEdit)
+        commentsLayout.addWidget(self.textEdit)
 
         commentsBox = QGroupBox('Comments')
         commentsBox.setLayout(commentsLayout)
 
-        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+        self.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.buttonBox.clicked.connect(self._handleButtonBoxClicked)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.tableView)
+        layout.addWidget(self.tableView)
         layout.addWidget(commentsBox)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
+        layout.addWidget(self.buttonBox)
+        self.setLayout(layout)
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
         if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
@@ -53,46 +47,36 @@ class ProductEditorDialog(QDialog):
 
 
 class ProductButtonBox(QWidget):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.insertMenu = QMenu()
         self.insertButton = QPushButton('Insert')
+        self.saveMenu = QMenu()
         self.saveButton = QPushButton('Save')
         self.editButton = QPushButton('Edit')
         self.removeButton = QPushButton('Remove')
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ProductButtonBox:
-        view = cls(parent)
-
-        view.insertButton.setMenu(view.insertMenu)
+        self.insertButton.setMenu(self.insertMenu)
+        self.saveButton.setMenu(self.saveMenu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.insertButton)
-        layout.addWidget(view.saveButton)
-        layout.addWidget(view.editButton)
-        layout.addWidget(view.removeButton)
-        view.setLayout(layout)
-
-        return view
+        layout.addWidget(self.insertButton)
+        layout.addWidget(self.saveButton)
+        layout.addWidget(self.editButton)
+        layout.addWidget(self.removeButton)
+        self.setLayout(layout)
 
 
 class ProductView(QWidget):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.tableView = QTableView()
         self.infoLabel = QLabel()
-        self.buttonBox = ProductButtonBox.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ProductView:
-        view = cls(parent)
+        self.buttonBox = ProductButtonBox()
 
         layout = QVBoxLayout()
-        layout.addWidget(view.tableView)
-        layout.addWidget(view.infoLabel)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
+        layout.addWidget(self.tableView)
+        layout.addWidget(self.infoLabel)
+        layout.addWidget(self.buttonBox)
+        self.setLayout(layout)

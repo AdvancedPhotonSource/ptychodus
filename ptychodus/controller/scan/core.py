@@ -76,13 +76,18 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentScan)
 
+        saveToFileAction = view.buttonBox.saveMenu.addAction('Save File...')
+        saveToFileAction.triggered.connect(controller._saveCurrentScanToFile)
+
+        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
+        syncToSettingsAction.triggered.connect(controller._syncCurrentScanToSettings)
+
         view.copierDialog.setWindowTitle('Copy Scan')
         view.copierDialog.sourceComboBox.setModel(tableModel)
         view.copierDialog.destinationComboBox.setModel(tableModel)
         view.copierDialog.finished.connect(controller._finishCopyingScan)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentScan)
-        view.buttonBox.saveButton.clicked.connect(controller._saveCurrentScan)
 
         return controller
 
@@ -140,7 +145,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
         dialog.open()
 
-    def _saveCurrentScan(self) -> None:
+    def _saveCurrentScanToFile(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
@@ -159,6 +164,9 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)
+
+    def _syncCurrentScanToSettings(self) -> None:
+        print('Sync scan to settings...')  # FIXME
 
     def _redrawPlot(self) -> None:
         self._plotView.axes.clear()

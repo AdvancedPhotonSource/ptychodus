@@ -92,13 +92,18 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentObject)
 
+        saveToFileAction = view.buttonBox.saveMenu.addAction('Save File...')
+        saveToFileAction.triggered.connect(controller._saveCurrentObjectToFile)
+
+        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
+        syncToSettingsAction.triggered.connect(controller._syncCurrentObjectToSettings)
+
         view.copierDialog.setWindowTitle('Copy Object')
         view.copierDialog.sourceComboBox.setModel(treeModel)
         view.copierDialog.destinationComboBox.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingObject)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentObject)
-        view.buttonBox.saveButton.clicked.connect(controller._saveCurrentObject)
 
         frcAction = view.buttonBox.analyzeMenu.addAction('Fourier Ring Correlation...')
         frcAction.triggered.connect(controller._analyzeFRC)
@@ -167,7 +172,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
         dialog.open()
 
-    def _saveCurrentObject(self) -> None:
+    def _saveCurrentObjectToFile(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
@@ -186,6 +191,9 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)
+
+    def _syncCurrentObjectToSettings(self) -> None:
+        print('Sync object to settings...')  # FIXME
 
     def _analyzeFRC(self) -> None:
         itemIndex = self._getCurrentItemIndex()

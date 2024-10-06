@@ -178,6 +178,8 @@ class ProductController(ProductRepositoryObserver):
         openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
         createNewAction = view.buttonBox.insertMenu.addAction('Create New')
         duplicateAction = view.buttonBox.insertMenu.addAction('Duplicate')
+        saveFileAction = view.buttonBox.saveMenu.addAction('Save File...')
+        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
 
         tableModel = ProductRepositoryTableModel(repository)
         tableProxyModel = QSortFilterProxyModel()
@@ -203,12 +205,13 @@ class ProductController(ProductRepositoryObserver):
         view.tableView.selectionModel().currentChanged.connect(controller._updateEnabledButtons)
         controller._updateEnabledButtons(QModelIndex(), QModelIndex())
 
-        openFileAction.triggered.connect(controller._openProduct)
+        openFileAction.triggered.connect(controller._openProductFromFile)
         createNewAction.triggered.connect(controller._createNewProduct)
         duplicateAction.triggered.connect(controller._duplicateCurrentProduct)
+        saveFileAction.triggered.connect(controller._saveCurrentProductToFile)
+        syncToSettingsAction.triggered.connect(controller._syncCurrentProductToSettings)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentProduct)
-        view.buttonBox.saveButton.clicked.connect(controller._saveCurrentProduct)
         view.buttonBox.removeButton.clicked.connect(controller._removeCurrentProduct)
 
         return controller
@@ -217,7 +220,7 @@ class ProductController(ProductRepositoryObserver):
     def tableModel(self) -> QAbstractTableModel:
         return self._tableModel
 
-    def _openProduct(self) -> None:
+    def _openProductFromFile(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Product',
@@ -235,7 +238,7 @@ class ProductController(ProductRepositoryObserver):
     def _createNewProduct(self) -> None:
         self._api.insertNewProduct()
 
-    def _saveCurrentProduct(self) -> None:
+    def _saveCurrentProductToFile(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
@@ -254,6 +257,9 @@ class ProductController(ProductRepositoryObserver):
                     ExceptionDialog.showException('File Writer', err)
         else:
             logger.error('No current item!')
+
+    def _syncCurrentProductToSettings(self) -> None:
+        print('Sync product to settings...')  # FIXME
 
     def _duplicateCurrentProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())

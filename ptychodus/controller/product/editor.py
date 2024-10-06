@@ -80,7 +80,7 @@ class ProductEditorViewController(Observer):
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
-        dialog = ProductEditorDialog.createInstance(parent)
+        dialog = ProductEditorDialog(parent)
         dialog.setWindowTitle(f'Edit Product: {product.getName()}')
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)

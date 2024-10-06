@@ -55,19 +55,19 @@ class ViewCore(QMainWindow):
         self.patternsImageView = ImageView.createInstance()
 
         self.productAction = self.navigationToolBar.addAction(QIcon(':/icons/products'), 'Products')
-        self.productView = ProductView.createInstance()
+        self.productView = ProductView()
         self.productDiagramView = QWidget()
 
         self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
-        self.scanView = RepositoryTableView.createInstance()
+        self.scanView = RepositoryTableView()
         self.scanPlotView = ScanPlotView.createInstance()
 
         self.probeAction = self.navigationToolBar.addAction(QIcon(':/icons/probe'), 'Probe')
-        self.probeView = RepositoryTreeView.createInstance()
+        self.probeView = RepositoryTreeView()
         self.probeImageView = ImageView.createInstance()
 
         self.objectAction = self.navigationToolBar.addAction(QIcon(':/icons/object'), 'Object')
-        self.objectView = RepositoryTreeView.createInstance()
+        self.objectView = RepositoryTreeView()
         self.objectImageView = ImageView.createInstance()
 
         self.reconstructorAction = self.navigationToolBar.addAction(

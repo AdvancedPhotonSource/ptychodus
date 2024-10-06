@@ -128,13 +128,18 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentProbe)
 
+        saveToFileAction = view.buttonBox.saveMenu.addAction('Save File...')
+        saveToFileAction.triggered.connect(controller._saveCurrentProbeToFile)
+
+        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
+        syncToSettingsAction.triggered.connect(controller._syncCurrentProbeToSettings)
+
         view.copierDialog.setWindowTitle('Copy Probe')
         view.copierDialog.sourceComboBox.setModel(treeModel)
         view.copierDialog.destinationComboBox.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingProbe)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentProbe)
-        view.buttonBox.saveButton.clicked.connect(controller._saveCurrentProbe)
 
         propagateAction = view.buttonBox.analyzeMenu.addAction('Propagate...')
         propagateAction.triggered.connect(controller._propagateProbe)
@@ -209,7 +214,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
         dialog.open()
 
-    def _saveCurrentProbe(self) -> None:
+    def _saveCurrentProbeToFile(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
@@ -228,6 +233,9 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)
+
+    def _syncCurrentProbeToSettings(self) -> None:
+        print('Sync probe to settings...')  # FIXME
 
     def _propagateProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()

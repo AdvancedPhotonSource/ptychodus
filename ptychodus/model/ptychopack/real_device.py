@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class RealPtychoPackDevice(PtychoPackDevice):
     def __init__(self) -> None:
+        super().__init__()
         self._available_devices = ptychopack.list_available_devices()
         self._device = self._available_devices[0]
 
