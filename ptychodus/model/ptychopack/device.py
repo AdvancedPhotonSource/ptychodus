@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 
+from ptychodus.api.observer import Observable
 
-class PtychoPackDevice(ABC):
+
+class PtychoPackDevice(ABC, Observable):
     @abstractmethod
     def get_available_devices(self) -> Iterator[str]:
         pass

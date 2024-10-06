@@ -22,7 +22,7 @@ class PtychoPackPresenter(Observable, Observer):
         self._settings = settings
         self._device = device
         settings.addObserver(self)
-        # FIXME device.addObserver(self)
+        device.addObserver(self)
 
     def get_available_devices(self) -> Iterator[str]:
         return self._device.get_available_devices()
@@ -42,8 +42,8 @@ class PtychoPackPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
-        # FIXME elif observable is self._device:
-        # FIXME     self.notifyObservers()
+        elif observable is self._device:
+            self.notifyObservers()
 
 
 class PtychoPackReconstructorLibrary(ReconstructorLibrary):

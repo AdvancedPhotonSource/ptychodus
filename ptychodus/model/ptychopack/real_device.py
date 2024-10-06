@@ -24,6 +24,7 @@ class RealPtychoPackDevice(PtychoPackDevice):
         for device in self._available_devices:
             if device.name == name:
                 self._device = device
+                self.notifyObservers()
                 return
 
         logger.warning(f'Failed to set device "{name}"')

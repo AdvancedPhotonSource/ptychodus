@@ -82,7 +82,7 @@ class SettingsRegistry(Observable):
             config.add_section(groupName)
 
             for parameterName, parameter in group.parameters().items():
-                valueString = str(parameter)
+                valueString = parameter.getValueAsString()
 
                 if changePathPrefix and isinstance(parameter, PathParameter):
                     modifiedPath = parameter.changePathPrefix(

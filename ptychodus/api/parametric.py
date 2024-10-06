@@ -4,7 +4,6 @@ from collections.abc import Iterator, Mapping, MutableSequence, Sequence
 from pathlib import Path
 from typing import Any, Final, Generic, TypeVar
 from uuid import UUID
-import json
 import logging
 
 from .observer import Observable, Observer
@@ -30,6 +29,10 @@ class Parameter(ABC, Generic[T], Observable):
 
     @abstractmethod
     def setValue(self, value: T, *, notify: bool = True) -> None:
+        pass
+
+    @abstractmethod
+    def getValueAsString(self) -> str:
         pass
 
     @abstractmethod
@@ -68,8 +71,8 @@ class ParameterBase(Parameter[T]):
             if notify:
                 self.notifyObservers()
 
-    def __str__(self) -> str:
-        return str(self._value)
+    def getValueAsString(self) -> str:
+        return repr(self._value)
 
 
 class StringParameter(ParameterBase[str]):
@@ -241,8 +244,21 @@ class RealArrayParameter(ParameterBase[MutableSequence[float]]):
             if notify:
                 self.notifyObservers()
 
+    def getValueAsString(self) -> str:
+        return ','.join(repr(value) for value in self)
+
     def setValueFromString(self, value: str) -> None:
-        self.setValue(json.loads(value))  # FIXME
+        tmp: list[float] = list()
+
+        for xstr in value.split(','):
+            try:
+                x = float(xstr)
+            except ValueError:
+                x = float('nan')
+
+            tmp.append(x)
+
+        self.setValue(tmp)
 
     def copy(self) -> RealArrayParameter:
         return RealArrayParameter(self.getValue(), self)
@@ -281,8 +297,21 @@ class ComplexArrayParameter(ParameterBase[MutableSequence[complex]]):
             if notify:
                 self.notifyObservers()
 
+    def getValueAsString(self) -> str:
+        return ','.join(repr(value) for value in self)
+
     def setValueFromString(self, value: str) -> None:
-        self.setValue(json.loads(value))  # FIXME
+        tmp: list[complex] = list()
+
+        for xstr in value.split(','):
+            try:
+                x = complex(xstr)
+            except ValueError:
+                x = float('nan') * 1j
+
+            tmp.append(x)
+
+        self.setValue(tmp)
 
     def copy(self) -> ComplexArrayParameter:
         return ComplexArrayParameter(self.getValue(), self)
