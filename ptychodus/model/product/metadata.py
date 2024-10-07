@@ -34,7 +34,7 @@ class MetadataRepositoryItem(ParameterGroup):
         self._nameFactory = nameFactory
 
         self._name = settings.name.copy()
-        self.setName(name if name else settings.name.getValue())
+        self._setName(name if name else settings.name.getValue())
         self._addParameter('name', self._name)
         self.comments = self.createStringParameter('comments', comments)
 
@@ -83,9 +83,15 @@ class MetadataRepositoryItem(ParameterGroup):
     def getName(self) -> str:
         return self._name.getValue()
 
-    def setName(self, name: str) -> None:
+    def _setName(self, name: str) -> None:
         uniqueName = self._nameFactory.createUniqueName(name)
         self._name.setValue(uniqueName)
+
+    def setName(self, name: str) -> None:
+        if name:
+            self._setName(name)
+        else:
+            self._name.notifyObservers()
 
     def getIndex(self) -> int:
         return self._index

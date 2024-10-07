@@ -44,7 +44,7 @@ class ScanPointTransform(ParameterGroup):
         transform = ScanPointTransform(self._rng, self._settings)
 
         for key, value in self.parameters().items():
-            transform.parameters()[key].setValue(value)
+            transform.parameters()[key].setValue(value.getValue())
 
         return transform
 

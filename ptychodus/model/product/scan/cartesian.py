@@ -54,7 +54,7 @@ class CartesianScanBuilder(ScanBuilder):
         builder = CartesianScanBuilder(self._variant, self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value)
+            builder.parameters()[key].setValue(value.getValue())
 
         return builder
 

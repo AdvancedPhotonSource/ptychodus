@@ -40,7 +40,7 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         builder = FresnelZonePlateProbeBuilder(self._settings, self._fresnelZonePlateChooser)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value)
+            builder.parameters()[key].setValue(value.getValue())
 
         return builder
 
