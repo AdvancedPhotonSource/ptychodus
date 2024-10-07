@@ -14,7 +14,6 @@ from .patterns import PatternsController
 from .probe import ProbeController
 from .product import ProductController
 from .ptychonn import PtychoNNViewControllerFactory
-from .ptychopack import PtychoPackViewControllerFactory
 from .reconstructor import ReconstructorController
 from .scan import ScanController
 from .settings import SettingsController
@@ -28,9 +27,6 @@ class ControllerCore:
 
         self._memoryController = MemoryController(model.memoryPresenter, view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
-        self._ptychoPackViewControllerFactory = PtychoPackViewControllerFactory(
-            model.ptychoPackReconstructorLibrary
-        )
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
             model.ptychonnReconstructorLibrary, self._fileDialogFactory
         )
@@ -115,7 +111,6 @@ class ControllerCore:
             self._fileDialogFactory,
             self._productController.tableModel,
             [
-                self._ptychoPackViewControllerFactory,
                 self._ptychonnViewControllerFactory,
                 self._tikeViewControllerFactory,
             ],
