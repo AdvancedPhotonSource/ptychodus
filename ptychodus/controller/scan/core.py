@@ -27,7 +27,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         plotView: ScanPlotView,
         fileDialogFactory: FileDialogFactory,
         tableModel: ScanTableModel,
-        proxyModel: QSortFilterProxyModel,
+        tableProxyModel: QSortFilterProxyModel,
     ) -> None:
         super().__init__()
         self._repository = repository
@@ -36,7 +36,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._plotView = plotView
         self._fileDialogFactory = fileDialogFactory
         self._tableModel = tableModel
-        self._proxyModel = proxyModel
+        self._tableProxyModel = tableProxyModel
         self._editorFactory = ScanEditorViewControllerFactory()
 
     @classmethod
@@ -49,17 +49,21 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         fileDialogFactory: FileDialogFactory,
     ) -> ScanController:
         tableModel = ScanTableModel(repository, api)
-        proxyModel = QSortFilterProxyModel()
-        proxyModel.setSourceModel(tableModel)
-        controller = cls(repository, api, view, plotView, fileDialogFactory, tableModel, proxyModel)
-        proxyModel.dataChanged.connect(lambda topLeft, bottomRight, roles: controller._redrawPlot())
+        tableProxyModel = QSortFilterProxyModel()
+        tableProxyModel.setSourceModel(tableModel)
+        controller = cls(
+            repository, api, view, plotView, fileDialogFactory, tableModel, tableProxyModel
+        )
+        tableProxyModel.dataChanged.connect(
+            lambda topLeft, bottomRight, roles: controller._redrawPlot()
+        )
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
         builderListModel.setStringList([name for name in api.builderNames()])
         builderItemDelegate = ComboBoxItemDelegate(builderListModel, view.tableView)
 
-        view.tableView.setModel(proxyModel)
+        view.tableView.setModel(tableProxyModel)
         view.tableView.setSortingEnabled(True)
         view.tableView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.tableView.setItemDelegateForColumn(2, builderItemDelegate)
@@ -95,7 +99,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         proxyIndex = self._view.tableView.currentIndex()
 
         if proxyIndex.isValid():
-            modelIndex = self._proxyModel.mapToSource(proxyIndex)
+            modelIndex = self._tableProxyModel.mapToSource(proxyIndex)
             return modelIndex.row()
 
         logger.warning('No current index!')
@@ -166,14 +170,20 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
                 ExceptionDialog.showException('File Writer', err)
 
     def _syncCurrentScanToSettings(self) -> None:
-        print('Sync scan to settings...')  # FIXME
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            item = self._repository[itemIndex]
+            item.syncToSettings()
 
     def _redrawPlot(self) -> None:
         self._plotView.axes.clear()
 
-        for row in range(self._proxyModel.rowCount()):
-            proxyIndex = self._proxyModel.index(row, 0)
-            itemIndex = self._proxyModel.mapToSource(proxyIndex).row()
+        for row in range(self._tableProxyModel.rowCount()):
+            proxyIndex = self._tableProxyModel.index(row, 0)
+            itemIndex = self._tableProxyModel.mapToSource(proxyIndex).row()
 
             if self._tableModel.isItemChecked(itemIndex):
                 itemName = self._repository.getName(itemIndex)

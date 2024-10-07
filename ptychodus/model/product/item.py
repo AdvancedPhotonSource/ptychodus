@@ -66,7 +66,7 @@ class ProductRepositoryItem(ParameterGroup):
         self._addGroup('probe', self._probe, observe=True)
         self._addGroup('object', self._object, observe=True)
 
-    def syncToSettings(self) -> None:  # FIXME call this
+    def syncToSettings(self) -> None:
         self._metadata.syncToSettings()
         self._scan.syncToSettings()
         self._probe.syncToSettings()

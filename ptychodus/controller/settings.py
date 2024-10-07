@@ -112,7 +112,7 @@ class SettingsController(Observer):
 
         for parameterName, parameter in group.parameters().items():
             names.append(parameterName)
-            values.append(str(parameter))
+            values.append(parameter.getValueAsString())
 
         self._tableModel.setNamesAndValues(names, values)
 

@@ -193,7 +193,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 ExceptionDialog.showException('File Writer', err)
 
     def _syncCurrentObjectToSettings(self) -> None:
-        print('Sync object to settings...')  # FIXME
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            item = self._repository[itemIndex]
+            item.syncToSettings()
 
     def _analyzeFRC(self) -> None:
         itemIndex = self._getCurrentItemIndex()

@@ -82,6 +82,9 @@ class StringParameter(ParameterBase[str]):
     def setValueFromString(self, value: str) -> None:
         self.setValue(str(value))
 
+    def getValueAsString(self) -> str:
+        return str(self._value)
+
     def copy(self) -> StringParameter:
         return StringParameter(self.getValue(), self)
 
@@ -105,6 +108,9 @@ class PathParameter(ParameterBase[Path]):
 
         return value
 
+    def getValueAsString(self) -> str:
+        return str(self._value)
+
     def copy(self) -> PathParameter:
         return PathParameter(self.getValue(), self)
 
@@ -115,6 +121,9 @@ class UUIDParameter(ParameterBase[UUID]):
 
     def setValueFromString(self, value: str) -> None:
         self.setValue(UUID(value))
+
+    def getValueAsString(self) -> str:
+        return str(self._value)
 
     def copy(self) -> UUIDParameter:
         return UUIDParameter(self.getValue(), self)

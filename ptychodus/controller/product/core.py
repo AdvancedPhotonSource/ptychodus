@@ -220,6 +220,16 @@ class ProductController(ProductRepositoryObserver):
     def tableModel(self) -> QAbstractTableModel:
         return self._tableModel
 
+    def _getCurrentItemIndex(self) -> int:
+        proxyIndex = self._view.tableView.currentIndex()
+
+        if proxyIndex.isValid():
+            modelIndex = self._tableProxyModel.mapToSource(proxyIndex)
+            return modelIndex.row()
+
+        logger.warning('No current index!')
+        return -1
+
     def _openProductFromFile(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
@@ -259,7 +269,13 @@ class ProductController(ProductRepositoryObserver):
             logger.error('No current item!')
 
     def _syncCurrentProductToSettings(self) -> None:
-        print('Sync product to settings...')  # FIXME
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            item = self._repository[itemIndex]
+            item.syncToSettings()
 
     def _duplicateCurrentProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())

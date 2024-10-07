@@ -235,7 +235,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 ExceptionDialog.showException('File Writer', err)
 
     def _syncCurrentProbeToSettings(self) -> None:
-        print('Sync probe to settings...')  # FIXME
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            item = self._repository[itemIndex]
+            item.syncToSettings()
 
     def _propagateProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()
