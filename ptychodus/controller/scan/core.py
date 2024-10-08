@@ -19,10 +19,16 @@ logger = logging.getLogger(__name__)
 
 
 class ScanController(SequenceObserver[ScanRepositoryItem]):
-
-    def __init__(self, repository: ScanRepository, api: ScanAPI, view: RepositoryTableView,
-                 plotView: ScanPlotView, fileDialogFactory: FileDialogFactory,
-                 tableModel: ScanTableModel, proxyModel: QSortFilterProxyModel) -> None:
+    def __init__(
+        self,
+        repository: ScanRepository,
+        api: ScanAPI,
+        view: RepositoryTableView,
+        plotView: ScanPlotView,
+        fileDialogFactory: FileDialogFactory,
+        tableModel: ScanTableModel,
+        tableProxyModel: QSortFilterProxyModel,
+    ) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
@@ -30,27 +36,34 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._plotView = plotView
         self._fileDialogFactory = fileDialogFactory
         self._tableModel = tableModel
-        self._proxyModel = proxyModel
+        self._tableProxyModel = tableProxyModel
         self._editorFactory = ScanEditorViewControllerFactory()
 
     @classmethod
-    def createInstance(cls, repository: ScanRepository, api: ScanAPI, view: RepositoryTableView,
-                       plotView: ScanPlotView,
-                       fileDialogFactory: FileDialogFactory) -> ScanController:
+    def createInstance(
+        cls,
+        repository: ScanRepository,
+        api: ScanAPI,
+        view: RepositoryTableView,
+        plotView: ScanPlotView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> ScanController:
         tableModel = ScanTableModel(repository, api)
-        proxyModel = QSortFilterProxyModel()
-        proxyModel.setSourceModel(tableModel)
-        controller = cls(repository, api, view, plotView, fileDialogFactory, tableModel,
-                         proxyModel)
-        proxyModel.dataChanged.connect(
-            lambda topLeft, bottomRight, roles: controller._redrawPlot())
+        tableProxyModel = QSortFilterProxyModel()
+        tableProxyModel.setSourceModel(tableModel)
+        controller = cls(
+            repository, api, view, plotView, fileDialogFactory, tableModel, tableProxyModel
+        )
+        tableProxyModel.dataChanged.connect(
+            lambda topLeft, bottomRight, roles: controller._redrawPlot()
+        )
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
         builderListModel.setStringList([name for name in api.builderNames()])
         builderItemDelegate = ComboBoxItemDelegate(builderListModel, view.tableView)
 
-        view.tableView.setModel(proxyModel)
+        view.tableView.setModel(tableProxyModel)
         view.tableView.setSortingEnabled(True)
         view.tableView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.tableView.setItemDelegateForColumn(2, builderItemDelegate)
@@ -58,7 +71,8 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         controller._updateView(QModelIndex(), QModelIndex())
 
         view.tableView.horizontalHeader().sectionClicked.connect(
-            lambda logicalIndex: controller._redrawPlot())
+            lambda logicalIndex: controller._redrawPlot()
+        )
 
         loadFromFileAction = view.buttonBox.loadMenu.addAction('Open File...')
         loadFromFileAction.triggered.connect(controller._loadCurrentScanFromFile)
@@ -66,13 +80,18 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentScan)
 
+        saveToFileAction = view.buttonBox.saveMenu.addAction('Save File...')
+        saveToFileAction.triggered.connect(controller._saveCurrentScanToFile)
+
+        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
+        syncToSettingsAction.triggered.connect(controller._syncCurrentScanToSettings)
+
         view.copierDialog.setWindowTitle('Copy Scan')
         view.copierDialog.sourceComboBox.setModel(tableModel)
         view.copierDialog.destinationComboBox.setModel(tableModel)
         view.copierDialog.finished.connect(controller._finishCopyingScan)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentScan)
-        view.buttonBox.saveButton.clicked.connect(controller._saveCurrentScan)
 
         return controller
 
@@ -80,7 +99,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         proxyIndex = self._view.tableView.currentIndex()
 
         if proxyIndex.isValid():
-            modelIndex = self._proxyModel.mapToSource(proxyIndex)
+            modelIndex = self._tableProxyModel.mapToSource(proxyIndex)
             return modelIndex.row()
 
         logger.warning('No current index!')
@@ -96,7 +115,8 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             self._view,
             'Open Scan',
             nameFilters=self._api.getOpenFileFilterList(),
-            selectedNameFilter=self._api.getOpenFileFilter())
+            selectedNameFilter=self._api.getOpenFileFilter(),
+        )
 
         if filePath:
             try:
@@ -129,7 +149,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
         dialog.open()
 
-    def _saveCurrentScan(self) -> None:
+    def _saveCurrentScanToFile(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
@@ -139,7 +159,8 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             self._view,
             'Save Scan',
             nameFilters=self._api.getSaveFileFilterList(),
-            selectedNameFilter=self._api.getSaveFileFilter())
+            selectedNameFilter=self._api.getSaveFileFilter(),
+        )
 
         if filePath:
             try:
@@ -148,12 +169,21 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)
 
+    def _syncCurrentScanToSettings(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            item = self._repository[itemIndex]
+            item.syncToSettings()
+
     def _redrawPlot(self) -> None:
         self._plotView.axes.clear()
 
-        for row in range(self._proxyModel.rowCount()):
-            proxyIndex = self._proxyModel.index(row, 0)
-            itemIndex = self._proxyModel.mapToSource(proxyIndex).row()
+        for row in range(self._tableProxyModel.rowCount()):
+            proxyIndex = self._tableProxyModel.index(row, 0)
+            itemIndex = self._tableProxyModel.mapToSource(proxyIndex).row()
 
             if self._tableModel.isItemChecked(itemIndex):
                 itemName = self._repository.getName(itemIndex)

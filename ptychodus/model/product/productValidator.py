@@ -8,10 +8,14 @@ from .scan import ScanRepositoryItem
 
 
 class ProductValidator(Observable, Observer):
-
-    def __init__(self, patterns: ActiveDiffractionDataset, scan: ScanRepositoryItem,
-                 geometry: ProductGeometry, probe: ProbeRepositoryItem,
-                 object_: ObjectRepositoryItem) -> None:
+    def __init__(
+        self,
+        patterns: ActiveDiffractionDataset,
+        scan: ScanRepositoryItem,
+        geometry: ProductGeometry,
+        probe: ProbeRepositoryItem,
+        object_: ObjectRepositoryItem,
+    ) -> None:
         super().__init__()
         self._patterns = patterns
         self._scan = scan
@@ -29,7 +33,7 @@ class ProductValidator(Observable, Observer):
         scan = self._scan.getScan()
         scanIndexes = set(point.index for point in scan)
         patternIndexes = set(self._patterns.getAssembledIndexes())
-        isScanValidNow = (not scanIndexes.isdisjoint(patternIndexes))
+        isScanValidNow = not scanIndexes.isdisjoint(patternIndexes)
 
         if self._isScanValid != isScanValidNow:
             self._isScanValid = isScanValidNow

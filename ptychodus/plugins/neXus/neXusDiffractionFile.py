@@ -8,9 +8,14 @@ import logging
 import h5py
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.patterns import (CropCenter, DiffractionDataset, DiffractionFileReader,
-                                    DiffractionMetadata, DiffractionPatternArray,
-                                    SimpleDiffractionDataset)
+from ptychodus.api.patterns import (
+    CropCenter,
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionMetadata,
+    DiffractionPatternArray,
+    SimpleDiffractionDataset,
+)
 from ptychodus.api.tree import SimpleTreeNode
 
 from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
@@ -43,15 +48,14 @@ class DataGroup:
         return iter(self.arrayList)
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray:
-        ...
+    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
 
-    def __getitem__(self, index: int | slice) -> \
-            DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+    def __getitem__(
+        self, index: int | slice
+    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         return self.arrayList[index]
 
     def __len__(self) -> int:
@@ -178,9 +182,12 @@ class EntryGroup:
 
 
 class NeXusDiffractionDataset(DiffractionDataset):
-
-    def __init__(self, metadata: DiffractionMetadata, contentsTree: SimpleTreeNode,
-                 entry: EntryGroup) -> None:
+    def __init__(
+        self,
+        metadata: DiffractionMetadata,
+        contentsTree: SimpleTreeNode,
+        entry: EntryGroup,
+    ) -> None:
         self._metadata = metadata
         self._contentsTree = contentsTree
         self._entry = entry
@@ -192,15 +199,14 @@ class NeXusDiffractionDataset(DiffractionDataset):
         return self._contentsTree
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray:
-        ...
+    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
 
-    def __getitem__(self, index: int | slice) -> \
-            DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+    def __getitem__(
+        self, index: int | slice
+    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         return self._entry.data[index]
 
     def __len__(self) -> int:
@@ -208,11 +214,10 @@ class NeXusDiffractionDataset(DiffractionDataset):
 
 
 class NeXusDiffractionFileReader(DiffractionFileReader):
-
     def __init__(self) -> None:
         super().__init__()
         self._treeBuilder = H5DiffractionFileTreeBuilder()
-        self.stageRotationInDegrees = 0.  # TODO This is a hack; remove when able!
+        self.stageRotationInDegrees = 0.0  # TODO This is a hack; remove when able!
 
     def read(self, filePath: Path) -> DiffractionDataset:
         dataset: DiffractionDataset = SimpleDiffractionDataset.createNullInstance(filePath)
@@ -263,6 +268,6 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 # vvv TODO This is a hack; remove when able! vvv
                 self.stageRotationInDegrees = entry.sample.goniometer.chiDeg
         except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file "{filePath}".')
 
         return dataset

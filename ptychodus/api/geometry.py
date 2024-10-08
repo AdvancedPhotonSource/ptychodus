@@ -22,17 +22,17 @@ class ImageExtent:
 
     @property
     def size(self) -> int:
-        '''returns the number of pixels in the image'''
+        """returns the number of pixels in the image"""
         return self.widthInPixels * self.heightInPixels
 
     @property
     def shape(self) -> tuple[int, int]:
-        '''returns the image shape (heightInPixels, widthInPixels) tuple'''
+        """returns the image shape (heightInPixels, widthInPixels) tuple"""
         return self.heightInPixels, self.widthInPixels
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ImageExtent):
-            return (self.shape == other.shape)
+            return self.shape == other.shape
 
         return False
 
@@ -92,7 +92,6 @@ class Box2D:
 
 
 class Interval(Generic[T]):
-
     def __init__(self, lower: T, upper: T) -> None:
         self.lower: T = lower
         self.upper: T = upper
@@ -130,7 +129,7 @@ class Interval(Generic[T]):
         return Interval[T](self.lower, self.upper)
 
     def __contains__(self, item: T) -> bool:
-        return (self.lower <= item and item < self.upper)
+        return self.lower <= item and item < self.upper
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.lower}, {self.upper})'

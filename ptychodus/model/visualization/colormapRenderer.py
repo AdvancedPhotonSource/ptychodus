@@ -4,7 +4,11 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
+from ptychodus.api.visualization import (
+    NumberArrayType,
+    RealArrayType,
+    VisualizationProduct,
+)
 
 from .colorAxis import ColorAxis
 from .colormap import ColormapParameter
@@ -14,18 +18,21 @@ from .transformation import ScalarTransformationParameter
 
 
 class ColormapRenderer(Renderer):
-
-    def __init__(self, component: DataArrayComponent,
-                 transformation: ScalarTransformationParameter, colorAxis: ColorAxis,
-                 colormap: ColormapParameter) -> None:
+    def __init__(
+        self,
+        component: DataArrayComponent,
+        transformation: ScalarTransformationParameter,
+        colorAxis: ColorAxis,
+        colormap: ColormapParameter,
+    ) -> None:
         super().__init__(component.name)
         self._component = component
         self._transformation = transformation
-        self._registerParameter('transformation', transformation)
+        self._addParameter('transformation', transformation)
         self._colorAxis = colorAxis
-        self._addParameterRepository(colorAxis, observe=True)
+        self._addGroup('color_axis', colorAxis, observe=True)
         self._colormap = colormap
-        self._registerParameter('colormap', colormap)
+        self._addParameter('colormap', colormap)
 
     def variants(self) -> Iterator[str]:
         return self._colormap.choices()
@@ -48,15 +55,18 @@ class ColormapRenderer(Renderer):
 
     def colorize(self, array: NumberArrayType) -> RealArrayType:
         values = self._component.calculate(array)
-        transform = self._transformation.getPlugin()
-        valuesTransformed = transform(values)
+        valuesTransformed = self._transformation.transform(values)
         return self._colorize(valuesTransformed)
 
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
-               autoscaleColorAxis: bool) -> VisualizationProduct:
+    def render(
+        self,
+        array: NumberArrayType,
+        pixelGeometry: PixelGeometry,
+        *,
+        autoscaleColorAxis: bool,
+    ) -> VisualizationProduct:
         values = self._component.calculate(array)
-        transform = self._transformation.getPlugin()
-        valuesTransformed = transform(values)
+        valuesTransformed = self._transformation.transform(values)
 
         if autoscaleColorAxis:
             self._colorAxis.setToDataRange(valuesTransformed)
@@ -64,7 +74,7 @@ class ColormapRenderer(Renderer):
         rgba = self._colorize(valuesTransformed)
 
         return VisualizationProduct(
-            valueLabel=transform.decorateText(self._component.name),
+            valueLabel=self._transformation.decorateText(self._component.name),
             values=array,
             rgba=rgba,
             pixelGeometry=pixelGeometry,

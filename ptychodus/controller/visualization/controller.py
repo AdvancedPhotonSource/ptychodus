@@ -11,8 +11,14 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.visualization import NumberArrayType
 
 from ...model.visualization import VisualizationEngine
-from ...view.visualization import (HistogramDialog, ImageItem, ImageItemEvents, ImageMouseTool,
-                                   LineCutDialog, VisualizationView)
+from ...view.visualization import (
+    HistogramDialog,
+    ImageItem,
+    ImageItemEvents,
+    ImageMouseTool,
+    LineCutDialog,
+    VisualizationView,
+)
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 
@@ -22,8 +28,14 @@ logger = logging.getLogger(__name__)
 class VisualizationController(Observer):
     MIME_TYPES = ['image/bmp', 'image/jpeg', 'image/png', 'image/x-portable-pixmap']
 
-    def __init__(self, engine: VisualizationEngine, view: VisualizationView, item: ImageItem,
-                 statusBar: QStatusBar, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        engine: VisualizationEngine,
+        view: VisualizationView,
+        item: ImageItem,
+        statusBar: QStatusBar,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._engine = engine
         self._view = view
@@ -34,9 +46,13 @@ class VisualizationController(Observer):
         self._histogramDialog = HistogramDialog.createInstance(view)
 
     @classmethod
-    def createInstance(cls, engine: VisualizationEngine, view: VisualizationView,
-                       statusBar: QStatusBar,
-                       fileDialogFactory: FileDialogFactory) -> VisualizationController:
+    def createInstance(
+        cls,
+        engine: VisualizationEngine,
+        view: VisualizationView,
+        statusBar: QStatusBar,
+        fileDialogFactory: FileDialogFactory,
+    ) -> VisualizationController:
         itemEvents = ImageItemEvents()
         item = ImageItem(itemEvents, statusBar)
         controller = cls(engine, view, item, statusBar, fileDialogFactory)
@@ -54,15 +70,17 @@ class VisualizationController(Observer):
 
         return controller
 
-    def setArray(self,
-                 array: NumberArrayType,
-                 pixelGeometry: PixelGeometry,
-                 *,
-                 autoscaleColorAxis: bool = False) -> None:
+    def setArray(
+        self,
+        array: NumberArrayType,
+        pixelGeometry: PixelGeometry,
+        *,
+        autoscaleColorAxis: bool = False,
+    ) -> None:
         try:
-            product = self._engine.render(array,
-                                          pixelGeometry,
-                                          autoscaleColorAxis=autoscaleColorAxis)
+            product = self._engine.render(
+                array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
+            )
         except ValueError as err:
             logger.exception(err)
             ExceptionDialog.showException('Renderer', err)
@@ -77,7 +95,8 @@ class VisualizationController(Observer):
 
     def saveImage(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view, 'Save Image', mimeTypeFilters=VisualizationController.MIME_TYPES)
+            self._view, 'Save Image', mimeTypeFilters=VisualizationController.MIME_TYPES
+        )
 
         if filePath:
             pixmap = self._item.pixmap()
@@ -107,6 +126,10 @@ class VisualizationController(Observer):
         self._lineCutDialog.open()
 
     def _analyzeRegion(self, rect: QRectF) -> None:
+        if rect.isEmpty():
+            logger.debug('QRectF is empty!')
+            return
+
         box = Box2D(
             x=rect.x(),
             y=rect.y(),
@@ -153,9 +176,11 @@ class VisualizationController(Observer):
         product = self._item.getProduct()
 
         if product is not None:
-            self.setArray(product.getValues(),
-                          product.getPixelGeometry(),
-                          autoscaleColorAxis=autoscaleColorAxis)
+            self.setArray(
+                product.getValues(),
+                product.getPixelGeometry(),
+                autoscaleColorAxis=autoscaleColorAxis,
+            )
 
     def update(self, observable: Observable) -> None:
         if observable is self._engine:

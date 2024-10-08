@@ -3,11 +3,21 @@ from collections.abc import Sequence
 from typing import Any
 import logging
 
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
+from PyQt5.QtCore import (
+    Qt,
+    QAbstractTableModel,
+    QModelIndex,
+    QObject,
+    QSortFilterProxyModel,
+)
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
-from ...model.product import (ProductAPI, ProductRepository, ProductRepositoryItem,
-                              ProductRepositoryObserver)
+from ...model.product import (
+    ProductAPI,
+    ProductRepository,
+    ProductRepositoryItem,
+    ProductRepositoryObserver,
+)
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
@@ -21,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 class ProductRepositoryTableModel(QAbstractTableModel):
-
     def __init__(self, repository: ProductRepository, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._repository = repository
@@ -44,10 +53,12 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
         return value
 
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._header[section]
 
@@ -81,10 +92,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     product = item.getProduct()
                     return f'{product.sizeInBytes / (1024 * 1024):.2f}'
 
-    def setData(self,
-                index: QModelIndex,
-                value: Any,
-                role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             try:
                 item = self._repository[index.row()]
@@ -140,11 +148,16 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
 
 class ProductController(ProductRepositoryObserver):
-
-    def __init__(self, repository: ProductRepository, api: ProductAPI, view: ProductView,
-                 fileDialogFactory: FileDialogFactory, duplicateAction: QAction,
-                 tableModel: ProductRepositoryTableModel,
-                 tableProxyModel: QSortFilterProxyModel) -> None:
+    def __init__(
+        self,
+        repository: ProductRepository,
+        api: ProductAPI,
+        view: ProductView,
+        fileDialogFactory: FileDialogFactory,
+        duplicateAction: QAction,
+        tableModel: ProductRepositoryTableModel,
+        tableProxyModel: QSortFilterProxyModel,
+    ) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
@@ -155,18 +168,32 @@ class ProductController(ProductRepositoryObserver):
         self._tableProxyModel = tableProxyModel
 
     @classmethod
-    def createInstance(cls, repository: ProductRepository, api: ProductAPI, view: ProductView,
-                       fileDialogFactory: FileDialogFactory) -> ProductController:
+    def createInstance(
+        cls,
+        repository: ProductRepository,
+        api: ProductAPI,
+        view: ProductView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> ProductController:
         openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
         createNewAction = view.buttonBox.insertMenu.addAction('Create New')
         duplicateAction = view.buttonBox.insertMenu.addAction('Duplicate')
+        saveFileAction = view.buttonBox.saveMenu.addAction('Save File...')
+        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
 
         tableModel = ProductRepositoryTableModel(repository)
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
-        controller = cls(repository, api, view, fileDialogFactory, duplicateAction, tableModel,
-                         tableProxyModel)
+        controller = cls(
+            repository,
+            api,
+            view,
+            fileDialogFactory,
+            duplicateAction,
+            tableModel,
+            tableProxyModel,
+        )
         repository.addObserver(controller)
         controller._updateInfoText()
 
@@ -178,12 +205,13 @@ class ProductController(ProductRepositoryObserver):
         view.tableView.selectionModel().currentChanged.connect(controller._updateEnabledButtons)
         controller._updateEnabledButtons(QModelIndex(), QModelIndex())
 
-        openFileAction.triggered.connect(controller._openProduct)
+        openFileAction.triggered.connect(controller._openProductFromFile)
         createNewAction.triggered.connect(controller._createNewProduct)
         duplicateAction.triggered.connect(controller._duplicateCurrentProduct)
+        saveFileAction.triggered.connect(controller._saveCurrentProductToFile)
+        syncToSettingsAction.triggered.connect(controller._syncCurrentProductToSettings)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentProduct)
-        view.buttonBox.saveButton.clicked.connect(controller._saveCurrentProduct)
         view.buttonBox.removeButton.clicked.connect(controller._removeCurrentProduct)
 
         return controller
@@ -192,12 +220,23 @@ class ProductController(ProductRepositoryObserver):
     def tableModel(self) -> QAbstractTableModel:
         return self._tableModel
 
-    def _openProduct(self) -> None:
+    def _getCurrentItemIndex(self) -> int:
+        proxyIndex = self._view.tableView.currentIndex()
+
+        if proxyIndex.isValid():
+            modelIndex = self._tableProxyModel.mapToSource(proxyIndex)
+            return modelIndex.row()
+
+        logger.warning('No current index!')
+        return -1
+
+    def _openProductFromFile(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Product',
             nameFilters=self._api.getOpenFileFilterList(),
-            selectedNameFilter=self._api.getOpenFileFilter())
+            selectedNameFilter=self._api.getOpenFileFilter(),
+        )
 
         if filePath:
             try:
@@ -209,7 +248,7 @@ class ProductController(ProductRepositoryObserver):
     def _createNewProduct(self) -> None:
         self._api.insertNewProduct()
 
-    def _saveCurrentProduct(self) -> None:
+    def _saveCurrentProductToFile(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
@@ -217,7 +256,8 @@ class ProductController(ProductRepositoryObserver):
                 self._view,
                 'Save Product',
                 nameFilters=self._api.getSaveFileFilterList(),
-                selectedNameFilter=self._api.getSaveFileFilter())
+                selectedNameFilter=self._api.getSaveFileFilter(),
+            )
 
             if filePath:
                 try:
@@ -227,6 +267,15 @@ class ProductController(ProductRepositoryObserver):
                     ExceptionDialog.showException('File Writer', err)
         else:
             logger.error('No current item!')
+
+    def _syncCurrentProductToSettings(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            item = self._repository[itemIndex]
+            item.syncToSettings()
 
     def _duplicateCurrentProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())

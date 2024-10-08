@@ -4,7 +4,11 @@ import logging
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.reconstructor import Reconstructor, TrainableReconstructor, TrainOutput
+from ptychodus.api.reconstructor import (
+    Reconstructor,
+    TrainableReconstructor,
+    TrainOutput,
+)
 
 from .api import ReconstructorAPI
 from .matcher import ScanIndexFilter
@@ -14,10 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructorPresenter(Observable, Observer):
-
-    def __init__(self, settings: ReconstructorSettings,
-                 reconstructorChooser: PluginChooser[Reconstructor],
-                 reconstructorAPI: ReconstructorAPI, reinitObservable: Observable) -> None:
+    def __init__(
+        self,
+        settings: ReconstructorSettings,
+        reconstructorChooser: PluginChooser[Reconstructor],
+        reconstructorAPI: ReconstructorAPI,
+        reinitObservable: Observable,
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._reconstructorChooser = reconstructorChooser
@@ -38,17 +45,18 @@ class ReconstructorPresenter(Observable, Observer):
         self._reconstructorChooser.setCurrentPluginByName(name)
 
     def _syncFromSettings(self) -> None:
-        self.setReconstructor(self._settings.algorithm.value)
+        self.setReconstructor(self._settings.algorithm.getValue())
 
     def _syncToSettings(self) -> None:
-        self._settings.algorithm.value = self._reconstructorChooser.currentPlugin.simpleName
+        self._settings.algorithm.setValue(self._reconstructorChooser.currentPlugin.simpleName)
 
-    def reconstruct(self,
-                    inputProductIndex: int,
-                    outputProductName: str,
-                    indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> int:
-        return self._reconstructorAPI.reconstruct(inputProductIndex, outputProductName,
-                                                  indexFilter)
+    def reconstruct(
+        self,
+        inputProductIndex: int,
+        outputProductName: str,
+        indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
+    ) -> int:
+        return self._reconstructorAPI.reconstruct(inputProductIndex, outputProductName, indexFilter)
 
     def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
         return self._reconstructorAPI.reconstructSplit(inputProductIndex, outputProductName)

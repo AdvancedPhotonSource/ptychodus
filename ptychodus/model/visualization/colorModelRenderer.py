@@ -4,7 +4,11 @@ from matplotlib.colors import Normalize
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import NumberArrayType, RealArrayType, VisualizationProduct
+from ptychodus.api.visualization import (
+    NumberArrayType,
+    RealArrayType,
+    VisualizationProduct,
+)
 
 from .colorAxis import ColorAxis
 from .colorModel import CylindricalColorModelParameter
@@ -14,20 +18,22 @@ from .transformation import ScalarTransformationParameter
 
 
 class CylindricalColorModelRenderer(Renderer):
-
-    def __init__(self, amplitudeComponent: AmplitudeArrayComponent,
-                 phaseComponent: PhaseInRadiansArrayComponent,
-                 transformation: ScalarTransformationParameter, colorAxis: ColorAxis,
-                 colorModel: CylindricalColorModelParameter) -> None:
+    def __init__(
+        self,
+        amplitudeComponent: AmplitudeArrayComponent,
+        phaseComponent: PhaseInRadiansArrayComponent,
+        transformation: ScalarTransformationParameter,
+        colorAxis: ColorAxis,
+    ) -> None:
         super().__init__('Complex')
         self._amplitudeComponent = amplitudeComponent
         self._phaseComponent = phaseComponent
         self._transformation = transformation
-        self._registerParameter('transformation', transformation)
+        self._addParameter('transformation', transformation)
         self._colorAxis = colorAxis
-        self._addParameterRepository(colorAxis, observe=True)
-        self._colorModel = colorModel
-        self._registerParameter('color_model', colorModel)
+        self._addGroup('color_axis', colorAxis, observe=True)
+        self._colorModel = CylindricalColorModelParameter()
+        self._addParameter('color_model', self._colorModel)
 
     def variants(self) -> Iterator[str]:
         return self._colorModel.choices()
@@ -41,8 +47,9 @@ class CylindricalColorModelRenderer(Renderer):
     def isCyclic(self) -> bool:
         return True
 
-    def _colorize(self, amplitudeTransformed: RealArrayType,
-                  phaseInRadians: RealArrayType) -> RealArrayType:
+    def _colorize(
+        self, amplitudeTransformed: RealArrayType, phaseInRadians: RealArrayType
+    ) -> RealArrayType:
         vrange = self._colorAxis.getRange()
         norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
 
@@ -53,16 +60,19 @@ class CylindricalColorModelRenderer(Renderer):
 
     def colorize(self, array: NumberArrayType) -> RealArrayType:
         amplitude = self._amplitudeComponent.calculate(array)
-        transform = self._transformation.getPlugin()
-        amplitudeTransformed = transform(amplitude)
+        amplitudeTransformed = self._transformation.transform(amplitude)
         phaseInRadians = self._phaseComponent.calculate(array)
         return self._colorize(amplitudeTransformed, phaseInRadians)
 
-    def render(self, array: NumberArrayType, pixelGeometry: PixelGeometry, *,
-               autoscaleColorAxis: bool) -> VisualizationProduct:
+    def render(
+        self,
+        array: NumberArrayType,
+        pixelGeometry: PixelGeometry,
+        *,
+        autoscaleColorAxis: bool,
+    ) -> VisualizationProduct:
         amplitude = self._amplitudeComponent.calculate(array)
-        transform = self._transformation.getPlugin()
-        amplitudeTransformed = transform(amplitude)
+        amplitudeTransformed = self._transformation.transform(amplitude)
         phaseInRadians = self._phaseComponent.calculate(array)
 
         if autoscaleColorAxis:
@@ -71,7 +81,7 @@ class CylindricalColorModelRenderer(Renderer):
         rgba = self._colorize(amplitudeTransformed, phaseInRadians)
 
         return VisualizationProduct(
-            valueLabel=transform.decorateText(self._amplitudeComponent.name),
+            valueLabel=self._transformation.decorateText(self._amplitudeComponent.name),
             values=array,
             rgba=rgba,
             pixelGeometry=pixelGeometry,

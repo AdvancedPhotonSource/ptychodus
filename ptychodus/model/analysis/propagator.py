@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from decimal import Decimal
 from pathlib import Path
 import logging
 
@@ -9,8 +8,12 @@ import numpy
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe import Probe
-from ptychodus.api.propagator import (AngularSpectrumPropagator, PropagatorParameters,
-                                      WavefieldArrayType, intensity)
+from ptychodus.api.propagator import (
+    AngularSpectrumPropagator,
+    PropagatorParameters,
+    WavefieldArrayType,
+    intensity,
+)
 from ptychodus.api.typing import RealArrayType
 
 from ..product import ProductRepository
@@ -20,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class ProbePropagator(Observable):
-
     def __init__(self, settings: ProbePropagationSettings, repository: ProductRepository) -> None:
         super().__init__()
         self._settings = settings
@@ -41,8 +43,13 @@ class ProbePropagator(Observable):
         item = self._repository[self._productIndex]
         return item.getName()
 
-    def propagate(self, *, beginCoordinateInMeters: Decimal, endCoordinateInMeters: Decimal,
-                  numberOfSteps: int) -> None:
+    def propagate(
+        self,
+        *,
+        beginCoordinateInMeters: float,
+        endCoordinateInMeters: float,
+        numberOfSteps: int,
+    ) -> None:
         item = self._repository[self._productIndex]
         probe = item.getProbe().getProbe()
         wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
@@ -51,8 +58,9 @@ class ProbePropagator(Observable):
             dtype=probe.array.dtype,
         )
         propagatedIntensity = numpy.zeros((numberOfSteps, *probe.array.shape[-2:]))
-        distanceInMeters = numpy.linspace(float(beginCoordinateInMeters),
-                                          float(endCoordinateInMeters), numberOfSteps)
+        distanceInMeters = numpy.linspace(
+            beginCoordinateInMeters, endCoordinateInMeters, numberOfSteps
+        )
         pixelGeometry = probe.getPixelGeometry()
 
         for idx, zInMeters in enumerate(distanceInMeters):
@@ -71,17 +79,17 @@ class ProbePropagator(Observable):
                 propagatedWavefield[idx, mode, :, :] = wf
                 propagatedIntensity[idx, :, :] += intensity(wf)
 
-        self._settings.beginCoordinateInMeters.value = beginCoordinateInMeters
-        self._settings.endCoordinateInMeters.value = endCoordinateInMeters
+        self._settings.beginCoordinateInMeters.setValue(beginCoordinateInMeters)
+        self._settings.endCoordinateInMeters.setValue(endCoordinateInMeters)
         self._propagatedWavefield = propagatedWavefield
         self._propagatedIntensity = propagatedIntensity
         self.notifyObservers()
 
-    def getBeginCoordinateInMeters(self) -> Decimal:
-        return self._settings.beginCoordinateInMeters.value
+    def getBeginCoordinateInMeters(self) -> float:
+        return self._settings.beginCoordinateInMeters.getValue()
 
-    def getEndCoordinateInMeters(self) -> Decimal:
-        return self._settings.endCoordinateInMeters.value
+    def getEndCoordinateInMeters(self) -> float:
+        return self._settings.endCoordinateInMeters.getValue()
 
     def _getProbe(self) -> Probe:
         item = self._repository[self._productIndex]
@@ -93,7 +101,7 @@ class ProbePropagator(Observable):
 
     def getNumberOfSteps(self) -> int:
         if self._propagatedIntensity is None:
-            return self._settings.numberOfSteps.value
+            return self._settings.numberOfSteps.getValue()
 
         return self._propagatedIntensity.shape[0]
 

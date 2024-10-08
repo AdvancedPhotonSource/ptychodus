@@ -5,10 +5,16 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (DiffractionPatternArrayType, DiffractionDataset,
-                                    DiffractionFileReader, DiffractionFileWriter,
-                                    DiffractionMetadata, DiffractionPatternArray,
-                                    DiffractionPatternState, SimpleDiffractionDataset)
+from ptychodus.api.patterns import (
+    DiffractionPatternArrayType,
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionFileWriter,
+    DiffractionMetadata,
+    DiffractionPatternArray,
+    DiffractionPatternState,
+    SimpleDiffractionDataset,
+)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -16,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 class H5DiffractionPatternArray(DiffractionPatternArray):
-
     def __init__(self, label: str, index: int, filePath: Path, dataPath: str) -> None:
         super().__init__()
         self._label = label
@@ -46,8 +51,7 @@ class H5DiffractionPatternArray(DiffractionPatternArray):
                 if isinstance(item, h5py.Dataset):
                     self._state = DiffractionPatternState.FOUND
                 else:
-                    raise ValueError(
-                        f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
+                    raise ValueError(f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
 
             data = item[()]
 
@@ -55,9 +59,9 @@ class H5DiffractionPatternArray(DiffractionPatternArray):
 
 
 class H5DiffractionFileTreeBuilder:
-
-    def _addAttributes(self, treeNode: SimpleTreeNode,
-                       attributeManager: h5py.AttributeManager) -> None:
+    def _addAttributes(
+        self, treeNode: SimpleTreeNode, attributeManager: h5py.AttributeManager
+    ) -> None:
         for name, value in attributeManager.items():
             if isinstance(value, str):
                 itemDetails = f'STRING = "{value}"'
@@ -65,8 +69,11 @@ class H5DiffractionFileTreeBuilder:
                 logger.debug(f'Skipping empty attribute {name}.')
             else:
                 stringInfo = h5py.check_string_dtype(value.dtype)
-                itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"' if stringInfo \
-                        else f'SCALAR {value.dtype} = {value}'
+                itemDetails = (
+                    f'STRING = "{value.decode(stringInfo.encoding)}"'
+                    if stringInfo
+                    else f'SCALAR {value.dtype} = {value}'
+                )
 
             treeNode.createChild([str(name), 'Attribute', itemDetails])
 
@@ -107,8 +114,11 @@ class H5DiffractionFileTreeBuilder:
                                 itemDetails = value.decode()
                             else:
                                 stringInfo = h5py.check_string_dtype(value.dtype)
-                                itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"' \
-                                        if stringInfo else f'SCALAR {value.dtype} = {value}'
+                                itemDetails = (
+                                    f'STRING = "{value.decode(stringInfo.encoding)}"'
+                                    if stringInfo
+                                    else f'SCALAR {value.dtype} = {value}'
+                                )
                         else:
                             itemDetails = f'{h5Item.shape} {h5Item.dtype}'
                 elif isinstance(h5Item, h5py.SoftLink):
@@ -126,7 +136,6 @@ class H5DiffractionFileTreeBuilder:
 
 
 class H5DiffractionFileReader(DiffractionFileReader):
-
     def __init__(self, dataPath: str) -> None:
         self._dataPath = dataPath
         self._treeBuilder = H5DiffractionFileTreeBuilder()
@@ -163,13 +172,12 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
                 dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file "{filePath}".')
 
         return dataset
 
 
 class H5DiffractionFileWriter(DiffractionFileWriter):
-
     def __init__(self, dataPath: str) -> None:
         self._dataPath = dataPath
 

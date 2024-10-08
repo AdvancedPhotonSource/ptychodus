@@ -7,14 +7,12 @@ from ptychodus.api.plugins import PluginRegistry
 
 
 class NPYObjectFileReader(ObjectFileReader):
-
     def read(self, filePath: Path) -> Object:
         array = numpy.load(filePath)
         return Object(array)
 
 
 class NPYObjectFileWriter(ObjectFileWriter):
-
     def write(self, filePath: Path, object_: Object) -> None:
         array = object_.array
         numpy.save(filePath, array)

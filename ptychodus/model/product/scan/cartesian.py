@@ -21,51 +21,41 @@ class CartesianScanVariant(IntEnum):
 
     @property
     def isSnaked(self) -> bool:
-        return (self.value & 1 != 0)
+        return self.value & 1 != 0
 
     @property
     def isTriangular(self) -> bool:
-        return (self.value & 2 != 0)
+        return self.value & 2 != 0
 
     @property
     def isEquilateral(self) -> bool:
-        return (self.value & 4 != 0)
+        return self.value & 4 != 0
 
 
 class CartesianScanBuilder(ScanBuilder):
-
     def __init__(self, variant: CartesianScanVariant, settings: ScanSettings) -> None:
-        super().__init__(variant.name.lower())
+        super().__init__(settings, variant.name.lower())
         self._variant = variant
         self._settings = settings
 
-        self.numberOfPointsX = self._registerIntegerParameter(
-            'number_of_points_x',
-            settings.numberOfPointsX.value,
-            minimum=0,
-        )
-        self.numberOfPointsY = self._registerIntegerParameter(
-            'number_of_points_y',
-            settings.numberOfPointsY.value,
-            minimum=0,
-        )
-        self.stepSizeXInMeters = self._registerRealParameter(
-            'step_size_x_m',
-            float(settings.stepSizeXInMeters.value),
-            minimum=0.,
-        )
-        self.stepSizeYInMeters = self._registerRealParameter(
-            'step_size_y_m',
-            float(settings.stepSizeYInMeters.value),
-            minimum=0.,
-        )
+        self.numberOfPointsX = settings.numberOfPointsX.copy()
+        self._addParameter('number_of_points_x', self.numberOfPointsX)
+
+        self.numberOfPointsY = settings.numberOfPointsY.copy()
+        self._addParameter('number_of_points_y', self.numberOfPointsY)
+
+        self.stepSizeXInMeters = settings.stepSizeXInMeters.copy()
+        self._addParameter('step_size_x_m', self.stepSizeXInMeters)
+
+        self.stepSizeYInMeters = settings.stepSizeYInMeters.copy()
+        self._addParameter('step_size_y_m', self.stepSizeYInMeters)
 
     def copy(self) -> CartesianScanBuilder:
         builder = CartesianScanBuilder(self._variant, self._settings)
-        builder.numberOfPointsX.setValue(self.numberOfPointsX.getValue())
-        builder.numberOfPointsY.setValue(self.numberOfPointsY.getValue())
-        builder.stepSizeXInMeters.setValue(self.stepSizeXInMeters.getValue())
-        builder.stepSizeYInMeters.setValue(self.stepSizeYInMeters.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value.getValue())
+
         return builder
 
     @property

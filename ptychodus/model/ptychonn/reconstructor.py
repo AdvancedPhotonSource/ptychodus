@@ -10,8 +10,12 @@ import ptychonn
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
-                                         TrainableReconstructor, TrainOutput)
+from ptychodus.api.reconstructor import (
+    ReconstructInput,
+    ReconstructOutput,
+    TrainableReconstructor,
+    TrainOutput,
+)
 
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
 from .buffers import ObjectPatchCircularBuffer, PatternCircularBuffer
@@ -27,9 +31,12 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
     PATCHES_KW: Final[str] = 'real'
     PATTERNS_KW: Final[str] = 'reciprocal'
 
-    def __init__(self, modelSettings: PtychoNNModelSettings,
-                 trainingSettings: PtychoNNTrainingSettings,
-                 modelProvider: PtychoNNModelProvider) -> None:
+    def __init__(
+        self,
+        modelSettings: PtychoNNModelSettings,
+        trainingSettings: PtychoNNTrainingSettings,
+        modelProvider: PtychoNNModelProvider,
+    ) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._modelProvider = modelProvider
@@ -51,7 +58,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         if dataSize != data.shape[-2]:
             raise ValueError('PtychoNN expects square diffraction data!')
 
-        isDataSizePow2 = (dataSize & (dataSize - 1) == 0 and dataSize > 0)
+        isDataSizePow2 = dataSize & (dataSize - 1) == 0 and dataSize > 0
 
         if not isDataSizePow2:
             raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
@@ -68,8 +75,13 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
             for i in range(inputSize):
                 for j in range(inputSize):
-                    binnedData[:, i, j] = numpy.sum(data[:, binSize * i:binSize * (i + 1),
-                                                         binSize * j:binSize * (j + 1)])
+                    binnedData[:, i, j] = numpy.sum(
+                        data[
+                            :,
+                            binSize * i : binSize * (i + 1),
+                            binSize * j : binSize * (j + 1),
+                        ]
+                    )
 
         model = self._modelProvider.getModel()
 
@@ -111,10 +123,11 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                 widthInPixels=parameters.patterns.shape[-1],
                 heightInPixels=parameters.patterns.shape[-2],
             )
-            maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.value)
+            maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.getValue())
             self._patternBuffer = PatternCircularBuffer(patternExtent, maximumSize)
             self._objectPatchBuffer = ObjectPatchCircularBuffer(
-                patternExtent, self._modelProvider.getNumberOfChannels(), maximumSize)
+                patternExtent, self._modelProvider.getNumberOfChannels(), maximumSize
+            )
 
         for scanPoint in parameters.product.scan:
             objectPatch = interpolator.getPatch(scanPoint, probeExtent)
@@ -130,7 +143,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         return self.TRAINING_DATA_FILE_FILTER
 
     def openTrainingData(self, filePath: Path) -> None:
-        logger.debug(f'Reading \"{filePath}\" as \"NPZ\"')
+        logger.debug(f'Reading "{filePath}" as "NPZ"')
         trainingData = numpy.load(filePath)
         self._patternBuffer.setBuffer(trainingData[self.PATTERNS_KW])
         self._objectPatchBuffer.setBuffer(trainingData[self.PATCHES_KW])
@@ -142,7 +155,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         return self.TRAINING_DATA_FILE_FILTER
 
     def saveTrainingData(self, filePath: Path) -> None:
-        logger.debug(f'Writing \"{filePath}\" as \"NPZ\"')
+        logger.debug(f'Writing "{filePath}" as "NPZ"')
         trainingData = {
             self.PATTERNS_KW: self._patternBuffer.getBuffer(),
             self.PATCHES_KW: self._objectPatchBuffer.getBuffer(),
@@ -152,16 +165,18 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
     def train(self) -> TrainOutput:
         model = self._modelProvider.getModel()
         logger.debug('Training...')
-        trainingSetFractionalSize = 1 - self._trainingSettings.validationSetFractionalSize.value
+        trainingSetFractionalSize = (
+            1 - self._trainingSettings.validationSetFractionalSize.getValue()
+        )
         trainer, trainerLog = ptychonn.train(
             model=model,
-            batch_size=self._modelSettings.batchSize.value,
+            batch_size=self._modelSettings.batchSize.getValue(),
             out_dir=None,
             X_train=self._patternBuffer.getBuffer(),
             Y_train=self._objectPatchBuffer.getBuffer(),
-            epochs=self._trainingSettings.trainingEpochs.value,
+            epochs=self._trainingSettings.trainingEpochs.getValue(),
             training_fraction=float(trainingSetFractionalSize),
-            log_frequency=self._trainingSettings.statusIntervalInEpochs.value,
+            log_frequency=self._trainingSettings.statusIntervalInEpochs.getValue(),
             strategy='ddp_notebook',
         )
         self._modelProvider.setTrainer(trainer)

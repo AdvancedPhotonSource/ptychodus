@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class LYNXOrchestraScanFileReader(ScanFileReader):
     SIMPLE_NAME: Final[str] = 'LYNXOrchestra'
-    MICRONS_TO_METERS: Final[float] = 1.e-6
+    MICRONS_TO_METERS: Final[float] = 1.0e-6
     DATA_POINT_COLUMN: Final[int] = 0
     X_COLUMN: Final[int] = 3
     Y_COLUMN: Final[int] = 6
@@ -55,12 +55,13 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
             columnHeaderRow = next(csvIterator)
 
             if columnHeaderRow == LYNXOrchestraScanFileReader.EXPECTED_HEADER:
-                logger.debug(f'Reading scan positions for \"{scanName}\"...')
+                logger.debug(f'Reading scan positions for "{scanName}"...')
             else:
                 raise ScanPointParseError(
                     'Bad LYNX Orchestra header!\n'
                     f'Expected: {LYNXOrchestraScanFileReader.EXPECTED_HEADER}\n'
-                    f'Found:    {columnHeaderRow}\n')
+                    f'Found:    {columnHeaderRow}\n'
+                )
 
             for row in csvIterator:
                 if row[0].startswith('#'):

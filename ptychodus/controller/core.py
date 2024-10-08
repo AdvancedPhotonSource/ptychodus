@@ -22,51 +22,87 @@ from .workflow import WorkflowController
 
 
 class ControllerCore:
-
     def __init__(self, model: ModelCore, view: ViewCore) -> None:
         self.view = view
 
         self._memoryController = MemoryController(model.memoryPresenter, view.memoryProgressBar)
         self._fileDialogFactory = FileDialogFactory()
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
-            model.ptychonnReconstructorLibrary, self._fileDialogFactory)
+            model.ptychonnReconstructorLibrary, self._fileDialogFactory
+        )
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
-        self._settingsController = SettingsController.createInstance(model.settingsRegistry,
-                                                                     view.settingsView,
-                                                                     view.settingsTableView,
-                                                                     self._fileDialogFactory)
+        self._settingsController = SettingsController(
+            model.settingsRegistry,
+            view.settingsView,
+            view.settingsTableView,
+            self._fileDialogFactory,
+        )
         self._patternsImageController = ImageController.createInstance(
-            model.patternVisualizationEngine, view.patternsImageView, view.statusBar(),
-            self._fileDialogFactory)
+            model.patternVisualizationEngine,
+            view.patternsImageView,
+            view.statusBar(),
+            self._fileDialogFactory,
+        )
         self._patternsController = PatternsController.createInstance(
-            model.detectorPresenter, model.diffractionDatasetInputOutputPresenter,
-            model.diffractionMetadataPresenter, model.diffractionDatasetPresenter,
-            model.patternPresenter, self._patternsImageController, view.patternsView,
-            self._fileDialogFactory)
-        self._productController = ProductController.createInstance(model.productRepository,
-                                                                   model.productAPI,
-                                                                   view.productView,
-                                                                   self._fileDialogFactory)
-        self._scanController = ScanController.createInstance(model.scanRepository, model.scanAPI,
-                                                             view.scanView, view.scanPlotView,
-                                                             self._fileDialogFactory)
-        self._probeImageController = ImageController.createInstance(model.probeVisualizationEngine,
-                                                                    view.probeImageView,
-                                                                    view.statusBar(),
-                                                                    self._fileDialogFactory)
+            model.detector,
+            model.diffractionDatasetInputOutputPresenter,
+            model.diffractionMetadataPresenter,
+            model.diffractionDatasetPresenter,
+            model.patternPresenter,
+            self._patternsImageController,
+            view.patternsView,
+            self._fileDialogFactory,
+        )
+        self._productController = ProductController.createInstance(
+            model.productRepository,
+            model.productAPI,
+            view.productView,
+            self._fileDialogFactory,
+        )
+        self._scanController = ScanController.createInstance(
+            model.scanRepository,
+            model.scanAPI,
+            view.scanView,
+            view.scanPlotView,
+            self._fileDialogFactory,
+        )
+        self._probeImageController = ImageController.createInstance(
+            model.probeVisualizationEngine,
+            view.probeImageView,
+            view.statusBar(),
+            self._fileDialogFactory,
+        )
         self._probeController = ProbeController.createInstance(
-            model.probeRepository, model.probeAPI, self._probeImageController,
-            model.probePropagator, model.probePropagatorVisualizationEngine, model.stxmSimulator,
-            model.stxmVisualizationEngine, model.exposureAnalyzer,
-            model.exposureVisualizationEngine, model.fluorescenceEnhancer,
-            model.fluorescenceVisualizationEngine, view.probeView, self._fileDialogFactory)
+            model.probeRepository,
+            model.probeAPI,
+            self._probeImageController,
+            model.probePropagator,
+            model.probePropagatorVisualizationEngine,
+            model.stxmSimulator,
+            model.stxmVisualizationEngine,
+            model.exposureAnalyzer,
+            model.exposureVisualizationEngine,
+            model.fluorescenceEnhancer,
+            model.fluorescenceVisualizationEngine,
+            view.probeView,
+            self._fileDialogFactory,
+        )
         self._objectImageController = ImageController.createInstance(
-            model.objectVisualizationEngine, view.objectImageView, view.statusBar(),
-            self._fileDialogFactory)
+            model.objectVisualizationEngine,
+            view.objectImageView,
+            view.statusBar(),
+            self._fileDialogFactory,
+        )
         self._objectController = ObjectController.createInstance(
-            model.objectRepository, model.objectAPI, self._objectImageController,
-            model.fourierRingCorrelator, model.xmcdAnalyzer, model.xmcdVisualizationEngine,
-            view.objectView, self._fileDialogFactory)
+            model.objectRepository,
+            model.objectAPI,
+            self._objectImageController,
+            model.fourierRingCorrelator,
+            model.xmcdAnalyzer,
+            model.xmcdVisualizationEngine,
+            view.objectView,
+            self._fileDialogFactory,
+        )
         self._reconstructorParametersController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,
@@ -74,23 +110,33 @@ class ControllerCore:
             view.reconstructorPlotView,
             self._fileDialogFactory,
             self._productController.tableModel,
-            [self._ptychonnViewControllerFactory, self._tikeViewControllerFactory],
+            [
+                self._ptychonnViewControllerFactory,
+                self._tikeViewControllerFactory,
+            ],
         )
         self._workflowController = WorkflowController.createInstance(
-            model.workflowParametersPresenter, model.workflowAuthorizationPresenter,
-            model.workflowStatusPresenter, model.workflowExecutionPresenter,
-            view.workflowParametersView, view.workflowTableView,
-            self._productController.tableModel)
+            model.workflowParametersPresenter,
+            model.workflowAuthorizationPresenter,
+            model.workflowStatusPresenter,
+            model.workflowExecutionPresenter,
+            view.workflowParametersView,
+            view.workflowTableView,
+            self._productController.tableModel,
+        )
         self._automationController = AutomationController.createInstance(
-            model._automationCore, model.automationPresenter, model.automationProcessingPresenter,
-            view.automationView, self._fileDialogFactory)
+            model._automationCore,
+            model.automationPresenter,
+            model.automationProcessingPresenter,
+            view.automationView,
+            self._fileDialogFactory,
+        )
 
         self._refreshDataTimer = QTimer()
         self._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
         self._refreshDataTimer.start(1000)  # TODO make configurable
 
-        view.navigationActionGroup.triggered.connect(
-            lambda action: self.swapCentralWidgets(action))
+        view.navigationActionGroup.triggered.connect(lambda action: self.swapCentralWidgets(action))
         view.workflowAction.setVisible(model.areWorkflowsSupported)
 
     def showMainWindow(self, windowTitle: str) -> None:

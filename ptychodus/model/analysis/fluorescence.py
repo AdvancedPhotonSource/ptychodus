@@ -8,9 +8,14 @@ from scipy.sparse.linalg import gmres, LinearOperator
 import math
 import numpy
 
-from ptychodus.api.fluorescence import (DeconvolutionStrategy, ElementMap, FluorescenceDataset,
-                                        FluorescenceFileReader, FluorescenceFileWriter,
-                                        UpscalingStrategy)
+from ptychodus.api.fluorescence import (
+    DeconvolutionStrategy,
+    ElementMap,
+    FluorescenceDataset,
+    FluorescenceFileReader,
+    FluorescenceFileWriter,
+    UpscalingStrategy,
+)
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
@@ -23,8 +28,9 @@ from .settings import FluorescenceSettings
 logger = logging.getLogger(__name__)
 
 
-def get_axis_weights_and_indexes(xmin_o: float, dx_o: float, xmin_p: float, dx_p: float,
-                                 N_p: int) -> tuple[Sequence[float], Sequence[int]]:
+def get_axis_weights_and_indexes(
+    xmin_o: float, dx_o: float, xmin_p: float, dx_p: float, N_p: int
+) -> tuple[Sequence[float], Sequence[int]]:
     weight: list[float] = []
     index: list[int] = []
 
@@ -57,15 +63,14 @@ def get_axis_weights_and_indexes(xmin_o: float, dx_o: float, xmin_p: float, dx_p
 
 
 class VSPILinearOperator(LinearOperator):
-
     def __init__(self, product: Product, xrf_nchannels: int) -> None:
-        '''
+        """
         M: number of XRF positions
         N: number of ptychography object pixels
         P: number of XRF channels
 
         A[M,N] * X[N,P] = B[M,P]
-        '''
+        """
         super().__init__(float, (len(product.scan), xrf_nchannels))
         self._product = product
 
@@ -87,10 +92,12 @@ class VSPILinearOperator(LinearOperator):
             xmin_p_m = point.positionXInMeters - probeGeometry.widthInMeters / 2
             ymin_p_m = point.positionYInMeters - probeGeometry.heightInMeters / 2
 
-            wx, ix = get_axis_weights_and_indexes(xmin_o_m, dx_o_m, xmin_p_m, dx_p_m,
-                                                  probeGeometry.widthInPixels)
-            wy, iy = get_axis_weights_and_indexes(ymin_o_m, dy_o_m, ymin_p_m, dy_p_m,
-                                                  probeGeometry.heightInPixels)
+            wx, ix = get_axis_weights_and_indexes(
+                xmin_o_m, dx_o_m, xmin_p_m, dx_p_m, probeGeometry.widthInPixels
+            )
+            wy, iy = get_axis_weights_and_indexes(
+                ymin_o_m, dy_o_m, ymin_p_m, dy_p_m, probeGeometry.heightInPixels
+            )
 
             IY, IX = numpy.meshgrid(iy, ix)
             i_nz = numpy.ravel_multi_index(list(zip(IY.flat, IX.flat)), objectShape)
@@ -106,14 +113,15 @@ class FluorescenceEnhancer(Observable, Observer):
     TWO_STEP: Final[str] = 'Upscale and Deconvolve'
 
     def __init__(
-            self,
-            settings: FluorescenceSettings,
-            dataMatcher: DiffractionPatternPositionMatcher,  # FIXME match XRF too
-            upscalingStrategyChooser: PluginChooser[UpscalingStrategy],
-            deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
-            fileReaderChooser: PluginChooser[FluorescenceFileReader],
-            fileWriterChooser: PluginChooser[FluorescenceFileWriter],
-            reinitObservable: Observable) -> None:
+        self,
+        settings: FluorescenceSettings,
+        dataMatcher: DiffractionPatternPositionMatcher,  # FIXME match XRF too
+        upscalingStrategyChooser: PluginChooser[UpscalingStrategy],
+        deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
+        fileReaderChooser: PluginChooser[FluorescenceFileReader],
+        fileWriterChooser: PluginChooser[FluorescenceFileWriter],
+        reinitObservable: Observable,
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._dataMatcher = dataMatcher
@@ -128,11 +136,13 @@ class FluorescenceEnhancer(Observable, Observer):
         self._enhanced: FluorescenceDataset | None = None
 
         upscalingStrategyChooser.addObserver(self)
-        upscalingStrategyChooser.setCurrentPluginByName(settings.upscalingStrategy.value)
+        upscalingStrategyChooser.setCurrentPluginByName(settings.upscalingStrategy.getValue())
         deconvolutionStrategyChooser.addObserver(self)
-        deconvolutionStrategyChooser.setCurrentPluginByName(settings.deconvolutionStrategy.value)
-        fileReaderChooser.setCurrentPluginByName(settings.fileType.value)
-        fileWriterChooser.setCurrentPluginByName(settings.fileType.value)
+        deconvolutionStrategyChooser.setCurrentPluginByName(
+            settings.deconvolutionStrategy.getValue()
+        )
+        fileReaderChooser.setCurrentPluginByName(settings.fileType.getValue())
+        fileWriterChooser.setCurrentPluginByName(settings.fileType.getValue())
         reinitObservable.addObserver(self)
 
     def setProduct(self, productIndex: int) -> None:
@@ -154,23 +164,23 @@ class FluorescenceEnhancer(Observable, Observer):
         if filePath.is_file():
             self._fileReaderChooser.setCurrentPluginByName(fileFilter)
             fileType = self._fileReaderChooser.currentPlugin.simpleName
-            logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
+            logger.debug(f'Reading "{filePath}" as "{fileType}"')
             fileReader = self._fileReaderChooser.currentPlugin.strategy
 
             try:
                 measured = fileReader.read(filePath)
             except Exception as exc:
-                raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
+                raise RuntimeError(f'Failed to read "{filePath}"') from exc
             else:
                 self._measured = measured
                 self._enhanced = None
 
-                self._settings.filePath.value = filePath
-                self._settings.fileType.value = fileType
+                self._settings.filePath.setValue(filePath)
+                self._settings.fileType.setValue(fileType)
 
                 self.notifyObservers()
         else:
-            logger.warning(f'Refusing to load dataset from invalid file path \"{filePath}\"')
+            logger.warning(f'Refusing to load dataset from invalid file path "{filePath}"')
 
     def getNumberOfChannels(self) -> int:
         return 0 if self._measured is None else len(self._measured.element_maps)
@@ -185,10 +195,10 @@ class FluorescenceEnhancer(Observable, Observer):
         return [self.VSPI, self.TWO_STEP]
 
     def getEnhancementStrategy(self) -> str:
-        return self.VSPI if self._settings.useVSPI.value else self.TWO_STEP
+        return self.VSPI if self._settings.useVSPI.getValue() else self.TWO_STEP
 
     def setEnhancementStrategy(self, name: str) -> None:
-        self._settings.useVSPI.value = (name.casefold() == self.VSPI.casefold())
+        self._settings.useVSPI.setValue(name.casefold() == self.VSPI.casefold())
 
     def getUpscalingStrategyList(self) -> Sequence[str]:
         return self._upscalingStrategyChooser.getDisplayNameList()
@@ -213,10 +223,11 @@ class FluorescenceEnhancer(Observable, Observer):
             raise ValueError('Fluorescence dataset not loaded!')
 
         reconstructInput = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            self._productIndex)
+            self._productIndex
+        )
         element_maps: list[ElementMap] = list()
 
-        if self._settings.useVSPI.value:
+        if self._settings.useVSPI.getValue():
             measured_emaps = self._measured.element_maps
             A = VSPILinearOperator(reconstructInput.product, len(measured_emaps))
             B = numpy.stack([b.counts_per_second.flatten() for b in measured_emaps]).T
@@ -234,7 +245,7 @@ class FluorescenceEnhancer(Observable, Observer):
             deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
 
             for emap in self._measured.element_maps:
-                logger.info(f'Enhancing \"{emap.name}\"')
+                logger.info(f'Enhancing "{emap.name}"')
                 emap_upscaled = upscaler(emap, reconstructInput.product)
                 emap_enhanced = deconvolver(emap_upscaled, reconstructInput.product)
                 element_maps.append(emap_enhanced)
@@ -267,21 +278,23 @@ class FluorescenceEnhancer(Observable, Observer):
 
         self._fileWriterChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        logger.debug(f'Writing "{filePath}" as "{fileType}"')
         writer = self._fileWriterChooser.currentPlugin.strategy
         writer.write(filePath, self._enhanced)
 
     def _openFluorescenceFileFromSettings(self) -> None:
-        self.openMeasuredDataset(self._settings.filePath.value, self._settings.fileType.value)
+        self.openMeasuredDataset(
+            self._settings.filePath.getValue(), self._settings.fileType.getValue()
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
             self._openFluorescenceFileFromSettings()
         elif observable is self._upscalingStrategyChooser:
             strategy = self._upscalingStrategyChooser.currentPlugin.simpleName
-            self._settings.upscalingStrategy.value = strategy
+            self._settings.upscalingStrategy.setValue(strategy)
             self.notifyObservers()
         elif observable is self._deconvolutionStrategyChooser:
             strategy = self._deconvolutionStrategyChooser.currentPlugin.simpleName
-            self._settings.deconvolutionStrategy.value = strategy
+            self._settings.deconvolutionStrategy.setValue(strategy)
             self.notifyObservers()

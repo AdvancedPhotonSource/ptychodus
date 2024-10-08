@@ -10,9 +10,13 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoNNModelProvider:
-
-    def __init__(self, modelSettings: PtychoNNModelSettings,
-                 trainingSettings: PtychoNNTrainingSettings, *, enableAmplitude: bool) -> None:
+    def __init__(
+        self,
+        modelSettings: PtychoNNModelSettings,
+        trainingSettings: PtychoNNTrainingSettings,
+        *,
+        enableAmplitude: bool,
+    ) -> None:
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._enableAmplitude = enableAmplitude
@@ -26,22 +30,26 @@ class PtychoNNModelProvider:
         return 2 if self._enableAmplitude else 1
 
     def getModel(self) -> ptychonn.LitReconSmallModel:
-        if self._model is None and self._trainer is not None and self._trainer.lightning_module is not None:
+        if (
+            self._model is None
+            and self._trainer is not None
+            and self._trainer.lightning_module is not None
+        ):
             return self._trainer.lightning_module
         else:
             logger.debug('Initializing model from settings')
             self._model = ptychonn.LitReconSmallModel(
-                nconv=self._modelSettings.numberOfConvolutionKernels.value,
-                use_batch_norm=self._modelSettings.useBatchNormalization.value,
+                nconv=self._modelSettings.numberOfConvolutionKernels.getValue(),
+                use_batch_norm=self._modelSettings.useBatchNormalization.getValue(),
                 enable_amplitude=self._enableAmplitude,
-                max_lr=float(self._trainingSettings.maximumLearningRate.value),
-                min_lr=float(self._trainingSettings.minimumLearningRate.value),
+                max_lr=float(self._trainingSettings.maximumLearningRate.getValue()),
+                min_lr=float(self._trainingSettings.minimumLearningRate.getValue()),
             )
 
         return self._model
 
     def openModel(self, filePath: Path) -> None:
-        logger.debug(f'Reading model from \"{filePath}\"')
+        logger.debug(f'Reading model from "{filePath}"')
         self._model = ptychonn.LitReconSmallModel.load_from_checkpoint(filePath)
         self._trainer = None
 
@@ -53,5 +61,5 @@ class PtychoNNModelProvider:
         if self._trainer is None:
             logger.warning('Need trainer to save model!')
         else:
-            logger.debug(f'Writing model to \"{filePath}\"')
+            logger.debug(f'Writing model to "{filePath}"')
             self._trainer.save_checkpoint(filePath)

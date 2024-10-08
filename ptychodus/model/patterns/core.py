@@ -9,8 +9,12 @@ import h5py
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.patterns import (DiffractionFileReader, DiffractionFileWriter,
-                                    DiffractionPatternArrayType, DiffractionPatternState)
+from ptychodus.api.patterns import (
+    DiffractionFileReader,
+    DiffractionFileWriter,
+    DiffractionPatternArrayType,
+    DiffractionPatternState,
+)
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -18,7 +22,7 @@ from ptychodus.api.tree import SimpleTreeNode
 from .active import ActiveDiffractionDataset
 from .api import PatternsAPI
 from .builder import ActiveDiffractionDatasetBuilder
-from .detector import Detector, DetectorPresenter
+from .detector import Detector
 from .io import DiffractionDatasetInputOutputPresenter
 from .metadata import DiffractionMetadataPresenter
 from .patterns import DiffractionPatternPresenter
@@ -40,7 +44,6 @@ class DiffractionPatternArrayPresenter:
 
 
 class DiffractionDatasetPresenter(Observable, Observer):
-
     def __init__(self, settings: PatternSettings, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
@@ -64,30 +67,30 @@ class DiffractionDatasetPresenter(Observable, Observer):
         return self._dataset.getInfoText()
 
     def isMemmapEnabled(self) -> bool:
-        return self._settings.memmapEnabled.value
+        return self._settings.memmapEnabled.getValue()
 
     def setMemmapEnabled(self, value: bool) -> None:
-        self._settings.memmapEnabled.value = value
+        self._settings.memmapEnabled.setValue(value)
 
     def getScratchDirectory(self) -> Path:
-        return self._settings.scratchDirectory.value
+        return self._settings.scratchDirectory.getValue()
 
     def setScratchDirectory(self, directory: Path) -> None:
-        self._settings.scratchDirectory.value = directory
+        self._settings.scratchDirectory.setValue(directory)
 
     def getNumberOfDataThreadsLimits(self) -> Interval[int]:
         return Interval[int](1, 64)
 
     def getNumberOfDataThreads(self) -> int:
         limits = self.getNumberOfDataThreadsLimits()
-        return limits.clamp(self._settings.numberOfDataThreads.value)
+        return limits.clamp(self._settings.numberOfDataThreads.getValue())
 
     def setNumberOfDataThreads(self, number: int) -> None:
-        self._settings.numberOfDataThreads.value = number
+        self._settings.numberOfDataThreads.setValue(number)
 
     @property
     def isAssembled(self) -> bool:
-        return (len(self._dataset) > 0)
+        return len(self._dataset) > 0
 
     def getContentsTree(self) -> SimpleTreeNode:
         return self._dataset.getContentsTree()
@@ -131,35 +134,43 @@ class DiffractionDatasetPresenter(Observable, Observer):
 
 
 class PatternsCore:
-
-    def __init__(self, settingsRegistry: SettingsRegistry,
-                 fileReaderChooser: PluginChooser[DiffractionFileReader],
-                 fileWriterChooser: PluginChooser[DiffractionFileWriter]) -> None:
+    def __init__(
+        self,
+        settingsRegistry: SettingsRegistry,
+        fileReaderChooser: PluginChooser[DiffractionFileReader],
+        fileWriterChooser: PluginChooser[DiffractionFileWriter],
+    ) -> None:
         self.detector = Detector(settingsRegistry)
-        self.detectorPresenter = DetectorPresenter.createInstance(self.detector)
         self.patternSettings = PatternSettings(settingsRegistry)
         self.productSettings = ProductSettings(settingsRegistry)
 
         # TODO vvv refactor vvv
-        fileReaderChooser.setCurrentPluginByName(self.patternSettings.fileType.value)
-        fileWriterChooser.setCurrentPluginByName(self.patternSettings.fileType.value)
+        fileReaderChooser.setCurrentPluginByName(self.patternSettings.fileType.getValue())
+        fileWriterChooser.setCurrentPluginByName(self.patternSettings.fileType.getValue())
         # TODO ^^^^^^^^^^^^^^^^
 
         self.patternSizer = PatternSizer.createInstance(self.patternSettings, self.detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
-            self.patternSettings, self.patternSizer)
+            self.patternSettings, self.patternSizer
+        )
 
         self.dataset = ActiveDiffractionDataset(self.patternSettings, self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self.patternSettings, self.dataset)
-        self.patternsAPI = PatternsAPI(self.patternSettings, self._builder, self.dataset,
-                                       fileReaderChooser, fileWriterChooser)
+        self.patternsAPI = PatternsAPI(
+            self.patternSettings,
+            self._builder,
+            self.dataset,
+            fileReaderChooser,
+            fileWriterChooser,
+        )
 
-        self.metadataPresenter = DiffractionMetadataPresenter(self.dataset, self.detector,
-                                                              self.patternSettings,
-                                                              self.productSettings)
+        self.metadataPresenter = DiffractionMetadataPresenter(
+            self.dataset, self.detector, self.patternSettings, self.productSettings
+        )
         self.datasetPresenter = DiffractionDatasetPresenter(self.patternSettings, self.dataset)
         self.datasetInputOutputPresenter = DiffractionDatasetInputOutputPresenter(
-            self.patternSettings, self.dataset, self.patternsAPI, settingsRegistry)
+            self.patternSettings, self.dataset, self.patternsAPI, settingsRegistry
+        )
 
     def start(self) -> None:
         pass

@@ -3,7 +3,12 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeFileReader, ProbeFileWriter
+from ptychodus.api.probe import (
+    FresnelZonePlate,
+    Probe,
+    ProbeFileReader,
+    ProbeFileWriter,
+)
 
 from ...patterns import ActiveDiffractionDataset, Detector
 from .averagePattern import AveragePatternProbeBuilder
@@ -19,12 +24,15 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeBuilderFactory(Iterable[str]):
-
-    def __init__(self, settings: ProbeSettings, detector: Detector,
-                 patterns: ActiveDiffractionDataset,
-                 fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
-                 fileReaderChooser: PluginChooser[ProbeFileReader],
-                 fileWriterChooser: PluginChooser[ProbeFileWriter]) -> None:
+    def __init__(
+        self,
+        settings: ProbeSettings,
+        detector: Detector,
+        patterns: ActiveDiffractionDataset,
+        fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
+        fileReaderChooser: PluginChooser[ProbeFileReader],
+        fileWriterChooser: PluginChooser[ProbeFileWriter],
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._detector = detector
@@ -48,7 +56,7 @@ class ProbeBuilderFactory(Iterable[str]):
         try:
             factory = self._builders[name]
         except KeyError as exc:
-            raise KeyError(f'Unknown probe builder \"{name}\"!') from exc
+            raise KeyError(f'Unknown probe builder "{name}"!') from exc
 
         return factory()
 
@@ -56,19 +64,19 @@ class ProbeBuilderFactory(Iterable[str]):
         return next(iter(self._builders.values()))()
 
     def createFromSettings(self) -> ProbeBuilder:
-        name = self._settings.builder.value
+        name = self._settings.builder.getValue()
         nameRepaired = name.casefold()
 
         if nameRepaired == 'from_file':
             return self.createProbeFromFile(
-                self._settings.filePath.value,
-                self._settings.fileType.value,
+                self._settings.filePath.getValue(),
+                self._settings.fileType.getValue(),
             )
 
         return self.create(nameRepaired)
 
     def _createAveragePatternBuilder(self) -> ProbeBuilder:
-        return AveragePatternProbeBuilder(self._detector, self._patterns)
+        return AveragePatternProbeBuilder(self._settings, self._detector, self._patterns)
 
     def _createFresnelZonePlateBuilder(self) -> ProbeBuilder:
         return FresnelZonePlateProbeBuilder(self._settings, self._fresnelZonePlateChooser)
@@ -83,7 +91,7 @@ class ProbeBuilderFactory(Iterable[str]):
         self._fileReaderChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileReaderChooser.currentPlugin.simpleName
         fileReader = self._fileReaderChooser.currentPlugin.strategy
-        return FromFileProbeBuilder(filePath, fileType, fileReader)
+        return FromFileProbeBuilder(self._settings, filePath, fileType, fileReader)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()
@@ -94,6 +102,6 @@ class ProbeBuilderFactory(Iterable[str]):
     def saveProbe(self, filePath: Path, fileFilter: str, probe: Probe) -> None:
         self._fileWriterChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        logger.debug(f'Writing "{filePath}" as "{fileType}"')
         fileWriter = self._fileWriterChooser.currentPlugin.strategy
         fileWriter.write(filePath, probe)

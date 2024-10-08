@@ -12,22 +12,29 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoNNTrainingParametersController(Observer):
-
-    def __init__(self, presenter: PtychoNNTrainingPresenter, view: PtychoNNTrainingParametersView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        presenter: PtychoNNTrainingPresenter,
+        view: PtychoNNTrainingParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
     def createInstance(
-            cls, presenter: PtychoNNTrainingPresenter, view: PtychoNNTrainingParametersView,
-            fileDialogFactory: FileDialogFactory) -> PtychoNNTrainingParametersController:
+        cls,
+        presenter: PtychoNNTrainingPresenter,
+        view: PtychoNNTrainingParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> PtychoNNTrainingParametersController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
         view.validationSetFractionalSizeSlider.valueChanged.connect(
-            presenter.setValidationSetFractionalSize)
+            presenter.setValidationSetFractionalSize
+        )
         view.maximumLearningRateLineEdit.valueChanged.connect(presenter.setMaximumLearningRate)
         view.minimumLearningRateLineEdit.valueChanged.connect(presenter.setMinimumLearningRate)
         view.trainingEpochsSpinBox.valueChanged.connect(presenter.setTrainingEpochs)
@@ -41,7 +48,8 @@ class PtychoNNTrainingParametersController(Observer):
         self._view.validationSetFractionalSizeSlider.setValueAndRange(
             self._presenter.getValidationSetFractionalSize(),
             self._presenter.getValidationSetFractionalSizeLimits(),
-            blockValueChangedSignal=True)
+            blockValueChangedSignal=True,
+        )
 
         self._view.maximumLearningRateLineEdit.setMinimum(Decimal())
         self._view.maximumLearningRateLineEdit.setValue(self._presenter.getMaximumLearningRate())
@@ -50,15 +58,18 @@ class PtychoNNTrainingParametersController(Observer):
         self._view.minimumLearningRateLineEdit.setValue(self._presenter.getMinimumLearningRate())
 
         self._view.trainingEpochsSpinBox.blockSignals(True)
-        self._view.trainingEpochsSpinBox.setRange(self._presenter.getTrainingEpochsLimits().lower,
-                                                  self._presenter.getTrainingEpochsLimits().upper)
+        self._view.trainingEpochsSpinBox.setRange(
+            self._presenter.getTrainingEpochsLimits().lower,
+            self._presenter.getTrainingEpochsLimits().upper,
+        )
         self._view.trainingEpochsSpinBox.setValue(self._presenter.getTrainingEpochs())
         self._view.trainingEpochsSpinBox.blockSignals(False)
 
         self._view.statusIntervalSpinBox.blockSignals(True)
         self._view.statusIntervalSpinBox.setRange(
             self._presenter.getStatusIntervalInEpochsLimits().lower,
-            self._presenter.getStatusIntervalInEpochsLimits().upper)
+            self._presenter.getStatusIntervalInEpochsLimits().upper,
+        )
         self._view.statusIntervalSpinBox.setValue(self._presenter.getStatusIntervalInEpochs())
         self._view.statusIntervalSpinBox.blockSignals(False)
 

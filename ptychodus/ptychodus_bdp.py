@@ -19,7 +19,6 @@ def versionString() -> str:
 
 
 class DirectoryType:
-
     def __init__(self, *, must_exist: bool) -> None:
         self._must_exist = must_exist
 
@@ -27,7 +26,7 @@ class DirectoryType:
         path = Path(string)
 
         if self._must_exist and not path.is_dir():
-            raise argparse.ArgumentTypeError(f'\"{string}\" is not a directory!')
+            raise argparse.ArgumentTypeError(f'"{string}" is not a directory!')
 
         return path
 
@@ -176,8 +175,7 @@ def main() -> int:
             replacementPathPrefix=args.remote_path_prefix,
         )
     elif bool(args.local_path_prefix) ^ bool(args.remote_path_prefix):
-        parser.error('--local_path_prefix and --remote_path_prefix'
-                     'must be given together.')
+        parser.error('--local_path_prefix and --remote_path_prefix' 'must be given together.')
 
     if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
         cropCenter = CropCenter(
@@ -202,9 +200,11 @@ def main() -> int:
         logger.warning('Number of GPUs is not implemented yet!')  # TODO
 
     with ModelCore(Path(args.settings.name), isDeveloperModeEnabled=args.dev) as model:
-        model.workflowAPI.openPatterns(Path(args.patterns_file_path.name),
-                                       cropCenter=cropCenter,
-                                       cropExtent=cropExtent)
+        model.workflowAPI.openPatterns(
+            Path(args.patterns_file_path.name),
+            cropCenter=cropCenter,
+            cropExtent=cropExtent,
+        )
 
         workflowProductAPI = model.workflowAPI.createProduct(
             name=args.name,

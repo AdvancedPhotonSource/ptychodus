@@ -7,7 +7,6 @@ from ..model.memory import MemoryPresenter
 
 
 class MemoryController:
-
     def __init__(self, presenter: MemoryPresenter, progressBar: QProgressBar) -> None:
         self._presenter = presenter
         self._progressBar = progressBar

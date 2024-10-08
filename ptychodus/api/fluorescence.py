@@ -21,28 +21,26 @@ class FluorescenceDataset:
 
     # TODO need to communicate association between element map pixels and scan order.
     #      integer-valued, same shape as counts_per_second
-    #scan_indexes: IntegerArray
+    # scan_indexes: IntegerArray
 
 
 class FluorescenceFileReader(ABC):
-
     @abstractmethod
     def read(self, filePath: Path) -> FluorescenceDataset:
-        '''reads a fluorescence dataset from file'''
+        """reads a fluorescence dataset from file"""
         pass
 
 
 class FluorescenceFileWriter(ABC):
-
     @abstractmethod
     def write(self, filePath: Path, dataset: FluorescenceDataset) -> None:
-        '''writes a fluorescence dataset to file'''
+        """writes a fluorescence dataset to file"""
         pass
 
 
 class UpscalingStrategy(ABC):
-    '''Uses ptychography-corrected scan positions to remap element
-    concentrations from the regular scan grid to the upscaled grid'''
+    """Uses ptychography-corrected scan positions to remap element
+    concentrations from the regular scan grid to the upscaled grid"""
 
     @abstractmethod
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
@@ -50,8 +48,8 @@ class UpscalingStrategy(ABC):
 
 
 class DeconvolutionStrategy(ABC):
-    '''Deconvolves the kernel from the accumulated array to obtain the
-    resolution-enhanced element map'''
+    """Deconvolves the kernel from the accumulated array to obtain the
+    resolution-enhanced element map"""
 
     @abstractmethod
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:

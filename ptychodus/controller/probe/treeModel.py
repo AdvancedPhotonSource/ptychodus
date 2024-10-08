@@ -10,7 +10,6 @@ from ...model.product.probe import ProbeRepositoryItem
 
 
 class ProbeTreeNode:
-
     def __init__(self, parent: ProbeTreeNode | None = None) -> None:
         self.parent = parent
         self.children: list[ProbeTreeNode] = list()
@@ -28,18 +27,21 @@ class ProbeTreeNode:
 
 
 class ProbeTreeModel(QAbstractItemModel):
-
-    def __init__(self,
-                 repository: ProbeRepository,
-                 api: ProbeAPI,
-                 parent: QObject | None = None) -> None:
+    def __init__(
+        self, repository: ProbeRepository, api: ProbeAPI, parent: QObject | None = None
+    ) -> None:
         super().__init__(parent)
         self._repository = repository
         self._api = api
         self._treeRoot = ProbeTreeNode()
         self._header = [
-            'Name', 'Relative Power', 'Builder', 'Data Type', 'Width [px]', 'Height [px]',
-            'Size [MB]'
+            'Name',
+            'Relative Power',
+            'Builder',
+            'Data Type',
+            'Width [px]',
+            'Height [px]',
+            'Size [MB]',
         ]
 
         for index, item in enumerate(repository):
@@ -90,20 +92,20 @@ class ProbeTreeModel(QAbstractItemModel):
         self._treeRoot.removeNode(index)
         self.endRemoveRows()
 
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._header[section]
 
     @overload
-    def parent(self, index: QModelIndex) -> QModelIndex:
-        ...
+    def parent(self, index: QModelIndex) -> QModelIndex: ...
 
     @overload
-    def parent(self) -> QObject:
-        ...
+    def parent(self) -> QObject: ...
 
     def parent(self, index: QModelIndex | None = None) -> QModelIndex | QObject:
         if index is None:
@@ -111,8 +113,11 @@ class ProbeTreeModel(QAbstractItemModel):
         elif index.isValid():
             node = index.internalPointer()
             parentNode = node.parent
-            return QModelIndex() if parentNode is self._treeRoot \
-                    else self.createIndex(parentNode.row(), 0, parentNode)
+            return (
+                QModelIndex()
+                if parentNode is self._treeRoot
+                else self.createIndex(parentNode.row(), 0, parentNode)
+            )
 
         return QModelIndex()
 
@@ -148,7 +153,7 @@ class ProbeTreeModel(QAbstractItemModel):
                     return -1
 
                 if numpy.isfinite(relativePower):
-                    return int(100. * relativePower)
+                    return int(100.0 * relativePower)
         else:
             item = self._repository[index.row()]
             probe = item.getProbe()
@@ -171,7 +176,7 @@ class ProbeTreeModel(QAbstractItemModel):
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.getProbe()
                 coherence = probe.getCoherence()
-                return int(100. * coherence) if numpy.isfinite(coherence) else -1
+                return int(100.0 * coherence) if numpy.isfinite(coherence) else -1
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -184,10 +189,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
         return value
 
-    def setData(self,
-                index: QModelIndex,
-                value: Any,
-                role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             parent = index.parent()
 

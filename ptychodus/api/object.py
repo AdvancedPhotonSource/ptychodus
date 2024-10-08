@@ -40,11 +40,11 @@ class ObjectGeometry:
 
     @property
     def minimumXInMeters(self) -> float:
-        return self.centerXInMeters - self.widthInMeters / 2.
+        return self.centerXInMeters - self.widthInMeters / 2.0
 
     @property
     def minimumYInMeters(self) -> float:
-        return self.centerYInMeters - self.heightInMeters / 2.
+        return self.centerYInMeters - self.heightInMeters / 2.0
 
     def getPixelGeometry(self) -> PixelGeometry:
         return PixelGeometry(
@@ -79,26 +79,26 @@ class ObjectGeometry:
         dy = self.centerYInMeters - geometry.centerYInMeters
         dw = self.widthInMeters - geometry.widthInMeters
         dh = self.heightInMeters - geometry.heightInMeters
-        return (abs(dx) <= dw and abs(dy) <= dh)
+        return abs(dx) <= dw and abs(dy) <= dh
 
 
 class ObjectGeometryProvider(ABC):
-
     @abstractmethod
     def getObjectGeometry(self) -> ObjectGeometry:
         pass
 
 
 class Object:
-
-    def __init__(self,
-                 array: ObjectArrayType | None = None,
-                 layerDistanceInMeters: Sequence[float] | None = None,
-                 *,
-                 pixelWidthInMeters: float = 0.,
-                 pixelHeightInMeters: float = 0.,
-                 centerXInMeters: float = 0.,
-                 centerYInMeters: float = 0.) -> None:
+    def __init__(
+        self,
+        array: ObjectArrayType | None = None,
+        layerDistanceInMeters: Sequence[float] | None = None,
+        *,
+        pixelWidthInMeters: float = 0.0,
+        pixelHeightInMeters: float = 0.0,
+        centerXInMeters: float = 0.0,
+        centerYInMeters: float = 0.0,
+    ) -> None:
         if array is None:
             self._array = numpy.zeros((1, 0, 0), dtype=complex)
         else:
@@ -212,32 +212,28 @@ class Object:
 
 
 class ObjectInterpolator(ABC):
-
     @abstractmethod
     def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> Object:
-        '''returns an interpolated patch from the object array'''
+        """returns an interpolated patch from the object array"""
         pass
 
 
 class ObjectPhaseCenteringStrategy(ABC):
-
     @abstractmethod
     def __call__(self, array: ObjectArrayType) -> ObjectArrayType:
-        '''returns the phase-centered array'''
+        """returns the phase-centered array"""
         pass
 
 
 class ObjectFileReader(ABC):
-
     @abstractmethod
     def read(self, filePath: Path) -> Object:
-        '''reads an object from file'''
+        """reads an object from file"""
         pass
 
 
 class ObjectFileWriter(ABC):
-
     @abstractmethod
     def write(self, filePath: Path, object_: Object) -> None:
-        '''writes an object to file'''
+        """writes an object to file"""
         pass

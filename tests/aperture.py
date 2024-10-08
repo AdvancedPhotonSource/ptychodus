@@ -10,13 +10,12 @@ RealArrayType: TypeAlias = numpy.typing.NDArray[numpy.floating[Any]]
 
 
 class SquareAperture:
-
     def __init__(self, width_m: float, wavelength_m: float) -> None:
         self._width_m = width_m
         self._wavelength_m = wavelength_m
 
     def get_fresnel_number(self, z_m: float) -> float:
-        upper = (self._width_m / 2)**2
+        upper = (self._width_m / 2) ** 2
         lower = self._wavelength_m * z_m
         return upper / lower
 
@@ -28,7 +27,7 @@ class SquareAperture:
         return (Cm + Cp + 1j * (Sm + Sp)) / numpy.sqrt(2)
 
     def diffract(self, x_m: RealArrayType, y_m: RealArrayType, z_m: float) -> ComplexArrayType:
-        '''Fresnel diffraction; see Goodman p.100'''
+        """Fresnel diffraction; see Goodman p.100"""
         assert x_m.shape == y_m.shape
         Ix = self._integral1D(x_m, z_m)
         Iy = self._integral1D(y_m, z_m)
@@ -36,19 +35,18 @@ class SquareAperture:
 
 
 class CircularAperture:
-
     def __init__(self, diameter_m: float, wavelength_m: float) -> None:
         self._diameter_m = diameter_m
         self._wavelength_m = wavelength_m
 
     def get_fresnel_number(self, z_m: float) -> float:
-        upper = (self._diameter_m / 2)**2
+        upper = (self._diameter_m / 2) ** 2
         lower = self._wavelength_m * z_m
         return upper / lower
 
     def diffract(self, x_m: RealArrayType, y_m: RealArrayType, z_m: float) -> ComplexArrayType:
-        '''Fresnel diffraction; see Goodman p.102'''
-        assert (x_m.shape == y_m.shape)
+        """Fresnel diffraction; see Goodman p.102"""
+        assert x_m.shape == y_m.shape
 
         twopi = 2 * numpy.pi
         sqrtLZ = numpy.sqrt(self._wavelength_m * z_m)

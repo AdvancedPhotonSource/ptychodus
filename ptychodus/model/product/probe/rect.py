@@ -10,31 +10,26 @@ from .settings import ProbeSettings
 
 
 class RectangularProbeBuilder(ProbeBuilder):
-
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('rectangular')
+        super().__init__(settings, 'rectangular')
         self._settings = settings
 
-        self.widthInMeters = self._registerRealParameter(
-            'width_m',
-            float(settings.rectangleWidthInMeters.value),
-            minimum=0.,
-        )
-        self.heightInMeters = self._registerRealParameter(
-            'height_m',
-            float(settings.rectangleHeightInMeters.value),
-            minimum=0.,
-        )
-        self.defocusDistanceInMeters = self._registerRealParameter(
-            'defocus_distance_m',
-            float(settings.defocusDistanceInMeters.value),
-        )  # from sample to the focal plane
+        self.widthInMeters = settings.rectangleWidthInMeters.copy()
+        self._addParameter('width_m', self.widthInMeters)
+
+        self.heightInMeters = settings.rectangleHeightInMeters.copy()
+        self._addParameter('height_m', self.heightInMeters)
+
+        # from sample to the focal plane
+        self.defocusDistanceInMeters = settings.defocusDistanceInMeters.copy()
+        self._addParameter('defocus_distance_m', self.defocusDistanceInMeters)
 
     def copy(self) -> RectangularProbeBuilder:
         builder = RectangularProbeBuilder(self._settings)
-        builder.widthInMeters.setValue(self.widthInMeters.getValue())
-        builder.heightInMeters.setValue(self.heightInMeters.getValue())
-        builder.defocusDistanceInMeters.setValue(self.defocusDistanceInMeters.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value.getValue())
+
         return builder
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
@@ -42,9 +37,9 @@ class RectangularProbeBuilder(ProbeBuilder):
         coords = self.getTransverseCoordinates(geometry)
 
         aX_m = numpy.fabs(coords.positionXInMeters)
-        rx_m = self.widthInMeters.getValue() / 2.
+        rx_m = self.widthInMeters.getValue() / 2.0
         aY_m = numpy.fabs(coords.positionYInMeters)
-        ry_m = self.heightInMeters.getValue() / 2.
+        ry_m = self.heightInMeters.getValue() / 2.0
 
         isInside = numpy.logical_and(aX_m < rx_m, aY_m < ry_m)
         rect = numpy.where(isInside, 1 + 0j, 0j)

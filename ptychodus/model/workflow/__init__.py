@@ -1,5 +1,10 @@
-from .core import (WorkflowAuthorizationPresenter, WorkflowCore, WorkflowExecutionPresenter,
-                   WorkflowParametersPresenter, WorkflowStatusPresenter)
+from .core import (
+    WorkflowAuthorizationPresenter,
+    WorkflowCore,
+    WorkflowExecutionPresenter,
+    WorkflowParametersPresenter,
+    WorkflowStatusPresenter,
+)
 from .status import WorkflowStatus
 
 __all__ = [

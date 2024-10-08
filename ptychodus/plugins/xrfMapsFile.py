@@ -6,8 +6,12 @@ import numpy
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.typing import RealArrayType
-from ptychodus.api.fluorescence import (ElementMap, FluorescenceDataset, FluorescenceFileReader,
-                                        FluorescenceFileWriter)
+from ptychodus.api.fluorescence import (
+    ElementMap,
+    FluorescenceDataset,
+    FluorescenceFileReader,
+    FluorescenceFileWriter,
+)
 
 
 class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
@@ -79,7 +83,6 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
 
 
 class NPZFluorescenceFileWriter(FluorescenceFileWriter):
-
     def write(self, filePath: Path, dataset: FluorescenceDataset) -> None:
         element_maps = {emap.name: emap.counts_per_second for emap in dataset.element_maps}
         numpy.savez(filePath, **element_maps)

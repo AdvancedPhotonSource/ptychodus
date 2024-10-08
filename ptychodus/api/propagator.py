@@ -17,40 +17,40 @@ def intensity(wavefield: WavefieldArrayType) -> RealArrayType:
 @dataclass(frozen=True)
 class PropagatorParameters:
     wavelength_m: float
-    '''illumination wavelength in meters'''
+    """illumination wavelength in meters"""
     width_px: int
-    '''number of pixels in the x-direction'''
+    """number of pixels in the x-direction"""
     height_px: int
-    '''number of pixels in the y-direction'''
+    """number of pixels in the y-direction"""
     pixel_width_m: float
-    '''source plane pixel width in meters'''
+    """source plane pixel width in meters"""
     pixel_height_m: float
-    '''source plane pixel height in meters'''
+    """source plane pixel height in meters"""
     propagation_distance_m: float
-    '''propagation distance in meters'''
+    """propagation distance in meters"""
 
     @property
     def dx(self) -> float:
-        '''pixel width in wavelengths'''
+        """pixel width in wavelengths"""
         return self.pixel_width_m / self.wavelength_m
 
     @property
     def pixel_aspect_ratio(self) -> float:
-        '''pixel aspect ratio (width / height)'''
+        """pixel aspect ratio (width / height)"""
         return self.pixel_width_m / self.pixel_height_m
 
     @property
     def z(self) -> float:
-        '''propagation distance in wavelengths'''
+        """propagation distance in wavelengths"""
         return self.propagation_distance_m / self.wavelength_m
 
     @property
     def fresnel_number(self) -> float:
-        '''fresnel number'''
+        """fresnel number"""
         return numpy.square(self.dx) / numpy.absolute(self.z)
 
     def get_spatial_coordinates(self) -> tuple[RealArrayType, RealArrayType]:
-        JJ, II = numpy.mgrid[:self.height_px, :self.width_px]
+        JJ, II = numpy.mgrid[: self.height_px, : self.width_px]
         XX = II - self.width_px // 2
         YY = JJ - self.height_px // 2
         return YY, XX
@@ -63,14 +63,12 @@ class PropagatorParameters:
 
 
 class Propagator(ABC):
-
     @abstractmethod
     def propagate(self, wavefield: WavefieldArrayType) -> WavefieldArrayType:
         pass
 
 
 class AngularSpectrumPropagator(Propagator):
-
     def __init__(self, parameters: PropagatorParameters) -> None:
         ar = parameters.pixel_aspect_ratio
 
@@ -87,7 +85,6 @@ class AngularSpectrumPropagator(Propagator):
 
 
 class FresnelTransferFunctionPropagator(Propagator):
-
     def __init__(self, parameters: PropagatorParameters) -> None:
         ar = parameters.pixel_aspect_ratio
 
@@ -103,7 +100,6 @@ class FresnelTransferFunctionPropagator(Propagator):
 
 
 class FresnelTransformPropagator(Propagator):
-
     def __init__(self, parameters: PropagatorParameters) -> None:
         ipi = 1j * numpy.pi
 
@@ -116,7 +112,7 @@ class FresnelTransformPropagator(Propagator):
         C0 = Fr / (1j * ar)
         C1 = numpy.exp(2j * numpy.pi * parameters.z)
         C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)
-        is_forward = (parameters.propagation_distance_m >= 0.)
+        is_forward = parameters.propagation_distance_m >= 0.0
 
         self._is_forward = is_forward
         self._A = C2 * C1 * C0 if is_forward else C2 * C1 / C0
@@ -130,7 +126,6 @@ class FresnelTransformPropagator(Propagator):
 
 
 class FraunhoferPropagator(Propagator):
-
     def __init__(self, parameters: PropagatorParameters) -> None:
         ipi = 1j * numpy.pi
 
@@ -143,7 +138,7 @@ class FraunhoferPropagator(Propagator):
         C0 = Fr / (1j * ar)
         C1 = numpy.exp(2j * numpy.pi * parameters.z)
         C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)
-        is_forward = (parameters.propagation_distance_m >= 0.)
+        is_forward = parameters.propagation_distance_m >= 0.0
 
         self._is_forward = is_forward
         self._A = C2 * C1 * C0 if is_forward else C2 * C1 / C0

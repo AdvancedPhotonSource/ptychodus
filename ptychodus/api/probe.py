@@ -18,8 +18,11 @@ class FresnelZonePlate:
     centralBeamstopDiameterInMeters: float
 
     def getFocalLengthInMeters(self, centralWavelengthInMeters: float) -> float:
-        return self.zonePlateDiameterInMeters * self.outermostZoneWidthInMeters \
-                / centralWavelengthInMeters
+        return (
+            self.zonePlateDiameterInMeters
+            * self.outermostZoneWidthInMeters
+            / centralWavelengthInMeters
+        )
 
 
 @dataclass(frozen=True)
@@ -38,18 +41,21 @@ class ProbeGeometry:
         return self.heightInPixels * self.pixelHeightInMeters
 
     def _asTuple(self) -> tuple[int, int, float, float]:
-        return (self.widthInPixels, self.heightInPixels, self.pixelWidthInMeters,
-                self.pixelHeightInMeters)
+        return (
+            self.widthInPixels,
+            self.heightInPixels,
+            self.pixelWidthInMeters,
+            self.pixelHeightInMeters,
+        )
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ProbeGeometry):
-            return (self._asTuple() == other._asTuple())
+            return self._asTuple() == other._asTuple()
 
         return False
 
 
 class ProbeGeometryProvider(ABC):
-
     @property
     @abstractmethod
     def detectorDistanceInMeters(self) -> float:
@@ -71,22 +77,23 @@ class ProbeGeometryProvider(ABC):
 
 
 class Probe:
-
     @staticmethod
     def _calculateModeRelativePower(array: WavefieldArrayType) -> Sequence[float]:
         power = numpy.sum(intensity(array), axis=(-2, -1))
         powersum = numpy.sum(power)
 
-        if powersum > 0.:
+        if powersum > 0.0:
             power /= powersum
 
         return power.tolist()
 
-    def __init__(self,
-                 array: WavefieldArrayType | None = None,
-                 *,
-                 pixelWidthInMeters: float = 0.,
-                 pixelHeightInMeters: float = 0.) -> None:
+    def __init__(
+        self,
+        array: WavefieldArrayType | None = None,
+        *,
+        pixelWidthInMeters: float = 0.0,
+        pixelHeightInMeters: float = 0.0,
+    ) -> None:
         if array is None:
             self._array = numpy.zeros((1, 0, 0), dtype=complex)
         else:
@@ -183,16 +190,14 @@ class Probe:
 
 
 class ProbeFileReader(ABC):
-
     @abstractmethod
     def read(self, filePath: Path) -> Probe:
-        '''reads a probe from file'''
+        """reads a probe from file"""
         pass
 
 
 class ProbeFileWriter(ABC):
-
     @abstractmethod
     def write(self, filePath: Path, probe: Probe) -> None:
-        '''writes a probe to file'''
+        """writes a probe to file"""
         pass

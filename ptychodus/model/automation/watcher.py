@@ -17,16 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
-
-    def __init__(self, workflow: FileBasedWorkflow,
-                 datasetBuffer: AutomationDatasetBuffer) -> None:
+    def __init__(self, workflow: FileBasedWorkflow, datasetBuffer: AutomationDatasetBuffer) -> None:
         super().__init__()
         self._workflow = workflow
         self._datasetBuffer = datasetBuffer
 
     def on_created_or_modified(self, event: watchdog.events.FileSystemEvent) -> None:
         if not event.is_directory:
-            srcPath = Path(event.src_path)
+            srcPath = Path(str(event.src_path))
 
             if srcPath.match(self._workflow.getWatchFilePattern()):
                 self._datasetBuffer.put(srcPath)
@@ -39,9 +37,12 @@ class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
 
 
 class DataDirectoryWatcher(Observable, Observer):
-
-    def __init__(self, settings: AutomationSettings, workflow: CurrentFileBasedWorkflow,
-                 datasetBuffer: AutomationDatasetBuffer) -> None:
+    def __init__(
+        self,
+        settings: AutomationSettings,
+        workflow: CurrentFileBasedWorkflow,
+        datasetBuffer: AutomationDatasetBuffer,
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._workflow = workflow
@@ -57,25 +58,28 @@ class DataDirectoryWatcher(Observable, Observer):
 
     def _updateWatch(self) -> None:
         self._observer.unschedule_all()
-        dataDirectory = self._settings.dataDirectory.value
+        dataDirectory = self._settings.dataDirectory.getValue()
 
         if dataDirectory.exists():
             observedWatch = self._observer.schedule(
                 event_handler=DataDirectoryEventHandler(self._workflow, self._datasetBuffer),
-                path=dataDirectory,
+                path=str(dataDirectory),
                 recursive=self._workflow.isWatchRecursive,
             )
             logger.debug(observedWatch)
         else:
-            logger.warning(f'Data directory \"{dataDirectory}\" does not exist!')
+            logger.warning(f'Data directory "{dataDirectory}" does not exist!')
 
     def start(self) -> None:
         if self.isAlive:
             logger.error('Automation watchdog thread already started!')
         else:
             logger.info('Starting automation watchdog thread...')
-            self._observer = PollingObserver() if self._settings.useWatchdogPollingObserver.value \
-                    else watchdog.observers.Observer()
+            self._observer = (
+                PollingObserver()
+                if self._settings.useWatchdogPollingObserver.getValue()
+                else watchdog.observers.Observer()
+            )
             self._observer.start()
             self._updateWatch()
             logger.debug('Automation watchdog thread started.')

@@ -15,10 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectBuilderFactory(Iterable[str]):
-
-    def __init__(self, rng: numpy.random.Generator, settings: ObjectSettings,
-                 fileReaderChooser: PluginChooser[ObjectFileReader],
-                 fileWriterChooser: PluginChooser[ObjectFileWriter]) -> None:
+    def __init__(
+        self,
+        rng: numpy.random.Generator,
+        settings: ObjectSettings,
+        fileReaderChooser: PluginChooser[ObjectFileReader],
+        fileWriterChooser: PluginChooser[ObjectFileWriter],
+    ) -> None:
         self._settings = settings
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
@@ -33,7 +36,7 @@ class ObjectBuilderFactory(Iterable[str]):
         try:
             factory = self._builders[name]
         except KeyError as exc:
-            raise KeyError(f'Unknown object builder \"{name}\"!') from exc
+            raise KeyError(f'Unknown object builder "{name}"!') from exc
 
         return factory()
 
@@ -41,13 +44,13 @@ class ObjectBuilderFactory(Iterable[str]):
         return next(iter(self._builders.values()))()
 
     def createFromSettings(self) -> ObjectBuilder:
-        name = self._settings.builder.value
+        name = self._settings.builder.getValue()
         nameRepaired = name.casefold()
 
         if nameRepaired == 'from_file':
             return self.createObjectFromFile(
-                self._settings.filePath.value,
-                self._settings.fileType.value,
+                self._settings.filePath.getValue(),
+                self._settings.fileType.getValue(),
             )
 
         return self.create(nameRepaired)
@@ -62,7 +65,7 @@ class ObjectBuilderFactory(Iterable[str]):
         self._fileReaderChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileReaderChooser.currentPlugin.simpleName
         fileReader = self._fileReaderChooser.currentPlugin.strategy
-        return FromFileObjectBuilder(filePath, fileType, fileReader)
+        return FromFileObjectBuilder(self._settings, filePath, fileType, fileReader)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._fileWriterChooser.getDisplayNameList()
@@ -73,6 +76,6 @@ class ObjectBuilderFactory(Iterable[str]):
     def saveObject(self, filePath: Path, fileFilter: str, object_: Object) -> None:
         self._fileWriterChooser.setCurrentPluginByName(fileFilter)
         fileType = self._fileWriterChooser.currentPlugin.simpleName
-        logger.debug(f'Writing \"{filePath}\" as \"{fileType}\"')
+        logger.debug(f'Writing "{filePath}" as "{fileType}"')
         fileWriter = self._fileWriterChooser.currentPlugin.strategy
         fileWriter.write(filePath, object_)

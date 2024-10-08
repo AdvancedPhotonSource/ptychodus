@@ -18,7 +18,6 @@ class AutomationDatasetState(Enum):
 
 
 class AutomationDatasetRepository(Observable):
-
     def __init__(self, settings: AutomationSettings) -> None:
         super().__init__()
         self._settings = settings
@@ -53,7 +52,7 @@ class AutomationDatasetRepository(Observable):
     def getLabel(self, index: int) -> str:
         with self._lock:
             filePath = self._fileList[index]
-            return str(filePath.relative_to(self._settings.dataDirectory.value))
+            return str(filePath.relative_to(self._settings.dataDirectory.getValue()))
 
     def getState(self, index: int) -> AutomationDatasetState:
         with self._lock:

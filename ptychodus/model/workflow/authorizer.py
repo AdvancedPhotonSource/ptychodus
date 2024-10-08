@@ -5,7 +5,6 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowAuthorizer:
-
     def __init__(self) -> None:
         super().__init__()
         self._authorizeLock = threading.Lock()
@@ -40,5 +39,5 @@ class WorkflowAuthorizer:
             self.isAuthorizedEvent.clear()
 
         while not self.shutdownEvent.is_set():
-            if self.isAuthorizedEvent.wait(timeout=1.):
+            if self.isAuthorizedEvent.wait(timeout=1.0):
                 break

@@ -9,9 +9,11 @@ from .settings import AutomationSettings
 
 
 class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
-
-    def __init__(self, settings: AutomationSettings,
-                 workflowChooser: PluginChooser[FileBasedWorkflow]) -> None:
+    def __init__(
+        self,
+        settings: AutomationSettings,
+        workflowChooser: PluginChooser[FileBasedWorkflow],
+    ) -> None:
         super().__init__()
         self._settings = settings
         self._workflowChooser = workflowChooser
@@ -27,7 +29,7 @@ class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
 
     def setWorkflow(self, name: str) -> None:
         self._workflowChooser.setCurrentPluginByName(name)
-        self._settings.strategy.value = self._workflowChooser.currentPlugin.simpleName
+        self._settings.strategy.setValue(self._workflowChooser.currentPlugin.simpleName)
 
     @property
     def isWatchRecursive(self) -> bool:
@@ -44,6 +46,6 @@ class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.setWorkflow(self._settings.strategy.value)
+            self.setWorkflow(self._settings.strategy.getValue())
         if observable is self._workflowChooser:
             self.notifyObservers()

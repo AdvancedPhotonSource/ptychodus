@@ -1,14 +1,28 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QFormLayout, QGridLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QListView, QPushButton, QRadioButton, QSlider,
-                             QSpinBox, QStatusBar, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QListView,
+    QPushButton,
+    QRadioButton,
+    QSlider,
+    QSpinBox,
+    QStatusBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .visualization import VisualizationParametersView, VisualizationWidget
 from .widgets import DecimalLineEdit, LengthWidget
 
 
 class ProbePropagationParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
         self.beginCoordinateWidget = LengthWidget.createInstance(isSigned=True)
@@ -32,7 +46,6 @@ class ProbePropagationParametersView(QGroupBox):
 
 
 class ProbePropagationDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.xyView = VisualizationWidget.createInstance('XY Plane')
@@ -71,7 +84,6 @@ class ProbePropagationDialog(QDialog):
 
 
 class STXMDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.visualizationWidget = VisualizationWidget.createInstance('Transmission')
@@ -95,13 +107,12 @@ class STXMDialog(QDialog):
 
 
 class ExposureParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
         self.quantitativeProbeCheckBox = QCheckBox('Quantitative Probe')
         self.photonFluxLineEdit = DecimalLineEdit.createInstance()
         self.exposureTimeLineEdit = DecimalLineEdit.createInstance()
-        self.massAttenuationLabel = QLabel('Mass Attenuation [m\u00B2/kg]:')
+        self.massAttenuationLabel = QLabel('Mass Attenuation [m\u00b2/kg]:')
         self.massAttenuationLineEdit = DecimalLineEdit.createInstance()
 
         layout = QFormLayout()
@@ -114,13 +125,12 @@ class ExposureParametersView(QGroupBox):
 
 
 class ExposureQuantityView(QGroupBox):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Quantity', parent)
         self.photonCountButton = QRadioButton('Photon Count')
         self.photonFluxButton = QRadioButton('Photon Flux [Hz]')
-        self.exposureButton = QRadioButton('Exposure [J/m\u00B2]')
-        self.irradianceButton = QRadioButton('Irradiance [W/m\u00B2]')
+        self.exposureButton = QRadioButton('Exposure [J/m\u00b2]')
+        self.irradianceButton = QRadioButton('Irradiance [W/m\u00b2]')
         self.doseButton = QRadioButton('Dose [Gy]')
         self.doseRateButton = QRadioButton('Dose Rate [Gy/s]')
 
@@ -135,7 +145,6 @@ class ExposureQuantityView(QGroupBox):
 
 
 class ExposureDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.visualizationWidget = VisualizationWidget.createInstance('Visualization')
@@ -163,7 +172,6 @@ class ExposureDialog(QDialog):
 
 
 class FluorescenceParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
         self.openButton = QPushButton('Open')
@@ -184,7 +192,6 @@ class FluorescenceParametersView(QGroupBox):
 
 
 class FluorescenceDialog(QDialog):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.measuredWidget = VisualizationWidget.createInstance('Measured')

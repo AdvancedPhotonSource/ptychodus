@@ -4,7 +4,6 @@ from ptychodus.api.scan import ScanPoint
 
 
 class ObjectLinearInterpolator(ObjectInterpolator):
-
     def __init__(self, object_: Object) -> None:
         self._object = object_
 
@@ -14,8 +13,10 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         patchWidth = patchExtent.widthInPixels
         patchRadiusXInMeters = geometry.pixelWidthInMeters * patchWidth / 2
         patchMinimumXInMeters = patchCenter.positionXInMeters - patchRadiusXInMeters
-        ixBeginF, xi = divmod(patchMinimumXInMeters - geometry.minimumXInMeters,
-                              geometry.pixelWidthInMeters)
+        ixBeginF, xi = divmod(
+            patchMinimumXInMeters - geometry.minimumXInMeters,
+            geometry.pixelWidthInMeters,
+        )
         ixBegin = int(ixBeginF)
         ixEnd = ixBegin + patchWidth
         ixSlice0 = slice(ixBegin, ixEnd)
@@ -24,15 +25,17 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         patchHeight = patchExtent.heightInPixels
         patchRadiusYInMeters = geometry.pixelHeightInMeters * patchHeight / 2
         patchMinimumYInMeters = patchCenter.positionYInMeters - patchRadiusYInMeters
-        iyBeginF, eta = divmod(patchMinimumYInMeters - geometry.minimumYInMeters,
-                               geometry.pixelHeightInMeters)
+        iyBeginF, eta = divmod(
+            patchMinimumYInMeters - geometry.minimumYInMeters,
+            geometry.pixelHeightInMeters,
+        )
         iyBegin = int(iyBeginF)
         iyEnd = iyBegin + patchHeight
         iySlice0 = slice(iyBegin, iyEnd)
         iySlice1 = slice(iyBegin + 1, iyEnd + 1)
 
-        xiC = 1. - xi
-        etaC = 1. - eta
+        xiC = 1.0 - xi
+        etaC = 1.0 - eta
 
         w00 = xiC * etaC
         w01 = xi * etaC

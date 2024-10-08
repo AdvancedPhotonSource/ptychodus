@@ -14,11 +14,12 @@ class ColormapParameter(Parameter[str], Observer):
     CYCLIC_COLORMAPS: Final[tuple[str, ...]] = ('hsv', 'twilight', 'twilight_shifted')
 
     def __init__(self, *, isCyclic: bool) -> None:
-        super().__init__('')
+        super().__init__()
+        self._isCyclic = isCyclic
         self._chooser = PluginChooser[Colormap]()
 
         for name, cmap in matplotlib.colormaps.items():
-            isCyclicColormap = (name in ColormapParameter.CYCLIC_COLORMAPS)
+            isCyclicColormap = name in ColormapParameter.CYCLIC_COLORMAPS
 
             if isCyclic == isCyclicColormap:
                 self._chooser.registerPlugin(cmap, displayName=name)
@@ -30,13 +31,26 @@ class ColormapParameter(Parameter[str], Observer):
         for name in self._chooser.getDisplayNameList():
             yield name
 
+    def getValue(self) -> str:
+        return self._chooser.currentPlugin.displayName
+
     def setValue(self, value: str, *, notify: bool = True) -> None:
         self._chooser.setCurrentPluginByName(value)
-        super().setValue(self._chooser.currentPlugin.displayName, notify=notify)
+
+    def getValueAsString(self) -> str:
+        return self.getValue()
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(value)
+
+    def copy(self) -> Parameter[str]:
+        parameter = ColormapParameter(isCyclic=self._isCyclic)
+        parameter.setValue(self.getValue())
+        return parameter
 
     def getPlugin(self) -> Colormap:
         return self._chooser.currentPlugin.strategy
 
     def update(self, observable: Observable) -> None:
         if observable is self._chooser:
-            super().setValue(self._chooser.currentPlugin.displayName)
+            self.notifyObservers()

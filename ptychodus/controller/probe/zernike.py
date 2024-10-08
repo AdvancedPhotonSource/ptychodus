@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class ZernikeTableModel(QAbstractTableModel):
-
     def __init__(self, builder: ZernikeProbeBuilder, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._builder = builder
@@ -30,10 +29,12 @@ class ZernikeTableModel(QAbstractTableModel):
 
         return value
 
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._header[section]
 
@@ -58,10 +59,7 @@ class ZernikeTableModel(QAbstractTableModel):
             elif index.column() == 3:
                 return f'{numpy.angle(coef):.6g}'
 
-    def setData(self,
-                index: QModelIndex,
-                value: Any,
-                role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
         if not index.isValid():
             return False
 

@@ -7,15 +7,21 @@ from ...model.visualization import VisualizationEngine
 from ...view.probe import STXMDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..visualization import VisualizationParametersController, VisualizationWidgetController
+from ..visualization import (
+    VisualizationParametersController,
+    VisualizationWidgetController,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class STXMViewController(Observer):
-
-    def __init__(self, simulator: STXMSimulator, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        simulator: STXMSimulator,
+        engine: VisualizationEngine,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._simulator = simulator
         self._fileDialogFactory = fileDialogFactory
@@ -24,9 +30,14 @@ class STXMViewController(Observer):
         self._dialog.saveButton.clicked.connect(self._saveResult)
 
         self._visualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.visualizationWidget, self._dialog.statusBar, fileDialogFactory)
+            engine,
+            self._dialog.visualizationWidget,
+            self._dialog.statusBar,
+            fileDialogFactory,
+        )
         self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.visualizationParametersView)
+            engine, self._dialog.visualizationParametersView
+        )
 
         simulator.addObserver(self)
 
@@ -50,7 +61,8 @@ class STXMViewController(Observer):
             self._dialog,
             title,
             nameFilters=self._simulator.getSaveFileFilterList(),
-            selectedNameFilter=self._simulator.getSaveFileFilter())
+            selectedNameFilter=self._simulator.getSaveFileFilter(),
+        )
 
         if filePath:
             try:

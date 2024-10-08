@@ -5,8 +5,12 @@ import threading
 
 import numpy
 
-from ptychodus.api.patterns import (DiffractionDataset, DiffractionPatternArray,
-                                    DiffractionPatternState, SimpleDiffractionPatternArray)
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionPatternArray,
+    DiffractionPatternState,
+    SimpleDiffractionPatternArray,
+)
 
 from .active import ActiveDiffractionDataset
 from .settings import PatternSettings
@@ -19,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class ActiveDiffractionDatasetBuilder:
-
     def __init__(self, settings: PatternSettings, dataset: ActiveDiffractionDataset) -> None:
         super().__init__()
         self._settings = settings
@@ -31,7 +34,7 @@ class ActiveDiffractionDatasetBuilder:
 
     @property
     def isAssembling(self) -> bool:
-        return (len(self._workers) > 0)
+        return len(self._workers) > 0
 
     def _getArrayAndAssemble(self) -> None:
         while not self._stopWorkEvent.is_set():
@@ -92,7 +95,7 @@ class ActiveDiffractionDatasetBuilder:
         logger.info('Starting data assembler...')
         self._stopWorkEvent.clear()
 
-        for idx in range(self._settings.numberOfDataThreads.value):
+        for idx in range(self._settings.numberOfDataThreads.getValue()):
             thread = threading.Thread(target=self._getArrayAndAssemble)
             thread.start()
             self._workers.append(thread)

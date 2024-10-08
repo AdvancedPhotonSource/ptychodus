@@ -10,9 +10,12 @@ from ...model.patterns import DiffractionPatternArrayPresenter
 
 
 class DatasetTreeNode:
-
-    def __init__(self, parentItem: DatasetTreeNode | None,
-                 presenter: DiffractionPatternArrayPresenter, frameIndex: int) -> None:
+    def __init__(
+        self,
+        parentItem: DatasetTreeNode | None,
+        presenter: DiffractionPatternArrayPresenter,
+        frameIndex: int,
+    ) -> None:
         self.parentItem = parentItem
         self._presenter = presenter
         self._frameIndex = frameIndex
@@ -77,7 +80,6 @@ class DatasetTreeNode:
 
 
 class DatasetTreeModel(QAbstractItemModel):
-
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rootNode = DatasetTreeNode.createRoot()
@@ -89,12 +91,10 @@ class DatasetTreeModel(QAbstractItemModel):
         self.endResetModel()
 
     @overload
-    def parent(self, child: QModelIndex) -> QModelIndex:
-        ...
+    def parent(self, child: QModelIndex) -> QModelIndex: ...
 
     @overload
-    def parent(self) -> QObject:
-        ...
+    def parent(self) -> QObject: ...
 
     def parent(self, child: QModelIndex | None = None) -> QModelIndex | QObject:
         if child is None:
@@ -113,10 +113,12 @@ class DatasetTreeModel(QAbstractItemModel):
 
             return value
 
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._header[section]
 

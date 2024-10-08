@@ -8,7 +8,6 @@ from .tree import SimpleTreeModel
 
 
 class PatternsInfoViewController(Observer):
-
     def __init__(self, presenter: DiffractionDatasetPresenter, treeModel: SimpleTreeModel) -> None:
         super().__init__()
         self._presenter = presenter

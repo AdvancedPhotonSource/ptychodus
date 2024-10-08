@@ -62,10 +62,12 @@ class XMCDAnalyzer:
 
         polar_difference = numpy.log(ratio, out=numpy.zeros_like(ratio), where=(ratio > 0))
         polar_sum = numpy.log(product, out=numpy.zeros_like(product), where=(product > 0))
-        polar_ratio = numpy.divide(polar_difference,
-                                   polar_sum,
-                                   out=numpy.zeros_like(polar_sum),
-                                   where=(polar_sum > 0))
+        polar_ratio = numpy.divide(
+            polar_difference,
+            polar_sum,
+            out=numpy.zeros_like(polar_sum),
+            where=(polar_sum > 0),
+        )
 
         return XMCDResult(
             pixel_width_m=rcircObject.pixelWidthInMeters,

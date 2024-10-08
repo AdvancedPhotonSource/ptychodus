@@ -32,8 +32,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.ruff]
-line-length = 99
+line-length = 100
 
-[tool.yapf]
-based_on_style = "pep8"
-column_limit = 99
+[tool.ruff.format]
+quote-style = "single"

@@ -4,8 +4,12 @@ import logging
 import h5py
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                    SimpleDiffractionDataset)
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionMetadata,
+    SimpleDiffractionDataset,
+)
 from ptychodus.api.plugins import PluginRegistry
 
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
@@ -14,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 class LYNXDiffractionFileReader(DiffractionFileReader):
-
     def __init__(self) -> None:
         self._dataPath = '/entry/data/eiger_4'
         self._treeBuilder = H5DiffractionFileTreeBuilder()
@@ -52,7 +55,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
                     dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file "{filePath}".')
 
         return dataset
 

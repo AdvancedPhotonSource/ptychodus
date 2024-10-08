@@ -13,52 +13,44 @@ __all__ = [
 
 
 class CylindricalColorModel(ABC):
-
     @abstractmethod
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         pass
 
 
 class HSVSaturationColorModel(CylindricalColorModel):
-
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, x, 1.0), 1.0
 
 
 class HSVValueColorModel(CylindricalColorModel):
-
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, x), 1.0
 
 
 class HSVAlphaColorModel(CylindricalColorModel):
-
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hsv_to_rgb(h, 1.0, 1.0), x
 
 
 class HLSLightnessColorModel(CylindricalColorModel):
-
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, x, 1.0), 1.0
 
 
 class HLSSaturationColorModel(CylindricalColorModel):
-
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, x), 1.0
 
 
 class HLSAlphaColorModel(CylindricalColorModel):
-
     def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
         return *colorsys.hls_to_rgb(h, 0.5, 1.0), x
 
 
 class CylindricalColorModelParameter(Parameter[str], Observer):
-
     def __init__(self) -> None:
-        super().__init__('')
+        super().__init__()
         self._chooser = PluginChooser[CylindricalColorModel]()
         self._chooser.registerPlugin(
             HSVSaturationColorModel(),
@@ -97,13 +89,26 @@ class CylindricalColorModelParameter(Parameter[str], Observer):
         for name in self._chooser.getDisplayNameList():
             yield name
 
+    def getValue(self) -> str:
+        return self._chooser.currentPlugin.displayName
+
     def setValue(self, value: str, *, notify: bool = True) -> None:
         self._chooser.setCurrentPluginByName(value)
-        super().setValue(self._chooser.currentPlugin.displayName, notify=notify)
+
+    def getValueAsString(self) -> str:
+        return self.getValue()
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue(value)
+
+    def copy(self) -> Parameter[str]:
+        parameter = CylindricalColorModelParameter()
+        parameter.setValue(self.getValue())
+        return parameter
 
     def getPlugin(self) -> CylindricalColorModel:
         return self._chooser.currentPlugin.strategy
 
     def update(self, observable: Observable) -> None:
         if observable is self._chooser:
-            super().setValue(self._chooser.currentPlugin.displayName)
+            self.notifyObservers()

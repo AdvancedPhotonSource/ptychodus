@@ -5,9 +5,19 @@ import numpy
 
 from PyQt5.QtCore import Qt, QPoint, QRect, QRectF, QSize
 from PyQt5.QtGui import QColor, QConicalGradient, QIcon, QLinearGradient, QPainter, QPen
-from PyQt5.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
-                             QHBoxLayout, QPushButton, QSizePolicy, QToolButton, QVBoxLayout,
-                             QWidget)
+from PyQt5.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGridLayout,
+    QHBoxLayout,
+    QPushButton,
+    QSizePolicy,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ptychodus.api.visualization import RealArrayType
 
@@ -16,7 +26,6 @@ from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
 class ImageDisplayRangeDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.buttonBox = QDialogButtonBox()
@@ -42,7 +51,6 @@ class ImageDisplayRangeDialog(QDialog):
 
 
 class ImageToolsGroupBox(BottomTitledGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Tools', parent)
         self.homeButton = QToolButton()
@@ -95,7 +103,6 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
 
 
 class ImageRendererGroupBox(BottomTitledGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Colorize', parent)
         self.rendererComboBox = QComboBox()
@@ -123,7 +130,6 @@ class ImageRendererGroupBox(BottomTitledGroupBox):
 
 
 class ImageDataRangeGroupBox(BottomTitledGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Data Range', parent)
         self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
@@ -161,7 +167,6 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
 
 
 class ImageRibbon(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.imageToolsGroupBox = ImageToolsGroupBox.createInstance()
@@ -185,11 +190,10 @@ class ImageRibbon(QWidget):
 
 
 class ImageWidget(VisualizationView):
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._colorLegendMinValue = 0.
-        self._colorLegendMaxValue = 1.
+        self._colorLegendMinValue = 0.0
+        self._colorLegendMaxValue = 1.0
         self._colorLegendStopPoints: list[tuple[float, QColor]] = [
             (0.0, QColor(Qt.GlobalColor.green)),
             (0.5, QColor(Qt.GlobalColor.yellow)),
@@ -199,15 +203,19 @@ class ImageWidget(VisualizationView):
         self._isColorLegendVisible = False
         self._isColorLegendCyclic = False
 
-    def setColorLegendColors(self, values: RealArrayType, rgbaArray: RealArrayType,
-                             isCyclic: bool) -> None:
+    def setColorLegendColors(
+        self, values: RealArrayType, rgbaArray: RealArrayType, isCyclic: bool
+    ) -> None:
         colorLegendStopPoints: list[tuple[float, QColor]] = list()
         self._colorLegendMinValue = values.min()
         self._colorLegendMaxValue = values.max()
 
         valueRange = self._colorLegendMaxValue - self._colorLegendMinValue
-        normalizedValues = (values - self._colorLegendMinValue) / valueRange if valueRange > 0 \
-                else numpy.full_like(values, 0.5)
+        normalizedValues = (
+            (values - self._colorLegendMinValue) / valueRange
+            if valueRange > 0
+            else numpy.full_like(values, 0.5)
+        )
 
         for x, rgba in zip(normalizedValues.clip(0, 1), rgbaArray):
             color = QColor()
@@ -226,7 +234,7 @@ class ImageWidget(VisualizationView):
     def _colorLegendTicks(self) -> Iterator[float]:
         for tick in range(self._colorLegendNumberOfTicks):
             a = tick / (self._colorLegendNumberOfTicks - 1)
-            yield (1. - a) * self._colorLegendMinValue + a * self._colorLegendMaxValue
+            yield (1.0 - a) * self._colorLegendMinValue + a * self._colorLegendMaxValue
 
     def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
         if not self._isColorLegendVisible:
@@ -252,7 +260,7 @@ class ImageWidget(VisualizationView):
             legendRect.moveRight(widgetRect.right() - legendMargin)
             legendRect.moveBottom(widgetRect.height() - legendMargin)
 
-            cgradient = QConicalGradient(legendRect.center(), 90.)
+            cgradient = QConicalGradient(legendRect.center(), 90.0)
             cgradient.setStops(self._colorLegendStopPoints)
             fgPainter.setBrush(cgradient)
             fgPainter.drawEllipse(legendRect)
@@ -283,7 +291,6 @@ class ImageWidget(VisualizationView):
 
 
 class ImageView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.imageRibbon = ImageRibbon.createInstance()

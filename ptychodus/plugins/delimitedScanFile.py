@@ -2,12 +2,16 @@ from pathlib import Path
 import csv
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import (Scan, ScanFileReader, ScanFileWriter, ScanPoint,
-                                ScanPointParseError)
+from ptychodus.api.scan import (
+    Scan,
+    ScanFileReader,
+    ScanFileWriter,
+    ScanPoint,
+    ScanPointParseError,
+)
 
 
 class DelimitedScanFileReader(ScanFileReader):
-
     def __init__(self, delimiter: str, swapXY: bool) -> None:
         self._delimiter = delimiter
         self._swapXY = swapXY
@@ -39,7 +43,6 @@ class DelimitedScanFileReader(ScanFileReader):
 
 
 class DelimitedScanFileWriter(ScanFileWriter):
-
     def __init__(self, delimiter: str, swapXY: bool) -> None:
         self._delimiter = delimiter
         self._swapXY = swapXY
@@ -49,8 +52,9 @@ class DelimitedScanFileWriter(ScanFileWriter):
             for point in scan:
                 x = point.positionXInMeters
                 y = point.positionYInMeters
-                line = f'{y}{self._delimiter}{x}\n' if self._swapXY \
-                        else f'{x}{self._delimiter}{y}\n'
+                line = (
+                    f'{y}{self._delimiter}{x}\n' if self._swapXY else f'{x}{self._delimiter}{y}\n'
+                )
                 csvFile.write(line)
 
 

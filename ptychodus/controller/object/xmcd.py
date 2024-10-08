@@ -5,16 +5,23 @@ from ...model.visualization import VisualizationEngine
 from ...view.object import XMCDDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..visualization import VisualizationParametersController, VisualizationWidgetController
+from ..visualization import (
+    VisualizationParametersController,
+    VisualizationWidgetController,
+)
 from .treeModel import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
 
 
 class XMCDViewController:
-
-    def __init__(self, analyzer: XMCDAnalyzer, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory, treeModel: ObjectTreeModel) -> None:
+    def __init__(
+        self,
+        analyzer: XMCDAnalyzer,
+        engine: VisualizationEngine,
+        fileDialogFactory: FileDialogFactory,
+        treeModel: ObjectTreeModel,
+    ) -> None:
         super().__init__()
         self._analyzer = analyzer
         self._engine = engine
@@ -28,13 +35,20 @@ class XMCDViewController:
         self._dialog.parametersView.saveButton.clicked.connect(self._saveResult)
 
         self._differenceVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.differenceWidget, self._dialog.statusBar, fileDialogFactory)
+            engine,
+            self._dialog.differenceWidget,
+            self._dialog.statusBar,
+            fileDialogFactory,
+        )
         self._sumVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.sumWidget, self._dialog.statusBar, fileDialogFactory)
+            engine, self._dialog.sumWidget, self._dialog.statusBar, fileDialogFactory
+        )
         self._ratioVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.ratioWidget, self._dialog.statusBar, fileDialogFactory)
+            engine, self._dialog.ratioWidget, self._dialog.statusBar, fileDialogFactory
+        )
         self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.parametersView.visualizationParametersView)
+            engine, self._dialog.parametersView.visualizationParametersView
+        )
         self._result: XMCDResult | None = None
 
     def _analyze(self) -> None:
@@ -52,13 +66,16 @@ class XMCDViewController:
             return
 
         self._result = result
-        self._differenceVisualizationWidgetController.setArray(result.polar_difference[0, :, :],
-                                                               result.pixel_geometry)
-        self._sumVisualizationWidgetController.setArray(result.polar_sum[0, :, :],
-                                                        result.pixel_geometry)
+        self._differenceVisualizationWidgetController.setArray(
+            result.polar_difference[0, :, :], result.pixel_geometry
+        )
+        self._sumVisualizationWidgetController.setArray(
+            result.polar_sum[0, :, :], result.pixel_geometry
+        )
         # TODO support multi-layer objects
-        self._ratioVisualizationWidgetController.setArray(result.polar_ratio[0, :, :],
-                                                          result.pixel_geometry)
+        self._ratioVisualizationWidgetController.setArray(
+            result.polar_ratio[0, :, :], result.pixel_geometry
+        )
 
     def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> None:
         self._dialog.parametersView.lcircComboBox.setCurrentIndex(lcircItemIndex)
@@ -76,7 +93,8 @@ class XMCDViewController:
             self._dialog,
             title,
             nameFilters=self._analyzer.getSaveFileFilterList(),
-            selectedNameFilter=self._analyzer.getSaveFileFilter())
+            selectedNameFilter=self._analyzer.getSaveFileFilter(),
+        )
 
         if filePath:
             try:

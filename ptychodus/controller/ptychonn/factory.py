@@ -9,9 +9,9 @@ from .controller import PtychoNNParametersController
 
 
 class PtychoNNViewControllerFactory(ReconstructorViewControllerFactory):
-
-    def __init__(self, model: PtychoNNReconstructorLibrary,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self, model: PtychoNNReconstructorLibrary, fileDialogFactory: FileDialogFactory
+    ) -> None:
         super().__init__()
         self._model = model
         self._fileDialogFactory = fileDialogFactory
@@ -24,9 +24,12 @@ class PtychoNNViewControllerFactory(ReconstructorViewControllerFactory):
     def createViewController(self, reconstructorName: str) -> QWidget:
         view = PtychoNNParametersView.createInstance()
 
-        controller = PtychoNNParametersController.createInstance(self._model.modelPresenter,
-                                                                 self._model.trainingPresenter,
-                                                                 view, self._fileDialogFactory)
+        controller = PtychoNNParametersController.createInstance(
+            self._model.modelPresenter,
+            self._model.trainingPresenter,
+            view,
+            self._fileDialogFactory,
+        )
         self._controllerList.append(controller)
 
         return view

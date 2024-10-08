@@ -7,10 +7,15 @@ import numpy
 import tables
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (DiffractionPatternArrayType, DiffractionDataset,
-                                    DiffractionFileReader, DiffractionMetadata,
-                                    DiffractionPatternArray, DiffractionPatternState,
-                                    SimpleDiffractionDataset)
+from ptychodus.api.patterns import (
+    DiffractionPatternArrayType,
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionMetadata,
+    DiffractionPatternArray,
+    DiffractionPatternState,
+    SimpleDiffractionDataset,
+)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
 
@@ -20,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 class PyTablesDiffractionPatternArray(DiffractionPatternArray):
-
     def __init__(self, label: str, index: int, filePath: Path, dataPath: str) -> None:
         super().__init__()
         self._label = label
@@ -51,7 +55,8 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
                     self._state = DiffractionPatternState.FOUND
                 else:
                     raise ValueError(
-                        f'Symlink {self._filePath}:{self._dataPath} is not a tables File!')
+                        f'Symlink {self._filePath}:{self._dataPath} is not a tables File!'
+                    )
 
             data = item[:]
 
@@ -59,7 +64,6 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
 
 
 class LCLSDiffractionFileReader(DiffractionFileReader):
-
     def __init__(self) -> None:
         self._dataPath = '/jungfrau1M/image_img'
         self._treeBuilder = H5DiffractionFileTreeBuilder()
@@ -97,7 +101,7 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
 
             dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
-            logger.debug(f'Unable to read file \"{filePath}\".')
+            logger.debug(f'Unable to read file "{filePath}".')
 
         return dataset
 
@@ -105,8 +109,12 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
 class LCLSScanFileReader(ScanFileReader):
     MICRONS_TO_METERS: Final[float] = 1e-6
 
-    def __init__(self, tomographyAngleInDegrees: float, ipm2LowThreshold: float,
-                 ipm2HighThreshold: float) -> None:
+    def __init__(
+        self,
+        tomographyAngleInDegrees: float,
+        ipm2LowThreshold: float,
+        ipm2HighThreshold: float,
+    ) -> None:
         self._tomographyAngleInDegrees = tomographyAngleInDegrees
         self._ipm2LowThreshold = ipm2LowThreshold
         self._ipm2HighThreshold = ipm2HighThreshold
@@ -156,9 +164,9 @@ def registerPlugins(registry: PluginRegistry) -> None:
     )
     registry.scanFileReaders.registerPlugin(
         LCLSScanFileReader(
-            tomographyAngleInDegrees=180.,
-            ipm2LowThreshold=2500.,
-            ipm2HighThreshold=6000.,
+            tomographyAngleInDegrees=180.0,
+            ipm2LowThreshold=2500.0,
+            ipm2HighThreshold=6000.0,
         ),
         simpleName=SIMPLE_NAME,
         displayName='LCLS XPP Scan Files (*.h5 *.hdf5)',

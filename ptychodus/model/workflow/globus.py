@@ -71,7 +71,6 @@ class PtychodusClient(gladier.GladierBaseClient):
 
 
 class CustomCodeHandler(fair_research_login.CodeHandler):
-
     def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         super().__init__()
         self._authorizer = authorizer
@@ -86,14 +85,12 @@ class CustomCodeHandler(fair_research_login.CodeHandler):
 
 
 class PtychodusClientBuilder(ABC):
-
     @abstractmethod
     def build(self) -> gladier.GladierBaseClient:
         pass
 
 
 class NativePtychodusClientBuilder(PtychodusClientBuilder):
-
     def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         super().__init__()
         self._authClient = fair_research_login.NativeClient(
@@ -128,7 +125,6 @@ class NativePtychodusClientBuilder(PtychodusClientBuilder):
 
 
 class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
-
     def __init__(self, clientID: str, clientSecret: str, flowID: str | None) -> None:
         super().__init__()
         self._authClient = globus_sdk.ConfidentialAppAuthClient(
@@ -158,9 +154,13 @@ class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
 
 
 class GlobusWorkflowThread(threading.Thread):
-
-    def __init__(self, authorizer: WorkflowAuthorizer, statusRepository: WorkflowStatusRepository,
-                 executor: WorkflowExecutor, clientBuilder: PtychodusClientBuilder) -> None:
+    def __init__(
+        self,
+        authorizer: WorkflowAuthorizer,
+        statusRepository: WorkflowStatusRepository,
+        executor: WorkflowExecutor,
+        clientBuilder: PtychodusClientBuilder,
+    ) -> None:
         super().__init__()
         self._authorizer = authorizer
         self._statusRepository = statusRepository
@@ -174,9 +174,12 @@ class GlobusWorkflowThread(threading.Thread):
         self.__gladierClient: gladier.GladierBaseClient | None = None
 
     @classmethod
-    def createInstance(cls, authorizer: WorkflowAuthorizer,
-                       statusRepository: WorkflowStatusRepository,
-                       executor: WorkflowExecutor) -> GlobusWorkflowThread:
+    def createInstance(
+        cls,
+        authorizer: WorkflowAuthorizer,
+        statusRepository: WorkflowStatusRepository,
+        executor: WorkflowExecutor,
+    ) -> GlobusWorkflowThread:
         try:
             clientID = os.environ['CLIENT_ID']
         except KeyError:
@@ -250,7 +253,7 @@ class GlobusWorkflowThread(threading.Thread):
             try:
                 startTime = datetime.fromisoformat(startTimeStr)
             except ValueError:
-                logger.warning(f'Failed to parse startTime \"{startTimeStr}\"!')
+                logger.warning(f'Failed to parse startTime "{startTimeStr}"!')
                 startTime = datetime(1, 1, 1)
 
             try:

@@ -8,13 +8,22 @@ from PyQt5.QtWidgets import QAbstractItemView, QFileSystemModel, QWizard
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.patterns import (DiffractionDatasetInputOutputPresenter, DiffractionDatasetPresenter,
-                               DiffractionMetadataPresenter, DiffractionPatternPresenter)
-from ...view.patterns import (OpenDatasetWizard, OpenDatasetWizardFilesPage,
-                              OpenDatasetWizardMetadataPage, OpenDatasetWizardPatternsPage,
-                              OpenDatasetWizardPatternCropView, OpenDatasetWizardPatternLoadView,
-                              OpenDatasetWizardPatternMemoryMapView,
-                              OpenDatasetWizardPatternTransformView)
+from ...model.patterns import (
+    DiffractionDatasetInputOutputPresenter,
+    DiffractionDatasetPresenter,
+    DiffractionMetadataPresenter,
+    DiffractionPatternPresenter,
+)
+from ...view.patterns import (
+    OpenDatasetWizard,
+    OpenDatasetWizardFilesPage,
+    OpenDatasetWizardMetadataPage,
+    OpenDatasetWizardPatternsPage,
+    OpenDatasetWizardPatternCropView,
+    OpenDatasetWizardPatternLoadView,
+    OpenDatasetWizardPatternMemoryMapView,
+    OpenDatasetWizardPatternTransformView,
+)
 from ..data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
@@ -25,11 +34,14 @@ __all__ = [
 
 
 class OpenDatasetWizardFilesController(Observer):
-
-    def __init__(self, presenter: DiffractionDatasetInputOutputPresenter,
-                 page: OpenDatasetWizardFilesPage, fileDialogFactory: FileDialogFactory,
-                 fileSystemModel: QFileSystemModel,
-                 fileSystemProxyModel: QSortFilterProxyModel) -> None:
+    def __init__(
+        self,
+        presenter: DiffractionDatasetInputOutputPresenter,
+        page: OpenDatasetWizardFilesPage,
+        fileDialogFactory: FileDialogFactory,
+        fileSystemModel: QFileSystemModel,
+        fileSystemProxyModel: QSortFilterProxyModel,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._page = page
@@ -38,9 +50,12 @@ class OpenDatasetWizardFilesController(Observer):
         self._fileSystemProxyModel = fileSystemProxyModel
 
     @classmethod
-    def createInstance(cls, presenter: DiffractionDatasetInputOutputPresenter,
-                       page: OpenDatasetWizardFilesPage,
-                       fileDialogFactory: FileDialogFactory) -> OpenDatasetWizardFilesController:
+    def createInstance(
+        cls,
+        presenter: DiffractionDatasetInputOutputPresenter,
+        page: OpenDatasetWizardFilesPage,
+        fileDialogFactory: FileDialogFactory,
+    ) -> OpenDatasetWizardFilesController:
         fileSystemModel = QFileSystemModel()
         fileSystemProxyModel = QSortFilterProxyModel()
         fileSystemModel.setFilter(QDir.Filter.AllEntries | QDir.Filter.AllDirs)
@@ -60,11 +75,14 @@ class OpenDatasetWizardFilesController(Observer):
         page.fileSystemTableView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         page.fileSystemTableView.verticalHeader().hide()
         page.fileSystemTableView.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows)
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
         page.fileSystemTableView.doubleClicked.connect(
-            controller._handleFileSystemTableDoubleClicked)
+            controller._handleFileSystemTableDoubleClicked
+        )
         page.fileSystemTableView.selectionModel().currentChanged.connect(
-            controller._checkIfComplete)
+            controller._checkIfComplete
+        )
 
         for fileFilter in presenter.getOpenFileFilterList():
             page.fileTypeComboBox.addItem(fileFilter)
@@ -127,16 +145,21 @@ class OpenDatasetWizardFilesController(Observer):
 
 
 class OpenDatasetWizardMetadataController(Observer):
-
-    def __init__(self, presenter: DiffractionMetadataPresenter,
-                 page: OpenDatasetWizardMetadataPage) -> None:
+    def __init__(
+        self,
+        presenter: DiffractionMetadataPresenter,
+        page: OpenDatasetWizardMetadataPage,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._page = page
 
     @classmethod
-    def createInstance(cls, presenter: DiffractionMetadataPresenter,
-                       page: OpenDatasetWizardMetadataPage) -> OpenDatasetWizardMetadataController:
+    def createInstance(
+        cls,
+        presenter: DiffractionMetadataPresenter,
+        page: OpenDatasetWizardMetadataPage,
+    ) -> OpenDatasetWizardMetadataController:
         controller = cls(presenter, page)
         presenter.addObserver(controller)
         controller._syncModelToView()
@@ -158,7 +181,8 @@ class OpenDatasetWizardMetadataController(Observer):
 
         self._presenter.syncPatternCrop(
             syncCenter=self._page.patternCropCenterCheckBox.isChecked(),
-            syncExtent=self._page.patternCropExtentCheckBox.isChecked())
+            syncExtent=self._page.patternCropExtentCheckBox.isChecked(),
+        )
 
         if self._page.probeEnergyCheckBox.isChecked():
             self._presenter.syncProbeEnergy()
@@ -198,16 +222,21 @@ class OpenDatasetWizardMetadataController(Observer):
 
 
 class PatternLoadController(Observer):
-
-    def __init__(self, presenter: DiffractionDatasetPresenter,
-                 view: OpenDatasetWizardPatternLoadView) -> None:
+    def __init__(
+        self,
+        presenter: DiffractionDatasetPresenter,
+        view: OpenDatasetWizardPatternLoadView,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: DiffractionDatasetPresenter,
-                       view: OpenDatasetWizardPatternLoadView) -> PatternLoadController:
+    def createInstance(
+        cls,
+        presenter: DiffractionDatasetPresenter,
+        view: OpenDatasetWizardPatternLoadView,
+    ) -> PatternLoadController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
         view.numberOfThreadsSpinBox.valueChanged.connect(presenter.setNumberOfDataThreads)
@@ -218,7 +247,8 @@ class PatternLoadController(Observer):
         self._view.numberOfThreadsSpinBox.blockSignals(True)
         self._view.numberOfThreadsSpinBox.setRange(
             self._presenter.getNumberOfDataThreadsLimits().lower,
-            self._presenter.getNumberOfDataThreadsLimits().upper)
+            self._presenter.getNumberOfDataThreadsLimits().upper,
+        )
         self._view.numberOfThreadsSpinBox.setValue(self._presenter.getNumberOfDataThreads())
         self._view.numberOfThreadsSpinBox.blockSignals(False)
 
@@ -228,19 +258,24 @@ class PatternLoadController(Observer):
 
 
 class PatternMemoryMapController(Observer):
-
-    def __init__(self, presenter: DiffractionDatasetPresenter,
-                 view: OpenDatasetWizardPatternMemoryMapView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        presenter: DiffractionDatasetPresenter,
+        view: OpenDatasetWizardPatternMemoryMapView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(cls, presenter: DiffractionDatasetPresenter,
-                       view: OpenDatasetWizardPatternMemoryMapView,
-                       fileDialogFactory: FileDialogFactory) -> PatternMemoryMapController:
+    def createInstance(
+        cls,
+        presenter: DiffractionDatasetPresenter,
+        view: OpenDatasetWizardPatternMemoryMapView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> PatternMemoryMapController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
@@ -248,7 +283,8 @@ class PatternMemoryMapController(Observer):
         controller._syncModelToView()
         view.toggled.connect(presenter.setMemmapEnabled)
         view.scratchDirectoryLineEdit.editingFinished.connect(
-            controller._syncScratchDirectoryToModel)
+            controller._syncScratchDirectoryToModel
+        )
         view.scratchDirectoryBrowseButton.clicked.connect(controller._browseScratchDirectory)
 
         return controller
@@ -259,7 +295,8 @@ class PatternMemoryMapController(Observer):
 
     def _browseScratchDirectory(self) -> None:
         dirPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, 'Choose Scratch ScratchDirectory')
+            self._view, 'Choose Scratch ScratchDirectory'
+        )
 
         if dirPath:
             self._presenter.setScratchDirectory(dirPath)
@@ -279,16 +316,21 @@ class PatternMemoryMapController(Observer):
 
 
 class PatternCropController(Observer):
-
-    def __init__(self, presenter: DiffractionPatternPresenter,
-                 view: OpenDatasetWizardPatternCropView) -> None:
+    def __init__(
+        self,
+        presenter: DiffractionPatternPresenter,
+        view: OpenDatasetWizardPatternCropView,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: DiffractionPatternPresenter,
-                       view: OpenDatasetWizardPatternCropView) -> PatternCropController:
+    def createInstance(
+        cls,
+        presenter: DiffractionPatternPresenter,
+        view: OpenDatasetWizardPatternCropView,
+    ) -> PatternCropController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -308,26 +350,34 @@ class PatternCropController(Observer):
         self._view.setChecked(self._presenter.isCropEnabled())
 
         self._view.centerXSpinBox.blockSignals(True)
-        self._view.centerXSpinBox.setRange(self._presenter.getCropCenterXLimitsInPixels().lower,
-                                           self._presenter.getCropCenterXLimitsInPixels().upper)
+        self._view.centerXSpinBox.setRange(
+            self._presenter.getCropCenterXLimitsInPixels().lower,
+            self._presenter.getCropCenterXLimitsInPixels().upper,
+        )
         self._view.centerXSpinBox.setValue(self._presenter.getCropCenterXInPixels())
         self._view.centerXSpinBox.blockSignals(False)
 
         self._view.centerYSpinBox.blockSignals(True)
-        self._view.centerYSpinBox.setRange(self._presenter.getCropCenterYLimitsInPixels().lower,
-                                           self._presenter.getCropCenterYLimitsInPixels().upper)
+        self._view.centerYSpinBox.setRange(
+            self._presenter.getCropCenterYLimitsInPixels().lower,
+            self._presenter.getCropCenterYLimitsInPixels().upper,
+        )
         self._view.centerYSpinBox.setValue(self._presenter.getCropCenterYInPixels())
         self._view.centerYSpinBox.blockSignals(False)
 
         self._view.extentXSpinBox.blockSignals(True)
-        self._view.extentXSpinBox.setRange(self._presenter.getCropWidthLimitsInPixels().lower,
-                                           self._presenter.getCropWidthLimitsInPixels().upper)
+        self._view.extentXSpinBox.setRange(
+            self._presenter.getCropWidthLimitsInPixels().lower,
+            self._presenter.getCropWidthLimitsInPixels().upper,
+        )
         self._view.extentXSpinBox.setValue(self._presenter.getCropWidthInPixels())
         self._view.extentXSpinBox.blockSignals(False)
 
         self._view.extentYSpinBox.blockSignals(True)
-        self._view.extentYSpinBox.setRange(self._presenter.getCropHeightLimitsInPixels().lower,
-                                           self._presenter.getCropHeightLimitsInPixels().upper)
+        self._view.extentYSpinBox.setRange(
+            self._presenter.getCropHeightLimitsInPixels().lower,
+            self._presenter.getCropHeightLimitsInPixels().upper,
+        )
         self._view.extentYSpinBox.setValue(self._presenter.getCropHeightInPixels())
         self._view.extentYSpinBox.blockSignals(False)
 
@@ -337,16 +387,21 @@ class PatternCropController(Observer):
 
 
 class PatternTransformController(Observer):
-
-    def __init__(self, presenter: DiffractionPatternPresenter,
-                 view: OpenDatasetWizardPatternTransformView) -> None:
+    def __init__(
+        self,
+        presenter: DiffractionPatternPresenter,
+        view: OpenDatasetWizardPatternTransformView,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
-    def createInstance(cls, presenter: DiffractionPatternPresenter,
-                       view: OpenDatasetWizardPatternTransformView) -> PatternTransformController:
+    def createInstance(
+        cls,
+        presenter: DiffractionPatternPresenter,
+        view: OpenDatasetWizardPatternTransformView,
+    ) -> PatternTransformController:
         controller = cls(presenter, view)
         presenter.addObserver(controller)
 
@@ -366,7 +421,8 @@ class PatternTransformController(Observer):
         self._view.valueLowerBoundSpinBox.blockSignals(True)
         self._view.valueLowerBoundSpinBox.setRange(
             self._presenter.getValueLowerBoundLimits().lower,
-            self._presenter.getValueLowerBoundLimits().upper)
+            self._presenter.getValueLowerBoundLimits().upper,
+        )
         self._view.valueLowerBoundSpinBox.setValue(self._presenter.getValueLowerBound())
         self._view.valueLowerBoundSpinBox.blockSignals(False)
 
@@ -375,7 +431,8 @@ class PatternTransformController(Observer):
         self._view.valueUpperBoundSpinBox.blockSignals(True)
         self._view.valueUpperBoundSpinBox.setRange(
             self._presenter.getValueUpperBoundLimits().lower,
-            self._presenter.getValueUpperBoundLimits().upper)
+            self._presenter.getValueUpperBoundLimits().upper,
+        )
         self._view.valueUpperBoundSpinBox.setValue(self._presenter.getValueUpperBound())
         self._view.valueUpperBoundSpinBox.blockSignals(False)
 
@@ -388,63 +445,89 @@ class PatternTransformController(Observer):
 
 
 class OpenDatasetWizardPatternsController:
-
-    def __init__(self, datasetPresenter: DiffractionDatasetPresenter,
-                 patternPresenter: DiffractionPatternPresenter,
-                 page: OpenDatasetWizardPatternsPage,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        datasetPresenter: DiffractionDatasetPresenter,
+        patternPresenter: DiffractionPatternPresenter,
+        page: OpenDatasetWizardPatternsPage,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         self._datasetPresenter = datasetPresenter
         self._patternPresenter = patternPresenter
         self._page = page
-        self._loadController = PatternLoadController.createInstance(datasetPresenter,
-                                                                    page.loadView)
+        self._loadController = PatternLoadController.createInstance(datasetPresenter, page.loadView)
         self._memoryMapController = PatternMemoryMapController.createInstance(
-            datasetPresenter, page.memoryMapView, fileDialogFactory)
-        self._cropController = PatternCropController.createInstance(patternPresenter,
-                                                                    page.cropView)
+            datasetPresenter, page.memoryMapView, fileDialogFactory
+        )
+        self._cropController = PatternCropController.createInstance(patternPresenter, page.cropView)
         self._transformController = PatternTransformController.createInstance(
-            patternPresenter, page.transformView)
+            patternPresenter, page.transformView
+        )
 
     @classmethod
     def createInstance(
-            cls, ioPresenter: DiffractionDatasetInputOutputPresenter,
-            datasetPresenter: DiffractionDatasetPresenter,
-            patternPresenter: DiffractionPatternPresenter, page: OpenDatasetWizardPatternsPage,
-            fileDialogFactory: FileDialogFactory) -> OpenDatasetWizardPatternsController:
+        cls,
+        ioPresenter: DiffractionDatasetInputOutputPresenter,
+        datasetPresenter: DiffractionDatasetPresenter,
+        patternPresenter: DiffractionPatternPresenter,
+        page: OpenDatasetWizardPatternsPage,
+        fileDialogFactory: FileDialogFactory,
+    ) -> OpenDatasetWizardPatternsController:
         controller = cls(datasetPresenter, patternPresenter, page, fileDialogFactory)
         page._setComplete(True)
         return controller
 
 
 class OpenDatasetWizardController:
-
-    def __init__(self, ioPresenter: DiffractionDatasetInputOutputPresenter,
-                 metadataPresenter: DiffractionMetadataPresenter,
-                 datasetPresenter: DiffractionDatasetPresenter,
-                 patternPresenter: DiffractionPatternPresenter, wizard: OpenDatasetWizard,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        ioPresenter: DiffractionDatasetInputOutputPresenter,
+        metadataPresenter: DiffractionMetadataPresenter,
+        datasetPresenter: DiffractionDatasetPresenter,
+        patternPresenter: DiffractionPatternPresenter,
+        wizard: OpenDatasetWizard,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         self._ioPresenter = ioPresenter
         self._wizard = wizard
         self._filesController = OpenDatasetWizardFilesController.createInstance(
-            ioPresenter, wizard.filesPage, fileDialogFactory)
+            ioPresenter, wizard.filesPage, fileDialogFactory
+        )
         self._metadataController = OpenDatasetWizardMetadataController.createInstance(
-            metadataPresenter, wizard.metadataPage)
+            metadataPresenter, wizard.metadataPage
+        )
         self._patternsController = OpenDatasetWizardPatternsController.createInstance(
-            ioPresenter, datasetPresenter, patternPresenter, wizard.patternsPage,
-            fileDialogFactory)
+            ioPresenter,
+            datasetPresenter,
+            patternPresenter,
+            wizard.patternsPage,
+            fileDialogFactory,
+        )
 
     @classmethod
-    def createInstance(cls, ioPresenter: DiffractionDatasetInputOutputPresenter,
-                       metadataPresenter: DiffractionMetadataPresenter,
-                       datasetPresenter: DiffractionDatasetPresenter,
-                       patternPresenter: DiffractionPatternPresenter, wizard: OpenDatasetWizard,
-                       fileDialogFactory: FileDialogFactory) -> OpenDatasetWizardController:
-        controller = cls(ioPresenter, metadataPresenter, datasetPresenter, patternPresenter,
-                         wizard, fileDialogFactory)
+    def createInstance(
+        cls,
+        ioPresenter: DiffractionDatasetInputOutputPresenter,
+        metadataPresenter: DiffractionMetadataPresenter,
+        datasetPresenter: DiffractionDatasetPresenter,
+        patternPresenter: DiffractionPatternPresenter,
+        wizard: OpenDatasetWizard,
+        fileDialogFactory: FileDialogFactory,
+    ) -> OpenDatasetWizardController:
+        controller = cls(
+            ioPresenter,
+            metadataPresenter,
+            datasetPresenter,
+            patternPresenter,
+            wizard,
+            fileDialogFactory,
+        )
         wizard.button(QWizard.WizardButton.NextButton).clicked.connect(
-            controller._executeNextButtonAction)
+            controller._executeNextButtonAction
+        )
         wizard.button(QWizard.WizardButton.FinishButton).clicked.connect(
-            controller._executeFinishButtonAction)
+            controller._executeFinishButtonAction
+        )
         return controller
 
     def _executeNextButtonAction(self) -> None:

@@ -13,10 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationDatasetProcessor:
-
-    def __init__(self, settings: AutomationSettings, repository: AutomationDatasetRepository,
-                 workflow: FileBasedWorkflow, workflowAPI: WorkflowAPI,
-                 processingQueue: queue.Queue[Path]) -> None:
+    def __init__(
+        self,
+        settings: AutomationSettings,
+        repository: AutomationDatasetRepository,
+        workflow: FileBasedWorkflow,
+        workflowAPI: WorkflowAPI,
+        processingQueue: queue.Queue[Path],
+    ) -> None:
         self._settings = settings
         self._repository = repository
         self._workflow = workflow
@@ -58,7 +62,7 @@ class AutomationDatasetProcessor:
 
             delayInSeconds = self._nextJobTime - time()
 
-            if delayInSeconds > 0. and self._stopWorkEvent.wait(timeout=delayInSeconds):
+            if delayInSeconds > 0.0 and self._stopWorkEvent.wait(timeout=delayInSeconds):
                 break
 
             try:
@@ -69,7 +73,7 @@ class AutomationDatasetProcessor:
                 logger.exception('Error while processing dataset!')
             finally:
                 self._processingQueue.task_done()
-                self._nextJobTime = self._settings.processingIntervalInSeconds.value + time()
+                self._nextJobTime = self._settings.processingIntervalInSeconds.getValue() + time()
 
     def start(self) -> None:
         self.stop()

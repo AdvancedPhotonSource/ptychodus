@@ -6,10 +6,25 @@ import numpy
 
 from PyQt5.QtCore import pyqtSignal, Qt, QObject, QPointF, QLineF, QRectF, QSize, QSizeF
 from PyQt5.QtGui import QIcon, QImage, QPalette, QPen, QPixmap, QWheelEvent
-from PyQt5.QtWidgets import (QAction, QApplication, QComboBox, QDialog, QFormLayout,
-                             QGraphicsLineItem, QGraphicsPixmapItem, QGraphicsRectItem,
-                             QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView,
-                             QGroupBox, QLineEdit, QStatusBar, QToolBar, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QAction,
+    QApplication,
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QGraphicsLineItem,
+    QGraphicsPixmapItem,
+    QGraphicsRectItem,
+    QGraphicsSceneHoverEvent,
+    QGraphicsSceneMouseEvent,
+    QGraphicsView,
+    QGroupBox,
+    QLineEdit,
+    QStatusBar,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -35,7 +50,6 @@ class ImageMouseTool(Enum):
 
 
 class ImageItem(QGraphicsPixmapItem):
-
     def __init__(self, events: ImageItemEvents, statusBar: QStatusBar) -> None:
         super().__init__()
         self._events = events
@@ -60,8 +74,13 @@ class ImageItem(QGraphicsPixmapItem):
         imageRGBAi = numpy.multiply(imageRGBAf, 255).astype(numpy.uint8).copy()
 
         try:
-            image = QImage(imageRGBAi.data, imageRGBAi.shape[1], imageRGBAi.shape[0],
-                           imageRGBAi.strides[0], QImage.Format.Format_RGBA8888)
+            image = QImage(
+                imageRGBAi.data,
+                imageRGBAi.shape[1],
+                imageRGBAi.shape[0],
+                imageRGBAi.strides[0],
+                QImage.Format.Format_RGBA8888,
+            )
             pixmap = QPixmap.fromImage(image)
         except Exception as exc:
             logger.exception(exc)
@@ -190,7 +209,6 @@ class ImageItem(QGraphicsPixmapItem):
 
 
 class LineCutDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
@@ -212,7 +230,6 @@ class LineCutDialog(QDialog):
 
 
 class RectangleView(QGroupBox):
-
     @staticmethod
     def _createReadOnlyLineEdit() -> QLineEdit:
         lineEdit = QLineEdit()
@@ -249,7 +266,6 @@ class RectangleView(QGroupBox):
 
 
 class HistogramDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
@@ -273,12 +289,11 @@ class HistogramDialog(QDialog):
 
 
 class VisualizationView(QGraphicsView):
-
     def wheelEvent(self, event: QWheelEvent) -> None:
         oldPosition = self.mapToScene(event.pos())
 
         zoomBase = 1.25
-        zoom = zoomBase if event.angleDelta().y() > 0 else 1. / zoomBase
+        zoom = zoomBase if event.angleDelta().y() > 0 else 1.0 / zoomBase
         self.scale(zoom, zoom)
 
         newPosition = self.mapToScene(event.pos())
@@ -288,7 +303,6 @@ class VisualizationView(QGraphicsView):
 
 
 class VisualizationWidget(QGroupBox):
-
     def __init__(self, title: str, parent: QWidget | None) -> None:
         super().__init__(title, parent)
         self.toolBar = QToolBar('Tools')
@@ -318,7 +332,6 @@ class VisualizationWidget(QGroupBox):
 
 
 class VisualizationParametersView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Visualization', parent)
 

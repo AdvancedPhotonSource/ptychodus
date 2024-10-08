@@ -7,7 +7,12 @@ import h5py
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe
-from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter, ProductMetadata
+from ptychodus.api.product import (
+    Product,
+    ProductFileReader,
+    ProductFileWriter,
+    ProductMetadata,
+)
 from ptychodus.api.scan import Scan, ScanPoint
 
 logger = logging.getLogger(__name__)

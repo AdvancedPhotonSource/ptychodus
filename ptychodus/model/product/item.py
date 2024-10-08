@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import logging
 
 from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import ParameterRepository
+from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.product import Product
 
 from .metadata import MetadataRepositoryItem
@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 class ProductRepositoryItemObserver(ABC):
-
     @abstractmethod
     def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
         pass
@@ -40,13 +39,19 @@ class ProductRepositoryItemObserver(ABC):
         pass
 
 
-class ProductRepositoryItem(ParameterRepository):
-
-    def __init__(self, parent: ProductRepositoryItemObserver, metadata: MetadataRepositoryItem,
-                 scan: ScanRepositoryItem, geometry: ProductGeometry, probe: ProbeRepositoryItem,
-                 object_: ObjectRepositoryItem, validator: ProductValidator,
-                 costs: Sequence[float]) -> None:
-        super().__init__('Product')
+class ProductRepositoryItem(ParameterGroup):
+    def __init__(
+        self,
+        parent: ProductRepositoryItemObserver,
+        metadata: MetadataRepositoryItem,
+        scan: ScanRepositoryItem,
+        geometry: ProductGeometry,
+        probe: ProbeRepositoryItem,
+        object_: ObjectRepositoryItem,
+        validator: ProductValidator,
+        costs: Sequence[float],
+    ) -> None:
+        super().__init__()
         self._parent = parent
         self._metadata = metadata
         self._scan = scan
@@ -56,10 +61,16 @@ class ProductRepositoryItem(ParameterRepository):
         self._validator = validator
         self._costs = list(costs)
 
-        self._addParameterRepository(self._metadata, observe=True)
-        self._addParameterRepository(self._scan, observe=True)
-        self._addParameterRepository(self._probe, observe=True)
-        self._addParameterRepository(self._object, observe=True)
+        self._addGroup('metadata', self._metadata, observe=True)
+        self._addGroup('scan', self._scan, observe=True)
+        self._addGroup('probe', self._probe, observe=True)
+        self._addGroup('object', self._object, observe=True)
+
+    def syncToSettings(self) -> None:
+        self._metadata.syncToSettings()
+        self._scan.syncToSettings()
+        self._probe.syncToSettings()
+        self._object.syncToSettings()
 
     def getName(self) -> str:
         return self._metadata.getName()
@@ -114,7 +125,6 @@ class ProductRepositoryItem(ParameterRepository):
 
 
 class ProductRepositoryObserver(ABC):
-
     @abstractmethod
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
         pass

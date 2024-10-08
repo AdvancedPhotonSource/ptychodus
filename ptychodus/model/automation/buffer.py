@@ -12,9 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationDatasetBuffer:
-
-    def __init__(self, settings: AutomationSettings, repository: AutomationDatasetRepository,
-                 processor: AutomationDatasetProcessor) -> None:
+    def __init__(
+        self,
+        settings: AutomationSettings,
+        repository: AutomationDatasetRepository,
+        processor: AutomationDatasetProcessor,
+    ) -> None:
         self._settings = settings
         self._repository = repository
         self._processor = processor
@@ -40,8 +43,8 @@ class AutomationDatasetBuffer:
                 except StopIteration:
                     pass
                 else:
-                    delayTime = self._settings.watchdogDelayInSeconds.value
-                    isFileReadyForProcessing = (eventTime + delayTime < time())
+                    delayTime = self._settings.watchdogDelayInSeconds.getValue()
+                    isFileReadyForProcessing = eventTime + delayTime < time()
 
                     if isFileReadyForProcessing:
                         self._eventTimes.popitem(last=False)
@@ -49,7 +52,7 @@ class AutomationDatasetBuffer:
             if isFileReadyForProcessing:
                 self._processor.put(filePath)
             else:
-                self._stopWorkEvent.wait(timeout=5.)  # TODO make configurable
+                self._stopWorkEvent.wait(timeout=5.0)  # TODO make configurable
 
     def start(self) -> None:
         if self._worker.is_alive():

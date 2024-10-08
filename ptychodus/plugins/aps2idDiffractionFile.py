@@ -6,8 +6,13 @@ import re
 import h5py
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                    DiffractionPatternArray, SimpleDiffractionDataset)
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionMetadata,
+    DiffractionPatternArray,
+    SimpleDiffractionDataset,
+)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -17,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 class APS2IDDiffractionFileReader(DiffractionFileReader):
-
     def _getFileSeries(self, filePath: Path) -> tuple[Mapping[int, Path], str]:
         filePathDict: dict[int, Path] = dict()
 
@@ -65,7 +69,7 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
 
                     dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
         except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file "{filePath}".')
 
         return dataset
 

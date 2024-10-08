@@ -5,15 +5,21 @@ from ...model.visualization import VisualizationEngine
 from ...view.probe import ExposureDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..visualization import VisualizationParametersController, VisualizationWidgetController
+from ..visualization import (
+    VisualizationParametersController,
+    VisualizationWidgetController,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class ExposureViewController:
-
-    def __init__(self, analyzer: ExposureAnalyzer, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        analyzer: ExposureAnalyzer,
+        engine: VisualizationEngine,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._analyzer = analyzer
         self._engine = engine
@@ -22,9 +28,14 @@ class ExposureViewController:
         self._dialog.saveButton.clicked.connect(self._saveResult)
 
         self._visualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.visualizationWidget, self._dialog.statusBar, fileDialogFactory)
+            engine,
+            self._dialog.visualizationWidget,
+            self._dialog.statusBar,
+            fileDialogFactory,
+        )
         self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.visualizationParametersView)
+            engine, self._dialog.visualizationParametersView
+        )
         self._result: ExposureMap | None = None
 
     def analyze(self, itemIndex: int) -> None:
@@ -48,7 +59,8 @@ class ExposureViewController:
             self._dialog,
             title,
             nameFilters=self._analyzer.getSaveFileFilterList(),
-            selectedNameFilter=self._analyzer.getSaveFileFilter())
+            selectedNameFilter=self._analyzer.getSaveFileFilter(),
+        )
 
         if filePath:
             try:

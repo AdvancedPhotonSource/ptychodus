@@ -9,11 +9,20 @@ from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 
 logger = logging.getLogger(__name__)
 
-# FIXME plugin for loading products from file
+
+class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
+    @property
+    def isWatchRecursive(self) -> bool:
+        return True
+
+    def getWatchFilePattern(self) -> str:
+        return 'product-out.npz'
+
+    def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
+        workflowAPI.openProduct(filePath, fileType='NPZ')
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):
-
     @property
     def isWatchRecursive(self) -> bool:
         return False
@@ -35,7 +44,6 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
 
 
 class APS26IDFileBasedWorkflow(FileBasedWorkflow):
-
     @property
     def isWatchRecursive(self) -> bool:
         return False
@@ -74,18 +82,17 @@ class APS31IDEMetadata:
     label: str
 
     def __str__(self) -> str:
-        return f'''scan_no={self.scan_no}
+        return f"""scan_no={self.scan_no}
         golden_angle={self.golden_angle}
         encoder_angle={self.encoder_angle}
         measurement_id={self.measurement_id}
         subtomo_no={self.subtomo_no}
         detector_position={self.detector_position}
         label={self.label}
-        '''
+        """
 
 
 class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
-
     @property
     def isWatchRecursive(self) -> bool:
         return True
@@ -142,11 +149,17 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             inputProductAPI.buildObject()
             # TODO would prefer to write instructions and submit to queue
             outputProductAPI = inputProductAPI.reconstructLocal(f'{productName}_out')
-            outputProductAPI.saveProduct(experimentDir / 'ptychodus' / f'{productName}.h5',
-                                         fileType='HDF5')
+            outputProductAPI.saveProduct(
+                experimentDir / 'ptychodus' / f'{productName}.h5', fileType='HDF5'
+            )
 
 
 def registerPlugins(registry: PluginRegistry) -> None:
+    registry.fileBasedWorkflows.registerPlugin(
+        PtychodusAutoloadProductFileBasedWorkflow(),
+        simpleName='Autoload_Product',
+        displayName='Autoload Product',
+    )
     registry.fileBasedWorkflows.registerPlugin(
         APS2IDFileBasedWorkflow(),
         simpleName='APS_2ID',

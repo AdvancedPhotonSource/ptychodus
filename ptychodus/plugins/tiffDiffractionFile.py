@@ -8,9 +8,15 @@ from tifffile import TiffFile
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                    DiffractionPatternArray, DiffractionPatternArrayType,
-                                    DiffractionPatternState, SimpleDiffractionDataset)
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionMetadata,
+    DiffractionPatternArray,
+    DiffractionPatternArrayType,
+    DiffractionPatternState,
+    SimpleDiffractionDataset,
+)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -18,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class TiffDiffractionPatternArray(DiffractionPatternArray):
-
     def __init__(self, filePath: Path, index: int) -> None:
         super().__init__()
         self._filePath = filePath
@@ -52,7 +57,6 @@ class TiffDiffractionPatternArray(DiffractionPatternArray):
 
 
 class TiffDiffractionFileReader(DiffractionFileReader):
-
     def _getFileSeries(self, filePath: Path) -> tuple[Mapping[int, Path], str]:
         filePathDict: dict[int, Path] = dict()
 
@@ -85,7 +89,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             with TiffFile(filePath) as tiff:
                 data = tiff.asarray()
         except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file "{filePath}".')
         else:
             if data.ndim == 2:
                 data = data[numpy.newaxis, :, :]

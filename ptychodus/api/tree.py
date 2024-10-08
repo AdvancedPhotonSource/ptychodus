@@ -3,7 +3,6 @@ from collections.abc import Sequence
 
 
 class SimpleTreeNode:
-
     def __init__(self, parentItem: SimpleTreeNode | None, itemData: Sequence[str]) -> None:
         self.parentItem = parentItem
         self.itemData = itemData
@@ -20,7 +19,7 @@ class SimpleTreeNode:
 
     @property
     def isRoot(self) -> bool:
-        return (self.parentItem is None)
+        return self.parentItem is None
 
     @property
     def isLeaf(self) -> bool:

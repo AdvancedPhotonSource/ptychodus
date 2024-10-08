@@ -5,10 +5,15 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader,
-                                    DiffractionFileWriter, DiffractionMetadata,
-                                    DiffractionPatternState, SimpleDiffractionDataset,
-                                    SimpleDiffractionPatternArray)
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionFileWriter,
+    DiffractionMetadata,
+    DiffractionPatternState,
+    SimpleDiffractionDataset,
+    SimpleDiffractionPatternArray,
+)
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -28,13 +33,13 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         try:
             contents = numpy.load(filePath)
         except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file "{filePath}".')
             return dataset
 
         try:
             patterns = contents[self.PATTERNS]
         except KeyError:
-            logger.warning(f'Failed to read patterns in \"{filePath}\".')
+            logger.warning(f'Failed to read patterns in "{filePath}".')
             return dataset
 
         numberOfPatterns, detectorHeight, detectorWidth = patterns.shape
@@ -49,8 +54,12 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
 
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         contentsTree.createChild(
-            [filePath.stem,
-             type(patterns).__name__, f'{patterns.dtype}{patterns.shape}'])
+            [
+                filePath.stem,
+                type(patterns).__name__,
+                f'{patterns.dtype}{patterns.shape}',
+            ]
+        )
 
         array = SimpleDiffractionPatternArray(
             label=filePath.stem,

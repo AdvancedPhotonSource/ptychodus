@@ -31,7 +31,6 @@ class DiffractionPatternState(Enum):
 
 
 class DiffractionPatternArray(Observable):
-
     @abstractmethod
     def getLabel(self) -> str:
         pass
@@ -53,9 +52,13 @@ class DiffractionPatternArray(Observable):
 
 
 class SimpleDiffractionPatternArray(DiffractionPatternArray):
-
-    def __init__(self, label: str, index: int, data: DiffractionPatternArrayType,
-                 state: DiffractionPatternState) -> None:
+    def __init__(
+        self,
+        label: str,
+        index: int,
+        data: DiffractionPatternArrayType,
+        state: DiffractionPatternState,
+    ) -> None:
         super().__init__()
         self._label = label
         self._index = index
@@ -100,7 +103,6 @@ class DiffractionMetadata:
 
 
 class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):
-
     @abstractmethod
     def getMetadata(self) -> DiffractionMetadata:
         pass
@@ -111,9 +113,12 @@ class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):
 
 
 class SimpleDiffractionDataset(DiffractionDataset):
-
-    def __init__(self, metadata: DiffractionMetadata, contentsTree: SimpleTreeNode,
-                 arrayList: list[DiffractionPatternArray]) -> None:
+    def __init__(
+        self,
+        metadata: DiffractionMetadata,
+        contentsTree: SimpleTreeNode,
+        arrayList: list[DiffractionPatternArray],
+    ) -> None:
         super().__init__()
         self._metadata = metadata
         self._contentsTree = contentsTree
@@ -133,15 +138,14 @@ class SimpleDiffractionDataset(DiffractionDataset):
         return self._contentsTree
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray:
-        ...
+    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
 
-    def __getitem__(self, index: int |slice) -> \
-            DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+    def __getitem__(
+        self, index: int | slice
+    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
         return self._arrayList[index]
 
     def __len__(self) -> int:
@@ -149,18 +153,18 @@ class SimpleDiffractionDataset(DiffractionDataset):
 
 
 class DiffractionFileReader(ABC):
-    '''interface for plugins that read diffraction files'''
+    """interface for plugins that read diffraction files"""
 
     @abstractmethod
     def read(self, filePath: Path) -> DiffractionDataset:
-        '''reads a diffraction dataset from file'''
+        """reads a diffraction dataset from file"""
         pass
 
 
 class DiffractionFileWriter(ABC):
-    '''interface for plugins that write diffraction files'''
+    """interface for plugins that write diffraction files"""
 
     @abstractmethod
     def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
-        '''writes a diffraction dataset to file'''
+        """writes a diffraction dataset to file"""
         pass

@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoShelvesScanFileReader(ScanFileReader):
-
     def read(self, filePath: Path) -> Scan:
         pointList: list[ScanPoint] = list()
 
@@ -32,7 +31,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
                         point = ScanPoint(idx, x, y)
                         pointList.append(point)
         except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file "{filePath}".')
 
         return Scan(pointList)
 

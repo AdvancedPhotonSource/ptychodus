@@ -8,15 +8,21 @@ from ...model.visualization import VisualizationEngine
 from ...view.probe import ProbePropagationDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..visualization import VisualizationParametersController, VisualizationWidgetController
+from ..visualization import (
+    VisualizationParametersController,
+    VisualizationWidgetController,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class ProbePropagationViewController(Observer):
-
-    def __init__(self, propagator: ProbePropagator, engine: VisualizationEngine,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        propagator: ProbePropagator,
+        engine: VisualizationEngine,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._propagator = propagator
         self._fileDialogFactory = fileDialogFactory
@@ -28,23 +34,27 @@ class ProbePropagationViewController(Observer):
         self._dialog.parametersView.numberOfStepsSpinBox.setRange(1, 999)
 
         self._xyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.xyView, self._dialog.statusBar, fileDialogFactory)
+            engine, self._dialog.xyView, self._dialog.statusBar, fileDialogFactory
+        )
         self._zxVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zxView, self._dialog.statusBar, fileDialogFactory)
+            engine, self._dialog.zxView, self._dialog.statusBar, fileDialogFactory
+        )
         self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.parametersView.visualizationParametersView)
+            engine, self._dialog.parametersView.visualizationParametersView
+        )
         self._zyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory)
+            engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory
+        )
 
         propagator.addObserver(self)
         self._syncModelToView()
 
     def _updateCurrentCoordinate(self, step: int) -> None:
-        lerpValue = Decimal()
+        lerpValue = 0.0
 
         slider = self._dialog.coordinateSlider
-        upper = Decimal(step - slider.minimum())
-        lower = Decimal(slider.maximum() - slider.minimum())
+        upper = step - slider.minimum()
+        lower = slider.maximum() - slider.minimum()
 
         if lower > 0:
             alpha = upper / lower
@@ -62,12 +72,13 @@ class ProbePropagationViewController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Update Current Coordinate', err)
         else:
-            self._xyVisualizationWidgetController.setArray(xyProjection,
-                                                           self._propagator.getPixelGeometry())
+            self._xyVisualizationWidgetController.setArray(
+                xyProjection, self._propagator.getPixelGeometry()
+            )
 
         # TODO auto-units
-        lerpValue *= Decimal('1e6')
-        self._dialog.coordinateLabel.setText(f'{lerpValue:.1f} \u00B5m')
+        lerpValue *= 1e6
+        self._dialog.coordinateLabel.setText(f'{lerpValue:.1f} \u00b5m')
 
     def _propagate(self) -> None:
         view = self._dialog.parametersView
@@ -75,8 +86,8 @@ class ProbePropagationViewController(Observer):
         try:
             self._propagator.propagate(
                 numberOfSteps=view.numberOfStepsSpinBox.value(),
-                beginCoordinateInMeters=view.beginCoordinateWidget.getLengthInMeters(),
-                endCoordinateInMeters=view.endCoordinateWidget.getLengthInMeters(),
+                beginCoordinateInMeters=float(view.beginCoordinateWidget.getLengthInMeters()),
+                endCoordinateInMeters=float(view.endCoordinateWidget.getLengthInMeters()),
             )
         except Exception as err:
             logger.exception(err)
@@ -100,7 +111,8 @@ class ProbePropagationViewController(Observer):
             self._dialog,
             title,
             nameFilters=self._propagator.getSaveFileFilterList(),
-            selectedNameFilter=self._propagator.getSaveFileFilter())
+            selectedNameFilter=self._propagator.getSaveFileFilter(),
+        )
 
         if filePath:
             try:
@@ -111,8 +123,12 @@ class ProbePropagationViewController(Observer):
 
     def _syncModelToView(self) -> None:
         view = self._dialog.parametersView
-        view.beginCoordinateWidget.setLengthInMeters(self._propagator.getBeginCoordinateInMeters())
-        view.endCoordinateWidget.setLengthInMeters(self._propagator.getEndCoordinateInMeters())
+        view.beginCoordinateWidget.setLengthInMeters(
+            Decimal.from_float(self._propagator.getBeginCoordinateInMeters())
+        )
+        view.endCoordinateWidget.setLengthInMeters(
+            Decimal.from_float(self._propagator.getEndCoordinateInMeters())
+        )
         view.numberOfStepsSpinBox.setValue(self._propagator.getNumberOfSteps())
 
         numberOfSteps = self._propagator.getNumberOfSteps()
@@ -128,10 +144,12 @@ class ProbePropagationViewController(Observer):
         self._updateCurrentCoordinate(self._dialog.coordinateSlider.value())
 
         try:
-            self._zxVisualizationWidgetController.setArray(self._propagator.getZXProjection(),
-                                                           self._propagator.getPixelGeometry())
-            self._zyVisualizationWidgetController.setArray(self._propagator.getZYProjection(),
-                                                           self._propagator.getPixelGeometry())
+            self._zxVisualizationWidgetController.setArray(
+                self._propagator.getZXProjection(), self._propagator.getPixelGeometry()
+            )
+            self._zyVisualizationWidgetController.setArray(
+                self._propagator.getZYProjection(), self._propagator.getPixelGeometry()
+            )
         except ValueError:
             self._zxVisualizationWidgetController.clearArray()
             self._zyVisualizationWidgetController.clearArray()

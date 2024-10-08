@@ -6,7 +6,9 @@ import logging
 import numpy
 import scipy.linalg
 
-from ptychodus.api.parametric import ParameterRepository
+from ptychodus.api.parametric import (
+    ParameterGroup,
+)
 from ptychodus.api.probe import Probe, WavefieldArrayType
 
 from .settings import ProbeSettings
@@ -19,39 +21,34 @@ class ProbeModeDecayType(IntEnum):
     EXPONENTIAL = auto()
 
 
-class MultimodalProbeBuilder(ParameterRepository):
-
+class MultimodalProbeBuilder(ParameterGroup):
     def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
-        super().__init__('additional_modes')
+        super().__init__()
         self._rng = rng
         self._settings = settings
 
-        self.numberOfModes = self._registerIntegerParameter(
-            'number_of_modes',
-            settings.numberOfModes.value,
-            minimum=1,
-        )
-        self.modeDecayType = self._registerStringParameter(
-            'mode_decay_type',
-            settings.modeDecayType.value,
-        )
-        self.modeDecayRatio = self._registerRealParameter(
-            'mode_decay_ratio',
-            float(settings.modeDecayRatio.value),
-            minimum=0.,
-            maximum=1.,
-        )
-        self.isOrthogonalizeModesEnabled = self._registerBooleanParameter(
-            'orthogonalize_modes',
-            settings.orthogonalizeModesEnabled.value,
-        )
+        self.numberOfModes = settings.numberOfModes.copy()
+        self._addParameter('number_of_modes', self.numberOfModes)
+
+        self.modeDecayType = settings.modeDecayType.copy()
+        self._addParameter('mode_decay_type', self.modeDecayType)
+
+        self.modeDecayRatio = settings.modeDecayRatio.copy()
+        self._addParameter('mode_decay_ratio', self.modeDecayRatio)
+
+        self.isOrthogonalizeModesEnabled = settings.isOrthogonalizeModesEnabled.copy()
+        self._addParameter('orthogonalize_modes', self.isOrthogonalizeModesEnabled)
+
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
 
     def copy(self) -> MultimodalProbeBuilder:
         builder = MultimodalProbeBuilder(self._rng, self._settings)
-        builder.numberOfModes.setValue(self.numberOfModes.getValue())
-        builder.modeDecayType.setValue(self.modeDecayType.getValue())
-        builder.modeDecayRatio.setValue(self.modeDecayRatio.getValue())
-        builder.isOrthogonalizeModesEnabled.setValue(self.isOrthogonalizeModesEnabled.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value.getValue())
+
         return builder
 
     def _initializeModes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
@@ -93,20 +90,20 @@ class MultimodalProbeBuilder(ParameterRepository):
         modeDecayTypeText = self.modeDecayType.getValue()
         modeDecayRatio = self.modeDecayRatio.getValue()
 
-        if modeDecayRatio > 0.:
+        if modeDecayRatio > 0.0:
             try:
                 modeDecayType = ProbeModeDecayType[modeDecayTypeText.upper()]
             except KeyError:
                 modeDecayType = ProbeModeDecayType.POLYNOMIAL
 
             if modeDecayType == ProbeModeDecayType.EXPONENTIAL:
-                b = 1. + (1. - modeDecayRatio) / modeDecayRatio
+                b = 1.0 + (1.0 - modeDecayRatio) / modeDecayRatio
                 return [b**-n for n in range(totalNumberOfModes)]
             else:
-                b = numpy.log(modeDecayRatio) / numpy.log(2.)
-                return [(n + 1)**b for n in range(totalNumberOfModes)]
+                b = numpy.log(modeDecayRatio) / numpy.log(2.0)
+                return [(n + 1) ** b for n in range(totalNumberOfModes)]
 
-        return [1.] + [0.] * (totalNumberOfModes - 1)
+        return [1.0] + [0.0] * (totalNumberOfModes - 1)
 
     def _adjustRelativePower(self, probe: WavefieldArrayType) -> WavefieldArrayType:
         modeWeights = self._getModeWeights(probe.shape[-3])
@@ -130,6 +127,8 @@ class MultimodalProbeBuilder(ParameterRepository):
 
         array = self._adjustRelativePower(array)
 
-        return Probe(array,
-                     pixelWidthInMeters=probe.pixelWidthInMeters,
-                     pixelHeightInMeters=probe.pixelHeightInMeters)
+        return Probe(
+            array,
+            pixelWidthInMeters=probe.pixelWidthInMeters,
+            pixelHeightInMeters=probe.pixelHeightInMeters,
+        )

@@ -14,40 +14,34 @@ from .settings import ProbeSettings
 
 
 class FresnelZonePlateProbeBuilder(ProbeBuilder):
-
-    def __init__(self, settings: ProbeSettings,
-                 fresnelZonePlateChooser: PluginChooser[FresnelZonePlate]) -> None:
-        super().__init__('fresnel_zone_plate')
+    def __init__(
+        self,
+        settings: ProbeSettings,
+        fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
+    ) -> None:
+        super().__init__(settings, 'fresnel_zone_plate')
         self._settings = settings
         self._fresnelZonePlateChooser = fresnelZonePlateChooser
 
-        self.zonePlateDiameterInMeters = self._registerRealParameter(
-            'zone_plate_diameter_m',
-            float(settings.zonePlateDiameterInMeters.value),
-            minimum=0.,
-        )
-        self.outermostZoneWidthInMeters = self._registerRealParameter(
-            'outermost_zone_width_m',
-            float(settings.outermostZoneWidthInMeters.value),
-            minimum=0.,
-        )
-        self.centralBeamstopDiameterInMeters = self._registerRealParameter(
-            'central_beamstop_diameter_m',
-            float(settings.centralBeamstopDiameterInMeters.value),
-            minimum=0.,
-        )
-        self.defocusDistanceInMeters = self._registerRealParameter(
-            'defocus_distance_m',
-            float(settings.defocusDistanceInMeters.value),
-        )  # from sample to the focal plane
+        self.zonePlateDiameterInMeters = settings.zonePlateDiameterInMeters.copy()
+        self._addParameter('zone_plate_diameter_m', self.zonePlateDiameterInMeters)
+
+        self.outermostZoneWidthInMeters = settings.outermostZoneWidthInMeters.copy()
+        self._addParameter('outermost_zone_width_m', self.outermostZoneWidthInMeters)
+
+        self.centralBeamstopDiameterInMeters = settings.centralBeamstopDiameterInMeters.copy()
+        self._addParameter('central_beamstop_diameter_m', self.centralBeamstopDiameterInMeters)
+
+        # from sample to the focal plane
+        self.defocusDistanceInMeters = settings.defocusDistanceInMeters.copy()
+        self._addParameter('defocus_distance_m', self.defocusDistanceInMeters)
 
     def copy(self) -> FresnelZonePlateProbeBuilder:
         builder = FresnelZonePlateProbeBuilder(self._settings, self._fresnelZonePlateChooser)
-        builder.zonePlateDiameterInMeters.setValue(self.zonePlateDiameterInMeters.getValue())
-        builder.outermostZoneWidthInMeters.setValue(self.outermostZoneWidthInMeters.getValue())
-        builder.centralBeamstopDiameterInMeters.setValue(
-            self.centralBeamstopDiameterInMeters.getValue())
-        builder.defocusDistanceInMeters.setValue(self.defocusDistanceInMeters.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value.getValue())
+
         return builder
 
     def labelsForPresets(self) -> Iterator[str]:
@@ -86,8 +80,9 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         RR_FZP = numpy.hypot(XX_FZP, YY_FZP)
 
         # transmission function of FZP
-        T = numpy.exp(-2j * numpy.pi / wavelengthInMeters * (XX_FZP**2 + YY_FZP**2) / 2 /
-                      focalLengthInMeters)
+        T = numpy.exp(
+            -2j * numpy.pi / wavelengthInMeters * (XX_FZP**2 + YY_FZP**2) / 2 / focalLengthInMeters
+        )
         C = RR_FZP <= zonePlate.zonePlateDiameterInMeters / 2
         H = RR_FZP >= zonePlate.centralBeamstopDiameterInMeters / 2
         fzpTransmissionFunction = T * C * H

@@ -3,7 +3,11 @@ from typing import Final, Sequence
 
 import scipy.io
 
-from ptychodus.api.constants import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
+from ptychodus.api.constants import (
+    ELECTRON_VOLT_J,
+    LIGHT_SPEED_M_PER_S,
+    PLANCK_CONSTANT_J_PER_HZ,
+)
 from ptychodus.api.object import Object, ObjectArrayType, ObjectFileWriter
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileWriter
@@ -46,10 +50,10 @@ class MATProductFileReader(ProductFileReader):
         metadata = ProductMetadata(
             name=filePath.stem,
             comments='',
-            detectorDistanceInMeters=0.,  # not included in file
+            detectorDistanceInMeters=0.0,  # not included in file
             probeEnergyInElectronVolts=probe_energy_eV,
-            probePhotonsPerSecond=0.,  # not included in file
-            exposureTimeInSeconds=0.,  # not included in file
+            probePhotonsPerSecond=0.0,  # not included in file
+            exposureTimeInSeconds=0.0,  # not included in file
         )
 
         dx_spec = p_struct['dx_spec']
@@ -105,7 +109,6 @@ class MATProductFileReader(ProductFileReader):
 
 
 class MATObjectFileWriter(ObjectFileWriter):
-
     def write(self, filePath: Path, object_: Object) -> None:
         array = object_.array
         matDict = {'object': array.transpose(1, 2, 0)}
@@ -114,7 +117,6 @@ class MATObjectFileWriter(ObjectFileWriter):
 
 
 class MATProbeFileWriter(ProbeFileWriter):
-
     def write(self, filePath: Path, probe: Probe) -> None:
         array = probe.array
         matDict = {'probe': array.transpose(1, 2, 0)}

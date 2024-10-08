@@ -8,8 +8,12 @@ import logging
 import pkgutil
 import re
 
-from .fluorescence import (DeconvolutionStrategy, FluorescenceFileReader, FluorescenceFileWriter,
-                           UpscalingStrategy)
+from .fluorescence import (
+    DeconvolutionStrategy,
+    FluorescenceFileReader,
+    FluorescenceFileWriter,
+    UpscalingStrategy,
+)
 from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
@@ -36,7 +40,6 @@ class PluginEntry(Generic[T]):
 
 
 class PluginChooser(Sequence[PluginEntry[T]], Observable):
-
     def __init__(self) -> None:
         super().__init__()
         self._entryList: list[PluginEntry[T]] = list()
@@ -71,15 +74,13 @@ class PluginChooser(Sequence[PluginEntry[T]], Observable):
 
                 return
 
-        logger.debug(f'Invalid plugin name \"{name}\"')
+        logger.debug(f'Invalid plugin name "{name}"')
 
     @overload
-    def __getitem__(self, index: int) -> PluginEntry[T]:
-        ...
+    def __getitem__(self, index: int) -> PluginEntry[T]: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[PluginEntry[T]]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[PluginEntry[T]]: ...
 
     def __getitem__(self, index: int | slice) -> PluginEntry[T] | Sequence[PluginEntry[T]]:
         return self._entryList[index]
@@ -98,7 +99,6 @@ class PluginChooser(Sequence[PluginEntry[T]], Observable):
 
 
 class PluginRegistry:
-
     def __init__(self) -> None:
         self.diffractionFileReaders = PluginChooser[DiffractionFileReader]()
         self.diffractionFileWriters = PluginChooser[DiffractionFileWriter]()
@@ -123,6 +123,7 @@ class PluginRegistry:
         registry = cls()
 
         import ptychodus.plugins
+
         ns_pkg: ModuleType = ptychodus.plugins
 
         # Specifying the second argument (prefix) to iter_modules makes the

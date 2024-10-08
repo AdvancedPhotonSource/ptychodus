@@ -6,9 +6,13 @@ from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.patterns import (DetectorPresenter, DiffractionDatasetInputOutputPresenter,
-                               DiffractionDatasetPresenter, DiffractionMetadataPresenter,
-                               DiffractionPatternPresenter)
+from ...model.patterns import (
+    Detector,
+    DiffractionDatasetInputOutputPresenter,
+    DiffractionDatasetPresenter,
+    DiffractionMetadataPresenter,
+    DiffractionPatternPresenter,
+)
 from ...view.patterns import PatternsView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
@@ -22,37 +26,57 @@ logger = logging.getLogger(__name__)
 
 
 class PatternsController(Observer):
-
-    def __init__(self, detectorPresenter: DetectorPresenter,
-                 ioPresenter: DiffractionDatasetInputOutputPresenter,
-                 metadataPresenter: DiffractionMetadataPresenter,
-                 datasetPresenter: DiffractionDatasetPresenter,
-                 patternPresenter: DiffractionPatternPresenter, imageController: ImageController,
-                 view: PatternsView, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        detector: Detector,
+        ioPresenter: DiffractionDatasetInputOutputPresenter,
+        metadataPresenter: DiffractionMetadataPresenter,
+        datasetPresenter: DiffractionDatasetPresenter,
+        patternPresenter: DiffractionPatternPresenter,
+        imageController: ImageController,
+        view: PatternsView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
-        self._detectorPresenter = detectorPresenter
+        self._detector = detector
         self._datasetPresenter = datasetPresenter
         self._ioPresenter = ioPresenter
         self._imageController = imageController
         self._view = view
         self._fileDialogFactory = fileDialogFactory
-        self._detectorController = DetectorController.createInstance(detectorPresenter,
-                                                                     view.detectorView)
+        self._detectorController = DetectorController(detector, view.detectorView)
         self._wizardController = OpenDatasetWizardController.createInstance(
-            ioPresenter, metadataPresenter, datasetPresenter, patternPresenter,
-            view.openDatasetWizard, fileDialogFactory)
+            ioPresenter,
+            metadataPresenter,
+            datasetPresenter,
+            patternPresenter,
+            view.openDatasetWizard,
+            fileDialogFactory,
+        )
         self._treeModel = DatasetTreeModel()
 
     @classmethod
-    def createInstance(cls, detectorPresenter: DetectorPresenter,
-                       ioPresenter: DiffractionDatasetInputOutputPresenter,
-                       metadataPresenter: DiffractionMetadataPresenter,
-                       datasetPresenter: DiffractionDatasetPresenter,
-                       patternPresenter: DiffractionPatternPresenter,
-                       imageController: ImageController, view: PatternsView,
-                       fileDialogFactory: FileDialogFactory) -> PatternsController:
-        controller = cls(detectorPresenter, ioPresenter, metadataPresenter, datasetPresenter,
-                         patternPresenter, imageController, view, fileDialogFactory)
+    def createInstance(
+        cls,
+        detector: Detector,
+        ioPresenter: DiffractionDatasetInputOutputPresenter,
+        metadataPresenter: DiffractionMetadataPresenter,
+        datasetPresenter: DiffractionDatasetPresenter,
+        patternPresenter: DiffractionPatternPresenter,
+        imageController: ImageController,
+        view: PatternsView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> PatternsController:
+        controller = cls(
+            detector,
+            ioPresenter,
+            metadataPresenter,
+            datasetPresenter,
+            patternPresenter,
+            imageController,
+            view,
+            fileDialogFactory,
+        )
 
         view.treeView.setModel(controller._treeModel)
         view.treeView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -73,7 +97,7 @@ class PatternsController(Observer):
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         if current.isValid():
             node = current.internalPointer()
-            pixelGeometry = self._detectorPresenter.getPixelGeometry()
+            pixelGeometry = self._detector.getPixelGeometry()
             self._imageController.setArray(node.data, pixelGeometry)
         else:
             self._imageController.clearArray()
@@ -83,7 +107,8 @@ class PatternsController(Observer):
             self._view,
             'Save Diffraction File',
             nameFilters=self._ioPresenter.getSaveFileFilterList(),
-            selectedNameFilter=self._ioPresenter.getSaveFileFilter())
+            selectedNameFilter=self._ioPresenter.getSaveFileFilter(),
+        )
 
         if filePath:
             try:
@@ -97,8 +122,10 @@ class PatternsController(Observer):
 
     def _closeDataset(self) -> None:
         button = QMessageBox.question(
-            self._view, 'Confirm Close',
-            'This will free the diffraction data from memory. Do you want to continue?')
+            self._view,
+            'Confirm Close',
+            'This will free the diffraction data from memory. Do you want to continue?',
+        )
 
         if button != QMessageBox.StandardButton.Yes:
             return

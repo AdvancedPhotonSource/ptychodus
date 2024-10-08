@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class NanoMaxScanFileReader(ScanFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.e-6
+    MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     def read(self, filePath: Path) -> Scan:
         pointList: list[ScanPoint] = list()

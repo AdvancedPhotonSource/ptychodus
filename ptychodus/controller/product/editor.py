@@ -1,6 +1,12 @@
 from typing import Any
 
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QSortFilterProxyModel
+from PyQt5.QtCore import (
+    Qt,
+    QAbstractTableModel,
+    QModelIndex,
+    QObject,
+    QSortFilterProxyModel,
+)
 from PyQt5.QtWidgets import QWidget
 
 from ptychodus.api.observer import Observable, Observer
@@ -10,7 +16,6 @@ from ...view.product import ProductEditorDialog
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
-
     def __init__(self, product: ProductRepositoryItem, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._product = product
@@ -23,10 +28,12 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Fresnel Number',
         ]
 
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._header[section]
 
@@ -56,9 +63,12 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
 
 class ProductEditorViewController(Observer):
-
-    def __init__(self, product: ProductRepositoryItem, tableModel: ProductPropertyTableModel,
-                 dialog: ProductEditorDialog) -> None:
+    def __init__(
+        self,
+        product: ProductRepositoryItem,
+        tableModel: ProductPropertyTableModel,
+        dialog: ProductEditorDialog,
+    ) -> None:
         super().__init__()
         self._product = product
         self._tableModel = tableModel
@@ -70,7 +80,7 @@ class ProductEditorViewController(Observer):
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
-        dialog = ProductEditorDialog.createInstance(parent)
+        dialog = ProductEditorDialog(parent)
         dialog.setWindowTitle(f'Edit Product: {product.getName()}')
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)

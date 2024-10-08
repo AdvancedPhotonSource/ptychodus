@@ -5,8 +5,12 @@ import h5py
 
 from ptychodus.api.constants import ELECTRON_VOLT_J
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.patterns import (DiffractionDataset, DiffractionFileReader, DiffractionMetadata,
-                                    SimpleDiffractionDataset)
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionMetadata,
+    SimpleDiffractionDataset,
+)
 from ptychodus.api.plugins import PluginRegistry
 
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
@@ -15,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 class CXIDiffractionFileReader(DiffractionFileReader):
-
     def __init__(self) -> None:
         self._dataPath = '/entry_1/data_1/data'
         self._treeBuilder = H5DiffractionFileTreeBuilder()
@@ -36,13 +39,13 @@ class CXIDiffractionFileReader(DiffractionFileReader):
 
                     detectorExtent = ImageExtent(detectorWidth, detectorHeight)
                     detectorDistanceInMeters = float(
-                        h5File['/entry_1/instrument_1/detector_1/distance'][()])
+                        h5File['/entry_1/instrument_1/detector_1/distance'][()]
+                    )
                     detectorPixelGeometry = PixelGeometry(
                         float(h5File['/entry_1/instrument_1/detector_1/x_pixel_size'][()]),
                         float(h5File['/entry_1/instrument_1/detector_1/y_pixel_size'][()]),
                     )
-                    probeEnergyInJoules = float(
-                        h5File['/entry_1/instrument_1/source_1/energy'][()])
+                    probeEnergyInJoules = float(h5File['/entry_1/instrument_1/source_1/energy'][()])
                     probeEnergyInElectronVolts = probeEnergyInJoules / ELECTRON_VOLT_J
 
                     metadata = DiffractionMetadata(
@@ -65,7 +68,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
 
                     dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
         except OSError:
-            logger.warning(f'Unable to read file \"{filePath}\".')
+            logger.warning(f'Unable to read file "{filePath}".')
 
         return dataset
 

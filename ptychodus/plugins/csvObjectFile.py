@@ -7,14 +7,12 @@ from ptychodus.api.plugins import PluginRegistry
 
 
 class CSVObjectFileReader(ObjectFileReader):
-
     def read(self, filePath: Path) -> Object:
         array = numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
         return Object(array)
 
 
 class CSVObjectFileWriter(ObjectFileWriter):
-
     def write(self, filePath: Path, object_: Object) -> None:
         array = object_.array
         numpy.savetxt(filePath, array, delimiter=',')

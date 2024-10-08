@@ -1,16 +1,17 @@
-from .adaptiveMoment import TikeAdaptiveMomentPresenter
-from .core import TikeReconstructorLibrary, TikePresenter
-from .multigrid import TikeMultigridPresenter
-from .objectCorrection import TikeObjectCorrectionPresenter
-from .positionCorrection import TikePositionCorrectionPresenter
-from .probeCorrection import TikeProbeCorrectionPresenter
+from .core import TikeReconstructorLibrary
+from .settings import (
+    TikeMultigridSettings,
+    TikeObjectCorrectionSettings,
+    TikePositionCorrectionSettings,
+    TikeProbeCorrectionSettings,
+    TikeSettings,
+)
 
 __all__ = [
-    'TikeAdaptiveMomentPresenter',
-    'TikeMultigridPresenter',
-    'TikeObjectCorrectionPresenter',
-    'TikePositionCorrectionPresenter',
-    'TikePresenter',
-    'TikeProbeCorrectionPresenter',
+    'TikeMultigridSettings',
+    'TikeObjectCorrectionSettings',
+    'TikePositionCorrectionSettings',
+    'TikeProbeCorrectionSettings',
     'TikeReconstructorLibrary',
+    'TikeSettings',
 ]

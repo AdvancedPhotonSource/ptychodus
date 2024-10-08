@@ -14,45 +14,48 @@ logger = logging.getLogger(__name__)
 
 
 class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver):
-
-    def __init__(self, repository: Sequence[ProductRepositoryItem],
-                 settings: ProductSettings) -> None:
+    def __init__(
+        self, repository: Sequence[ProductRepositoryItem], settings: ProductSettings
+    ) -> None:
         self._repository = repository
         self._settings = settings
 
     def create(self, metadata: ProductMetadata) -> MetadataRepositoryItem:
-        return MetadataRepositoryItem(self, metadata)
+        return MetadataRepositoryItem(
+            self._settings,
+            self,
+            name=metadata.name,
+            comments=metadata.comments,
+            detectorDistanceInMeters=metadata.detectorDistanceInMeters,
+            probeEnergyInElectronVolts=metadata.probeEnergyInElectronVolts,
+            probePhotonsPerSecond=metadata.probePhotonsPerSecond,
+            exposureTimeInSeconds=metadata.exposureTimeInSeconds,
+        )
 
-    def createDefault(self,
-                      name: str,
-                      *,
-                      comments: str = '',
-                      detectorDistanceInMeters: float | None = None,
-                      probeEnergyInElectronVolts: float | None = None,
-                      probePhotonsPerSecond: float | None = None,
-                      exposureTimeInSeconds: float | None = None) -> MetadataRepositoryItem:
-        detectorDistanceInMeters_ = float(self._settings.detectorDistanceInMeters.value) \
-                if detectorDistanceInMeters is None else detectorDistanceInMeters
-        probeEnergyInElectronVolts_ = float(self._settings.probeEnergyInElectronVolts.value) \
-                if probeEnergyInElectronVolts is None else probeEnergyInElectronVolts
-        probePhotonsPerSecond_ = float(self._settings.probePhotonsPerSecond.value) \
-                if probePhotonsPerSecond is None else probePhotonsPerSecond
-        exposureTimeInSeconds_ = float(self._settings.exposureTimeInSeconds.value) \
-                if exposureTimeInSeconds is None else exposureTimeInSeconds
-
-        metadata = ProductMetadata(
+    def createDefault(
+        self,
+        *,
+        name: str = '',
+        comments: str = '',
+        detectorDistanceInMeters: float | None = None,
+        probeEnergyInElectronVolts: float | None = None,
+        probePhotonsPerSecond: float | None = None,
+        exposureTimeInSeconds: float | None = None,
+    ) -> MetadataRepositoryItem:
+        return MetadataRepositoryItem(
+            self._settings,
+            self,
             name=name,
             comments=comments,
-            detectorDistanceInMeters=detectorDistanceInMeters_,
-            probeEnergyInElectronVolts=probeEnergyInElectronVolts_,
-            probePhotonsPerSecond=probePhotonsPerSecond_,
-            exposureTimeInSeconds=exposureTimeInSeconds_,
+            detectorDistanceInMeters=detectorDistanceInMeters,
+            probeEnergyInElectronVolts=probeEnergyInElectronVolts,
+            probePhotonsPerSecond=probePhotonsPerSecond,
+            exposureTimeInSeconds=exposureTimeInSeconds,
         )
-        return self.create(metadata)
 
     def createUniqueName(self, candidateName: str) -> str:
         reservedNames = set([item.getName() for item in self._repository])
-        name = candidateName
+        name = candidateName if candidateName else 'Unnamed'
         match = 0
 
         while name in reservedNames:

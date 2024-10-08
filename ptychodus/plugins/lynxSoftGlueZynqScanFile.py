@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
     SIMPLE_NAME: Final[str] = 'LYNXSoftGlueZynq'
-    MICRONS_TO_METERS: Final[float] = 1.e-6
+    MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     EXPECTED_HEADER_RAW: Final[list[str]] = [
         'DataPoint',
@@ -47,12 +47,12 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
             columnHeaderRow = next(csvIterator)
 
             if columnHeaderRow == LYNXSoftGlueZynqScanFileReader.EXPECTED_HEADER_RAW:
-                logger.debug(f'Reading raw scan positions for \"{scanName}\"...')
+                logger.debug(f'Reading raw scan positions for "{scanName}"...')
                 X = 1
                 Y = 2
                 DETECTOR_COUNT = 4
             elif columnHeaderRow == LYNXSoftGlueZynqScanFileReader.EXPECTED_HEADER_PROCESSED:
-                logger.debug(f'Reading processed scan positions for \"{scanName}\"...')
+                logger.debug(f'Reading processed scan positions for "{scanName}"...')
                 DETECTOR_COUNT = 0
                 X = 1
                 Y = 3

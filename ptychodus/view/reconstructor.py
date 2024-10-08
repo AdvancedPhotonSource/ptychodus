@@ -1,8 +1,21 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
-                             QHBoxLayout, QMenu, QPlainTextEdit, QProgressBar, QPushButton,
-                             QScrollArea, QStackedWidget, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QMenu,
+    QPlainTextEdit,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -10,7 +23,6 @@ from matplotlib.figure import Figure
 
 
 class ReconstructorView(QGroupBox):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Parameters', parent)
         self.algorithmComboBox = QComboBox()
@@ -46,7 +58,6 @@ class ReconstructorView(QGroupBox):
 
 
 class ReconstructorProgressDialog(QDialog):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.textEdit = QPlainTextEdit()
@@ -72,7 +83,6 @@ class ReconstructorProgressDialog(QDialog):
 
 
 class ReconstructorParametersView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.reconstructorView = ReconstructorView.createInstance()
@@ -98,7 +108,6 @@ class ReconstructorParametersView(QWidget):
 
 
 class ReconstructorPlotView(QWidget):
-
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()

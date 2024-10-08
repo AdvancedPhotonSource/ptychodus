@@ -10,25 +10,23 @@ from .settings import ProbeSettings
 
 
 class DiskProbeBuilder(ProbeBuilder):
-
     def __init__(self, settings: ProbeSettings) -> None:
-        super().__init__('disk')
+        super().__init__(settings, 'disk')
         self._settings = settings
 
-        self.diameterInMeters = self._registerRealParameter(
-            'diameter_m',
-            float(settings.diskDiameterInMeters.value),
-            minimum=0.,
-        )
-        self.defocusDistanceInMeters = self._registerRealParameter(
-            'defocus_distance_m',
-            float(settings.defocusDistanceInMeters.value),
-        )  # from sample to the focal plane
+        self.diameterInMeters = settings.diskDiameterInMeters.copy()
+        self._addParameter('diameter_m', self.diameterInMeters)
+
+        # from sample to the focal plane
+        self.defocusDistanceInMeters = settings.defocusDistanceInMeters.copy()
+        self._addParameter('defocus_distance_m', self.defocusDistanceInMeters)
 
     def copy(self) -> DiskProbeBuilder:
         builder = DiskProbeBuilder(self._settings)
-        builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
-        builder.defocusDistanceInMeters.setValue(self.defocusDistanceInMeters.getValue())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].setValue(value.getValue())
+
         return builder
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
@@ -36,7 +34,7 @@ class DiskProbeBuilder(ProbeBuilder):
         coords = self.getTransverseCoordinates(geometry)
 
         R_m = coords.positionRInMeters
-        r_m = self.diameterInMeters.getValue() / 2.
+        r_m = self.diameterInMeters.getValue() / 2.0
         disk = numpy.where(R_m < r_m, 1 + 0j, 0j)
 
         propagatorParameters = PropagatorParameters(

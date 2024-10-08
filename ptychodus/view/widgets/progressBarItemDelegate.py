@@ -2,14 +2,18 @@ import logging
 
 from PyQt5.QtCore import Qt, QModelIndex
 from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import (QApplication, QStyle, QStyleOptionProgressBar, QStyledItemDelegate,
-                             QStyleOptionViewItem)
+from PyQt5.QtWidgets import (
+    QApplication,
+    QStyle,
+    QStyleOptionProgressBar,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class ProgressBarItemDelegate(QStyledItemDelegate):
-
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
         progress = index.data(Qt.ItemDataRole.UserRole)
 

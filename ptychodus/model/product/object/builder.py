@@ -5,65 +5,86 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.object import Object, ObjectFileReader, ObjectGeometryProvider
-from ptychodus.api.parametric import ParameterRepository
+from ptychodus.api.parametric import ParameterGroup
+
+from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
 
 
-class ObjectBuilder(ParameterRepository):
-
-    def __init__(self, name: str) -> None:
-        super().__init__('builder')
-        self._name = self._registerStringParameter('name', name)
+class ObjectBuilder(ParameterGroup):
+    def __init__(self, settings: ObjectSettings, name: str) -> None:
+        super().__init__()
+        self._name = settings.builder.copy()
+        self._name.setValue(name)
+        self._addParameter('name', self._name)
 
     def getName(self) -> str:
         return self._name.getValue()
+
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
 
     @abstractmethod
     def copy(self) -> ObjectBuilder:
         pass
 
     @abstractmethod
-    def build(self, geometryProvider: ObjectGeometryProvider,
-              layerDistanceInMeters: Sequence[float]) -> Object:
+    def build(
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        layerDistanceInMeters: Sequence[float],
+    ) -> Object:
         pass
 
 
 class FromMemoryObjectBuilder(ObjectBuilder):
-
-    def __init__(self, object_: Object) -> None:
-        super().__init__('from_memory')
+    def __init__(self, settings: ObjectSettings, object_: Object) -> None:
+        super().__init__(settings, 'from_memory')
+        self._settings = settings
         self._object = object_.copy()
 
     def copy(self) -> FromMemoryObjectBuilder:
-        return FromMemoryObjectBuilder(self._object)
+        return FromMemoryObjectBuilder(self._settings, self._object)
 
-    def build(self, geometryProvider: ObjectGeometryProvider,
-              layerDistanceInMeters: Sequence[float]) -> Object:
+    def build(
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        layerDistanceInMeters: Sequence[float],
+    ) -> Object:
         return self._object
 
 
 class FromFileObjectBuilder(ObjectBuilder):
-
-    def __init__(self, filePath: Path, fileType: str, fileReader: ObjectFileReader) -> None:
-        super().__init__('from_file')
-        self.filePath = self._registerPathParameter('file_path', filePath)
-        self.fileType = self._registerStringParameter('file_type', fileType)
+    def __init__(
+        self, settings: ObjectSettings, filePath: Path, fileType: str, fileReader: ObjectFileReader
+    ) -> None:
+        super().__init__(settings, 'from_file')
+        self._settings = settings
+        self.filePath = settings.filePath.copy()
+        self._addParameter('file_path', self.filePath)
+        self.fileType = settings.fileType.copy()
+        self._addParameter('file_type', self.fileType)
         self._fileReader = fileReader
 
     def copy(self) -> FromFileObjectBuilder:
-        return FromFileObjectBuilder(self.filePath.getValue(), self.fileType.getValue(),
-                                     self._fileReader)
+        return FromFileObjectBuilder(
+            self._settings, self.filePath.getValue(), self.fileType.getValue(), self._fileReader
+        )
 
-    def build(self, geometryProvider: ObjectGeometryProvider,
-              layerDistanceInMeters: Sequence[float]) -> Object:
+    def build(
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        layerDistanceInMeters: Sequence[float],
+    ) -> Object:
         filePath = self.filePath.getValue()
         fileType = self.fileType.getValue()
-        logger.debug(f'Reading \"{filePath}\" as \"{fileType}\"')
+        logger.debug(f'Reading "{filePath}" as "{fileType}"')
 
         try:
             object_ = self._fileReader.read(filePath)
         except Exception as exc:
-            raise RuntimeError(f'Failed to read \"{filePath}\"') from exc
+            raise RuntimeError(f'Failed to read "{filePath}"') from exc
 
         return object_

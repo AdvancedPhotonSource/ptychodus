@@ -112,7 +112,7 @@ class MDAHeader:
 
     @property
     def has_extra_pvs(self) -> bool:
-        return (self.extra_pvs_offset > 0)
+        return self.extra_pvs_offset > 0
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
@@ -176,8 +176,16 @@ class MDAScanPositionerInfo:
         readback_description = read_counted_string_from_buffer(fp)
         readback_unit = read_counted_string_from_buffer(fp)
 
-        return cls(number, name, description, step_mode, unit, readback_name, readback_description,
-                   readback_unit)
+        return cls(
+            number,
+            name,
+            description,
+            step_mode,
+            unit,
+            readback_name,
+            readback_description,
+            readback_unit,
+        )
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
@@ -289,8 +297,9 @@ class MDAScanData:
     detector_array: numpy.typing.NDArray[numpy.floating[Any]]  # float, shape: nd x npts
 
     @classmethod
-    def read(cls, fp: typing.BinaryIO, scanHeader: MDAScanHeader,
-             scanInfo: MDAScanInfo) -> MDAScanData:
+    def read(
+        cls, fp: typing.BinaryIO, scanHeader: MDAScanHeader, scanInfo: MDAScanInfo
+    ) -> MDAScanData:
         npts = scanHeader.num_requested_points
         np = scanInfo.num_positioners
         nd = scanInfo.num_detectors
@@ -435,7 +444,7 @@ class MDAFile:
 
 
 class MDAScanFileReader(ScanFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.e-6
+    MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     def read(self, filePath: Path) -> Scan:
         pointList: list[ScanPoint] = list()
@@ -460,7 +469,7 @@ class MDAScanFileReader(ScanFileReader):
 
 
 class HXNScanFileReader(ScanFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.e-6
+    MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     def read(self, filePath: Path) -> Scan:
         pointList = list()

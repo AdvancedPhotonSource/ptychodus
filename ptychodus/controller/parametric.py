@@ -5,35 +5,53 @@ from typing import Final
 import logging
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAbstractButton, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
-                             QGroupBox, QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtGui import QIntValidator, QValidator
+from PyQt5.QtWidgets import (
+    QAbstractButton,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QLineEdit,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, IntegerParameter, RealParameter
+from ptychodus.api.parametric import (
+    BooleanParameter,
+    IntegerParameter,
+    RealParameter,
+    StringParameter,
+)
 
 from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWidget
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'ParameterDialogBuilder',
+    'ParameterViewBuilder',
 ]
 
 
 class ParameterViewController(ABC):
-
     @abstractmethod
     def getWidget(self) -> QWidget:
         pass
 
 
 class CheckBoxParameterViewController(ParameterViewController, Observer):
-
-    def __init__(self, parameter: BooleanParameter) -> None:
+    def __init__(self, parameter: BooleanParameter, text: str, *, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = QCheckBox()
+        self._widget = QCheckBox(text)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
         self._widget.toggled.connect(parameter.setValue)
@@ -53,10 +71,13 @@ class CheckBoxParameterViewController(ParameterViewController, Observer):
 class SpinBoxParameterViewController(ParameterViewController, Observer):
     MAX_INT: Final[int] = 0x7FFFFFFF
 
-    def __init__(self, parameter: IntegerParameter) -> None:
+    def __init__(self, parameter: IntegerParameter, *, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = QSpinBox()
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
         self._widget.valueChanged.connect(parameter.setValue)
@@ -87,12 +108,123 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
             self._syncModelToView()
 
 
-class DecimalLineEditParameterViewController(ParameterViewController, Observer):
-
-    def __init__(self, parameter: RealParameter, *, isSigned: bool = False) -> None:
+class ComboBoxParameterViewController(ParameterViewController, Observer):
+    def __init__(
+        self, parameter: StringParameter, items: Sequence[str], *, tool_tip: str = ''
+    ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = DecimalLineEdit.createInstance(isSigned=isSigned)
+        self._widget = QComboBox()
+
+        for item in items:
+            self._widget.addItem(item)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
+
+        self._syncModelToView()
+        self._widget.textActivated.connect(parameter.setValue)
+        parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncModelToView(self) -> None:
+        self._widget.setCurrentText(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
+class LineEditParameterViewController(ParameterViewController, Observer):
+    def __init__(
+        self, parameter: StringParameter, validator: QValidator | None = None, *, tool_tip: str = ''
+    ) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = QLineEdit()
+
+        if validator is not None:
+            self._widget.setValidator(validator)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
+
+        self._syncModelToView()
+        self._widget.editingFinished.connect(self._syncViewToModel)
+        parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncViewToModel(self) -> None:
+        self._parameter.setValue(self._widget.text())
+
+    def _syncModelToView(self) -> None:
+        self._widget.setText(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
+class IntegerLineEditParameterViewController(ParameterViewController, Observer):
+    def __init__(self, parameter: IntegerParameter, *, tool_tip: str = '') -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = QLineEdit()
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
+
+        validator = QIntValidator()
+        bottom = parameter.getMinimum()
+        top = parameter.getMaximum()
+
+        if bottom is not None:
+            validator.setBottom(bottom)
+
+        if top is not None:
+            validator.setTop(top)
+
+        self._widget.setValidator(validator)
+
+        self._syncModelToView()
+        self._widget.editingFinished.connect(self._syncViewToModel)
+        parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncViewToModel(self) -> None:
+        text = self._widget.text()
+
+        try:
+            value = int(text)
+        except ValueError:
+            logger.warning(f'Failed to convert "{text}" to int!')
+        else:
+            self._parameter.setValue(value)
+
+    def _syncModelToView(self) -> None:
+        self._widget.setText(str(self._parameter.getValue()))
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
+class DecimalLineEditParameterViewController(ParameterViewController, Observer):
+    def __init__(
+        self, parameter: RealParameter, *, is_signed: bool = False, tool_tip: str = ''
+    ) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = DecimalLineEdit.createInstance(isSigned=is_signed)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
         self._widget.valueChanged.connect(self._syncViewToModel)
@@ -113,11 +245,13 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 
 
 class DecimalSliderParameterViewController(ParameterViewController, Observer):
-
-    def __init__(self, parameter: RealParameter) -> None:
+    def __init__(self, parameter: RealParameter, *, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
         self._widget.valueChanged.connect(self._syncViewToModel)
@@ -146,11 +280,10 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
 
 
 class LengthWidgetParameterViewController(ParameterViewController, Observer):
-
-    def __init__(self, parameter: RealParameter, *, isSigned: bool = False) -> None:
+    def __init__(self, parameter: RealParameter, *, is_signed: bool = False) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = LengthWidget.createInstance(isSigned=isSigned)
+        self._widget = LengthWidget.createInstance(isSigned=is_signed)
 
         self._syncModelToView()
         self._widget.lengthChanged.connect(self._syncViewToModel)
@@ -171,7 +304,6 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
 
 
 class AngleWidgetParameterViewController(ParameterViewController, Observer):
-
     def __init__(self, parameter: RealParameter) -> None:
         super().__init__()
         self._parameter = parameter
@@ -195,10 +327,21 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
             self._syncModelToView()
 
 
-class ParameterDialog(QDialog):
+class ParameterWidget(QWidget):
+    def __init__(
+        self, viewControllers: Sequence[ParameterViewController], parent: QWidget | None = None
+    ) -> None:
+        super().__init__(parent)
+        self._viewControllers = viewControllers
 
-    def __init__(self, viewControllers: Sequence[ParameterViewController],
-                 buttonBox: QDialogButtonBox, parent: QWidget | None) -> None:
+
+class ParameterDialog(QDialog):
+    def __init__(
+        self,
+        viewControllers: Sequence[ParameterViewController],
+        buttonBox: QDialogButtonBox,
+        parent: QWidget | None,
+    ) -> None:
         super().__init__(parent)
         self._viewControllers = viewControllers
         self._buttonBox = buttonBox
@@ -215,50 +358,95 @@ class ParameterDialog(QDialog):
             self.reject()
 
 
-class ParameterDialogBuilder:
-
+class ParameterViewBuilder:
     def __init__(self) -> None:
         self._viewControllersTop: list[ParameterViewController] = list()
         self._viewControllers: dict[tuple[str, str], ParameterViewController] = dict()
         self._viewControllersBottom: list[ParameterViewController] = list()
 
-    def addCheckBox(self, parameter: BooleanParameter, label: str, group: str = '') -> None:
-        viewController = CheckBoxParameterViewController(parameter)
-        self.addViewController(viewController, label, group)
+    def addCheckBox(
+        self,
+        parameter: BooleanParameter,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        viewController = CheckBoxParameterViewController(parameter, '')
+        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
-    def addSpinBox(self, parameter: IntegerParameter, label: str, group: str = '') -> None:
+    def addSpinBox(
+        self,
+        parameter: IntegerParameter,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
         viewController = SpinBoxParameterViewController(parameter)
-        self.addViewController(viewController, label, group)
+        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
-    def addDecimalLineEdit(self, parameter: RealParameter, label: str, group: str = '') -> None:
+    def addDecimalLineEdit(
+        self,
+        parameter: RealParameter,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
         viewController = DecimalLineEditParameterViewController(parameter)
-        self.addViewController(viewController, label, group)
+        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
-    def addDecimalSlider(self, parameter: RealParameter, label: str, group: str = '') -> None:
+    def addDecimalSlider(
+        self,
+        parameter: RealParameter,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
         viewController = DecimalSliderParameterViewController(parameter)
-        self.addViewController(viewController, label, group)
+        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
-    def addLengthWidget(self, parameter: RealParameter, label: str, group: str = '') -> None:
+    def addLengthWidget(
+        self,
+        parameter: RealParameter,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
         viewController = LengthWidgetParameterViewController(parameter)
-        self.addViewController(viewController, label, group)
+        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
-    def addAngleWidget(self, parameter: RealParameter, label: str, group: str = '') -> None:
+    def addAngleWidget(
+        self,
+        parameter: RealParameter,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
         viewController = AngleWidgetParameterViewController(parameter)
-        self.addViewController(viewController, label, group)
+        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
     def addViewControllerToTop(self, viewController: ParameterViewController) -> None:
         self._viewControllersTop.append(viewController)
 
-    def addViewController(self,
-                          viewController: ParameterViewController,
-                          label: str,
-                          group: str = '') -> None:
+    def addViewController(
+        self,
+        viewController: ParameterViewController,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
         self._viewControllers[group, label] = viewController
 
     def addViewControllerToBottom(self, viewController: ParameterViewController) -> None:
         self._viewControllersBottom.append(viewController)
 
-    def build(self, windowTitle: str, parent: QWidget | None) -> QDialog:
+    def _buildLayout(self, *, add_stretch: bool) -> QVBoxLayout:
         groupDict: dict[str, QFormLayout] = dict()
 
         for (groupName, widgetLabel), vc in self._viewControllers.items():
@@ -286,20 +474,38 @@ class ParameterDialogBuilder:
         for viewController in self._viewControllersBottom:
             layout.addWidget(viewController.getWidget())
 
-        buttonBox = QDialogButtonBox()
-        layout.addWidget(buttonBox)
+        if add_stretch:
+            layout.addStretch()
 
+        return layout
+
+    def _flushViewControllers(self) -> Sequence[ParameterViewController]:
         viewControllers: list[ParameterViewController] = list()
         viewControllers.extend(self._viewControllersTop)
         viewControllers.extend(self._viewControllers.values())
         viewControllers.extend(self._viewControllersBottom)
 
-        dialog = ParameterDialog(list(self._viewControllers.values()), buttonBox, parent)
-        dialog.setLayout(layout)
-        dialog.setWindowTitle(windowTitle)
-
         self._viewControllersTop.clear()
         self._viewControllers.clear()
         self._viewControllersBottom.clear()
+
+        return viewControllers
+
+    def buildWidget(self) -> QWidget:
+        layout = self._buildLayout(add_stretch=True)
+
+        widget = ParameterWidget(self._flushViewControllers())
+        widget.setLayout(layout)
+
+        return widget
+
+    def buildDialog(self, windowTitle: str, parent: QWidget | None) -> QDialog:
+        buttonBox = QDialogButtonBox()
+        layout = self._buildLayout(add_stretch=False)
+        layout.addWidget(buttonBox)
+
+        dialog = ParameterDialog(self._flushViewControllers(), buttonBox, parent)
+        dialog.setLayout(layout)
+        dialog.setWindowTitle(windowTitle)
 
         return dialog

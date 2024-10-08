@@ -6,33 +6,32 @@ from ptychodus.api.product import Product
 
 
 class IdentityDeconvolution(DeconvolutionStrategy):
-
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
         return emap
 
 
 class RichardsonLucyDeconvolution(DeconvolutionStrategy):
-
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        cps = skimage.restoration.richardson_lucy(emap.counts_per_second,
-                                                  product.probe.getIntensity())
+        cps = skimage.restoration.richardson_lucy(
+            emap.counts_per_second, product.probe.getIntensity()
+        )
         return ElementMap(emap.name, cps)
 
 
 class WienerDeconvolution(DeconvolutionStrategy):
-
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
         balance = 0.05  # TODO
-        cps = skimage.restoration.wiener(emap.counts_per_second, product.probe.getIntensity(),
-                                         balance)
+        cps = skimage.restoration.wiener(
+            emap.counts_per_second, product.probe.getIntensity(), balance
+        )
         return ElementMap(emap.name, cps)
 
 
 class UnsupervisedWienerDeconvolution(DeconvolutionStrategy):
-
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        cps, _ = skimage.restoration.unsupervised_wiener(emap.counts_per_second,
-                                                         product.probe.getIntensity())
+        cps, _ = skimage.restoration.unsupervised_wiener(
+            emap.counts_per_second, product.probe.getIntensity()
+        )
         return ElementMap(emap.name, cps)
 
 

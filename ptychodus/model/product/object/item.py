@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import ParameterRepository
+from ptychodus.api.parametric import ParameterGroup
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
@@ -13,25 +13,34 @@ from .settings import ObjectSettings
 logger = logging.getLogger(__name__)
 
 
-class ObjectRepositoryItem(ParameterRepository):
-
-    def __init__(self, geometryProvider: ObjectGeometryProvider, settings: ObjectSettings,
-                 builder: ObjectBuilder) -> None:
-        super().__init__('Object')
+class ObjectRepositoryItem(ParameterGroup):
+    def __init__(
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        settings: ObjectSettings,
+        builder: ObjectBuilder,
+    ) -> None:
+        super().__init__()
         self._geometryProvider = geometryProvider
         self._settings = settings
         self._builder = builder
         self._object = Object()
 
-        self._addParameterRepository(builder, observe=True)
-        self.layerDistanceInMeters = self._registerRealArrayParameter(
-            'layer_distance_m', [numpy.inf])
+        self._addGroup('builder', builder, observe=True)
+        # TODO sync layer distance to/from settings
+        self.layerDistanceInMeters = self.createRealArrayParameter('layer_distance_m', [numpy.inf])
 
         self._rebuild()
 
     def assign(self, item: ObjectRepositoryItem) -> None:
         self.layerDistanceInMeters.setValue(item.layerDistanceInMeters.getValue(), notify=False)
         self.setBuilder(item.getBuilder().copy())
+
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
+
+        self._builder.syncToSettings()
 
     def getNumberOfLayers(self) -> int:
         return len(self.layerDistanceInMeters)
@@ -40,7 +49,7 @@ class ObjectRepositoryItem(ParameterRepository):
         numRequested = max(1, number)
         distanceInMeters = list(self.layerDistanceInMeters.getValue())
         numExisting = len(distanceInMeters)
-        defaultDistanceInMeters = float(self._settings.objectLayerDistanceInMeters.value)
+        defaultDistanceInMeters = float(self._settings.objectLayerDistanceInMeters.getValue())
 
         if numExisting < 2:
             distanceInMeters = [defaultDistanceInMeters] * numRequested
@@ -61,11 +70,11 @@ class ObjectRepositoryItem(ParameterRepository):
         return self._builder
 
     def setBuilder(self, builder: ObjectBuilder) -> None:
-        self._removeParameterRepository(self._builder)
+        self._removeGroup('builder')
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
-        self._addParameterRepository(self._builder, observe=True)
+        self._addGroup('builder', self._builder, observe=True)
         self._rebuild()
 
     def _rebuild(self) -> None:

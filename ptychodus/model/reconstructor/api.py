@@ -3,7 +3,11 @@ import logging
 import time
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.reconstructor import Reconstructor, TrainableReconstructor, TrainOutput
+from ptychodus.api.reconstructor import (
+    Reconstructor,
+    TrainableReconstructor,
+    TrainOutput,
+)
 
 from ..product import ProductRepository
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
@@ -12,21 +16,26 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructorAPI:
-
-    def __init__(self, dataMatcher: DiffractionPatternPositionMatcher,
-                 productRepository: ProductRepository,
-                 reconstructorChooser: PluginChooser[Reconstructor]) -> None:
+    def __init__(
+        self,
+        dataMatcher: DiffractionPatternPositionMatcher,
+        productRepository: ProductRepository,
+        reconstructorChooser: PluginChooser[Reconstructor],
+    ) -> None:
         self._dataMatcher = dataMatcher
         self._productRepository = productRepository
         self._reconstructorChooser = reconstructorChooser
 
-    def reconstruct(self,
-                    inputProductIndex: int,
-                    outputProductName: str,
-                    indexFilter: ScanIndexFilter = ScanIndexFilter.ALL) -> int:
+    def reconstruct(
+        self,
+        inputProductIndex: int,
+        outputProductName: str,
+        indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
+    ) -> int:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
         parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            inputProductIndex, indexFilter)
+            inputProductIndex, indexFilter
+        )
 
         tic = time.perf_counter()
         result = reconstructor.reconstruct(parameters)
@@ -57,7 +66,8 @@ class ReconstructorAPI:
             logger.info('Preparing input data...')
             tic = time.perf_counter()
             parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-                inputProductIndex, ScanIndexFilter.ALL)
+                inputProductIndex, ScanIndexFilter.ALL
+            )
             toc = time.perf_counter()
             logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
 

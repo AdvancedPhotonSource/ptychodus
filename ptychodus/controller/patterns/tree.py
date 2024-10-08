@@ -6,7 +6,6 @@ from ptychodus.api.tree import SimpleTreeNode
 
 
 class SimpleTreeModel(QAbstractItemModel):
-
     def __init__(self, rootNode: SimpleTreeNode, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rootNode = rootNode
@@ -17,12 +16,10 @@ class SimpleTreeModel(QAbstractItemModel):
         self.endResetModel()
 
     @overload
-    def parent(self, child: QModelIndex) -> QModelIndex:
-        ...
+    def parent(self, child: QModelIndex) -> QModelIndex: ...
 
     @overload
-    def parent(self) -> QObject:
-        ...
+    def parent(self) -> QObject: ...
 
     def parent(self, child: QModelIndex | None = None) -> QModelIndex | QObject:
         if child is None:
@@ -41,10 +38,12 @@ class SimpleTreeModel(QAbstractItemModel):
 
             return value
 
-    def headerData(self,
-                   section: int,
-                   orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._rootNode.data(section)
 

@@ -2,36 +2,69 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import logging
 
-from ptychodus.api.parametric import ParameterRepository
+from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.product import ProductMetadata
+
+from ..patterns import ProductSettings
 
 logger = logging.getLogger(__name__)
 
 
 class UniqueNameFactory(ABC):
-
     @abstractmethod
     def createUniqueName(self, candidateName: str) -> str:
         pass
 
 
-class MetadataRepositoryItem(ParameterRepository):
+class MetadataRepositoryItem(ParameterGroup):
+    def __init__(
+        self,
+        settings: ProductSettings,
+        nameFactory: UniqueNameFactory,
+        *,
+        name: str = '',
+        comments: str = '',
+        detectorDistanceInMeters: float | None = None,
+        probeEnergyInElectronVolts: float | None = None,
+        probePhotonsPerSecond: float | None = None,
+        exposureTimeInSeconds: float | None = None,
+    ) -> None:
+        super().__init__()
+        self._settings = settings
+        self._nameFactory = nameFactory
 
-    def __init__(self, parent: UniqueNameFactory, metadata: ProductMetadata) -> None:
-        super().__init__('metadata')
-        self._parent = parent
-        self._name = self._registerStringParameter('name', parent.createUniqueName(metadata.name))
-        self.comments = self._registerStringParameter('comments', metadata.comments)
-        self.detectorDistanceInMeters = self._registerRealParameter(
-            'detector_distance_m', metadata.detectorDistanceInMeters, minimum=0.)
-        self.probeEnergyInElectronVolts = self._registerRealParameter(
-            'probe_energy_eV', metadata.probeEnergyInElectronVolts, minimum=0.)
-        self.probePhotonsPerSecond = self._registerRealParameter('probe_photons_per_second',
-                                                                 metadata.probePhotonsPerSecond,
-                                                                 minimum=0.)
-        self.exposureTimeInSeconds = self._registerRealParameter('exposure_time_s',
-                                                                 metadata.exposureTimeInSeconds,
-                                                                 minimum=0.)
+        self._name = settings.name.copy()
+        self._setName(name if name else settings.name.getValue())
+        self._addParameter('name', self._name)
+        self.comments = self.createStringParameter('comments', comments)
+
+        self.detectorDistanceInMeters = settings.detectorDistanceInMeters.copy()
+
+        if detectorDistanceInMeters is not None:
+            self.detectorDistanceInMeters.setValue(detectorDistanceInMeters)
+
+        self._addParameter('detector_distance_m', self.detectorDistanceInMeters)
+
+        self.probeEnergyInElectronVolts = settings.probeEnergyInElectronVolts.copy()
+
+        if probeEnergyInElectronVolts is not None:
+            self.probeEnergyInElectronVolts.setValue(probeEnergyInElectronVolts)
+
+        self._addParameter('probe_energy_eV', self.probeEnergyInElectronVolts)
+
+        self.probePhotonsPerSecond = settings.probePhotonsPerSecond.copy()
+
+        if probePhotonsPerSecond is not None:
+            self.probePhotonsPerSecond.setValue(probePhotonsPerSecond)
+
+        self._addParameter('probe_photons_per_second', self.probePhotonsPerSecond)
+
+        self.exposureTimeInSeconds = settings.exposureTimeInSeconds.copy()
+
+        if exposureTimeInSeconds is not None:
+            self.exposureTimeInSeconds.setValue(exposureTimeInSeconds)
+
+        self._addParameter('exposure_time_s', self.exposureTimeInSeconds)
 
         self._index = -1
 
@@ -43,12 +76,22 @@ class MetadataRepositoryItem(ParameterRepository):
         self.probePhotonsPerSecond.setValue(item.probePhotonsPerSecond.getValue())
         self.exposureTimeInSeconds.setValue(item.exposureTimeInSeconds.getValue())
 
+    def syncToSettings(self) -> None:
+        for parameter in self.parameters().values():
+            parameter.syncValueToParent()
+
     def getName(self) -> str:
         return self._name.getValue()
 
-    def setName(self, name: str) -> None:
-        uniqueName = self._parent.createUniqueName(name)
+    def _setName(self, name: str) -> None:
+        uniqueName = self._nameFactory.createUniqueName(name)
         self._name.setValue(uniqueName)
+
+    def setName(self, name: str) -> None:
+        if name:
+            self._setName(name)
+        else:
+            self._name.notifyObservers()
 
     def getIndex(self) -> int:
         return self._index

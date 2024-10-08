@@ -23,12 +23,18 @@ logger = logging.getLogger(__name__)
 
 
 class ObjectController(SequenceObserver[ObjectRepositoryItem]):
-
-    def __init__(self, repository: ObjectRepository, api: ObjectAPI,
-                 imageController: ImageController, correlator: FourierRingCorrelator,
-                 xmcdAnalyzer: XMCDAnalyzer, xmcdVisualizationEngine: VisualizationEngine,
-                 view: RepositoryTreeView, fileDialogFactory: FileDialogFactory,
-                 treeModel: ObjectTreeModel) -> None:
+    def __init__(
+        self,
+        repository: ObjectRepository,
+        api: ObjectAPI,
+        imageController: ImageController,
+        correlator: FourierRingCorrelator,
+        xmcdAnalyzer: XMCDAnalyzer,
+        xmcdVisualizationEngine: VisualizationEngine,
+        view: RepositoryTreeView,
+        fileDialogFactory: FileDialogFactory,
+        treeModel: ObjectTreeModel,
+    ) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
@@ -39,19 +45,35 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._editorFactory = ObjectEditorViewControllerFactory()
 
         self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel)
-        self._xmcdViewController = XMCDViewController(xmcdAnalyzer, xmcdVisualizationEngine,
-                                                      fileDialogFactory, treeModel)
+        self._xmcdViewController = XMCDViewController(
+            xmcdAnalyzer, xmcdVisualizationEngine, fileDialogFactory, treeModel
+        )
 
     @classmethod
-    def createInstance(cls, repository: ObjectRepository, api: ObjectAPI,
-                       imageController: ImageController, correlator: FourierRingCorrelator,
-                       xmcdAnalyzer: XMCDAnalyzer, xmcdVisualizationEngine: VisualizationEngine,
-                       view: RepositoryTreeView,
-                       fileDialogFactory: FileDialogFactory) -> ObjectController:
+    def createInstance(
+        cls,
+        repository: ObjectRepository,
+        api: ObjectAPI,
+        imageController: ImageController,
+        correlator: FourierRingCorrelator,
+        xmcdAnalyzer: XMCDAnalyzer,
+        xmcdVisualizationEngine: VisualizationEngine,
+        view: RepositoryTreeView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         treeModel = ObjectTreeModel(repository, api)
-        controller = cls(repository, api, imageController, correlator, xmcdAnalyzer,
-                         xmcdVisualizationEngine, view, fileDialogFactory, treeModel)
+        controller = cls(
+            repository,
+            api,
+            imageController,
+            correlator,
+            xmcdAnalyzer,
+            xmcdVisualizationEngine,
+            view,
+            fileDialogFactory,
+            treeModel,
+        )
         repository.addObserver(controller)
 
         builderListModel = QStringListModel()
@@ -70,13 +92,18 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentObject)
 
+        saveToFileAction = view.buttonBox.saveMenu.addAction('Save File...')
+        saveToFileAction.triggered.connect(controller._saveCurrentObjectToFile)
+
+        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
+        syncToSettingsAction.triggered.connect(controller._syncCurrentObjectToSettings)
+
         view.copierDialog.setWindowTitle('Copy Object')
         view.copierDialog.sourceComboBox.setModel(treeModel)
         view.copierDialog.destinationComboBox.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingObject)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentObject)
-        view.buttonBox.saveButton.clicked.connect(controller._saveCurrentObject)
 
         frcAction = view.buttonBox.analyzeMenu.addAction('Fourier Ring Correlation...')
         frcAction.triggered.connect(controller._analyzeFRC)
@@ -111,7 +138,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             self._view,
             'Open Object',
             nameFilters=self._api.getOpenFileFilterList(),
-            selectedNameFilter=self._api.getOpenFileFilter())
+            selectedNameFilter=self._api.getOpenFileFilter(),
+        )
 
         if filePath:
             try:
@@ -144,7 +172,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
         dialog.open()
 
-    def _saveCurrentObject(self) -> None:
+    def _saveCurrentObjectToFile(self) -> None:
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
@@ -154,7 +182,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             self._view,
             'Save Object',
             nameFilters=self._api.getSaveFileFilterList(),
-            selectedNameFilter=self._api.getSaveFileFilter())
+            selectedNameFilter=self._api.getSaveFileFilter(),
+        )
 
         if filePath:
             try:
@@ -162,6 +191,15 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)
+
+    def _syncCurrentObjectToSettings(self) -> None:
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+        else:
+            item = self._repository[itemIndex]
+            item.syncToSettings()
 
     def _analyzeFRC(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -197,8 +235,11 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 logger.warning('Unable to access item for visualization!')
             else:
                 object_ = item.getObject()
-                array = object_.getLayer(current.row()) if current.parent().isValid() \
-                        else object_.getLayersFlattened()
+                array = (
+                    object_.getLayer(current.row())
+                    if current.parent().isValid()
+                    else object_.getLayersFlattened()
+                )
                 self._imageController.setArray(array, object_.getPixelGeometry())
 
     def handleItemInserted(self, index: int, item: ObjectRepositoryItem) -> None:

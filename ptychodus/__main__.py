@@ -35,6 +35,18 @@ def main() -> int:
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
+        '--fluorescence-input',
+        metavar='FLUORESCENCE_INPUT_FILE',
+        type=argparse.FileType('r'),
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        '--fluorescence-output',
+        metavar='FLUORESCENCE_OUTPUT_FILE',
+        type=argparse.FileType('w'),
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         '-i',
         '--input',
         metavar='INPUT_FILE',
@@ -88,7 +100,22 @@ def main() -> int:
             action = parsedArgs.batch
             inputFilePath = Path(parsedArgs.input.name)
             outputFilePath = Path(parsedArgs.output.name)
-            return model.batchModeExecute(action, inputFilePath, outputFilePath)
+            fluorescenceInputFilePath: Path | None = None
+            fluorescenceOutputFilePath: Path | None = None
+
+            if parsedArgs.flourescence_input is not None:
+                fluorescenceInputFilePath = Path(parsedArgs.fluorescence_input.name)
+
+            if parsedArgs.flourescence_output is not None:
+                fluorescenceOutputFilePath = Path(parsedArgs.fluorescence_output.name)
+
+            return model.batchModeExecute(
+                action,
+                inputFilePath,
+                outputFilePath,
+                fluorescenceInputFilePath=fluorescenceInputFilePath,
+                fluorescenceOutputFilePath=fluorescenceOutputFilePath,
+            )
 
         try:
             from PyQt5.QtWidgets import QApplication
@@ -100,9 +127,11 @@ def main() -> int:
         verifyAllArgumentsParsed(parser, app.arguments()[1:])
 
         from ptychodus.view import ViewCore
+
         view = ViewCore.createInstance(parsedArgs.dev)
 
         from ptychodus.controller import ControllerCore
+
         controller = ControllerCore(model, view)
         controller.showMainWindow(versionString())
 
