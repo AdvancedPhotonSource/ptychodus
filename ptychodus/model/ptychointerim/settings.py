@@ -1,0 +1,162 @@
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry
+
+
+class PtychoInterimSettings(Observable, Observer):
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtychoInterim')
+        self._settingsGroup.addObserver(self)
+
+        self.useGPU = self._settingsGroup.createBooleanParameter('UseGPU', True)
+        self.useDoublePrecision = self._settingsGroup.createBooleanParameter(
+            'UseDoublePrecision', False
+        )
+        self.numEpochs = self._settingsGroup.createIntegerParameter('NumEpochs', 100, minimum=1)
+        self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 1, minimum=1)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class PtychoInterimObjectSettings(Observable, Observer):
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtychoInterimObject')
+        self._settingsGroup.addObserver(self)
+
+        self.isOptimizable = self._settingsGroup.createBooleanParameter('IsOptimizable', True)
+        self.optimizationPlanStart = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStart', 0, minimum=0
+        )
+        self.optimizationPlanStop = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStop', -1
+        )
+        self.optimizationPlanStride = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStride', 1, minimum=1
+        )
+        self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
+        self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
+
+        self.l1NormConstraintWeight = self._settingsGroup.createRealParameter(
+            'L1NormConstraintWeight', 0.0, minimum=0.0
+        )
+        self.l1NormConstraintStride = self._settingsGroup.createIntegerParameter(
+            'L1NormConstraintStride', 1, minimum=1
+        )
+        self.smoothnessConstraintAlpha = self._settingsGroup.createRealParameter(
+            'SmoothnessConstraintAlpha', 0.0, minimum=0.0, maximum=1.0 / 8
+        )
+        self.smoothnessConstraintStride = self._settingsGroup.createIntegerParameter(
+            'SmoothnessConstraintStride', 1, minimum=1
+        )
+        self.totalVariationWeight = self._settingsGroup.createRealParameter(
+            'TotalVariationWeight', 0.0, minimum=0.0
+        )
+        self.totalVaritionStride = self._settingsGroup.createIntegerParameter(
+            'TotalVaritionStride', 1, minimum=1
+        )
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class PtychoInterimProbeSettings(Observable, Observer):
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtychoInterimProbe')
+        self._settingsGroup.addObserver(self)
+
+        self.isOptimizable = self._settingsGroup.createBooleanParameter('IsOptimizable', True)
+        self.optimizationPlanStart = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStart', 0, minimum=0
+        )
+        self.optimizationPlanStop = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStop', -1
+        )
+        self.optimizationPlanStride = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStride', 1, minimum=1
+        )
+        self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
+        self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
+
+        self.orthogonalizeIncoherentModesMethod = self._settingsGroup.createStringParameter(
+            'OrthogonalizeIncoherentModesMethod', 'GS'
+        )
+        self.probePower = self._settingsGroup.createRealParameter('ProbePower', 0.0, minimum=0.0)
+        self.probePowerConstraintStride = self._settingsGroup.createIntegerParameter(
+            'ProbePowerConstraintStride', 1, minimum=1
+        )
+        self.orthogonalizeIncoherentModes = self._settingsGroup.createBooleanParameter(
+            'OrthogonalizeIncoherentModes', False
+        )
+        self.orthogonalizeIncoherentModesStride = self._settingsGroup.createIntegerParameter(
+            'OrthogonalizeIncoherentModesStride', 1, minimum=1
+        )
+        self.orthogonalizeOPRModes = self._settingsGroup.createBooleanParameter(
+            'OrthogonalizeOPRModes', False
+        )
+        self.orthogonalizeOPRModesStride = self._settingsGroup.createIntegerParameter(
+            'OrthogonalizeOPRModesStride', 1, minimum=1
+        )
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class PtychoInterimProbePositionSettings(Observable, Observer):
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtychoInterimProbePosition')
+        self._settingsGroup.addObserver(self)
+
+        self.isOptimizable = self._settingsGroup.createBooleanParameter('IsOptimizable', False)
+        self.optimizationPlanStart = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStart', 0, minimum=0
+        )
+        self.optimizationPlanStop = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStop', -1
+        )
+        self.optimizationPlanStride = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStride', 1, minimum=1
+        )
+        self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
+        self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class PtychoInterimOPRSettings(Observable, Observer):
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtychoInterimOPR')
+        self._settingsGroup.addObserver(self)
+
+        self.isOptimizable = self._settingsGroup.createBooleanParameter('IsOptimizable', False)
+        self.optimizationPlanStart = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStart', 0, minimum=0
+        )
+        self.optimizationPlanStop = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStop', -1
+        )
+        self.optimizationPlanStride = self._settingsGroup.createIntegerParameter(
+            'OptimizationPlanStride', 1, minimum=1
+        )
+        self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
+        self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
+
+        self.optimizeIntensityVariation = self._settingsGroup.createBooleanParameter(
+            'OptimizeIntensityVariation', False
+        )
+        self.optimizeEigenmodeWeights = self._settingsGroup.createBooleanParameter(
+            'OptimizeEigenmodeWeigts', True
+        )
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()

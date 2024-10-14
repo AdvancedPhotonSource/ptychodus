@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 import logging
 
-import ptychopack
+import ptychointerim
 
 from .device import PtychoPackDevice
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class RealPtychoPackDevice(PtychoPackDevice):
     def __init__(self) -> None:
         super().__init__()
-        self._available_devices = ptychopack.list_available_devices()
+        self._available_devices = ptychointerim.list_available_devices()
         self._device = self._available_devices[0]
 
     def get_available_devices(self) -> Iterator[str]:
@@ -30,5 +30,5 @@ class RealPtychoPackDevice(PtychoPackDevice):
 
         logger.warning(f'Failed to set device "{name}"')
 
-    def get_ptychopack_device(self) -> ptychopack.Device:
+    def get_ptychopack_device(self) -> ptychointerim.Device:
         return self._device

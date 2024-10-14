@@ -5,12 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .product import Product
-from .patterns import DiffractionPatternArrayType
+from .patterns import BooleanArrayType, DiffractionPatternArrayType
 
 
 @dataclass(frozen=True)
 class ReconstructInput:
     patterns: DiffractionPatternArrayType
+    goodPixelMask: BooleanArrayType
     product: Product
 
 

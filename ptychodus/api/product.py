@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from sys import getsizeof
 
+from .constants import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
 from .object import Object
 from .probe import Probe
 from .scan import Scan
@@ -17,6 +18,19 @@ class ProductMetadata:
     probeEnergyInElectronVolts: float
     probePhotonsPerSecond: float
     exposureTimeInSeconds: float
+
+    @property
+    def probeEnergyInJoules(self) -> float:
+        return self.probeEnergyInElectronVolts * ELECTRON_VOLT_J
+
+    @property
+    def probeWavelengthInMeters(self) -> float:
+        hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S
+
+        try:
+            return hc_Jm / self.probeEnergyInJoules
+        except ZeroDivisionError:
+            return 0.0
 
     @property
     def sizeInBytes(self) -> int:

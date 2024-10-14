@@ -1,5 +1,6 @@
 import numpy
-from ptychopack import (
+
+from ptychointerim.ptychopack import (
     CorrectionPlan,
     CorrectionPlanElement,
     DataProduct,
@@ -76,10 +77,6 @@ class PtychographicIterativeEngineReconstructor(Reconstructor):
         algorithm.set_probe_power(probe_power)
         algorithm.set_probe_relaxation(float(self._settings.pie_probe_relaxation.getValue()))
         algorithm.set_beta(float(self._settings.pie_beta.getValue()))
-        algorithm.set_pc_probe_threshold(
-            float(self._settings.position_correction_probe_threshold.getValue())
-        )
-        algorithm.set_pc_feedback(float(self._settings.position_correction_feedback.getValue()))
 
         data_error = algorithm.iterate(plan)
         pp_output_product = algorithm.get_product()

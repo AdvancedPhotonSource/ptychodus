@@ -13,6 +13,7 @@ from .geometry import ImageExtent, PixelGeometry
 from .observer import Observable
 from .tree import SimpleTreeNode
 
+BooleanArrayType: TypeAlias = numpy.typing.NDArray[numpy.bool_]
 DiffractionPatternArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 DiffractionPatternIndexes: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 
