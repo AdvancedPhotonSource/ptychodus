@@ -70,8 +70,8 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def insertNewProduct(
         self,
-        name: str,
         *,
+        name: str = '',
         comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
@@ -92,13 +92,6 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         probeItem = self._probeRepositoryItemFactory.create(geometry)
         objectItem = self._objectRepositoryItemFactory.create(geometry)
 
-        if likeIndex >= 0:
-            sourceItem = self._itemList[likeIndex]
-            metadataItem.assign(sourceItem.getMetadata())
-            scanItem.assign(sourceItem.getScan())
-            probeItem.assign(sourceItem.getProbe())
-            objectItem.assign(sourceItem.getObject())
-
         item = ProductRepositoryItem(
             parent=self,
             metadata=metadataItem,
@@ -109,6 +102,9 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
             costs=list(),
         )
+
+        if likeIndex >= 0:
+            item.assignItem(self._itemList[likeIndex], notify=False)
 
         return self._insertProduct(item)
 

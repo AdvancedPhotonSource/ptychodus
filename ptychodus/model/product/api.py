@@ -112,7 +112,7 @@ class ScanAPI:
             logger.warning(f'Failed to access destination scan {destinationIndex} for copying!')
             return
 
-        destinationItem.assign(sourceItem)
+        destinationItem.assignItem(sourceItem)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._builderFactory.getSaveFileFilterList()
@@ -220,7 +220,7 @@ class ProbeAPI:
             logger.warning(f'Failed to access destination probe {destinationIndex} for copying!')
             return
 
-        destinationItem.assign(sourceItem)
+        destinationItem.assignItem(sourceItem)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._builderFactory.getSaveFileFilterList()
@@ -328,7 +328,7 @@ class ObjectAPI:
             logger.warning(f'Failed to access destination object {destinationIndex} for copying!')
             return
 
-        destinationItem.assign(sourceItem)
+        destinationItem.assignItem(sourceItem)
 
     def getSaveFileFilterList(self) -> Sequence[str]:
         return self._builderFactory.getSaveFileFilterList()
@@ -370,7 +370,7 @@ class ProductAPI:
         likeIndex: int = -1,
     ) -> int:
         return self._repository.insertNewProduct(
-            name,
+            name=name,
             comments=comments,
             detectorDistanceInMeters=detectorDistanceInMeters,
             probeEnergyInElectronVolts=probeEnergyInElectronVolts,

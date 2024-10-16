@@ -7,7 +7,7 @@ from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
 
-from .builder import ObjectBuilder
+from .builder import FromMemoryObjectBuilder, ObjectBuilder
 from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
@@ -32,9 +32,13 @@ class ObjectRepositoryItem(ParameterGroup):
 
         self._rebuild()
 
-    def assign(self, item: ObjectRepositoryItem) -> None:
+    def assignItem(self, item: ObjectRepositoryItem) -> None:
         self.layerDistanceInMeters.setValue(item.layerDistanceInMeters.getValue(), notify=False)
         self.setBuilder(item.getBuilder().copy())
+
+    def assign(self, object_: Object) -> None:
+        builder = FromMemoryObjectBuilder(self._settings, object_)
+        self.setBuilder(builder)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
