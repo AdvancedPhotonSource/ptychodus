@@ -5,7 +5,6 @@ import numpy
 from ptychointerim.api import (
     Devices,
     Dtypes,
-    LossFunctions,
     ObjectTypes,
     OptimizationPlan,
     Optimizers,

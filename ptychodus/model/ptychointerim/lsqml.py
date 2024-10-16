@@ -11,7 +11,6 @@ from ptychointerim.api import (
     LSQMLProbeOptions,
     LSQMLProbePositionOptions,
     LSQMLReconstructorOptions,
-    LossFunctions,
     ObjectTypes,
     OptimizationPlan,
     Optimizers,
